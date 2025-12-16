@@ -9,7 +9,7 @@ export class Admin {
     email!: string;
 
     @Column({ type: "varchar", length: 255 })
-    passwordHash!: string;
+    password_hash!: string;
 
     @CreateDateColumn({ type: "timestamp with time zone" })
     createdAt!: Date;
