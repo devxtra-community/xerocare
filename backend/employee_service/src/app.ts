@@ -2,6 +2,7 @@ import "reflect-metadata";
 import express from "express";
 import { Source } from "./config/dataSource";
 import "./config/env";
+import { verifyAuthentication } from "./controllers/auth.Controller";
 
 const app = express();
 app.use(express.json());
@@ -20,5 +21,5 @@ const startServer = async () => {
     process.exit(1);
   }
 };
-
+app.use('/auth/verify',verifyAuthentication)
 startServer();
