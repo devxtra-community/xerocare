@@ -3,6 +3,7 @@ import express from "express";
 import { Source } from "./config/dataSource";
 import "./config/env";
 import { verifyAuthentication } from "./controllers/auth.Controller";
+import adminRouter from "./routes/adminRoutes";
 
 const app = express();
 app.use(express.json());
@@ -22,4 +23,6 @@ const startServer = async () => {
   }
 };
 app.use('/auth/verify',verifyAuthentication)
+app.use("/admin",adminRouter)
+
 startServer();
