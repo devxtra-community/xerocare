@@ -1,6 +1,5 @@
 import {StatCard}  from "@/components/statcard"
 import ProductsTable from "@/components/productTable"
-import { Card } from "@/components/ui/card"
 
 
 export default function Dashboard() {

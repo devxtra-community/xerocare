@@ -23,7 +23,7 @@ export default function AddEmployeeDialog() {
                 <div className="space-y-4">
                     <Input placeholder="Full Name" />
                     <RoleSelect />
-                    <Input type="date" />
+                    <Input type="date" placeholder="Join Date"/>
                     <Input placeholder="Salary" />
                     <Input type="email" placeholder="Email" />
 

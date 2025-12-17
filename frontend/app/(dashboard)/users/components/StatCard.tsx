@@ -1,10 +1,17 @@
-export default function StatCard({
-title,value
-}:{title:string;value:string;}){
-    return(
-        <div className="rounded-xl bg-primary text-primary-foreground p-4 shadow">
-            <p className="text-sm text-primary-foreground/80">{title}</p>
-            <p className="text-2xl font-bold">{value}</p>
-        </div>
-    )
+type StatCardProps = {
+  title: string;
+  value: number | string;
+};
+
+export default function StatCard({ title, value }: StatCardProps) {
+  return (
+    <div className="rounded-xl border border-border bg-card p-4">
+      <p className="text-xs uppercase tracking-wide text-foreground">
+        {title}
+      </p>
+      <p className="mt-2 text-2xl font-bold text-primary">
+        {value}
+      </p>
+    </div>
+  );
 }
