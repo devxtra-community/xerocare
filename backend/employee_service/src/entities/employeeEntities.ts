@@ -1,6 +1,5 @@
-import { Column,CreateDateColumn,UpdateDateColumn,PrimaryGeneratedColumn,Entity, ManyToOne, JoinColumn,Index } from "typeorm";
+import { Column,CreateDateColumn,UpdateDateColumn,PrimaryGeneratedColumn,Entity,Index } from "typeorm";
 import { EmployeeRole } from "../constants/employeeRole";
-import { Branch } from "./branchEntities";
 
 @Entity("employee")
 export class Employee{
@@ -16,10 +15,6 @@ export class Employee{
 
     @Column({type:"enum",enum:EmployeeRole,default:EmployeeRole.EMPLOYEE})
     role!:EmployeeRole;
-
-    @ManyToOne(()=>Branch,{nullable:true,onDelete:"SET NULL"})
-    @JoinColumn({name:"branch_id"})
-    branch!:Branch|null;
 
     @CreateDateColumn({type:"timestamp with time zone"})
     createdAt!:Date;

@@ -2,6 +2,8 @@ import "reflect-metadata";
 import express from "express";
 import { Source } from "./config/dataSource";
 import "./config/env";
+import adminRouter from "./routes/adminRoutes";
+import authRouter from "./routes/authRouter";
 
 const app = express();
 app.use(express.json());
@@ -20,5 +22,8 @@ const startServer = async () => {
     process.exit(1);
   }
 };
+
+app.use('/auth',authRouter)
+app.use("/admin",adminRouter)
 
 startServer();
