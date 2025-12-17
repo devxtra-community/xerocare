@@ -1,21 +1,28 @@
 import jwt, { Secret, SignOptions } from "jsonwebtoken";
 
-const JWT_SECRET: Secret = process.env.JWT_SECRET as Secret;
+const ACCESS_SECRET = process.env.ACCESS_SECRET as Secret;
+const REFRESH_SECRET = process.env.REFRESH_SECRET as Secret;
 
-if (!process.env.JWT_SECRET) {
-  throw new Error("JWT_SECRET is missing");
-}
-export function signJwt(
-  payload: object,
-  expiresIn: SignOptions["expiresIn"] = "1d"
-) {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn });
+export function signAccesstoken(payload: object, expiresIn: SignOptions["expiresIn"] = "15m") {
+  return jwt.sign(payload, ACCESS_SECRET, { expiresIn:expiresIn });
 }
 
-export function verifyJwt<T>(token: string): T | null {
+export function signRefreshtoken(payload: object, expiresIn: SignOptions["expiresIn"] = "15d") {
+  return jwt.sign(payload, REFRESH_SECRET, { expiresIn:expiresIn });
+}
+
+export function verifyAccessToken<T>(token: string): T | null {
   try {
-    return jwt.verify(token, JWT_SECRET) as T;
-  } catch (err) {
+    return jwt.verify(token, ACCESS_SECRET) as T;
+  } catch {
+    return null;
+  }
+}
+
+export function verifyRefreshToken<T>(token: string): T | null {
+  try {
+    return jwt.verify(token, REFRESH_SECRET) as T;
+  } catch {
     return null;
   }
 }

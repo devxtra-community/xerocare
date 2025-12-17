@@ -1,7 +1,6 @@
 import bcrypt from "bcrypt";
 import { EmployeeRepository } from "../repositories/employeeRepository";
 import { EmployeeRole } from "../constants/employeeRole";
-import { Source } from "../config/dataSource";
 
 export class AdminService {
     private employeeRepo = new EmployeeRepository();
@@ -10,10 +9,9 @@ export class AdminService {
         email: string;
         password: string;
         role?: string;
-        branchId?: string;
         expireDate?: Date;
     }) {
-        const { email, password, role, branchId, expireDate } = payload;
+        const { email, password, role, expireDate } = payload;
 
         const existing = await this.employeeRepo.findByEmail(email);
         if (existing) {
