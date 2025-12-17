@@ -57,7 +57,7 @@ export default function ProductsTable() {
           </TableRow>
         </TableHeader>
 
-        <TableBody className="border-separate border-spacing-y-3">
+        <TableBody className="border-separate border-spacing-y-3 text-foreground">
           {currentData.map((item, index) => (
             <TableRow
               key={index}
@@ -78,7 +78,6 @@ export default function ProductsTable() {
         </TableBody>
       </Table>
 
-      {/* Pagination */}
       <div className="mt-6 flex items-center gap-4 text-sm">
         <button
           onClick={() => setPage(p => p - 1)}

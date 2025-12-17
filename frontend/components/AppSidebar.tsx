@@ -67,7 +67,6 @@ export default function AppSidebar() {
         </div>
       </SidebarHeader>
 
-      {/* MENU */}
       <SidebarContent className="bg-[#0A4C7E]">
         <SidebarGroup>
           <SidebarGroupContent>
@@ -100,7 +99,6 @@ export default function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
 
-      {/* FOOTER */}
       <SidebarFooter className="bg-[#0A4C7E] border-t border-white/10">
         <SidebarMenu className="px-2">
           <SidebarMenuItem>
