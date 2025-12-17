@@ -34,7 +34,7 @@ export default function Dashboard() {
       </div>
       <div className="flex">
 
-      <div className="w-[570px] h-[300px] mt-[30px]">
+      <div className="w-142.5 h-75 mt-7.5">
          <ProductsTable />
       </div>
       </div>
