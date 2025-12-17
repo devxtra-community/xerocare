@@ -7,9 +7,7 @@ const authService = new AuthService();
 
 export const adminLogin = async (req: Request, res: Response) => {
   try {
-    const { admin, accessToken, refreshToken } = await adminAuthService.login(
-      req.body
-    );
+    const { admin, accessToken, refreshToken } = await adminAuthService.login(req.body);
 
     res.cookie("refreshToken", refreshToken, {
       httpOnly: true,
