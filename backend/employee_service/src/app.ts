@@ -26,6 +26,6 @@ const startServer = async () => {
 
 app.use('/auth',authRouter)
 app.use("/employee",employeeRouter)
-app.use("/admin/auth", adminRouter);
+app.use("/admin", adminRouter);
 
 startServer();
