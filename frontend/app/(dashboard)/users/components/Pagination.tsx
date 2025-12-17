@@ -1,26 +1,43 @@
-"use client"
+"use client";
 
-import { Button } from "@/components/ui/button"
+import { Button } from "@/components/ui/button";
 
-export default function Pagination() {
-    return (
-        <div className="flex items-center justify-between">
-            <p className="text-sm text-muted-foreground">Showing 1 to 5 of 25 results</p>
+type PaginationProps = {
+  page: number;
+  totalPages: number;
+  onPageChange: (page: number) => void;
+};
 
-            <div className="flex items-center gap-2"> 
-                <Button variant="outline" size="sm">Previous</Button>
-                <Button size="sm">1</Button>
-                <Button variant="outline" size="sm">
-                    2
-                </Button>
-                <Button variant="outline" size="sm">
-                    3
-                </Button>
+export default function Pagination({
+  page,
+  totalPages,
+  onPageChange,
+}: PaginationProps) {
+  return (
+    <div className="flex items-center justify-between">
+      <p className="text-sm text-muted-foreground">
+        Page {page} of {totalPages}
+      </p>
 
-                <Button variant="outline" size="sm">
-                    Next
-                </Button>
-            </div>
-        </div>
-    )
+      <div className="flex gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={page === 1}
+          onClick={() => onPageChange(page - 1)}
+        >
+          Previous
+        </Button>
+
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={page === totalPages}
+          onClick={() => onPageChange(page + 1)}
+        >
+          Next
+        </Button>
+      </div>
+    </div>
+  );
 }
