@@ -31,24 +31,24 @@ const menuItems = [
   {
     title: "Sales",
     icon: ShoppingCart,
-    href: "/sales",
+    href: "/admin/sales",
   },
   {
     title: "Branch",
     icon: Building2,
-    href: "/branch",
+    href: "/admin/branch",
     disabled: true,
   },
   {
     title: "Human Resources",
     icon: Users,
-    href: "/hr",
+    href: "/admin/hr",
     disabled: true,
   },
   {
     title: "Warehouse",
     icon: Package,
-    href: "/warehouse",
+    href: "/admin/warehouse",
   },
 ]
 
@@ -106,7 +106,7 @@ export default function AppSidebar() {
               asChild
               className="py-3 text-white/70 hover:bg-red-500/20 hover:text-red-300"
             >
-              <a href="/logout" className="flex items-center gap-3 px-3">
+              <a href="/admin/logout" className="flex items-center gap-3 px-3">
                 <LogOut className="h-4 w-4" />
                 <span>Logout</span>
               </a>

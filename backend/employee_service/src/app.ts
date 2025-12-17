@@ -1,14 +1,20 @@
 import "reflect-metadata";
-import express from "express";
+import express, { urlencoded } from "express";
 import { Source } from "./config/dataSource";
 import "./config/env";
 import adminAuthRouter from "./routes/adminAuthRouter";
 import adminEmployeeRouter from "./routes/adminEmployeeRouter";
 import authRouter from "./routes/authRouter";
+import cors from 'cors';
+
 
 const app = express();
 app.use(express.json());
-
+app.use(urlencoded({extended:true}))
+app.use(cors({
+  origin:process.env.CLIENT_URL,
+  credentials:true
+}))
 const startServer = async () => {
   try {
     await Source.initialize();
