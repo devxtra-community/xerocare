@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import api from "@/lib/api";
+import { useRouter } from "next/navigation";
 
 export function LoginForm({
   className,
@@ -15,6 +16,8 @@ export function LoginForm({
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const router =useRouter()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -28,7 +31,10 @@ export function LoginForm({
       });
       const data = res.data;
       localStorage.setItem("accessToken", data.accessToken);
-      console.log("Login success:", data);
+      if(data.success){
+        console.log("Login success:", data);
+        router.push('/dashboard')
+      }
 
     } catch (err: any) {
       setError(
