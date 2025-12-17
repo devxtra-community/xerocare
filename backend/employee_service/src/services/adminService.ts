@@ -1,39 +1,38 @@
 import bcrypt from "bcrypt";
-import { EmployeeRepository } from "../repositories/employeeRepository";
-import { EmployeeRole } from "../constants/employeeRole";
-import { Source } from "../config/dataSource";
+import { AdminRepository } from "../repositories/adminRepository";
+import { signAccesstoken, signRefreshtoken } from "../utlis/jwt";
+import { AuthRepository } from "../repositories/authRepository";
 
-export class AdminService {
-    private employeeRepo = new EmployeeRepository();
+export class AdminAuthService {
 
-    async addEmployee(payload: {
-        email: string;
-        password: string;
-        role?: string;
-        branchId?: string;
-        expireDate?: Date;
-    }) {
-        const { email, password, role, branchId, expireDate } = payload;
+  private adminRepo = new AdminRepository();
+  private authRepo = new AuthRepository();
 
-        const existing = await this.employeeRepo.findByEmail(email);
-        if (existing) {
-            throw new Error("Employee already Exist");
-        }
+  async login(payload: { email: string; password: string }) {
+    const { email, password } = payload;
 
-        if (payload.role && !Object.values(EmployeeRole).includes(payload.role as EmployeeRole)) {
-            throw new Error("Invalid role");
-        }
+    const admin = await this.adminRepo.findByEmail(email);
+    if (!admin)
+    {
+        throw new Error("Admin not found");
+    }    
 
-        const roleEnum = payload.role as EmployeeRole;
-
-        const passwordHash = await bcrypt.hash(password, 10);
-
-        return this.employeeRepo.createEmployee({
-            email,
-            password_hash: passwordHash,
-            role: roleEnum,
-            expire_date:expireDate ?? null,
-        });
+    const isValid = await bcrypt.compare(password, admin.password_hash);
+    if (!isValid)
+    {    
+        throw new Error("Invalid password");
     }
+    
+    const accessToken = signAccesstoken({
+      id: admin.id,
+      email: admin.email,
+      role: "ADMIN"
+    });
 
+    const refreshToken = signRefreshtoken({ id: admin.id });
+
+    await this.authRepo.saveRefreshToken(admin, refreshToken);
+
+    return { admin, accessToken, refreshToken };
+  }
 }
