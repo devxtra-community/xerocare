@@ -1,31 +1,24 @@
 import { Request, Response } from "express";
 import { AuthService } from "../services/authService";
+import { issueTokens } from "../services/tokenService";
 
 const authService = new AuthService();
 
-export const login = async (req: Request, res: Response) => {
+export const login = async (req:Request, res:Response) => {
   try {
-    
-    const result = await authService.login(req.body);
+    const { user } = await authService.login(req.body);
 
-    const {user, accessToken , refreshToken} = result;
+    const accessToken = await issueTokens(user, res);
 
-    res.cookie("refreshToken",refreshToken,{
-      httpOnly:true,
-      secure:true,
-      sameSite:"strict",
-      maxAge: 15 * 24 * 60 * 60 * 1000
-    })
-
-    return res.status(200).json({
-      message:"Login success",
+    return res.json({
+      message: "Login success",
       accessToken,
-      data:user,
-      success:true,
-    })
+      data: user,
+      success: true
+    });
 
   } catch (err:any) {
-    return res.status(500).json({ message: err.message || "Internal server error", success: false });
+    return res.status(500).json({ message: err.message, success: false });
   }
 };
 
