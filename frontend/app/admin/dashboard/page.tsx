@@ -1,5 +1,6 @@
 import {StatCard}  from "@/components/statcard"
 import ProductsTable from "@/components/productTable"
+import HrTable from "@/components/hrTable"
 import { Card } from "@/components/ui/card"
 
 
@@ -33,11 +34,17 @@ export default function Dashboard() {
           subtitle="1 month indicator"
         />
       </div>
-      <div className="flex">
+      <div className="flex" >
 
-      <div className="w-[570px] h-[300px] mt-[30px]">
+      <div className="w-[570px] mt-[20px]">
          <ProductsTable />
       </div>
+      
+       
+      </div>
+      <div><h1 className="pt-[20px] text-primary">Human Resource</h1></div>
+     <div className="w-[700px] pt-[30px]">
+        <HrTable/>
       </div>
     </div>
   )
