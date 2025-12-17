@@ -32,11 +32,17 @@ export default function Dashboard() {
           subtitle="1 month indicator"
         />
       </div>
-      <div className="flex">
+      <div className="flex" >
 
       <div className="w-142.5 h-75 mt-7.5">
          <ProductsTable />
       </div>
+      
+       
+      </div>
+      <div><h1 className="pt-[20px] text-primary">Human Resource</h1></div>
+     <div className="w-[700px] pt-[30px]">
+        <HrTable/>
       </div>
     </div>
   )

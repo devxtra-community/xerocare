@@ -15,18 +15,17 @@ type StatCardProps = {
 export function StatCard({ title, value, subtitle }: StatCardProps) {
   return (
     <Card className="rounded-2xl">
-      <CardContent className="flex flex-col items-center justify-center gap-1.5 py-6 text-center">
-        <CardTitle className="text-sm font-medium text-muted-foreground">
+      <CardContent className="flex flex-col items-center justify-center gap-1 py-3 text-center">
+        <CardTitle className="text-xs font-medium text-muted-foreground">
           {title}
         </CardTitle>
 
-        {/* Brand color from --primary */}
-        <div className="text-2xl font-semibold text-primary">
+        <div className="text-xl font-semibold text-primary">
           {value}
         </div>
 
         {subtitle && (
-          <CardDescription className="text-xs text-muted-foreground">
+          <CardDescription className="text-[11px] text-muted-foreground">
             {subtitle}
           </CardDescription>
         )}
