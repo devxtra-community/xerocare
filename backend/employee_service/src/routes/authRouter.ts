@@ -1,9 +1,10 @@
 import { Router } from "express";
-import { verifyAuthentication } from "../controllers/auth.Controller";
-
+import { login, logout, refresh } from "../controllers/auth.Controller";
 
 const authRouter = Router();
-authRouter.post("/verify", verifyAuthentication);
 
+authRouter.post("/login", login);
+authRouter.post("/refresh", refresh);
+authRouter.post("/logout",logout);
 
 export default authRouter;
