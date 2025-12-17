@@ -1,26 +1,18 @@
 "use client"
 
 import { useState } from "react"
-import {
-  Table,
-  TableHeader,
-  TableBody,
-  TableHead,
-  TableRow,
-  TableCell,
-} from "@/components/ui/table"
 
 const humanResourcedatas = [
-  {Fullname: "Riyas",Possition: "Sales Staff",startDate: "20/12/2024",salary: "75,000",expair: "20/12/2027",},
-  {Fullname: "Nadhil",Possition: "Sales Staff",startDate: "20/12/2024",salary: "74,000",expair: "20/12/2027",},
-  {Fullname: "Chechu",Possition: "Sales Staff",startDate: "20/12/2024",salary: "71,000",expair: "20/12/2027",},
-  {Fullname: "Shanu",Possition: "Sales Staff",startDate: "20/12/2024",salary: "35,000",expair: "20/12/2027",},
-  {Fullname: "Sameer",Possition: "Sales Staff", startDate: "20/12/2024",salary: "34,000", expair: "20/12/2027",},
-  {Fullname: "shrijit",Possition: "Sales Staff",startDate: "20/12/2024",salary: "55,000",expair: "20/12/2027",},
-  {Fullname: "messi",Possition: "Sales Staff",startDate: "20/12/2024",salary: "45,000",expair: "20/12/2027",},
-  {Fullname: "cristiano",Possition: "Sales Staff",startDate: "20/12/2024",salary: "45,000",expair: "20/12/2027",},
-  {Fullname: "Drogba",Possition: "Sales Staff",startDate: "20/12/2024",salary: "35,000",expair: "20/12/2027",},
-  {Fullname: "Rajanmon",Possition: "Sales Staff", startDate: "20/12/2024",salary: "55,000", expair: "20/12/2027",},
+  { Fullname: "Parviz Aslanov", Position: "UI Designer", startDate: "20.11.2023", salary: "1700 AZN", avatar: "P" },
+  { Fullname: "Seving Aslanova", Position: "UX Designer", startDate: "19.02.2023", salary: "1200 AZN", avatar: "S" },
+  { Fullname: "Ceyhun Aslanov", Position: "React Developer", startDate: "18.05.2004", salary: "3009 AZN", avatar: "C" },
+  { Fullname: "Ayla Mammadova", Position: "UX Researcher Intern", startDate: "18.07.2004", salary: "400 AZN", avatar: "A" },
+  { Fullname: "Orxan Hüseyinov", Position: "Accountant", startDate: "17.09.2022", salary: "2000 AZN", avatar: "O" },
+  { Fullname: "Parviz Aslanov", Position: "UI Designer", startDate: "20.11.2023", salary: "1700 AZN", avatar: "P" },
+  { Fullname: "Seving Aslanova", Position: "UX Designer", startDate: "19.02.2023", salary: "1200 AZN", avatar: "S" },
+  { Fullname: "Ceyhun Aslanov", Position: "React Developer", startDate: "18.05.2004", salary: "3009 AZN", avatar: "C" },
+  { Fullname: "Ayla Mammadova", Position: "UX Researcher Intern", startDate: "18.07.2004", salary: "400 AZN", avatar: "A" },
+  { Fullname: "Orxan Hüseyinov", Position: "Accountant", startDate: "17.09.2022", salary: "2000 AZN", avatar: "O" },
 ]
 
 const ITEMS_PER_PAGE = 5
@@ -36,70 +28,69 @@ export default function HrTable() {
   )
 
   return (
-    <div className="rounded-2xl bg-white p-6 shadow-sm">
-      <Table>
-        <TableHeader>
-          <TableRow className="border-none">
-            <TableHead className="text-primary font-semibold">
-              FULL NAME
-            </TableHead>
-            <TableHead className="text-primary font-semibold">
-              POSITION
-            </TableHead>
-            <TableHead className="text-primary font-semibold">
-              START DATE
-            </TableHead>
-            <TableHead className="text-primary font-semibold">
-              SALARY
-            </TableHead>
-            <TableHead className="text-primary font-semibold">
-              CONTRACT END
-            </TableHead>
-          </TableRow>
-        </TableHeader>
+    <div className="rounded-2xl bg-white p-4 shadow-sm w-full flex flex-col">
+      {/* TABLE */}
+      <div className="w-full overflow-x-auto">
+        <table className="w-full">
+          <thead>
+            <tr className="border-b">
+              <th className="text-left text-sm font-semibold text-blue-900 py-3">FULL NAME</th>
+              <th className="text-left text-sm font-semibold text-blue-900 py-3">POSITION</th>
+              <th className="text-left text-sm font-semibold text-blue-900 py-3">START DATE</th>
+              <th className="text-left text-sm font-semibold text-blue-900 py-3">SALARY</th>
+            </tr>
+          </thead>
 
-        <TableBody className="border-separate border-spacing-y-3 text-foreground">
-          {currentData.map((item, index) => (
-            <TableRow
-              key={index}
-              className={`border-none rounded-xl ${
-                index % 2 === 1 ? "bg-muted" : ""
-              }`}
-            >
-              <TableCell className="font-medium rounded-l-xl">
-                {item.Fullname}
-              </TableCell>
-              <TableCell>{item.Possition}</TableCell>
-              <TableCell>{item.startDate}</TableCell>
-              <TableCell>{item.salary}</TableCell>
-              <TableCell className="rounded-r-xl">
-                {item.expair}
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+          <tbody>
+            {currentData.map((item, index) => (
+              <tr key={index} className={index % 2 ? "bg-sky-100/60" : ""}>
+                <td className="py-3 px-2 text-sm font-medium">
+                  <div className="flex items-center gap-3">
+                    <div className="h-8 w-8 rounded-full bg-gray-300 flex items-center justify-center text-sm font-medium text-gray-700">
+                      {item.avatar}
+                    </div>
+                    <span className="text-gray-900">{item.Fullname}</span>
+                  </div>
+                </td>
+                <td className="py-3 px-2 text-sm text-gray-700">{item.Position}</td>
+                <td className="py-3 px-2 text-sm text-gray-700">{item.startDate}</td>
+                <td className="py-3 px-2 text-sm text-gray-700">{item.salary}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
 
-      {/* Pagination */}
-      <div className="mt-6 flex items-center gap-4 text-sm">
+      {/* PAGINATION */}
+      <div className="mt-4 flex items-center justify-center gap-2 text-sm">
         <button
-          onClick={() => setPage(p => p - 1)}
+          onClick={() => setPage(p => Math.max(1, p - 1))}
           disabled={page === 1}
-          className="rounded-md border px-4 py-2 disabled:opacity-40"
+          className="rounded-md border px-3 py-1 disabled:opacity-40 hover:bg-gray-50 transition"
         >
-          Previous
+          &lt;
         </button>
 
-        <span className="text-muted-foreground">
-          Page {page} of {totalPages}
-        </span>
+        {Array.from({ length: totalPages }, (_, i) => i + 1).slice(0, 4).map(num => (
+          <button
+            key={num}
+            onClick={() => setPage(num)}
+            className={`px-3 py-1 rounded-md transition ${
+              page === num ? "bg-blue-900 text-white" : "border hover:bg-gray-50"
+            }`}
+          >
+            {num}
+          </button>
+        ))}
+
+        {totalPages > 4 && <span className="px-2">...</span>}
 
         <button
-          onClick={() => setPage(p => p + 1)}
+          onClick={() => setPage(p => Math.min(totalPages, p + 1))}
           disabled={page === totalPages}
-          className="rounded-md border px-4 py-2 disabled:opacity-40"
+          className="rounded-md border px-3 py-1 disabled:opacity-40 hover:bg-gray-50 transition"
         >
-          Next
+          &gt;
         </button>
       </div>
     </div>

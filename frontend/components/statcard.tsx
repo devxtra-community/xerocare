@@ -14,18 +14,18 @@ type StatCardProps = {
 
 export function StatCard({ title, value, subtitle }: StatCardProps) {
   return (
-    <Card className="rounded-2xl">
-      <CardContent className="flex flex-col items-center justify-center gap-1 py-3 text-center">
-        <CardTitle className="text-xs font-medium text-muted-foreground">
+    <Card className="rounded-2xl h-[100px] !bg-white border-0 shadow-sm">
+      <CardContent className="h-full flex flex-col items-center justify-center gap-1 text-center p-4 !bg-white">
+        <CardTitle className="font-medium text-muted-foreground text-sm">
           {title}
         </CardTitle>
 
-        <div className="text-xl font-semibold text-primary">
+        <div className="text-2xl font-bold text-primary">
           {value}
         </div>
 
         {subtitle && (
-          <CardDescription className="text-[11px] text-muted-foreground">
+          <CardDescription className="text-xs text-muted-foreground">
             {subtitle}
           </CardDescription>
         )}
