@@ -2,8 +2,8 @@ import "reflect-metadata";
 import express from "express";
 import { Source } from "./config/dataSource";
 import "./config/env";
-import adminAuthRouter from "./routes/adminAuthRouter";
-import adminEmployeeRouter from "./routes/adminEmployeeRouter";
+import adminRouter from "./routes/adminRouter";
+import employeeRouter from "./routes/employeeRouter";
 import authRouter from "./routes/authRouter";
 
 const app = express();
@@ -25,7 +25,7 @@ const startServer = async () => {
 };
 
 app.use('/auth',authRouter)
-app.use("/admin",adminEmployeeRouter)
-app.use("/admin/auth", adminAuthRouter);
+app.use("/employee",employeeRouter)
+app.use("/admin/auth", adminRouter);
 
 startServer();

@@ -18,6 +18,10 @@ export class AdminService {
             throw new Error("Employee already Exist");
         }
 
+        if (role === EmployeeRole.ADMIN) {
+            throw new Error("You cannot create another admin");
+        }
+
         if (payload.role && !Object.values(EmployeeRole).includes(payload.role as EmployeeRole)) {
             throw new Error("Invalid role");
         }
