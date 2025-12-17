@@ -1,9 +1,9 @@
 import { Request, Response } from "express";
 import { signJwt } from "../utlis/jwt";
-
 export const verifyAuthentication = (req: Request, res: Response) => {
   try {
     const { email, password } = req.body;
+    // const user = findUser
 
     const verify = signJwt({
       email: "shanu@gmail.com",
@@ -14,13 +14,13 @@ export const verifyAuthentication = (req: Request, res: Response) => {
       .status(500)
       .json({
         message: "Authentication successfull",
-        AccessToken: "hello shanu how are you",
-        status: true,
+        AccessToken: verify,
+        success: true,
       });
   } catch (err) {
     console.log(err);
     return res
       .status(500)
-      .json({ message: "Internal Error Occured", status: false });
+      .json({ message: "Internal Error Occured", success: false });
   }
 };
