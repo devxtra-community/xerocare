@@ -1,14 +1,14 @@
 import { Request, Response } from "express";
-import { AdminAuthService } from "../services/adminService";
+import { AdminService } from "../services/adminService";
 import { AuthService } from "../services/authService";
 import { issueTokens } from "../services/tokenService";
 
-const adminAuthService = new AdminAuthService();
+const adminService = new AdminService();
 const authService = new AuthService();
 
 export const adminLogin = async (req:Request, res:Response) => {
   try {
-    const { admin } = await adminAuthService.login(req.body);
+    const { admin } = await adminService.login(req.body);
 
     const accessToken = await issueTokens(admin, res);
 

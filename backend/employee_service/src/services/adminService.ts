@@ -3,7 +3,7 @@ import { AdminRepository } from "../repositories/adminRepository";
 import { signAccesstoken, signRefreshtoken } from "../utlis/jwt";
 import { AuthRepository } from "../repositories/authRepository";
 
-export class AdminAuthService {
+export class AdminService {
 
   private adminRepo = new AdminRepository();
   private authRepo = new AuthRepository();

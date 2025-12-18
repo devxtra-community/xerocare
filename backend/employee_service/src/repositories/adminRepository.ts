@@ -7,6 +7,5 @@ export class AdminRepository {
   async findByEmail(email: string) {
     return this.repo.findOne({ where: { email } });
   }
-
   
 }

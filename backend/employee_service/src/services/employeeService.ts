@@ -1,17 +1,20 @@
 import bcrypt from "bcrypt";
 import { EmployeeRepository } from "../repositories/employeeRepository";
 import { EmployeeRole } from "../constants/employeeRole";
+import { generateRandomPassword } from "../utlis/passwordGenerator";
+import { sendEmployeeWelcomeMail } from "../utlis/mailer";
 
-export class AdminService {
+export class EmployeeService {
     private employeeRepo = new EmployeeRepository();
 
     async addEmployee(payload: {
+        first_name:string,
+        last_name:string,
         email: string;
-        password: string;
         role?: string;
         expireDate?: Date;
     }) {
-        const { email, password, role, expireDate } = payload;
+        const { first_name,last_name, email, role, expireDate } = payload;
 
         const existing = await this.employeeRepo.findByEmail(email);
         if (existing) {
@@ -28,14 +31,21 @@ export class AdminService {
 
         const roleEnum = payload.role as EmployeeRole;
 
-        const passwordHash = await bcrypt.hash(password, 10);
+        const plainPassword = generateRandomPassword();
 
-        return this.employeeRepo.createEmployee({
+        const passwordHash = await bcrypt.hash(plainPassword, 10);
+
+        const employee= this.employeeRepo.createEmployee({
+            first_name,
+            last_name,
             email,
             password_hash: passwordHash,
             role: roleEnum,
             expire_date:expireDate ?? null,
         });
-    }
 
+        await sendEmployeeWelcomeMail(email, plainPassword);
+
+        return employee;
+    }
 }

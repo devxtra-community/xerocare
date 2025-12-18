@@ -1,62 +1,160 @@
 import { Request, Response } from "express";
 import { AuthService } from "../services/authService";
 import { issueTokens } from "../services/tokenService";
+import { OtpService } from "../services/otpService";
+import { OtpPurpose } from "../constants/otpPurpose";
 
 const authService = new AuthService();
+const otpService = new OtpService();
 
-export const login = async (req:Request, res:Response) => {
+export const login = async (req: Request, res: Response) => {
   try {
     const { user } = await authService.login(req.body);
 
-    const {accessToken,refreshToken} = await issueTokens(user, res);
+    await otpService.sendOtp(user.email, OtpPurpose.LOGIN);
 
     return res.json({
-      message: "Login success",
-      accessToken,
-      refreshToken,
-      data: user,
-      success: true
+      message: "Otp sent to registered email",
+      success: true,
     });
-
-  } catch (err:any) {
+  } catch (err: any) {
     return res.status(500).json({ message: err.message, success: false });
   }
 };
 
-export const refresh = async(req:Request , res:Response)=>{
-  try{
+export const loginVerify = async (req: Request, res: Response) => {
+  try {
+    const email = req.body.email.toLowerCase().trim();
+    const otp = req.body.otp.trim();
+
+    await otpService.verifyOtp(email, otp, OtpPurpose.LOGIN);
+
+    const user = await authService.findUserByEmail(email);
+
+    const accessToken = await issueTokens(user, res);
+
+    return res.json({
+      message: "Login successfull",
+      accessToken,
+      data: user,
+      success: true,
+    });
+  } catch (err: any) {
+    return res.status(400).json({
+      message: err.message,
+      success: false,
+    });
+  }
+};
+
+export const refresh = async (req: Request, res: Response) => {
+  try {
     const refreshToken = req.cookies.refreshToken;
-    if(!refreshToken)
-    {
+    if (!refreshToken) {
       throw new Error("No refresh token");
     }
 
-    const {accessToken,refreshToken:newRefreshToken} = await authService.refresh(refreshToken);
+    const user = await authService.refresh(refreshToken);
 
-    res.cookie("refreshToken",newRefreshToken,{
-      httpOnly:true,
-      secure:true,
-      sameSite:"strict",
-      maxAge: 15 * 24 * 60 * 60 * 1000
-    })
+    const accessToken = await issueTokens(user, res);
 
-    res.json({message:"Access token refreshed",accessToken,success:true});
-
-  }catch (err: any) {
-    return res.status(500).json({ message: err.message || "Internal server error", success: false });
+    return res.json({
+      message: "Access token refreshed",
+      accessToken,
+      success: true,
+    });
+  } catch (err: any) {
+    return res.status(401).json({
+      message: err.message || "Invalid refresh token",
+      success: false,
+    });
   }
-}
+};
 
-export const logout = async(req:Request,res:Response)=>{
-  try{
+export const logout = async (req: Request, res: Response) => {
+  try {
     const refreshToken = req.cookies.refreshToken;
     console.log(refreshToken)
     await authService.logout(refreshToken);
 
     res.clearCookie("refreshToken");
-    res.json({message:"logout successfull",success:true})
-
-  }catch (err: any) {
-    return res.status(500).json({ message: err.message || "Internal server error", success: false });
+    res.json({ message: "logout successfull", success: true });
+  } catch (err: any) {
+    return res.status(500).json({
+      message: err.message || "Internal server error",
+      success: false,
+    });
   }
-}
+};
+
+export const changePassword = async (req: Request, res: Response) => {
+  try {
+    const userId = req.user.id;
+    const { currentPassword, newPassword } = req.body;
+
+    await authService.changePassword({
+      userId,
+      currentPassword,
+      newPassword,
+    });
+
+    return res
+      .status(200)
+      .json({ message: "Password changed successfully", success: true });
+  } catch (err: any) {
+    return res.status(500).json({
+      message: err.message || "Internal server error",
+      success: false,
+    });
+  }
+};
+
+export const forgotPassword = async (req: Request, res: Response) => {
+  try {
+    const email = req.body.email.toLowerCase().trim();
+
+    const user = await authService.findUserByEmail(email);
+    if (!user) {
+      return res.json({
+        message: "No Account exist for corresponding mail",
+        success: true,
+      });
+    }
+
+    await otpService.sendOtp(email, OtpPurpose.FORGOT_PASSWORD);
+
+    return res.json({
+      message: "6 digit otp has been send to your email",
+      success: true,
+    });
+  } catch (err: any) {
+    return res.status(400).json({
+      message: err.message,
+      success: false,
+    });
+  }
+};
+
+export const resetPassword = async (req: Request, res: Response) => {
+  try {
+    const email = req.body.email.toLowerCase().trim();
+    const otp = String(req.body.otp).trim();
+    const { newPassword } = req.body;
+
+    await otpService.verifyOtp(email, otp, OtpPurpose.FORGOT_PASSWORD);
+
+    const user = await authService.findUserByEmail(email);
+
+    await authService.resetPassword(user.id, newPassword);
+
+    return res.json({
+      message: "Password reset successfully",
+      success: true,
+    });
+  } catch (err: any) {
+    return res.status(400).json({
+      message: err.message,
+      success: false,
+    });
+  }
+};
