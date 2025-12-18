@@ -33,7 +33,7 @@ export function LoginForm({
       localStorage.setItem("accessToken", res.data.accessToken);
       if (res.data.success) {
         console.log("Login success:", data);
-        router.push(`/dashboard`)
+        router.push(`/dashboard/${data.role}`)
       }
 
     } catch (err: unknown) {

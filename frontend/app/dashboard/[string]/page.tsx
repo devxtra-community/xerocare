@@ -7,6 +7,8 @@ import { getUserFromToken, UserRole } from "@/lib/auth";
 import AdminDashboard from "@/components/dashboard/AdminDashboard";
 import HrDashboard from "@/components/dashboard/HrDashboard";
 import EmployeeDashboard from "@/components/dashboard/EmployeeDashboard";
+import ManagerDashboard from "@/components/dashboard/ManagerDashboard";
+import FinanceDashboard from "@/components/dashboard/FinanceDashboard";
 
 export default function DashboardPage() {
     const router = useRouter();
@@ -14,6 +16,7 @@ export default function DashboardPage() {
 
     useEffect(() => {
         const user = getUserFromToken();
+        console.log(user)
 
         if (!user) {
             router.replace("/login");
@@ -21,7 +24,6 @@ export default function DashboardPage() {
         }
 
         if (user.role !== role) {
-            // eslint-disable-next-line react-hooks/exhaustive-deps
             setRole(user.role);
         }
     }, [router]);
@@ -39,6 +41,13 @@ export default function DashboardPage() {
 
         case "EMPLOYEE":
             return <EmployeeDashboard />;
+
+        case "FINANCE":
+            return <FinanceDashboard />;
+        
+        case "MANAGER":
+            return <ManagerDashboard />;
+
 
         default:
             return <p>Unauthorized</p>;
