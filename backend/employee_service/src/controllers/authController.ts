@@ -73,6 +73,7 @@ export const refresh = async (req: Request, res: Response) => {
 
 export const logout = async (req: Request, res: Response) => {
   try {
+    console.log("inside logout :",req.cookies)
     const refreshToken = req.cookies.refreshToken;
     console.log(refreshToken)
     await authService.logout(refreshToken);

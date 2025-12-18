@@ -21,12 +21,20 @@ export function getUserFromToken(): JwtPayload | null {
   }
 }
 
-export async function login(email: string, password: string) {
+export async function requestLoginOtp(email: string, password: string) {
   const res = await api.post("/auth/login", {
     email,
     password,
   });
-  console.log(res)
+  return res.data;
+}
+
+export async function verifyLoginOtp(email: string, otp: string) {
+  const res = await api.post("/auth/login/verify", {
+    email,
+    otp,
+  });
+  console.log(res);
   setAuthTokens({
     accessToken: res.data.accessToken,
     refreshToken: res.data.refreshToken,
@@ -36,17 +44,16 @@ export async function login(email: string, password: string) {
 
 export async function logout() {
 
-  try{
-      const res = await api.post('/auth/logout');
-      console.log(res)
-      if(res.data.success)
-      {
-        localStorage.clear();
-        return res.data
-        
-      }
+  try {
+    const res = await api.post('/auth/logout');
+    console.log(res)
+    if (res.data.success) {
+      localStorage.clear();
+      return res.data
+
+    }
   }
-  catch(err){
+  catch (err) {
     console.log(err);
   }
 }
