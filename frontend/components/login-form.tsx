@@ -7,6 +7,7 @@ import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import api from "@/lib/api";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 
 export function LoginForm({
   className,
@@ -29,11 +30,15 @@ export function LoginForm({
         email,
         password,
       });
-      const data = res.data.data;
-      localStorage.setItem("accessToken", res.data.accessToken);
-      if (res.data.success) {
+      const data = res.data;
+      localStorage.setItem("accessToken", data.accessToken);
+      if (data.success) {
         console.log("Login success:", data);
-        router.push(`/dashboard/${data.role}`)
+        router.push(`/dashboard`)
+        toast.success(data.message)
+      }
+      else{
+        toast.message(data.message)
       }
 
     } catch (err: unknown) {

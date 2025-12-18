@@ -20,6 +20,10 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
+import api from "@/lib/api"
+import { toast } from "sonner"
+import { useRouter } from "next/navigation"
+
 
 const menuItems = [
   {
@@ -52,7 +56,26 @@ const menuItems = [
   },
 ]
 
+
+
 export default function AppSidebar() {
+const router = useRouter()
+
+ const handleLogOut=async()=>{
+  try{
+    const logout= await api.post('/auth/logout');
+    if(!logout.data.success){
+      toast.error(logout.data.message)
+    }
+    else{
+      router.push('/login');
+      toast.success(logout.data.message)
+    }
+  }
+  catch(err){
+    console.log(err)
+  }
+}
   return (
     <Sidebar collapsible="icon" className="border-r-0">
       {/* LOGO */}
@@ -106,10 +129,9 @@ export default function AppSidebar() {
               asChild
               className="py-3 text-white/70 hover:bg-red-500/20 hover:text-red-300"
             >
-              <a href="/admin/logout" className="flex items-center gap-3 px-3">
-                <LogOut className="h-4 w-4" />
-                <span>Logout</span>
-              </a>
+              <button className="flex items-center gap-3 px-3" onClick={handleLogOut}>
+                Logout
+              </button>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>

@@ -31,7 +31,7 @@ export default function DashboardPage() {
     if (!role) {
         return <p>Loading...</p>;
     }
-
+    
     switch (role) {
         case "ADMIN":
             return <AdminDashboard />;
