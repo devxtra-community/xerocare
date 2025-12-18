@@ -2,7 +2,7 @@ import api from "./api";
 import { setAuthTokens } from "axios-jwt";
 import { jwtDecode } from "jwt-decode";
 
-export type UserRole = "ADMIN" | "HR" | "EMPLOYEE" | "FINANCE" | "";
+export type UserRole = "ADMIN" | "HR" | "EMPLOYEE" | "FINANCE" | "MANAGER";
 
 export interface JwtPayload {
   id: string;
