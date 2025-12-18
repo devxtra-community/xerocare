@@ -12,7 +12,6 @@ export async function issueTokens(user: any, res: any) {
   });
 
   const refreshToken = signRefreshtoken({ id: user.id });
-
   await authRepo.saveRefreshToken(user, refreshToken);
 
   res.cookie("refreshToken", refreshToken, {
@@ -22,5 +21,5 @@ export async function issueTokens(user: any, res: any) {
     maxAge: 15 * 24 * 60 * 60 * 1000,
   });
 
-  return accessToken;
+  return {accessToken,refreshToken};
 }

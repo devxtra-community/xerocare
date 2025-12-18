@@ -23,6 +23,7 @@ import {
 import api from "@/lib/api"
 import { toast } from "sonner"
 import { useRouter } from "next/navigation"
+import { logout } from "@/lib/auth"
 
 
 const menuItems = [
@@ -59,18 +60,18 @@ const menuItems = [
 
 
 export default function AppSidebar() {
-const router = useRouter()
+// const router = useRouter()
 
  const handleLogOut=async()=>{
   try{
-    const logout= await api.post('/auth/logout');
-    if(!logout.data.success){
-      toast.error(logout.data.message)
-    }
-    else{
-      router.push('/login');
-      toast.success(logout.data.message)
-    }
+    const res= await logout();
+    // if(!res.data.success){
+    //   toast.error(logout.data.message)
+    // }
+    // else{
+    //   router.push('/login');
+    //   toast.success(logout.data.message)
+    // }
   }
   catch(err){
     console.log(err)

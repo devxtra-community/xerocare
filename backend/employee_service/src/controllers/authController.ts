@@ -8,11 +8,12 @@ export const login = async (req:Request, res:Response) => {
   try {
     const { user } = await authService.login(req.body);
 
-    const accessToken = await issueTokens(user, res);
+    const {accessToken,refreshToken} = await issueTokens(user, res);
 
     return res.json({
       message: "Login success",
       accessToken,
+      refreshToken,
       data: user,
       success: true
     });
@@ -49,6 +50,7 @@ export const refresh = async(req:Request , res:Response)=>{
 export const logout = async(req:Request,res:Response)=>{
   try{
     const refreshToken = req.cookies.refreshToken;
+    console.log(refreshToken)
     await authService.logout(refreshToken);
 
     res.clearCookie("refreshToken");

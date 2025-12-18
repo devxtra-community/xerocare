@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import api from "@/lib/api";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { login } from "@/lib/auth";
 
 export function LoginForm({
   className,
@@ -26,19 +27,16 @@ export function LoginForm({
     setError(null);
 
     try {
-      const res = await api.post("/auth/login", {
-        email,
-        password,
-      });
+      const res = await login(email,password)
       const data = res.data;
-      localStorage.setItem("accessToken", data.accessToken);
-      if (data.success) {
-        console.log("Login success:", data);
+      localStorage.setItem("accessToken", res.accessToken);
+      if (res.success) {
+        console.log("Login success:", res);
         router.push(`/dashboard`)
-        toast.success(data.message)
+        toast.success(res.message)
       }
       else{
-        toast.message(data.message)
+        toast.message(res.message)
       }
 
     } catch (err: unknown) {
