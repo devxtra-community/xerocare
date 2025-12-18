@@ -3,9 +3,11 @@ import { AuthService } from "../services/authService";
 import { issueTokens } from "../services/tokenService";
 import { OtpService } from "../services/otpService";
 import { OtpPurpose } from "../constants/otpPurpose";
+import { MagicLinkService } from "../services/magicLinkService";
 
 const authService = new AuthService();
 const otpService = new OtpService();
+const magicLinkService = new MagicLinkService();
 
 export const login = async (req: Request, res: Response) => {
   try {
@@ -115,7 +117,7 @@ export const forgotPassword = async (req: Request, res: Response) => {
     const user = await authService.findUserByEmail(email);
     if (!user) {
       return res.json({
-        message: "No Account exist for corresponding mail",
+        message: "If account exists, magic link sent",
         success: true,
       });
     }
@@ -123,7 +125,7 @@ export const forgotPassword = async (req: Request, res: Response) => {
     await otpService.sendOtp(email, OtpPurpose.FORGOT_PASSWORD);
 
     return res.json({
-      message: "6 digit otp has been send to your email",
+      message: "If account exists, magic link sent",
       success: true,
     });
   } catch (err: any) {
@@ -148,6 +150,55 @@ export const resetPassword = async (req: Request, res: Response) => {
 
     return res.json({
       message: "Password reset successfully",
+      success: true,
+    });
+  } catch (err: any) {
+    return res.status(400).json({
+      message: err.message,
+      success: false,
+    });
+  }
+};
+
+export const requestMagicLink = async (
+  req: Request,
+  res: Response
+) => {
+  try {
+    const email = req.body.email.toLowerCase().trim();
+
+    await magicLinkService.sendMagicLink(email);
+
+    return res.json({
+      message: "If account exists, magic link sent",
+      success: true,
+    });
+  } catch (err: any) {
+    return res.status(400).json({
+      message: err.message,
+      success: false,
+    });
+  }
+};
+
+export const verifyMagicLink = async (
+  req: Request,
+  res: Response
+) => {
+  try {
+    const email = req.body.email.toLowerCase().trim();
+    const token = req.body.token.trim();
+
+    await magicLinkService.verifyMagicLink(email, token);
+
+    const user = await authService.findUserByEmail(email);
+
+    const accessToken = await issueTokens(user, res);
+
+    return res.json({
+      message: "Login successfull",
+      accessToken,
+      data: user,
       success: true,
     });
   } catch (err: any) {

@@ -6,6 +6,7 @@ import { Admin } from "../entities/adminEntities";
 import { Employee } from "../entities/employeeEntities";
 import { Auth } from "../entities/authEntities";
 import { Otp } from "../entities/otpEntities";
+import { MagicLink } from "../entities/magicLinkEntity";
 
 export const Source = new DataSource({
   type: "postgres",
@@ -14,5 +15,5 @@ export const Source = new DataSource({
     rejectUnauthorized:false,
   },
   synchronize: true,
-  entities: [Admin,Employee,Auth,Otp],
+  entities: [Admin,Employee,Auth,Otp,MagicLink],
 });

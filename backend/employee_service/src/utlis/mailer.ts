@@ -45,3 +45,20 @@ export async function sendOtpMail(to: string, otp: string ,purpose: OtpPurpose) 
     `,
   });
 }
+
+export async function sendMagicLinkMail(
+  to: string,
+  link: string
+) {
+  await mailer.sendMail({
+    from: process.env.MAIL_USER,
+    to,
+    subject: "Login to your account",
+    html: `
+      <h2>Passwordless Login</h2>
+      <p>Click the link below to log in:</p>
+      <a href="${link}">${link}</a>
+      <p>This link expires in 10 minutes.</p>
+    `,
+  });
+}
