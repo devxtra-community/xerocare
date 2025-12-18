@@ -14,7 +14,7 @@ export default function Dashboard() {
       <div className="flex flex-col space-y-3 sm:space-y-4">
         <h3 className="text-lg sm:text-xl font-bold text-blue-900">Sales</h3>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 md:gap-4">
           <StatCard title="Total Earnings" value="100.000 AZN" subtitle="1 month indicator" />
           <StatCard title="Total Number Of Products Sold" value="3400" subtitle="1 month indicator" />
           <StatCard title="Best Selling Model" value="Electronics" subtitle="1 month indicator" />
