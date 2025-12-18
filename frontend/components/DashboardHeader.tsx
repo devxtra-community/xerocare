@@ -1,9 +1,9 @@
-"use client"
+"use client";
 
-import { Search, Bell, HelpCircle, ChevronDown, Menu } from "lucide-react"
-import { Input } from "@/components/ui/input"
-import { Button } from "@/components/ui/button"
-import { SidebarTrigger } from "@/components/ui/sidebar"
+import { Search, Bell, HelpCircle, ChevronDown, Menu } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { SidebarTrigger } from "@/components/ui/sidebar";
 
 export default function DashboardHeader() {
   return (
@@ -69,6 +69,5 @@ export default function DashboardHeader() {
         </div>
       </div>
     </header>
-  )
+  );
 }
-

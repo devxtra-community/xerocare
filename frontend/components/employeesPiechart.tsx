@@ -1,22 +1,22 @@
-"use client"
+"use client";
 
-import { PieChart, Pie, Cell } from "recharts"
-import { useState, useEffect } from "react"
+import { PieChart, Pie, Cell } from "recharts";
+import { useState, useEffect } from "react";
 
 const data = [
   { name: "Employee", value: 186, color: "#003F7D", percentage: 62.5 },
   { name: "Finance", value: 75, color: "#0284C7", percentage: 25 },
   { name: "HR", value: 37, color: "#9BD0E5", percentage: 12.5 },
-]
+];
 
-const TOTAL = 300
+const TOTAL = 300;
 
 export default function EmployeePieChart() {
-  const [isClient, setIsClient] = useState(false)
+  const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
-    setIsClient(true)
-  }, [])
+    setIsClient(true);
+  }, []);
 
   return (
     <div className="rounded-2xl bg-white shadow-sm w-full p-4 h-[280px] flex flex-col">
@@ -47,7 +47,9 @@ export default function EmployeePieChart() {
 
         <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
           <p className="text-[8px] text-gray-500 leading-tight font-medium">
-            Total Number<br />Of Employees
+            Total Number
+            <br />
+            Of Employees
           </p>
           <p className="text-xl font-bold text-gray-900 leading-none mt-0.5">
             {TOTAL}
@@ -59,7 +61,9 @@ export default function EmployeePieChart() {
         <div className="grid grid-cols-3 text-[10px] font-semibold text-blue-900 border-b border-gray-200 pb-1.5 mb-1.5">
           <span>Department</span>
           <span className="text-center">
-            Number Of<br />Employees
+            Number Of
+            <br />
+            Employees
           </span>
           <span className="text-right">%</span>
         </div>
@@ -74,9 +78,7 @@ export default function EmployeePieChart() {
                 className="h-2 w-2 rounded-full"
                 style={{ backgroundColor: item.color }}
               />
-              <span className="font-medium text-gray-900">
-                {item.name}
-              </span>
+              <span className="font-medium text-gray-900">{item.name}</span>
             </div>
             <span className="text-center font-semibold text-gray-900">
               {item.value}
@@ -88,5 +90,5 @@ export default function EmployeePieChart() {
         ))}
       </div>
     </div>
-  )
+  );
 }

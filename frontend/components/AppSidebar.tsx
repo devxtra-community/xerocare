@@ -1,5 +1,3 @@
-
-
 import {
   LayoutDashboard,
   ShoppingCart,
@@ -7,7 +5,7 @@ import {
   Users,
   Package,
   LogOut,
-} from "lucide-react"
+} from "lucide-react";
 
 import {
   Sidebar,
@@ -19,7 +17,7 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-} from "@/components/ui/sidebar"
+} from "@/components/ui/sidebar";
 
 const menuItems = [
   { title: "Dashboard", icon: LayoutDashboard, href: "/", active: true },
@@ -27,13 +25,11 @@ const menuItems = [
   { title: "Branch", icon: Building2, href: "/branch", disabled: true },
   { title: "Human Resources", icon: Users, href: "/hr", disabled: true },
   { title: "Warehouse", icon: Package, href: "/warehouse" },
-]
+];
 
 export default function AppSidebar() {
   return (
     <Sidebar collapsible="icon" className="border-r-0">
-
-  
       <SidebarHeader className="bg-sidebar border-b border-white/10">
         <div className="flex items-center gap-3 px-4 py-4">
           <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/10">
@@ -45,12 +41,10 @@ export default function AppSidebar() {
         </div>
       </SidebarHeader>
 
-    
       <SidebarContent className="bg-sidebar">
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu className="space-y-1 px-2">
-
               {menuItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton
@@ -85,14 +79,11 @@ export default function AppSidebar() {
                       "
                     >
                       <item.icon className="h-4 w-4" />
-                      <span className="font-medium">
-                        {item.title}
-                      </span>
+                      <span className="font-medium">{item.title}</span>
                     </a>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
-
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
@@ -119,7 +110,6 @@ export default function AppSidebar() {
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarFooter>
-
     </Sidebar>
-  )
+  );
 }

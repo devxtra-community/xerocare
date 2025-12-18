@@ -1,101 +1,48 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import {
-  Table,
-  TableHeader,
-  TableBody,
-  TableHead,
-  TableRow,
-  TableCell,
-} from "@/components/ui/table"
+import { useState } from "react";
 
-
-const data = [
-  {
-    productName: "Iphone 14",
-    productCode: "ELEC-1001",
-    quantity: 15,
-    supplyHistory: "20.11.2023",
-  },
-  {
-    productName: "Samsung S24",
-    productCode: "ELEC-1002",
-    quantity: 20,
-    supplyHistory: "20.11.2023",
-  },
-  {
-    productName: "Black M Jacket",
-    productCode: "CLOTH-BLK-M",
-    quantity: 20,
-    supplyHistory: "20.10.2023",
-  },
-  {
-    productName: "Black L Jacket",
-    productCode: "CLOTH-BLK-L",
-    quantity: 20,
-    supplyHistory: "30.10.2023",
-  },
-  {
-    productName: "Armani Perfume",
-    productCode: "COSM-ARM-201",
-    quantity: 30,
-    supplyHistory: "20.11.2023",
-  },
-  {
-    productName: "Iphone 14",
-    productCode: "ELEC-1001",
-    quantity: 15,
-    supplyHistory: "20.11.2023",
-  },
-  {
-    productName: "Samsung S24",
-    productCode: "ELEC-1002",
-    quantity: 20,
-    supplyHistory: "20.11.2023",
-  },
-  {
-    productName: "Black M Jacket",
-    productCode: "CLOTH-BLK-M",
-    quantity: 20,
-    supplyHistory: "20.10.2023",
-  },
-  {
-    productName: "Black L Jacket",
-    productCode: "CLOTH-BLK-L",
-    quantity: 20,
-    supplyHistory: "30.10.2023",
-  },
-  {
-    productName: "Armani Perfume",
-    productCode: "COSM-ARM-201",
-    quantity: 30,
-    supplyHistory: "20.11.2023",
-  },
-]
-
-const ITEMS_PER_PAGE = 5
+const ITEMS_PER_PAGE = 5;
 
 export default function WarehouseTable() {
-  const [page, setPage] = useState(1)
+  const [page, setPage] = useState(1);
 
   const data = [
-    {productName: "Iphone 14", productCode: "ELEC-1001", quantity: 15, supplyHistory: "20.11.2023"},
-    {productName: "Samsung S24", productCode: "ELEC-1002", quantity: 20, supplyHistory: "20.11.2023"},
-    {productName: "Black M Jacket", productCode: "CLOTH-BLK-M", quantity: 20, supplyHistory: "20.10.2023"},
-    {productName: "Black L Jacket", productCode: "CLOTH-BLK-L", quantity: 20, supplyHistory: "30.10.2023"},
-    {productName: "Armani Perfume", productCode: "COSM-ARM-201", quantity: 30, supplyHistory: "20.11.2023"},
-    {productName: "Iphone 14", productCode: "ELEC-1001", quantity: 15, supplyHistory: "20.11.2023"},
-    {productName: "Samsung S24", productCode: "ELEC-1002", quantity: 20, supplyHistory: "20.11.2023"},
-    {productName: "Black M Jacket", productCode: "CLOTH-BLK-M", quantity: 20, supplyHistory: "20.10.2023"},
-    {productName: "Black L Jacket", productCode: "CLOTH-BLK-L", quantity: 20, supplyHistory: "30.10.2023"},
-    {productName: "Armani Perfume", productCode: "COSM-ARM-201", quantity: 30, supplyHistory: "20.11.2023"},
-  ]
+    {
+      wearhouseName: "First Store",
+      branch: "Ernakulam",
+      Location: "ABC Street",
+      productStock: "3456",
+    },
+    {
+      wearhouseName: "Central Hub",
+      branch: "Kochi",
+      Location: "MG Road",
+      productStock: "2890",
+    },
+    {
+      wearhouseName: "North Depot",
+      branch: "Thrissur",
+      Location: "Round North",
+      productStock: "4120",
+    },
+    {
+      wearhouseName: "South Warehouse",
+      branch: "Trivandrum",
+      Location: "Kazhakkoottam",
+      productStock: "1980",
+    },
+    {
+      wearhouseName: "Metro Store",
+      branch: "Calicut",
+      Location: "SM Street",
+      productStock: "3650",
+    },
+  ];
 
-  const ITEMS_PER_PAGE = 5
-  const totalPages = Math.ceil(data.length / ITEMS_PER_PAGE)
-  const startIndex = (page - 1) * ITEMS_PER_PAGE
-  const currentData = data.slice(startIndex, startIndex + ITEMS_PER_PAGE)
+  const totalPages = Math.ceil(data.length / ITEMS_PER_PAGE);
+  const startIndex = (page - 1) * ITEMS_PER_PAGE;
+  const currentData = data.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
   return (
     <div className="rounded-2xl bg-white p-2 sm:p-3 shadow-sm w-full h-[260px] flex flex-col">
@@ -103,71 +50,77 @@ export default function WarehouseTable() {
         <table className="w-full">
           <thead>
             <tr className="border-b">
-              <th className="text-left text-[10px] sm:text-xs font-semibold text-blue-900 py-1.5 sm:py-2 px-1 sm:px-2">PRODUCT</th>
-              <th className="text-left text-[10px] sm:text-xs font-semibold text-blue-900 py-1.5 sm:py-2 px-1 sm:px-2">CODE</th>
-              <th className="text-left text-[10px] sm:text-xs font-semibold text-blue-900 py-1.5 sm:py-2 px-1 sm:px-2">QTY</th>
-              <th className="text-left text-[10px] sm:text-xs font-semibold text-blue-900 py-1.5 sm:py-2 px-1 sm:px-2">SUPPLY</th>
+              <th className="text-left text-[10px] sm:text-xs font-semibold text-blue-900 py-2 px-2">
+                WAREHOUSE
+              </th>
+              <th className="text-left text-[10px] sm:text-xs font-semibold text-blue-900 py-2 px-2">
+                BRANCH
+              </th>
+              <th className="text-left text-[10px] sm:text-xs font-semibold text-blue-900 py-2 px-2">
+                LOCATION
+              </th>
+              <th className="text-left text-[10px] sm:text-xs font-semibold text-blue-900 py-2 px-2">
+                STOCK
+              </th>
             </tr>
           </thead>
+
           <tbody>
             {currentData.map((item, index) => (
-              <tr key={index} className={index % 2 === 1 ? "bg-sky-100/60" : ""}>
-                <td className="py-1.5 sm:py-2 px-1 sm:px-2 text-[10px] sm:text-xs font-medium text-gray-900">{item.productName}</td>
-                <td className="py-1.5 sm:py-2 px-1 sm:px-2 text-[10px] sm:text-xs text-gray-700">{item.productCode}</td>
-                <td className="py-1.5 sm:py-2 px-1 sm:px-2 text-[10px] sm:text-xs text-gray-700">{item.quantity}</td>
-                <td className="py-1.5 sm:py-2 px-1 sm:px-2 text-[10px] sm:text-xs text-gray-700">{item.supplyHistory}</td>
+              <tr
+                key={index}
+                className={index % 2 === 1 ? "bg-sky-100/60" : ""}
+              >
+                <td className="py-2 px-2 text-[10px] sm:text-xs font-medium text-gray-900">
+                  {item.wearhouseName}
+                </td>
+                <td className="py-2 px-2 text-[10px] sm:text-xs text-gray-700">
+                  {item.branch}
+                </td>
+                <td className="py-2 px-2 text-[10px] sm:text-xs text-gray-700">
+                  {item.Location}
+                </td>
+                <td className="py-2 px-2 text-[10px] sm:text-xs text-gray-700">
+                  {item.productStock}
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
 
-      <div className="mt-2 sm:mt-3 flex items-center justify-center gap-1 sm:gap-1.5 text-[10px] sm:text-xs flex-shrink-0">
+      {/* Pagination */}
+      <div className="mt-2 flex items-center justify-center gap-1 text-[10px] sm:text-xs">
         <button
-          onClick={() => setPage(p => Math.max(1, p - 1))}
+          onClick={() => setPage((p) => Math.max(1, p - 1))}
           disabled={page === 1}
-          className="rounded-md border px-1.5 sm:px-2 py-0.5 disabled:opacity-40 hover:bg-gray-50 transition"
+          className="rounded-md border px-2 py-0.5 disabled:opacity-40"
         >
           &lt;
         </button>
 
-        {Array.from({ length: Math.min(totalPages, 4) }, (_, i) => {
-          const pageNum = i + 1
-          if (pageNum === 4 && totalPages > 4) {
-            return <span key="ellipsis" className="px-0.5 sm:px-1">...</span>
-          }
-          return (
-            <button
-              key={pageNum}
-              onClick={() => setPage(pageNum)}
-              className={`px-1.5 sm:px-2 py-0.5 rounded-md transition ${
-                page === pageNum ? "bg-blue-900 text-white" : "border hover:bg-gray-50"
-              }`}
-            >
-              {pageNum}
-            </button>
-          )
-        })}
-
-        {totalPages > 4 && (
+        {Array.from({ length: totalPages }, (_, i) => i + 1).map((num) => (
           <button
-            onClick={() => setPage(totalPages)}
-            className={`px-1.5 sm:px-2 py-0.5 rounded-md border transition ${
-              page === totalPages ? "bg-blue-900 text-white" : "hover:bg-gray-50"
+            key={num}
+            onClick={() => setPage(num)}
+            className={`px-2 py-0.5 rounded-md ${
+              page === num
+                ? "bg-blue-900 text-white"
+                : "border hover:bg-gray-50"
             }`}
           >
-            {totalPages}
+            {num}
           </button>
-        )}
+        ))}
 
         <button
-          onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+          onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
           disabled={page === totalPages}
-          className="rounded-md border px-1.5 sm:px-2 py-0.5 disabled:opacity-40 hover:bg-gray-50 transition"
+          className="rounded-md border px-2 py-0.5 disabled:opacity-40"
         >
           &gt;
         </button>
       </div>
     </div>
-  )
+  );
 }

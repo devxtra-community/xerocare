@@ -1,6 +1,6 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
+import { useState, useEffect } from "react";
 import {
   Area,
   AreaChart,
@@ -8,7 +8,7 @@ import {
   XAxis,
   YAxis,
   ResponsiveContainer,
-} from "recharts"
+} from "recharts";
 
 const data = [
   { day: "18", sales: 30000 },
@@ -18,15 +18,15 @@ const data = [
   { day: "26", sales: 25000 },
   { day: "28", sales: 50000 },
   { day: "30", sales: 60000 },
-]
+];
 
 export default function SalesChart() {
-  const [selectedPeriod, setSelectedPeriod] = useState("1M")
-  const [isClient, setIsClient] = useState(false)
+  const [selectedPeriod, setSelectedPeriod] = useState("1M");
+  const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
-    setIsClient(true)
-  }, [])
+    setIsClient(true);
+  }, []);
 
   return (
     <div className="rounded-2xl bg-white h-[260px] w-full shadow-sm flex flex-col p-3">
@@ -102,5 +102,5 @@ export default function SalesChart() {
         )}
       </div>
     </div>
-  )
+  );
 }

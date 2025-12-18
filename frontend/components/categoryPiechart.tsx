@@ -1,26 +1,24 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import { PieChart, Pie, Cell } from "recharts"
+import { useState, useEffect } from "react";
+import { PieChart, Pie, Cell } from "recharts";
 
 const data = [
   { name: "Electronics", value: 60, color: "#FF6B35" },
   { name: "Cosmetics", value: 25, color: "#004E89" },
   { name: "Accessories", value: 15, color: "#00A8E8" },
-]
+];
 
 export default function CategoryPieChart() {
-  const [isClient, setIsClient] = useState(false)
+  const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
-    setIsClient(true)
-  }, [])
+    setIsClient(true);
+  }, []);
 
   return (
     <div className="rounded-2xl bg-white shadow-sm w-full p-4 h-[260px] flex flex-col">
-      <h3 className="text-base font-semibold text-blue-900 mb-3">
-        Category
-      </h3>
+      <h3 className="text-base font-semibold text-blue-900 mb-3">Category</h3>
 
       <div className="relative w-[120px] h-[120px] mx-auto mb-4">
         {isClient && (
@@ -59,16 +57,12 @@ export default function CategoryPieChart() {
                 className="h-2 w-2 rounded-full"
                 style={{ backgroundColor: item.color }}
               />
-              <span className="font-medium text-gray-900">
-                {item.name}
-              </span>
+              <span className="font-medium text-gray-900">{item.name}</span>
             </div>
-            <span className="font-semibold text-gray-900">
-              {item.value}%
-            </span>
+            <span className="font-semibold text-gray-900">{item.value}%</span>
           </div>
         ))}
       </div>
     </div>
-  )
+  );
 }
