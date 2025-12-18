@@ -29,16 +29,16 @@ export default function SalesChart() {
   }, [])
 
   return (
-    <div className="rounded-2xl bg-white h-[350px] w-full shadow-sm flex flex-col p-4">
+    <div className="rounded-2xl bg-white h-[260px] w-full shadow-sm flex flex-col p-3">
       <div className="flex flex-row items-center justify-between pb-2">
-        <p className="text-sm text-gray-600">Last 30 days</p>
+        <p className="text-xs text-gray-600">Last 30 days</p>
 
-        <div className="flex gap-2 text-xs">
+        <div className="flex gap-1.5 text-[10px]">
           {["1W", "1M", "3M", "1Y"].map((period) => (
             <button
               key={period}
               onClick={() => setSelectedPeriod(period)}
-              className={`px-3 py-1 rounded-md transition-colors ${
+              className={`px-2 py-0.5 rounded-md transition-colors ${
                 selectedPeriod === period
                   ? "bg-blue-900 text-white font-medium"
                   : "text-gray-600 hover:bg-gray-100"
@@ -55,7 +55,7 @@ export default function SalesChart() {
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart
               data={data}
-              margin={{ top: 10, left: 0, right: 10, bottom: 0 }}
+              margin={{ top: 5, left: 0, right: 5, bottom: 0 }}
             >
               <defs>
                 <linearGradient id="salesGradient" x1="0" y1="0" x2="0" y2="1">
@@ -74,18 +74,18 @@ export default function SalesChart() {
                 dataKey="day"
                 axisLine={false}
                 tickLine={false}
-                tickMargin={8}
-                tick={{ fill: "#6b7280", fontSize: 12 }}
+                tickMargin={6}
+                tick={{ fill: "#6b7280", fontSize: 10 }}
               />
 
               <YAxis
                 axisLine={false}
                 tickLine={false}
                 tickFormatter={(v) => `${v / 1000}k`}
-                tickMargin={8}
+                tickMargin={6}
                 domain={[0, 100000]}
                 ticks={[0, 20000, 40000, 60000, 80000, 100000]}
-                tick={{ fill: "#6b7280", fontSize: 12 }}
+                tick={{ fill: "#6b7280", fontSize: 10 }}
               />
 
               <Area

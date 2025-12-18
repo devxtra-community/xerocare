@@ -19,23 +19,23 @@ export default function EmployeePieChart() {
   }, [])
 
   return (
-    <div className="rounded-2xl bg-white shadow-sm w-full p-6 h-[400px] flex flex-col">
-      <div className="relative w-[150px] h-[150px] mx-auto mb-6">
+    <div className="rounded-2xl bg-white shadow-sm w-full p-4 h-[280px] flex flex-col">
+      <div className="relative w-[100px] h-[100px] mx-auto mb-2">
         {isClient && (
-          <PieChart width={150} height={150}>
+          <PieChart width={100} height={100}>
             <Pie
               data={data}
               dataKey="value"
               nameKey="name"
-              cx={75}
-              cy={75}
-              innerRadius={44}
-              outerRadius={70}
+              cx={50}
+              cy={50}
+              innerRadius={30}
+              outerRadius={47}
               startAngle={90}
               endAngle={-270}
               paddingAngle={3}
               stroke="#ffffff"
-              strokeWidth={4}
+              strokeWidth={2}
               isAnimationActive={false}
             >
               {data.map((entry, index) => (
@@ -46,17 +46,17 @@ export default function EmployeePieChart() {
         )}
 
         <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-          <p className="text-[10px] text-gray-500 leading-tight font-medium">
+          <p className="text-[8px] text-gray-500 leading-tight font-medium">
             Total Number<br />Of Employees
           </p>
-          <p className="text-3xl font-bold text-gray-900 leading-none mt-1">
+          <p className="text-xl font-bold text-gray-900 leading-none mt-0.5">
             {TOTAL}
           </p>
         </div>
       </div>
 
-      <div className="w-full">
-        <div className="grid grid-cols-3 text-xs font-semibold text-blue-900 border-b border-gray-200 pb-2 mb-2">
+      <div className="w-full flex-1 overflow-hidden">
+        <div className="grid grid-cols-3 text-[10px] font-semibold text-blue-900 border-b border-gray-200 pb-1.5 mb-1.5">
           <span>Department</span>
           <span className="text-center">
             Number Of<br />Employees
@@ -67,11 +67,11 @@ export default function EmployeePieChart() {
         {data.map((item) => (
           <div
             key={item.name}
-            className="grid grid-cols-3 items-center py-3 text-sm"
+            className="grid grid-cols-3 items-center py-1.5 text-xs"
           >
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5">
               <span
-                className="h-2.5 w-2.5 rounded-full"
+                className="h-2 w-2 rounded-full"
                 style={{ backgroundColor: item.color }}
               />
               <span className="font-medium text-gray-900">

@@ -17,27 +17,27 @@ export default function CategoryPieChart() {
   }, [])
 
   return (
-    <div className="rounded-2xl bg-white shadow-sm w-full p-6 h-[350px] flex flex-col">
-      <h3 className="text-lg font-semibold text-blue-900 mb-4">
+    <div className="rounded-2xl bg-white shadow-sm w-full p-4 h-[260px] flex flex-col">
+      <h3 className="text-base font-semibold text-blue-900 mb-3">
         Category
       </h3>
 
-      <div className="relative w-[150px] h-[150px] mx-auto mb-6">
+      <div className="relative w-[120px] h-[120px] mx-auto mb-4">
         {isClient && (
-          <PieChart width={150} height={150}>
+          <PieChart width={120} height={120}>
             <Pie
               data={data}
               dataKey="value"
               nameKey="name"
-              cx={75}
-              cy={75}
-              innerRadius={44}
-              outerRadius={70}
+              cx={60}
+              cy={60}
+              innerRadius={35}
+              outerRadius={56}
               startAngle={90}
               endAngle={-270}
               paddingAngle={3}
               stroke="#ffffff"
-              strokeWidth={4}
+              strokeWidth={3}
               isAnimationActive={false}
             >
               {data.map((entry, index) => (
@@ -48,15 +48,15 @@ export default function CategoryPieChart() {
         )}
       </div>
 
-      <div className="w-full space-y-3">
+      <div className="w-full space-y-2">
         {data.map((item) => (
           <div
             key={item.name}
-            className="flex items-center justify-between text-sm"
+            className="flex items-center justify-between text-xs"
           >
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5">
               <span
-                className="h-2.5 w-2.5 rounded-full"
+                className="h-2 w-2 rounded-full"
                 style={{ backgroundColor: item.color }}
               />
               <span className="font-medium text-gray-900">
