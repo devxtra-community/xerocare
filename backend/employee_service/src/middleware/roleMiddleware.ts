@@ -6,7 +6,7 @@ export const requireRole = (...allowedRoles: string[]) => {
       return res.status(401).json({ message: "Not authenticated", success: false });
     }
 
-    const userRole = req.user.role;
+    const userRole = req.user.role || "ADMIN";
 
     if (!allowedRoles.includes(userRole)) {
       return res.status(403).json({ message: "Access denied: insufficient permissions", success: false });

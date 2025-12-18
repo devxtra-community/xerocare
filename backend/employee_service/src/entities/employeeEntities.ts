@@ -10,6 +10,13 @@ export class Employee{
     @Column({type:"varchar",length:255})
     email!:string;
 
+    @Column({ type: "varchar", length: 255, nullable: true })
+    first_name!: string | null;
+
+    @Column({ type: "varchar", length: 255, nullable: true })
+    last_name!: string | null;
+
+
     @Column({type:"varchar",length:255})
     password_hash!:string;
 

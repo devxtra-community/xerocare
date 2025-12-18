@@ -1,7 +1,7 @@
 import { Request,Response } from "express";
-import { AdminService } from "../services/employeeService";
+import { EmployeeService} from "../services/employeeService";
 
-const service = new AdminService();
+const service = new EmployeeService();
 
 export const addEmployee = async(req:Request,res:Response)=>{
     try{
