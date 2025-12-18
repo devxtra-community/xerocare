@@ -1,24 +1,5 @@
-import AddEmployeeDialog from "./components/AddEmployeeDialog";
-import UserTable from "./components/UserTable";
-
-
-
-// export default function UsersPage(){
-//     return(
-//         <div className="space-y-6">
-//             {/*HEADER*/}
-
-//             <div className="flex items-center justify-between p-6">
-//                 <h1 className="mb-4 text-3xl font-serif">Human Resources</h1>
-//                 <AddEmployeeDialog/>
-//             </div>
-
-//             {/*TABLE*/}
-//         <UserTable users={users}/>
-//         </div>
-//     )
-// }
-
+import AddEmployeeDialog from "@/app/employee/components/AddEmployeeDialog";
+import UserTable from "@/app/employee/components/UserTable";
 
 export type UserListItem = {
     id: number;
@@ -29,8 +10,6 @@ export type UserListItem = {
     expiryDate: string;
     salary: string;
 };
-
-
 
 async function getUsers(): Promise<UserListItem[]> {
     // 🔹 TEMP mock — backend will replace this
@@ -137,7 +116,7 @@ async function getUsers(): Promise<UserListItem[]> {
     ];
 }
 
-export default async function UsersPage() {
+export default async function HrDashboard() {
     const users = await getUsers();
 
     return (
@@ -149,7 +128,7 @@ export default async function UsersPage() {
                 <AddEmployeeDialog />
             </div>
 
-            <UserTable users={users} />;
+            <UserTable users={users} />
         </div>
     )
 }

@@ -17,7 +17,7 @@ export function LoginForm({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const router =useRouter()
+  const router = useRouter()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,19 +29,23 @@ export function LoginForm({
         email,
         password,
       });
-      const data = res.data;
-      localStorage.setItem("accessToken", data.accessToken);
-      if(data.success){
+      const data = res.data.data;
+      localStorage.setItem("accessToken", res.data.accessToken);
+      if (res.data.success) {
         console.log("Login success:", data);
-        router.push('/dashboard')
+        router.push(`/dashboard`)
       }
 
-    } catch (err: any) {
-      setError(
-        err.response?.data?.error ||
-        err.message ||
-        "Login failed"
-      );
+    } catch (err: unknown) {
+      let errorMessage = "Login failed";
+      if (err && typeof err === 'object' && 'response' in err) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        errorMessage = (err as any).response?.data?.error || (err as any).message || errorMessage;
+      } else if (err instanceof Error) {
+        errorMessage = err.message;
+      }
+
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }

@@ -1,5 +1,25 @@
 import api from "./api";
 import { setAuthTokens } from "axios-jwt";
+import { jwtDecode } from "jwt-decode";
+
+export type UserRole = "ADMIN" | "HR" | "EMPLOYEE";
+
+export interface JwtPayload {
+  id: string;
+  role: UserRole;
+  exp: number;
+}
+
+export function getUserFromToken(): JwtPayload | null {
+  const token = localStorage.getItem("accessToken");
+  if (!token) return null;
+
+  try {
+    return jwtDecode<JwtPayload>(token);
+  } catch {
+    return null;
+  }
+}
 
 export async function login(email: string, password: string) {
   const res = await api.post("/auth/verify", {
