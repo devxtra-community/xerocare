@@ -19,7 +19,7 @@ export default function Dashboard() {
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 md:gap-4">
           <StatCard
             title="Total Earnings"
-            value="100.000 AZN"
+            value="100.000"
             subtitle="1 month indicator"
           />
           <StatCard
