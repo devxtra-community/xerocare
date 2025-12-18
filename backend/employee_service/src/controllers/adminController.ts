@@ -1,34 +1,29 @@
 import { Request, Response } from "express";
 import { AdminAuthService } from "../services/adminService";
 import { AuthService } from "../services/authService";
+import { issueTokens } from "../services/tokenService";
 
 const adminAuthService = new AdminAuthService();
 const authService = new AuthService();
 
-export const adminLogin = async (req: Request, res: Response) => {
+export const adminLogin = async (req:Request, res:Response) => {
   try {
-    const { admin, accessToken, refreshToken } = await adminAuthService.login(req.body);
+    const { admin } = await adminAuthService.login(req.body);
 
-    res.cookie("refreshToken", refreshToken, {
-      httpOnly: true,
-      secure: true,
-      sameSite: "strict",
-      maxAge: 15 * 24 * 60 * 60 * 1000,
-    });
+    const accessToken = await issueTokens(admin, res);
 
-    return res.status(200).json({
+    return res.json({
       message: "Admin login successfully",
       accessToken,
       data: admin,
-      success: true,
+      success: true
     });
-  } catch (err: any) {
-    return res.status(500).json({
-      message: err.message || "Internal server error",
-      success: false,
-    });
+
+  } catch (err:any) {
+    return res.status(500).json({ message: err.message, success: false });
   }
 };
+
 
 export const adminLogout = async (req:Request, res:Response) => {
   try {
