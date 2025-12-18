@@ -1,4 +1,4 @@
 export enum OtpPurpose{
     LOGIN = "LOGIN",
-    PASSWORD_RESET = "PASSWORD_RESET"
+    FORGOT_PASSWORD ="FORGOT_PASSWORD"    
 }

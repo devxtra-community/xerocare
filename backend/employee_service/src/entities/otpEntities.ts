@@ -17,10 +17,10 @@ export class Otp{
     purpose!:OtpPurpose | null;
     
     @Column({type:"timestamp with time zone"})
-    expireAt!:Date;
+    expires_at!:Date;
 
     @Column({type:"boolean",default: false})
-    isUsed!: boolean;
+    is_used!: boolean;
 
     @CreateDateColumn({type:"timestamp with time zone"})
     createdAt!: Date;

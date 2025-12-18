@@ -1,24 +1,8 @@
+"use client";
+
 import AddEmployeeDialog from "@/components/AddEmployeeDialog";
 import UserTable from "@/components/UserTable";
-
-
-
-// export default function UsersPage(){
-//     return(
-//         <div className="space-y-6">
-//             {/*HEADER*/}
-
-//             <div className="flex items-center justify-between p-6">
-//                 <h1 className="mb-4 text-3xl font-serif">Human Resources</h1>
-//                 <AddEmployeeDialog/>
-//             </div>
-
-//             {/*TABLE*/}
-//         <UserTable users={users}/>
-//         </div>
-//     )
-// }
-
+import { useEffect, useState } from "react";
 
 export type UserListItem = {
     id: number;
@@ -30,10 +14,8 @@ export type UserListItem = {
     salary: string;
 };
 
-
-
-async function getUsers(): Promise<UserListItem[]> {
-    // 🔹 TEMP mock — backend will replace this
+// Mock data function - made sync for client usage, or could be async with useEffect
+function getUsers(): UserListItem[] {
     return [
         {
             id: 1,
@@ -137,8 +119,15 @@ async function getUsers(): Promise<UserListItem[]> {
     ];
 }
 
-export default async function UsersPage() {
-    const users = await getUsers();
+export default function UsersPage() {
+    const [users, setUsers] = useState<UserListItem[]>([]);
+
+    useEffect(() => {
+        // Simulate fetch
+        const data = getUsers();
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        setUsers(data);
+    }, []);
 
     return (
         <div className="space-y-6">
@@ -149,7 +138,7 @@ export default async function UsersPage() {
                 <AddEmployeeDialog />
             </div>
 
-            <UserTable users={users} />;
+            <UserTable users={users} />
         </div>
     )
 }
