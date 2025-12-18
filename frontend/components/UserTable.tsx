@@ -12,7 +12,16 @@ import {
 import Link from "next/link";
 import { useState } from "react";
 import Pagination from "./Pagination";
-import {type UserListItem } from "@/app/dashboard/page";
+
+export type UserListItem = {
+  id: number;
+  name: string;
+  department: string;
+  branch: string;
+  startDate: string;
+  expiryDate: string;
+  salary: string;
+};
 
 
 const USERS_PER_PAGE = 8;

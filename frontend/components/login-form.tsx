@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import api from "@/lib/api";
+
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { login } from "@/lib/auth";
@@ -27,15 +27,14 @@ export function LoginForm({
     setError(null);
 
     try {
-      const res = await login(email,password)
-      const data = res.data;
+      const res = await login(email, password)
       localStorage.setItem("accessToken", res.accessToken);
       if (res.success) {
         console.log("Login success:", res);
         router.push(`/dashboard`)
         toast.success(res.message)
       }
-      else{
+      else {
         toast.message(res.message)
       }
 

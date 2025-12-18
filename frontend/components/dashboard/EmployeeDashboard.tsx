@@ -1,5 +1,5 @@
-import AddEmployeeDialog from "./components/AddEmployeeDialog";
-import UserTable from "./components/UserTable";
+import AddEmployeeDialog from "@/components/AddEmployeeDialog";
+import UserTable from "@/components/UserTable";
 
 
 

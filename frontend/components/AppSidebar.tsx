@@ -6,7 +6,6 @@ import {
   Building2,
   Users,
   Package,
-  LogOut,
 } from "lucide-react"
 
 import {
@@ -20,9 +19,6 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
-import api from "@/lib/api"
-import { toast } from "sonner"
-import { useRouter } from "next/navigation"
 import { logout } from "@/lib/auth"
 
 
@@ -60,23 +56,23 @@ const menuItems = [
 
 
 export default function AppSidebar() {
-// const router = useRouter()
+  // const router = useRouter()
 
- const handleLogOut=async()=>{
-  try{
-    const res= await logout();
-    // if(!res.data.success){
-    //   toast.error(logout.data.message)
-    // }
-    // else{
-    //   router.push('/login');
-    //   toast.success(logout.data.message)
-    // }
+  const handleLogOut = async () => {
+    try {
+      await logout();
+      // if(!res.data.success){
+      //   toast.error(logout.data.message)
+      // }
+      // else{
+      //   router.push('/login');
+      //   toast.success(logout.data.message)
+      // }
+    }
+    catch (err) {
+      console.log(err)
+    }
   }
-  catch(err){
-    console.log(err)
-  }
-}
   return (
     <Sidebar collapsible="icon" className="border-r-0">
       {/* LOGO */}
@@ -103,10 +99,9 @@ export default function AppSidebar() {
                     disabled={item.disabled}
                     className={`
                       py-2.5 rounded-md
-                      ${
-                        item.active
-                          ? "bg-white text-[#0A4C7E]"
-                          : "text-white hover:bg-white/10"
+                      ${item.active
+                        ? "bg-white text-[#0A4C7E]"
+                        : "text-white hover:bg-white/10"
                       }
                       ${item.disabled ? "opacity-50 cursor-not-allowed" : ""}
                     `}

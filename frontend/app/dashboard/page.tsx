@@ -24,14 +24,15 @@ export default function DashboardPage() {
         }
 
         if (user.role !== role) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect
             setRole(user.role);
         }
-    }, [router]);
+    }, [router, role]);
 
     if (!role) {
         return <p>Loading...</p>;
     }
-    
+
     switch (role) {
         case "ADMIN":
             return <AdminDashboard />;
@@ -44,7 +45,7 @@ export default function DashboardPage() {
 
         case "FINANCE":
             return <FinanceDashboard />;
-        
+
         case "MANAGER":
             return <ManagerDashboard />;
 
