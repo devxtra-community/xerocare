@@ -20,6 +20,8 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
 import { logout } from "@/lib/auth"
+import { toast } from "sonner"
+import { useRouter } from "next/navigation"
 
 
 const menuItems = [
@@ -56,21 +58,23 @@ const menuItems = [
 
 
 export default function AppSidebar() {
-  // const router = useRouter()
+  const router = useRouter()
 
   const handleLogOut = async () => {
     try {
-      await logout();
-      // if(!res.data.success){
-      //   toast.error(logout.data.message)
-      // }
-      // else{
-      //   router.push('/login');
-      //   toast.success(logout.data.message)
-      // }
+      const res = await logout();
+      console.log(res)
+      if(!res?.data.success){
+        toast.error(res?.data.message)
+      }
+      else{
+        router.push('/login');
+        toast.success(res.data.message)
+      }
     }
     catch (err) {
       console.log(err)
+
     }
   }
   return (

@@ -42,6 +42,35 @@ export async function verifyLoginOtp(email: string, otp: string) {
   return res.data;
 }
 
+export async function requestMagicLink(email: string) {
+  const res = await api.post("/auth/magic-link", { email });
+  return res.data;
+}
+
+export async function verifyMagicLink(email: string, token: string) {
+  const res = await api.post("/auth/magic-link/verify", { email, token });
+  console.log(res);
+  setAuthTokens({
+    accessToken: res.data.accessToken,
+    refreshToken: res.data.refreshToken,
+  });
+  return res.data;
+}
+
+export async function requestForgotPasswordOtp(email: string) {
+  const res = await api.post("/auth/forgot-password", { email });
+  return res.data;
+}
+
+export async function resetPassword(email: string, otp: string, newPassword: string) {
+  const res = await api.post("/auth/forgot-password/verify", {
+    email,
+    otp,
+    newPassword,
+  });
+  return res.data;
+}
+
 export async function logout() {
 
   try {
@@ -49,7 +78,7 @@ export async function logout() {
     console.log(res)
     if (res.data.success) {
       localStorage.clear();
-      return res.data
+      return res
 
     }
   }
