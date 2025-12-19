@@ -89,4 +89,14 @@ export class AuthService {
     const hash = await bcrypt.hash(newPassword, 10);
     await this.employeeRepo.updatePassword(userId, hash);
   }
+
+  async logoutOtherDevices(userId: string, currentRefreshToken: string) {
+    if (!currentRefreshToken) {
+      throw new Error("No refresh token found");
+    }
+
+    await this.authRepo.deleteOtherTokens(userId, currentRefreshToken);
+
+    return true;
+  }
 }

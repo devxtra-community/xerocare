@@ -27,4 +27,16 @@ export class AuthRepository{
     async deleteToken(refreshToken: string){
         return this.authRepo.delete({refresh_token:refreshToken})
     }
+
+    async deleteOtherTokens(
+    userId: string,
+    currentToken: string
+  ) {
+    return this.authRepo
+      .createQueryBuilder()
+      .delete()
+      .where("employeeId = :userId", { userId })
+      .andWhere("token != :currentToken", { currentToken })
+      .execute();
+  }
 }

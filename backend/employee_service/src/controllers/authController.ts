@@ -33,7 +33,7 @@ export const loginVerify = async (req: Request, res: Response) => {
 
     const user = await authService.findUserByEmail(email);
 
-    const {accessToken,refreshToken} = await issueTokens(user, res);
+    const { accessToken,refreshToken } = await issueTokens(user, res);
 
     return res.json({
       message: "Login successfull",
@@ -59,7 +59,7 @@ export const refresh = async (req: Request, res: Response) => {
 
     const user = await authService.refresh(refreshToken);
 
-    const {accessToken} = await issueTokens(user, res);
+    const { accessToken } = await issueTokens(user, res);
 
     return res.json({
       message: "Access token refreshed",
@@ -116,6 +116,8 @@ export const changePassword = async (req: Request, res: Response) => {
 export const forgotPassword = async (req: Request, res: Response) => {
   try {
     const email = req.body.email.toLowerCase().trim();
+    const userId = req.user.id;
+    const currentRefreshToken = req.cookies.refreshToken;
 
     const user = await authService.findUserByEmail(email);
     if (!user) {
@@ -126,6 +128,7 @@ export const forgotPassword = async (req: Request, res: Response) => {
     }
 
     await otpService.sendOtp(email, OtpPurpose.FORGOT_PASSWORD);
+    await authService.logoutOtherDevices(userId, currentRefreshToken);
 
     return res.json({
       message: "If account exists, magic link sent",
@@ -144,12 +147,16 @@ export const resetPassword = async (req: Request, res: Response) => {
     const email = req.body.email.toLowerCase().trim();
     const otp = String(req.body.otp).trim();
     const { newPassword } = req.body;
+    const userId = req.user.id;
+    const currentRefreshToken = req.cookies.refreshToken;
 
     await otpService.verifyOtp(email, otp, OtpPurpose.FORGOT_PASSWORD);
 
     const user = await authService.findUserByEmail(email);
 
     await authService.resetPassword(user.id, newPassword);
+
+    await authService.logoutOtherDevices(userId, currentRefreshToken);
 
     return res.json({
       message: "Password reset successfully",
@@ -163,10 +170,7 @@ export const resetPassword = async (req: Request, res: Response) => {
   }
 };
 
-export const requestMagicLink = async (
-  req: Request,
-  res: Response
-) => {
+export const requestMagicLink = async (req: Request, res: Response) => {
   try {
     const email = req.body.email.toLowerCase().trim();
 
@@ -184,10 +188,7 @@ export const requestMagicLink = async (
   }
 };
 
-export const verifyMagicLink = async (
-  req: Request,
-  res: Response
-) => {
+export const verifyMagicLink = async (req: Request, res: Response) => {
   try {
     const email = req.body.email.toLowerCase().trim();
     const token = req.body.token.trim();
@@ -196,7 +197,7 @@ export const verifyMagicLink = async (
 
     const user = await authService.findUserByEmail(email);
 
-    const {accessToken} = await issueTokens(user, res);
+    const { accessToken } = await issueTokens(user, res);
 
     return res.json({
       message: "Login successfull",
@@ -207,6 +208,32 @@ export const verifyMagicLink = async (
   } catch (err: any) {
     return res.status(400).json({
       message: err.message,
+      success: false,
+    });
+  }
+};
+
+export const logoutOtherDevices = async (req: Request, res: Response) => {
+  try {
+    const userId = req.user.id;
+    const currentRefreshToken = req.cookies.refreshToken;
+
+    if (!currentRefreshToken) {
+      return res.status(400).json({
+        message: "No refresh token found",
+        success: false,
+      });
+    }
+
+    await authService.logoutOtherDevices(userId, currentRefreshToken);
+
+    return res.json({
+      message: "Logged out from other devices",
+      success: true,
+    });
+  } catch (err: any) {
+    return res.status(500).json({
+      message: err.message || "Internal server error",
       success: false,
     });
   }
