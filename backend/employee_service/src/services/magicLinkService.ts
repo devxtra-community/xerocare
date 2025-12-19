@@ -20,7 +20,7 @@ export class MagicLinkService {
       expires_at: new Date(Date.now() + 10 * 60 * 1000), 
     });
 
-    const link = `${process.env.FRONTEND_URL}/magic-login?email=${encodeURIComponent(
+    const link = `${process.env.CLIENT_URL}/magic-login?email=${encodeURIComponent(
       email
     )}&token=${token}`;
 
