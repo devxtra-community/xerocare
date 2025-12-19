@@ -34,9 +34,6 @@ export default function DashboardPage() {
     }
 
     switch (role) {
-        case "ADMIN":
-            return <AdminDashboard />;
-
         case "HR":
             return <HrDashboard />;
 
