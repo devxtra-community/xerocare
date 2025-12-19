@@ -62,16 +62,16 @@ export default function ProductsTable() {
         <table className="w-full">
           <thead>
             <tr className="border-b">
-              <th className="text-left text-[10px] sm:text-xs font-semibold text-blue-900 py-1.5 sm:py-2 px-1 sm:px-2">
+              <th className="text-left text-[10px] sm:text-xs font-semibold text-primary py-1.5 sm:py-2 px-1 sm:px-2">
                 PRODUCT
               </th>
-              <th className="text-left text-[10px] sm:text-xs font-semibold text-blue-900 py-1.5 sm:py-2 px-1 sm:px-2">
+              <th className="text-left text-[10px] sm:text-xs font-semibold text-primary py-1.5 sm:py-2 px-1 sm:px-2">
                 QTY
               </th>
-              <th className="text-left text-[10px] sm:text-xs font-semibold text-blue-900 py-1.5 sm:py-2 px-1 sm:px-2">
+              <th className="text-left text-[10px] sm:text-xs font-semibold text-primary py-1.5 sm:py-2 px-1 sm:px-2">
                 PRICE
               </th>
-              <th className="text-left text-[10px] sm:text-xs font-semibold text-blue-900 py-1.5 sm:py-2 px-1 sm:px-2">
+              <th className="text-left text-[10px] sm:text-xs font-semibold text-primary py-1.5 sm:py-2 px-1 sm:px-2">
                 DATE
               </th>
             </tr>
@@ -138,7 +138,7 @@ export default function ProductsTable() {
             onClick={() => setPage(totalPages)}
             className={`px-1.5 sm:px-2 py-0.5 rounded-md border transition ${
               page === totalPages
-                ? "bg-blue-900 text-white"
+                ? "bg-primary text-white"
                 : "hover:bg-gray-50"
             }`}
           >

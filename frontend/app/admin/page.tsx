@@ -8,7 +8,7 @@ import CategoryPieChart from "@/components/categoryPiechart";
 
 export default function Dashboard() {
   return (
-    <div className="bg-gray-50 min-h-screen p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6">
+    <div className="bg-blue-100 min-h-screen p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6">
       <h3 className="text-xl sm:text-2xl md:text-2xl font-bold text-blue-900">
         Welcome, Riyas!
       </h3>
