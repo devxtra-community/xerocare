@@ -4,6 +4,7 @@ import {
   SidebarInset,
 } from "@/components/ui/sidebar"
 import AppSidebar from "@/components/AppSidebar"
+import DashboardHeader from "@/components/DashboardHeader"
 
 export default function AdminLayout({
   children,
@@ -14,7 +15,7 @@ export default function AdminLayout({
     <SidebarProvider>
       <div className="flex min-h-screen w-full">
         <AppSidebar />
-
+        <DashboardHeader/>
         <SidebarInset className="bg-muted min-h-screen w-full">
           {children}
         </SidebarInset>
