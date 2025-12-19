@@ -197,11 +197,12 @@ export const verifyMagicLink = async (req: Request, res: Response) => {
 
     const user = await authService.findUserByEmail(email);
 
-    const { accessToken } = await issueTokens(user, res);
+    const { accessToken,refreshToken } = await issueTokens(user, res);
 
     return res.json({
       message: "Login successfull",
       accessToken,
+      refreshToken,
       data: user,
       success: true,
     });
