@@ -33,7 +33,7 @@ export const loginVerify = async (req: Request, res: Response) => {
 
     const user = await authService.findUserByEmail(email);
 
-    const accessToken = await issueTokens(user, res);
+    const {accessToken} = await issueTokens(user, res);
 
     return res.json({
       message: "Login successfull",
@@ -58,7 +58,7 @@ export const refresh = async (req: Request, res: Response) => {
 
     const user = await authService.refresh(refreshToken);
 
-    const accessToken = await issueTokens(user, res);
+    const {accessToken} = await issueTokens(user, res);
 
     return res.json({
       message: "Access token refreshed",
@@ -193,7 +193,7 @@ export const verifyMagicLink = async (
 
     const user = await authService.findUserByEmail(email);
 
-    const accessToken = await issueTokens(user, res);
+    const {accessToken} = await issueTokens(user, res);
 
     return res.json({
       message: "Login successfull",
