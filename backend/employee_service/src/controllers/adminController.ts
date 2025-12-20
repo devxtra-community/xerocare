@@ -30,7 +30,7 @@ export const adminLogout = async (req:Request, res:Response) => {
     const refreshToken = req.cookies.refreshToken;
     await authService.logout(refreshToken);
     res.clearCookie("refreshToken");
-    res.json({ message: "Admin logout successful", success: true });
+    res.json({ message: "Admin logout successful", success: true, isAdmin:true });
   } 
   catch (err: any) {
     return res.status(500).json({
