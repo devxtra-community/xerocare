@@ -38,6 +38,36 @@ export default function WarehouseTable() {
       Location: "SM Street",
       productStock: "3650",
     },
+    {
+      wearhouseName: "First Store",
+      branch: "Ernakulam",
+      Location: "ABC Street",
+      productStock: "3456",
+    },
+    {
+      wearhouseName: "Central Hub",
+      branch: "Kochi",
+      Location: "MG Road",
+      productStock: "2890",
+    },
+    {
+      wearhouseName: "North Depot",
+      branch: "Thrissur",
+      Location: "Round North",
+      productStock: "4120",
+    },
+    {
+      wearhouseName: "South Warehouse",
+      branch: "Trivandrum",
+      Location: "Kazhakkoottam",
+      productStock: "1980",
+    },
+    {
+      wearhouseName: "Metro Store",
+      branch: "Calicut",
+      Location: "SM Street",
+      productStock: "3650",
+    },
   ];
 
   const totalPages = Math.ceil(data.length / ITEMS_PER_PAGE);

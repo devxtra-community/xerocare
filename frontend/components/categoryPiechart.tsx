@@ -36,7 +36,7 @@ export default function CategoryPieChart() {
               paddingAngle={3}
               stroke="#ffffff"
               strokeWidth={3}
-              isAnimationActive={false}
+              isAnimationActive={true}
             >
               {data.map((entry, index) => (
                 <Cell key={index} fill={entry.color} />

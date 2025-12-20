@@ -36,7 +36,7 @@ export default function EmployeePieChart() {
               paddingAngle={3}
               stroke="#ffffff"
               strokeWidth={2}
-              isAnimationActive={false}
+              isAnimationActive={true}
             >
               {data.map((entry, index) => (
                 <Cell key={index} fill={entry.color} />

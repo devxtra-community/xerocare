@@ -21,10 +21,10 @@ import {
 
 const menuItems = [
   { title: "Dashboard", icon: LayoutDashboard, href: "/", active: true },
-  { title: "Sales", icon: ShoppingCart, href: "/sales" },
+  { title: "Sales", icon: ShoppingCart, href: "/admin/sales" },
   { title: "Branch", icon: Building2, href: "/branch", disabled: true },
   { title: "Human Resources", icon: Users, href: "/hr", disabled: true },
-  { title: "Warehouse", icon: Package, href: "/warehouse" },
+  { title: "Warehouse", icon: Package, href: "admin/warehouse" },
 ];
 
 export default function AppSidebar() {
