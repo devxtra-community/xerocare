@@ -39,38 +39,45 @@ export const addEmployee = async (req: Request, res: Response) => {
       id_proof_key: idProofKey,
     });
 
-    res.status(201).json({
-      message: "Employee created successfully",
-      data: employee,
-      success: true,
-    });
+    res.status(201).json({message: "Employee created successfully",data: employee,success: true,});
   } catch (err: any) {
-    res.status(400).json({
-      message: err.message,
-      success: false,
-    });
+    res.status(400).json({message: err.message,success: false,});
   }
 };
 
 
-export const getEmployeeIdProof = async (
-  req: Request,
-  res: Response
-) => {
+export const getEmployeeIdProof = async (req: Request,res: Response) => {
   try {
     const employeeId = req.params.id;
 
     const result =
       await service.getEmployeeIdProof(employeeId);
 
-    return res.json({
-      success: true,
-      data: result,
-    });
+    return res.json({success: true,data: result,});
   } catch (err: any) {
-    return res.status(404).json({
-      success: false,
-      message: err.message,
-    });
+    return res.status(404).json({success: false,message: err.message,});
+  }
+};
+
+export const getAllEmployees = async (req: Request,res: Response) => {
+  try {
+    const page = Number(req.query.page) || 1;
+    const limit = Number(req.query.limit) || 20;
+
+    const result = await service.getAllEmployees(page, limit);
+
+    return res.json({success: true,data: result,message:"Employees fetched successfully"});
+  } catch (err: any) {
+    return res.status(500).json({success: false,message: err.message,});
+  }
+};
+
+export const getEmployeeById = async (req: Request,res: Response) => {
+  try {
+    const employee = await service.getEmployeeById(req.params.id);
+
+    return res.json({success: true,data: employee,message:"Employee fetched successfully"});
+  } catch (err: any) {
+    return res.status(404).json({success: false,message: err.message,});
   }
 };

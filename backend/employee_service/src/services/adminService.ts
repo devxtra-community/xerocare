@@ -1,12 +1,10 @@
 import bcrypt from "bcrypt";
 import { AdminRepository } from "../repositories/adminRepository";
-import { signAccesstoken, signRefreshtoken } from "../utlis/jwt";
 import { AuthRepository } from "../repositories/authRepository";
 
 export class AdminService {
 
   private adminRepo = new AdminRepository();
-  private authRepo = new AuthRepository();
 
   async login(payload: { email: string; password: string }) {
     const { email, password } = payload;

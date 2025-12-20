@@ -2,8 +2,8 @@ import bcrypt from "bcrypt";
 import { EmployeeRepository } from "../repositories/employeeRepository";
 import { EmployeeRole } from "../constants/employeeRole";
 import { generateRandomPassword } from "../utlis/passwordGenerator";
-import { sendEmployeeWelcomeMail } from "../utlis/mailer";
 import { getSignedIdProofUrl } from "../utlis/r2SignedUrl";
+import { publishEmailJob } from "../queues/emailProducer";
 
 export class EmployeeService {
   private employeeRepo = new EmployeeRepository();
@@ -63,7 +63,11 @@ export class EmployeeService {
       expire_date: expireDate ?? null,
     });
 
-    await sendEmployeeWelcomeMail(email, plainPassword);
+    publishEmailJob({
+      type: "WELCOME",
+      email,
+      password: plainPassword,
+    }).catch(console.error);
 
     return employee;
   }
@@ -85,5 +89,31 @@ export class EmployeeService {
       url: signedUrl,
       expiresIn: "5 minutes",
     };
-  }    
+  }
+
+  async getAllEmployees(page = 1, limit = 20) {
+    const skip = (page - 1) * limit;
+
+    const { data, total } = await this.employeeRepo.findAll(skip, limit);
+
+    return {
+      employees: data,
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  async getEmployeeById(id: string) {
+    const employee = await this.employeeRepo.findByIdSafe(id);
+
+    if (!employee) {
+      throw new Error("Employee not found");
+    }
+
+    return employee;
+  }
 }

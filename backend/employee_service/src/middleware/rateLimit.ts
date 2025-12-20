@@ -1,35 +1,44 @@
-import rateLimit from "express-rate-limit";
+import { redis } from "../config/redis";
+import { Request, Response, NextFunction } from "express";
 
-export const otpRequestLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5,                  // 5 requests
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: {
-    message: "Too many requests. Please try again later.",
-    success: false,
-  },
-});
+interface RateLimitOptions {
+  keyPrefix: string;
+  windowSec: number;
+  max: number;
+}
 
-export const otpVerifyLimiter = rateLimit({
-  windowMs: 10 * 60 * 1000, // 10 minutes
-  max: 5,                  // 5 attempts
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: {
-    message: "Too many attempts. Please try again later.",
-    success: false,
-  },
-});
+export const redisRateLimiter =
+  (options: RateLimitOptions) =>
+  async (req: Request, res: Response, next: NextFunction) => {
+    const identifier =
+      req.body?.email ??
+      req.ip ??
+      "unknown";
 
-export const loginLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 10,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: {
-    message: "Too many login attempts. Try again later.",
-    success: false,
-  },
-});
+    const key = `${options.keyPrefix}:${identifier}`;
 
+    try {
+      const count = await Promise.race([
+        redis.incr(key),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error("Redis timeout")), 500)
+        ),
+      ]);
+
+      if (count === 1) {
+        await redis.expire(key, options.windowSec);
+      }
+
+      if (count > options.max) {
+        return res.status(429).json({
+          success: false,
+          message: "Too many requests. Please try again later.",
+        });
+      }
+
+      return next();
+    } catch (err:any) {
+      console.error("Rate limiter skipped:", err.message);
+      return next();
+    }
+  };

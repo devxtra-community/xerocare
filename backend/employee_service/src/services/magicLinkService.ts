@@ -1,43 +1,32 @@
+import { redis } from "../config/redis";
 import crypto from "crypto";
-import bcrypt from "bcrypt";
-import { MagicLinkRepository } from "../repositories/magicLinkRepository";
-import { sendMagicLinkMail } from "../utlis/mailer";
+import { publishEmailJob } from "../queues/emailProducer";
 
 export class MagicLinkService {
-  private repo = new MagicLinkRepository();
-
-  private generateToken() {
-    return crypto.randomBytes(32).toString("hex");
-  }
 
   async sendMagicLink(email: string) {
-    const token = this.generateToken();
-    const tokenHash = await bcrypt.hash(token, 10);
+    const token = crypto.randomBytes(32).toString("hex");
 
-    await this.repo.create({
-      email,
-      token_hash: tokenHash,
-      expires_at: new Date(Date.now() + 10 * 60 * 1000), 
-    });
+    const key = `magic:login:${token}`;
 
-    const link = `${process.env.CLIENT_URL}/magic-login?email=${encodeURIComponent(
-      email
-    )}&token=${token}`;
+    await redis.set(key, email, "EX", 600);
 
-    await sendMagicLinkMail(email, link);
+    const link = `${process.env.CLIENT_URL}/magic-login?token=${token}`;
+
+    publishEmailJob({ type: "MAGIC", email, link }).catch(console.error);
+
   }
 
-  async verifyMagicLink(email: string, token: string) {
-    const record = await this.repo.findValidByEmail(email);
+  async verifyMagicLink(token: string) {
+    const key = `magic:login:${token}`;
 
-    if (!record) throw new Error("Invalid or expired link");
-    if (record.expires_at < new Date())
-      throw new Error("Link expired");
+    const email = await redis.get(key);
+    if (!email) {
+      throw new Error("Invalid or expired magic link");
+    }
 
-    const valid = await bcrypt.compare(token, record.token_hash);
-    if (!valid) throw new Error("Invalid link");
+    await redis.del(key);
 
-    await this.repo.markUsed(record.id);
-    return true;
+    return email;
   }
 }

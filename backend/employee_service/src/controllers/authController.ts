@@ -33,7 +33,7 @@ export const loginVerify = async (req: Request, res: Response) => {
 
     const user = await authService.findUserByEmail(email);
 
-    const accessToken = await issueTokens(user,req,res);
+    const accessToken = await issueTokens(user, req, res);
 
     return res.json({
       message: "Login successfull",
@@ -58,7 +58,7 @@ export const refresh = async (req: Request, res: Response) => {
 
     const user = await authService.refresh(refreshToken);
 
-    const accessToken = await issueTokens(user,req,res);
+    const accessToken = await issueTokens(user, req, res);
 
     return res.json({
       message: "Access token refreshed",
@@ -187,17 +187,19 @@ export const requestMagicLink = async (req: Request, res: Response) => {
 
 export const verifyMagicLink = async (req: Request, res: Response) => {
   try {
-    const email = req.body.email.toLowerCase().trim();
     const token = req.body.token.trim();
 
-    await magicLinkService.verifyMagicLink(email, token);
+    const email = await magicLinkService.verifyMagicLink(token);
 
     const user = await authService.findUserByEmail(email);
+    if (!user) {
+      throw new Error("User not found");
+    }
 
-    const accessToken = await issueTokens(user,req,res);
+    const accessToken = await issueTokens(user, req, res);
 
     return res.json({
-      message: "Login successfull",
+      message: "Login successful",
       accessToken,
       data: user,
       success: true,
@@ -241,10 +243,7 @@ export const getSessions = async (req: Request, res: Response) => {
     const userId = req.user.id;
     const currentToken = req.cookies.refreshToken;
 
-    const sessions = await authService.getSessions(
-      userId,
-      currentToken
-    );
+    const sessions = await authService.getSessions(userId, currentToken);
 
     return res.json({
       data: sessions,
@@ -258,10 +257,7 @@ export const getSessions = async (req: Request, res: Response) => {
   }
 };
 
-export const logoutSession = async (
-  req: Request,
-  res: Response
-) => {
+export const logoutSession = async (req: Request, res: Response) => {
   try {
     const userId = req.user.id;
     const { sessionId } = req.body;
