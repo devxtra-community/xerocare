@@ -52,6 +52,7 @@ export const loginVerify = async (req: Request, res: Response) => {
 
 export const refresh = async (req: Request, res: Response) => {
   try {
+    console.log("inside refreshing accestoken")
     const refreshToken = req.cookies.refreshToken;
     if (!refreshToken) {
       throw new Error("No refresh token");

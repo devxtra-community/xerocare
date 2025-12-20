@@ -1,5 +1,5 @@
 import api from "./api";
-import { setAuthTokens } from "axios-jwt";
+
 import { jwtDecode } from "jwt-decode";
 
 export type UserRole = "HR" | "EMPLOYEE" | "FINANCE" | "MANAGER";
@@ -35,10 +35,8 @@ export async function verifyLoginOtp(email: string, otp: string) {
     otp,
   });
   console.log(res);
-  setAuthTokens({
-    accessToken: res.data.accessToken,
-    refreshToken: res.data.refreshToken,
-  });
+  localStorage.setItem("accessToken", res.data.accessToken);
+
   return res.data;
 }
 
@@ -50,10 +48,8 @@ export async function requestMagicLink(email: string) {
 export async function verifyMagicLink(email: string, token: string) {
   const res = await api.post("/auth/magic-link/verify", { email, token });
   console.log(res);
-  setAuthTokens({
-    accessToken: res.data.accessToken,
-    refreshToken: res.data.refreshToken,
-  });
+  localStorage.setItem("accessToken", res.data.accessToken);
+
   return res.data;
 }
 
