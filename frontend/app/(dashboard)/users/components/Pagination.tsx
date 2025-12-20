@@ -14,7 +14,7 @@ export default function Pagination({
   onPageChange,
 }: PaginationProps) {
   return (
-    <div className="flex items-center justify-between">
+    <div className="flex flex-col items-center justify-between">
       <p className="text-sm text-muted-foreground">
         Page {page} of {totalPages}
       </p>

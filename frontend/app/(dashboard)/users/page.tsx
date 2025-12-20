@@ -2,24 +2,6 @@ import AddEmployeeDialog from "./components/AddEmployeeDialog";
 import UserTable from "./components/UserTable";
 
 
-
-// export default function UsersPage(){
-//     return(
-//         <div className="space-y-6">
-//             {/*HEADER*/}
-
-//             <div className="flex items-center justify-between p-6">
-//                 <h1 className="mb-4 text-3xl font-serif">Human Resources</h1>
-//                 <AddEmployeeDialog/>
-//             </div>
-
-//             {/*TABLE*/}
-//         <UserTable users={users}/>
-//         </div>
-//     )
-// }
-
-
 export type UserListItem = {
     id: number;
     name: string;
@@ -29,7 +11,6 @@ export type UserListItem = {
     expiryDate: string;
     salary: string;
 };
-
 
 
 async function getUsers(): Promise<UserListItem[]> {
@@ -144,8 +125,8 @@ export default async function UsersPage() {
         <div className="space-y-6">
             {/*HEADER*/}
 
-            <div className="flex items-center justify-between p-6">
-                <h1 className="mb-4 text-3xl font-serif">Human Resources</h1>
+            <div className ="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-6">
+                <h1 className="mb-4 sm:text-3xl font-serif">Human Resources</h1>
                 <AddEmployeeDialog />
             </div>
 
