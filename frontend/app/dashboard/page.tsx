@@ -24,7 +24,6 @@ export default function DashboardPage() {
         }
 
         if (user.role !== role) {
-            // eslint-disable-next-line react-hooks/set-state-in-effect
             setRole(user.role);
         }
     }, [router, role]);
