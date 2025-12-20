@@ -8,8 +8,8 @@ export type UserListItem = {
     department: string;
     branch: string;
     startDate: string;
-    expiryDate: string;
-    salary: string;
+    visaexpiryDate: string;
+    salary: number;
 };
 
 
@@ -22,8 +22,8 @@ async function getUsers(): Promise<UserListItem[]> {
             department: "Marketing",
             branch: "Kochi",
             startDate: "19.02.2023",
-            expiryDate: "19.02.2025",
-            salary: "1200 AZN"
+            visaexpiryDate: "19.02.2025",
+            salary: 1250
         },
         {
             id: 2,
@@ -31,8 +31,8 @@ async function getUsers(): Promise<UserListItem[]> {
             department: "Finance",
             branch: "Ernakulam",
             startDate: "19.05.2023",
-            expiryDate: "19.05.2025",
-            salary: "1500 AZN"
+            visaexpiryDate: "19.05.2025",
+            salary: 750
         },
         {
             id: 3,
@@ -40,8 +40,8 @@ async function getUsers(): Promise<UserListItem[]> {
             department: "Finance",
             branch: "Ernakulam",
             startDate: "19.05.2023",
-            expiryDate: "19.05.2025",
-            salary: "1500 AZN"
+            visaexpiryDate: "19.05.2025",
+            salary: 6000
         },
         {
             id: 4,
@@ -49,8 +49,8 @@ async function getUsers(): Promise<UserListItem[]> {
             department: "Finance",
             branch: "Ernakulam",
             startDate: "19.05.2023",
-            expiryDate: "19.05.2025",
-            salary: "1500 AZN"
+            visaexpiryDate: "19.05.2025",
+            salary: 1500
         },
         {
             id: 5,
@@ -58,8 +58,8 @@ async function getUsers(): Promise<UserListItem[]> {
             department: "Finance",
             branch: "Ernakulam",
             startDate: "19.05.2023",
-            expiryDate: "19.05.2025",
-            salary: "1500 AZN"
+            visaexpiryDate: "19.05.2025",
+            salary: 800
         },
         {
             id: 6,
@@ -67,8 +67,8 @@ async function getUsers(): Promise<UserListItem[]> {
             department: "Finance",
             branch: "Ernakulam",
             startDate: "19.05.2023",
-            expiryDate: "19.05.2025",
-            salary: "1500 AZN"
+            visaexpiryDate: "19.05.2025",
+            salary: 7000
         },
         {
             id: 7,
@@ -76,8 +76,8 @@ async function getUsers(): Promise<UserListItem[]> {
             department: "Finance",
             branch: "Ernakulam",
             startDate: "19.05.2023",
-            expiryDate: "19.05.2025",
-            salary: "1500 AZN"
+            visaexpiryDate: "19.05.2025",
+            salary: 1000
         },
         {
             id: 8,
@@ -85,8 +85,8 @@ async function getUsers(): Promise<UserListItem[]> {
             department: "Finance",
             branch: "Ernakulam",
             startDate: "19.05.2023",
-            expiryDate: "19.05.2025",
-            salary: "1500 AZN"
+            visaexpiryDate: "19.05.2025",
+            salary: 5000
         },
         {
             id: 9,
@@ -94,8 +94,8 @@ async function getUsers(): Promise<UserListItem[]> {
             department: "Finance",
             branch: "Ernakulam",
             startDate: "19.05.2023",
-            expiryDate: "19.05.2025",
-            salary: "1500 AZN"
+            visaexpiryDate: "19.05.2025",
+            salary: 4000
         },
         {
             id: 10,
@@ -103,8 +103,8 @@ async function getUsers(): Promise<UserListItem[]> {
             department: "Finance",
             branch: "Ernakulam",
             startDate: "19.05.2023",
-            expiryDate: "19.05.2025",
-            salary: "1500 AZN"
+            visaexpiryDate: "19.05.2025",
+            salary: 6000
         },
         {
             id: 11,
@@ -112,8 +112,8 @@ async function getUsers(): Promise<UserListItem[]> {
             department: "Finance",
             branch: "Ernakulam",
             startDate: "19.05.2023",
-            expiryDate: "19.05.2025",
-            salary: "1500 AZN"
+            visaexpiryDate: "19.05.2025",
+            salary: 2500    
         },
     ];
 }
@@ -125,12 +125,12 @@ export default async function UsersPage() {
         <div className="space-y-6">
             {/*HEADER*/}
 
-            <div className ="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-6">
-                <h1 className="mb-4 sm:text-3xl font-serif">Human Resources</h1>
+            <div className ="flex flex-col gap-4 p-6 sm:flex-row sm:items-center sm:justify-between sm:p-6">
+                <h1 className="sm:text-3xl font-serif">Human Resources</h1>
                 <AddEmployeeDialog />
             </div>
 
-            <UserTable users={users} />;
+            <UserTable users={users} />
         </div>
     )
 }

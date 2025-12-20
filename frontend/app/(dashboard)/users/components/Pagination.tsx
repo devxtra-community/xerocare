@@ -14,8 +14,8 @@ export default function Pagination({
   onPageChange,
 }: PaginationProps) {
   return (
-    <div className="flex flex-col items-center justify-between">
-      <p className="text-sm text-muted-foreground">
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <p className="text-sm text-muted-foreground text-center sm:text-left">
         Page {page} of {totalPages}
       </p>
 

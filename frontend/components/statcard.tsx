@@ -1,4 +1,3 @@
-import * as React from "react"
 import {
   Card,
   CardContent,
@@ -8,7 +7,7 @@ import {
 
 type StatCardProps = {
   title: string
-  value: string
+  value: string|number
   subtitle?: string
 }
 
