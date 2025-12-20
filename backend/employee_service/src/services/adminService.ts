@@ -23,16 +23,6 @@ export class AdminService {
         throw new Error("Invalid password");
     }
     
-    const accessToken = signAccesstoken({
-      id: admin.id,
-      email: admin.email,
-      role: "ADMIN"
-    });
-
-    const refreshToken = signRefreshtoken({ id: admin.id });
-
-    await this.authRepo.saveRefreshToken(admin, refreshToken);
-
-    return { admin, accessToken, refreshToken };
+    return admin;
   }
 }

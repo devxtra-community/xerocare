@@ -99,4 +99,22 @@ export class AuthService {
 
     return true;
   }
+
+  async getSessions(userId: string, currentToken: string) {
+    const sessions = await this.authRepo.getUserSessions(userId);
+
+    return sessions.map((s) => ({
+      id: s.id,
+      ip: s.ip_address,
+      userAgent: s.user_agent,
+      createdAt: s.createdAt,
+      isCurrent: s.refresh_token === currentToken,
+    }));
+  }
+
+  async logoutSession(userId: string, sessionId: string) {
+    await this.authRepo.deleteSessionById(sessionId, userId);
+    return true;
+  }
+
 }
