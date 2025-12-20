@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { login, logout, refresh,changePassword, loginVerify, forgotPassword, resetPassword, requestMagicLink, verifyMagicLink, logoutOtherDevices } from "../controllers/authController";
+import { login, logout, refresh,changePassword, loginVerify, forgotPassword, resetPassword, requestMagicLink, verifyMagicLink, logoutOtherDevices, getSessions, logoutSession } from "../controllers/authController";
 import { authMiddleware } from "../middleware/authMiddleware";
 import {otpRequestLimiter,otpVerifyLimiter,loginLimiter} from "../middleware/rateLimit";
 
@@ -15,6 +15,7 @@ authRouter.post("/forgot-password/verify",otpVerifyLimiter, resetPassword);
 authRouter.post("/magic-link",otpRequestLimiter, requestMagicLink);
 authRouter.post("/magic-link/verify",otpVerifyLimiter, verifyMagicLink);
 authRouter.post("/logout-other-devices",authMiddleware,logoutOtherDevices);
-
+authRouter.get("/sessions",authMiddleware,getSessions);
+authRouter.post("/sessions/logout",authMiddleware,logoutSession)
 
 export default authRouter;

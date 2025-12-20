@@ -8,9 +8,9 @@ const authService = new AuthService();
 
 export const adminLogin = async (req:Request, res:Response) => {
   try {
-    const { admin } = await adminService.login(req.body);
+    const admin = await adminService.login(req.body);
 
-    const {accessToken} = await issueTokens(admin, res);
+    const accessToken = await issueTokens(admin,req,res);
 
     return res.json({
       message: "Admin login successfully",

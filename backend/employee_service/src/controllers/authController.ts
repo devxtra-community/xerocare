@@ -33,7 +33,7 @@ export const loginVerify = async (req: Request, res: Response) => {
 
     const user = await authService.findUserByEmail(email);
 
-    const accessToken = await issueTokens(user, res);
+    const accessToken = await issueTokens(user,req,res);
 
     return res.json({
       message: "Login successfull",
@@ -58,7 +58,7 @@ export const refresh = async (req: Request, res: Response) => {
 
     const user = await authService.refresh(refreshToken);
 
-    const accessToken = await issueTokens(user, res);
+    const accessToken = await issueTokens(user,req,res);
 
     return res.json({
       message: "Access token refreshed",
@@ -194,7 +194,7 @@ export const verifyMagicLink = async (req: Request, res: Response) => {
 
     const user = await authService.findUserByEmail(email);
 
-    const accessToken = await issueTokens(user, res);
+    const accessToken = await issueTokens(user,req,res);
 
     return res.json({
       message: "Login successfull",
@@ -231,6 +231,50 @@ export const logoutOtherDevices = async (req: Request, res: Response) => {
   } catch (err: any) {
     return res.status(500).json({
       message: err.message || "Internal server error",
+      success: false,
+    });
+  }
+};
+
+export const getSessions = async (req: Request, res: Response) => {
+  try {
+    const userId = req.user.id;
+    const currentToken = req.cookies.refreshToken;
+
+    const sessions = await authService.getSessions(
+      userId,
+      currentToken
+    );
+
+    return res.json({
+      data: sessions,
+      success: true,
+    });
+  } catch (err: any) {
+    return res.status(500).json({
+      message: err.message,
+      success: false,
+    });
+  }
+};
+
+export const logoutSession = async (
+  req: Request,
+  res: Response
+) => {
+  try {
+    const userId = req.user.id;
+    const { sessionId } = req.body;
+
+    await authService.logoutSession(userId, sessionId);
+
+    return res.json({
+      message: "Session logged out",
+      success: true,
+    });
+  } catch (err: any) {
+    return res.status(500).json({
+      message: err.message,
       success: false,
     });
   }
