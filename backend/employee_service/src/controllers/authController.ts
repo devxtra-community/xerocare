@@ -38,7 +38,6 @@ export const loginVerify = async (req: Request, res: Response) => {
     return res.json({
       message: "Login successfull",
       accessToken,
-      refreshToken,
       data: user,
       success: true,
     });
@@ -200,7 +199,6 @@ export const verifyMagicLink = async (req: Request, res: Response) => {
     return res.json({
       message: "Login successfull",
       accessToken,
-      refreshToken,
       data: user,
       success: true,
     });
