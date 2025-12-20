@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 import  StatCard  from "@/components/StatCard";
 import ProductsTable from "@/components/productTable";
 import HrTable from "@/components/HrTable";
@@ -9,23 +8,10 @@ import CategoryPieChart from "@/components/CategoryPieChart";
 
 export default function Dashboard() {
   return (
-    <div className="bg-gray-50 min-h-screen p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6">
-=======
-import { StatCard } from "@/components/statcard";
-import ProductsTable from "@/components/productTable";
-import HrTable from "@/components/hrTable";
-import SalesChart from "@/components/salesChart";
-import EmployeePieChart from "@/components/employeesPiechart";
-import WarehouseTable from "@/components/wearhouseTable";
-import CategoryPieChart from "@/components/categoryPiechart";
-
-export default function Dashboard() {
-  return (
     <div className="bg-blue-100 min-h-screen p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6">
->>>>>>> riyas
-      <h3 className="text-xl sm:text-2xl md:text-2xl font-bold text-blue-900">
+      {/* <h3 className="text-xl sm:text-2xl md:text-2xl font-bold text-blue-900">
         Welcome, Riyas!
-      </h3>
+      </h3> */}
 
       <div className="flex flex-col space-y-3 sm:space-y-4">
         <h3 className="text-lg sm:text-m font-bold text-blue-900">Sales</h3>
@@ -100,8 +86,4 @@ export default function Dashboard() {
       </div>
     </div>
   );
-<<<<<<< HEAD
 }
-=======
-}
->>>>>>> riyas

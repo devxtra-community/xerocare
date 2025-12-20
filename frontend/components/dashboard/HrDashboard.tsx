@@ -129,8 +129,4 @@ export default function HrDashboard() {
             {/* <UserTable users={users} /> */}
         </div>
     )
-<<<<<<< HEAD
 }
-=======
-}
->>>>>>> riyas

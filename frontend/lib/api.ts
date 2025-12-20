@@ -1,9 +1,4 @@
 import axios from "axios";
-<<<<<<< HEAD
-
-=======
-import { applyAuthTokenInterceptor } from "axios-jwt";
->>>>>>> riyas
 import { requestRefresh } from "./auth-refresh";
 
 const api = axios.create({
@@ -11,13 +6,6 @@ const api = axios.create({
   withCredentials: true,
 });
 
-<<<<<<< HEAD
-=======
-applyAuthTokenInterceptor(api, {
-  requestRefresh,
-});
-
->>>>>>> riyas
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem("accessToken");
@@ -26,7 +14,6 @@ api.interceptors.request.use(
     }
     return config;
   },
-<<<<<<< HEAD
   (error) => Promise.reject(error)
 );
 
@@ -92,15 +79,8 @@ api.interceptors.response.use(
         return Promise.reject(refreshError);
       }
     }
-=======
-  (error) => {
->>>>>>> riyas
     return Promise.reject(error);
   }
 );
 
-<<<<<<< HEAD
 export default api;
-=======
-export default api;
->>>>>>> riyas

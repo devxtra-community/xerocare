@@ -20,8 +20,4 @@ export default function AdminLayout({
       </div>
     </SidebarProvider>
   );
-<<<<<<< HEAD
 }
-=======
-}
->>>>>>> riyas

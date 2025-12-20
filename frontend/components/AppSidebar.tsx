@@ -1,15 +1,11 @@
+"use client"
 import {
   LayoutDashboard,
   ShoppingCart,
   Building2,
   Users,
   Package,
-<<<<<<< HEAD
-} from "lucide-react"
-=======
-  LogOut,
 } from "lucide-react";
->>>>>>> riyas
 
 import {
   Sidebar,
@@ -21,7 +17,6 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-<<<<<<< HEAD
 } from "@/components/ui/sidebar"
 import { logout } from "@/lib/auth"
 import { toast } from "sonner"
@@ -58,17 +53,6 @@ const menuItems = [
     href: "/admin/warehouse",
   },
 ]
-=======
-} from "@/components/ui/sidebar";
-
-const menuItems = [
-  { title: "Dashboard", icon: LayoutDashboard, href: "/", active: true },
-  { title: "Sales", icon: ShoppingCart, href: "/admin/sales" },
-  { title: "Branch", icon: Building2, href: "/branch", disabled: true },
-  { title: "Human Resources", icon: Users, href: "/hr", disabled: true },
-  { title: "Warehouse", icon: Package, href: "admin/warehouse" },
-];
->>>>>>> riyas
 
 
 
@@ -83,7 +67,12 @@ export default function AppSidebar() {
         toast.error(res?.data.message)
       }
       else{
-        router.push('/login');
+        if(res.data.isadmin){
+          router.push('/admin/login');
+        }
+        else{
+          router.push('/login');
+        }
         toast.success(res.data.message)
       }
     }
@@ -117,11 +106,6 @@ export default function AppSidebar() {
                     disabled={item.disabled}
                     className={`
                       py-2.5 rounded-md
-<<<<<<< HEAD
-                      ${item.active
-                        ? "bg-white text-[#0A4C7E]"
-                        : "text-white hover:bg-white/10"
-=======
                       !text-sidebar-accent-foreground
                       [&_svg]:!text-sidebar-accent-foreground
 
@@ -135,7 +119,6 @@ export default function AppSidebar() {
                         item.disabled
                           ? "!text-sidebar-accent-foreground/70 cursor-not-allowed"
                           : ""
->>>>>>> riyas
                       }
                     `}
                   >

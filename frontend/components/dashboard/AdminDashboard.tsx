@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 import  StatCard  from "@/components/StatCard";
 import ProductsTable from "@/components/productTable";
 import HrTable from "@/components/HrTable";
@@ -6,15 +5,6 @@ import SalesChart from "@/components/SalesChart";
 import EmployeePieChart from "@/components/employeesPiechart";
 import WarehouseTable from "@/components/employeesPiechart";
 import CategoryPieChart from "@/components/CategoryPieChart";
-=======
-import { StatCard } from "@/components/statcard";
-import ProductsTable from "@/components/productTable";
-import HrTable from "@/components/hrTable";
-import SalesChart from "@/components/salesChart";
-import EmployeePieChart from "@/components/employeesPiechart";
-import WarehouseTable from "@/components/wearhouseTable";
-import CategoryPieChart from "@/components/categoryPiechart";
->>>>>>> riyas
 
 export default function Dashboard() {
   return (
@@ -96,8 +86,4 @@ export default function Dashboard() {
       </div>
     </div>
   );
-<<<<<<< HEAD
 }
-=======
-}
->>>>>>> riyas

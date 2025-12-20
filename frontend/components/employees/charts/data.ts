@@ -13,8 +13,4 @@ export type WorkingHoursPoint = {
 export type PerformancePoint = {
   name: string;
   value: number;
-<<<<<<< HEAD
 };
-=======
-};
->>>>>>> riyas

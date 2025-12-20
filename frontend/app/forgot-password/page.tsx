@@ -8,7 +8,6 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-<<<<<<< HEAD
 import {
     AlertDialog,
     AlertDialogAction,
@@ -19,8 +18,6 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-=======
->>>>>>> riyas
 
 export default function ForgotPasswordPage() {
     const [step, setStep] = useState<"request" | "reset">("request");
@@ -28,7 +25,6 @@ export default function ForgotPasswordPage() {
     const [otp, setOtp] = useState("");
     const [newPassword, setNewPassword] = useState("");
     const [loading, setLoading] = useState(false);
-<<<<<<< HEAD
     const [showConfirm, setShowConfirm] = useState(false);
     const router = useRouter();
 
@@ -39,12 +35,6 @@ export default function ForgotPasswordPage() {
 
     const handleConfirm = async () => {
         setShowConfirm(false);
-=======
-    const router = useRouter();
-
-    const handleRequestSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
->>>>>>> riyas
         setLoading(true);
         try {
             const res = await requestForgotPasswordOtp(email);
@@ -56,10 +46,7 @@ export default function ForgotPasswordPage() {
             }
         } catch (err: unknown) {
             let msg = "Failed to send OTP";
-<<<<<<< HEAD
-=======
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
->>>>>>> riyas
             if ((err as any).response?.data?.message) msg = (err as any).response.data.message;
             toast.error(msg);
         } finally {
@@ -80,10 +67,7 @@ export default function ForgotPasswordPage() {
             }
         } catch (err: unknown) {
             let msg = "Failed to reset password";
-<<<<<<< HEAD
-=======
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
->>>>>>> riyas
             if ((err as any).response?.data?.message) msg = (err as any).response.data.message;
             toast.error(msg);
         } finally {
@@ -169,7 +153,6 @@ export default function ForgotPasswordPage() {
                     )}
                 </CardContent>
             </Card>
-<<<<<<< HEAD
 
             <AlertDialog open={showConfirm} onOpenChange={setShowConfirm}>
                 <AlertDialogContent>
@@ -188,8 +171,3 @@ export default function ForgotPasswordPage() {
         </div>
     );
 }
-=======
-        </div>
-    );
-}
->>>>>>> riyas

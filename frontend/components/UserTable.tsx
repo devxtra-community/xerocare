@@ -93,8 +93,4 @@ export default function UserTable({ users }: UserTableProps) {
       />
     </div>
   );
-<<<<<<< HEAD
 }
-=======
-}
->>>>>>> riyas

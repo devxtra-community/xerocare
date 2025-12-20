@@ -35,8 +35,4 @@ export default function WorkingHoursChart({ data }: Props) {
             </ResponsiveContainer>
         </div>
     );
-<<<<<<< HEAD
 }
-=======
-}
->>>>>>> riyas

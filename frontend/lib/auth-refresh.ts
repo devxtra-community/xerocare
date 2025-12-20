@@ -8,8 +8,4 @@ export const requestRefresh = async (): Promise<string> => {
   );
 
   return res.data.accessToken;
-<<<<<<< HEAD
 };
-=======
-};
->>>>>>> riyas

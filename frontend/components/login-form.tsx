@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 "use client";
 
 import { useState } from "react";
@@ -11,25 +10,11 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { requestLoginOtp, verifyLoginOtp, requestMagicLink } from "@/lib/auth";
 import Link from "next/link";
-=======
-"use client"
-
-import { cn } from "@/lib/utils"
-import { Button } from "@/components/ui/button"
-
-import {
-  Field,
-  FieldGroup,
-  FieldLabel,
-} from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
->>>>>>> riyas
 
 export function LoginForm({
   className,
   ...props
 }: React.ComponentProps<"div">) {
-<<<<<<< HEAD
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [otp, setOtp] = useState("");
@@ -128,12 +113,6 @@ export function LoginForm({
       setLoading(false);
     }
   };
-=======
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    // submit logic
-  }
->>>>>>> riyas
 
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
@@ -141,7 +120,6 @@ export function LoginForm({
         Xerocare
       </h1>
 
-<<<<<<< HEAD
       <div className="flex gap-2 p-1 bg-muted rounded-lg">
         <button
           onClick={() => { setLoginMethod("password"); setStep("credentials"); setError(null); }}
@@ -305,48 +283,4 @@ export function LoginForm({
       )}
     </div>
   );
-=======
-      <FieldGroup>
-        <div className="flex flex-col items-center gap-1 text-center">
-          <h1 className="text-xl text-muted-foreground">
-            Login to your account
-          </h1>
-        </div>
-
-        <Field>
-          <FieldLabel htmlFor="email" className="text-muted-foreground">
-            Email
-          </FieldLabel>
-          <Input
-            id="email"
-            type="email"
-            placeholder="m@example.com"
-            required
-          />
-        </Field>
-
-        <Field>
-          <div className="flex items-center">
-            <FieldLabel htmlFor="password" className="text-muted-foreground">
-              Password
-            </FieldLabel>
-            <a
-              href="#"
-              className="ml-auto text-muted-foreground underline-offset-4 hover:underline"
-            >
-              Forgot your password?
-            </a>
-          </div>
-          <Input id="password" type="password" required />
-        </Field>
-
-        <Field>
-          <Button onClick={handleSubmit} className="w-full relative z-0">
-            Login
-          </Button>
-        </Field>
-      </FieldGroup>
-    </div>
-  )
->>>>>>> riyas
 }

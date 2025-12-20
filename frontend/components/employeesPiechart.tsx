@@ -1,8 +1,4 @@
 "use client";
-<<<<<<< HEAD
-=======
-
->>>>>>> riyas
 import { PieChart, Pie, Cell } from "recharts";
 import { useState, useEffect } from "react";
 
@@ -39,11 +35,7 @@ export default function EmployeePieChart() {
               paddingAngle={3}
               stroke="#ffffff"
               strokeWidth={2}
-<<<<<<< HEAD
               isAnimationActive={false}
-=======
-              isAnimationActive={true}
->>>>>>> riyas
             >
               {data.map((entry, index) => (
                 <Cell key={index} fill={entry.color} />

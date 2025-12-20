@@ -34,12 +34,6 @@ export default function DashboardPage() {
     }
 
     switch (role) {
-<<<<<<< HEAD
-=======
-        case "ADMIN":
-            return <AdminDashboard />;
-
->>>>>>> riyas
         case "HR":
             return <HrDashboard />;
 
@@ -56,8 +50,4 @@ export default function DashboardPage() {
         default:
             return <p>Unauthorized</p>;
     }
-<<<<<<< HEAD
 }
-=======
-}
->>>>>>> riyas

@@ -1,15 +1,8 @@
 import api from "./api";
-<<<<<<< HEAD
 
 import { jwtDecode } from "jwt-decode";
 
 export type UserRole = "HR" | "EMPLOYEE" | "FINANCE" | "MANAGER";
-=======
-import { setAuthTokens } from "axios-jwt";
-import { jwtDecode } from "jwt-decode";
-
-export type UserRole = "ADMIN" | "HR" | "EMPLOYEE" | "FINANCE" | "MANAGER";
->>>>>>> riyas
 
 export interface JwtPayload {
   id: string;
@@ -42,15 +35,8 @@ export async function verifyLoginOtp(email: string, otp: string) {
     otp,
   });
   console.log(res);
-<<<<<<< HEAD
   localStorage.setItem("accessToken", res.data.accessToken);
 
-=======
-  setAuthTokens({
-    accessToken: res.data.accessToken,
-    refreshToken: res.data.refreshToken,
-  });
->>>>>>> riyas
   return res.data;
 }
 
@@ -62,15 +48,8 @@ export async function requestMagicLink(email: string) {
 export async function verifyMagicLink(email: string, token: string) {
   const res = await api.post("/auth/magic-link/verify", { email, token });
   console.log(res);
-<<<<<<< HEAD
   localStorage.setItem("accessToken", res.data.accessToken);
 
-=======
-  setAuthTokens({
-    accessToken: res.data.accessToken,
-    refreshToken: res.data.refreshToken,
-  });
->>>>>>> riyas
   return res.data;
 }
 
@@ -102,8 +81,13 @@ export async function logout() {
   catch (err) {
     console.log(err);
   }
-<<<<<<< HEAD
 }
-=======
+
+export async function adminLogin(email: string, password: string) {
+  const res = await api.post("/admin/login", {
+    email,
+    password
+  })
+  localStorage.setItem("accessToken", res.data.accessToken);
+  return res.data;
 }
->>>>>>> riyas

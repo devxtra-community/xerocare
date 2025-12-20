@@ -9,11 +9,7 @@ export default function DashboardHeader() {
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-[#003F7D] text-white">
       <div className="flex h-14 sm:h-16 items-center justify-between px-3 sm:px-6 gap-2">
-<<<<<<< HEAD
-        {/* Left: Hamburger menu (mobile) + Dashboard text */}
-=======
     
->>>>>>> riyas
         <div className="flex items-center gap-2">
           <SidebarTrigger className="lg:hidden text-white hover:bg-white/10">
             <Menu className="h-5 w-5" />
@@ -21,10 +17,7 @@ export default function DashboardHeader() {
           <h1 className="text-base sm:text-lg font-semibold">Dashboard</h1>
         </div>
 
-<<<<<<< HEAD
         {/* Center: Search bar (hidden on mobile) */}
-=======
->>>>>>> riyas
         <div className="hidden md:flex flex-1 items-center justify-center px-4">
           <div className="relative w-full max-w-md">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
@@ -36,15 +29,9 @@ export default function DashboardHeader() {
           </div>
         </div>
 
-<<<<<<< HEAD
         {/* Right: Icons and User Profile */}
         <div className="flex items-center gap-2 sm:gap-4">
           {/* Notifications */}
-=======
-  
-        <div className="flex items-center gap-2 sm:gap-4">
-         
->>>>>>> riyas
           <Button
             variant="ghost"
             size="icon"
@@ -53,10 +40,7 @@ export default function DashboardHeader() {
             <Bell className="h-4 w-4 sm:h-5 sm:w-5" />
           </Button>
 
-<<<<<<< HEAD
           {/* Help (hidden on mobile) */}
-=======
->>>>>>> riyas
           <Button
             variant="ghost"
             size="icon"
@@ -65,11 +49,7 @@ export default function DashboardHeader() {
             <HelpCircle className="h-5 w-5" />
           </Button>
 
-<<<<<<< HEAD
           {/* User Profile */}
-=======
-
->>>>>>> riyas
           <div className="flex items-center gap-2 sm:gap-3 pl-2 sm:pl-4 border-l border-white/20">
             <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-full bg-white/20 flex items-center justify-center text-xs sm:text-sm font-medium">
               R
@@ -90,8 +70,4 @@ export default function DashboardHeader() {
       </div>
     </header>
   );
-<<<<<<< HEAD
 }
-=======
-}
->>>>>>> riyas
