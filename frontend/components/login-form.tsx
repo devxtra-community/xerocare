@@ -43,9 +43,7 @@ export function LoginForm({
     } catch (err: unknown) {
       let errorMessage = "Login failed";
       if (err && typeof err === 'object' && 'response' in err) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         errorMessage = (err as any).response?.data?.error || (err as any).message || errorMessage;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         if ((err as any).response?.data?.message) errorMessage = (err as any).response.data.message;
       } else if (err instanceof Error) {
         errorMessage = err.message;
@@ -66,8 +64,7 @@ export function LoginForm({
       const res = await verifyLoginOtp(email, otp);
       if (res.success) {
         toast.success(res.message);
-        // Store token logic is already in verifyLoginOtp via setAuthTokens
-        localStorage.setItem("accessToken", res.accessToken); // Keeping this for consistency with previous code if needed elsewhere, though axios-jwt handles it usually.
+        localStorage.setItem("accessToken", res.accessToken);
         router.push(`/dashboard`);
       } else {
         toast.error(res.message);
@@ -76,9 +73,7 @@ export function LoginForm({
     } catch (err: unknown) {
       let errorMessage = "Verification failed";
       if (err && typeof err === 'object' && 'response' in err) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         errorMessage = (err as any).response?.data?.error || (err as any).message || errorMessage;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         if ((err as any).response?.data?.message) errorMessage = (err as any).response.data.message;
 
       } else if (err instanceof Error) {
@@ -108,9 +103,7 @@ export function LoginForm({
     } catch (err: unknown) {
       let errorMessage = "Failed to send magic link";
       if (err && typeof err === 'object' && 'response' in err) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         errorMessage = (err as any).response?.data?.error || (err as any).message || errorMessage;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         if ((err as any).response?.data?.message) errorMessage = (err as any).response.data.message;
       } else if (err instanceof Error) {
         errorMessage = err.message;

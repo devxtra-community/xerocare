@@ -117,8 +117,6 @@ export const changePassword = async (req: Request, res: Response) => {
 export const forgotPassword = async (req: Request, res: Response) => {
   try {
     const email = req.body.email.toLowerCase().trim();
-    const userId = req.user.id;
-    const currentRefreshToken = req.cookies.refreshToken;
 
     const user = await authService.findUserByEmail(email);
     if (!user) {
@@ -129,7 +127,6 @@ export const forgotPassword = async (req: Request, res: Response) => {
     }
 
     await otpService.sendOtp(email, OtpPurpose.FORGOT_PASSWORD);
-    await authService.logoutOtherDevices(userId, currentRefreshToken);
 
     return res.json({
       message: "If account exists, magic link sent",

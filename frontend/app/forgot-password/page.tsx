@@ -8,6 +8,16 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export default function ForgotPasswordPage() {
     const [step, setStep] = useState<"request" | "reset">("request");
@@ -15,10 +25,16 @@ export default function ForgotPasswordPage() {
     const [otp, setOtp] = useState("");
     const [newPassword, setNewPassword] = useState("");
     const [loading, setLoading] = useState(false);
+    const [showConfirm, setShowConfirm] = useState(false);
     const router = useRouter();
 
-    const handleRequestSubmit = async (e: React.FormEvent) => {
+    const handleRequestSubmit = (e: React.FormEvent) => {
         e.preventDefault();
+        setShowConfirm(true);
+    };
+
+    const handleConfirm = async () => {
+        setShowConfirm(false);
         setLoading(true);
         try {
             const res = await requestForgotPasswordOtp(email);
@@ -30,7 +46,6 @@ export default function ForgotPasswordPage() {
             }
         } catch (err: unknown) {
             let msg = "Failed to send OTP";
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             if ((err as any).response?.data?.message) msg = (err as any).response.data.message;
             toast.error(msg);
         } finally {
@@ -51,7 +66,6 @@ export default function ForgotPasswordPage() {
             }
         } catch (err: unknown) {
             let msg = "Failed to reset password";
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             if ((err as any).response?.data?.message) msg = (err as any).response.data.message;
             toast.error(msg);
         } finally {
@@ -137,6 +151,21 @@ export default function ForgotPasswordPage() {
                     )}
                 </CardContent>
             </Card>
+
+            <AlertDialog open={showConfirm} onOpenChange={setShowConfirm}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Is this your correct email?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            We will send a password reset code to <strong>{email}</strong>.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>No</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleConfirm}>Yes, Send Code</AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     );
 }
