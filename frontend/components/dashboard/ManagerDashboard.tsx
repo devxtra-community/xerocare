@@ -8,4 +8,8 @@ export default function ManagerDashboard() {
             {/* Add Manager specific content here */}
         </div>
     );
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> riyas

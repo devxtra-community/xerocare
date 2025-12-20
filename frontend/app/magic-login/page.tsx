@@ -85,4 +85,8 @@ export default function MagicLoginPage() {
             <MagicLoginContent />
         </Suspense>
     )
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> riyas

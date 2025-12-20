@@ -1,12 +1,15 @@
-"use client"
-
 import {
   LayoutDashboard,
   ShoppingCart,
   Building2,
   Users,
   Package,
+<<<<<<< HEAD
 } from "lucide-react"
+=======
+  LogOut,
+} from "lucide-react";
+>>>>>>> riyas
 
 import {
   Sidebar,
@@ -18,6 +21,7 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+<<<<<<< HEAD
 } from "@/components/ui/sidebar"
 import { logout } from "@/lib/auth"
 import { toast } from "sonner"
@@ -54,6 +58,17 @@ const menuItems = [
     href: "/admin/warehouse",
   },
 ]
+=======
+} from "@/components/ui/sidebar";
+
+const menuItems = [
+  { title: "Dashboard", icon: LayoutDashboard, href: "/", active: true },
+  { title: "Sales", icon: ShoppingCart, href: "/admin/sales" },
+  { title: "Branch", icon: Building2, href: "/branch", disabled: true },
+  { title: "Human Resources", icon: Users, href: "/hr", disabled: true },
+  { title: "Warehouse", icon: Package, href: "admin/warehouse" },
+];
+>>>>>>> riyas
 
 
 
@@ -79,19 +94,18 @@ export default function AppSidebar() {
   }
   return (
     <Sidebar collapsible="icon" className="border-r-0">
-      {/* LOGO */}
-      <SidebarHeader className="bg-[#0A4C7E] border-b border-white/10">
+      <SidebarHeader className="bg-sidebar border-b border-white/10">
         <div className="flex items-center gap-3 px-4 py-4">
           <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/10">
-            <LayoutDashboard className="h-5 w-5 text-white" />
+            <LayoutDashboard className="h-5 w-5 text-sidebar-accent-foreground" />
           </div>
-          <span className="text-base font-semibold text-white group-data-[collapsible=icon]:hidden">
+          <span className="text-base font-semibold text-sidebar-accent-foreground group-data-[collapsible=icon]:hidden">
             Xerocare
           </span>
         </div>
       </SidebarHeader>
 
-      <SidebarContent className="bg-[#0A4C7E]">
+      <SidebarContent className="bg-sidebar">
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu className="space-y-1 px-2">
@@ -103,16 +117,39 @@ export default function AppSidebar() {
                     disabled={item.disabled}
                     className={`
                       py-2.5 rounded-md
+<<<<<<< HEAD
                       ${item.active
                         ? "bg-white text-[#0A4C7E]"
                         : "text-white hover:bg-white/10"
+=======
+                      !text-sidebar-accent-foreground
+                      [&_svg]:!text-sidebar-accent-foreground
+
+                      ${
+                        item.active
+                          ? "bg-white text-sidebar [&_svg]:text-sidebar"
+                          : "hover:bg-white/10"
                       }
-                      ${item.disabled ? "opacity-50 cursor-not-allowed" : ""}
+
+                      ${
+                        item.disabled
+                          ? "!text-sidebar-accent-foreground/70 cursor-not-allowed"
+                          : ""
+>>>>>>> riyas
+                      }
                     `}
                   >
-                    <a href={item.href} className="flex items-center gap-3 px-3">
+                    <a
+                      href={item.href}
+                      className="
+                        flex items-center gap-3 px-3
+                        text-sidebar-accent-foreground
+                        [&_span]:text-sidebar-accent-foreground
+                        [&_svg]:text-sidebar-accent-foreground
+                      "
+                    >
                       <item.icon className="h-4 w-4" />
-                      <span>{item.title}</span>
+                      <span className="font-medium">{item.title}</span>
                     </a>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -122,12 +159,18 @@ export default function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
 
-      <SidebarFooter className="bg-[#0A4C7E] border-t border-white/10">
+      <SidebarFooter className="bg-sidebar border-t border-white/10">
         <SidebarMenu className="px-2">
           <SidebarMenuItem>
             <SidebarMenuButton
               asChild
-              className="py-3 text-white/70 hover:bg-red-500/20 hover:text-red-300"
+              className="
+                py-3
+                text-sidebar-accent-foreground
+                [&_svg]:text-sidebar-accent-foreground
+                hover:bg-red-500/20
+                hover:text-red-300
+              "
             >
               <button className="flex items-center gap-3 px-3" onClick={handleLogOut}>
                 Logout
@@ -137,5 +180,5 @@ export default function AppSidebar() {
         </SidebarMenu>
       </SidebarFooter>
     </Sidebar>
-  )
+  );
 }

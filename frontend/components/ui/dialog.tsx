@@ -140,4 +140,8 @@ export {
   DialogPortal,
   DialogTitle,
   DialogTrigger,
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> riyas
