@@ -28,45 +28,54 @@ export default function UserTable({ users }: UserTableProps) {
   const startIndex = (page - 1) * USERS_PER_PAGE;
   const currentData = users.slice(startIndex, startIndex + USERS_PER_PAGE);
 
+  const handleUserEdit = (userId: number) => {
+    console.log("edit user", userId);
+  };
+
+  const handleUserDelete = (userId: number) => {
+    alert("Confirm delete");
+    console.log("delete user", userId);
+  };
+
   return (
-    <div className="space-y-4">
-      <div className="rounded-2xl border border-border bg-card overflow-x-auto">
-        <Table className="min-w-275">
+    <div>
+      <div className="rounded-2xl shadow-sm border  pl-2 bg-card">
+        <Table className="min-w-150">
           <TableHeader>
-            <TableRow className="bg-muted">
-              <TableHead>Full Name</TableHead>
-              <TableHead>Department</TableHead>
-              <TableHead>Branch</TableHead>
-              <TableHead>Start Date</TableHead>
-              <TableHead>Visa Expiry Date</TableHead>
-              <TableHead>Salary</TableHead>
-              <TableHead>Action</TableHead>
+            <TableRow>
+              <TableHead className="text-primary">Full Name</TableHead>
+              <TableHead className="text-primary">Department</TableHead>
+              <TableHead className="text-primary">Branch</TableHead>
+              <TableHead className="text-primary">Start Date</TableHead>
+              <TableHead className="text-primary">Visa Expiry</TableHead>
+              <TableHead className="text-primary">Salary</TableHead>
+              <TableHead className="text-primary">Actions</TableHead>
             </TableRow>
           </TableHeader>
 
-          <TableBody className="border-separate border-spacing-y-3 text-foreground">
-            {currentData.map((u,index) => (
-              <TableRow  key={index}
-              className={`border-none rounded-xl ${
-                index % 2 === 1 ? "bg-sky-100/60" : ""
-              }`}>
-                
+          <TableBody className="text-foreground">
+            {currentData.map((u, index) => (
+              <TableRow
+                key={index}
+                className={`border-none rounded-xl ${
+                  index % 2 === 1 ? "bg-sky-100/60" : ""
+                }`}
+              >
                 <TableCell className="font-medium rounded-l-xl">
                   <div className="flex items-center gap-1 min-w-25">
-                  <Image
-                    src="/image/profilePic.png"
-                    alt={`${u.name} profile picture`}
-                    width={32}
-                    height={32}
-                    className=" rounded-full"
-                  />
-                  <Link
-                    href={`/users/${u.id}`}
-                    className="text-primary hover:underline whitespace-nowrap"
-                  >
-                    {u.name}
-                  </Link>
-
+                    <Image
+                      src="/image/profilePic.png"
+                      alt={`${u.name} profile picture`}
+                      width={32}
+                      height={32}
+                      className=" rounded-full"
+                    />
+                    <Link
+                      href={`/users/${u.id}`}
+                      className="hover:underline whitespace-normal"
+                    >
+                      {u.name}
+                    </Link>
                   </div>
                 </TableCell>
 
@@ -77,9 +86,18 @@ export default function UserTable({ users }: UserTableProps) {
                 <TableCell>{u.salary}</TableCell>
 
                 <TableCell className="flex flex-col gap-2 sm:flex-row sm:gap-3 text-destructive">
-                  <button>Edit</button>
-                  <button>Delete</button>
-                  <button>Report</button>
+                  <button
+                    className="hover:underline text-primary"
+                    onClick={() => handleUserEdit(u.id)}
+                  >
+                    Edit
+                  </button>
+                  <button
+                    className="hover:underline text-accent"
+                    onClick={() => handleUserDelete(u.id)}
+                  >
+                    Delete
+                  </button>
                 </TableCell>
               </TableRow>
             ))}

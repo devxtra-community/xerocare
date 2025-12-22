@@ -1,7 +1,10 @@
+// "use client"
+
 import AttendanceChart from "@/components/employees/charts/AttendanceChart";
 import StatCard from "../components/StatCard";
 import PerformanceChart from "@/components/employees/charts/PerformanceChart";
 import WorkingHoursChart from "@/components/employees/charts/WorkingHoursChart";
+import { Bell, MailIcon, LucidePencil } from "lucide-react";
 import Image from "next/image";
 
 type Employee = {
@@ -111,37 +114,48 @@ export default async function EmployeeProfile({
         </p>
         <div className="mt-4 flex justify-center gap-4">
           <button className="flex h-10 w-10 items-center justify-center rounded-full border border-border text-muted-foreground hover:text-primary">
-            🔒
+            <Bell size={18} />
           </button>
           <button className="flex h-10 w-10 items-center justify-center rounded-full border border-border text-muted-foreground hover:text-primary">
-            ✉️
+            <MailIcon size={18} />
+          </button>
+          <button className="flex h-10 w-10 items-center justify-center rounded-full border border-border text-muted-foreground hover:text-primary">
+            <LucidePencil size={18} />
           </button>
         </div>
 
         <div className="lg:col-span-4 xl:col-span-3 rounded-2xl bg-card p-4 sm:p-6">
           <div className="mt-6 space-y-4">
             {/* Identity */}
-            <div className="rounded-xl border border-border  p-4">
-              <Info label="Employee ID" value={employee.id} />
-              <Info label="Department" value={employee.department} />
-              <Info label="Designation" value={employee.designation} />
+            <div>
+              <h4>Employee Id</h4>
+              <div className="rounded-xl border border-border shadow-sm p-2">
+                <Info label="Employee ID" value={employee.id} />
+                <Info label="Department" value={employee.department} />
+                <Info label="Designation" value={employee.designation} />
+              </div>
             </div>
-
             {/* Work */}
-            <div className="rounded-xl border border-border  p-4">
-              <Info label="Outlet Allocation" value={employee.outlet} />
-              <Info label="Date of Joining" value={employee.joiningDate} />
-              <Info label="Employee Type" value={employee.employeeType} />
-              <Info label="Salary" value={employee.salary} />
-              <Info label="Contract Period" value={employee.contractPeriod} />
-              <Info label="Reporting Manager" value={employee.manager} />
+            <div>
+              <h4>Job Details</h4>
+              <div className="rounded-xl border border-border shadow-sm p-2">
+                <Info label="Outlet Allocation" value={employee.outlet} />
+                <Info label="Date of Joining" value={employee.joiningDate} />
+                <Info label="Employee Type" value={employee.employeeType} />
+                <Info label="Salary" value={employee.salary} />
+                <Info label="Contract Period" value={employee.contractPeriod} />
+                <Info label="Reporting Manager" value={employee.manager} />
+              </div>
             </div>
 
             {/* Contact */}
-            <div className="rounded-xl border border-border  p-4">
-              <Info label="Mobile Number" value={employee.phone} />
-              <Info label="Email" value={employee.email} />
-              <Info label="Address" value={employee.address} />
+            <div>
+              <h4>Contact</h4>
+              <div className="rounded-xl border  shadow-sm p-2">
+                <Info label="Mobile Number" value={employee.phone} />
+                <Info label="Email" value={employee.email} />
+                <Info label="Address" value={employee.address} />
+              </div>
             </div>
           </div>
         </div>
@@ -159,12 +173,12 @@ export default async function EmployeeProfile({
           <StatCard title="Leave Balance" value={stats.leaveBalance} />
         </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <AttendanceChart data={charts.attendance} />
-              <PerformanceChart data={charts.performance} />
-            </div>
-          
-        <div className="p-4 rounded-xl border border-border bg-card">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <AttendanceChart data={charts.attendance} />
+          <PerformanceChart data={charts.performance} />
+        </div>
+
+        <div>
           <WorkingHoursChart data={charts.workingHours} />
         </div>
       </div>
