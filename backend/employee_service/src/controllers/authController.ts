@@ -11,6 +11,7 @@ const magicLinkService = new MagicLinkService();
 
 export const login = async (req: Request, res: Response) => {
   try {
+    console.log("request reached here");
     const { user } = await authService.login(req.body);
 
     await otpService.sendOtp(user.email, OtpPurpose.LOGIN);

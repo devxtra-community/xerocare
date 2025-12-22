@@ -16,6 +16,7 @@
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "express": "^5.2.1",
+    "http-proxy": "^1.18.1",
     "http-proxy-middleware": "^3.0.0"
   },
   "devDependencies": {

@@ -17,6 +17,7 @@ app.use(cors({
   origin: process.env.CLIENT_URL,
   credentials: true
 }))
+
 const startServer = async () => {
   try {
     await Source.initialize();
