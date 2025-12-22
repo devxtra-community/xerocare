@@ -73,7 +73,6 @@ api.interceptors.response.use(
         processQueue(refreshError as Error, null);
         isRefreshing = false;
 
-        // Refresh failed (token expired/invalid), logout user
         localStorage.removeItem("accessToken");
         window.location.href = "/login";
         return Promise.reject(refreshError);
