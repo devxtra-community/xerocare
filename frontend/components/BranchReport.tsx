@@ -13,138 +13,136 @@ import {
 } from "@/components/ui/table";
 import { Search, Filter, ArrowUpDown, X, Trash2 } from "lucide-react";
 
-type Warehouse = {
+type Branch = {
   id: string;
-  warehouseName: string;
   branchName: string;
   address: string;
   location: string;
+  startedDate: string;
   status: "active" | "inactive";
 };
 
 const ITEMS_PER_PAGE = 10;
 
-const initialWarehouses: Warehouse[] = [
+/* ✅ MANUALLY ADDED 11 RECORDS */
+const initialBranches: Branch[] = [
   {
     id: "1",
-    warehouseName: "Central Warehouse",
-    branchName: "UrbanHub Outlet",
+    branchName: "CityWave Store",
     address: "MG Road, Ernakulam",
     location: "Ernakulam",
+    startedDate: "20.11.2023",
     status: "active",
   },
   {
     id: "2",
-    warehouseName: "North Zone Storage",
-    branchName: "CityMart",
-    address: "Kakkanad Info Park Road",
-    location: "Kakkanad",
+    branchName: "UrbanHub Outlet",
+    address: "Vyttila Junction",
+    location: "Kochi",
+    startedDate: "10.02.2023",
     status: "active",
   },
   {
     id: "3",
-    warehouseName: "Coastal Warehouse",
-    branchName: "Harbor Retail",
-    address: "Beach Road",
-    location: "Kochi",
+    branchName: "PrimePoint Store",
+    address: "Pattom",
+    location: "Thiruvananthapuram",
+    startedDate: "18.05.2024",
     status: "inactive",
   },
   {
     id: "4",
-    warehouseName: "Hilltop Warehouse",
-    branchName: "GreenLeaf Stores",
-    address: "Munnar Main Road",
-    location: "Idukki",
+    branchName: "North Depot",
+    address: "Round North",
+    location: "Thrissur",
+    startedDate: "12.01.2022",
     status: "active",
   },
   {
     id: "5",
-    warehouseName: "South Distribution Center",
-    branchName: "QuickBuy",
-    address: "NH 66 Bypass",
-    location: "Alappuzha",
+    branchName: "South Warehouse",
+    address: "Kazhakkoottam",
+    location: "Trivandrum",
+    startedDate: "09.09.2021",
     status: "inactive",
   },
   {
     id: "6",
-    warehouseName: "Metro Storage Hub",
-    branchName: "SuperSave",
-    address: "Edappally Junction",
-    location: "Ernakulam",
+    branchName: "Metro Store",
+    address: "SM Street",
+    location: "Kozhikode",
+    startedDate: "22.06.2023",
     status: "active",
   },
   {
     id: "7",
-    warehouseName: "Valley Storage",
-    branchName: "FreshMart",
-    address: "Main Junction",
-    location: "Idukki",
-    status: "inactive",
+    branchName: "HillView Outlet",
+    address: "Kalpetta Road",
+    location: "Wayanad",
+    startedDate: "15.03.2022",
+    status: "active",
   },
   {
     id: "8",
-    warehouseName: "Harbor Depot",
-    branchName: "SeaSide",
-    address: "Port Road",
-    location: "Kollam",
-    status: "active",
+    branchName: "LakeSide Store",
+    address: "Vembanad",
+    location: "Alappuzha",
+    startedDate: "01.08.2020",
+    status: "inactive",
   },
   {
     id: "9",
-    warehouseName: "Central Cold Storage",
-    branchName: "CoolMart",
-    address: "Market Road",
-    location: "Thrissur",
-    status: "inactive",
-  },
-  {
-    id: "10",
-    warehouseName: "Express Warehouse",
-    branchName: "SpeedBuy",
-    address: "Bypass Road",
-    location: "Palakkad",
+    branchName: "Harbor Point",
+    address: "Beach Road",
+    location: "Kollam",
+    startedDate: "11.11.2021",
     status: "active",
   },
   {
-    id: "11",
-    warehouseName: "GreenField Storage",
-    branchName: "EcoMart",
-    address: "NH Road",
-    location: "Malappuram",
+    id: "10",
+    branchName: "Valley Mart",
+    address: "Main Junction",
+    location: "Idukki",
+    startedDate: "05.05.2022",
     status: "inactive",
+  },
+  {
+    id: "11",
+    branchName: "GreenField Store",
+    address: "NH Bypass",
+    location: "Palakkad",
+    startedDate: "30.10.2023",
+    status: "active",
   },
 ];
 
-export default function WarehouseReport() {
-  const [warehouses, setWarehouses] = useState(initialWarehouses);
+export default function BranchReport() {
+  const [branches, setBranches] = useState(initialBranches);
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [deleteOpen, setDeleteOpen] = useState(false);
-  const [deleteWarehouse, setDeleteWarehouse] =
-    useState<Warehouse | null>(null);
+  const [deleteBranch, setDeleteBranch] = useState<Branch | null>(null);
 
   /* FILTER */
-  const filteredWarehouses = warehouses.filter((w) =>
-    `${w.warehouseName} ${w.branchName} ${w.address} ${w.location}`
+  const filteredBranches = branches.filter((b) =>
+    `${b.branchName} ${b.address} ${b.location}`
       .toLowerCase()
       .includes(searchQuery.toLowerCase())
   );
 
   /* PAGINATION */
-  const totalPages = Math.ceil(filteredWarehouses.length / ITEMS_PER_PAGE);
+  const totalPages = Math.ceil(filteredBranches.length / ITEMS_PER_PAGE);
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-  const currentData = filteredWarehouses.slice(
+  const currentData = filteredBranches.slice(
     startIndex,
     startIndex + ITEMS_PER_PAGE
   );
 
   const confirmDelete = () => {
-    if (!deleteWarehouse) return;
-    setWarehouses((prev) =>
-      prev.filter((w) => w.id !== deleteWarehouse.id)
-    );
+    if (!deleteBranch) return;
+    setBranches((prev) => prev.filter((b) => b.id !== deleteBranch.id));
     setDeleteOpen(false);
-    setDeleteWarehouse(null);
+    setDeleteBranch(null);
   };
 
   return (
@@ -154,14 +152,12 @@ export default function WarehouseReport() {
         {/* HEADER */}
         <div className="flex justify-between items-start">
           <div>
-            <h1 className="text-2xl font-semibold text-primary">Warehouse</h1>
+            <h1 className="text-2xl font-semibold text-primary">Branches</h1>
             <p className="text-sm text-slate-500">
-              Manage and track warehouse information
+              Manage and track branch information
             </p>
           </div>
-          <Button className="bg-blue-900 text-white">
-            Add Warehouse
-          </Button>
+          <Button className="bg-blue-900 text-white">Add Branch</Button>
         </div>
 
         {/* SEARCH */}
@@ -169,7 +165,7 @@ export default function WarehouseReport() {
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
             <Input
-              placeholder="Search warehouse"
+              placeholder="Search branch"
               value={searchQuery}
               onChange={(e) => {
                 setSearchQuery(e.target.value);
@@ -191,31 +187,31 @@ export default function WarehouseReport() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>WAREHOUSE NAME</TableHead>
                 <TableHead>BRANCH NAME</TableHead>
                 <TableHead>ADDRESS</TableHead>
                 <TableHead>LOCATION</TableHead>
+                <TableHead>STARTED DATE</TableHead>
                 <TableHead>STATUS</TableHead>
                 <TableHead>ACTION</TableHead>
               </TableRow>
             </TableHeader>
 
             <TableBody>
-              {currentData.map((w, i) => (
-                <TableRow key={w.id} className={i % 2 ? "bg-blue-50" : ""}>
-                  <TableCell>{w.warehouseName}</TableCell>
-                  <TableCell>{w.branchName}</TableCell>
-                  <TableCell>{w.address}</TableCell>
-                  <TableCell>{w.location}</TableCell>
+              {currentData.map((b, i) => (
+                <TableRow key={b.id} className={i % 2 ? "bg-blue-50" : ""}>
+                  <TableCell>{b.branchName}</TableCell>
+                  <TableCell>{b.address}</TableCell>
+                  <TableCell>{b.location}</TableCell>
+                  <TableCell>{b.startedDate}</TableCell>
                   <TableCell>
                     <span
                       className={`px-2 py-1 text-xs rounded ${
-                        w.status === "active"
+                        b.status === "active"
                           ? "bg-green-100 text-green-700"
                           : "bg-red-100 text-red-700"
                       }`}
                     >
-                      {w.status}
+                      {b.status}
                     </span>
                   </TableCell>
                   <TableCell className="space-x-3 text-xs">
@@ -225,7 +221,7 @@ export default function WarehouseReport() {
                     <button
                       className="text-red-600 hover:underline"
                       onClick={() => {
-                        setDeleteWarehouse(w);
+                        setDeleteBranch(b);
                         setDeleteOpen(true);
                       }}
                     >
@@ -285,10 +281,10 @@ export default function WarehouseReport() {
               <X />
             </button>
             <Trash2 className="mx-auto text-red-600 mb-3" />
-            <h3 className="text-lg font-semibold">Delete Warehouse</h3>
+            <h3 className="text-lg font-semibold">Delete Branch</h3>
             <p className="text-sm text-slate-500 mt-1">
               Are you sure you want to delete{" "}
-              <b>{deleteWarehouse?.warehouseName}</b>?
+              <b>{deleteBranch?.branchName}</b>?
             </p>
             <div className="flex justify-center gap-4 mt-6">
               <Button variant="outline" onClick={() => setDeleteOpen(false)}>
@@ -304,3 +300,4 @@ export default function WarehouseReport() {
     </div>
   );
 }
+
