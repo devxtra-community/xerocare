@@ -163,7 +163,7 @@
       </div>
 
       {/* User Table */}
-      <div className="mt-2">
+      <div className="mt-2 ">
         <UserTable users={users} />
       </div>
 

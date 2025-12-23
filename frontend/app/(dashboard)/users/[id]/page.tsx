@@ -16,7 +16,7 @@ type Employee = {
   joiningDate: string;
   employeeType: string;
   salary: string;
-  contractPeriod: string;
+  visaExpiry: string;
   manager: string;
   phone: string;
   email: string;
@@ -25,13 +25,12 @@ type Employee = {
 
 type EmployeeStats = {
   presentDays: number;
-  performance: number; // percentage
-  tasksCompleted: number; // percentage
+  performance: number;
+  tasksCompleted: number;
   leaveBalance: number;
 };
 
 async function getEmployeeById(id: string): Promise<Employee> {
-  // 🔹 TEMP mock (replace with real API later)
   return {
     id: "1",
     name: "Aliana",
@@ -41,7 +40,7 @@ async function getEmployeeById(id: string): Promise<Employee> {
     joiningDate: "31/03/2025",
     employeeType: "Full Time",
     salary: "$2200",
-    contractPeriod: "3 Years",
+    visaExpiry: "10/05/2025",
     manager: "Branch Manager",
     phone: "+91 9043847732",
     email: "aliana700@gmail.com",
@@ -50,7 +49,6 @@ async function getEmployeeById(id: string): Promise<Employee> {
 }
 
 async function getEmployeeStats(id: string): Promise<EmployeeStats> {
-  // 🔹 TEMP mock — backend will replace this
   return {
     presentDays: 223,
     performance: 75,
@@ -75,7 +73,7 @@ async function getEmployeeCharts(id: string) {
       { day: "Wed", hours: 8 },
       { day: "Thu", hours: 6.5 },
       { day: "Fri", hours: 7 },
-      { day: "sat", hours: 6 },
+      { day: "Sat", hours: 6 },
     ],
     performance: [
       { name: "Task Completed", value: 62.5 },
@@ -94,24 +92,28 @@ export default async function EmployeeProfile({
   const charts = await getEmployeeCharts(params.id);
 
   return (
-    <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-12 h-screen min-h-0 md:overflow-hidden">
       {/* LEFT PROFILE */}
-      <div className="lg:col-span-5 xl:col-span-4 rounded-xl border border-border bg-card p-6">
+      <div className="col-span-4 rounded-xl border shadow-sm bg-card p-4 sm:p-6 overflow-x-0 overflow-x-hidden min-h-0">
+        <div className="w-full h-14 bg-blue-500 rounded-t-xl">
+
         <Image
           src="/image/profilePic.png"
           alt={`${employee.name} profile picture`}
           width={96}
           height={96}
-          className="mx-auto rounded-full"
-        />
+          className="mx-auto pt-1 h-20 w-20 sm:h-24 sm:w-24 rounded-full"
+          />
+          </div>
 
         <h2 className="mt-3 text-center text-lg font-semibold">
           {employee.name}
         </h2>
 
         <p className="text-center text-sm text-muted-foreground">
-          {employee.email}
+          {employee.designation}
         </p>
+
         <div className="mt-4 flex justify-center gap-4">
           <button className="flex h-10 w-10 items-center justify-center rounded-full border border-border text-muted-foreground hover:text-primary">
             <Bell size={18} />
@@ -124,34 +126,35 @@ export default async function EmployeeProfile({
           </button>
         </div>
 
-        <div className="lg:col-span-4 xl:col-span-3 rounded-2xl bg-card p-4 sm:p-6">
-          <div className="mt-6 space-y-4">
-            {/* Identity */}
+        <div className="mt-6 border-t pt-2"></div>
+
+        {/* DETAILS */}
+        <div className=" bg-card p-1">
+          <div className="mt-2 space-y-4">
             <div>
-              <h4>Employee Id</h4>
-              <div className="rounded-xl border border-border shadow-sm p-2">
+              <h4>Employee</h4>
+              <div className=" bg-muted/40 p-1">
                 <Info label="Employee ID" value={employee.id} />
                 <Info label="Department" value={employee.department} />
                 <Info label="Designation" value={employee.designation} />
               </div>
             </div>
-            {/* Work */}
+
             <div>
               <h4>Job Details</h4>
-              <div className="rounded-xl border border-border shadow-sm p-2">
+              <div className=" bg-muted p-1">
                 <Info label="Outlet Allocation" value={employee.outlet} />
                 <Info label="Date of Joining" value={employee.joiningDate} />
                 <Info label="Employee Type" value={employee.employeeType} />
                 <Info label="Salary" value={employee.salary} />
-                <Info label="Contract Period" value={employee.contractPeriod} />
+                <Info label="Visa Expiry Date" value={employee.visaExpiry} />
                 <Info label="Reporting Manager" value={employee.manager} />
               </div>
             </div>
 
-            {/* Contact */}
             <div>
               <h4>Contact</h4>
-              <div className="rounded-xl border  shadow-sm p-2">
+              <div className=" bg-muted/40 p-1">
                 <Info label="Mobile Number" value={employee.phone} />
                 <Info label="Email" value={employee.email} />
                 <Info label="Address" value={employee.address} />
@@ -162,23 +165,24 @@ export default async function EmployeeProfile({
       </div>
 
       {/* RIGHT DASHBOARD */}
-      <div className="lg:col-span-7 xl:col-span-8 space-y-6">
-        <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-4 gap-4">
-          <StatCard title="Present Days" value={stats.presentDays} />
+      <div className="lg:col-span-8 xl:col-span-8 space-y-6 min-h-screen">
+        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <StatC ard title="Present Days" value={stats.presentDays} />
           <StatCard title="Performance Trend" value={`${stats.performance}%`} />
-          <StatCard
-            title="Tasks Completed"
-            value={`${stats.tasksCompleted}%`}
-          />
+          <StatCard title="Tasks Completed" value={`${stats.tasksCompleted}%`} />
           <StatCard title="Leave Balance" value={stats.leaveBalance} />
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <AttendanceChart data={charts.attendance} />
-          <PerformanceChart data={charts.performance} />
+          <div >
+            <AttendanceChart data={charts.attendance} />
+          </div>
+          <div >
+            <PerformanceChart data={charts.performance} />
+          </div>
         </div>
 
-        <div>
+        <div >
           <WorkingHoursChart data={charts.workingHours} />
         </div>
       </div>
@@ -188,12 +192,11 @@ export default async function EmployeeProfile({
 
 function Info({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex flex-col gap-1 border-b border-border pb-2 last:border-b-0 sm:flex-row sm:items-center sm:justify-between">
+    <div className="grid grid-cols-2 sm:grid-cols-[140px_1fr] gap-3 py-1 ">
       <span className="text-xs font-medium uppercase text-primary">
         {label}
       </span>
-
-      <span className="text-sm font-semibold text-foreground sm:text-right break-words">
+      <span className="text-sm font-semibold break-words">
         {value}
       </span>
     </div>

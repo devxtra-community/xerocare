@@ -12,7 +12,7 @@ export default function Pagination({
   onPageChange,
 }: PaginationProps) {
   return (
-    <div className="mt-6 flex items-center gap-4 text-sm">
+    <div className="mt-6 flex items-center justify-center gap-4 text-sm">
       <button onClick={()=>onPageChange(page-1)}
         disabled={page===1}
         className="rounded-md border px-4 py-2 disabled:opacity-40">Previous</button>

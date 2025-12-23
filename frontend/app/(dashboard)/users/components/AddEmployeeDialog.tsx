@@ -24,6 +24,27 @@ export default function AddEmployeeDialog() {
     email: "",
   });
 
+  const [file, setFile] = useState<File | null>(null);
+
+  function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const selectedFile = e.target.files?.[0];
+    if (!selectedFile) return;
+
+    const allowedTypes = [
+      "text/csv",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "application/vnd.ms-excel",
+    ];
+
+    if (!allowedTypes.includes(selectedFile.type)) {
+      alert("Please upload a CSV or Excel file");
+      return;
+    }
+
+    setFile(selectedFile);
+    console.log("Bulk upload file:", selectedFile);
+  }
+
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
     setForm({ ...form, [e.target.name]: e.target.value });
   }
@@ -34,7 +55,6 @@ export default function AddEmployeeDialog() {
       return;
     }
 
-    // TEMP — later replace with API call
     console.log("New Employee:", form);
 
     setForm({
@@ -47,16 +67,6 @@ export default function AddEmployeeDialog() {
     setOpen(false);
   }
 
-  function handleCancel() {
-    setForm({
-      name: "",
-      role: "",
-      joinDate: "",
-      salary: "",
-      email: "",
-    });
-    setOpen(false);
-  }
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
@@ -105,9 +115,27 @@ export default function AddEmployeeDialog() {
           />
         </div>
         <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-          <Button variant="outline" onClick={handleCancel}>
-            Cancel
-          </Button>
+          <div>
+            <input
+              type="file"
+              accept=".csv,.xlsx"
+              id="employee-upload"
+              className="hidden"
+              onChange={handleFileUpload}
+            />
+            <label htmlFor="employee-upload">
+              <Button variant="outline" type="button">
+                Upload CSV / Excel
+              </Button>
+            </label>
+
+            {file && (
+              <p className="mt-1 text-xs text-muted-foreground">
+                Selected: {file.name}
+              </p>
+            )}
+          </div>
+
           <Button onClick={handleSubmit}>Confirm</Button>
         </div>
       </DialogContent>

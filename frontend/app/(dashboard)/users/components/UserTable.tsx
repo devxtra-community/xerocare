@@ -13,6 +13,7 @@ import { useState } from "react";
 import Pagination from "./Pagination";
 import { type UserListItem } from "../page";
 import Image from "next/image";
+import ConfirmDialog from "@/components/AlertDialog";
 
 const USERS_PER_PAGE = 8;
 
@@ -32,8 +33,7 @@ export default function UserTable({ users }: UserTableProps) {
     console.log("edit user", userId);
   };
 
-  const handleUserDelete = (userId: number) => {
-    alert("Confirm delete");
+  const handleUserDelete = async (userId: number) => {
     console.log("delete user", userId);
   };
 
@@ -92,12 +92,17 @@ export default function UserTable({ users }: UserTableProps) {
                   >
                     Edit
                   </button>
-                  <button
-                    className="hover:underline text-accent"
-                    onClick={() => handleUserDelete(u.id)}
-                  >
-                    Delete
-                  </button>
+                  <ConfirmDialog
+                    title="Delete employee?"
+                    description={`This will permanently remove ${u.name} from the system.`}
+                    confirmText="Delete"
+                    onConfirm={() => handleUserDelete(u.id)}
+                    trigger={
+                      <button className="hover:underline text-accent">
+                        Delete
+                      </button>
+                    }
+                  />
                 </TableCell>
               </TableRow>
             ))}
