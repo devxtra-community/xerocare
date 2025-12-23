@@ -25,8 +25,6 @@ export function AdminLoginForm({
     setLoading(true);
     setError(null);
 
-    // Add your admin login logic here
-
     setLoading(false);
   };
 
@@ -39,9 +37,7 @@ export function AdminLoginForm({
       <form onSubmit={handleSubmit}>
         <FieldGroup>
           <div className="flex flex-col items-center text-center">
-            <h1 className="text-xl text-muted-foreground">
-              Admin Login
-            </h1>
+            <h1 className="text-xl text-muted-foreground">Admin Login</h1>
           </div>
 
           <Field>
@@ -67,11 +63,7 @@ export function AdminLoginForm({
             />
           </Field>
 
-          {error && (
-            <p className="text-sm text-red-500 text-center">
-              {error}
-            </p>
-          )}
+          {error && <p className="text-sm text-red-500 text-center">{error}</p>}
 
           <Field>
             <Button type="submit" className="w-full" disabled={loading}>
