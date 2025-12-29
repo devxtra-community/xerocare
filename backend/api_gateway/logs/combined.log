@@ -1,3 +1,0 @@
-2025-12-29T06:47:43.170Z [info]: Server running on port 3001
-2025-12-29T06:47:43.171Z [info]: Proxying to Employee Service at http://localhost:3002
-2025-12-29T06:48:58.944Z [info]: ::1 - - [29/Dec/2025:06:48:58 +0000] "GET /health HTTP/1.1" 200 100 "-" "PostmanRuntime/7.49.1"
