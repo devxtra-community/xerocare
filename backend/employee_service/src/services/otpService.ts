@@ -1,6 +1,7 @@
 import { OtpPurpose } from "../constants/otpPurpose";
 import { redis } from "../config/redis";
 import { publishEmailJob } from "../queues/emailProducer";
+import { AppError } from "../errors/appError";
 
 export class OtpService {
   private generateOtp() {
@@ -31,11 +32,11 @@ export class OtpService {
 
     const storedOtp = await redis.get(key);
     if (!storedOtp) {
-      throw new Error("OTP expired or not found");
+      throw new AppError("OTP expired or not found", 400);
     }
 
     if (storedOtp !== otp) {
-      throw new Error("Invalid OTP");
+      throw new AppError("Invalid OTP", 400);
     }
 
     await redis.del(key);

@@ -12,6 +12,7 @@ import { startWorker } from "./workers/emailWorker";
 import { httpLogger } from "./middleware/httplogger";
 import healthRouter from "./routes/health"
 import { logger } from "./config/logger";
+import { errorHandler } from "./middleware/errorHandler";
 
 const app = express();
 app.use(express.json());
@@ -39,14 +40,13 @@ const startServer = async () => {
   }
 };
 app.use(httpLogger)
-app.use("/",healthRouter)
+app.use("/", healthRouter)
 app.use('/auth', authRouter)
 app.use("/employee", employeeRouter)
 app.use("/admin", adminRouter);
 
-app.use((err: any, req: any, res: any, next: any) => {
-  logger.error(err);
-  res.status(500).json({ message: "Internal Server Error" });
-});
+
+
+app.use(errorHandler)
 
 startServer();

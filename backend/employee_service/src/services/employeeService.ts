@@ -4,6 +4,7 @@ import { EmployeeRole } from "../constants/employeeRole";
 import { generateRandomPassword } from "../utlis/passwordGenerator";
 import { getSignedIdProofUrl } from "../utlis/r2SignedUrl";
 import { publishEmailJob } from "../queues/emailProducer";
+import { AppError } from "../errors/appError";
 
 export class EmployeeService {
   private employeeRepo = new EmployeeRepository();
@@ -31,18 +32,18 @@ export class EmployeeService {
 
     const existing = await this.employeeRepo.findByEmail(email);
     if (existing) {
-      throw new Error("Employee already Exist");
+      throw new AppError("Employee already Exist", 409);
     }
 
     if (role === EmployeeRole.ADMIN) {
-      throw new Error("You cannot create another admin");
+      throw new AppError("You cannot create another admin", 403);
     }
 
     if (
       payload.role &&
       !Object.values(EmployeeRole).includes(payload.role as EmployeeRole)
     ) {
-      throw new Error("Invalid role");
+      throw new AppError("Invalid role", 400);
     }
 
     const roleEnum = (role ?? EmployeeRole.EMPLOYEE) as EmployeeRole;
@@ -76,11 +77,11 @@ export class EmployeeService {
     const employee = await this.employeeRepo.findById(employeeId);
 
     if (!employee) {
-      throw new Error("Employee not found");
+      throw new AppError("Employee not found", 404);
     }
 
     if (!employee.id_proof_key) {
-      throw new Error("No ID proof uploaded");
+      throw new AppError("No ID proof uploaded", 404);
     }
 
     const signedUrl = await getSignedIdProofUrl(employee.id_proof_key);
@@ -111,7 +112,7 @@ export class EmployeeService {
     const employee = await this.employeeRepo.findByIdSafe(id);
 
     if (!employee) {
-      throw new Error("Employee not found");
+      throw new AppError("Employee not found", 404);
     }
 
     return employee;
