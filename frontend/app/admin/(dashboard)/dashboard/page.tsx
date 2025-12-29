@@ -3,7 +3,7 @@ import ProductsTable from "@/components/productTable";
 import HrTable from "@/components/HrTable";
 import SalesChart from "@/components/SalesChart";
 import EmployeePieChart from "@/components/employeesPiechart";
-import WarehouseTable from "@/components/WarehouseTable";
+
 import CategoryPieChart from "@/components/CategoryPieChart";
 
 export default function Dashboard() {

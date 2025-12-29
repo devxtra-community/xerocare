@@ -1,8 +1,8 @@
 import next from "next";
-import SalesPage from "@/components/SlesReport"
+import AdminSalesPage from "@/components/AdminSales";
 
 export default function AdminSalesDashboard(){
   return(
-    <SalesPage/>
+    <AdminSalesPage/>
   )
 }

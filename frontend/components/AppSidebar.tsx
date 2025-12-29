@@ -5,6 +5,10 @@ import {
   Building2,
   Users,
   Package,
+  Wallet,
+  Truck,
+  UsersRound,
+  Boxes,
 } from "lucide-react";
 
 import {
@@ -51,9 +55,27 @@ const menuItems = [
     icon: Package,
     href: "/admin/warehouse",
   },
-]
-
-
+  {
+    title: "Finance",
+    icon: Wallet,
+    href: "/admin/finance",
+  },
+  {
+    title: "Vendors",
+    icon: Truck,
+    href: "/admin/vendors",
+  },
+  {
+    title: "Customers",
+    icon: UsersRound,
+    href: "/admin/customers",
+  },
+  {
+    title: "Inventory",
+    icon: Boxes,
+    href: "/admin/inventory",
+  },
+];
 
 export default function AppSidebar() {
   const router = useRouter()
