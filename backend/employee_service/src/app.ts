@@ -7,7 +7,8 @@ import employeeRouter from "./routes/employeeRouter";
 import authRouter from "./routes/authRouter";
 import cors from 'cors';
 import cookieParser from "cookie-parser";
-
+import { getRabbitChannel } from "./config/rabbitmq";
+import { startWorker } from "./workers/emailWorker";
 
 const app = express();
 app.use(express.json());
@@ -21,6 +22,8 @@ app.use(cors({
 const startServer = async () => {
   try {
     await Source.initialize();
+    await getRabbitChannel();
+    await startWorker();
     console.log("Database connected");
 
     const PORT = process.env.PORT;
