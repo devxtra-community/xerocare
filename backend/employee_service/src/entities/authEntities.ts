@@ -18,6 +18,12 @@ export class Auth{
     @Column()
     refresh_token!:string;
 
+    @Column({ nullable: true })
+    ip_address!: string;
+
+    @Column({ nullable: true })
+    user_agent!: string;
+
     @CreateDateColumn({type:"timestamp with time zone"})
     createdAt!: Date;
 

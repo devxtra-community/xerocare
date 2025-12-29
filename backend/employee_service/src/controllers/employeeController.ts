@@ -1,15 +1,83 @@
-import { Request,Response } from "express";
-import { AdminService } from "../services/employeeService";
+import { Request, Response } from "express";
+import { EmployeeService } from "../services/employeeService";
+import { MulterS3File } from "../types/multer-s3-file";
 
-const service = new AdminService();
+const service = new EmployeeService();
 
-export const addEmployee = async(req:Request,res:Response)=>{
-    try{
-        const employee = await service.addEmployee(req.body)
-        res.status(201).json({message:"Employee created successfully",data:employee})
-    }
-    catch(err:any)
-    {
-        res.status(400).json({error:err.message})
-    }
-}
+export const addEmployee = async (req: Request, res: Response) => {
+  try {
+    const {
+      first_name,
+      last_name,
+      email,
+      role,
+      expireDate,
+      salary,
+    } = req.body;
+
+    const files = req.files as {
+        profile_image?: MulterS3File[];
+        id_proof?: MulterS3File[]
+    };
+
+    const profileImageKey = files?.profile_image?.[0]?.key ?? null;
+
+    const profileImageUrl = profileImageKey
+    ? `${process.env.R2_PUBLIC_URL}/${process.env.R2_BUCKET}/${profileImageKey}`
+    : null;
+
+    const idProofKey = files?.id_proof?.[0]?.key ?? null;
+
+    const employee = await service.addEmployee({
+      first_name,
+      last_name,
+      email,
+      role,
+      expireDate,
+      salary: salary ? Number(salary) : null,
+      profile_image_url: profileImageUrl,
+      id_proof_key: idProofKey,
+    });
+
+    res.status(201).json({message: "Employee created successfully",data: employee,success: true,});
+  } catch (err: any) {
+    res.status(400).json({message: err.message,success: false,});
+  }
+};
+
+
+export const getEmployeeIdProof = async (req: Request,res: Response) => {
+  try {
+    const employeeId = req.params.id;
+
+    const result =
+      await service.getEmployeeIdProof(employeeId);
+
+    return res.json({success: true,data: result,});
+  } catch (err: any) {
+    return res.status(404).json({success: false,message: err.message,});
+  }
+};
+
+export const getAllEmployees = async (req: Request,res: Response) => {
+  try {
+    const page = Number(req.query.page) || 1;
+    const limit = Number(req.query.limit) || 20;
+
+    const result = await service.getAllEmployees(page, limit);
+
+    return res.json({success: true,data: result,message:"Employees fetched successfully"});
+  } catch (err: any) {
+    return res.status(500).json({success: false,message: err.message,});
+  }
+};
+
+export const getEmployeeById = async (req: Request,res: Response) => {
+  try {
+    const employee = await service.getEmployeeById(req.params.id);
+
+    return res.json({success: true,data: employee,message:"Employee fetched successfully"});
+  } catch (err: any) {
+    return res.status(404).json({success: false,message: err.message,});
+  }
+};
