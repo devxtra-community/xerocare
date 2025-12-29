@@ -16,7 +16,7 @@ export default function AdminSalesPage() {
           Sales
         </h3>
 
-        {/* STAT CARDS */}
+        
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 sm:gap-2 md:gap-4">
           <StatCard title="Total Revenue" value="₹100,000" subtitle="Last 30 days" />
           <StatCard title="Total Orders" value="420" subtitle="Last 30 days" />
@@ -24,7 +24,7 @@ export default function AdminSalesPage() {
           <StatCard title="Top Product" value="iPhone 15 Pro" subtitle="This month" />
         </div>
 
-        {/* TABLE + SALES TREND */}
+   
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 sm:gap-6 items-stretch">
 
           <div className="xl:col-span-2 flex flex-col space-y-2">

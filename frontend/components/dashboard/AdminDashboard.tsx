@@ -76,7 +76,7 @@ export default function Dashboard() {
 
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-5">
           <div className="xl:col-span-2 bg-gray-50 rounded-xl p-4">
-            <WarehouseTable />
+          
           </div>
 
           <div className="bg-gray-50 rounded-xl p-4 flex items-center justify-center">

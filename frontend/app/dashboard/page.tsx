@@ -24,7 +24,6 @@ export default function DashboardPage() {
         }
 
         if (user.role !== role) {
-           
             setRole(user.role);
         }
     }, [router, role]);
