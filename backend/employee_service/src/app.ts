@@ -9,6 +9,9 @@ import cors from 'cors';
 import cookieParser from "cookie-parser";
 import { getRabbitChannel } from "./config/rabbitmq";
 import { startWorker } from "./workers/emailWorker";
+import { httpLogger } from "./middleware/httplogger";
+import healthRouter from "./routes/health"
+import { logger } from "./config/logger";
 
 const app = express();
 app.use(express.json());
@@ -28,16 +31,22 @@ const startServer = async () => {
 
     const PORT = process.env.PORT;
     app.listen(PORT, () => {
-      console.log(`Server running on port ${PORT}`);
+      logger.info(`Server running on port ${PORT}`);
     });
   } catch (error) {
     console.error("DB connection failed", error);
     process.exit(1);
   }
 };
-
+app.use(httpLogger)
+app.use("/",healthRouter)
 app.use('/auth', authRouter)
 app.use("/employee", employeeRouter)
 app.use("/admin", adminRouter);
+
+app.use((err: any, req: any, res: any, next: any) => {
+  logger.error(err);
+  res.status(500).json({ message: "Internal Server Error" });
+});
 
 startServer();

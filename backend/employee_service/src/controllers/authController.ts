@@ -11,7 +11,6 @@ const magicLinkService = new MagicLinkService();
 
 export const login = async (req: Request, res: Response) => {
   try {
-    console.log("request reached here");
     const { user } = await authService.login(req.body);
 
     await otpService.sendOtp(user.email, OtpPurpose.LOGIN);
@@ -52,7 +51,6 @@ export const loginVerify = async (req: Request, res: Response) => {
 
 export const refresh = async (req: Request, res: Response) => {
   try {
-    console.log("inside refreshing accestoken")
     const refreshToken = req.cookies.refreshToken;
     if (!refreshToken) {
       throw new Error("No refresh token");
@@ -77,9 +75,7 @@ export const refresh = async (req: Request, res: Response) => {
 
 export const logout = async (req: Request, res: Response) => {
   try {
-    console.log("inside logout :",req.cookies)
     const refreshToken = req.cookies.refreshToken;
-    console.log(refreshToken)
     await authService.logout(refreshToken);
 
     res.clearCookie("refreshToken");

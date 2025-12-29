@@ -3,6 +3,9 @@ import express, { Express } from "express";
 import cors from "cors";
 import { createProxyMiddleware } from "http-proxy-middleware";
 import type { Options } from "http-proxy-middleware";
+import healthRouter from "./routes/health"
+import { httpLogger } from "./middleware/httplogger";
+import { logger } from "./config/logger";
 
 const app: Express = express();
 // app.use(express.json());
@@ -21,10 +24,16 @@ const proxyOptions: Options = {
   target: EMPLOYEE_SERVICE_URL,
   changeOrigin: true,
 };
-
+app.use(httpLogger)
+app.use("/",healthRouter)
 app.use('/', createProxyMiddleware(proxyOptions));
 
+app.use((err: any, req: any, res: any, next: any) => {
+  logger.error(err);
+  res.status(500).json({ message: "Internal Server Error" });
+});
+
 app.listen(PORT, () => {
-  console.log(`API Gateway running on port ${PORT}`);
-  console.log(`Proxying to Employee Service at ${EMPLOYEE_SERVICE_URL}`);
+  logger.info(`Server running on port ${PORT}`);
+  logger.info(`Proxying to Employee Service at ${EMPLOYEE_SERVICE_URL}`);
 });

@@ -34,7 +34,6 @@ export async function verifyLoginOtp(email: string, otp: string) {
     email,
     otp,
   });
-  console.log(res);
   localStorage.setItem("accessToken", res.data.accessToken);
 
   return res.data;
@@ -47,7 +46,6 @@ export async function requestMagicLink(email: string) {
 
 export async function verifyMagicLink(email: string, token: string) {
   const res = await api.post("/auth/magic-link/verify", { email, token });
-  console.log(res);
   localStorage.setItem("accessToken", res.data.accessToken);
 
   return res.data;
@@ -71,7 +69,6 @@ export async function logout() {
 
   try {
     const res = await api.post('/auth/logout');
-    console.log(res)
     if (res.data.success) {
       localStorage.clear();
       return res
