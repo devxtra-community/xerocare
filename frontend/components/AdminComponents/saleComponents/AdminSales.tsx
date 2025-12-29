@@ -1,22 +1,20 @@
 import StatCard from "@/components/StatCard";
-import SalesSummaryTable from "@/components/SalesSummaryTable";
-import SalesChart from "@/components/SalesChart";
+import SalesSummaryTable from "@/components/AdminComponents/saleComponents/SalesSummaryTable";
+import SalesChart from "@/components/AdminComponents/dashboardComponents/SalesChart";
 
-import MonthlySalesBarChart from "@/components/monthlysalesBarchart";
-import MostSoldProductChart from "@/components/MostSoldProductChart";
-
+import MonthlySalesBarChart from "@/components/AdminComponents/saleComponents/monthlysalesChart";
+import MostSoldProductChart from "@/components/AdminComponents/saleComponents/MostSoldProductChart";
 
 export default function AdminSalesPage() {
   return (
     <div className="bg-blue-100 min-h-screen p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6">
-
       {/* SALES */}
       <div className="space-y-3">
         <h3 className="text-sm sm:text-base md:text-lg font-bold text-blue-900">
           Sales
         </h3>
 
-        
+        {/* SUMMARY CARDS */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 sm:gap-2 md:gap-4">
           <StatCard title="Total Revenue" value="₹100,000" subtitle="Last 30 days" />
           <StatCard title="Total Orders" value="420" subtitle="Last 30 days" />
@@ -24,9 +22,8 @@ export default function AdminSalesPage() {
           <StatCard title="Top Product" value="iPhone 15 Pro" subtitle="This month" />
         </div>
 
-   
+        {/* TABLE + TREND */}
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 sm:gap-6 items-stretch">
-
           <div className="xl:col-span-2 flex flex-col space-y-2">
             <h3 className="text-sm sm:text-base font-bold text-blue-900">
               Sales Summary
@@ -46,21 +43,29 @@ export default function AdminSalesPage() {
           </div>
         </div>
 
-        {/* EXTRA CHARTS */}
+        {/* ANALYTICS */}
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 sm:gap-6">
-
-          <div className="bg-white rounded-xl p-3">
-            <MonthlySalesBarChart />
+          <div className="space-y-2">
+            <h4 className="text-sm font-semibold text-blue-900">
+              Sales per Month
+            </h4>
+            <div className="bg-white rounded-xl p-3">
+              <MonthlySalesBarChart />
+            </div>
           </div>
 
-          <div className="bg-white rounded-xl p-3">
-            <MostSoldProductChart />
+          <div className="space-y-2">
+            <h4 className="text-sm font-semibold text-blue-900">
+              Sold Products by Quantity
+            </h4>
+            <div className="bg-white rounded-xl p-3">
+              <MostSoldProductChart />
+            </div>
           </div>
-
-          
-
         </div>
       </div>
     </div>
   );
 }
+
+

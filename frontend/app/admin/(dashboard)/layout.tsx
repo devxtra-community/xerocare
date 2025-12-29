@@ -1,6 +1,6 @@
 import React from "react";
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
-import AppSidebar from "@/components/AppSidebar";
+import AppSidebar from "@/components/AdminComponents/AppSidebar";
 import DashboardHeader from "@/components/DashboardHeader";
 
 export default function AdminLayout({

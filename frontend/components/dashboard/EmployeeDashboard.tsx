@@ -1,7 +1,7 @@
 "use client";
 
 import AddEmployeeDialog from "@/components/AddEmployeeDialog";
-import UserTable from "@/components/UserTable";
+import UserTable from "@/components/AdminComponents/UserTable";
 import { useEffect, useState } from "react";
 
 export type UserListItem = {

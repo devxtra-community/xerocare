@@ -24,12 +24,23 @@ export default function MonthlySalesBarChart() {
     <div className="bg-white rounded-xl p-3 sm:p-4">
       <div className="h-[220px]">
         <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={data}>
+          <BarChart data={data} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
             <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="month" />
-            <YAxis />
-            <Tooltip />
-            <Bar dataKey="sales" fill="#2563eb" radius={[4, 4, 0, 0]} />
+            <XAxis 
+              dataKey="month" 
+              tick={{ fontSize: 11, fill: "#1e3a8a" }}
+              axisLine={{ stroke: "#e5e7eb" }}
+              tickMargin={8}
+            />
+            <YAxis 
+              tick={{ fontSize: 11, fill: "#1e3a8a" }}
+              axisLine={{ stroke: "#e5e7eb" }}
+            />
+            <Tooltip 
+              contentStyle={{ fontSize: 12 }}
+              labelStyle={{ color: "#1e3a8a" }}
+            />
+            <Bar dataKey="sales" fill="#0D47A1" radius={[4, 4, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
       </div>
