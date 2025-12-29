@@ -8,7 +8,7 @@ import {
 import { OtpPurpose } from "../constants/otpPurpose";
 
 
-const startWorker = async () => {
+export const startWorker = async () => {
   const channel = await getRabbitChannel();
 
   channel.consume("email_queue", async (msg) => {
@@ -38,4 +38,3 @@ const startWorker = async () => {
   console.log("Email worker running");
 };
 
-startWorker();

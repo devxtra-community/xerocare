@@ -1,13 +1,11 @@
 "use client"
-
 import {
   LayoutDashboard,
   ShoppingCart,
   Building2,
   Users,
   Package,
-  LogOut,
-} from "lucide-react"
+} from "lucide-react";
 
 import {
   Sidebar,
@@ -20,20 +18,71 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
+import { logout } from "@/lib/auth"
+import { toast } from "sonner"
+import { useRouter } from "next/navigation"
+
 
 const menuItems = [
-  { title: "Dashboard", icon: LayoutDashboard, href: "/", active: true },
-  { title: "Sales", icon: ShoppingCart, href: "/sales" },
-  { title: "Branch", icon: Building2, href: "/branch", disabled: true },
-  { title: "Human Resources", icon: Users, href: "/hr", disabled: true },
-  { title: "Warehouse", icon: Package, href: "/warehouse" },
+  {
+    title: "Dashboard",
+    icon: LayoutDashboard,
+    href: "/",
+    active: true,
+  },
+  {
+    title: "Sales",
+    icon: ShoppingCart,
+    href: "/admin/sales",
+  },
+  {
+    title: "Branch",
+    icon: Building2,
+    href: "/admin/branch",
+    disabled: true,
+  },
+  {
+    title: "Human Resources",
+    icon: Users,
+    href: "/admin/hr",
+    disabled: true,
+  },
+  {
+    title: "Warehouse",
+    icon: Package,
+    href: "/admin/warehouse",
+  },
 ]
 
+
+
 export default function AppSidebar() {
+  const router = useRouter()
+
+  const handleLogOut = async () => {
+    try {
+      const res = await logout();
+      console.log(res)
+      if(!res?.data.success){
+        toast.error(res?.data.message)
+      }
+      else{
+        if(res.data.isadmin){
+          router.push('/admin/login');
+        }
+        else{
+          router.push('/login');
+        }
+        toast.success(res.data.message)
+      }
+    }
+    catch (err) {
+      console.log(err)
+
+    }
+  }
   return (
     <Sidebar collapsible="icon" className="border-r-0">
-
-  
       <SidebarHeader className="bg-sidebar border-b border-white/10">
         <div className="flex items-center gap-3 px-4 py-4">
           <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/10">
@@ -45,7 +94,6 @@ export default function AppSidebar() {
         </div>
       </SidebarHeader>
 
-    
       <SidebarContent className="bg-sidebar">
         <SidebarGroup>
           <SidebarGroupContent>
@@ -85,9 +133,7 @@ export default function AppSidebar() {
                       "
                     >
                       <item.icon className="h-4 w-4" />
-                      <span className="font-medium">
-                        {item.title}
-                      </span>
+                      <span className="font-medium">{item.title}</span>
                     </a>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -111,15 +157,14 @@ export default function AppSidebar() {
                 hover:text-red-300
               "
             >
-              <a href="/logout" className="flex items-center gap-3 px-3">
-                <LogOut className="h-4 w-4" />
-                <span>Logout</span>
-              </a>
+              <button className="flex items-center gap-3 px-3" onClick={handleLogOut}>
+                Logout
+              </button>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarFooter>
 
     </Sidebar>
-  )
+  );
 }

@@ -1,0 +1,93 @@
+import api from "./api";
+
+import { jwtDecode } from "jwt-decode";
+
+export type UserRole = "HR" | "EMPLOYEE" | "FINANCE" | "MANAGER";
+
+export interface JwtPayload {
+  id: string;
+  role: UserRole;
+  exp: number;
+}
+
+export function getUserFromToken(): JwtPayload | null {
+  const token = localStorage.getItem("accessToken");
+  if (!token) return null;
+
+  try {
+    return jwtDecode<JwtPayload>(token);
+  } catch {
+    return null;
+  }
+}
+
+export async function requestLoginOtp(email: string, password: string) {
+  const res = await api.post("/auth/login", {
+    email,
+    password,
+  });
+  return res.data;
+}
+
+export async function verifyLoginOtp(email: string, otp: string) {
+  const res = await api.post("/auth/login/verify", {
+    email,
+    otp,
+  });
+  console.log(res);
+  localStorage.setItem("accessToken", res.data.accessToken);
+
+  return res.data;
+}
+
+export async function requestMagicLink(email: string) {
+  const res = await api.post("/auth/magic-link", { email });
+  return res.data;
+}
+
+export async function verifyMagicLink(email: string, token: string) {
+  const res = await api.post("/auth/magic-link/verify", { email, token });
+  console.log(res);
+  localStorage.setItem("accessToken", res.data.accessToken);
+
+  return res.data;
+}
+
+export async function requestForgotPasswordOtp(email: string) {
+  const res = await api.post("/auth/forgot-password", { email });
+  return res.data;
+}
+
+export async function resetPassword(email: string, otp: string, newPassword: string) {
+  const res = await api.post("/auth/forgot-password/verify", {
+    email,
+    otp,
+    newPassword,
+  });
+  return res.data;
+}
+
+export async function logout() {
+
+  try {
+    const res = await api.post('/auth/logout');
+    console.log(res)
+    if (res.data.success) {
+      localStorage.clear();
+      return res
+
+    }
+  }
+  catch (err) {
+    console.log(err);
+  }
+}
+
+export async function adminLogin(email: string, password: string) {
+  const res = await api.post("/admin/login", {
+    email,
+    password
+  })
+  localStorage.setItem("accessToken", res.data.accessToken);
+  return res.data;
+}

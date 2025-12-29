@@ -3,7 +3,7 @@ import jwt, { Secret, SignOptions } from "jsonwebtoken";
 const ACCESS_SECRET = process.env.ACCESS_SECRET as Secret;
 const REFRESH_SECRET = process.env.REFRESH_SECRET as Secret;
 
-export function signAccesstoken(payload: object, expiresIn: SignOptions["expiresIn"] = "15m") {
+export function signAccesstoken(payload: object, expiresIn: SignOptions["expiresIn"] = "2m") {
   return jwt.sign(payload, ACCESS_SECRET, { expiresIn:expiresIn });
 }
 
