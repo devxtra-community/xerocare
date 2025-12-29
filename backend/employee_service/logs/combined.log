@@ -1,2 +1,0 @@
-2025-12-29T06:47:42.997Z [info]: Server running on port 3002
-2025-12-29T06:49:21.875Z [info]: ::1 - - [29/Dec/2025:06:49:21 +0000] "GET /health HTTP/1.1" 200 141 "-" "PostmanRuntime/7.49.1"
