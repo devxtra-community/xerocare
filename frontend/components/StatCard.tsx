@@ -14,8 +14,8 @@ type StatCardProps = {
 
 export default function StatCard({ title, value, subtitle }: StatCardProps) {
   return (
-    <Card className="rounded-2xl min-h-[90px] sm:h-[100px] !bg-white border-0 shadow-sm">
-      <CardContent className="h-full flex flex-col items-center justify-center gap-0.5 sm:gap-1 text-center p-2 sm:p-3 md:p-4 !bg-white">
+    <Card className="rounded-2xl min-h-[70px] sm:h-[80px] !bg-white border-0 shadow-sm">
+      <CardContent className="h-full flex flex-col items-center justify-center gap-0.5 sm:gap-1 text-center p-1.5 sm:p-2 md:p-3 !bg-white">
         <CardTitle className="font-medium text-muted-foreground text-[10px] sm:text-xs md:text-sm leading-tight">
           {title}
         </CardTitle>

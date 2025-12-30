@@ -65,11 +65,7 @@ const menuItems = [
     icon: Truck,
     href: "/admin/vendors",
   },
-  {
-    title: "Customers",
-    icon: UsersRound,
-    href: "/admin/customers",
-  },
+
   {
     title: "Inventory",
     icon: Boxes,
@@ -103,8 +99,9 @@ export default function AppSidebar() {
     }
   }
   return (
-    <Sidebar collapsible="icon" className="border-r-0">
-      <SidebarHeader className="bg-sidebar border-b border-white/10">
+
+    <Sidebar collapsible="icon" className="border-r-0 border-none !border-r-0">
+      <SidebarHeader className="bg-sidebar">
         <div className="flex items-center gap-3 px-4 py-4">
           <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/10">
             <LayoutDashboard className="h-5 w-5 text-sidebar-accent-foreground" />
@@ -163,7 +160,7 @@ export default function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
 
-      <SidebarFooter className="bg-sidebar border-t border-white/10">
+      <SidebarFooter className="bg-sidebar">
         <SidebarMenu className="px-2">
           <SidebarMenuItem>
             <SidebarMenuButton

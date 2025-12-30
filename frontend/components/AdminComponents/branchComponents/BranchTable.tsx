@@ -94,12 +94,12 @@ export default function BranchReport() {
       .includes(search.toLowerCase())
   );
 
-  // Calculate statistics
+  
   const totalBranches = branches.length;
   const activeBranches = branches.filter(b => b.status === "active").length;
   const inactiveBranches = branches.filter(b => b.status === "inactive").length;
   
-  // Calculate new branches in last 2 years
+  
   const twoYearsAgo = new Date();
   twoYearsAgo.setFullYear(twoYearsAgo.getFullYear() - 2);
   const newBranches = branches.filter(b => new Date(b.startedDate) >= twoYearsAgo).length;

@@ -12,6 +12,19 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import StatCard from "@/components/StatCard";
+import {
+  ResponsiveContainer,
+  ComposedChart,
+  Line,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  AreaChart,
+  Area,
+} from "recharts";
 
 type Finance = {
   id: string;
@@ -71,6 +84,15 @@ const initialFinance: Finance[] = [
   },
 ];
 
+const chartData = [
+  { month: "Jan", income: 450000, expense: 320000, profit: 130000, margin: 28.8 },
+  { month: "Feb", income: 420000, expense: 300000, profit: 120000, margin: 28.5 },
+  { month: "Mar", income: 500000, expense: 350000, profit: 150000, margin: 30.0 },
+  { month: "Apr", income: 470000, expense: 330000, profit: 140000, margin: 29.7 },
+  { month: "May", income: 520000, expense: 380000, profit: 140000, margin: 26.9 },
+  { month: "Jun", income: 480000, expense: 310000, profit: 170000, margin: 35.4 },
+];
+
 export default function FinanceReport() {
   const [finance] = useState<Finance[]>(initialFinance);
   const [search, setSearch] = useState("");
@@ -127,6 +149,93 @@ export default function FinanceReport() {
           value={profitMonths.toString()}
           subtitle="Positive months"
         />
+      </div>
+
+      {/* Charts Section */}
+      <div className="flex flex-col lg:flex-row gap-6">
+        {/* Income vs Expense Chart */}
+        <div className="flex-1 bg-white p-4 rounded-2xl shadow-sm">
+          <h4 className="text-md font-semibold text-blue-900 mb-4">Income vs Expense</h4>
+          <div className="h-[200px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <ComposedChart
+                data={chartData}
+                margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
+                <XAxis 
+                  dataKey="month" 
+                  axisLine={false} 
+                  tickLine={false} 
+                  tick={{ fill: "#64748B", fontSize: 10 }} 
+                  dy={10}
+                />
+                <YAxis 
+                  axisLine={false} 
+                  tickLine={false} 
+                  tick={{ fill: "#64748B", fontSize: 10 }} 
+                />
+                <Tooltip 
+                  contentStyle={{ borderRadius: "8px", border: "none", boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)", padding: "4px", fontSize: "10px" }}
+                  itemStyle={{ padding: 0 }}
+                />
+                <Legend iconType="circle" wrapperStyle={{ paddingTop: "10px", fontSize: "10px" }} />
+                <Bar dataKey="income" name="Income" barSize={20} fill="#3B82F6" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="expense" name="Expense" barSize={20} fill="#EF4444" radius={[4, 4, 0, 0]} />
+                <Line type="monotone" dataKey="profit" name="Profit Trend" stroke="#10B981" strokeWidth={2} dot={{ r: 4, fill: "#10B981" }} />
+              </ComposedChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* Profit Margin Chart */}
+        <div className="flex-1 bg-white p-4 rounded-2xl shadow-sm">
+          <h4 className="text-md font-semibold text-blue-900 mb-4">Profit Margin %</h4>
+          <div className="h-[200px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart
+                data={chartData}
+                margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+              >
+                <defs>
+                  <linearGradient id="colorMargin" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#8B5CF6" stopOpacity={0.1}/>
+                    <stop offset="95%" stopColor="#8B5CF6" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
+                <XAxis 
+                  dataKey="month" 
+                  axisLine={false} 
+                  tickLine={false} 
+                  tick={{ fill: "#64748B", fontSize: 10 }} 
+                  dy={10}
+                />
+                <YAxis 
+                  axisLine={false} 
+                  tickLine={false} 
+                  tick={{ fill: "#64748B", fontSize: 10 }} 
+                  unit="%"
+                />
+                <Tooltip 
+                  formatter={(value: number) => [`${value}%`, "Profit Margin"]}
+                  contentStyle={{ borderRadius: "8px", border: "none", boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)", padding: "4px", fontSize: "10px" }}
+                  itemStyle={{ padding: 0 }}
+                />
+                <Legend iconType="circle" wrapperStyle={{ paddingTop: "10px", fontSize: "10px" }} />
+                <Area 
+                  type="monotone" 
+                  dataKey="margin" 
+                  name="Profit Margin" 
+                  stroke="#8B5CF6" 
+                  strokeWidth={2}
+                  fillOpacity={1} 
+                  fill="url(#colorMargin)" 
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
       </div>
 
       {/* Search + Filter */}
