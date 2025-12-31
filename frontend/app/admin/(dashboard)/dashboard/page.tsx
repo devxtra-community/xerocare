@@ -8,13 +8,13 @@ import CategoryPieChart from "@/components/AdminComponents/dashboardComponents/C
 
 export default function Dashboard() {
   return (
-    <div className="bg-blue-100 min-h-screen p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6">
+    <div className="bg-blue-100 min-h-screen p-3 sm:p-4 md:p-6 space-y-8 sm:space-y-10">
       {/* <h3 className="text-xl sm:text-2xl md:text-2xl font-bold text-blue-900">
         Welcome, Riyas!
       </h3> */}
 
-      <div className="flex flex-col space-y-3 sm:space-y-4">
-        <h3 className="text-lg sm:text-m font-bold text-blue-900">Sales</h3>
+      <div className="flex flex-col space-y-4 sm:space-y-6">
+        <h3 className="text-xl sm:text-2xl font-bold text-blue-900">Sales</h3>
 
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 md:gap-4">
           <StatCard
@@ -40,14 +40,14 @@ export default function Dashboard() {
         </div>
 
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 sm:gap-6">
-          <div className="space-y-2">
-            <h3 className="text-base sm:text-lg md:text-xl font-bold text-blue-900">
+          <div className="space-y-4">
+            <h3 className="text-lg sm:text-xl font-bold text-blue-900">
               Products
             </h3>
             <ProductsTable />
           </div>
-          <div className="space-y-2">
-            <h3 className="text-base sm:text-lg md:text-xl font-bold text-blue-900">
+          <div className="space-y-4">
+            <h3 className="text-lg sm:text-xl font-bold text-blue-900">
               Sales Overview
             </h3>
             <SalesChart />
@@ -55,8 +55,8 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div className="flex flex-col space-y-3 sm:space-y-4">
-        <h3 className="text-lg sm:text-xl font-bold text-blue-900">
+      <div className="flex flex-col space-y-4 sm:space-y-6">
+        <h3 className="text-xl sm:text-2xl font-bold text-blue-900">
           Human Resources
         </h3>
 
@@ -70,8 +70,8 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div className="flex flex-col space-y-3 sm:space-y-4">
-        <h3 className="text-lg sm:text-xl font-bold text-blue-900">
+      <div className="flex flex-col space-y-4 sm:space-y-6">
+        <h3 className="text-xl sm:text-2xl font-bold text-blue-900">
           Warehouse
         </h3>
 

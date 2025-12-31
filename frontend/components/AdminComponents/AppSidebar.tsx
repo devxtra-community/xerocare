@@ -24,15 +24,14 @@ import {
 } from "@/components/ui/sidebar"
 import { logout } from "@/lib/auth"
 import { toast } from "sonner"
-import { useRouter } from "next/navigation"
+import { useRouter, usePathname } from "next/navigation"
 
 
 const menuItems = [
   {
     title: "Dashboard",
     icon: LayoutDashboard,
-    href: "/",
-    active: true,
+    href: "/admin/dashboard",
   },
   {
     title: "Sales",
@@ -75,6 +74,7 @@ const menuItems = [
 
 export default function AppSidebar() {
   const router = useRouter()
+  const pathname = usePathname()
 
   const handleLogOut = async () => {
     try {
@@ -120,7 +120,7 @@ export default function AppSidebar() {
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton
                     asChild
-                    isActive={item.active}
+                    isActive={pathname === item.href}
                     disabled={item.disabled}
                     className={`
                       py-2.5 rounded-md
@@ -128,7 +128,7 @@ export default function AppSidebar() {
                       [&_svg]:!text-sidebar-accent-foreground
 
                       ${
-                        item.active
+                        pathname === item.href
                           ? "bg-white text-sidebar [&_svg]:text-sidebar"
                           : "hover:bg-white/10"
                       }

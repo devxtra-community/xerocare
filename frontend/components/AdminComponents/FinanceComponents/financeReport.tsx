@@ -121,9 +121,9 @@ export default function FinanceReport() {
   ).length;
 
   return (
-    <div className="bg-blue-100 min-h-screen p-4 space-y-6">
+    <div className="bg-blue-100 min-h-screen p-4 space-y-8 sm:space-y-10">
       {/* Header */}
-      <h3 className="text-lg font-bold text-blue-900">
+      <h3 className="text-xl sm:text-2xl font-bold text-blue-900">
         Financial Report
       </h3>
 
@@ -154,8 +154,8 @@ export default function FinanceReport() {
       {/* Charts Section */}
       <div className="flex flex-col lg:flex-row gap-6">
         {/* Income vs Expense Chart */}
-        <div className="flex-1 bg-white p-4 rounded-2xl shadow-sm">
-          <h4 className="text-md font-semibold text-blue-900 mb-4">Income vs Expense</h4>
+        <div className="flex-1 bg-white p-4 rounded-2xl shadow-sm space-y-4">
+          <h4 className="text-lg sm:text-xl font-bold text-blue-900">Income vs Expense</h4>
           <div className="h-[200px] w-full">
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart
@@ -189,8 +189,8 @@ export default function FinanceReport() {
         </div>
 
         {/* Profit Margin Chart */}
-        <div className="flex-1 bg-white p-4 rounded-2xl shadow-sm">
-          <h4 className="text-md font-semibold text-blue-900 mb-4">Profit Margin %</h4>
+        <div className="flex-1 bg-white p-4 rounded-2xl shadow-sm space-y-4">
+          <h4 className="text-lg sm:text-xl font-bold text-blue-900">Profit Margin %</h4>
           <div className="h-[200px] w-full">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart

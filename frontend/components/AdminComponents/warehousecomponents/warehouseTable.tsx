@@ -142,10 +142,10 @@ export default function WarehouseReport() {
   };
 
   return (
-    <div className="bg-blue-100 min-h-screen p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6">
+    <div className="bg-blue-100 min-h-screen p-3 sm:p-4 md:p-6 space-y-8 sm:space-y-10">
       {/* WAREHOUSES */}
-      <div className="space-y-3">
-        <h3 className="text-sm sm:text-base md:text-lg font-bold text-blue-900">
+      <div className="space-y-4 sm:space-y-6">
+        <h3 className="text-xl sm:text-2xl font-bold text-blue-900">
           Warehouses
         </h3>
 
