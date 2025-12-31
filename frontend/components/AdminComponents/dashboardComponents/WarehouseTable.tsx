@@ -105,7 +105,7 @@ export default function WarehouseTable() {
             onClick={() => setPage(num)}
             className={`px-2 py-0.5 rounded-md ${
               page === num
-                ? "bg-blue-900 text-white"
+                ? "bg-primary text-white"
                 : "border hover:bg-gray-50"
             }`}
           >

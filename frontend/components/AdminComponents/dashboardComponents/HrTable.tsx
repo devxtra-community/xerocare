@@ -161,7 +161,7 @@ export default function HrTable() {
               onClick={() => setPage(num)}
               className={`px-1.5 sm:px-2 py-0.5 rounded-md transition ${
                 page === num
-                  ? "bg-blue-900 text-white"
+                  ? "bg-primary text-white"
                   : "border hover:bg-gray-50"
               }`}
             >

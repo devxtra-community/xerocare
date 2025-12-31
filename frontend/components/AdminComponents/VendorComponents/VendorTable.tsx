@@ -159,7 +159,7 @@ export default function VendorTable() {
             </DropdownMenuContent>
           </DropdownMenu>
           <Button 
-            className="bg-blue-900 text-white gap-2"
+            className="bg-primary text-white gap-2"
             onClick={() => {
               setEditingVendor(null);
               setFormOpen(true);
@@ -415,7 +415,7 @@ function VendorFormModal({
             Cancel
           </Button>
           <Button
-            className="rounded-full px-6 bg-blue-900 hover:bg-blue-800 text-white"
+            className="rounded-full px-6 bg-primary hover:bg-primary/90 text-white"
             onClick={() => onConfirm(form)}
           >
             Confirm

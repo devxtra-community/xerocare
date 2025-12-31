@@ -39,7 +39,7 @@ export default function SalesChart() {
               onClick={() => setSelectedPeriod(period)}
               className={`px-2 py-0.5 rounded-md transition-colors ${
                 selectedPeriod === period
-                  ? "bg-blue-900 text-white font-medium"
+                  ? "bg-primary text-white font-medium"
                   : "text-gray-600 hover:bg-gray-100"
               }`}
             >

@@ -1,21 +1,35 @@
 "use client";
 
-import React, { useState } from "react";
+import React from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Printer, Mail, Phone, MapPin, Building2, User, Edit } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { 
+  ArrowLeft, 
+  Printer, 
+  Edit, 
+  Mail, 
+  Phone, 
+  MapPin, 
+  Building2, 
+  User,
+  CreditCard,
+  ShoppingCart,
+  TrendingUp,
+  Clock
+} from "lucide-react";
+import StatCard from "@/components/StatCard";
+import VendorTransactionsTable from "@/components/AdminComponents/vendorComponents/VendorTransactionsTable";
+import VendorSpendingTrend from "@/components/AdminComponents/vendorComponents/VendorSpendingTrend";
 
 export default function VendorProfilePage() {
   const params = useParams();
   const router = useRouter();
   const id = params.id as string;
 
-  // Mock Data - In a real app, fetch using 'id'
   const vendor = {
-    id: "1",
-    name: "ABC Supplies",
-    type: "Supplier",
+    id: id || "1",
+    name: "ABC Supplies Pvt Ltd",
+    type: "Primary Supplier",
     contactPerson: "John Doe",
     phone: "+91 9876543210",
     email: "john@abcsupplies.com",
@@ -25,6 +39,7 @@ export default function VendorProfilePage() {
     totalOrders: 45,
     purchaseValue: 1200000,
     outstandingAmount: 50000,
+    creditLimit: 500000,
     bankDetails: {
       accountName: "ABC Supplies Pvt Ltd",
       accountNumber: "123456789012",
@@ -34,114 +49,159 @@ export default function VendorProfilePage() {
   };
 
   return (
-    <div className="p-6 space-y-6 bg-blue-50/50 min-h-screen">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => router.back()}>
-            <ArrowLeft className="h-5 w-5 text-slate-500" />
-          </Button>
-          <div>
-            <h2 className="text-xl sm:text-2xl font-bold text-blue-900 font-serif flex items-center gap-3">
-              {vendor.name}
-              <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${vendor.status === "Active" ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"}`}>
-                {vendor.status}
-              </span>
-            </h2>
-            <p className="text-sm text-slate-500">Vendor ID: #{id} • {vendor.type}</p>
+    <div className="bg-blue-100 min-h-screen p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6">
+      {/* HEADER SECTION */}
+      <div className="space-y-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <Button 
+                variant="ghost" 
+                size="icon" 
+                className="h-8 w-8 hover:bg-blue-200/50" 
+                onClick={() => router.back()}
+            >
+              <ArrowLeft className="h-5 w-5 text-blue-900" />
+            </Button>
+            <div>
+              <h3 className="text-sm sm:text-base md:text-lg font-bold text-blue-900 flex items-center gap-2 uppercase">
+                VENDOR DETAIL
+                <span className="px-2 py-0.5 rounded-full text-[10px] bg-green-100 text-green-700 uppercase font-bold">
+                  {vendor.status}
+                </span>
+              </h3>
+              <p className="text-xs text-blue-600 font-medium uppercase tracking-wider">
+                ID: #{vendor.id} • {vendor.name}
+              </p>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" className="h-8 text-[11px] rounded-lg border-blue-200 text-blue-700 hover:bg-blue-50 gap-1.5 font-semibold">
+              <Printer className="h-3.5 w-3.5" /> PRINT
+            </Button>
+            <Button size="sm" className="h-8 text-[11px] rounded-lg bg-primary hover:bg-primary/90 text-white gap-1.5 font-semibold">
+              <Edit className="h-3.5 w-3.5" /> EDIT PROFILE
+            </Button>
           </div>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" className="gap-2 bg-white">
-            <Printer className="h-4 w-4" /> Print
-          </Button>
-          <Button size="sm" className="gap-2 bg-blue-900 text-white hover:bg-blue-800">
-             <Edit className="h-4 w-4" /> Edit Vendor
-          </Button>
+
+        {/* FINANCIAL SUMMARY CARDS */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 sm:gap-2 md:gap-4">
+          <StatCard 
+            title="Total Spend" 
+            value={`₹${(vendor.purchaseValue/100000).toFixed(1)}L`} 
+            subtitle="Lifetime Purchase"
+          />
+          <StatCard 
+            title="Total Orders" 
+            value={vendor.totalOrders.toString()} 
+            subtitle="Successful Deliveries"
+          />
+          <StatCard 
+            title="Outstanding" 
+            value={`₹${(vendor.outstandingAmount/1000).toFixed(0)}K`} 
+            subtitle="Pending Payments"
+          />
+          <StatCard 
+            title="Credit Limit" 
+            value={`₹${(vendor.creditLimit/100000).toFixed(1)}L`} 
+            subtitle="Available: ₹4.5L"
+          />
         </div>
-      </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Card 1: General Information */}
-        <Card className="rounded-2xl border-none shadow-sm h-full">
-            <CardHeader className="bg-white rounded-t-2xl border-b border-gray-100 pb-4">
-               <CardTitle className="text-base text-blue-900 font-bold flex items-center gap-2">
-                    <User className="h-4 w-4" /> General Information
-               </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4 pt-6">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                        <div className="text-xs text-slate-400 uppercase font-semibold mb-1">Contact Person</div>
-                        <div className="text-sm font-medium text-slate-800">{vendor.contactPerson}</div>
-                    </div>
+        {/* MAIN CONTENT: INFO + TRANSACTIONS */}
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 sm:gap-6 items-stretch">
+          {/* COLUMN 1: VENDOR INFO (1/3) */}
+          <div className="space-y-4 sm:space-y-6">
+            {/* General Info Card */}
+            <div className="bg-white rounded-xl shadow-sm p-4 space-y-4">
+               <h3 className="text-xs font-bold text-blue-900 uppercase flex items-center gap-2 border-b border-gray-50 pb-2">
+                  <User className="h-3.5 w-3.5" /> Contact Profile
+               </h3>
+               <div className="space-y-3">
+                  <div className="flex items-start gap-3">
+                     <div className="p-1.5 bg-blue-50 rounded-lg">
+                        <User className="h-3.5 w-3.5 text-blue-600" />
+                     </div>
                      <div>
-                        <div className="text-xs text-slate-400 uppercase font-semibold mb-1">Vendor Type</div>
-                        <div className="text-sm font-medium text-slate-800">{vendor.type}</div>
-                    </div>
-                </div>
-
-                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <p className="text-[10px] text-gray-400 uppercase font-bold">Contact Person</p>
+                        <p className="text-xs font-semibold text-gray-900">{vendor.contactPerson}</p>
+                     </div>
+                  </div>
+                  <div className="flex items-start gap-3">
+                     <div className="p-1.5 bg-blue-50 rounded-lg">
+                        <Phone className="h-3.5 w-3.5 text-blue-600" />
+                     </div>
                      <div>
-                        <div className="text-xs text-slate-400 uppercase font-semibold mb-1">Phone Number</div>
-                        <div className="text-sm font-medium text-slate-800 flex items-center gap-2">
-                            <Phone className="h-3 w-3 text-slate-400" /> {vendor.phone}
-                        </div>
-                    </div>
+                        <p className="text-[10px] text-gray-400 uppercase font-bold">Phone</p>
+                        <p className="text-xs font-semibold text-gray-900">{vendor.phone}</p>
+                     </div>
+                  </div>
+                  <div className="flex items-start gap-3">
+                     <div className="p-1.5 bg-blue-50 rounded-lg">
+                        <Mail className="h-3.5 w-3.5 text-blue-600" />
+                     </div>
                      <div>
-                        <div className="text-xs text-slate-400 uppercase font-semibold mb-1">Email Address</div>
-                        <div className="text-sm font-medium text-slate-800 flex items-center gap-2">
-                            <Mail className="h-3 w-3 text-slate-400" /> {vendor.email}
-                        </div>
-                    </div>
-                </div>
-
-                <div>
-                    <div className="text-xs text-slate-400 uppercase font-semibold mb-1">Office Address</div>
-                    <div className="text-sm font-medium text-slate-800 flex items-start gap-2">
-                        <MapPin className="h-3 w-3 text-slate-400 mt-0.5" />
-                        {vendor.address}
-                    </div>
-                </div>
-            </CardContent>
-        </Card>
-
-        {/* Card 2: Business & Financials */}
-         <Card className="rounded-2xl border-none shadow-sm h-full">
-            <CardHeader className="bg-white rounded-t-2xl border-b border-gray-100 pb-4">
-               <CardTitle className="text-base text-blue-900 font-bold flex items-center gap-2">
-                    <Building2 className="h-4 w-4" /> Business Details
-               </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4 pt-6">
-                 <div>
-                    <div className="text-xs text-slate-400 uppercase font-semibold mb-1">GSTIN</div>
-                    <div className="text-sm font-medium text-slate-800">{vendor.gstin}</div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                        <div className="text-xs text-slate-400 uppercase font-semibold mb-1">Bank Name</div>
-                        <div className="text-sm font-medium text-slate-800">{vendor.bankDetails.bankName}</div>
-                    </div>
+                        <p className="text-[10px] text-gray-400 uppercase font-bold">Email</p>
+                        <p className="text-xs font-semibold text-gray-900">{vendor.email}</p>
+                     </div>
+                  </div>
+                  <div className="flex items-start gap-3">
+                     <div className="p-1.5 bg-blue-50 rounded-lg">
+                        <MapPin className="h-3.5 w-3.5 text-blue-600" />
+                     </div>
                      <div>
-                        <div className="text-xs text-slate-400 uppercase font-semibold mb-1">Account Number</div>
-                        <div className="text-sm font-medium text-slate-800">{vendor.bankDetails.accountNumber}</div>
-                    </div>
-                </div>
-                 <div>
-                    <div className="text-xs text-slate-400 uppercase font-semibold mb-1">IFSC Code</div>
-                    <div className="text-sm font-medium text-slate-800">{vendor.bankDetails.ifsc}</div>
-                </div>
+                        <p className="text-[10px] text-gray-400 uppercase font-bold">Location</p>
+                        <p className="text-xs font-semibold text-gray-900 leading-relaxed">{vendor.address}</p>
+                     </div>
+                  </div>
+               </div>
+            </div>
 
-                <div className="pt-4 mt-2 border-t border-dashed border-gray-200">
-                    <div className="flex justify-between items-center">
-                         <div className="text-sm text-slate-500">Outstanding Balance</div>
-                         <div className="text-lg font-bold text-red-600">₹ {vendor.outstandingAmount.toLocaleString()}</div>
-                    </div>
-                </div>
-            </CardContent>
-        </Card>
+            {/* Business Details Card */}
+            <div className="bg-white rounded-xl shadow-sm p-4 space-y-4">
+               <h3 className="text-xs font-bold text-blue-900 uppercase flex items-center gap-2 border-b border-gray-50 pb-2">
+                  <Building2 className="h-3.5 w-3.5" /> Business & Tax
+               </h3>
+               <div className="space-y-3">
+                  <div className="bg-blue-50/50 p-2 rounded-lg border border-blue-100/50">
+                    <p className="text-[10px] text-blue-600 uppercase font-bold">GSTIN Number</p>
+                    <p className="text-xs font-bold text-blue-900">{vendor.gstin}</p>
+                  </div>
+                  <div className="grid grid-cols-1 gap-3">
+                     <div>
+                        <p className="text-[10px] text-gray-400 uppercase font-bold">Bank Name</p>
+                        <p className="text-xs font-semibold text-gray-900">{vendor.bankDetails.bankName}</p>
+                     </div>
+                     <div>
+                        <p className="text-[10px] text-gray-400 uppercase font-bold">Account / IFSC</p>
+                        <p className="text-xs font-mono font-semibold text-gray-900">{vendor.bankDetails.accountNumber} / {vendor.bankDetails.ifsc}</p>
+                     </div>
+                  </div>
+               </div>
+            </div>
+          </div>
+
+          {/* COLUMN 2: TRANSACTION HISTORY (2/3) + ANALYTICS */}
+          <div className="xl:col-span-2 flex flex-col space-y-4 sm:space-y-6">
+            <div className="flex flex-col space-y-2 flex-1 min-h-[400px]">
+               <h3 className="text-sm font-bold text-blue-900 uppercase flex items-center gap-2">
+                  <Clock className="h-3.5 w-3.5" /> Transaction History
+               </h3>
+               <div className="flex-1">
+                  <VendorTransactionsTable />
+               </div>
+            </div>
+
+            <div className="flex flex-col space-y-2 h-[280px]">
+               <h3 className="text-sm font-bold text-blue-900 uppercase flex items-center gap-2">
+                  <TrendingUp className="h-3.5 w-3.5" /> Purchasing Analytics
+               </h3>
+               <div className="flex-1 bg-white rounded-xl p-4 shadow-sm">
+                  <VendorSpendingTrend />
+               </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

@@ -185,7 +185,7 @@ export default function WarehouseReport() {
           </div>
 
           <Button
-            className="bg-blue-900 text-white gap-2"
+            className="bg-primary text-white gap-2"
             onClick={() => {
               setEditingWarehouse(null);
               setFormOpen(true);
@@ -362,7 +362,7 @@ function WarehouseFormModal({
                   <SelectItem
                     key={branch}
                     value={branch}
-                    className="focus:bg-blue-900 focus:text-white"
+                    className="focus:bg-primary focus:text-white"
                   >
                     {branch}
                   </SelectItem>
@@ -405,7 +405,7 @@ function WarehouseFormModal({
                   <SelectItem
                     key={type}
                     value={type}
-                    className="focus:bg-blue-900 focus:text-white"
+                    className="focus:bg-primary focus:text-white"
                   >
                     {type}
                   </SelectItem>
@@ -437,13 +437,13 @@ function WarehouseFormModal({
               <SelectContent>
                 <SelectItem
                   value="active"
-                  className="focus:bg-blue-900 focus:text-white"
+                  className="focus:bg-primary focus:text-white"
                 >
                   Active
                 </SelectItem>
                 <SelectItem
                   value="inactive"
-                  className="focus:bg-blue-900 focus:text-white"
+                  className="focus:bg-primary focus:text-white"
                 >
                   Inactive
                 </SelectItem>
@@ -461,7 +461,7 @@ function WarehouseFormModal({
             Cancel
           </Button>
           <Button
-            className="rounded-full px-6 bg-blue-900 hover:bg-blue-800 text-white"
+            className="rounded-full px-6 bg-primary hover:bg-primary/90 text-white"
             onClick={() => onConfirm(form)}
           >
             Confirm

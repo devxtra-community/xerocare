@@ -124,7 +124,7 @@ export default function ProductsTable() {
               onClick={() => setPage(pageNum)}
               className={`px-1.5 sm:px-2 py-0.5 rounded-md transition ${
                 page === pageNum
-                  ? "bg-blue-900 text-white"
+                  ? "bg-primary text-white"
                   : "border hover:bg-gray-50"
               }`}
             >

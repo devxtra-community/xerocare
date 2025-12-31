@@ -94,7 +94,7 @@ export default function BranchReport() {
       .includes(search.toLowerCase())
   );
 
-  
+                                                                                                                                                        
   const totalBranches = branches.length;
   const activeBranches = branches.filter(b => b.status === "active").length;
   const inactiveBranches = branches.filter(b => b.status === "inactive").length;
@@ -167,7 +167,7 @@ export default function BranchReport() {
           </div>
 
           <Button
-            className="bg-blue-900 text-white gap-2"
+            className="bg-primary text-white gap-2"
             onClick={() => {
               setEditingBranch(null);
               setFormOpen(true);
@@ -364,7 +364,7 @@ function BranchFormModal({
                   <SelectItem 
                     key={manager} 
                     value={manager}
-                    className="focus:bg-blue-900 focus:text-white"
+                    className="focus:bg-primary focus:text-white"
                   >
                     {manager}
                   </SelectItem>
@@ -384,10 +384,10 @@ function BranchFormModal({
                 <SelectValue placeholder="Select status" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="active" className="focus:bg-blue-900 focus:text-white">
+                <SelectItem value="active" className="focus:bg-primary focus:text-white">
                   Active
                 </SelectItem>
-                <SelectItem value="inactive" className="focus:bg-blue-900 focus:text-white">
+                <SelectItem value="inactive" className="focus:bg-primary focus:text-white">
                   Inactive
                 </SelectItem>
               </SelectContent>
@@ -400,7 +400,7 @@ function BranchFormModal({
             Cancel
           </Button>
           <Button
-            className="rounded-full px-6 bg-blue-900 hover:bg-blue-800 text-white"
+            className="rounded-full px-6 bg-primary hover:bg-primary/90 text-white"
             onClick={() => onConfirm(form)}
           >
             Confirm

@@ -180,9 +180,9 @@ export default function FinanceReport() {
                   itemStyle={{ padding: 0 }}
                 />
                 <Legend iconType="circle" wrapperStyle={{ paddingTop: "10px", fontSize: "10px" }} />
-                <Bar dataKey="income" name="Income" barSize={20} fill="#3B82F6" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="expense" name="Expense" barSize={20} fill="#EF4444" radius={[4, 4, 0, 0]} />
-                <Line type="monotone" dataKey="profit" name="Profit Trend" stroke="#10B981" strokeWidth={2} dot={{ r: 4, fill: "#10B981" }} />
+                <Bar dataKey="income" name="Income" barSize={20} fill="#2563eb" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="expense" name="Expense" barSize={20} fill="#93c5fd" radius={[4, 4, 0, 0]} />
+                <Line type="monotone" dataKey="profit" name="Profit Trend" stroke="#2563eb" strokeWidth={2} dot={{ r: 4, fill: "#2563eb" }} />
               </ComposedChart>
             </ResponsiveContainer>
           </div>
@@ -199,8 +199,8 @@ export default function FinanceReport() {
               >
                 <defs>
                   <linearGradient id="colorMargin" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#8B5CF6" stopOpacity={0.1}/>
-                    <stop offset="95%" stopColor="#8B5CF6" stopOpacity={0}/>
+                    <stop offset="5%" stopColor="#2563eb" stopOpacity={0.1}/>
+                    <stop offset="95%" stopColor="#2563eb" stopOpacity={0}/>
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
@@ -227,7 +227,7 @@ export default function FinanceReport() {
                   type="monotone" 
                   dataKey="margin" 
                   name="Profit Margin" 
-                  stroke="#8B5CF6" 
+                  stroke="#2563eb" 
                   strokeWidth={2}
                   fillOpacity={1} 
                   fill="url(#colorMargin)" 
