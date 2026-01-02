@@ -9,6 +9,7 @@ import {
 export enum VendorStatus {
   ACTIVE = "ACTIVE",
   INACTIVE = "INACTIVE",
+  DELETED = "DELETED",                                  
 }
 
 @Entity({ name: "vendors" })

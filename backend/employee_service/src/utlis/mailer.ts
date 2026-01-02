@@ -62,3 +62,36 @@ export async function sendMagicLinkMail(
     `,
   });
 }
+
+export async function sendVendorWelcomeMail(
+  to: string,
+  vendorName: string
+) {
+  await mailer.sendMail({
+    from: process.env.MAIL_USER,
+    to,
+    subject: "Welcome to XeroCare – Vendor Registration Successful",
+    html: `
+      <h2>Welcome, ${vendorName} </h2>
+
+      <p>
+        We are pleased to inform you that your vendor profile has been
+        successfully created in the <strong>XeroCare system</strong>.
+      </p>
+
+      <p>
+        Our procurement and operations team will contact you whenever
+        there are requirements related to inventory or supplies.
+      </p>
+
+      <p>
+        <b>Note:</b> This is an informational email only.
+        Vendors do not have direct login access to the system.
+      </p>
+
+      <br/>
+      <p>— Team XeroCare</p>
+    `,
+  });
+}
+

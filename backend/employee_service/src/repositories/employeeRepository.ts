@@ -8,6 +8,10 @@ export class EmployeeRepository{
         return this.repo.findOne({where:{email}});
     }
 
+    async save(employee: Employee) {
+        return this.repo.save(employee);
+    }
+
     async findById(id:string){
         return this.repo.findOne({where:{id}});
     }

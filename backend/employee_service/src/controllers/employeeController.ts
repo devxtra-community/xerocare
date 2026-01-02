@@ -93,3 +93,17 @@ export const getEmployeeById = async (req: Request, res: Response, next: NextFun
     next(new AppError(err.message, err.statusCode || 404));
   }
 };
+
+export const deleteEmployee = async (req:Request, res:Response, next: NextFunction) =>{
+  try{
+    const employee = await service.getEmployeeById(req.params.id);
+
+    return res.json({
+      success:true,
+      data:employee,
+      message: "Employee deleted successfully"
+    });
+  } catch(err:any){
+    next(new AppError(err.message, err.statusCode || 500))
+  }
+}

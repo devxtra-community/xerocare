@@ -1,6 +1,7 @@
 import { VendorRepository } from "../repositories/vendorRepository";
-import { Vendor } from "../entities/vendorEntity";
+import { Vendor, VendorStatus } from "../entities/vendorEntity";
 import { AppError } from "../errors/appError";
+import { publishEmailJob } from "../queues/emailPublisher";
 
 interface CreateVendorDTO {
   name: string;
@@ -23,6 +24,12 @@ export class VendorService {
     }
 
     const vendor = this.vendorRepo.create(data);
+
+    await publishEmailJob({
+      type: "VENDOR_WELCOME",
+      email: vendor.email,
+      vendorName: vendor.name,
+    });
     return this.vendorRepo.save(vendor);
   }
 
@@ -48,5 +55,25 @@ export class VendorService {
 
     Object.assign(vendor, data);
     return this.vendorRepo.save(vendor);
+  }
+
+  async deleteVendor(id:string){
+    const vendor = await this.vendorRepo.findById(id);
+
+    if(!vendor)
+    {
+      throw new AppError("vendor not found" , 404);
+    }
+
+    if(vendor.status === VendorStatus.DELETED)
+    {
+      throw new AppError("Vendor already deleted" , 400);
+    }
+
+    vendor.status = VendorStatus.DELETED;
+
+    await this.vendorRepo.save(vendor);
+
+    return true;
   }
 }

@@ -1,5 +1,5 @@
 import { DataSource, Repository } from "typeorm";
-import { Vendor } from "../entities/vendorEntity";
+import { Vendor,VendorStatus } from "../entities/vendorEntity";
 
 export class VendorRepository extends Repository<Vendor> {
   constructor(dataSource: DataSource) {
@@ -10,7 +10,24 @@ export class VendorRepository extends Repository<Vendor> {
     return this.findOne({ where: { email } });
   }
 
+  findById(id: string) {
+    return this.findOne({ where: { id } });
+  }
+
   findByName(name: string) {
     return this.findOne({ where: { name } });
+  }
+
+  findActive() {
+    return this.find({
+      where: { status: VendorStatus.ACTIVE },
+      order: { createdAt: "DESC" },
+    });
+  }
+
+  findByIdActive(id: string) {
+    return this.findOne({
+      where: { id, status: VendorStatus.ACTIVE },
+    });
   }
 }
