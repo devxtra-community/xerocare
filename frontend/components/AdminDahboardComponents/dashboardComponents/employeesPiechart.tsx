@@ -45,13 +45,11 @@ export default function EmployeePieChart() {
         )}
 
         <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-          <p className="text-[8px] text-gray-500 leading-tight font-medium">
-            Total Number
-            <br />
-            Of Employees
-          </p>
-          <p className="text-xl font-bold text-gray-900 leading-none mt-0.5">
+          <p className="text-xl font-bold text-gray-900 leading-none mt-2 ml-2">
             {TOTAL}
+          </p>
+            <p className="text-[8px] text-gray-900 leading-tight font-medium ml-2">
+            Total 
           </p>
         </div>
       </div>
