@@ -11,21 +11,21 @@ import {
 } from "@/components/ui/table"
 
 const humanResourcedatas = [
-  {Fullname: "Riyas",Possition: "Sales Staff",startDate: "20/12/2024",salary: "75,000",expair: "20/12/2027",},
-  {Fullname: "Nadhil",Possition: "Sales Staff",startDate: "20/12/2024",salary: "74,000",expair: "20/12/2027",},
-  {Fullname: "Chechu",Possition: "Sales Staff",startDate: "20/12/2024",salary: "71,000",expair: "20/12/2027",},
-  {Fullname: "Shanu",Possition: "Sales Staff",startDate: "20/12/2024",salary: "35,000",expair: "20/12/2027",},
-  {Fullname: "Sameer",Possition: "Sales Staff", startDate: "20/12/2024",salary: "34,000", expair: "20/12/2027",},
-  {Fullname: "shrijit",Possition: "Sales Staff",startDate: "20/12/2024",salary: "55,000",expair: "20/12/2027",},
-  {Fullname: "messi",Possition: "Sales Staff",startDate: "20/12/2024",salary: "45,000",expair: "20/12/2027",},
-  {Fullname: "cristiano",Possition: "Sales Staff",startDate: "20/12/2024",salary: "45,000",expair: "20/12/2027",},
-  {Fullname: "Drogba",Possition: "Sales Staff",startDate: "20/12/2024",salary: "35,000",expair: "20/12/2027",},
-  {Fullname: "Rajanmon",Possition: "Sales Staff", startDate: "20/12/2024",salary: "55,000", expair: "20/12/2027",},
+  { Fullname: "Riyas", Possition: "Sales Staff", startDate: "20/12/2024", salary: "75,000", expair: "20/12/2027", },
+  { Fullname: "Nadhil", Possition: "Sales Staff", startDate: "20/12/2024", salary: "74,000", expair: "20/12/2027", },
+  { Fullname: "Chechu", Possition: "Sales Staff", startDate: "20/12/2024", salary: "71,000", expair: "20/12/2027", },
+  { Fullname: "Shanu", Possition: "Sales Staff", startDate: "20/12/2024", salary: "35,000", expair: "20/12/2027", },
+  { Fullname: "Sameer", Possition: "Sales Staff", startDate: "20/12/2024", salary: "34,000", expair: "20/12/2027", },
+  { Fullname: "shrijit", Possition: "Sales Staff", startDate: "20/12/2024", salary: "55,000", expair: "20/12/2027", },
+  { Fullname: "messi", Possition: "Sales Staff", startDate: "20/12/2024", salary: "45,000", expair: "20/12/2027", },
+  { Fullname: "cristiano", Possition: "Sales Staff", startDate: "20/12/2024", salary: "45,000", expair: "20/12/2027", },
+  { Fullname: "Drogba", Possition: "Sales Staff", startDate: "20/12/2024", salary: "35,000", expair: "20/12/2027", },
+  { Fullname: "Rajanmon", Possition: "Sales Staff", startDate: "20/12/2024", salary: "55,000", expair: "20/12/2027", },
 ]
 
 const ITEMS_PER_PAGE = 5
 
-export default function HrTable() {
+export default function SuspendedHrTable() {
   const [page, setPage] = useState(1)
 
   const totalPages = Math.ceil(humanResourcedatas.length / ITEMS_PER_PAGE)
@@ -62,9 +62,8 @@ export default function HrTable() {
           {currentData.map((item, index) => (
             <TableRow
               key={index}
-              className={`border-none rounded-xl ${
-                index % 2 === 1 ? "bg-muted" : ""
-              }`}
+              className={`border-none rounded-xl ${index % 2 === 1 ? "bg-muted" : ""
+                }`}
             >
               <TableCell className="font-medium rounded-l-xl">
                 {item.Fullname}

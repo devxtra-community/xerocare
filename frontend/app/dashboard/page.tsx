@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getUserFromToken, UserRole } from "@/lib/auth";
 
-import AdminDashboard from "@/components/dashboard/AdminDashboard";
+
 import HrDashboard from "@/components/dashboard/HrDashboard";
 import EmployeeDashboard from "@/components/dashboard/EmployeeDashboard";
 import ManagerDashboard from "@/components/dashboard/ManagerDashboard";
@@ -22,10 +22,9 @@ export default function DashboardPage() {
             return;
         }
 
-        if (user.role !== role) {
-            setRole(user.role);
-        }
-    }, [router, role]);
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        setRole(user.role);
+    }, [router]);
 
     if (!role) {
         return <p>Loading...</p>;

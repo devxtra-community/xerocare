@@ -3,10 +3,9 @@
 		"husky": "^9.1.7"
 	},
   "scripts": {
-    "dev": "ts-node-dev src/index.ts",
-    "build": "tsc",
-    "lint": "eslint .",
-    "typecheck": "tsc --noEmit"
+    "lint": "pnpm -r lint",
+    "typecheck": "pnpm -r typecheck"
   }
+
 
 }

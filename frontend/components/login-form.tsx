@@ -11,6 +11,17 @@ import { toast } from "sonner";
 import { requestLoginOtp, verifyLoginOtp, requestMagicLink } from "@/lib/auth";
 import Link from "next/link";
 
+interface APIError {
+  response?: {
+    data?: {
+      error?: string;
+      message?: string;
+    };
+  };
+  message?: string;
+}
+
+
 export function LoginForm({
   className,
   ...props
@@ -43,8 +54,9 @@ export function LoginForm({
     } catch (err: unknown) {
       let errorMessage = "Login failed";
       if (err && typeof err === 'object' && 'response' in err) {
-        errorMessage = (err as any).response?.data?.error || (err as any).message || errorMessage;
-        if ((err as any).response?.data?.message) errorMessage = (err as any).response.data.message;
+        const apiError = err as APIError;
+        errorMessage = apiError.response?.data?.error || apiError.message || errorMessage;
+        if (apiError.response?.data?.message) errorMessage = apiError.response.data.message;
       } else if (err instanceof Error) {
         errorMessage = err.message;
       }
@@ -73,9 +85,9 @@ export function LoginForm({
     } catch (err: unknown) {
       let errorMessage = "Verification failed";
       if (err && typeof err === 'object' && 'response' in err) {
-        errorMessage = (err as any).response?.data?.error || (err as any).message || errorMessage;
-        if ((err as any).response?.data?.message) errorMessage = (err as any).response.data.message;
-
+        const apiError = err as APIError;
+        errorMessage = apiError.response?.data?.error || apiError.message || errorMessage;
+        if (apiError.response?.data?.message) errorMessage = apiError.response.data.message;
       } else if (err instanceof Error) {
         errorMessage = err.message;
       }
@@ -103,8 +115,9 @@ export function LoginForm({
     } catch (err: unknown) {
       let errorMessage = "Failed to send magic link";
       if (err && typeof err === 'object' && 'response' in err) {
-        errorMessage = (err as any).response?.data?.error || (err as any).message || errorMessage;
-        if ((err as any).response?.data?.message) errorMessage = (err as any).response.data.message;
+        const apiError = err as APIError;
+        errorMessage = apiError.response?.data?.error || apiError.message || errorMessage;
+        if (apiError.response?.data?.message) errorMessage = apiError.response.data.message;
       } else if (err instanceof Error) {
         errorMessage = err.message;
       }

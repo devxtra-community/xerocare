@@ -24,6 +24,7 @@ export default function SalesChart() {
   const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsClient(true);
   }, []);
 
@@ -37,11 +38,10 @@ export default function SalesChart() {
             <button
               key={period}
               onClick={() => setSelectedPeriod(period)}
-              className={`px-2 py-0.5 rounded-md transition-colors ${
-                selectedPeriod === period
+              className={`px-2 py-0.5 rounded-md transition-colors ${selectedPeriod === period
                   ? "bg-blue-900 text-white font-medium"
                   : "text-gray-600 hover:bg-gray-100"
-              }`}
+                }`}
             >
               {period}
             </button>

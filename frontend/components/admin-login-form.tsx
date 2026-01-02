@@ -10,6 +10,17 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { adminLogin } from "@/lib/auth";
 
+interface APIError {
+    response?: {
+        data?: {
+            error?: string;
+            message?: string;
+        };
+    };
+    message?: string;
+}
+
+
 export function AdminLoginForm({
     className,
     ...props
@@ -38,8 +49,8 @@ export function AdminLoginForm({
         } catch (err: unknown) {
             let errorMessage = "Login failed";
             if (err && typeof err === 'object' && 'response' in err) {
-                errorMessage = (err as any).response?.data?.error || (err as any).message || errorMessage;
-                if ((err as any).response?.data?.message) errorMessage = (err as any).response.data.message;
+                errorMessage = (err as APIError).response?.data?.error || (err as APIError).message || errorMessage;
+                if ((err as APIError).response?.data?.message) errorMessage = (err as APIError).response!.data!.message!;
             } else if (err instanceof Error) {
                 errorMessage = err.message;
             }

@@ -1,8 +1,8 @@
-import next from "next";
+
 import SalesPage from "@/components/SlesReport"
 
-export default function AdminSalesDashboard(){
-  return(
-    <SalesPage/>
+export default function AdminSalesDashboard() {
+  return (
+    <SalesPage />
   )
 }
