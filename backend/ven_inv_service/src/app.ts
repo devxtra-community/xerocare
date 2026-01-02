@@ -19,7 +19,7 @@ app.use(errorHandler);
 const startServer = async () => {
   try {
     await Source.initialize();
-    console.log("Database connected");
+    logger.info("Database connected");
 
     const PORT = process.env.PORT;
     app.listen(PORT, () => {
