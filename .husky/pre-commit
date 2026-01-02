@@ -1,0 +1,4 @@
+#!/bin/sh
+
+pnpm --filter ven_inv_service lint
+pnpm --filter ven_inv_service typecheck
