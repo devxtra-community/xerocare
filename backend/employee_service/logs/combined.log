@@ -1,0 +1,3 @@
+2026-01-02T10:11:07.392Z [info]: Server running on port 3002
+2026-01-02T10:11:20.838Z [info]: ::ffff:127.0.0.1 - - [02/Jan/2026:10:11:20 +0000] "POST /auth/login HTTP/1.1" 200 57 "http://localhost:3000/" "Mozilla/5.0 (iPhone; CPU iPhone OS 18_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.5 Mobile/15E148 Safari/604.1"
+2026-01-02T10:11:54.890Z [info]: ::ffff:127.0.0.1 - - [02/Jan/2026:10:11:54 +0000] "POST /auth/login/verify HTTP/1.1" 200 722 "http://localhost:3000/" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
