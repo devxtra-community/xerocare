@@ -14,7 +14,7 @@ type Props = {
     data: AttendancePoint[];
 };
 
-export default function AttendanceChart({ data }: Props) {
+export default function AttendanceChart1({ data }: Props) {
     return (
         <div className="bg-card border border-border rounded-xl p-6 h-64">
             <h3 className="font-medium mb-2 text-foreground">

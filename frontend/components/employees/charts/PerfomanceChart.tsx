@@ -10,6 +10,8 @@ import { PerformancePoint } from "./data";
 
 type Props = {
     data: PerformancePoint[];
+    title:string;
+    centerLabel?:string;
 };
 
 export default function PerformanceChart({ data }: Props) {

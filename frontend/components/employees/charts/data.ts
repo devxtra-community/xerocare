@@ -2,7 +2,7 @@
 
 export type AttendancePoint = {
   month: string;
-  days: number;
+  attendancePercentage: number;
 };
 
 export type WorkingHoursPoint = {

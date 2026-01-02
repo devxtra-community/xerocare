@@ -1,8 +1,8 @@
 import React from "react";
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
-import AppSidebar from "@/components/AppSidebar";
 import DashboardHeader from "@/components/DashboardHeader";
 import AuthGuard from "@/components/auth-guard";
+import HRSidebar from "@/components/hr/HRSidebar";
 
 export default function AdminLayout({
   children,
@@ -12,7 +12,7 @@ export default function AdminLayout({
   return (
       <SidebarProvider>
         <div className="flex min-h-screen w-full">
-          <AppSidebar />
+          <HRSidebar />
 
           <SidebarInset className="bg-muted min-h-screen w-full flex flex-col">
             <DashboardHeader />

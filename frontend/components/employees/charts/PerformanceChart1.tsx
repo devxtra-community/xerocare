@@ -10,9 +10,11 @@ import { PerformancePoint } from "./data";
 
 type Props = {
     data: PerformancePoint[];
+    title:string;
+    centerLabel?:string;
 };
 
-export default function PerformanceChart({ data }: Props) {
+export default function PerformanceChart1({ data }: Props) {
     const COLORS = [
         "rgb(var(--primary-rgb))",
   "rgb(var(--muted-rgb))",

@@ -1,5 +1,4 @@
 "use client";
-import { Button } from "@/components/ui/button";
 
 type PaginationProps = {
   page: number;
@@ -12,31 +11,42 @@ export default function Pagination({
   totalPages,
   onPageChange,
 }: PaginationProps) {
+  if (totalPages <= 1) return null;
+
   return (
-    <div className="flex items-center justify-between">
-      <p className="text-sm text-muted-foreground">
-        Page {page} of {totalPages}
-      </p>
+    <div className="mt-2 flex items-center justify-center gap-1 text-[10px] sm:text-xs">
+      {/* Previous */}
+      <button
+        onClick={() => onPageChange(page - 1)}
+        disabled={page === 1}
+        className="rounded-md border px-2 py-0.5 disabled:opacity-40"
+      >
+        &lt;
+      </button>
 
-      <div className="flex gap-2">
-        <Button
-          variant="outline"
-          size="sm"
-          disabled={page === 1}
-          onClick={() => onPageChange(page - 1)}
+      {/* Page numbers */}
+      {Array.from({ length: totalPages }, (_, i) => i + 1).map((num) => (
+        <button
+          key={num}
+          onClick={() => onPageChange(num)}
+          className={`px-2 py-0.5 rounded-md transition-colors ${
+            page === num
+              ? "bg-primary text-primary-foreground"
+              : "border hover:bg-muted"
+          }`}
         >
-          Previous
-        </Button>
+          {num}
+        </button>
+      ))}
 
-        <Button
-          variant="outline"
-          size="sm"
-          disabled={page === totalPages}
-          onClick={() => onPageChange(page + 1)}
-        >
-          Next
-        </Button>
-      </div>
+      {/* Next */}
+      <button
+        onClick={() => onPageChange(page + 1)}
+        disabled={page === totalPages}
+        className="rounded-md border px-2 py-0.5 disabled:opacity-40"
+      >
+        &gt;
+      </button>
     </div>
   );
 }
