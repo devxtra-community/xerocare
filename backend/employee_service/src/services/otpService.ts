@@ -1,40 +1,45 @@
-import bcrypt from "bcrypt";
-import { OtpRepository } from "../repositories/otpRepository";
-import { sendOtpMail } from "../utlis/mailer";
 import { OtpPurpose } from "../constants/otpPurpose";
+import { redis } from "../config/redis";
+import { publishEmailJob } from "../queues/emailProducer";
+import { AppError } from "../errors/appError";
 
 export class OtpService {
-  private otpRepo = new OtpRepository();
-
   private generateOtp() {
     return Math.floor(100000 + Math.random() * 900000).toString();
   }
 
-  async sendOtp(email: string, purpose :OtpPurpose) {
-    const otp = this.generateOtp();
-    const otpHash = await bcrypt.hash(otp, 10);
-
-    await this.otpRepo.createOtp({
-      email,
-      otp_hash: otpHash,
-      purpose,
-      expires_at: new Date(Date.now() + 5 * 60 * 1000), 
-    });
-
-    await sendOtpMail(email, otp, purpose);
+  private getKey(email: string, purpose: OtpPurpose) {
+    return `otp:${purpose}:${email}`;
   }
 
-  async verifyOtp(email: string, otp: string, purpose : OtpPurpose) {
-    const record = await this.otpRepo.findLatest(email,purpose);
+  async sendOtp(email: string, purpose: OtpPurpose) {
+    const otp = this.generateOtp();
+    const key = this.getKey(email, purpose);
 
-    if (!record) throw new Error("OTP not found");
-    if (record.is_used) throw new Error("OTP already used");
-    if (record.expires_at < new Date()) throw new Error("OTP expired");
+    await redis.set(key, otp, "EX", 300);
 
-    const valid = await bcrypt.compare(otp, record.otp_hash);
-    if (!valid) throw new Error("Invalid OTP");
+    publishEmailJob({
+      type: "OTP",
+      email,
+      otp,
+    }).catch((err) => {
+      console.error("Failed to queue OTP email", err);
+    });
+  }
 
-    await this.otpRepo.markUsed(record.id);
+  async verifyOtp(email: string, otp: string, purpose: OtpPurpose) {
+    const key = this.getKey(email, purpose);
+
+    const storedOtp = await redis.get(key);
+    if (!storedOtp) {
+      throw new AppError("OTP expired or not found", 400);
+    }
+
+    if (storedOtp !== otp) {
+      throw new AppError("Invalid OTP", 400);
+    }
+
+    await redis.del(key);
     return true;
   }
 }

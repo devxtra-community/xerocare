@@ -1,12 +1,10 @@
 import bcrypt from "bcrypt";
 import { AdminRepository } from "../repositories/adminRepository";
-import { signAccesstoken, signRefreshtoken } from "../utlis/jwt";
-import { AuthRepository } from "../repositories/authRepository";
+import { AppError } from "../errors/appError";
 
 export class AdminService {
 
   private adminRepo = new AdminRepository();
-  private authRepo = new AuthRepository();
 
   async login(payload: { email: string; password: string }) {
     const { email, password } = payload;
@@ -14,13 +12,13 @@ export class AdminService {
     const admin = await this.adminRepo.findByEmail(email);
     if (!admin)
     {
-        throw new Error("Admin not found");
+        throw new AppError("Admin not found",404);
     }    
 
     const isValid = await bcrypt.compare(password, admin.password_hash);
     if (!isValid)
     {    
-        throw new Error("Invalid password");
+        throw new AppError("Invalid password",401);
     }
     
     return admin;

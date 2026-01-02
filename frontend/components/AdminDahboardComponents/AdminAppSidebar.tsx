@@ -79,7 +79,6 @@ export default function AppSidebar() {
   const handleLogOut = async () => {
     try {
       const res = await logout();
-      console.log(res)
       if(!res?.data.success){
         toast.error(res?.data.message)
       }
@@ -116,6 +115,7 @@ export default function AppSidebar() {
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu className="space-y-1 px-2">
+
               {menuItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton
@@ -155,6 +155,7 @@ export default function AppSidebar() {
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
+
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
@@ -180,6 +181,7 @@ export default function AppSidebar() {
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarFooter>
+
     </Sidebar>
   );
 }

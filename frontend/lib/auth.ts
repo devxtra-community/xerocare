@@ -22,7 +22,7 @@ export function getUserFromToken(): JwtPayload | null {
 }
 
 export async function requestLoginOtp(email: string, password: string) {
-  const res = await api.post("/auth/login", {
+  const res = await api.post("/e/auth/login", {
     email,
     password,
   });
@@ -30,36 +30,34 @@ export async function requestLoginOtp(email: string, password: string) {
 }
 
 export async function verifyLoginOtp(email: string, otp: string) {
-  const res = await api.post("/auth/login/verify", {
+  const res = await api.post("/e/auth/login/verify", {
     email,
     otp,
   });
-  console.log(res);
   localStorage.setItem("accessToken", res.data.accessToken);
 
   return res.data;
 }
 
 export async function requestMagicLink(email: string) {
-  const res = await api.post("/auth/magic-link", { email });
+  const res = await api.post("/e/auth/magic-link", { email });
   return res.data;
 }
 
 export async function verifyMagicLink(email: string, token: string) {
-  const res = await api.post("/auth/magic-link/verify", { email, token });
-  console.log(res);
+  const res = await api.post("/e/auth/magic-link/verify", { email, token });
   localStorage.setItem("accessToken", res.data.accessToken);
 
   return res.data;
 }
 
 export async function requestForgotPasswordOtp(email: string) {
-  const res = await api.post("/auth/forgot-password", { email });
+  const res = await api.post("/e/auth/forgot-password", { email });
   return res.data;
 }
 
 export async function resetPassword(email: string, otp: string, newPassword: string) {
-  const res = await api.post("/auth/forgot-password/verify", {
+  const res = await api.post("/e/auth/forgot-password/verify", {
     email,
     otp,
     newPassword,
@@ -70,8 +68,7 @@ export async function resetPassword(email: string, otp: string, newPassword: str
 export async function logout() {
 
   try {
-    const res = await api.post('/auth/logout');
-    console.log(res)
+    const res = await api.post('/e/auth/logout');
     if (res.data.success) {
       localStorage.clear();
       return res
@@ -84,7 +81,7 @@ export async function logout() {
 }
 
 export async function adminLogin(email: string, password: string) {
-  const res = await api.post("/admin/login", {
+  const res = await api.post("/e/admin/login", {
     email,
     password
   })

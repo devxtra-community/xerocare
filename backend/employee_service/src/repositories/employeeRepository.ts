@@ -8,6 +8,10 @@ export class EmployeeRepository{
         return this.repo.findOne({where:{email}});
     }
 
+    async save(employee: Employee) {
+        return this.repo.save(employee);
+    }
+
     async findById(id:string){
         return this.repo.findOne({where:{id}});
     }
@@ -21,6 +25,46 @@ export class EmployeeRepository{
         return this.repo.update(userId,{
             password_hash:passwordHash
         })
+    }
+
+    async findAll(skip = 0, take = 20) {
+        const [data, total] = await this.repo.findAndCount({
+        select: [
+            "id",
+            "email",
+            "first_name",
+            "last_name",
+            "role",
+            "salary",
+            "profile_image_url",
+            "createdAt",
+            "updatedAt",
+            "expire_date",
+        ],
+        order: { createdAt: "DESC" },
+        skip,
+        take,
+        });
+
+        return { data, total };
+    }
+
+    async findByIdSafe(id: string) {
+        return this.repo.findOne({
+        where: { id },
+        select: [
+            "id",
+            "email",
+            "first_name",
+            "last_name",
+            "role",
+            "salary",
+            "profile_image_url",
+            "createdAt",
+            "updatedAt",
+            "expire_date",
+        ],
+        });
     }
     
 }

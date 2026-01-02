@@ -1,4 +1,5 @@
-import { Request, Response } from "express";
+import { Request, Response, NextFunction } from "express";
+import { AppError } from "../errors/appError";
 import { AuthService } from "../services/authService";
 import { issueTokens } from "../services/tokenService";
 import { OtpService } from "../services/otpService";
@@ -9,7 +10,7 @@ const authService = new AuthService();
 const otpService = new OtpService();
 const magicLinkService = new MagicLinkService();
 
-export const login = async (req: Request, res: Response) => {
+export const login = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { user } = await authService.login(req.body);
 
@@ -20,11 +21,11 @@ export const login = async (req: Request, res: Response) => {
       success: true,
     });
   } catch (err: any) {
-    return res.status(500).json({ message: err.message, success: false });
+    next(new AppError(err.message, err.statusCode || 500));
   }
 };
 
-export const loginVerify = async (req: Request, res: Response) => {
+export const loginVerify = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const email = req.body.email.toLowerCase().trim();
     const otp = req.body.otp.trim();
@@ -33,7 +34,7 @@ export const loginVerify = async (req: Request, res: Response) => {
 
     const user = await authService.findUserByEmail(email);
 
-    const accessToken = await issueTokens(user,req,res);
+    const accessToken = await issueTokens(user, req, res);
 
     return res.json({
       message: "Login successfull",
@@ -42,16 +43,12 @@ export const loginVerify = async (req: Request, res: Response) => {
       success: true,
     });
   } catch (err: any) {
-    return res.status(400).json({
-      message: err.message,
-      success: false,
-    });
+    next(new AppError(err.message, err.statusCode || 400));
   }
 };
 
-export const refresh = async (req: Request, res: Response) => {
+export const refresh = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    console.log("inside refreshing accestoken")
     const refreshToken = req.cookies.refreshToken;
     if (!refreshToken) {
       throw new Error("No refresh token");
@@ -59,7 +56,7 @@ export const refresh = async (req: Request, res: Response) => {
 
     const user = await authService.refresh(refreshToken);
 
-    const accessToken = await issueTokens(user,req,res);
+    const accessToken = await issueTokens(user, req, res);
 
     return res.json({
       message: "Access token refreshed",
@@ -67,31 +64,23 @@ export const refresh = async (req: Request, res: Response) => {
       success: true,
     });
   } catch (err: any) {
-    return res.status(401).json({
-      message: err.message || "Invalid refresh token",
-      success: false,
-    });
+    next(new AppError(err.message || "Invalid refresh token", err.statusCode || 401));
   }
 };
 
-export const logout = async (req: Request, res: Response) => {
+export const logout = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    console.log("inside logout :",req.cookies)
     const refreshToken = req.cookies.refreshToken;
-    console.log(refreshToken)
     await authService.logout(refreshToken);
 
     res.clearCookie("refreshToken");
     res.json({ message: "logout successfull", success: true });
   } catch (err: any) {
-    return res.status(500).json({
-      message: err.message || "Internal server error",
-      success: false,
-    });
+    next(new AppError(err.message || "Internal server error", err.statusCode || 500));
   }
 };
 
-export const changePassword = async (req: Request, res: Response) => {
+export const changePassword = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const userId = req.user.id;
     const { currentPassword, newPassword } = req.body;
@@ -106,14 +95,11 @@ export const changePassword = async (req: Request, res: Response) => {
       .status(200)
       .json({ message: "Password changed successfully", success: true });
   } catch (err: any) {
-    return res.status(500).json({
-      message: err.message || "Internal server error",
-      success: false,
-    });
+    next(new AppError(err.message || "Internal server error", err.statusCode || 500));
   }
 };
 
-export const forgotPassword = async (req: Request, res: Response) => {
+export const forgotPassword = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const email = req.body.email.toLowerCase().trim();
 
@@ -132,14 +118,11 @@ export const forgotPassword = async (req: Request, res: Response) => {
       success: true,
     });
   } catch (err: any) {
-    return res.status(400).json({
-      message: err.message,
-      success: false,
-    });
+    next(new AppError(err.message, err.statusCode || 400));
   }
 };
 
-export const resetPassword = async (req: Request, res: Response) => {
+export const resetPassword = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const email = req.body.email.toLowerCase().trim();
     const otp = String(req.body.otp).trim();
@@ -160,14 +143,11 @@ export const resetPassword = async (req: Request, res: Response) => {
       success: true,
     });
   } catch (err: any) {
-    return res.status(400).json({
-      message: err.message,
-      success: false,
-    });
+    next(new AppError(err.message, err.statusCode || 400));
   }
 };
 
-export const requestMagicLink = async (req: Request, res: Response) => {
+export const requestMagicLink = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const email = req.body.email.toLowerCase().trim();
 
@@ -178,48 +158,41 @@ export const requestMagicLink = async (req: Request, res: Response) => {
       success: true,
     });
   } catch (err: any) {
-    return res.status(400).json({
-      message: err.message,
-      success: false,
-    });
+    next(new AppError(err.message, err.statusCode || 400));
   }
 };
 
-export const verifyMagicLink = async (req: Request, res: Response) => {
+export const verifyMagicLink = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const email = req.body.email.toLowerCase().trim();
     const token = req.body.token.trim();
 
-    await magicLinkService.verifyMagicLink(email, token);
+    const email = await magicLinkService.verifyMagicLink(token);
 
     const user = await authService.findUserByEmail(email);
+    if (!user) {
+      throw new Error("User not found");
+    }
 
-    const accessToken = await issueTokens(user,req,res);
+    const accessToken = await issueTokens(user, req, res);
 
     return res.json({
-      message: "Login successfull",
+      message: "Login successful",
       accessToken,
       data: user,
       success: true,
     });
   } catch (err: any) {
-    return res.status(400).json({
-      message: err.message,
-      success: false,
-    });
+    next(new AppError(err.message, err.statusCode || 400));
   }
 };
 
-export const logoutOtherDevices = async (req: Request, res: Response) => {
+export const logoutOtherDevices = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const userId = req.user.id;
     const currentRefreshToken = req.cookies.refreshToken;
 
     if (!currentRefreshToken) {
-      return res.status(400).json({
-        message: "No refresh token found",
-        success: false,
-      });
+      return next(new AppError("No refresh token found", 400));
     }
 
     await authService.logoutOtherDevices(userId, currentRefreshToken);
@@ -229,39 +202,27 @@ export const logoutOtherDevices = async (req: Request, res: Response) => {
       success: true,
     });
   } catch (err: any) {
-    return res.status(500).json({
-      message: err.message || "Internal server error",
-      success: false,
-    });
+    next(new AppError(err.message || "Internal server error", err.statusCode || 500));
   }
 };
 
-export const getSessions = async (req: Request, res: Response) => {
+export const getSessions = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const userId = req.user.id;
     const currentToken = req.cookies.refreshToken;
 
-    const sessions = await authService.getSessions(
-      userId,
-      currentToken
-    );
+    const sessions = await authService.getSessions(userId, currentToken);
 
     return res.json({
       data: sessions,
       success: true,
     });
   } catch (err: any) {
-    return res.status(500).json({
-      message: err.message,
-      success: false,
-    });
+    next(new AppError(err.message, err.statusCode || 500));
   }
 };
 
-export const logoutSession = async (
-  req: Request,
-  res: Response
-) => {
+export const logoutSession = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const userId = req.user.id;
     const { sessionId } = req.body;
@@ -273,9 +234,6 @@ export const logoutSession = async (
       success: true,
     });
   } catch (err: any) {
-    return res.status(500).json({
-      message: err.message,
-      success: false,
-    });
+    next(new AppError(err.message, err.statusCode || 500));
   }
 };

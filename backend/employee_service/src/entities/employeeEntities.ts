@@ -1,6 +1,12 @@
 import { Column,CreateDateColumn,UpdateDateColumn,PrimaryGeneratedColumn,Entity,Index } from "typeorm";
 import { EmployeeRole } from "../constants/employeeRole";
 
+export enum EmployeeStatus{
+    ACTIVE = "ACTIVE",
+    INACTIVE = "INACTIVE",
+    DELETED = "DELETED"
+}
+
 @Entity("employee")
 export class Employee{
     @PrimaryGeneratedColumn("uuid")
@@ -16,7 +22,6 @@ export class Employee{
     @Column({ type: "varchar", length: 255, nullable: true })
     last_name!: string | null;
 
-
     @Column({type:"varchar",length:255})
     password_hash!:string;
 
@@ -31,6 +36,13 @@ export class Employee{
 
     @Column({ type: "varchar", length: 500, nullable: true })
     id_proof_key!: string | null;
+
+    @Column({
+    type: "enum",
+    enum: EmployeeStatus,
+    default: EmployeeStatus.ACTIVE,
+    })
+    status!: EmployeeStatus;
 
     @CreateDateColumn({type:"timestamp with time zone"})
     createdAt!:Date;
