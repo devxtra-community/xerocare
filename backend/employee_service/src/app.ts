@@ -27,6 +27,7 @@ const startServer = async () => {
   try {
     await Source.initialize();
     await getRabbitChannel();
+    console.log("rabbit mq channel connected")
     await startWorker();
     console.log("Database connected");
 
