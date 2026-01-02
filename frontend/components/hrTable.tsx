@@ -1,97 +1,53 @@
 "use client";
-import { useState } from "react";
-
-const humanResourcedatas = [
-  {
-    Fullname: "Parviz Aslanov",
-    Position: "UI Designer",
-    startDate: "20.11.2023",
-    salary: "1700 ",
-    avatar: "P",
-  },
-  {
-    Fullname: "Seving Aslanova",
-    Position: "UX Designer",
-    startDate: "19.02.2023",
-    salary: "1200 ",
-    avatar: "S",
-  },
-  {
-    Fullname: "Ceyhun Aslanov",
-    Position: "React Developer",
-    startDate: "18.05.2004",
-    salary: "3009 ",
-    avatar: "C",
-  },
-  {
-    Fullname: "Ayla Mammadova",
-    Position: "UX Researcher Intern",
-    startDate: "18.07.2004",
-    salary: "400 ",
-    avatar: "A",
-  },
-  {
-    Fullname: "Orxan Hüseyinov",
-    Position: "Accountant",
-    startDate: "17.09.2022",
-    salary: "2000 ",
-    avatar: "O",
-  },
-  {
-    Fullname: "Parviz Aslanov",
-    Position: "UI Designer",
-    startDate: "20.11.2023",
-    salary: "1700 ",
-    avatar: "P",
-  },
-  {
-    Fullname: "Seving Aslanova",
-    Position: "UX Designer",
-    startDate: "19.02.2023",
-    salary: "1200 ",
-    avatar: "S",
-  },
-  {
-    Fullname: "Ceyhun Aslanov",
-    Position: "React Developer",
-    startDate: "18.05.2004",
-    salary: "3009 ",
-    avatar: "C",
-  },
-  {
-    Fullname: "Ayla Mammadova",
-    Position: "UX Researcher Intern",
-    startDate: "18.07.2004",
-    salary: "400 ",
-    avatar: "A",
-  },
-  {
-    Fullname: "Orxan Hüseyinov",
-    Position: "Accountant",
-    startDate: "17.09.2022",
-    salary: "2000 ",
-    avatar: "O",
-  },
-  {
-    Fullname: "Orxan Hüseyinov",
-    Position: "Accountant",
-    startDate: "17.09.2022",
-    salary: "2000 ",
-    avatar: "O",
-  },
-];
+import { useState, useEffect } from "react";
+import { getAllEmployees, Employee } from "@/lib/employee";
 
 const ITEMS_PER_PAGE = 5;
 
+// Helper to format date
+const formatDate = (dateString: string) => {
+  return new Date(dateString).toLocaleDateString("en-GB");
+};
+
 export default function HrTable() {
+  const [employees, setEmployees] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
 
-  const totalPages = Math.ceil(humanResourcedatas.length / ITEMS_PER_PAGE);
+  useEffect(() => {
+    const fetchEmployees = async () => {
+      try {
+        const response = await getAllEmployees();
+        const data = response.data || [];
+
+        // Map backend data to table format
+        const mappedData = data.map((emp: any) => ({
+          id: emp.id,
+          Fullname: `${emp.first_name || ""} ${emp.last_name || ""}`.trim(),
+          Position: emp.role,
+          startDate: emp.createdAt ? formatDate(emp.createdAt) : "N/A",
+          salary: emp.salary ? `${emp.salary}` : "N/A",
+          avatar: emp.first_name ? emp.first_name[0].toUpperCase() : "U",
+        }));
+
+        setEmployees(mappedData);
+      } catch (error) {
+        console.error("Failed to fetch employees", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchEmployees();
+  }, []);
+
+  const totalPages = Math.ceil(employees.length / ITEMS_PER_PAGE);
   const startIndex = (page - 1) * ITEMS_PER_PAGE;
-  const currentData = humanResourcedatas.slice(
-    startIndex,
-    startIndex + ITEMS_PER_PAGE
-  );
+  const currentData = employees.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+
+  if (loading) {
+    return <div className="rounded-2xl bg-white p-2 sm:p-3 shadow-sm w-full h-[280px] flex items-center justify-center">Loading...</div>;
+  }
 
   return (
     <div className="rounded-2xl bg-white p-2 sm:p-3 shadow-sm w-full h-[280px] flex flex-col">
@@ -116,29 +72,35 @@ export default function HrTable() {
           </thead>
 
           <tbody>
-            {currentData.map((item, index) => (
-              <tr key={index} className={index % 2 ? "bg-sky-100/60" : ""}>
-                <td className="py-1.5 sm:py-2 px-1 sm:px-2 text-[10px] sm:text-xs font-medium">
-                  <div className="flex items-center gap-1 sm:gap-2">
-                    <div className="h-5 w-5 sm:h-6 sm:w-6 rounded-full bg-gray-300 flex items-center justify-center text-[10px] sm:text-xs font-medium text-gray-700">
-                      {item.avatar}
+            {currentData.length > 0 ? (
+              currentData.map((item, index) => (
+                <tr key={index} className={index % 2 ? "bg-sky-100/60" : ""}>
+                  <td className="py-1.5 sm:py-2 px-1 sm:px-2 text-[10px] sm:text-xs font-medium">
+                    <div className="flex items-center gap-1 sm:gap-2">
+                      <div className="h-5 w-5 sm:h-6 sm:w-6 rounded-full bg-gray-300 flex items-center justify-center text-[10px] sm:text-xs font-medium text-gray-700">
+                        {item.avatar}
+                      </div>
+                      <span className="text-gray-900 truncate">
+                        {item.Fullname}
+                      </span>
                     </div>
-                    <span className="text-gray-900 truncate">
-                      {item.Fullname}
-                    </span>
-                  </div>
-                </td>
-                <td className="py-1.5 sm:py-2 px-1 sm:px-2 text-[10px] sm:text-xs text-gray-700">
-                  {item.Position}
-                </td>
-                <td className="py-1.5 sm:py-2 px-1 sm:px-2 text-[10px] sm:text-xs text-gray-700">
-                  {item.startDate}
-                </td>
-                <td className="py-1.5 sm:py-2 px-1 sm:px-2 text-[10px] sm:text-xs text-gray-700">
-                  {item.salary}
-                </td>
+                  </td>
+                  <td className="py-1.5 sm:py-2 px-1 sm:px-2 text-[10px] sm:text-xs text-gray-700">
+                    {item.Position}
+                  </td>
+                  <td className="py-1.5 sm:py-2 px-1 sm:px-2 text-[10px] sm:text-xs text-gray-700">
+                    {item.startDate}
+                  </td>
+                  <td className="py-1.5 sm:py-2 px-1 sm:px-2 text-[10px] sm:text-xs text-gray-700">
+                    {item.salary}
+                  </td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan={4} className="text-center py-4 text-xs text-gray-500">No employees found</td>
               </tr>
-            ))}
+            )}
           </tbody>
         </table>
       </div>
@@ -159,11 +121,10 @@ export default function HrTable() {
             <button
               key={num}
               onClick={() => setPage(num)}
-              className={`px-1.5 sm:px-2 py-0.5 rounded-md transition ${
-                page === num
+              className={`px-1.5 sm:px-2 py-0.5 rounded-md transition ${page === num
                   ? "bg-blue-900 text-white"
                   : "border hover:bg-gray-50"
-              }`}
+                }`}
             >
               {num}
             </button>

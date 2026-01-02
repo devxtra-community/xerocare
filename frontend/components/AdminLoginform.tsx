@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { adminLogin } from "@/lib/auth";
 
 export function AdminLoginForm({
   className,
@@ -25,7 +26,32 @@ export function AdminLoginForm({
     setLoading(true);
     setError(null);
 
-    setLoading(false);
+    try {
+      const res = await adminLogin(email, password);
+
+      if (res.success) {
+        toast.success("Login successful");
+        localStorage.setItem("accessToken", res.accessToken);
+
+        // Set cookie for middleware access
+        document.cookie = `accessToken=${res.accessToken}; path=/; max-age=86400; SameSite=Strict`;
+
+        router.push("/admin/dashboard");
+      } else {
+        setError(res.message || "Login failed");
+        toast.error(res.message || "Login failed");
+      }
+    } catch (err: any) {
+      let errorMessage = "Login failed";
+      if (err.response?.data?.message) {
+        errorMessage = err.response.data.message;
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+      setError(errorMessage);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

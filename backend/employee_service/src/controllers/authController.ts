@@ -74,6 +74,7 @@ export const logout = async (req: Request, res: Response, next: NextFunction) =>
     await authService.logout(refreshToken);
 
     res.clearCookie("refreshToken");
+    res.clearCookie("accessToken");
     res.json({ message: "logout successfull", success: true });
   } catch (err: any) {
     next(new AppError(err.message || "Internal server error", err.statusCode || 500));

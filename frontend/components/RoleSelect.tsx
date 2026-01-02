@@ -1,16 +1,22 @@
 "use client"
-import { Select, SelectTrigger,SelectValue,SelectContent,SelectItem } from "@/components/ui/select"
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select"
 
-export default function RoleSelect(){
-    return(
-        <Select>
+interface Props {
+    value?: string;
+    onChange?: (value: string) => void;
+}
+
+export default function RoleSelect({ value, onChange }: Props) {
+    return (
+        <Select value={value} onValueChange={onChange}>
             <SelectTrigger>
                 <SelectValue placeholder="Select Employee Role"></SelectValue>
             </SelectTrigger>
             <SelectContent>
-                <SelectItem value="marketing">Marketing</SelectItem>
-                <SelectItem value="finance">Finance</SelectItem>
-                <SelectItem value="sales">Sales</SelectItem>
+                <SelectItem value="HR">HR</SelectItem>
+                <SelectItem value="EMPLOYEE">Employee</SelectItem>
+                <SelectItem value="FINANCE">Finance</SelectItem>
+                <SelectItem value="MANAGER">Manager</SelectItem>
             </SelectContent>
         </Select>
     )

@@ -10,6 +10,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { requestLoginOtp, verifyLoginOtp, requestMagicLink } from "@/lib/auth";
 import Link from "next/link";
+import { jwtDecode } from "jwt-decode";
 
 export function LoginForm({
   className,
@@ -65,7 +66,27 @@ export function LoginForm({
       if (res.success) {
         toast.success(res.message);
         localStorage.setItem("accessToken", res.accessToken);
-        router.push(`/dashboard`);
+
+        // Set cookie for middleware access
+        document.cookie = `accessToken=${res.accessToken}; path=/; max-age=86400; SameSite=Strict`;
+
+        // Decode token to get role
+        try {
+          const decoded: any = jwtDecode(res.accessToken);
+          const role = decoded.role;
+
+          if (role === "ADMIN" || role === "HR") {
+            router.push("/admin/dashboard");
+          } else if (role === "MANAGER") {
+            router.push("/manager/dashboard");
+          } else {
+            router.push("/dashboard");
+          }
+        } catch (e) {
+          console.error("Failed to decode token", e);
+          router.push("/dashboard");
+        }
+
       } else {
         toast.error(res.message);
         setError(res.message);

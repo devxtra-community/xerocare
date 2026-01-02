@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Table,
   TableBody,
@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, Filter, Eye, Edit, Plus } from "lucide-react";
+import { Search, Filter, Eye, Edit, Plus, Trash2, X } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -19,7 +19,17 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useRouter } from "next/navigation";
+import { getVendors, createVendor, updateVendor, deleteVendor as apiDeleteVendor, Vendor as ApiVendor } from "@/lib/vendor";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
+// Extend frontend Vendor type to match API + UI needs
+// We keep the UI structure but populate from API where possible
 type Vendor = {
   id: string;
   name: string;
@@ -33,102 +43,96 @@ type Vendor = {
   status: "Active" | "On Hold";
 };
 
-const initialVendors: Vendor[] = [
-  {
-    id: "1",
-    name: "ABC Supplies",
-    type: "Supplier",
-    contactPerson: "John Doe",
-    phone: "+91 9876543210",
-    email: "john@abcsupplies.com",
-    totalOrders: 45,
-    purchaseValue: 1200000,
-    outstandingAmount: 50000,
-    status: "Active",
-  },
-  {
-    id: "2",
-    name: "XYZ Distributors",
-    type: "Distributor",
-    contactPerson: "Jane Smith",
-    phone: "+91 9876543211",
-    email: "jane@xyz.com",
-    totalOrders: 32,
-    purchaseValue: 850000,
-    outstandingAmount: 0,
-    status: "Active",
-  },
-  {
-    id: "3",
-    name: "Tech Solutions",
-    type: "Service",
-    contactPerson: "Mike Ross",
-    phone: "+91 9876543212",
-    email: "mike@techsol.com",
-    totalOrders: 12,
-    purchaseValue: 450000,
-    outstandingAmount: 25000,
-    status: "On Hold",
-  },
-  {
-    id: "4",
-    name: "Global Traders",
-    type: "Supplier",
-    contactPerson: "Sarah Lee",
-    phone: "+91 9876543213",
-    email: "sarah@global.com",
-    totalOrders: 56,
-    purchaseValue: 1500000,
-    outstandingAmount: 120000,
-    status: "Active",
-  },
-  {
-    id: "5",
-    name: "Fast Logistics",
-    type: "Service",
-    contactPerson: "David Kim",
-    phone: "+91 9876543214",
-    email: "david@fastlog.com",
-    totalOrders: 8,
-    purchaseValue: 120000,
-    outstandingAmount: 0,
-    status: "Active",
-  },
-];
-
 export default function VendorTable() {
   const router = useRouter();
-  const [vendors, setVendors] = useState<Vendor[]>(initialVendors);
+  const [vendors, setVendors] = useState<Vendor[]>([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [filterType, setFilterType] = useState<"All" | "Supplier" | "Distributor" | "Service">("All");
 
   const [formOpen, setFormOpen] = useState(false);
   const [editingVendor, setEditingVendor] = useState<Vendor | null>(null);
-  const [deleteVendor, setDeleteVendor] = useState<Vendor | null>(null);
+  const [deleteVendor, setDeleteVendorTarget] = useState<Vendor | null>(null);
+
+  const fetchVendors = async () => {
+    setLoading(true);
+    try {
+      const res = await getVendors();
+      const apiVendors: any[] = res.data || []; // Adjust based on actual API response structure
+
+      const mappedVendors: Vendor[] = apiVendors.map((v) => ({
+        id: v.id,
+        name: v.name,
+        type: v.type || "Supplier", // Default if missing
+        contactPerson: v.contactPerson || "N/A", // Default if missing
+        phone: v.phone || "N/A",
+        email: v.email || "N/A",
+        totalOrders: v.totalOrders || 0, // Mock
+        purchaseValue: v.purchaseValue || 0, // Mock
+        outstandingAmount: v.outstandingAmount || 0, // Mock
+        status: v.status === "ACTIVE" ? "Active" : "On Hold",
+      }));
+
+      setVendors(mappedVendors);
+    } catch (error) {
+      console.error("Failed to fetch vendors", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchVendors();
+  }, []);
 
   const filteredVendors = vendors.filter((vendor) => {
     const matchesSearch = vendor.name.toLowerCase().includes(search.toLowerCase()) ||
-                          vendor.contactPerson.toLowerCase().includes(search.toLowerCase());
+      vendor.contactPerson.toLowerCase().includes(search.toLowerCase());
     const matchesType = filterType === "All" || vendor.type === filterType;
     return matchesSearch && matchesType;
   });
 
-  const handleSave = (data: Vendor) => {
-    // In a real app, this would be an API call
-    if (editingVendor) {
-      setVendors((prev) => prev.map((v) => (v.id === data.id ? data : v)));
-    } else {
-      setVendors((prev) => [...prev, data]);
+  const handleSave = async (data: any) => {
+    try {
+      // Helper to map UI status back to API status
+      const apiData = {
+        name: data.name,
+        email: data.email,
+        phone: data.phone,
+        status: data.status === "Active" ? "ACTIVE" : "INACTIVE",
+        // Add other fields if backend supports them later
+      };
+
+      if (editingVendor) {
+        await updateVendor(editingVendor.id, apiData);
+      } else {
+        await createVendor(apiData);
+      }
+
+      await fetchVendors(); // Refresh list
+      setFormOpen(false);
+      setEditingVendor(null);
+    } catch (error) {
+      console.error("Failed to save vendor", error);
+      alert("Failed to save vendor");
     }
-    setFormOpen(false);
-    setEditingVendor(null);
   };
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (!deleteVendor) return;
-    setVendors((prev) => prev.filter((v) => v.id !== deleteVendor.id));
-    setDeleteVendor(null);
+    try {
+      await apiDeleteVendor(deleteVendor.id);
+      await fetchVendors(); // Refresh list
+      setDeleteVendorTarget(null);
+    } catch (error) {
+      console.error("Failed to delete vendor", error);
+      alert("Failed to delete vendor");
+    }
   };
+
+  if (loading) {
+    return <div className="p-4 text-center">Loading vendors...</div>;
+  }
 
   return (
     <div className="space-y-4">
@@ -158,14 +162,14 @@ export default function VendorTable() {
               <DropdownMenuItem onClick={() => setFilterType("Service")}>Service</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-          <Button 
+          <Button
             className="bg-primary text-white gap-2"
             onClick={() => {
               setEditingVendor(null);
               setFormOpen(true);
             }}
           >
-             <Plus size={16} /> Add Vendor
+            <Plus size={16} /> Add Vendor
           </Button>
         </div>
       </div>
@@ -191,13 +195,12 @@ export default function VendorTable() {
               filteredVendors.map((vendor, index) => (
                 <TableRow key={vendor.id} className={`border-b border-gray-100 hover:bg-slate-50/50 ${index % 2 !== 0 ? "bg-sky-100/60" : ""}`}>
                   <TableCell className="font-medium text-blue-900">{vendor.name}</TableCell>
-                  <TableCell className="text-slate-500 font-medium">VND-{vendor.id.padStart(3, '0')}</TableCell>
+                  <TableCell className="text-slate-500 font-medium">VND-{vendor.id.substring(0, 4)}</TableCell>
                   <TableCell>
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                      vendor.type === "Supplier" ? "bg-blue-100 text-blue-700" :
-                      vendor.type === "Distributor" ? "bg-purple-100 text-purple-700" :
-                      "bg-orange-100 text-orange-700"
-                    }`}>
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${vendor.type === "Supplier" ? "bg-blue-100 text-blue-700" :
+                        vendor.type === "Distributor" ? "bg-purple-100 text-purple-700" :
+                          "bg-orange-100 text-orange-700"
+                      }`}>
                       {vendor.type}
                     </span>
                   </TableCell>
@@ -216,26 +219,25 @@ export default function VendorTable() {
                   <TableCell className="text-right font-medium">₹ {vendor.purchaseValue.toLocaleString()}</TableCell>
                   <TableCell className="text-right font-medium text-red-600">₹ {vendor.outstandingAmount.toLocaleString()}</TableCell>
                   <TableCell>
-                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                      vendor.status === "Active" ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"
-                    }`}>
+                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium ${vendor.status === "Active" ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"
+                      }`}>
                       <span className={`h-1.5 w-1.5 rounded-full ${vendor.status === "Active" ? "bg-green-600" : "bg-yellow-600"}`}></span>
                       {vendor.status}
                     </span>
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2">
-                       <Button 
-                        variant="ghost" 
-                        size="icon" 
+                      <Button
+                        variant="ghost"
+                        size="icon"
                         className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
                         onClick={() => router.push(`/admin/vendors/${vendor.id}`)}
-                       >
+                      >
                         <Eye className="h-4 w-4" />
                       </Button>
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
+                      <Button
+                        variant="ghost"
+                        size="icon"
                         className="h-8 w-8 text-slate-500 hover:text-slate-700 hover:bg-slate-100"
                         onClick={() => {
                           setEditingVendor(vendor);
@@ -244,24 +246,24 @@ export default function VendorTable() {
                       >
                         <Edit className="h-4 w-4" />
                       </Button>
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
+                      <Button
+                        variant="ghost"
+                        size="icon"
                         className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50"
-                        onClick={() => setDeleteVendor(vendor)}
+                        onClick={() => setDeleteVendorTarget(vendor)}
                       >
-                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-trash-2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-trash-2"><path d="M3 6h18" /><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" /><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" /><line x1="10" x2="10" y1="11" y2="17" /><line x1="14" x2="14" y1="11" y2="17" /></svg>
                       </Button>
                     </div>
                   </TableCell>
                 </TableRow>
               ))
             ) : (
-                <TableRow>
-                    <TableCell colSpan={10} className="text-center py-8 text-slate-500">
-                        No vendors found matching your criteria.
-                    </TableCell>
-                </TableRow>
+              <TableRow>
+                <TableCell colSpan={10} className="text-center py-8 text-slate-500">
+                  No vendors found matching your criteria.
+                </TableCell>
+              </TableRow>
             )}
           </TableBody>
         </Table>
@@ -279,7 +281,7 @@ export default function VendorTable() {
       {deleteVendor && (
         <ConfirmDeleteModal
           name={deleteVendor.name}
-          onCancel={() => setDeleteVendor(null)}
+          onCancel={() => setDeleteVendorTarget(null)}
           onConfirm={confirmDelete}
         />
       )}
@@ -288,14 +290,6 @@ export default function VendorTable() {
 }
 
 // ------------------- Helper Components ------------------- //
-import { X, Trash2 } from "lucide-react";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 
 function VendorFormModal({
   initialData,
@@ -304,19 +298,15 @@ function VendorFormModal({
 }: {
   initialData: Vendor | null;
   onClose: () => void;
-  onConfirm: (data: Vendor) => void;
+  onConfirm: (data: any) => void;
 }) {
-  const [form, setForm] = useState<Vendor>(
+  const [form, setForm] = useState<any>(
     initialData ?? {
-      id: crypto.randomUUID(),
       name: "",
       type: "Supplier",
       contactPerson: "",
       phone: "",
       email: "",
-      totalOrders: 0,
-       purchaseValue: 0,
-       outstandingAmount: 0,
       status: "Active",
     }
   );
@@ -344,33 +334,33 @@ function VendorFormModal({
               onChange={(e) => setForm({ ...form, name: e.target.value })}
             />
           </Field>
-          
-           <div className="grid grid-cols-2 gap-4">
-              <Field label="Contact Person">
-                <Input
-                  placeholder="Enter contact person"
-                  value={form.contactPerson}
-                  onChange={(e) => setForm({ ...form, contactPerson: e.target.value })}
-                />
-              </Field>
-               <Field label="Type">
-                <Select
-                  value={form.type}
-                  onValueChange={(value) =>
-                    setForm({ ...form, type: value as "Supplier" | "Distributor" | "Service" })
-                  }
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Supplier">Supplier</SelectItem>
-                    <SelectItem value="Distributor">Distributor</SelectItem>
-                    <SelectItem value="Service">Service</SelectItem>
-                  </SelectContent>
-                </Select>
-              </Field>
-           </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <Field label="Contact Person">
+              <Input
+                placeholder="Enter contact person"
+                value={form.contactPerson}
+                onChange={(e) => setForm({ ...form, contactPerson: e.target.value })}
+              />
+            </Field>
+            <Field label="Type">
+              <Select
+                value={form.type}
+                onValueChange={(value) =>
+                  setForm({ ...form, type: value })
+                }
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Supplier">Supplier</SelectItem>
+                  <SelectItem value="Distributor">Distributor</SelectItem>
+                  <SelectItem value="Service">Service</SelectItem>
+                </SelectContent>
+              </Select>
+            </Field>
+          </div>
 
           <Field label="Phone">
             <Input
@@ -392,7 +382,7 @@ function VendorFormModal({
             <Select
               value={form.status}
               onValueChange={(value) =>
-                setForm({ ...form, status: value as "Active" | "On Hold" })
+                setForm({ ...form, status: value })
               }
             >
               <SelectTrigger className="w-full">
