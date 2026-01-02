@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { addEmployee, getAllEmployees, getEmployeeById, getEmployeeIdProof } from "../controllers/employeeController";
+import { addEmployee, deleteEmployee, getAllEmployees, getEmployeeById, getEmployeeIdProof } from "../controllers/employeeController";
 import { authMiddleware } from "../middleware/authMiddleware";
 import { requireRole } from "../middleware/roleMiddleware";
 import { uploadEmployeeFiles } from "../middleware/uploadEmployeeFiles";
@@ -20,5 +20,6 @@ employeeRouter.get("/:id/id-proof",authMiddleware,requireRole("ADMIN", "HR"),get
 
 employeeRouter.get("/",requireRole("ADMIN","HR"),getAllEmployees)
 employeeRouter.get("/:id",requireRole("ADMIN","HR"),getEmployeeById)
+employeeRouter.delete("/:id",requireRole("ADMIN","HR"),deleteEmployee)
 
 export default employeeRouter;

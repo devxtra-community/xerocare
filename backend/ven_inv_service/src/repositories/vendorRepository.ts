@@ -10,6 +10,10 @@ export class VendorRepository extends Repository<Vendor> {
     return this.findOne({ where: { email } });
   }
 
+  findById(id: string) {
+    return this.findOne({ where: { id } });
+  }
+
   findByName(name: string) {
     return this.findOne({ where: { name } });
   }

@@ -5,6 +5,7 @@ import { generateRandomPassword } from "../utlis/passwordGenerator";
 import { getSignedIdProofUrl } from "../utlis/r2SignedUrl";
 import { publishEmailJob } from "../queues/emailProducer";
 import { AppError } from "../errors/appError";
+import { EmployeeStatus } from "../entities/employeeEntities";
 
 export class EmployeeService {
   private employeeRepo = new EmployeeRepository();
@@ -116,5 +117,25 @@ export class EmployeeService {
     }
 
     return employee;
+  }                                 
+  
+  async deleteEmployee(id:string) {
+    const employee = await this.employeeRepo.findById(id);
+
+    if(!employee)
+    {
+      throw new AppError("Employee not exist", 404)
+    }
+
+    if(employee.status === EmployeeStatus.DELETED)
+    {
+      throw new AppError("Employee Already deleted", 400)
+    }
+
+    employee.status = EmployeeStatus.DELETED;
+
+    await this.employeeRepo.save(employee);
+
+    return true;
   }
 }

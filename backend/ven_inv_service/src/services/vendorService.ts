@@ -58,7 +58,7 @@ export class VendorService {
   }
 
   async deleteVendor(id:string){
-    const vendor = await this.vendorRepo.findOne({where: {id}});
+    const vendor = await this.vendorRepo.findById(id);
 
     if(!vendor)
     {
