@@ -45,8 +45,6 @@ app.use('/auth', authRouter)
 app.use("/employee", employeeRouter)
 app.use("/admin", adminRouter);
 
-
-
 app.use(errorHandler)
 
 startServer();

@@ -7,7 +7,7 @@ const authRepo = new AuthRepository();
 export async function issueTokens(user: any,req:Request, res: Response) {
 
   const accessToken = signAccesstoken({
-    id: user.id,
+    userId: user.id,
     email: user.email,
     role: user.role,
   });
