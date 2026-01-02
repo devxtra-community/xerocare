@@ -10,19 +10,6 @@ import {
   TableCell,
 } from "@/components/ui/table";
 
-const data = [
-  { name: "Macbook Pro", qty: 2, price: "2999 AZN", date: "20.09.2024" },
-  { name: "Macbook Air", qty: 4, price: "1499 AZN", date: "19.09.2024" },
-  { name: "Iphone 15 Pro", qty: 15, price: "3999 AZN", date: "18.09.2024" },
-  { name: "Iphone 15 Pro Max", qty: 10, price: "4499 AZN", date: "19.09.2024" },
-  { name: "Iphone 15", qty: 12, price: "1999 AZN", date: "17.09.2024" },
-  { name: "Macbook Pro", qty: 2, price: "2999 AZN", date: "20.09.2024" },
-  { name: "Macbook Air", qty: 4, price: "1499 AZN", date: "19.09.2024" },
-  { name: "Iphone 15 Pro", qty: 15, price: "3999 AZN", date: "18.09.2024" },
-  { name: "Iphone 15 Pro Max", qty: 10, price: "4499 AZN", date: "19.09.2024" },
-  { name: "Iphone 15", qty: 12, price: "1999 AZN", date: "17.09.2024" },
-  { name: "Iphone 15", qty: 12, price: "1999 AZN", date: "17.09.2024" },
-];
 
 export default function ProductsTable() {
   const [page, setPage] = useState(1);

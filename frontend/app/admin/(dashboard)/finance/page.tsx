@@ -1,12 +1,12 @@
 import React from "react";
-import BranchReport from "@/components/AdminComponents/FinanceComponents/financeReport";
+import FinanceReport from "@/components/AdminDahboardComponents/FinanceComponents/financeReport";
 
 
 export default function FinancePage(){
     return(
   <>
   
-  <BranchReport/>
+  <FinanceReport/>
   
   </>
     )

@@ -1,10 +1,10 @@
 import StatCard from "@/components/StatCard";
-import ProductsTable from "@/components/AdminComponents/dashboardComponents/productTable";
-import HrTable from "@/components/AdminComponents/dashboardComponents/HrTable";
-import SalesChart from "@/components/AdminComponents/dashboardComponents/SalesChart";
-import EmployeePieChart from "@/components/AdminComponents/dashboardComponents/employeesPiechart";
+import ProductsTable from "../AdminDahboardComponents/dashboardComponents/productTable";
+import HrTable from "../AdminDahboardComponents/dashboardComponents/HrTable";
+import SalesChart from "../AdminDahboardComponents/dashboardComponents/SalesChart";
+import EmployeePieChart from "../AdminDahboardComponents/dashboardComponents/employeesPiechart";
 
-import CategoryPieChart from "@/components/AdminComponents/dashboardComponents/CategoryPieChart";
+import CategoryPieChart from "../AdminDahboardComponents/dashboardComponents/CategoryPieChart";
 
 export default function Dashboard() {
   return (

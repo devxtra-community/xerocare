@@ -18,8 +18,8 @@ import {
   Clock
 } from "lucide-react";
 import StatCard from "@/components/StatCard";
-import VendorTransactionsTable from "@/components/AdminComponents/vendorComponents/VendorTransactionsTable";
-import VendorSpendingTrend from "@/components/AdminComponents/vendorComponents/VendorSpendingTrend";
+import VendorTransactionsTable from "@/components/AdminDahboardComponents/vendorComponents/VendorTransactionsTable";
+import VendorSpendingTrend from "@/components/AdminDahboardComponents/vendorComponents/VendorSpendingTrend";
 
 export default function VendorProfilePage() {
   const params = useParams();
@@ -109,48 +109,48 @@ export default function VendorProfilePage() {
         </div>
 
         {/* MAIN CONTENT: INFO + TRANSACTIONS */}
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 sm:gap-6 items-stretch">
-          {/* COLUMN 1: VENDOR INFO (1/3) */}
-          <div className="space-y-4 sm:space-y-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
+          {/* COLUMN 1: VENDOR INFO */}
+          <div className="lg:col-span-1 flex flex-col gap-6">
             {/* General Info Card */}
-            <div className="bg-white rounded-xl shadow-sm p-4 space-y-4">
-               <h3 className="text-xs font-bold text-blue-900 uppercase flex items-center gap-2 border-b border-gray-50 pb-2">
-                  <User className="h-3.5 w-3.5" /> Contact Profile
+            <div className="bg-white rounded-xl shadow-sm p-4 border border-blue-100/30 flex-1 flex flex-col">
+               <h3 className="text-xs font-bold text-blue-900 uppercase flex items-center gap-2 border-b border-gray-50 pb-3 mb-4">
+                  <User className="h-3.5 w-3.5 text-primary" /> Contact Profile
                </h3>
-               <div className="space-y-3">
+               <div className="space-y-4 flex-1">
                   <div className="flex items-start gap-3">
-                     <div className="p-1.5 bg-blue-50 rounded-lg">
-                        <User className="h-3.5 w-3.5 text-blue-600" />
+                     <div className="p-2 bg-blue-50 rounded-lg">
+                        <User className="h-4 w-4 text-blue-600" />
                      </div>
                      <div>
-                        <p className="text-[10px] text-gray-400 uppercase font-bold">Contact Person</p>
+                        <p className="text-[10px] text-gray-400 uppercase font-bold tracking-wider">Contact Person</p>
                         <p className="text-xs font-semibold text-gray-900">{vendor.contactPerson}</p>
                      </div>
                   </div>
                   <div className="flex items-start gap-3">
-                     <div className="p-1.5 bg-blue-50 rounded-lg">
-                        <Phone className="h-3.5 w-3.5 text-blue-600" />
+                     <div className="p-2 bg-blue-50 rounded-lg">
+                        <Phone className="h-4 w-4 text-blue-600" />
                      </div>
                      <div>
-                        <p className="text-[10px] text-gray-400 uppercase font-bold">Phone</p>
+                        <p className="text-[10px] text-gray-400 uppercase font-bold tracking-wider">Phone</p>
                         <p className="text-xs font-semibold text-gray-900">{vendor.phone}</p>
                      </div>
                   </div>
                   <div className="flex items-start gap-3">
-                     <div className="p-1.5 bg-blue-50 rounded-lg">
-                        <Mail className="h-3.5 w-3.5 text-blue-600" />
+                     <div className="p-2 bg-blue-50 rounded-lg">
+                        <Mail className="h-4 w-4 text-blue-600" />
                      </div>
                      <div>
-                        <p className="text-[10px] text-gray-400 uppercase font-bold">Email</p>
+                        <p className="text-[10px] text-gray-400 uppercase font-bold tracking-wider">Email</p>
                         <p className="text-xs font-semibold text-gray-900">{vendor.email}</p>
                      </div>
                   </div>
                   <div className="flex items-start gap-3">
-                     <div className="p-1.5 bg-blue-50 rounded-lg">
-                        <MapPin className="h-3.5 w-3.5 text-blue-600" />
+                     <div className="p-2 bg-blue-50 rounded-lg">
+                        <MapPin className="h-4 w-4 text-blue-600" />
                      </div>
                      <div>
-                        <p className="text-[10px] text-gray-400 uppercase font-bold">Location</p>
+                        <p className="text-[10px] text-gray-400 uppercase font-bold tracking-wider">Location</p>
                         <p className="text-xs font-semibold text-gray-900 leading-relaxed">{vendor.address}</p>
                      </div>
                   </div>
@@ -158,49 +158,52 @@ export default function VendorProfilePage() {
             </div>
 
             {/* Business Details Card */}
-            <div className="bg-white rounded-xl shadow-sm p-4 space-y-4">
-               <h3 className="text-xs font-bold text-blue-900 uppercase flex items-center gap-2 border-b border-gray-50 pb-2">
-                  <Building2 className="h-3.5 w-3.5" /> Business & Tax
+            <div className="bg-white rounded-xl shadow-sm p-4 border border-blue-100/30 flex-1 flex flex-col">
+               <h3 className="text-xs font-bold text-blue-900 uppercase flex items-center gap-2 border-b border-gray-50 pb-3 mb-4">
+                  <Building2 className="h-3.5 w-3.5 text-primary" /> Business & Tax
                </h3>
-               <div className="space-y-3">
-                  <div className="bg-blue-50/50 p-2 rounded-lg border border-blue-100/50">
-                    <p className="text-[10px] text-blue-600 uppercase font-bold">GSTIN Number</p>
-                    <p className="text-xs font-bold text-blue-900">{vendor.gstin}</p>
+               <div className="space-y-4 flex-1">
+                  <div className="bg-blue-50/50 p-3 rounded-lg border border-blue-100/50">
+                    <p className="text-[10px] text-blue-600 uppercase font-bold tracking-wider">GSTIN Number</p>
+                    <p className="text-sm font-bold text-blue-900">{vendor.gstin}</p>
                   </div>
-                  <div className="grid grid-cols-1 gap-3">
+                  <div className="grid grid-cols-1 gap-4">
                      <div>
-                        <p className="text-[10px] text-gray-400 uppercase font-bold">Bank Name</p>
+                        <p className="text-[10px] text-gray-400 uppercase font-bold tracking-wider">Bank Name</p>
                         <p className="text-xs font-semibold text-gray-900">{vendor.bankDetails.bankName}</p>
                      </div>
                      <div>
-                        <p className="text-[10px] text-gray-400 uppercase font-bold">Account / IFSC</p>
-                        <p className="text-xs font-mono font-semibold text-gray-900">{vendor.bankDetails.accountNumber} / {vendor.bankDetails.ifsc}</p>
+                        <p className="text-[10px] text-gray-400 uppercase font-bold tracking-wider">Account / IFSC</p>
+                        <p className="text-xs font-mono font-semibold text-gray-900 break-all">{vendor.bankDetails.accountNumber} / {vendor.bankDetails.ifsc}</p>
                      </div>
                   </div>
                </div>
             </div>
           </div>
 
-          {/* COLUMN 2: TRANSACTION HISTORY (2/3) + ANALYTICS */}
-          <div className="xl:col-span-2 flex flex-col space-y-4 sm:space-y-6">
-            <div className="flex flex-col space-y-2 flex-1 min-h-[400px]">
-               <h3 className="text-sm font-bold text-blue-900 uppercase flex items-center gap-2">
-                  <Clock className="h-3.5 w-3.5" /> Transaction History
+          {/* COLUMN 2 & 3: TRANSACTION HISTORY */}
+          <div className="lg:col-span-2">
+            <div className="bg-white rounded-xl shadow-sm border border-blue-100/30 h-full flex flex-col overflow-hidden text-blue-900 uppercase">
+               <h3 className="text-xs font-bold text-blue-900 uppercase flex items-center gap-2 p-4 border-b border-gray-50 flex-none bg-white">
+                  <Clock className="h-3.5 w-3.5 text-primary" /> Transaction History
                </h3>
-               <div className="flex-1">
+               <div className="flex-1 overflow-auto">
                   <VendorTransactionsTable />
                </div>
             </div>
-
-            <div className="flex flex-col space-y-2 h-[280px]">
-               <h3 className="text-sm font-bold text-blue-900 uppercase flex items-center gap-2">
-                  <TrendingUp className="h-3.5 w-3.5" /> Purchasing Analytics
-               </h3>
-               <div className="flex-1 bg-white rounded-xl p-4 shadow-sm">
-                  <VendorSpendingTrend />
-               </div>
-            </div>
           </div>
+        </div>
+
+        {/* BOTTOM SECTION: ANALYTICS */}
+        <div className="space-y-4">
+           <h3 className="text-sm font-bold text-blue-900 uppercase flex items-center gap-2">
+              <TrendingUp className="h-3.5 w-3.5 text-primary" /> Purchasing Analytics
+           </h3>
+           <div className="bg-white rounded-xl p-6 shadow-sm border border-blue-100/30">
+              <div className="h-[320px]">
+                <VendorSpendingTrend />
+              </div>
+           </div>
         </div>
       </div>
     </div>

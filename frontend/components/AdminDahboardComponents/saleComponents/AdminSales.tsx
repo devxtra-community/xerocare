@@ -1,9 +1,9 @@
 import StatCard from "@/components/StatCard";
-import SalesSummaryTable from "@/components/AdminComponents/saleComponents/SalesSummaryTable";
-import SalesChart from "@/components/AdminComponents/dashboardComponents/SalesChart";
+import SalesSummaryTable from "./SalesSummaryTable";
+import SalesChart from "../dashboardComponents/SalesChart";
 
-import MonthlySalesBarChart from "@/components/AdminComponents/saleComponents/monthlysalesChart";
-import MostSoldProductChart from "@/components/AdminComponents/saleComponents/MostSoldProductChart";
+import MonthlySalesBarChart from "./monthlysalesChart";
+import MostSoldProductChart from "./MostSoldProductChart";
 
 export default function AdminSalesPage() {
   return (

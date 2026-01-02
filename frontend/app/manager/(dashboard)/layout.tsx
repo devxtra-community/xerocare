@@ -1,6 +1,6 @@
 import React from "react";
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
-import AppSidebar from "@/components/AdminDahboardComponents/AdminAppSidebar";
+import ManagerSidebar from "@/components/ManagerDashboardComponents/ManagerAppSidebar";
 import DashboardHeader from "@/components/DashboardHeader";
 
 export default function AdminLayout({
@@ -11,7 +11,7 @@ export default function AdminLayout({
   return (
     <SidebarProvider>
       <div className="flex min-h-screen w-full">
-        <AppSidebar />
+        <ManagerSidebar />
 
         <SidebarInset className="bg-muted min-h-screen w-full flex flex-col">
           <DashboardHeader />

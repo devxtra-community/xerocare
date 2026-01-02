@@ -1,8 +1,8 @@
 "use client";
 
 import React from "react";
-import VendorStats from "@/components/AdminComponents/VendorComponents/VendorStats";
-import VendorTable from "@/components/AdminComponents/VendorComponents/VendorTable";
+import VendorStats from "@/components/AdminDahboardComponents/VendorComponents/VendorStats";
+import VendorTable from "@/components/AdminDahboardComponents/VendorComponents/VendorTable";
 
 export default function VendorsPage() {
   return (
