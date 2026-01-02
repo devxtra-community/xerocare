@@ -62,7 +62,6 @@ export default function AppSidebar() {
   const handleLogOut = async () => {
     try {
       const res = await logout();
-      console.log(res)
       if(!res?.data.success){
         toast.error(res?.data.message)
       }

@@ -1,6 +1,7 @@
 import { redis } from "../config/redis";
 import crypto from "crypto";
 import { publishEmailJob } from "../queues/emailProducer";
+import { AppError } from "../errors/appError";
 
 export class MagicLinkService {
 
@@ -22,7 +23,7 @@ export class MagicLinkService {
 
     const email = await redis.get(key);
     if (!email) {
-      throw new Error("Invalid or expired magic link");
+      throw new AppError("Invalid or expired magic link", 400);
     }
 
     await redis.del(key);

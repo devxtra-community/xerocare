@@ -16,7 +16,6 @@ export default function DashboardPage() {
 
     useEffect(() => {
         const user = getUserFromToken();
-        console.log(user)
 
         if (!user) {
             router.replace("/login");
