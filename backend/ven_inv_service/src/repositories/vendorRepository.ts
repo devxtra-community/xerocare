@@ -1,5 +1,5 @@
-import { DataSource, Repository } from "typeorm";
-import { Vendor,VendorStatus } from "../entities/vendorEntity";
+import { DataSource, Repository } from 'typeorm';
+import { Vendor, VendorStatus } from '../entities/vendorEntity';
 
 export class VendorRepository extends Repository<Vendor> {
   constructor(dataSource: DataSource) {
@@ -21,7 +21,7 @@ export class VendorRepository extends Repository<Vendor> {
   findActive() {
     return this.find({
       where: { status: VendorStatus.ACTIVE },
-      order: { createdAt: "DESC" },
+      order: { createdAt: 'DESC' },
     });
   }
 

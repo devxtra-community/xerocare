@@ -1,5 +1,5 @@
-"use client";
-import { useState } from "react";
+'use client';
+import { useState } from 'react';
 
 const ITEMS_PER_PAGE = 5;
 
@@ -8,34 +8,34 @@ export default function WarehouseTable() {
 
   const data = [
     {
-      wearhouseName: "First Store",
-      branch: "Ernakulam",
-      Location: "ABC Street",
-      productStock: "3456",
+      wearhouseName: 'First Store',
+      branch: 'Ernakulam',
+      Location: 'ABC Street',
+      productStock: '3456',
     },
     {
-      wearhouseName: "Central Hub",
-      branch: "Kochi",
-      Location: "MG Road",
-      productStock: "2890",
+      wearhouseName: 'Central Hub',
+      branch: 'Kochi',
+      Location: 'MG Road',
+      productStock: '2890',
     },
     {
-      wearhouseName: "North Depot",
-      branch: "Thrissur",
-      Location: "Round North",
-      productStock: "4120",
+      wearhouseName: 'North Depot',
+      branch: 'Thrissur',
+      Location: 'Round North',
+      productStock: '4120',
     },
     {
-      wearhouseName: "South Warehouse",
-      branch: "Trivandrum",
-      Location: "Kazhakkoottam",
-      productStock: "1980",
+      wearhouseName: 'South Warehouse',
+      branch: 'Trivandrum',
+      Location: 'Kazhakkoottam',
+      productStock: '1980',
     },
     {
-      wearhouseName: "Metro Store",
-      branch: "Calicut",
-      Location: "SM Street",
-      productStock: "3650",
+      wearhouseName: 'Metro Store',
+      branch: 'Calicut',
+      Location: 'SM Street',
+      productStock: '3650',
     },
   ];
 
@@ -66,19 +66,12 @@ export default function WarehouseTable() {
 
           <tbody>
             {currentData.map((item, index) => (
-              <tr
-                key={index}
-                className={index % 2 === 1 ? "bg-sky-100/60" : ""}
-              >
+              <tr key={index} className={index % 2 === 1 ? 'bg-sky-100/60' : ''}>
                 <td className="py-2 px-2 text-[10px] sm:text-xs font-medium text-gray-900">
                   {item.wearhouseName}
                 </td>
-                <td className="py-2 px-2 text-[10px] sm:text-xs text-gray-700">
-                  {item.branch}
-                </td>
-                <td className="py-2 px-2 text-[10px] sm:text-xs text-gray-700">
-                  {item.Location}
-                </td>
+                <td className="py-2 px-2 text-[10px] sm:text-xs text-gray-700">{item.branch}</td>
+                <td className="py-2 px-2 text-[10px] sm:text-xs text-gray-700">{item.Location}</td>
                 <td className="py-2 px-2 text-[10px] sm:text-xs text-gray-700">
                   {item.productStock}
                 </td>
@@ -103,9 +96,7 @@ export default function WarehouseTable() {
             key={num}
             onClick={() => setPage(num)}
             className={`px-2 py-0.5 rounded-md ${
-              page === num
-                ? "bg-blue-900 text-white"
-                : "border hover:bg-gray-50"
+              page === num ? 'bg-blue-900 text-white' : 'border hover:bg-gray-50'
             }`}
           >
             {num}
@@ -123,4 +114,3 @@ export default function WarehouseTable() {
     </div>
   );
 }
-

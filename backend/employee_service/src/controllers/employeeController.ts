@@ -1,20 +1,13 @@
-import { Request, Response, NextFunction } from "express";
-import { AppError } from "../errors/appError";
-import { EmployeeService } from "../services/employeeService";
-import { MulterS3File } from "../types/multer-s3-file";
+import { Request, Response, NextFunction } from 'express';
+import { AppError } from '../errors/appError';
+import { EmployeeService } from '../services/employeeService';
+import { MulterS3File } from '../types/multer-s3-file';
 
 const service = new EmployeeService();
 
 export const addEmployee = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const {
-      first_name,
-      last_name,
-      email,
-      role,
-      expireDate,
-      salary,
-    } = req.body;
+    const { first_name, last_name, email, role, expireDate, salary } = req.body;
 
     const files = req.files as {
       profile_image?: MulterS3File[];
@@ -41,7 +34,7 @@ export const addEmployee = async (req: Request, res: Response, next: NextFunctio
     });
 
     res.status(201).json({
-      message: "Employee created successfully",
+      message: 'Employee created successfully',
       data: employee,
       success: true,
     });
@@ -49,7 +42,6 @@ export const addEmployee = async (req: Request, res: Response, next: NextFunctio
     next(new AppError(err.message, err.statusCode || 400));
   }
 };
-
 
 export const getEmployeeIdProof = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -73,7 +65,7 @@ export const getAllEmployees = async (req: Request, res: Response, next: NextFun
     return res.json({
       success: true,
       data: result,
-      message: "Employees fetched successfully",
+      message: 'Employees fetched successfully',
     });
   } catch (err: any) {
     next(new AppError(err.message, err.statusCode || 500));
@@ -87,23 +79,23 @@ export const getEmployeeById = async (req: Request, res: Response, next: NextFun
     return res.json({
       success: true,
       data: employee,
-      message: "Employee fetched successfully",
+      message: 'Employee fetched successfully',
     });
   } catch (err: any) {
     next(new AppError(err.message, err.statusCode || 404));
   }
 };
 
-export const deleteEmployee = async (req:Request, res:Response, next: NextFunction) =>{
-  try{
+export const deleteEmployee = async (req: Request, res: Response, next: NextFunction) => {
+  try {
     const employee = await service.getEmployeeById(req.params.id);
 
     return res.json({
-      success:true,
-      data:employee,
-      message: "Employee deleted successfully"
+      success: true,
+      data: employee,
+      message: 'Employee deleted successfully',
     });
-  } catch(err:any){
-    next(new AppError(err.message, err.statusCode || 500))
+  } catch (err: any) {
+    next(new AppError(err.message, err.statusCode || 500));
   }
-}
+};

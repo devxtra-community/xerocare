@@ -1,16 +1,11 @@
-import * as React from "react"
-import {
-  Card,
-  CardContent,
-  CardTitle,
-  CardDescription,
-} from "@/components/ui/card"
+import * as React from 'react';
+import { Card, CardContent, CardTitle, CardDescription } from '@/components/ui/card';
 
 type StatCardProps = {
-  title: string
-  value: string
-  subtitle?: string
-}
+  title: string;
+  value: string;
+  subtitle?: string;
+};
 
 export default function StatCard({ title, value, subtitle }: StatCardProps) {
   return (
@@ -20,9 +15,7 @@ export default function StatCard({ title, value, subtitle }: StatCardProps) {
           {title}
         </CardTitle>
 
-        <div className="text-base sm:text-xl md:text-2xl font-bold text-primary">
-          {value}
-        </div>
+        <div className="text-base sm:text-xl md:text-2xl font-bold text-primary">{value}</div>
 
         {subtitle && (
           <CardDescription className="text-[9px] sm:text-[10px] md:text-xs text-muted-foreground">
@@ -31,5 +24,5 @@ export default function StatCard({ title, value, subtitle }: StatCardProps) {
         )}
       </CardContent>
     </Card>
-  )
+  );
 }

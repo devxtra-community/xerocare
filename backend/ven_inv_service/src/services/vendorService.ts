@@ -1,7 +1,7 @@
-import { VendorRepository } from "../repositories/vendorRepository";
-import { Vendor, VendorStatus } from "../entities/vendorEntity";
-import { AppError } from "../errors/appError";
-import { publishEmailJob } from "../queues/emailPublisher";
+import { VendorRepository } from '../repositories/vendorRepository';
+import { Vendor, VendorStatus } from '../entities/vendorEntity';
+import { AppError } from '../errors/appError';
+import { publishEmailJob } from '../queues/emailPublisher';
 
 interface CreateVendorDTO {
   name: string;
@@ -15,18 +15,18 @@ export class VendorService {
   async createVendor(data: CreateVendorDTO): Promise<Vendor> {
     const existingByEmail = await this.vendorRepo.findByEmail(data.email);
     if (existingByEmail) {
-      throw new AppError("Vendor email already exists", 409);
+      throw new AppError('Vendor email already exists', 409);
     }
 
     const existingByName = await this.vendorRepo.findByName(data.name);
     if (existingByName) {
-      throw new AppError("Vendor name already exists", 409);
+      throw new AppError('Vendor name already exists', 409);
     }
 
     const vendor = this.vendorRepo.create(data);
 
     await publishEmailJob({
-      type: "VENDOR_WELCOME",
+      type: 'VENDOR_WELCOME',
       email: vendor.email,
       vendorName: vendor.name,
     });
@@ -35,39 +35,34 @@ export class VendorService {
 
   async getAllVendors(): Promise<Vendor[]> {
     return this.vendorRepo.find({
-      order: { createdAt: "DESC" },
+      order: { createdAt: 'DESC' },
     });
   }
 
   async getVendorById(id: string): Promise<Vendor> {
     const vendor = await this.vendorRepo.findOne({ where: { id } });
     if (!vendor) {
-      throw new AppError("Vendor not found", 404);
+      throw new AppError('Vendor not found', 404);
     }
     return vendor;
   }
 
-  async updateVendor(
-    id: string,
-    data: Partial<CreateVendorDTO>
-  ): Promise<Vendor> {
+  async updateVendor(id: string, data: Partial<CreateVendorDTO>): Promise<Vendor> {
     const vendor = await this.getVendorById(id);
 
     Object.assign(vendor, data);
     return this.vendorRepo.save(vendor);
   }
 
-  async deleteVendor(id:string){
+  async deleteVendor(id: string) {
     const vendor = await this.vendorRepo.findById(id);
 
-    if(!vendor)
-    {
-      throw new AppError("vendor not found" , 404);
+    if (!vendor) {
+      throw new AppError('vendor not found', 404);
     }
 
-    if(vendor.status === VendorStatus.DELETED)
-    {
-      throw new AppError("Vendor already deleted" , 400);
+    if (vendor.status === VendorStatus.DELETED) {
+      throw new AppError('Vendor already deleted', 400);
     }
 
     vendor.status = VendorStatus.DELETED;

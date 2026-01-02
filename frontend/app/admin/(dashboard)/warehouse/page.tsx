@@ -1,10 +1,9 @@
-
-import WarehouseReport from "@/components/warehouseReport";
+import WarehouseReport from '@/components/warehouseReport';
 
 export default function WarehousePage() {
-    return (
-        <>
-            <WarehouseReport />
-        </>
-    )
+  return (
+    <>
+      <WarehouseReport />
+    </>
+  );
 }

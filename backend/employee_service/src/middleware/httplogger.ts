@@ -1,7 +1,7 @@
-import morgan from "morgan";
-import { logger } from "../config/logger";
+import morgan from 'morgan';
+import { logger } from '../config/logger';
 
-export const httpLogger = morgan("combined", {
+export const httpLogger = morgan('combined', {
   stream: {
     write: (message: string) => {
       logger.info(message.trim());

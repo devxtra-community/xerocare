@@ -1,11 +1,5 @@
-"use client"
-import {
-  LayoutDashboard,
-  ShoppingCart,
-  Building2,
-  Users,
-  Package,
-} from "lucide-react";
+'use client';
+import { LayoutDashboard, ShoppingCart, Building2, Users, Package } from 'lucide-react';
 
 import {
   Sidebar,
@@ -17,69 +11,62 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-} from "@/components/ui/sidebar"
-import { logout } from "@/lib/auth"
-import { toast } from "sonner"
-import { useRouter } from "next/navigation"
-
+} from '@/components/ui/sidebar';
+import { logout } from '@/lib/auth';
+import { toast } from 'sonner';
+import { useRouter } from 'next/navigation';
 
 const menuItems = [
   {
-    title: "Dashboard",
+    title: 'Dashboard',
     icon: LayoutDashboard,
-    href: "/",
+    href: '/',
     active: true,
   },
   {
-    title: "Sales",
+    title: 'Sales',
     icon: ShoppingCart,
-    href: "/admin/sales",
+    href: '/admin/sales',
   },
   {
-    title: "Branch",
+    title: 'Branch',
     icon: Building2,
-    href: "/admin/branch",
+    href: '/admin/branch',
     disabled: true,
   },
   {
-    title: "Human Resources",
+    title: 'Human Resources',
     icon: Users,
-    href: "/admin/hr",
+    href: '/admin/hr',
     disabled: true,
   },
   {
-    title: "Warehouse",
+    title: 'Warehouse',
     icon: Package,
-    href: "/admin/warehouse",
+    href: '/admin/warehouse',
   },
-]
-
-
+];
 
 export default function AppSidebar() {
-  const router = useRouter()
+  const router = useRouter();
 
   const handleLogOut = async () => {
     try {
       const res = await logout();
-      if(!res?.data.success){
-        toast.error(res?.data.message)
-      }
-      else{
-        if(res.data.isadmin){
+      if (!res?.data.success) {
+        toast.error(res?.data.message);
+      } else {
+        if (res.data.isadmin) {
           router.push('/admin/login');
-        }
-        else{
+        } else {
           router.push('/login');
         }
-        toast.success(res.data.message)
+        toast.success(res.data.message);
       }
+    } catch (err) {
+      console.log(err);
     }
-    catch (err) {
-      console.log(err)
-
-    }
-  }
+  };
   return (
     <Sidebar collapsible="icon" className="border-r-0">
       <SidebarHeader className="bg-sidebar border-b border-white/10">
@@ -97,7 +84,6 @@ export default function AppSidebar() {
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu className="space-y-1 px-2">
-
               {menuItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton
@@ -111,14 +97,12 @@ export default function AppSidebar() {
 
                       ${
                         item.active
-                          ? "bg-white text-sidebar [&_svg]:text-sidebar"
-                          : "hover:bg-white/10"
+                          ? 'bg-white text-sidebar [&_svg]:text-sidebar'
+                          : 'hover:bg-white/10'
                       }
 
                       ${
-                        item.disabled
-                          ? "!text-sidebar-accent-foreground/70 cursor-not-allowed"
-                          : ""
+                        item.disabled ? '!text-sidebar-accent-foreground/70 cursor-not-allowed' : ''
                       }
                     `}
                   >
@@ -137,7 +121,6 @@ export default function AppSidebar() {
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
-
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
@@ -163,7 +146,6 @@ export default function AppSidebar() {
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarFooter>
-
     </Sidebar>
   );
 }

@@ -1,5 +1,4 @@
-
-"use client";
+'use client';
 
 import {
   Table,
@@ -8,10 +7,10 @@ import {
   TableHead,
   TableBody,
   TableCell,
-} from "@/components/ui/table";
-import Link from "next/link";
-import { useState } from "react";
-import Pagination from "./Pagination";
+} from '@/components/ui/table';
+import Link from 'next/link';
+import { useState } from 'react';
+import Pagination from './Pagination';
 
 export type UserListItem = {
   id: number;
@@ -22,7 +21,6 @@ export type UserListItem = {
   expiryDate: string;
   salary: string;
 };
-
 
 const USERS_PER_PAGE = 8;
 
@@ -36,10 +34,7 @@ export default function UserTable({ users }: UserTableProps) {
   const totalPages = Math.ceil(users.length / USERS_PER_PAGE);
 
   const startIndex = (page - 1) * USERS_PER_PAGE;
-  const currentData = users.slice(
-    startIndex,
-    startIndex + USERS_PER_PAGE
-  );
+  const currentData = users.slice(startIndex, startIndex + USERS_PER_PAGE);
 
   return (
     <div className="space-y-4">
@@ -61,10 +56,7 @@ export default function UserTable({ users }: UserTableProps) {
             {currentData.map((u) => (
               <TableRow key={u.id} className="hover:bg-muted/50">
                 <TableCell className="font-medium">
-                  <Link
-                    href={`/users/${u.id}`}
-                    className="text-primary hover:underline"
-                  >
+                  <Link href={`/users/${u.id}`} className="text-primary hover:underline">
                     {u.name}
                   </Link>
                 </TableCell>
@@ -86,11 +78,7 @@ export default function UserTable({ users }: UserTableProps) {
         </Table>
       </div>
 
-      <Pagination
-        page={page}
-        totalPages={totalPages}
-        onPageChange={setPage}
-      />
+      <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
     </div>
   );
 }

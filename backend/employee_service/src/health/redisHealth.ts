@@ -1,19 +1,19 @@
-import { redis } from "../config/redis";
+import { redis } from '../config/redis';
 
 export const checkRedis = async () => {
   try {
     const result = await redis.ping();
 
-    if (result !== "PONG") {
-      throw new Error("Unexpected Redis response");
+    if (result !== 'PONG') {
+      throw new Error('Unexpected Redis response');
     }
 
     return {
-      status: "UP",
+      status: 'UP',
     };
   } catch (error: any) {
     return {
-      status: "DOWN",
+      status: 'DOWN',
       error: error.message,
     };
   }

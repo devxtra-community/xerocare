@@ -1,5 +1,5 @@
-import { Request, Response, NextFunction } from "express";
-import { VendorService } from "../services/vendorService";
+import { Request, Response, NextFunction } from 'express';
+import { VendorService } from '../services/vendorService';
 
 export class VendorController {
   constructor(private readonly vendorService: VendorService) {}
@@ -45,10 +45,7 @@ export class VendorController {
 
   updateVendor = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const vendor = await this.vendorService.updateVendor(
-        req.params.id,
-        req.body
-      );
+      const vendor = await this.vendorService.updateVendor(req.params.id, req.body);
 
       return res.json({
         success: true,
@@ -65,7 +62,7 @@ export class VendorController {
 
       return res.json({
         success: true,
-        message: "Vendor deleted successfully",
+        message: 'Vendor deleted successfully',
       });
     } catch (error) {
       next(error);

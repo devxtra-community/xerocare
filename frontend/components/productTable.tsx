@@ -1,35 +1,32 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-
-
-
+import { useState } from 'react';
 
 export default function ProductsTable() {
   const [page, setPage] = useState(1);
 
   const data = [
-    { name: "Macbook Pro", qty: 2, price: "2999 AZN", date: "20.09.2024" },
-    { name: "Macbook Air", qty: 4, price: "1499 AZN", date: "19.09.2024" },
-    { name: "Iphone 15 Pro", qty: 15, price: "3999 AZN", date: "18.09.2024" },
+    { name: 'Macbook Pro', qty: 2, price: '2999 AZN', date: '20.09.2024' },
+    { name: 'Macbook Air', qty: 4, price: '1499 AZN', date: '19.09.2024' },
+    { name: 'Iphone 15 Pro', qty: 15, price: '3999 AZN', date: '18.09.2024' },
     {
-      name: "Iphone 15 Pro Max",
+      name: 'Iphone 15 Pro Max',
       qty: 10,
-      price: "4499 AZN",
-      date: "19.09.2024",
+      price: '4499 AZN',
+      date: '19.09.2024',
     },
-    { name: "Iphone 15", qty: 12, price: "1999 AZN", date: "17.09.2024" },
-    { name: "Macbook Pro", qty: 2, price: "2999 AZN", date: "20.09.2024" },
-    { name: "Macbook Air", qty: 4, price: "1499 AZN", date: "19.09.2024" },
-    { name: "Iphone 15 Pro", qty: 15, price: "3999 AZN", date: "18.09.2024" },
+    { name: 'Iphone 15', qty: 12, price: '1999 AZN', date: '17.09.2024' },
+    { name: 'Macbook Pro', qty: 2, price: '2999 AZN', date: '20.09.2024' },
+    { name: 'Macbook Air', qty: 4, price: '1499 AZN', date: '19.09.2024' },
+    { name: 'Iphone 15 Pro', qty: 15, price: '3999 AZN', date: '18.09.2024' },
     {
-      name: "Iphone 15 Pro Max",
+      name: 'Iphone 15 Pro Max',
       qty: 10,
-      price: "4499 AZN",
-      date: "19.09.2024",
+      price: '4499 AZN',
+      date: '19.09.2024',
     },
-    { name: "Iphone 15", qty: 12, price: "1999 AZN", date: "17.09.2024" },
-    { name: "Iphone 15", qty: 12, price: "1999 AZN", date: "17.09.2024" },
+    { name: 'Iphone 15', qty: 12, price: '1999 AZN', date: '17.09.2024' },
+    { name: 'Iphone 15', qty: 12, price: '1999 AZN', date: '17.09.2024' },
   ];
 
   const ITEMS_PER_PAGE = 5;
@@ -59,10 +56,7 @@ export default function ProductsTable() {
           </thead>
           <tbody>
             {currentData.map((item, index) => (
-              <tr
-                key={index}
-                className={index % 2 === 1 ? "bg-sky-100/60" : ""}
-              >
+              <tr key={index} className={index % 2 === 1 ? 'bg-sky-100/60' : ''}>
                 <td className="py-1.5 sm:py-2 px-1 sm:px-2 text-[10px] sm:text-xs font-medium text-gray-900">
                   {item.name}
                 </td>
@@ -103,10 +97,9 @@ export default function ProductsTable() {
             <button
               key={pageNum}
               onClick={() => setPage(pageNum)}
-              className={`px-1.5 sm:px-2 py-0.5 rounded-md transition ${page === pageNum
-                ? "bg-blue-900 text-white"
-                : "border hover:bg-gray-50"
-                }`}
+              className={`px-1.5 sm:px-2 py-0.5 rounded-md transition ${
+                page === pageNum ? 'bg-blue-900 text-white' : 'border hover:bg-gray-50'
+              }`}
             >
               {pageNum}
             </button>
@@ -116,10 +109,9 @@ export default function ProductsTable() {
         {totalPages > 4 && (
           <button
             onClick={() => setPage(totalPages)}
-            className={`px-1.5 sm:px-2 py-0.5 rounded-md border transition ${page === totalPages
-              ? "bg-primary text-white"
-              : "hover:bg-gray-50"
-              }`}
+            className={`px-1.5 sm:px-2 py-0.5 rounded-md border transition ${
+              page === totalPages ? 'bg-primary text-white' : 'hover:bg-gray-50'
+            }`}
           >
             {totalPages}
           </button>

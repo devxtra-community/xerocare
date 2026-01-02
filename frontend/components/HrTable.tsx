@@ -1,83 +1,83 @@
-"use client";
-import { useState } from "react";
+'use client';
+import { useState } from 'react';
 
 const humanResourcedatas = [
   {
-    Fullname: "Parviz Aslanov",
-    Position: "UI Designer",
-    startDate: "20.11.2023",
-    salary: "1700 ",
-    avatar: "P",
+    Fullname: 'Parviz Aslanov',
+    Position: 'UI Designer',
+    startDate: '20.11.2023',
+    salary: '1700 ',
+    avatar: 'P',
   },
   {
-    Fullname: "Seving Aslanova",
-    Position: "UX Designer",
-    startDate: "19.02.2023",
-    salary: "1200 ",
-    avatar: "S",
+    Fullname: 'Seving Aslanova',
+    Position: 'UX Designer',
+    startDate: '19.02.2023',
+    salary: '1200 ',
+    avatar: 'S',
   },
   {
-    Fullname: "Ceyhun Aslanov",
-    Position: "React Developer",
-    startDate: "18.05.2004",
-    salary: "3009 ",
-    avatar: "C",
+    Fullname: 'Ceyhun Aslanov',
+    Position: 'React Developer',
+    startDate: '18.05.2004',
+    salary: '3009 ',
+    avatar: 'C',
   },
   {
-    Fullname: "Ayla Mammadova",
-    Position: "UX Researcher Intern",
-    startDate: "18.07.2004",
-    salary: "400 ",
-    avatar: "A",
+    Fullname: 'Ayla Mammadova',
+    Position: 'UX Researcher Intern',
+    startDate: '18.07.2004',
+    salary: '400 ',
+    avatar: 'A',
   },
   {
-    Fullname: "Orxan Hüseyinov",
-    Position: "Accountant",
-    startDate: "17.09.2022",
-    salary: "2000 ",
-    avatar: "O",
+    Fullname: 'Orxan Hüseyinov',
+    Position: 'Accountant',
+    startDate: '17.09.2022',
+    salary: '2000 ',
+    avatar: 'O',
   },
   {
-    Fullname: "Parviz Aslanov",
-    Position: "UI Designer",
-    startDate: "20.11.2023",
-    salary: "1700 ",
-    avatar: "P",
+    Fullname: 'Parviz Aslanov',
+    Position: 'UI Designer',
+    startDate: '20.11.2023',
+    salary: '1700 ',
+    avatar: 'P',
   },
   {
-    Fullname: "Seving Aslanova",
-    Position: "UX Designer",
-    startDate: "19.02.2023",
-    salary: "1200 ",
-    avatar: "S",
+    Fullname: 'Seving Aslanova',
+    Position: 'UX Designer',
+    startDate: '19.02.2023',
+    salary: '1200 ',
+    avatar: 'S',
   },
   {
-    Fullname: "Ceyhun Aslanov",
-    Position: "React Developer",
-    startDate: "18.05.2004",
-    salary: "3009 ",
-    avatar: "C",
+    Fullname: 'Ceyhun Aslanov',
+    Position: 'React Developer',
+    startDate: '18.05.2004',
+    salary: '3009 ',
+    avatar: 'C',
   },
   {
-    Fullname: "Ayla Mammadova",
-    Position: "UX Researcher Intern",
-    startDate: "18.07.2004",
-    salary: "400 ",
-    avatar: "A",
+    Fullname: 'Ayla Mammadova',
+    Position: 'UX Researcher Intern',
+    startDate: '18.07.2004',
+    salary: '400 ',
+    avatar: 'A',
   },
   {
-    Fullname: "Orxan Hüseyinov",
-    Position: "Accountant",
-    startDate: "17.09.2022",
-    salary: "2000 ",
-    avatar: "O",
+    Fullname: 'Orxan Hüseyinov',
+    Position: 'Accountant',
+    startDate: '17.09.2022',
+    salary: '2000 ',
+    avatar: 'O',
   },
   {
-    Fullname: "Orxan Hüseyinov",
-    Position: "Accountant",
-    startDate: "17.09.2022",
-    salary: "2000 ",
-    avatar: "O",
+    Fullname: 'Orxan Hüseyinov',
+    Position: 'Accountant',
+    startDate: '17.09.2022',
+    salary: '2000 ',
+    avatar: 'O',
   },
 ];
 
@@ -88,10 +88,7 @@ export default function HrTable() {
 
   const totalPages = Math.ceil(humanResourcedatas.length / ITEMS_PER_PAGE);
   const startIndex = (page - 1) * ITEMS_PER_PAGE;
-  const currentData = humanResourcedatas.slice(
-    startIndex,
-    startIndex + ITEMS_PER_PAGE
-  );
+  const currentData = humanResourcedatas.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
   return (
     <div className="rounded-2xl bg-white p-2 sm:p-3 shadow-sm w-full h-[280px] flex flex-col">
@@ -117,15 +114,13 @@ export default function HrTable() {
 
           <tbody>
             {currentData.map((item, index) => (
-              <tr key={index} className={index % 2 ? "bg-sky-100/60" : ""}>
+              <tr key={index} className={index % 2 ? 'bg-sky-100/60' : ''}>
                 <td className="py-1.5 sm:py-2 px-1 sm:px-2 text-[10px] sm:text-xs font-medium">
                   <div className="flex items-center gap-1 sm:gap-2">
                     <div className="h-5 w-5 sm:h-6 sm:w-6 rounded-full bg-gray-300 flex items-center justify-center text-[10px] sm:text-xs font-medium text-gray-700">
                       {item.avatar}
                     </div>
-                    <span className="text-gray-900 truncate">
-                      {item.Fullname}
-                    </span>
+                    <span className="text-gray-900 truncate">{item.Fullname}</span>
                   </div>
                 </td>
                 <td className="py-1.5 sm:py-2 px-1 sm:px-2 text-[10px] sm:text-xs text-gray-700">
@@ -160,9 +155,7 @@ export default function HrTable() {
               key={num}
               onClick={() => setPage(num)}
               className={`px-1.5 sm:px-2 py-0.5 rounded-md transition ${
-                page === num
-                  ? "bg-blue-900 text-white"
-                  : "border hover:bg-gray-50"
+                page === num ? 'bg-blue-900 text-white' : 'border hover:bg-gray-50'
               }`}
             >
               {num}
@@ -182,4 +175,3 @@ export default function HrTable() {
     </div>
   );
 }
-

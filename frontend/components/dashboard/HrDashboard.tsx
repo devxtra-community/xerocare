@@ -2,13 +2,13 @@
 // import UserTable from "@/app/employee/components/UserTable";
 
 export type UserListItem = {
-    id: number;
-    name: string;
-    department: string;
-    branch: string;
-    startDate: string;
-    expiryDate: string;
-    salary: string;
+  id: number;
+  name: string;
+  department: string;
+  branch: string;
+  startDate: string;
+  expiryDate: string;
+  salary: string;
 };
 
 // async function getUsers(): Promise<UserListItem[]> {
@@ -117,16 +117,16 @@ export type UserListItem = {
 // }
 
 export default function HrDashboard() {
-    return (
-        <div className="space-y-6">
-            {/*HEADER*/}
+  return (
+    <div className="space-y-6">
+      {/*HEADER*/}
 
-            <div className="flex items-center justify-between p-6">
-                <h1 className="mb-4 text-3xl font-serif">Human Resources</h1>
-                {/* <AddEmployeeDialog /> */}
-            </div>
+      <div className="flex items-center justify-between p-6">
+        <h1 className="mb-4 text-3xl font-serif">Human Resources</h1>
+        {/* <AddEmployeeDialog /> */}
+      </div>
 
-            {/* <UserTable users={users} /> */}
-        </div>
-    )
+      {/* <UserTable users={users} /> */}
+    </div>
+  );
 }
