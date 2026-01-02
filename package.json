@@ -1,11 +1,11 @@
 {
-	"devDependencies": {
-		"husky": "^9.1.7"
-	},
+  "devDependencies": {
+    "@commitlint/cli": "^20.3.0",
+    "@commitlint/config-conventional": "^20.3.0",
+    "husky": "^9.1.7"
+  },
   "scripts": {
     "lint": "pnpm -r lint",
     "typecheck": "pnpm -r typecheck"
   }
-
-
 }
