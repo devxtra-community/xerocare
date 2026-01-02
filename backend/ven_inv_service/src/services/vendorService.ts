@@ -1,5 +1,5 @@
 import { VendorRepository } from "../repositories/vendorRepository";
-import { Vendor } from "../entities/vendorEntity";
+import { Vendor, VendorStatus } from "../entities/vendorEntity";
 import { AppError } from "../errors/appError";
 import { publishEmailJob } from "../queues/emailPublisher";
 
@@ -55,5 +55,25 @@ export class VendorService {
 
     Object.assign(vendor, data);
     return this.vendorRepo.save(vendor);
+  }
+
+  async deleteVendor(id:string){
+    const vendor = await this.vendorRepo.findOne({where: {id}});
+
+    if(!vendor)
+    {
+      throw new AppError("vendor not found" , 404);
+    }
+
+    if(vendor.status === VendorStatus.DELETED)
+    {
+      throw new AppError("Vendor already deleted" , 400);
+    }
+
+    vendor.status = VendorStatus.DELETED;
+
+    await this.vendorRepo.save(vendor);
+
+    return true;
   }
 }

@@ -38,4 +38,13 @@ export class VendorController {
       data: vendor,
     });
   };
+
+  deleteVendor = async(req:Request, res:Response)=>{
+    await this.vendorService.deleteVendor(req.params.id);
+
+    return res.json({
+      success:true,
+      message:"vendor deleted successfully"
+    })
+  }
 }

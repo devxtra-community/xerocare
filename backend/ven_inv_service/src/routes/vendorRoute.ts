@@ -16,5 +16,6 @@ router.post("/",authMiddleware,roleMiddleware(["ADMIN"]),vendorController.create
 router.get("/",authMiddleware,roleMiddleware(["ADMIN", "HR"]),vendorController.getVendors);
 router.get("/:id",authMiddleware,roleMiddleware(["ADMIN", "HR"]),vendorController.getVendorById);
 router.patch("/:id",authMiddleware,roleMiddleware(["ADMIN"]),vendorController.updateVendor);
+router.delete("/:id",authMiddleware,roleMiddleware(["ADMIN"]),vendorController.deleteVendor)
 
 export default router;
