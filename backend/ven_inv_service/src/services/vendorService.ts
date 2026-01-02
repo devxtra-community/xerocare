@@ -1,6 +1,7 @@
 import { VendorRepository } from "../repositories/vendorRepository";
 import { Vendor } from "../entities/vendorEntity";
 import { AppError } from "../errors/appError";
+import { publishEmailJob } from "../queues/emailPublisher";
 
 interface CreateVendorDTO {
   name: string;
@@ -23,6 +24,12 @@ export class VendorService {
     }
 
     const vendor = this.vendorRepo.create(data);
+
+    await publishEmailJob({
+      type: "VENDOR_WELCOME",
+      email: vendor.email,
+      vendorName: vendor.name,
+    });
     return this.vendorRepo.save(vendor);
   }
 

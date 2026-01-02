@@ -4,6 +4,7 @@ import {
   sendOtpMail,
   sendMagicLinkMail,
   sendEmployeeWelcomeMail,
+  sendVendorWelcomeMail,
 } from "../utlis/mailer";
 import { OtpPurpose } from "../constants/otpPurpose";
 
@@ -28,6 +29,11 @@ export const startWorker = async () => {
       if (job.type === "WELCOME") {
         await sendEmployeeWelcomeMail(job.email, job.password);
       }
+
+      if (job.type === "VENDOR_WELCOME") {
+        await sendVendorWelcomeMail(job.email, job.vendorName);
+      }
+
 
       channel.ack(msg);
     } catch (err) {
