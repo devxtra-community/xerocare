@@ -1,11 +1,10 @@
-import { signAccesstoken, signRefreshtoken } from "../utlis/jwt";
-import { AuthRepository } from "../repositories/authRepository";
-import { Request,Response } from "express";
+import { signAccesstoken, signRefreshtoken } from '../utlis/jwt';
+import { AuthRepository } from '../repositories/authRepository';
+import { Request, Response } from 'express';
 
 const authRepo = new AuthRepository();
 
-export async function issueTokens(user: any,req:Request, res: Response) {
-
+export async function issueTokens(user: any, req: Request, res: Response) {
   const accessToken = signAccesstoken({
     userId: user.id,
     email: user.email,
@@ -14,15 +13,15 @@ export async function issueTokens(user: any,req:Request, res: Response) {
 
   const refreshToken = signRefreshtoken({ id: user.id });
 
-  await authRepo.saveRefreshToken(user, refreshToken,{
-    ip_address:req.ip,
-    user_agent: req.headers["user-agent"] || "unknown",
+  await authRepo.saveRefreshToken(user, refreshToken, {
+    ip_address: req.ip,
+    user_agent: req.headers['user-agent'] || 'unknown',
   });
 
-  res.cookie("refreshToken", refreshToken, {
+  res.cookie('refreshToken', refreshToken, {
     httpOnly: true,
     secure: true,
-    sameSite: "strict",
+    sameSite: 'strict',
     maxAge: 15 * 24 * 60 * 60 * 1000,
   });
 

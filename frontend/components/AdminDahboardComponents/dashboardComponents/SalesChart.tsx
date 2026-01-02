@@ -1,29 +1,23 @@
-"use client";
-import { useState, useEffect } from "react";
-import {
-  Area,
-  AreaChart,
-  CartesianGrid,
-  XAxis,
-  YAxis,
-  ResponsiveContainer,
-} from "recharts";
+'use client';
+import { useState, useEffect } from 'react';
+import { Area, AreaChart, CartesianGrid, XAxis, YAxis, ResponsiveContainer } from 'recharts';
 
 const data = [
-  { day: "18", sales: 30000 },
-  { day: "20", sales: 45000 },
-  { day: "22", sales: 70000 },
-  { day: "24", sales: 55000 },
-  { day: "26", sales: 25000 },
-  { day: "28", sales: 50000 },
-  { day: "30", sales: 60000 },
+  { day: '18', sales: 30000 },
+  { day: '20', sales: 45000 },
+  { day: '22', sales: 70000 },
+  { day: '24', sales: 55000 },
+  { day: '26', sales: 25000 },
+  { day: '28', sales: 50000 },
+  { day: '30', sales: 60000 },
 ];
 
 export default function SalesChart() {
-  const [selectedPeriod, setSelectedPeriod] = useState("1M");
+  const [selectedPeriod, setSelectedPeriod] = useState('1M');
   const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsClient(true);
   }, []);
 
@@ -33,14 +27,14 @@ export default function SalesChart() {
         <p className="text-xs text-gray-600">Last 30 days</p>
 
         <div className="flex gap-1.5 text-[10px]">
-          {["1W", "1M", "3M", "1Y"].map((period) => (
+          {['1W', '1M', '3M', '1Y'].map((period) => (
             <button
               key={period}
               onClick={() => setSelectedPeriod(period)}
               className={`px-2 py-0.5 rounded-md transition-colors ${
                 selectedPeriod === period
-                  ? "bg-primary text-white font-medium"
-                  : "text-gray-600 hover:bg-gray-100"
+                  ? 'bg-primary text-white font-medium'
+                  : 'text-gray-600 hover:bg-gray-100'
               }`}
             >
               {period}
@@ -52,10 +46,7 @@ export default function SalesChart() {
       <div className="flex-1 w-full">
         {isClient && (
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart
-              data={data}
-              margin={{ top: 5, left: 0, right: 5, bottom: 0 }}
-            >
+            <AreaChart data={data} margin={{ top: 5, left: 0, right: 5, bottom: 0 }}>
               <defs>
                 <linearGradient id="salesGradient" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="0%" stopColor="#1d4ed8" stopOpacity={0.7} />
@@ -63,18 +54,14 @@ export default function SalesChart() {
                 </linearGradient>
               </defs>
 
-              <CartesianGrid
-                vertical={false}
-                strokeDasharray="3 3"
-                strokeOpacity={0.3}
-              />
+              <CartesianGrid vertical={false} strokeDasharray="3 3" strokeOpacity={0.3} />
 
               <XAxis
                 dataKey="day"
                 axisLine={false}
                 tickLine={false}
                 tickMargin={6}
-                tick={{ fill: "#6b7280", fontSize: 10 }}
+                tick={{ fill: '#6b7280', fontSize: 10 }}
               />
 
               <YAxis
@@ -84,7 +71,7 @@ export default function SalesChart() {
                 tickMargin={6}
                 domain={[0, 100000]}
                 ticks={[0, 20000, 40000, 60000, 80000, 100000]}
-                tick={{ fill: "#6b7280", fontSize: 10 }}
+                tick={{ fill: '#6b7280', fontSize: 10 }}
               />
 
               <Area

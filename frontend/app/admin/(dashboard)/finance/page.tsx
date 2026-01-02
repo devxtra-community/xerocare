@@ -1,13 +1,10 @@
-import React from "react";
-import FinanceReport from "@/components/AdminDahboardComponents/FinanceComponents/financeReport";
+import React from 'react';
+import FinanceReport from '@/components/AdminDahboardComponents/FinanceComponents/financeReport';
 
-
-export default function FinancePage(){
-    return(
-  <>
-  
-  <FinanceReport/>
-  
-  </>
-    )
+export default function FinancePage() {
+  return (
+    <>
+      <FinanceReport />
+    </>
+  );
 }

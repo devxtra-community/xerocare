@@ -1,5 +1,5 @@
-"use client";
-import React, { useState, useEffect } from "react";
+'use client';
+import React, { useState, useEffect } from 'react';
 import {
   Area,
   AreaChart,
@@ -9,23 +9,24 @@ import {
   ResponsiveContainer,
   Tooltip,
   Legend,
-} from "recharts";
+} from 'recharts';
 
 const data = [
-  { day: "Mon", stockIn: 4000, stockOut: 2400 },
-  { day: "Tue", stockIn: 3000, stockOut: 1398 },
-  { day: "Wed", stockIn: 2000, stockOut: 9800 },
-  { day: "Thu", stockIn: 2780, stockOut: 3908 },
-  { day: "Fri", stockIn: 1890, stockOut: 4800 },
-  { day: "Sat", stockIn: 2390, stockOut: 3800 },
-  { day: "Sun", stockIn: 3490, stockOut: 4300 },
+  { day: 'Mon', stockIn: 4000, stockOut: 2400 },
+  { day: 'Tue', stockIn: 3000, stockOut: 1398 },
+  { day: 'Wed', stockIn: 2000, stockOut: 9800 },
+  { day: 'Thu', stockIn: 2780, stockOut: 3908 },
+  { day: 'Fri', stockIn: 1890, stockOut: 4800 },
+  { day: 'Sat', stockIn: 2390, stockOut: 3800 },
+  { day: 'Sun', stockIn: 3490, stockOut: 4300 },
 ];
 
 export default function InventoryChart() {
-  const [selectedPeriod, setSelectedPeriod] = useState("Weekly");
+  const [selectedPeriod, setSelectedPeriod] = useState('Weekly');
   const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsClient(true);
   }, []);
 
@@ -37,14 +38,14 @@ export default function InventoryChart() {
         <p className="text-xs text-gray-500 font-medium uppercase">Last 7 Days</p>
 
         <div className="flex gap-1.5 text-[10px] bg-blue-50/50 p-1 rounded-lg border border-blue-100/50">
-          {["Weekly", "Monthly"].map((period) => (
+          {['Weekly', 'Monthly'].map((period) => (
             <button
               key={period}
               onClick={() => setSelectedPeriod(period)}
               className={`px-3 py-1.5 rounded-md transition-all duration-200 ${
                 selectedPeriod === period
-                  ? "bg-primary text-white font-medium shadow-sm"
-                  : "text-blue-600 hover:text-blue-800"
+                  ? 'bg-primary text-white font-medium shadow-sm'
+                  : 'text-blue-600 hover:text-blue-800'
               }`}
             >
               {period}
@@ -55,10 +56,7 @@ export default function InventoryChart() {
 
       <div className="flex-1 w-full min-h-[250px]">
         <ResponsiveContainer width="100%" height="100%">
-          <AreaChart
-            data={data}
-            margin={{ top: 10, left: 0, right: 10, bottom: 0 }}
-          >
+          <AreaChart data={data} margin={{ top: 10, left: 0, right: 10, bottom: 0 }}>
             <defs>
               <linearGradient id="stockInGradient" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="5%" stopColor="#2563eb" stopOpacity={0.2} />
@@ -70,28 +68,30 @@ export default function InventoryChart() {
               </linearGradient>
             </defs>
             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
-            <XAxis 
-              dataKey="day" 
-              axisLine={false} 
-              tickLine={false} 
-              tick={{ fill: "#64748B", fontSize: 10 }} 
+            <XAxis
+              dataKey="day"
+              axisLine={false}
+              tickLine={false}
+              tick={{ fill: '#64748B', fontSize: 10 }}
               tickMargin={10}
             />
-            <YAxis 
-              axisLine={false} 
-              tickLine={false} 
-              tick={{ fill: "#64748B", fontSize: 10 }} 
+            <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748B', fontSize: 10 }} />
+            <Tooltip
+              contentStyle={{
+                borderRadius: '8px',
+                border: 'none',
+                boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
+                padding: '8px',
+                fontSize: '11px',
+              }}
+              cursor={{ stroke: '#e2e8f0', strokeWidth: 1 }}
             />
-            <Tooltip 
-              contentStyle={{ borderRadius: "8px", border: "none", boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)", padding: "8px", fontSize: "11px" }}
-              cursor={{ stroke: "#e2e8f0", strokeWidth: 1 }}
-            />
-            <Legend 
-               verticalAlign="top" 
-               align="right"
-               height={36} 
-               iconType="circle"
-               wrapperStyle={{ fontSize: "10px", color: "#64748B", top: -10 }}
+            <Legend
+              verticalAlign="top"
+              align="right"
+              height={36}
+              iconType="circle"
+              wrapperStyle={{ fontSize: '10px', color: '#64748B', top: -10 }}
             />
             <Area
               type="monotone"

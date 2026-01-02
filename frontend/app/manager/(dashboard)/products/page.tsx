@@ -1,10 +1,10 @@
-import React from "react";
-import ManagerProduct from "@/components/ManagerDashboardComponents/productComponents/managerProductTable";
+import React from 'react';
+import ManagerProduct from '@/components/ManagerDashboardComponents/productComponents/managerProductTable';
 
-export default function managerProductpage(){
-    return(
-        <>
-        <ManagerProduct/>
-        </>
-    )
+export default function managerProductpage() {
+  return (
+    <>
+      <ManagerProduct />
+    </>
+  );
 }

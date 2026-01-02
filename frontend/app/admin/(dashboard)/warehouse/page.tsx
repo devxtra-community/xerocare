@@ -1,12 +1,10 @@
-import React from "react";
-import WarehouseReport from "@/components/AdminDahboardComponents/warehousecomponents/warehouseTable";
+import React from 'react';
+import WarehouseReport from '@/components/AdminDahboardComponents/warehousecomponents/warehouseTable';
 
-
-export default function AdminWarehousePage(){
-    return(
-        <>
-        <WarehouseReport/>
-        
-        </>
-    )
+export default function AdminWarehousePage() {
+  return (
+    <>
+      <WarehouseReport />
+    </>
+  );
 }

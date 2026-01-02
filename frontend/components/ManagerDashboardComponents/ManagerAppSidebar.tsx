@@ -1,4 +1,4 @@
-"use client"
+'use client';
 
 import {
   LayoutDashboard,
@@ -9,7 +9,7 @@ import {
   Users,
   Wallet,
   Tags,
-} from "lucide-react"
+} from 'lucide-react';
 
 import {
   Sidebar,
@@ -21,75 +21,75 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-} from "@/components/ui/sidebar"
+} from '@/components/ui/sidebar';
 
-import { logout } from "@/lib/auth"
-import { toast } from "sonner"
-import { useRouter, usePathname } from "next/navigation"
+import { logout } from '@/lib/auth';
+import { toast } from 'sonner';
+import { useRouter, usePathname } from 'next/navigation';
 
 const menuItems = [
   {
-    title: "Dashboard",
+    title: 'Dashboard',
     icon: LayoutDashboard,
-    href: "/manager/dashboard",
+    href: '/manager/dashboard',
   },
   {
-    title: "Products",
+    title: 'Products',
     icon: Tags,
-    href: "/manager/products",
+    href: '/manager/products',
   },
   {
-    title: "Sales",
+    title: 'Sales',
     icon: ShoppingCart,
-    href: "/manager/sales",
+    href: '/manager/sales',
   },
   {
-    title: "Vendors",
+    title: 'Vendors',
     icon: Truck,
-    href: "/manager/vendors",
+    href: '/manager/vendors',
   },
   {
-    title: "Employees",
+    title: 'Employees',
     icon: Users,
-    href: "/manager/employees",
+    href: '/manager/employees',
   },
   {
-    title: "Orders",
+    title: 'Orders',
     icon: Package,
-    href: "/manager/orders",
+    href: '/manager/orders',
   },
   {
-    title: "Finance",
+    title: 'Finance',
     icon: Wallet,
-    href: "/manager/finance",
+    href: '/manager/finance',
   },
   {
-    title: "Inventory",
+    title: 'Inventory',
     icon: Boxes,
-    href: "/manager/inventory",
+    href: '/manager/inventory',
   },
-]
+];
 
 export default function ManagerSidebar() {
-  const router = useRouter()
-  const pathname = usePathname()
+  const router = useRouter();
+  const pathname = usePathname();
 
   const handleLogout = async () => {
     try {
-      const res = await logout()
+      const res = await logout();
 
       if (!res?.data?.success) {
-        toast.error(res?.data?.message)
-        return
+        toast.error(res?.data?.message);
+        return;
       }
 
-      router.push("/login")
-      toast.success(res.data.message)
+      router.push('/login');
+      toast.success(res.data.message);
     } catch (error) {
-      console.error(error)
-      toast.error("Logout failed")
+      console.error(error);
+      toast.error('Logout failed');
     }
-  }
+  };
 
   return (
     <Sidebar collapsible="icon" className="border-r-0">
@@ -116,8 +116,8 @@ export default function ManagerSidebar() {
                     className={`py-2.5 rounded-md
                       ${
                         pathname === item.href
-                          ? "bg-white text-sidebar"
-                          : "hover:bg-white/10 text-sidebar-accent-foreground"
+                          ? 'bg-white text-sidebar'
+                          : 'hover:bg-white/10 text-sidebar-accent-foreground'
                       }`}
                   >
                     <a href={item.href} className="flex items-center gap-3 px-3">
@@ -135,14 +135,8 @@ export default function ManagerSidebar() {
       <SidebarFooter className="bg-sidebar">
         <SidebarMenu className="px-2">
           <SidebarMenuItem>
-            <SidebarMenuButton
-              asChild
-              className="py-3 hover:bg-red-500/20 hover:text-red-300"
-            >
-              <button
-                className="flex items-center gap-3 px-3"
-                onClick={handleLogout}
-              >
+            <SidebarMenuButton asChild className="py-3 hover:bg-red-500/20 hover:text-red-300">
+              <button className="flex items-center gap-3 px-3" onClick={handleLogout}>
                 Logout
               </button>
             </SidebarMenuButton>
@@ -150,5 +144,5 @@ export default function ManagerSidebar() {
         </SidebarMenu>
       </SidebarFooter>
     </Sidebar>
-  )
+  );
 }

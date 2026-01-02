@@ -1,8 +1,8 @@
-import bcrypt from "bcrypt";
-import { EmployeeRepository } from "../repositories/employeeRepository";
-import { verifyRefreshToken } from "../utlis/jwt";
-import { AuthRepository } from "../repositories/authRepository";
-import { AppError } from "../errors/appError";
+import bcrypt from 'bcrypt';
+import { EmployeeRepository } from '../repositories/employeeRepository';
+import { verifyRefreshToken } from '../utlis/jwt';
+import { AuthRepository } from '../repositories/authRepository';
+import { AppError } from '../errors/appError';
 
 export class AuthService {
   private employeeRepo = new EmployeeRepository();
@@ -13,12 +13,12 @@ export class AuthService {
 
     const user = await this.employeeRepo.findByEmail(email);
     if (!user) {
-      throw new AppError("User not found", 404);
+      throw new AppError('User not found', 404);
     }
 
     const isValid = await bcrypt.compare(password, user.password_hash);
     if (!isValid) {
-      throw new AppError("Invalid password", 401);
+      throw new AppError('Invalid password', 401);
     }
 
     return { user };
@@ -27,17 +27,17 @@ export class AuthService {
   async refresh(refreshToken: string) {
     const payload = verifyRefreshToken<{ id: string }>(refreshToken);
     if (!payload) {
-      throw new AppError("Invalid refresh token", 401);
+      throw new AppError('Invalid refresh token', 401);
     }
 
     const storedToken = await this.authRepo.findByToken(refreshToken);
     if (!storedToken) {
-      throw new AppError("Token not found", 401);
+      throw new AppError('Token not found', 401);
     }
 
     const user = storedToken.employee;
     if (!user) {
-      throw new AppError("User not found for this token", 404);
+      throw new AppError('User not found for this token', 404);
     }
 
     await this.authRepo.deleteToken(refreshToken);
@@ -50,21 +50,17 @@ export class AuthService {
     return true;
   }
 
-  async changePassword(payload: {
-    userId: string;
-    currentPassword: string;
-    newPassword: string;
-  }) {
+  async changePassword(payload: { userId: string; currentPassword: string; newPassword: string }) {
     const { userId, currentPassword, newPassword } = payload;
 
     const user = await this.employeeRepo.findById(userId);
     if (!user) {
-      throw new AppError("User not found", 404);
+      throw new AppError('User not found', 404);
     }
 
     const isMatch = await bcrypt.compare(currentPassword, user.password_hash);
     if (!isMatch) {
-      throw new AppError("Current password is incorrect", 401);
+      throw new AppError('Current password is incorrect', 401);
     }
 
     const newHash = await bcrypt.hash(newPassword, 10);
@@ -75,12 +71,10 @@ export class AuthService {
   }
 
   async findUserByEmail(email: string) {
-    const user = await this.employeeRepo.findByEmail(
-      email.toLowerCase().trim()
-    );
+    const user = await this.employeeRepo.findByEmail(email.toLowerCase().trim());
 
     if (!user) {
-      throw new AppError("User not found", 404);
+      throw new AppError('User not found', 404);
     }
 
     return user;
@@ -93,7 +87,7 @@ export class AuthService {
 
   async logoutOtherDevices(userId: string, currentRefreshToken: string) {
     if (!currentRefreshToken) {
-      throw new AppError("No refresh token found", 400);
+      throw new AppError('No refresh token found', 400);
     }
 
     await this.authRepo.deleteOtherTokens(userId, currentRefreshToken);
@@ -117,5 +111,4 @@ export class AuthService {
     await this.authRepo.deleteSessionById(sessionId, userId);
     return true;
   }
-
 }

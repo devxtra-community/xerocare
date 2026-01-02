@@ -1,8 +1,8 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import { Input } from "@/components/ui/input";
-import { Search } from "lucide-react";
+import { useState } from 'react';
+import { Input } from '@/components/ui/input';
+import { Search } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -10,8 +10,8 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
-import StatCard from "@/components/StatCard";
+} from '@/components/ui/table';
+import StatCard from '@/components/StatCard';
 import {
   ResponsiveContainer,
   ComposedChart,
@@ -24,90 +24,85 @@ import {
   Legend,
   AreaChart,
   Area,
-} from "recharts";
+} from 'recharts';
 
 type Finance = {
   id: string;
   Month: string;
   Income: number;
   expense: number;
-  source: "Sale" | "Lease" | "Rent";
+  source: 'Sale' | 'Lease' | 'Rent';
   totalIncome: number;
-  profitStatus: "profit" | "loss";
+  profitStatus: 'profit' | 'loss';
 };
 
 const initialFinance: Finance[] = [
   {
-    id: "1",
-    Month: "January 2024",
+    id: '1',
+    Month: 'January 2024',
     Income: 450000,
     expense: 320000,
-    source: "Sale",
+    source: 'Sale',
     totalIncome: 130000,
-    profitStatus: "profit",
+    profitStatus: 'profit',
   },
   {
-    id: "2",
-    Month: "February 2024",
+    id: '2',
+    Month: 'February 2024',
     Income: 420000,
     expense: 300000,
-    source: "Rent",
+    source: 'Rent',
     totalIncome: 120000,
-    profitStatus: "profit",
+    profitStatus: 'profit',
   },
   {
-    id: "3",
-    Month: "March 2024",
+    id: '3',
+    Month: 'March 2024',
     Income: 500000,
     expense: 350000,
-    source: "Lease",
+    source: 'Lease',
     totalIncome: 150000,
-    profitStatus: "profit",
+    profitStatus: 'profit',
   },
   {
-    id: "4",
-    Month: "April 2024",
+    id: '4',
+    Month: 'April 2024',
     Income: 470000,
     expense: 330000,
-    source: "Sale",
+    source: 'Sale',
     totalIncome: 140000,
-    profitStatus: "profit",
+    profitStatus: 'profit',
   },
   {
-    id: "5",
-    Month: "May 2024",
+    id: '5',
+    Month: 'May 2024',
     Income: 520000,
     expense: 380000,
-    source: "Rent",
+    source: 'Rent',
     totalIncome: 140000,
-    profitStatus: "profit",
+    profitStatus: 'profit',
   },
 ];
 
 const chartData = [
-  { month: "Jan", income: 450000, expense: 320000, profit: 130000, margin: 28.8 },
-  { month: "Feb", income: 420000, expense: 300000, profit: 120000, margin: 28.5 },
-  { month: "Mar", income: 500000, expense: 350000, profit: 150000, margin: 30.0 },
-  { month: "Apr", income: 470000, expense: 330000, profit: 140000, margin: 29.7 },
-  { month: "May", income: 520000, expense: 380000, profit: 140000, margin: 26.9 },
-  { month: "Jun", income: 480000, expense: 310000, profit: 170000, margin: 35.4 },
+  { month: 'Jan', income: 450000, expense: 320000, profit: 130000, margin: 28.8 },
+  { month: 'Feb', income: 420000, expense: 300000, profit: 120000, margin: 28.5 },
+  { month: 'Mar', income: 500000, expense: 350000, profit: 150000, margin: 30.0 },
+  { month: 'Apr', income: 470000, expense: 330000, profit: 140000, margin: 29.7 },
+  { month: 'May', income: 520000, expense: 380000, profit: 140000, margin: 26.9 },
+  { month: 'Jun', income: 480000, expense: 310000, profit: 170000, margin: 35.4 },
 ];
 
 export default function FinanceReport() {
   const [finance] = useState<Finance[]>(initialFinance);
-  const [search, setSearch] = useState("");
-  const [sourceFilter, setSourceFilter] = useState<
-    "All" | "Sale" | "Lease" | "Rent"
-  >("All");
+  const [search, setSearch] = useState('');
+  const [sourceFilter, setSourceFilter] = useState<'All' | 'Sale' | 'Lease' | 'Rent'>('All');
 
   // 🔍 Search + Source filter
   const filteredFinance = finance.filter((f) => {
-    const matchesSearch = `${f.Month} ${f.source}`
-      .toLowerCase()
-      .includes(search.toLowerCase());
+    const matchesSearch = `${f.Month} ${f.source}`.toLowerCase().includes(search.toLowerCase());
 
-    const matchesSource =
-      sourceFilter === "All" || f.source === sourceFilter;
+    const matchesSource = sourceFilter === 'All' || f.source === sourceFilter;
 
     return matchesSearch && matchesSource;
   });
@@ -116,16 +111,12 @@ export default function FinanceReport() {
   const totalIncome = finance.reduce((s, f) => s + f.Income, 0);
   const totalExpense = finance.reduce((s, f) => s + f.expense, 0);
   const netProfit = totalIncome - totalExpense;
-  const profitMonths = finance.filter(
-    (f) => f.profitStatus === "profit"
-  ).length;
+  const profitMonths = finance.filter((f) => f.profitStatus === 'profit').length;
 
   return (
     <div className="bg-blue-100 min-h-screen p-4 space-y-8 sm:space-y-10">
       {/* Header */}
-      <h3 className="text-xl sm:text-2xl font-bold text-blue-900">
-        Financial Report
-      </h3>
+      <h3 className="text-xl sm:text-2xl font-bold text-blue-900">Financial Report</h3>
 
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -158,31 +149,49 @@ export default function FinanceReport() {
           <h4 className="text-lg sm:text-xl font-bold text-blue-900">Income vs Expense</h4>
           <div className="h-[200px] w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <ComposedChart
-                data={chartData}
-                margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-              >
+              <ComposedChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
-                <XAxis 
-                  dataKey="month" 
-                  axisLine={false} 
-                  tickLine={false} 
-                  tick={{ fill: "#64748B", fontSize: 10 }} 
+                <XAxis
+                  dataKey="month"
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fill: '#64748B', fontSize: 10 }}
                   dy={10}
                 />
-                <YAxis 
-                  axisLine={false} 
-                  tickLine={false} 
-                  tick={{ fill: "#64748B", fontSize: 10 }} 
-                />
-                <Tooltip 
-                  contentStyle={{ borderRadius: "8px", border: "none", boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)", padding: "4px", fontSize: "10px" }}
+                <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748B', fontSize: 10 }} />
+                <Tooltip
+                  contentStyle={{
+                    borderRadius: '8px',
+                    border: 'none',
+                    boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
+                    padding: '4px',
+                    fontSize: '10px',
+                  }}
                   itemStyle={{ padding: 0 }}
                 />
-                <Legend iconType="circle" wrapperStyle={{ paddingTop: "10px", fontSize: "10px" }} />
-                <Bar dataKey="income" name="Income" barSize={20} fill="#2563eb" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="expense" name="Expense" barSize={20} fill="#93c5fd" radius={[4, 4, 0, 0]} />
-                <Line type="monotone" dataKey="profit" name="Profit Trend" stroke="#2563eb" strokeWidth={2} dot={{ r: 4, fill: "#2563eb" }} />
+                <Legend iconType="circle" wrapperStyle={{ paddingTop: '10px', fontSize: '10px' }} />
+                <Bar
+                  dataKey="income"
+                  name="Income"
+                  barSize={20}
+                  fill="#2563eb"
+                  radius={[4, 4, 0, 0]}
+                />
+                <Bar
+                  dataKey="expense"
+                  name="Expense"
+                  barSize={20}
+                  fill="#93c5fd"
+                  radius={[4, 4, 0, 0]}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="profit"
+                  name="Profit Trend"
+                  stroke="#2563eb"
+                  strokeWidth={2}
+                  dot={{ r: 4, fill: '#2563eb' }}
+                />
               </ComposedChart>
             </ResponsiveContainer>
           </div>
@@ -193,44 +202,47 @@ export default function FinanceReport() {
           <h4 className="text-lg sm:text-xl font-bold text-blue-900">Profit Margin %</h4>
           <div className="h-[200px] w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart
-                data={chartData}
-                margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-              >
+              <AreaChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
                 <defs>
                   <linearGradient id="colorMargin" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#2563eb" stopOpacity={0.1}/>
-                    <stop offset="95%" stopColor="#2563eb" stopOpacity={0}/>
+                    <stop offset="5%" stopColor="#2563eb" stopOpacity={0.1} />
+                    <stop offset="95%" stopColor="#2563eb" stopOpacity={0} />
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
-                <XAxis 
-                  dataKey="month" 
-                  axisLine={false} 
-                  tickLine={false} 
-                  tick={{ fill: "#64748B", fontSize: 10 }} 
+                <XAxis
+                  dataKey="month"
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fill: '#64748B', fontSize: 10 }}
                   dy={10}
                 />
-                <YAxis 
-                  axisLine={false} 
-                  tickLine={false} 
-                  tick={{ fill: "#64748B", fontSize: 10 }} 
+                <YAxis
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fill: '#64748B', fontSize: 10 }}
                   unit="%"
                 />
-                <Tooltip 
-                  formatter={(value: number) => [`${value}%`, "Profit Margin"]}
-                  contentStyle={{ borderRadius: "8px", border: "none", boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)", padding: "4px", fontSize: "10px" }}
+                <Tooltip
+                  formatter={(value: number) => [`${value}%`, 'Profit Margin']}
+                  contentStyle={{
+                    borderRadius: '8px',
+                    border: 'none',
+                    boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
+                    padding: '4px',
+                    fontSize: '10px',
+                  }}
                   itemStyle={{ padding: 0 }}
                 />
-                <Legend iconType="circle" wrapperStyle={{ paddingTop: "10px", fontSize: "10px" }} />
-                <Area 
-                  type="monotone" 
-                  dataKey="margin" 
-                  name="Profit Margin" 
-                  stroke="#2563eb" 
+                <Legend iconType="circle" wrapperStyle={{ paddingTop: '10px', fontSize: '10px' }} />
+                <Area
+                  type="monotone"
+                  dataKey="margin"
+                  name="Profit Margin"
+                  stroke="#2563eb"
                   strokeWidth={2}
-                  fillOpacity={1} 
-                  fill="url(#colorMargin)" 
+                  fillOpacity={1}
+                  fill="url(#colorMargin)"
                 />
               </AreaChart>
             </ResponsiveContainer>
@@ -252,9 +264,7 @@ export default function FinanceReport() {
 
         <select
           value={sourceFilter}
-          onChange={(e) =>
-            setSourceFilter(e.target.value as any)
-          }
+          onChange={(e) => setSourceFilter(e.target.value as 'All' | 'Sale' | 'Lease' | 'Rent')}
           className="h-9 rounded-md border border-input bg-white px-3 text-sm"
         >
           <option value="All">All Sources</option>
@@ -269,18 +279,8 @@ export default function FinanceReport() {
         <Table>
           <TableHeader>
             <TableRow>
-              {[
-                "MONTH",
-                "SOURCE",
-                "INCOME",
-                "EXPENSE",
-                "PROFIT",
-                "STATUS",
-              ].map((h) => (
-                <TableHead
-                  key={h}
-                  className="text-xs font-semibold text-blue-900 uppercase px-4"
-                >
+              {['MONTH', 'SOURCE', 'INCOME', 'EXPENSE', 'PROFIT', 'STATUS'].map((h) => (
+                <TableHead key={h} className="text-xs font-semibold text-blue-900 uppercase px-4">
                   {h}
                 </TableHead>
               ))}
@@ -289,31 +289,20 @@ export default function FinanceReport() {
 
           <TableBody>
             {filteredFinance.map((f, i) => (
-              <TableRow
-                key={f.id}
-                className={i % 2 ? "bg-sky-100/60" : ""}
-              >
-                <TableCell className="px-4 font-medium">
-                  {f.Month}
-                </TableCell>
-                <TableCell className="px-4">
-                  {f.source}
-                </TableCell>
-                <TableCell className="px-4">
-                  ₹ {f.Income.toLocaleString()}
-                </TableCell>
-                <TableCell className="px-4">
-                  ₹ {f.expense.toLocaleString()}
-                </TableCell>
+              <TableRow key={f.id} className={i % 2 ? 'bg-sky-100/60' : ''}>
+                <TableCell className="px-4 font-medium">{f.Month}</TableCell>
+                <TableCell className="px-4">{f.source}</TableCell>
+                <TableCell className="px-4">₹ {f.Income.toLocaleString()}</TableCell>
+                <TableCell className="px-4">₹ {f.expense.toLocaleString()}</TableCell>
                 <TableCell className="px-4 font-medium text-primary">
                   ₹ {f.totalIncome.toLocaleString()}
                 </TableCell>
                 <TableCell className="px-4">
                   <span
                     className={`px-2.5 py-1 rounded-full text-xs font-medium ${
-                      f.profitStatus === "profit"
-                        ? "bg-green-100 text-green-700"
-                        : "bg-red-100 text-red-700"
+                      f.profitStatus === 'profit'
+                        ? 'bg-green-100 text-green-700'
+                        : 'bg-red-100 text-red-700'
                     }`}
                   >
                     {f.profitStatus}

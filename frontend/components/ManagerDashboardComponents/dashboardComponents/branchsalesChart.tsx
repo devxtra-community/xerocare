@@ -1,6 +1,6 @@
-"use client";
+'use client';
 
-import { useState, useEffect } from "react";
+import { useState, useEffect } from 'react';
 import {
   Area,
   AreaChart,
@@ -9,21 +9,22 @@ import {
   YAxis,
   ResponsiveContainer,
   Tooltip,
-} from "recharts";
+} from 'recharts';
 
 const data = [
-  { branch: "Kochi", sales: 120000 },
-  { branch: "Ernakulam", sales: 95000 },
-  { branch: "Trivandrum", sales: 70000 },
-  { branch: "Kozhikode", sales: 85000 },
-  { branch: "Thrissur", sales: 60000 },
+  { branch: 'Kochi', sales: 120000 },
+  { branch: 'Ernakulam', sales: 95000 },
+  { branch: 'Trivandrum', sales: 70000 },
+  { branch: 'Kozhikode', sales: 85000 },
+  { branch: 'Thrissur', sales: 60000 },
 ];
 
 export default function BranchSalesChart() {
-  const [selectedPeriod, setSelectedPeriod] = useState("1M");
+  const [selectedPeriod, setSelectedPeriod] = useState('1M');
   const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsClient(true);
   }, []);
 
@@ -31,19 +32,17 @@ export default function BranchSalesChart() {
     <div className="rounded-2xl bg-white h-[260px] w-full shadow-sm flex flex-col p-3">
       {/* Header */}
       <div className="flex items-center justify-between pb-2">
-        <p className="text-xs text-gray-600">
-          Branch sales ({selectedPeriod})
-        </p>
+        <p className="text-xs text-gray-600">Branch sales ({selectedPeriod})</p>
 
         <div className="flex gap-1.5 text-[10px]">
-          {["1W", "1M", "3M", "1Y"].map((period) => (
+          {['1W', '1M', '3M', '1Y'].map((period) => (
             <button
               key={period}
               onClick={() => setSelectedPeriod(period)}
               className={`px-2 py-0.5 rounded-md transition ${
                 selectedPeriod === period
-                  ? "bg-primary text-white font-medium"
-                  : "text-gray-600 hover:bg-gray-100"
+                  ? 'bg-primary text-white font-medium'
+                  : 'text-gray-600 hover:bg-gray-100'
               }`}
             >
               {period}
@@ -56,35 +55,22 @@ export default function BranchSalesChart() {
       <div className="flex-1 w-full">
         {isClient && (
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart
-              data={data}
-              margin={{ top: 5, left: 0, right: 5, bottom: 0 }}
-            >
+            <AreaChart data={data} margin={{ top: 5, left: 0, right: 5, bottom: 0 }}>
               <defs>
-                <linearGradient
-                  id="branchSalesGradient"
-                  x1="0"
-                  y1="0"
-                  x2="0"
-                  y2="1"
-                >
+                <linearGradient id="branchSalesGradient" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="0%" stopColor="#1d4ed8" stopOpacity={0.7} />
                   <stop offset="100%" stopColor="#1d4ed8" stopOpacity={0.05} />
                 </linearGradient>
               </defs>
 
-              <CartesianGrid
-                vertical={false}
-                strokeDasharray="3 3"
-                strokeOpacity={0.3}
-              />
+              <CartesianGrid vertical={false} strokeDasharray="3 3" strokeOpacity={0.3} />
 
               <XAxis
                 dataKey="branch"
                 axisLine={false}
                 tickLine={false}
                 tickMargin={6}
-                tick={{ fill: "#6b7280", fontSize: 10 }}
+                tick={{ fill: '#6b7280', fontSize: 10 }}
               />
 
               <YAxis
@@ -94,7 +80,7 @@ export default function BranchSalesChart() {
                 tickMargin={6}
                 domain={[0, 150000]}
                 ticks={[0, 30000, 60000, 90000, 120000, 150000]}
-                tick={{ fill: "#6b7280", fontSize: 10 }}
+                tick={{ fill: '#6b7280', fontSize: 10 }}
               />
 
               {/* ✅ SMALL TOOLTIP */}
@@ -117,19 +103,21 @@ export default function BranchSalesChart() {
   );
 }
 
-
-
-function CustomTooltip({ active, payload, label }: any) {
+function CustomTooltip({
+  active,
+  payload,
+  label,
+}: {
+  active?: boolean;
+  payload?: { value: number }[];
+  label?: string;
+}) {
   if (!active || !payload?.length) return null;
 
   return (
     <div className="bg-white px-2 py-1 rounded-md shadow-sm text-[10px] leading-tight">
-      <p className="text-gray-700 font-medium">
-        Branch: {label}
-      </p>
-      <p className="text-blue-600">
-        Sales: ₹{payload[0].value.toLocaleString()}
-      </p>
+      <p className="text-gray-700 font-medium">Branch: {label}</p>
+      <p className="text-blue-600">Sales: ₹{payload[0].value.toLocaleString()}</p>
     </div>
   );
 }

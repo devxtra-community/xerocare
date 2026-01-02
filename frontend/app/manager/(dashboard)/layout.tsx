@@ -1,13 +1,9 @@
-import React from "react";
-import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
-import ManagerSidebar from "@/components/ManagerDashboardComponents/ManagerAppSidebar";
-import DashboardHeader from "@/components/DashboardHeader";
+import React from 'react';
+import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
+import ManagerSidebar from '@/components/ManagerDashboardComponents/ManagerAppSidebar';
+import DashboardHeader from '@/components/DashboardHeader';
 
-export default function AdminLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function AdminLayout({ children }: { children: React.ReactNode }) {
   return (
     <SidebarProvider>
       <div className="flex min-h-screen w-full">

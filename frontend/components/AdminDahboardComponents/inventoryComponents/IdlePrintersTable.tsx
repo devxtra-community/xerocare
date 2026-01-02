@@ -1,4 +1,4 @@
-"use client"
+'use client';
 
 import {
   Table,
@@ -7,34 +7,34 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table"
+} from '@/components/ui/table';
 
 const data = [
   {
-    model: "Canon ImageRunner 2630",
-    branch: "Main Branch",
-    vendor: "TechSolutions",
+    model: 'Canon ImageRunner 2630',
+    branch: 'Main Branch',
+    vendor: 'TechSolutions',
     idleDays: 45,
-    lastUsed: "2023-11-15",
-    reason: "Project Ended",
+    lastUsed: '2023-11-15',
+    reason: 'Project Ended',
   },
   {
-    model: "Xerox WorkCentre 3345",
-    branch: "East Wing",
-    vendor: "Xerox Direct",
+    model: 'Xerox WorkCentre 3345',
+    branch: 'East Wing',
+    vendor: 'Xerox Direct',
     idleDays: 12,
-    lastUsed: "2023-12-18",
-    reason: "Newer model preferred",
+    lastUsed: '2023-12-18',
+    reason: 'Newer model preferred',
   },
   {
-    model: "Kyocera Ecosys M2540dw",
-    branch: "West Wing",
-    vendor: "PrintMasters",
+    model: 'Kyocera Ecosys M2540dw',
+    branch: 'West Wing',
+    vendor: 'PrintMasters',
     idleDays: 60,
-    lastUsed: "2023-10-30",
-    reason: "Frequent jams",
+    lastUsed: '2023-10-30',
+    reason: 'Frequent jams',
   },
-]
+];
 
 export default function IdlePrintersTable() {
   return (
@@ -56,7 +56,9 @@ export default function IdlePrintersTable() {
               <TableCell className="font-medium text-gray-900">{item.model}</TableCell>
               <TableCell className="text-gray-600">{item.branch}</TableCell>
               <TableCell className="text-gray-600">{item.vendor}</TableCell>
-              <TableCell className="text-center font-bold text-orange-600">{item.idleDays} Days</TableCell>
+              <TableCell className="text-center font-bold text-orange-600">
+                {item.idleDays} Days
+              </TableCell>
               <TableCell className="text-gray-600">{item.lastUsed}</TableCell>
               <TableCell className="text-gray-600 text-sm italic">{item.reason}</TableCell>
             </TableRow>
@@ -64,5 +66,5 @@ export default function IdlePrintersTable() {
         </TableBody>
       </Table>
     </div>
-  )
+  );
 }
