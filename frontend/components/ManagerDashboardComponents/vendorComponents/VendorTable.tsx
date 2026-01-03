@@ -34,8 +34,6 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 
-// Extend frontend Vendor type to match API + UI needs
-// We keep the UI structure but populate from API where possible
 type Vendor = {
   id: string;
   name: string;
@@ -58,13 +56,11 @@ type VendorFormData = {
   status: 'Active' | 'On Hold';
 };
 
-export { type Vendor }; // Export so parent can use it
-
 export default function VendorTable({
   vendors,
   loading,
   onRefresh,
-  basePath = '/admin',
+  basePath = '/manager',
 }: {
   vendors: Vendor[];
   loading: boolean;
@@ -72,18 +68,12 @@ export default function VendorTable({
   basePath?: string;
 }) {
   const router = useRouter();
-  // const [vendors, setVendors] = useState<Vendor[]>([]); // Lifted up
-  // const [loading, setLoading] = useState(true); // Lifted up
   const [search, setSearch] = useState('');
-  const [filterType, setFilterType] = useState<'All' | 'Supplier' | 'Distributor' | 'Service'>(
-    'All',
-  );
+  const [filterType, setFilterType] = useState('All');
 
   const [formOpen, setFormOpen] = useState(false);
   const [editingVendor, setEditingVendor] = useState<Vendor | null>(null);
-  const [deleteVendor, setDeleteVendorTarget] = useState<Vendor | null>(null);
-
-  /* Fetched in parent */
+  const [deleteVendorTarget, setDeleteVendorTarget] = useState<Vendor | null>(null);
 
   const filteredVendors = vendors.filter((vendor) => {
     const matchesSearch =
@@ -95,30 +85,28 @@ export default function VendorTable({
 
   const handleSave = async (data: VendorFormData) => {
     try {
-      // Helper to map UI status back to API status
       const apiData = {
         name: data.name,
         email: data.email,
         phone: data.phone,
         status: (data.status === 'Active' ? 'ACTIVE' : 'INACTIVE') as 'ACTIVE' | 'INACTIVE',
-        // Add other fields if backend supports them later
       };
 
       if (editingVendor) {
         await updateVendor(editingVendor.id, apiData);
+        toast.success('Vendor updated successfully');
       } else {
         await createVendor(apiData);
+        toast.success('Vendor created successfully');
       }
 
-      onRefresh(); // Refresh list
+      onRefresh();
       setFormOpen(false);
       setEditingVendor(null);
     } catch (err: unknown) {
       console.error('Failed to save vendor', err);
       if (err instanceof AxiosError) {
         toast.error(err.response?.data?.message || 'Failed to save vendor');
-      } else if (err instanceof Error) {
-        toast.error(err.message);
       } else {
         toast.error('Failed to save vendor');
       }
@@ -126,16 +114,15 @@ export default function VendorTable({
   };
 
   const confirmDelete = async () => {
-    if (!deleteVendor) return;
+    if (!deleteVendorTarget) return;
     try {
-      await apiDeleteVendor(deleteVendor.id);
-      onRefresh(); // Refresh list
+      await apiDeleteVendor(deleteVendorTarget.id);
+      toast.success('Vendor deleted successfully');
+      onRefresh();
       setDeleteVendorTarget(null);
     } catch (err: unknown) {
       if (err instanceof AxiosError) {
         toast.error(err.response?.data?.message || 'Failed to delete vendor');
-      } else if (err instanceof Error) {
-        toast.error(err.message || 'Failed to delete vendor');
       } else {
         toast.error('Failed to delete vendor');
       }
@@ -143,13 +130,13 @@ export default function VendorTable({
   };
 
   if (loading) {
-    return <div className="p-4 text-center">Loading vendors...</div>;
+    return <div className="p-8 text-center text-blue-900 font-medium">Loading vendors...</div>;
   }
 
   return (
     <div className="space-y-4">
       {/* Search and Filters */}
-      <div className="flex flex-col sm:flex-row gap-4 justify-between items-center">
+      <div className="flex flex-col sm:flex-row gap-4 justify-between items-center px-4 pt-4">
         <div className="relative w-full sm:w-[300px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
           <Input
@@ -162,7 +149,7 @@ export default function VendorTable({
         <div className="flex gap-2 w-full sm:w-auto">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" className="gap-2 bg-white">
+              <Button variant="outline" className="gap-2 bg-white border-blue-400/60">
                 <Filter className="h-4 w-4" />
                 Filter: {filterType}
               </Button>
@@ -190,138 +177,150 @@ export default function VendorTable({
         </div>
       </div>
 
-      <div className="rounded-2xl border bg-white overflow-hidden shadow-sm">
-        <Table>
-          <TableHeader className="bg-white border-b border-gray-200">
-            <TableRow>
-              <TableHead className="font-semibold text-[11px] text-blue-900 uppercase">
-                Vendor Name
-              </TableHead>
-              <TableHead className="font-semibold text-[11px] text-blue-900 uppercase">
-                Code
-              </TableHead>
-              <TableHead className="font-semibold text-[11px] text-blue-900 uppercase">
-                Type
-              </TableHead>
-              <TableHead className="font-semibold text-[11px] text-blue-900 uppercase">
-                Contact
-              </TableHead>
-              <TableHead className="font-semibold text-[11px] text-blue-900 uppercase">
-                Details
-              </TableHead>
-              <TableHead className="text-right font-semibold text-[11px] text-blue-900 uppercase">
-                Orders
-              </TableHead>
-              <TableHead className="text-right font-semibold text-[11px] text-blue-900 uppercase">
-                Purchase Value
-              </TableHead>
-              <TableHead className="text-right font-semibold text-[11px] text-blue-900 uppercase">
-                Outstanding
-              </TableHead>
-              <TableHead className="font-semibold text-[11px] text-blue-900 uppercase">
-                Status
-              </TableHead>
-              <TableHead className="text-right font-semibold text-[11px] text-blue-900 uppercase">
-                Actions
-              </TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filteredVendors.length > 0 ? (
-              filteredVendors.map((vendor, index) => (
-                <TableRow
-                  key={vendor.id}
-                  className={`border-b border-gray-100 hover:bg-slate-50/50 ${index % 2 !== 0 ? 'bg-sky-100/60' : ''}`}
-                >
-                  <TableCell className="font-medium text-blue-900">{vendor.name}</TableCell>
-                  <TableCell className="text-slate-500 font-medium">
-                    VND-{vendor.id.substring(0, 4)}
-                  </TableCell>
-                  <TableCell>
-                    <span
-                      className={`px-2 py-1 rounded-full text-xs font-medium ${vendor.type === 'Supplier'
-                        ? 'bg-blue-100 text-blue-700'
-                        : vendor.type === 'Distributor'
-                          ? 'bg-purple-100 text-purple-700'
-                          : 'bg-orange-100 text-orange-700'
-                        }`}
-                    >
-                      {vendor.type}
-                    </span>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex flex-col">
-                      <span className="text-sm font-medium">{vendor.contactPerson}</span>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex flex-col text-xs text-slate-500">
-                      <span>{vendor.phone}</span>
-                      <span>{vendor.email}</span>
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-right">{vendor.totalOrders}</TableCell>
-                  <TableCell className="text-right font-medium">
-                    ₹ {vendor.purchaseValue.toLocaleString()}
-                  </TableCell>
-                  <TableCell className="text-right font-medium text-red-600">
-                    ₹ {vendor.outstandingAmount.toLocaleString()}
-                  </TableCell>
-                  <TableCell>
-                    <span
-                      className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium ${vendor.status === 'Active'
-                        ? 'bg-green-100 text-green-700'
-                        : 'bg-yellow-100 text-yellow-700'
-                        }`}
-                    >
+      <div className="rounded-2xl border border-blue-100 bg-white overflow-hidden shadow-sm m-4 mt-0">
+        <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-gray-200">
+          <Table className="min-w-[1050px]">
+            <TableHeader className="bg-slate-50/50">
+              <TableRow className="border-b border-blue-50/50 hover:bg-transparent">
+                <TableHead className="font-bold text-[10px] text-blue-900 uppercase py-3 px-4">
+                  Vendor Name
+                </TableHead>
+                <TableHead className="font-bold text-[10px] text-blue-900 uppercase">
+                  Code
+                </TableHead>
+                <TableHead className="font-bold text-[10px] text-blue-900 uppercase">
+                  Type
+                </TableHead>
+                <TableHead className="font-bold text-[10px] text-blue-900 uppercase">
+                  Contact
+                </TableHead>
+                <TableHead className="font-bold text-[10px] text-blue-900 uppercase">
+                  Details
+                </TableHead>
+                <TableHead className="text-right font-bold text-[10px] text-blue-900 uppercase">
+                  Orders
+                </TableHead>
+                <TableHead className="text-right font-bold text-[10px] text-blue-900 uppercase">
+                  Purchase Value
+                </TableHead>
+                <TableHead className="text-right font-bold text-[10px] text-blue-900 uppercase">
+                  Outstanding
+                </TableHead>
+                <TableHead className="font-bold text-[10px] text-blue-900 uppercase">
+                  Status
+                </TableHead>
+                <TableHead className="text-right font-bold text-[10px] text-blue-900 uppercase px-4">
+                  Actions
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredVendors.length > 0 ? (
+                filteredVendors.map((vendor, index) => (
+                  <TableRow
+                    key={vendor.id}
+                    className={`border-b border-blue-50/20 hover:bg-blue-50/30 transition-colors ${
+                      index % 2 !== 0 ? 'bg-sky-50/20' : ''
+                    }`}
+                  >
+                    <TableCell className="px-4 py-3 font-semibold text-blue-900">
+                      {vendor.name}
+                    </TableCell>
+                    <TableCell className="text-slate-500 font-medium text-[10px]">
+                      VND-{vendor.id.substring(0, 4)}
+                    </TableCell>
+                    <TableCell>
                       <span
-                        className={`h-1.5 w-1.5 rounded-full ${vendor.status === 'Active' ? 'bg-green-600' : 'bg-yellow-600'}`}
-                      ></span>
-                      {vendor.status}
-                    </span>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end gap-2">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                        onClick={() => router.push(`${basePath}/vendors/${vendor.id}`)}
-                   >
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-slate-500 hover:text-slate-700 hover:bg-slate-100"
-                        onClick={() => {
-                          setEditingVendor(vendor);
-                          setFormOpen(true);
-                        }}
+                        className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
+                          vendor.type === 'Supplier'
+                            ? 'bg-blue-100 text-blue-700'
+                            : vendor.type === 'Distributor'
+                              ? 'bg-purple-100 text-purple-700'
+                              : 'bg-orange-100 text-orange-700'
+                        }`}
                       >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50"
-                        onClick={() => setDeleteVendorTarget(vendor)}
+                        {vendor.type}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      <span className="text-xs font-semibold text-gray-800">
+                        {vendor.contactPerson}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex flex-col text-[10px] text-slate-500">
+                        <span className="font-medium">{vendor.phone}</span>
+                        <span className="font-medium">{vendor.email}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-right text-xs font-bold text-gray-700">
+                      {vendor.totalOrders}
+                    </TableCell>
+                    <TableCell className="text-right font-bold text-blue-900 text-xs">
+                      ₹ {vendor.purchaseValue.toLocaleString()}
+                    </TableCell>
+                    <TableCell className="text-right font-bold text-red-600 text-xs">
+                      ₹ {vendor.outstandingAmount.toLocaleString()}
+                    </TableCell>
+                    <TableCell>
+                      <span
+                        className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-tight ${
+                          vendor.status === 'Active'
+                            ? 'bg-green-100 text-green-700'
+                            : 'bg-yellow-100 text-yellow-700'
+                        }`}
                       >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
+                        <span
+                          className={`h-1 w-1 rounded-full ${
+                            vendor.status === 'Active' ? 'bg-green-600' : 'bg-yellow-600'
+                          }`}
+                        />
+                        {vendor.status}
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-right px-4">
+                      <div className="flex justify-end gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                          onClick={() => router.push(`${basePath}/vendors/${vendor.id}`)}
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-slate-500 hover:text-slate-700 hover:bg-slate-100"
+                          onClick={() => {
+                            setEditingVendor(vendor);
+                            setFormOpen(true);
+                          }}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50"
+                          onClick={() => setDeleteVendorTarget(vendor)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell colSpan={10} className="text-center py-8 text-slate-500 italic">
+                    No vendors found matching your criteria.
                   </TableCell>
                 </TableRow>
-              ))
-            ) : (
-              <TableRow>
-                <TableCell colSpan={10} className="text-center py-8 text-slate-500">
-                  No vendors found matching your criteria.
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
+              )}
+            </TableBody>
+          </Table>
+        </div>
       </div>
 
       {/* MODALS */}
@@ -333,9 +332,9 @@ export default function VendorTable({
         />
       )}
 
-      {deleteVendor && (
+      {deleteVendorTarget && (
         <ConfirmDeleteModal
-          name={deleteVendor.name}
+          name={deleteVendorTarget.name}
           onCancel={() => setDeleteVendorTarget(null)}
           onConfirm={confirmDelete}
         />
@@ -343,8 +342,6 @@ export default function VendorTable({
     </div>
   );
 }
-
-
 
 function VendorFormModal({
   initialData,
@@ -358,21 +355,21 @@ function VendorFormModal({
   const [form, setForm] = useState<VendorFormData>(
     initialData
       ? {
-        name: initialData.name,
-        type: initialData.type,
-        contactPerson: initialData.contactPerson,
-        phone: initialData.phone,
-        email: initialData.email,
-        status: initialData.status,
-      }
+          name: initialData.name,
+          type: initialData.type,
+          contactPerson: initialData.contactPerson,
+          phone: initialData.phone,
+          email: initialData.email,
+          status: initialData.status,
+        }
       : {
-        name: '',
-        type: 'Supplier',
-        contactPerson: '',
-        phone: '',
-        email: '',
-        status: 'Active',
-      },
+          name: '',
+          type: 'Supplier',
+          contactPerson: '',
+          phone: '',
+          email: '',
+          status: 'Active',
+        },
   );
 
   return (
