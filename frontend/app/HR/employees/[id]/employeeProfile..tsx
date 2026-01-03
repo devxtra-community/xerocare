@@ -62,9 +62,7 @@ export default function EmployeeProfile({
         />
       )}
 
-      {activeTab === "attendance" && (
-        <AttendanceTab employeeId={employee.id} />
-      )}
+      {activeTab === "attendance" && <AttendanceTab employeeId={employee.id} />}
 
       {activeTab === "leave" && <LeaveTab employeeId={employee.id} />}
 

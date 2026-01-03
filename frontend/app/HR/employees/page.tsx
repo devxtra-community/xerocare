@@ -1,7 +1,6 @@
 import EmployeeTable from "@/components/employeeTable";
 import AddEmployeeDialog from "@/components/hr/AddEmployeeDialog";
 import { employees } from "@/lib/hr";
-import Link from "next/link";
 
 export default function EmployeesPage() {
   return (

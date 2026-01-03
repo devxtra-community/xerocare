@@ -49,7 +49,7 @@ const menuItems = [
     title: "Documents",
     icon: Package,
     href: "/HR/documents",
-    disabled:"true"
+    disabled:true
   },
 ]
 

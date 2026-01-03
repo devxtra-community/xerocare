@@ -163,7 +163,7 @@ function Info({ label, value }: { label: string; value: string }) {
   return (
     <div className="grid grid-cols-[120px_1fr] gap-2 text-sm py-1">
       <span className="uppercase text-xs text-primary">{label}</span>
-      <span className="font-medium break-words">{value}</span>
+      <span className="font-medium break-all">{value}</span>
     </div>
   );
 }
