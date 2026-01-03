@@ -44,8 +44,8 @@ export async function requestMagicLink(email: string) {
   return res.data;
 }
 
-export async function verifyMagicLink(email: string, token: string) {
-  const res = await api.post('/e/auth/magic-link/verify', { email, token });
+export async function verifyMagicLink( token: string) {
+  const res = await api.post('/e/auth/magic-link/verify', { token });
   localStorage.setItem('accessToken', res.data.accessToken);
 
   return res.data;

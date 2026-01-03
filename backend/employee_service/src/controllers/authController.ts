@@ -5,6 +5,7 @@ import { issueTokens } from '../services/tokenService';
 import { OtpService } from '../services/otpService';
 import { OtpPurpose } from '../constants/otpPurpose';
 import { MagicLinkService } from '../services/magicLinkService';
+import { logger } from '../config/logger';
 
 const authService = new AuthService();
 const otpService = new OtpService();
@@ -35,6 +36,7 @@ export const loginVerify = async (req: Request, res: Response, next: NextFunctio
     const user = await authService.findUserByEmail(email);
 
     const accessToken = await issueTokens(user, req, res);
+    logger.info("login successfull")
 
     return res.json({
       message: 'Login successfull',

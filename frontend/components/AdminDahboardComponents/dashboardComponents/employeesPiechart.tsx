@@ -1,21 +1,76 @@
 'use client';
 import { PieChart, Pie, Cell } from 'recharts';
 import { useState, useEffect } from 'react';
+import { getAllEmployees } from '@/lib/employee';
 
-const data = [
-  { name: 'Employee', value: 186, color: '#003F7D', percentage: 62.5 },
-  { name: 'Finance', value: 75, color: '#0284C7', percentage: 25 },
-  { name: 'HR', value: 37, color: '#9BD0E5', percentage: 12.5 },
-];
+interface ChartData {
+  name: string;
+  value: number;
+  color: string;
+  percentage: number;
+}
 
-const TOTAL = 300;
+const COLORS = {
+  Employee: '#003F7D',
+  Finance: '#0284C7',
+  HR: '#9BD0E5',
+  Other: '#CBD5E1',
+};
 
 export default function EmployeePieChart() {
   const [isClient, setIsClient] = useState(false);
+  const [data, setData] = useState<ChartData[]>([]);
+  const [total, setTotal] = useState(0);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsClient(true);
+    const fetchData = async () => {
+      try {
+        const res: any = await getAllEmployees();
+        const employees = res.data?.employees || [];
+        const roleCounts: Record<string, number> = {};
+
+        // Count employees by role
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        employees.forEach((emp: any) => {
+          let role = emp.role || 'Other';
+          // Normalize role names
+          if (role === 'EMPLOYEE') role = 'Employee';
+          if (role === 'FINANCE') role = 'Finance';
+          if (role === 'HR') role = 'HR';
+          if (role === 'MANAGER') role = 'Other';
+
+          roleCounts[role] = (roleCounts[role] || 0) + 1;
+        });
+
+        const totalCount = employees.length;
+        setTotal(totalCount);
+
+        const chartData = Object.keys(roleCounts).map((role) => {
+          const count = roleCounts[role];
+          const colorKey = role as keyof typeof COLORS;
+          return {
+            name: role,
+            value: count,
+            color: COLORS[colorKey] || COLORS.Other,
+            percentage: totalCount > 0 ? parseFloat(((count / totalCount) * 100).toFixed(1)) : 0,
+          };
+        });
+
+        // Ensure we always have some data to display or valid empty state
+        if (chartData.length === 0) {
+          setData([{ name: 'No Data', value: 1, color: '#f3f4f6', percentage: 0 }]);
+          setTotal(0);
+        } else {
+          setData(chartData);
+        }
+
+      } catch (error) {
+        console.error('Failed to fetch employee stats', error);
+      }
+    };
+
+    fetchData();
   }, []);
 
   return (
@@ -46,7 +101,7 @@ export default function EmployeePieChart() {
         )}
 
         <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-          <p className="text-xl font-bold text-gray-900 leading-none mt-2 ml-2">{TOTAL}</p>
+          <p className="text-xl font-bold text-gray-900 leading-none mt-2 ml-2">{total}</p>
           <p className="text-[8px] text-gray-900 leading-tight font-medium ml-2">Total</p>
         </div>
       </div>
@@ -63,14 +118,16 @@ export default function EmployeePieChart() {
         </div>
 
         {data.map((item) => (
-          <div key={item.name} className="grid grid-cols-3 items-center py-1.5 text-xs">
-            <div className="flex items-center gap-1.5">
-              <span className="h-2 w-2 rounded-full" style={{ backgroundColor: item.color }} />
-              <span className="font-medium text-gray-900">{item.name}</span>
+          item.name !== 'No Data' && (
+            <div key={item.name} className="grid grid-cols-3 items-center py-1.5 text-xs">
+              <div className="flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full" style={{ backgroundColor: item.color }} />
+                <span className="font-medium text-gray-900">{item.name}</span>
+              </div>
+              <span className="text-center font-semibold text-gray-900">{item.value}</span>
+              <span className="text-right font-semibold text-gray-900">{item.percentage}%</span>
             </div>
-            <span className="text-center font-semibold text-gray-900">{item.value}</span>
-            <span className="text-right font-semibold text-gray-900">{item.percentage}%</span>
-          </div>
+          )
         ))}
       </div>
     </div>

@@ -16,8 +16,7 @@ function MagicLoginContent() {
   const [errorMessage, setErrorMessage] = useState('');
 
   useEffect(() => {
-    if (!email || !token) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (!token) {
       setStatus('error');
       setErrorMessage('Invalid link parameters.');
       return;
@@ -25,15 +24,33 @@ function MagicLoginContent() {
 
     const verify = async () => {
       try {
-        const res = await verifyMagicLink(email, token);
+        // verifyMagicLink requires email and token.
+        // If email is missing from URL params, this might fail if the API requires it.
+        // Assuming the magic link URL includes `?email=...&token=...`
+        const res = await verifyMagicLink(token);
+
         if (res.success) {
           setStatus('success');
           toast.success('Login successful!');
-          // Token storage is handled in verifyMagicLink (if axios-jwt is used) or manual storage there
           localStorage.setItem('accessToken', res.accessToken);
-          setTimeout(() => {
-            router.push('/dashboard');
-          }, 1000);
+
+          document.cookie = `accessToken=${res.accessToken}; path=/; max-age=86400; SameSite=Strict`;
+
+          try {
+            const user = res.data;
+            const role = user?.role;
+
+            if (role === 'ADMIN' || role === 'HR') {
+              setTimeout(() => router.push('/admin/dashboard'), 500);
+            } else if (role === 'MANAGER') {
+              setTimeout(() => router.push('/manager/dashboard'), 500);
+            } else {
+              setTimeout(() => router.push('/dashboard'), 500);
+            }
+          } catch (e) {
+            console.error('Failed to handle role redirect', e);
+            setTimeout(() => router.push('/dashboard'), 500);
+          }
         } else {
           setStatus('error');
           setErrorMessage(res.message || 'Verification failed');
@@ -41,7 +58,6 @@ function MagicLoginContent() {
       } catch (err: unknown) {
         setStatus('error');
         let msg = 'An error occurred';
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         if ((err as any).response?.data?.message) msg = (err as any).response.data.message;
         else if (err instanceof Error) msg = err.message;
         setErrorMessage(msg);

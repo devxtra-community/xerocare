@@ -6,6 +6,7 @@ import { errorHandler } from './middlewares/errorHandler';
 import { logger } from './config/logger';
 import healthRouter from './routes/health';
 import { Source } from './config/db';
+// import inventoryRouter from './routes/inventoryRoute';
 
 const app = express();
 
@@ -13,7 +14,7 @@ app.use(express.json());
 
 app.use('/', healthRouter);
 app.use('/vendors', vendorRouter);
-
+// app.use('/inventory',inventoryRouter)
 app.use(errorHandler);
 
 const startServer = async () => {
