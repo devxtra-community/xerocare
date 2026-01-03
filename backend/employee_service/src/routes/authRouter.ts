@@ -12,6 +12,7 @@ import {
   logoutOtherDevices,
   getSessions,
   logoutSession,
+  getMe,
 } from '../controllers/authController';
 import { authMiddleware } from '../middleware/authMiddleware';
 import { redisRateLimiter } from '../middleware/rateLimit';
@@ -36,5 +37,6 @@ authRouter.post('/magic-link/verify', rateLimit, verifyMagicLink);
 authRouter.post('/logout-other-devices', authMiddleware, logoutOtherDevices);
 authRouter.get('/sessions', authMiddleware, getSessions);
 authRouter.post('/sessions/logout', authMiddleware, logoutSession);
+authRouter.get('/me', authMiddleware, getMe);
 
 export default authRouter;

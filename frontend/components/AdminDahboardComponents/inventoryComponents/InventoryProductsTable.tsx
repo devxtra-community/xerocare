@@ -9,7 +9,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { Eye, Edit2, MoreVertical } from 'lucide-react';
+import { Eye, Edit2 } from 'lucide-react';
 
 const inventoryData = [
   {
@@ -110,11 +110,10 @@ export default function InventoryProductsTable() {
                 </TableCell>
                 <TableCell className="px-6 py-4 text-center">
                   <span
-                    className={`px-2.5 py-1 rounded-full text-xs font-medium ${
-                      item.damagedStock > 0
+                    className={`px-2.5 py-1 rounded-full text-xs font-medium ${item.damagedStock > 0
                         ? 'bg-red-100 text-red-700'
                         : 'bg-green-100 text-green-700'
-                    }`}
+                      }`}
                   >
                     {item.damagedStock}
                   </span>
@@ -170,9 +169,8 @@ export default function InventoryProductsTable() {
               <button
                 key={i}
                 onClick={() => setPage(i + 1)}
-                className={`w-7 h-7 rounded-lg text-[11px] flex items-center justify-center transition-colors ${
-                  page === i + 1 ? 'bg-primary text-white' : 'hover:bg-blue-50 text-blue-600'
-                }`}
+                className={`w-7 h-7 rounded-lg text-[11px] flex items-center justify-center transition-colors ${page === i + 1 ? 'bg-primary text-white' : 'hover:bg-blue-50 text-blue-600'
+                  }`}
               >
                 {i + 1}
               </button>

@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import {
   ArrowLeft,
@@ -12,8 +12,6 @@ import {
   MapPin,
   Building2,
   User,
-  CreditCard,
-  ShoppingCart,
   TrendingUp,
   Clock,
 } from 'lucide-react';
@@ -21,10 +19,9 @@ import StatCard from '@/components/StatCard';
 import VendorTransactionsTable from '@/components/AdminDahboardComponents/vendorComponents/VendorTransactionsTable';
 import VendorSpendingTrend from '@/components/AdminDahboardComponents/vendorComponents/VendorSpendingTrend';
 
-export default function VendorProfilePage() {
-  const params = useParams();
+export default function Page({ params }: { params: { id: string } }) {
   const router = useRouter();
-  const id = params.id as string;
+  const id = params.id;
 
   const vendor = {
     id: id || '1',

@@ -7,7 +7,7 @@ import {
   Package,
   Wallet,
   Truck,
-  UsersRound,
+
   Boxes,
 } from 'lucide-react';
 
@@ -120,14 +120,12 @@ export default function AppSidebar() {
                       !text-sidebar-accent-foreground
                       [&_svg]:!text-sidebar-accent-foreground
 
-                      ${
-                        pathname === item.href
-                          ? 'bg-white text-sidebar [&_svg]:text-sidebar'
-                          : 'hover:bg-white/10'
+                      ${pathname === item.href
+                        ? 'bg-white text-sidebar [&_svg]:text-sidebar'
+                        : 'hover:bg-white/10'
                       }
 
-                      ${
-                        item.disabled ? '!text-sidebar-accent-foreground/70 cursor-not-allowed' : ''
+                      ${item.disabled ? '!text-sidebar-accent-foreground/70 cursor-not-allowed' : ''
                       }
                     `}
                   >

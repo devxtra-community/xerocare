@@ -1,6 +1,5 @@
-import next from 'next';
 import AdminSalesPage from '@/components/AdminDahboardComponents/saleComponents/AdminSales';
 
-export default function AdminSalesDashboard() {
+export default function SalesPage() {
   return <AdminSalesPage />;
 }
