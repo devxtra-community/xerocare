@@ -43,6 +43,7 @@ export async function requestMagicLink(email: string) {
   const res = await api.post('/e/auth/magic-link', { email });
   return res.data;
 }
+// 
 
 export async function verifyMagicLink( token: string) {
   const res = await api.post('/e/auth/magic-link/verify', { token });
