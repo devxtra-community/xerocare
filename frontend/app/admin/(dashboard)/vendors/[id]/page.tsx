@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import {
   ArrowLeft,
@@ -19,10 +19,9 @@ import StatCard from '@/components/StatCard';
 import VendorTransactionsTable from '@/components/AdminDahboardComponents/vendorComponents/VendorTransactionsTable';
 import VendorSpendingTrend from '@/components/AdminDahboardComponents/vendorComponents/VendorSpendingTrend';
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export default function Page({ params }: { params: { id: string } }) {
   const router = useRouter();
-  const id = params.id as string;
+  const id = params.id;
 
   const vendor = {
     id: id || '1',

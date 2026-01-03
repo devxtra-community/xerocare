@@ -23,7 +23,7 @@ export default function EmployeePieChart() {
   const [total, setTotal] = useState(0);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsClient(true);
     const fetchData = async () => {
       try {

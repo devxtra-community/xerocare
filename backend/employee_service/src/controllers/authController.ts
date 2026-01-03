@@ -238,3 +238,16 @@ export const logoutSession = async (req: Request, res: Response, next: NextFunct
     next(new AppError(err.message, err.statusCode || 500));
   }
 };
+
+export const getMe = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user.userId;
+    const user = await authService.findUserById(userId);
+    return res.json({
+      success: true, 
+      data: user,
+    });
+  } catch (err: any) {
+    next(new AppError(err.message, err.statusCode || 500));
+  }
+};
