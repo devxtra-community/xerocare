@@ -1,6 +1,7 @@
-// import { Router } from "express";
-// const inventoryRouter = Router();
+import { Router } from "express";
+import { inventoryStatus } from "../controllers/inventoryController";
+const inventoryRouter = Router();
 
-// inventoryRouter.get('');
+inventoryRouter.get('/status',inventoryStatus);
 
-// export default inventoryRouter;
+export default inventoryRouter;

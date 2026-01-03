@@ -1,39 +1,33 @@
 import {
-  Column,
-  CreateDateColumn,
-  UpdateDateColumn,
-  PrimaryGeneratedColumn,
   Entity,
-  Index,
-} from 'typeorm';
+  PrimaryGeneratedColumn,
+  Column,
+  ManyToOne,
+  JoinColumn,
+} from "typeorm";
+import { Product } from "./productEntity";
 
-@Entity('inventory')
+@Entity("inventory")
 export class Inventory {
-  @PrimaryGeneratedColumn('uuid')
-  id!: string;
+  @PrimaryGeneratedColumn()
+  id!: number;
 
-  @Index({ unique: true })
-  @Column({ type: 'varchar', length: 255, nullable: true })
-  sku!: string | null;
+  @ManyToOne(() => Product, (product) => product.inventory)
+  @JoinColumn({ name: "product_id" })
+  product!: Product;
 
-  @Column({ type: 'varchar', length: 100 })
-  printer_model!: string;
+  @Column()
+  product_id!: number;
 
-  @Column({ type: 'varchar', length: 255 })
-  name!: string;
+  @Column()
+  warehouse_id!: number;
 
-  @Column({ type: 'int', default: 0 })
-  quantity!: number;
+  @Column({ type: "int", default: 0 })
+  available_stock!: number;
 
-  @Column({ type: 'numeric', precision: 12, scale: 2, nullable: true })
-  unit_price!: number | null;
+  @Column({ type: "int", default: 0 })
+  reserved_stock!: number;
 
-  @Column({ type: 'varchar', length: 1000, nullable: true })
-  description!: string | null;
-
-  @CreateDateColumn({ type: 'timestamp with time zone' })
-  createdAt!: Date;
-
-  @UpdateDateColumn({ type: 'timestamp with time zone' })
-  updatedAt!: Date;
+  @Column({ type: "int", default: 0 })
+  damaged_stock!: number;
 }

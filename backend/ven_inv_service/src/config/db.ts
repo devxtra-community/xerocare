@@ -1,8 +1,10 @@
 import 'reflect-metadata';
 import { DataSource } from 'typeorm';
 import './env';
-
 import { Vendor } from '../entities/vendorEntity';
+import { Model } from '../entities/modelEntity';
+import { Product } from '../entities/productEntity';
+import { Inventory } from '../entities/inventoryEntity';
 
 export const Source = new DataSource({
   type: 'postgres',
@@ -11,5 +13,5 @@ export const Source = new DataSource({
     rejectUnauthorized: false,
   },
   synchronize: true,
-  entities: [Vendor],
+  entities: [Vendor,Model,Product,Inventory],
 });
