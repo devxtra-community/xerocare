@@ -40,16 +40,16 @@ export function EmployeeTabs({
   );
 }
 
-export function OverviewTab({ employee }: { employee: UserListItem }) {
-  return (
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-      <StatCard title="Department" value={employee.department} />
-      <StatCard title="Branch" value={employee.branch} />
-      <StatCard title="Joined On" value={employee.visaExpiryDate} />
-      <StatCard title="Status" value="Active" />
-    </div>
-  );
-}
+// export function OverviewTab({ employee }: { employee: UserListItem }) {
+//   return (
+//     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+//       <StatCard title="Department" value={employee.department} />
+//       <StatCard title="Branch" value={employee.branch} />
+//       <StatCard title="Joined On" value={employee.visaExpiryDate} />
+//       <StatCard title="Status" value="Active" />
+//     </div>
+//   );
+// }
 
 export function AttendanceTab({ employeeId }: { employeeId: string }) {
   const { data, summary } = getEmployeeAttendance(

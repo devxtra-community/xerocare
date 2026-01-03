@@ -48,7 +48,7 @@ export default function HROverviewPage() {
   }, [filters]);
 
   return (
-    <div className="space-y-8 px-2 sm:px-4 md:px-6">
+    <div className="space-y-8 px-2 sm:px-4 md:px-6 pb-5 ">
       {/* PAGE TITLE */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-2xl font-semibold">Human Resources</h1>

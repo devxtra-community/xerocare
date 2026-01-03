@@ -25,7 +25,7 @@ export type UserListItem = {
   salary: number;
 };
 
-const USERS_PER_PAGE = 3;
+const USERS_PER_PAGE = 10;
 
 type UserTableProps = {
   users: UserListItem[];
@@ -67,7 +67,7 @@ export default function EmployeeTable({ users }: UserTableProps) {
               <TableRow key={u.id}>
                 <TableCell>
                   <Link
-                    href={`/hr/employees/${u.id}`}
+                    href={`/HR/employees/${u.id}`}
                     className=" hover:underline font-medium"
                   >
                     {u.name}

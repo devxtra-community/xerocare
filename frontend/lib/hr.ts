@@ -10,6 +10,22 @@ export type Employee = {
   salary: number;
 };
 
+export type EmployeeProfile = {
+  id: string;
+  name: string;
+  designation: string;
+  department: string;
+  outlet: string;
+  joiningDate: string;
+  employeeType: string;
+  salary: number;
+  visaExpiry: string;
+  manager: string;
+  phone: string;
+  email: string;
+  address: string;
+};
+
 export type UserListItem = {
   id: string;
   name: string;
@@ -23,6 +39,9 @@ export type UserListItem = {
   salary: number;
 };
 
+const employee:Employee[]=[
+  
+]
 export const employees: UserListItem[] = [
   {
     id: "1",

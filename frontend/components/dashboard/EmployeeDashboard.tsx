@@ -1,8 +1,10 @@
 "use client";
 
-import AddEmployeeDialog from "@/components/AddEmployeeDialog";
+
 import UserTable from "@/components/UserTable";
 import { useEffect, useState } from "react";
+import AddEmployeeDialog from "../hr/AddEmployeeDialog";
+import { employees } from "@/lib/hr";
 
 export type UserListItem = {
     id: number;
@@ -138,7 +140,7 @@ export default function UsersPage() {
                 <AddEmployeeDialog />
             </div>
 
-            <UserTable users={users} />
+            <UserTable users={employees} />
         </div>
     )
 }

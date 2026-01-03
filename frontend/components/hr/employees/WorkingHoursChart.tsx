@@ -8,7 +8,7 @@ import {
     Tooltip,
     ResponsiveContainer,
 } from "recharts";
-import { WorkingHoursPoint } from "./data";
+import { WorkingHoursPoint } from "../../employees/charts/data";
 
 type Props = {
     data: WorkingHoursPoint[];

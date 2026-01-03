@@ -6,15 +6,15 @@ import {
   Cell,
   ResponsiveContainer,
   Tooltip,
-  Legend,
   Label,
 } from "recharts";
 
+import type { TooltipProps } from "recharts";
 /* ---------------- TYPES ---------------- */
 
 export type OrgPerformanceData = {
   label: "Completed" | "In Progress" | "Pending" | "Overdue";
-  value: number; 
+  value: number;
 };
 
 type Props = {
@@ -22,15 +22,38 @@ type Props = {
   data: OrgPerformanceData[];
 };
 
+/* ---------------- COLORS ---------------- */
 
 const COLORS: Record<OrgPerformanceData["label"], string> = {
   Completed: "rgb(var(--primary-rgb))",
-  "In Progress": "rgb(var(--secondary-rgb))",
-  Pending: "rgb(var(--muted-foreground-rgb))",
-  Overdue: "rgb(var(--destructive-rgb))",
+  "In Progress": "#00A8E8",
+  Pending: "rgb(var(--primary-light-rgb))",
+  Overdue: "#FF6B35",
 };
 
+/* ---------------- CUSTOM TOOLTIP ---------------- */
 
+
+function PerformanceTooltip({
+  active,
+  payload,
+}: TooltipProps<number, string>) {
+  if (!active || !payload || payload.length === 0) return null;
+
+  const data = payload[0].payload as OrgPerformanceData;
+
+  return (
+    <div className="rounded-md border bg-card px-3 py-2 shadow-sm">
+      <p className="text-sm font-medium">{data.label}</p>
+      <p className="text-xs text-muted-foreground">
+        {data.value}%
+      </p>
+    </div>
+  );
+}
+
+
+/* ---------------- COMPONENT ---------------- */
 
 export default function PerformanceDonutChart({
   title = "Workload Status Overview",
@@ -40,17 +63,18 @@ export default function PerformanceDonutChart({
     data.find((d) => d.label === "Completed")?.value ?? 0;
 
   return (
-    <div className="rounded-xl border bg-card p-4 h-[280px]">
+    <div className="rounded-xl border bg-card p-3 ">
       <h3 className="font-medium mb-4">{title}</h3>
+<div className="h-[220px]">
 
-      <ResponsiveContainer width="100%" height="90%">
+      <ResponsiveContainer width="100%" height="100%">
         <PieChart>
           <Pie
             data={data}
             dataKey="value"
             nameKey="label"
-            innerRadius={60}
-            outerRadius={90}
+            innerRadius={50}
+            outerRadius={80}
             stroke="none"
             label={({ name, value }) => `${name} (${value}%)`}
           >
@@ -82,13 +106,15 @@ export default function PerformanceDonutChart({
                   </text>
                 </g>
               )}
-            />
+              />
           </Pie>
 
-          <Tooltip formatter={(value) => `${value}%`} />
-          <Legend verticalAlign="bottom" />
+          {/* CUSTOM TOOLTIP */}
+          <Tooltip content={<PerformanceTooltip />} />
+
         </PieChart>
       </ResponsiveContainer>
+              </div>
     </div>
   );
 }

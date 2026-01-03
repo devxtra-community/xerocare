@@ -4,7 +4,7 @@ import DashboardHeader from "@/components/DashboardHeader";
 import AuthGuard from "@/components/auth-guard";
 import HRSidebar from "@/components/hr/HRSidebar";
 
-export default function AdminLayout({
+export default function HRLayout({
   children,
 }: {
   children: React.ReactNode;
@@ -14,7 +14,7 @@ export default function AdminLayout({
         <div className="flex min-h-screen w-full">
           <HRSidebar />
 
-          <SidebarInset className="bg-muted min-h-screen w-full flex flex-col">
+          <SidebarInset className="bg-background min-h-screen w-full flex flex-col">
             <DashboardHeader />
             <div className="flex-1 overflow-auto">{children}</div>
           </SidebarInset>
