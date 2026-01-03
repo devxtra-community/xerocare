@@ -1,6 +1,6 @@
 "use client";
 
-import AddEmployeeDialog from "@/components/hr/AddEmployeeDialog";
+import AddEmployeeDialog from "@/components/AddEmployeeDialog";
 import UserTable from "@/components/UserTable";
 import { useEffect, useState } from "react";
 

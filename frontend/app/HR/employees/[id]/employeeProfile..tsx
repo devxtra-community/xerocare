@@ -8,14 +8,14 @@ import {
   LeaveTab,
   DocumentsTab,
 } from "@/components/hr/employeeTabs";
-import { Employee } from "@/lib/hr";
+import { Employee, employees, UserListItem } from "@/lib/hr";
 
 type Tab = "overview" | "attendance" | "leave" | "documents";
 
 export default function EmployeeProfile({
   employee,
 }: {
-  employee  : Employee;
+  employee  : UserListItem;
 }) {
   const [activeTab, setActiveTab] = useState<Tab>("overview");
 
@@ -33,7 +33,7 @@ export default function EmployeeProfile({
       <EmployeeTabs active={activeTab} onChange={setActiveTab} />
 
       
-      {activeTab === "overview" && <OverviewTab employee={employee} />}
+      {activeTab === "overview" && <OverviewTab employee={employees} />}
       {activeTab === "attendance" && <AttendanceTab employeeId={employee.id} />}
       {activeTab === "leave" && <LeaveTab employeeId={employee.id} />}
       {activeTab === "documents" && <DocumentsTab />}

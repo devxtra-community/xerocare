@@ -10,28 +10,34 @@ import {
   Label,
 } from "recharts";
 
+/* ---------------- TYPES ---------------- */
 
-export type PerformanceData = {
-  label: string;
-  value: number;
+export type OrgPerformanceData = {
+  label: "Completed" | "In Progress" | "Pending" | "Overdue";
+  value: number; 
 };
-
 
 type Props = {
   title?: string;
-  data: PerformanceData[];
+  data: OrgPerformanceData[];
 };
 
-const COLORS = [
-  "rgb(var(--primary-rgb))",
-  "rgb(var(--muted-foreground-rgb))",
-];
+
+const COLORS: Record<OrgPerformanceData["label"], string> = {
+  Completed: "rgb(var(--primary-rgb))",
+  "In Progress": "rgb(var(--secondary-rgb))",
+  Pending: "rgb(var(--muted-foreground-rgb))",
+  Overdue: "rgb(var(--destructive-rgb))",
+};
+
+
 
 export default function PerformanceDonutChart({
-  title = "Overall Performance",
+  title = "Workload Status Overview",
   data,
 }: Props) {
-  const completed = data.find(d => d.label === "Completed")?.value ?? 0;
+  const completedValue =
+    data.find((d) => d.label === "Completed")?.value ?? 0;
 
   return (
     <div className="rounded-xl border bg-card p-4 h-[280px]">
@@ -46,22 +52,26 @@ export default function PerformanceDonutChart({
             innerRadius={60}
             outerRadius={90}
             stroke="none"
+            label={({ name, value }) => `${name} (${value}%)`}
           >
-            {data.map((_, index) => (
-              <Cell key={index} fill={COLORS[index % COLORS.length]} />
+            {data.map((entry) => (
+              <Cell
+                key={entry.label}
+                fill={COLORS[entry.label]}
+              />
             ))}
 
-            
+            {/* CENTER LABEL */}
             <Label
               position="center"
               content={() => (
                 <g textAnchor="middle">
                   <text
                     x="50%"
-                    y="50%"
+                    y="48%"
                     className="fill-primary text-2xl font-bold"
                   >
-                    {completed}%
+                    {completedValue}%
                   </text>
                   <text
                     x="50%"

@@ -131,7 +131,7 @@
 import StatCard from "@/components/StatCard";
 import AttendanceChart from "@/components/employees/charts/AttandenceChart";
 import PerformanceChart from "@/components/employees/charts/PerfomanceChart";
-import AddEmployeeDialog from "@/components/hr/AddEmployeeDialog";
+import AddEmployeeDialog from "@/components/AddEmployeeDialog";
 import UserTable from "@/components/UserTable";
 
 /* ---------------- TYPES ---------------- */
@@ -255,3 +255,4 @@ export default async function HRPage() {
     </div>
   );
 }
+

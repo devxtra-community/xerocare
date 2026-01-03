@@ -11,10 +11,19 @@ import {
 import Link from "next/link";
 import { useState } from "react";
 import Pagination from "./Pagination";
-import { UserListItem } from "./employeeTable";
-// import ConfirmDialog from "./ConfirmDialog";
+import ConfirmDialog from "./ConfirmDialog";
 
-
+export type UserListItem = {
+  id: string;
+  name: string;
+  department: string;
+  branch: string;
+  employmentType: "Full-time" | "Part-time" | "Contract";
+  status: "Active" | "On Leave" | "Inactive";
+  startDate: string;
+  visaExpiryDate: string;
+  salary: number;
+};
 
 const USERS_PER_PAGE = 3;
 
@@ -22,9 +31,9 @@ type UserTableProps = {
   users: UserListItem[];
 };
 
-export default function UserTable({ users }: UserTableProps) {
+export default function EmployeeTable({ users }: UserTableProps) {
   const [page, setPage] = useState(1);
-  // const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
 
   const totalPages = Math.ceil(users.length / USERS_PER_PAGE);
   const startIndex = (page - 1) * USERS_PER_PAGE;
@@ -49,6 +58,7 @@ export default function UserTable({ users }: UserTableProps) {
                 Visa Expiry Date
               </TableHead>
               <TableHead className="text-primary font-bold">Salary</TableHead>
+              <TableHead className="text-primary font-bold">Action</TableHead>
             </TableRow>
           </TableHeader>
 
@@ -79,17 +89,15 @@ export default function UserTable({ users }: UserTableProps) {
                   {u.visaExpiryDate}
                 </TableCell>
                 <TableCell>{u.salary}</TableCell>
-                {/* <TableCell className="space-x-3">
-                  <button className="text-primary hover:underline">
-                    Edit
-                  </button>
+                <TableCell className="space-x-3">
+                  <button className="text-primary hover:underline">Edit</button>
                   <button
                     className="text-accent hover:underline"
                     onClick={() => setDeleteId(u.id)}
                   >
                     Delete
                   </button>
-                </TableCell> */}
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>
@@ -101,14 +109,14 @@ export default function UserTable({ users }: UserTableProps) {
         />
       </div>
 
-      {/* <ConfirmDialog
+      <ConfirmDialog
         open={deleteId !== null}
         onOpenChange={() => setDeleteId(null)}
         title="Delete employee?"
         description="This action cannot be undone."
         confirmText="Delete"
         onConfirm={() => setDeleteId(null)}
-      /> */}
+      />
     </>
   );
 }

@@ -12,9 +12,11 @@ import {
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+
+
+import { useState } from "react";
 import RoleSelect from "../RoleSelect";
 import ConfirmDialog from "../ConfirmDialog";
-import { useState } from "react";
 
 type EmployeeForm = {
   name: string;
@@ -68,7 +70,7 @@ export default function AddEmployeeDialog() {
     <>
       <Dialog>
         <DialogTrigger asChild>
-          <Button className="rounded-full">Add Employee</Button>
+          <Button className="rounded-full">+ Add Employee</Button>
         </DialogTrigger>
 
         <DialogOverlay className="fixed inset-0 bg-background/70 backdrop-blur-md" />

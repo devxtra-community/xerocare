@@ -1,3 +1,5 @@
+import { OrgPerformanceData } from "@/components/hr/performanceDonutChart";
+
 export type Employee = {
   id: string;
   name: string;
@@ -8,24 +10,67 @@ export type Employee = {
   salary: number;
 };
 
-export const employees: Employee[] = [
+export type UserListItem = {
+  id: string;
+  name: string;
+  designation: string;
+  department: string;
+  branch: string;
+  employmentType: "Full-time" | "Part-time" | "Contract";
+  status: "Active" | "On Leave" | "Inactive";
+  startDate: string;
+  visaExpiryDate: string;
+  salary: number;
+};
+
+export const employees: UserListItem[] = [
   {
     id: "1",
     name: "Aisha Rahman",
+    designation:"Hiring Manager",
     department: "HR",
-    designation: "HR Executive",
-    branch: "Bangalore",
-    joiningDate: "11-01-2022",
+    branch: "Kochi",
+    employmentType: "Full-time",
+    status: "Active",
+    startDate: "2023-02-19",
+    visaExpiryDate: "2026-02-19",
     salary: 3000,
   },
   {
     id: "2",
     name: "Mark Lue",
+    designation:"Accountant",
     department: "Finance",
-    designation: "Accountant",
     branch: "Ernakulam",
-    joiningDate: "19-05-2023",
-    salary: 1500,
+    employmentType: "Contract",
+    status: "On Leave",
+    startDate: "2022-05-10",
+    visaExpiryDate: "2025-05-10",
+    salary: 2500,
+  },
+  {
+    id: "3",
+    name: "Aisha Rahman",
+    designation:"HR Manager",
+    department: "HR",
+    branch: "Kochi",
+    employmentType: "Part-time",
+    status: "Inactive",
+    startDate: "2023-02-19",
+    visaExpiryDate: "2026-02-19",
+    salary: 6000,
+  },
+  {
+    id: "4",
+    name: "Mark Lue",
+    designation:"Analyst",
+    department: "Finance",
+    branch: "Ernakulam",
+    employmentType: "Contract",
+    status: "On Leave",
+    startDate: "2022-05-10",
+    visaExpiryDate: "2025-05-10",
+    salary: 3500,
   },
 ];
         
@@ -138,4 +183,17 @@ export const leaveRecords: LeaveRecord[] = [
     days: 5,
     status: "Approved",
   },
+];
+
+export type EmployeeFilters = {
+  department: string;
+  employmentType: string;
+  status: string;
+};
+
+export const orgWorkloadData:OrgPerformanceData[] = [
+  { label: "Completed", value: 58 },
+  { label: "In Progress", value: 22 },
+  { label: "Pending", value: 12 },
+  { label: "Overdue", value: 8 },
 ];
