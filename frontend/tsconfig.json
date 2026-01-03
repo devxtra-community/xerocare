@@ -27,7 +27,9 @@
     "**/*.ts",
     "**/*.tsx",
     "**/*.mts",
-    "components/AdminComponents/saleComponents"
+    "components/AdminComponents/saleComponents",
+    ".next/types/**/*.ts",
+    ".next/dev/types/**/*.ts"
   ],
   "exclude": ["node_modules"]
 }
