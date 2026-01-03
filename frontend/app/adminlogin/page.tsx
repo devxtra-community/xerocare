@@ -1,3 +1,4 @@
+import Image from 'next/image';
 import { AdminLoginForm } from '@/components/AdminLoginform';
 
 export default function AdminLoginPage() {
@@ -13,9 +14,10 @@ export default function AdminLoginPage() {
         </div>
 
         <div className="bg-muted relative hidden lg:block">
-          <img
+          <Image
             src="/placeholder.svg"
             alt="Image"
+            fill
             className="absolute inset-0 h-full w-full object-cover dark:brightness-[0.2] dark:grayscale"
           />
         </div>

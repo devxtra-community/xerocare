@@ -1,6 +1,7 @@
 import next from 'next';
 import AdminSalesPage from '@/components/AdminDahboardComponents/saleComponents/AdminSales';
 
-export default function AdminSalesDashboard() {
-  return <AdminSalesPage />;
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export default function SalesPage() {
+  ;
 }

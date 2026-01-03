@@ -23,9 +23,11 @@ export default function EmployeePieChart() {
   const [total, setTotal] = useState(0);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     setIsClient(true);
     const fetchData = async () => {
       try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const res: any = await getAllEmployees();
         const employees = res.data?.employees || [];
         const roleCounts: Record<string, number> = {};

@@ -16,17 +16,16 @@ function MagicLoginContent() {
   const [errorMessage, setErrorMessage] = useState('');
 
   useEffect(() => {
-    if (!token) {
-      setStatus('error');
-      setErrorMessage('Invalid link parameters.');
-      return;
-    }
-
     const verify = async () => {
+      if (!token) {
+        setStatus('error');
+        setErrorMessage('Invalid link parameters.');
+        return;
+      }
+
       try {
-        // verifyMagicLink requires email and token.
-        // If email is missing from URL params, this might fail if the API requires it.
-        // Assuming the magic link URL includes `?email=...&token=...`
+        // verifyMagicLink requires only token
+        // If email is present in URL, we ignore it as backend validates token securely
         const res = await verifyMagicLink(token);
 
         if (res.success) {
@@ -58,6 +57,7 @@ function MagicLoginContent() {
       } catch (err: unknown) {
         setStatus('error');
         let msg = 'An error occurred';
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         if ((err as any).response?.data?.message) msg = (err as any).response.data.message;
         else if (err instanceof Error) msg = err.message;
         setErrorMessage(msg);
