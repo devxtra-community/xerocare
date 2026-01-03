@@ -1,6 +1,6 @@
-"use client";
+'use client';
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect } from 'react';
 import {
   Table,
   TableBody,
@@ -8,47 +8,66 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Search, Filter, Eye, Edit, Plus, Trash2, X } from "lucide-react";
+} from '@/components/ui/table';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Search, Filter, Eye, Edit, Plus, Trash2, X } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { useRouter } from "next/navigation";
-import { getVendors, createVendor, updateVendor, deleteVendor as apiDeleteVendor, Vendor as ApiVendor } from "@/lib/vendor";
+} from '@/components/ui/dropdown-menu';
+import { useRouter } from 'next/navigation';
+import {
+  getVendors,
+  createVendor,
+  updateVendor,
+  deleteVendor as apiDeleteVendor,
+  Vendor as ApiVendor,
+} from '@/lib/vendor';
+import { toast } from 'sonner';
+import { AxiosError } from 'axios';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
+} from '@/components/ui/select';
 
 // Extend frontend Vendor type to match API + UI needs
 // We keep the UI structure but populate from API where possible
 type Vendor = {
   id: string;
   name: string;
-  type: "Supplier" | "Distributor" | "Service";
+  type: 'Supplier' | 'Distributor' | 'Service';
   contactPerson: string;
   phone: string;
   email: string;
   totalOrders: number;
   purchaseValue: number;
   outstandingAmount: number;
-  status: "Active" | "On Hold";
+  status: 'Active' | 'On Hold';
+};
+
+type VendorFormData = {
+  name: string;
+  type: 'Supplier' | 'Distributor' | 'Service';
+  contactPerson: string;
+  phone: string;
+  email: string;
+  status: 'Active' | 'On Hold';
 };
 
 export default function VendorTable() {
   const router = useRouter();
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
-  const [filterType, setFilterType] = useState<"All" | "Supplier" | "Distributor" | "Service">("All");
+  const [search, setSearch] = useState('');
+  const [filterType, setFilterType] = useState<'All' | 'Supplier' | 'Distributor' | 'Service'>(
+    'All',
+  );
 
   const [formOpen, setFormOpen] = useState(false);
   const [editingVendor, setEditingVendor] = useState<Vendor | null>(null);
@@ -58,24 +77,34 @@ export default function VendorTable() {
     setLoading(true);
     try {
       const res = await getVendors();
-      const apiVendors: any[] = res.data || []; // Adjust based on actual API response structure
+      const apiVendors: ApiVendor[] = res.data || []; // Adjust based on actual API response structure
 
-      const mappedVendors: Vendor[] = apiVendors.map((v) => ({
-        id: v.id,
-        name: v.name,
-        type: v.type || "Supplier", // Default if missing
-        contactPerson: v.contactPerson || "N/A", // Default if missing
-        phone: v.phone || "N/A",
-        email: v.email || "N/A",
-        totalOrders: v.totalOrders || 0, // Mock
-        purchaseValue: v.purchaseValue || 0, // Mock
-        outstandingAmount: v.outstandingAmount || 0, // Mock
-        status: v.status === "ACTIVE" ? "Active" : "On Hold",
-      }));
+      const mappedVendors: Vendor[] = apiVendors.map((v) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const raw = v as any;
+        return {
+          id: v.id,
+          name: v.name,
+          type: raw.type || 'Supplier', // Default if missing
+          contactPerson: raw.contactPerson || 'N/A', // Default if missing
+          phone: v.phone || 'N/A',
+          email: v.email || 'N/A',
+          totalOrders: raw.totalOrders || 0, // Mock
+          purchaseValue: raw.purchaseValue || 0, // Mock
+          outstandingAmount: raw.outstandingAmount || 0, // Mock
+          status: raw.status === 'ACTIVE' ? 'Active' : 'On Hold',
+        };
+      });
 
       setVendors(mappedVendors);
-    } catch (error) {
-      console.error("Failed to fetch vendors", error);
+    } catch (err: unknown) {
+      if (err instanceof AxiosError) {
+        toast.error(err.response?.data?.message || err.message);
+      } else if (err instanceof Error) {
+        toast.error(err.message);
+      } else {
+        toast.error('Failed to fetch vendors');
+      }
     } finally {
       setLoading(false);
     }
@@ -86,20 +115,21 @@ export default function VendorTable() {
   }, []);
 
   const filteredVendors = vendors.filter((vendor) => {
-    const matchesSearch = vendor.name.toLowerCase().includes(search.toLowerCase()) ||
+    const matchesSearch =
+      vendor.name.toLowerCase().includes(search.toLowerCase()) ||
       vendor.contactPerson.toLowerCase().includes(search.toLowerCase());
-    const matchesType = filterType === "All" || vendor.type === filterType;
+    const matchesType = filterType === 'All' || vendor.type === filterType;
     return matchesSearch && matchesType;
   });
 
-  const handleSave = async (data: any) => {
+  const handleSave = async (data: VendorFormData) => {
     try {
       // Helper to map UI status back to API status
       const apiData = {
         name: data.name,
         email: data.email,
         phone: data.phone,
-        status: data.status === "Active" ? "ACTIVE" : "INACTIVE",
+        status: data.status === 'Active' ? 'ACTIVE' : 'INACTIVE',
         // Add other fields if backend supports them later
       };
 
@@ -112,9 +142,15 @@ export default function VendorTable() {
       await fetchVendors(); // Refresh list
       setFormOpen(false);
       setEditingVendor(null);
-    } catch (error) {
-      console.error("Failed to save vendor", error);
-      alert("Failed to save vendor");
+    } catch (err: unknown) {
+      console.error('Failed to save vendor', err);
+      if (err instanceof AxiosError) {
+        toast.error(err.response?.data?.message || 'Failed to save vendor');
+      } else if (err instanceof Error) {
+        toast.error(err.message);
+      } else {
+        toast.error('Failed to save vendor');
+      }
     }
   };
 
@@ -124,9 +160,14 @@ export default function VendorTable() {
       await apiDeleteVendor(deleteVendor.id);
       await fetchVendors(); // Refresh list
       setDeleteVendorTarget(null);
-    } catch (error) {
-      console.error("Failed to delete vendor", error);
-      alert("Failed to delete vendor");
+    } catch (err: unknown) {
+      if (err instanceof AxiosError) {
+        toast.error(err.response?.data?.message || 'Failed to delete vendor');
+      } else if (err instanceof Error) {
+        toast.error(err.message || 'Failed to delete vendor');
+      } else {
+        toast.error('Failed to delete vendor');
+      }
     }
   };
 
@@ -156,10 +197,14 @@ export default function VendorTable() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => setFilterType("All")}>All Types</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setFilterType("Supplier")}>Supplier</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setFilterType("Distributor")}>Distributor</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setFilterType("Service")}>Service</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setFilterType('All')}>All Types</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setFilterType('Supplier')}>
+                Supplier
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setFilterType('Distributor')}>
+                Distributor
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setFilterType('Service')}>Service</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
           <Button
@@ -178,29 +223,59 @@ export default function VendorTable() {
         <Table>
           <TableHeader className="bg-white border-b border-gray-200">
             <TableRow>
-              <TableHead className="font-semibold text-[11px] text-blue-900 uppercase">Vendor Name</TableHead>
-              <TableHead className="font-semibold text-[11px] text-blue-900 uppercase">Code</TableHead>
-              <TableHead className="font-semibold text-[11px] text-blue-900 uppercase">Type</TableHead>
-              <TableHead className="font-semibold text-[11px] text-blue-900 uppercase">Contact</TableHead>
-              <TableHead className="font-semibold text-[11px] text-blue-900 uppercase">Details</TableHead>
-              <TableHead className="text-right font-semibold text-[11px] text-blue-900 uppercase">Orders</TableHead>
-              <TableHead className="text-right font-semibold text-[11px] text-blue-900 uppercase">Purchase Value</TableHead>
-              <TableHead className="text-right font-semibold text-[11px] text-blue-900 uppercase">Outstanding</TableHead>
-              <TableHead className="font-semibold text-[11px] text-blue-900 uppercase">Status</TableHead>
-              <TableHead className="text-right font-semibold text-[11px] text-blue-900 uppercase">Actions</TableHead>
+              <TableHead className="font-semibold text-[11px] text-blue-900 uppercase">
+                Vendor Name
+              </TableHead>
+              <TableHead className="font-semibold text-[11px] text-blue-900 uppercase">
+                Code
+              </TableHead>
+              <TableHead className="font-semibold text-[11px] text-blue-900 uppercase">
+                Type
+              </TableHead>
+              <TableHead className="font-semibold text-[11px] text-blue-900 uppercase">
+                Contact
+              </TableHead>
+              <TableHead className="font-semibold text-[11px] text-blue-900 uppercase">
+                Details
+              </TableHead>
+              <TableHead className="text-right font-semibold text-[11px] text-blue-900 uppercase">
+                Orders
+              </TableHead>
+              <TableHead className="text-right font-semibold text-[11px] text-blue-900 uppercase">
+                Purchase Value
+              </TableHead>
+              <TableHead className="text-right font-semibold text-[11px] text-blue-900 uppercase">
+                Outstanding
+              </TableHead>
+              <TableHead className="font-semibold text-[11px] text-blue-900 uppercase">
+                Status
+              </TableHead>
+              <TableHead className="text-right font-semibold text-[11px] text-blue-900 uppercase">
+                Actions
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {filteredVendors.length > 0 ? (
               filteredVendors.map((vendor, index) => (
-                <TableRow key={vendor.id} className={`border-b border-gray-100 hover:bg-slate-50/50 ${index % 2 !== 0 ? "bg-sky-100/60" : ""}`}>
+                <TableRow
+                  key={vendor.id}
+                  className={`border-b border-gray-100 hover:bg-slate-50/50 ${index % 2 !== 0 ? 'bg-sky-100/60' : ''}`}
+                >
                   <TableCell className="font-medium text-blue-900">{vendor.name}</TableCell>
-                  <TableCell className="text-slate-500 font-medium">VND-{vendor.id.substring(0, 4)}</TableCell>
+                  <TableCell className="text-slate-500 font-medium">
+                    VND-{vendor.id.substring(0, 4)}
+                  </TableCell>
                   <TableCell>
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${vendor.type === "Supplier" ? "bg-blue-100 text-blue-700" :
-                        vendor.type === "Distributor" ? "bg-purple-100 text-purple-700" :
-                          "bg-orange-100 text-orange-700"
-                      }`}>
+                    <span
+                      className={`px-2 py-1 rounded-full text-xs font-medium ${
+                        vendor.type === 'Supplier'
+                          ? 'bg-blue-100 text-blue-700'
+                          : vendor.type === 'Distributor'
+                            ? 'bg-purple-100 text-purple-700'
+                            : 'bg-orange-100 text-orange-700'
+                      }`}
+                    >
                       {vendor.type}
                     </span>
                   </TableCell>
@@ -216,12 +291,23 @@ export default function VendorTable() {
                     </div>
                   </TableCell>
                   <TableCell className="text-right">{vendor.totalOrders}</TableCell>
-                  <TableCell className="text-right font-medium">₹ {vendor.purchaseValue.toLocaleString()}</TableCell>
-                  <TableCell className="text-right font-medium text-red-600">₹ {vendor.outstandingAmount.toLocaleString()}</TableCell>
+                  <TableCell className="text-right font-medium">
+                    ₹ {vendor.purchaseValue.toLocaleString()}
+                  </TableCell>
+                  <TableCell className="text-right font-medium text-red-600">
+                    ₹ {vendor.outstandingAmount.toLocaleString()}
+                  </TableCell>
                   <TableCell>
-                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium ${vendor.status === "Active" ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"
-                      }`}>
-                      <span className={`h-1.5 w-1.5 rounded-full ${vendor.status === "Active" ? "bg-green-600" : "bg-yellow-600"}`}></span>
+                    <span
+                      className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                        vendor.status === 'Active'
+                          ? 'bg-green-100 text-green-700'
+                          : 'bg-yellow-100 text-yellow-700'
+                      }`}
+                    >
+                      <span
+                        className={`h-1.5 w-1.5 rounded-full ${vendor.status === 'Active' ? 'bg-green-600' : 'bg-yellow-600'}`}
+                      ></span>
                       {vendor.status}
                     </span>
                   </TableCell>
@@ -252,7 +338,7 @@ export default function VendorTable() {
                         className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50"
                         onClick={() => setDeleteVendorTarget(vendor)}
                       >
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-trash-2"><path d="M3 6h18" /><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" /><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" /><line x1="10" x2="10" y1="11" y2="17" /><line x1="14" x2="14" y1="11" y2="17" /></svg>
+                        <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
                   </TableCell>
@@ -298,17 +384,26 @@ function VendorFormModal({
 }: {
   initialData: Vendor | null;
   onClose: () => void;
-  onConfirm: (data: any) => void;
+  onConfirm: (data: VendorFormData) => void;
 }) {
-  const [form, setForm] = useState<any>(
-    initialData ?? {
-      name: "",
-      type: "Supplier",
-      contactPerson: "",
-      phone: "",
-      email: "",
-      status: "Active",
-    }
+  const [form, setForm] = useState<VendorFormData>(
+    initialData
+      ? {
+          name: initialData.name,
+          type: initialData.type,
+          contactPerson: initialData.contactPerson,
+          phone: initialData.phone,
+          email: initialData.email,
+          status: initialData.status,
+        }
+      : {
+          name: '',
+          type: 'Supplier',
+          contactPerson: '',
+          phone: '',
+          email: '',
+          status: 'Active',
+        },
   );
 
   return (
@@ -316,7 +411,7 @@ function VendorFormModal({
       <div className="w-full max-w-lg rounded-2xl bg-white shadow-xl px-6 py-5 relative max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-5">
           <h2 className="text-lg font-semibold text-gray-900">
-            {initialData ? "Update Vendor" : "Add Vendor"}
+            {initialData ? 'Update Vendor' : 'Add Vendor'}
           </h2>
           <button
             onClick={onClose}
@@ -347,7 +442,7 @@ function VendorFormModal({
               <Select
                 value={form.type}
                 onValueChange={(value) =>
-                  setForm({ ...form, type: value })
+                  setForm({ ...form, type: value as VendorFormData['type'] })
                 }
               >
                 <SelectTrigger className="w-full">
@@ -382,7 +477,7 @@ function VendorFormModal({
             <Select
               value={form.status}
               onValueChange={(value) =>
-                setForm({ ...form, status: value })
+                setForm({ ...form, status: value as VendorFormData['status'] })
               }
             >
               <SelectTrigger className="w-full">
@@ -397,11 +492,7 @@ function VendorFormModal({
         </div>
 
         <div className="mt-6 flex justify-end gap-3">
-          <Button
-            variant="outline"
-            className="rounded-full px-6"
-            onClick={onClose}
-          >
+          <Button variant="outline" className="rounded-full px-6" onClick={onClose}>
             Cancel
           </Button>
           <Button
@@ -447,18 +538,10 @@ function ConfirmDeleteModal({
   );
 }
 
-function Field({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <label className="block text-sm font-medium text-gray-700 mb-1">
-        {label}
-      </label>
+      <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
       {children}
     </div>
   );

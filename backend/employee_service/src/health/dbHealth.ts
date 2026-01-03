@@ -1,4 +1,4 @@
-import { Source } from "../config/dataSource";
+import { Source } from '../config/dataSource';
 
 export const checkDatabase = async () => {
   try {
@@ -6,14 +6,14 @@ export const checkDatabase = async () => {
       await Source.initialize();
     }
 
-    await Source.query("SELECT 1");
+    await Source.query('SELECT 1');
 
     return {
-      status: "UP",
+      status: 'UP',
     };
   } catch (error: any) {
     return {
-      status: "DOWN",
+      status: 'DOWN',
       error: error.message,
     };
   }

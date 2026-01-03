@@ -1,8 +1,8 @@
-import api from "./api";
+import api from './api';
 
-import { jwtDecode } from "jwt-decode";
+import { jwtDecode } from 'jwt-decode';
 
-export type UserRole = "HR" | "EMPLOYEE" | "FINANCE" | "MANAGER";
+export type UserRole = 'HR' | 'EMPLOYEE' | 'FINANCE' | 'MANAGER';
 
 export interface JwtPayload {
   id: string;
@@ -11,7 +11,7 @@ export interface JwtPayload {
 }
 
 export function getUserFromToken(): JwtPayload | null {
-  const token = localStorage.getItem("accessToken");
+  const token = localStorage.getItem('accessToken');
   if (!token) return null;
 
   try {
@@ -22,7 +22,7 @@ export function getUserFromToken(): JwtPayload | null {
 }
 
 export async function requestLoginOtp(email: string, password: string) {
-  const res = await api.post("/e/auth/login", {
+  const res = await api.post('/e/auth/login', {
     email,
     password,
   });
@@ -30,34 +30,35 @@ export async function requestLoginOtp(email: string, password: string) {
 }
 
 export async function verifyLoginOtp(email: string, otp: string) {
-  const res = await api.post("/e/auth/login/verify", {
+  const res = await api.post('/e/auth/login/verify', {
     email,
     otp,
   });
-  localStorage.setItem("accessToken", res.data.accessToken);
+  localStorage.setItem('accessToken', res.data.accessToken);
 
   return res.data;
 }
 
 export async function requestMagicLink(email: string) {
-  const res = await api.post("/e/auth/magic-link", { email });
+  const res = await api.post('/e/auth/magic-link', { email });
   return res.data;
 }
+// 
 
-export async function verifyMagicLink(email: string, token: string) {
-  const res = await api.post("/e/auth/magic-link/verify", { email, token });
-  localStorage.setItem("accessToken", res.data.accessToken);
+export async function verifyMagicLink( token: string) {
+  const res = await api.post('/e/auth/magic-link/verify', { token });
+  localStorage.setItem('accessToken', res.data.accessToken);
 
   return res.data;
 }
 
 export async function requestForgotPasswordOtp(email: string) {
-  const res = await api.post("/e/auth/forgot-password", { email });
+  const res = await api.post('/e/auth/forgot-password', { email });
   return res.data;
 }
 
 export async function resetPassword(email: string, otp: string, newPassword: string) {
-  const res = await api.post("/e/auth/forgot-password/verify", {
+  const res = await api.post('/e/auth/forgot-password/verify', {
     email,
     otp,
     newPassword,
@@ -66,25 +67,22 @@ export async function resetPassword(email: string, otp: string, newPassword: str
 }
 
 export async function logout() {
-
   try {
     const res = await api.post('/e/auth/logout');
     if (res.data.success) {
       localStorage.clear();
-      return res
-
+      return res;
     }
-  }
-  catch (err) {
+  } catch (err) {
     console.log(err);
   }
 }
 
 export async function adminLogin(email: string, password: string) {
-  const res = await api.post("/e/admin/login", {
+  const res = await api.post('/e/admin/login', {
     email,
-    password
-  })
-  localStorage.setItem("accessToken", res.data.accessToken);
+    password,
+  });
+  localStorage.setItem('accessToken', res.data.accessToken);
   return res.data;
 }

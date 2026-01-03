@@ -1,14 +1,10 @@
-import React from "react";
-import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
-import AppSidebar from "@/components/AdminDahboardComponents/AdminAppSidebar";
-import DashboardHeader from "@/components/DashboardHeader";
-import AuthGuard from "@/components/auth-guard";
+import React from 'react';
+import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
+import AppSidebar from '@/components/AdminDahboardComponents/AdminAppSidebar';
+import DashboardHeader from '@/components/DashboardHeader';
+import AuthGuard from '@/components/auth-guard';
 
-export default function AdminLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function AdminLayout({ children }: { children: React.ReactNode }) {
   return (
     <AuthGuard loginUrl="/admin/login">
       <SidebarProvider>

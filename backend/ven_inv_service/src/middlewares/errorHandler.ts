@@ -1,14 +1,9 @@
-import { Request, Response, NextFunction } from "express";
-import { AppError } from "../errors/appError";
-import { logger } from "../config/logger";
+import { Request, Response, NextFunction } from 'express';
+import { AppError } from '../errors/appError';
+import { logger } from '../config/logger';
 
-export const errorHandler = (
-  err: Error,
-  req: Request,
-  res: Response,
-  _next: NextFunction
-) => {
-  logger.error("Unhandled error", {
+export const errorHandler = (err: Error, req: Request, res: Response, _next: NextFunction) => {
+  logger.error('Unhandled error', {
     message: err.message,
     stack: err.stack,
     path: req.originalUrl,
@@ -24,6 +19,6 @@ export const errorHandler = (
 
   return res.status(500).json({
     success: false,
-    message: "Internal server error",
+    message: 'Internal server error',
   });
 };

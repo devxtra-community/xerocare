@@ -1,18 +1,19 @@
-"use client";
+'use client';
 
-import { useState, useEffect } from "react";
-import { PieChart, Pie, Cell } from "recharts";
+import { useState, useEffect } from 'react';
+import { PieChart, Pie, Cell } from 'recharts';
 
 const data = [
-  { name: "Electronics", value: 60, color: "#FF6B35" },
-  { name: "Cosmetics", value: 25, color: "#004E89" },
-  { name: "Accessories", value: 15, color: "#00A8E8" },
+  { name: 'Electronics', value: 60, color: '#FF6B35' },
+  { name: 'Cosmetics', value: 25, color: '#004E89' },
+  { name: 'Accessories', value: 15, color: '#00A8E8' },
 ];
 
 export default function CategoryPieChart() {
   const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsClient(true);
   }, []);
 
@@ -48,15 +49,9 @@ export default function CategoryPieChart() {
 
       <div className="w-full space-y-2">
         {data.map((item) => (
-          <div
-            key={item.name}
-            className="flex items-center justify-between text-xs"
-          >
+          <div key={item.name} className="flex items-center justify-between text-xs">
             <div className="flex items-center gap-1.5">
-              <span
-                className="h-2 w-2 rounded-full"
-                style={{ backgroundColor: item.color }}
-              />
+              <span className="h-2 w-2 rounded-full" style={{ backgroundColor: item.color }} />
               <span className="font-medium text-gray-900">{item.name}</span>
             </div>
             <span className="font-semibold text-gray-900">{item.value}%</span>

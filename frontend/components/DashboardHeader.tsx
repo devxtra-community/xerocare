@@ -1,15 +1,14 @@
-"use client";
+'use client';
 
-import { Search, Bell, HelpCircle, ChevronDown, Menu } from "lucide-react";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { SidebarTrigger } from "@/components/ui/sidebar";
+import { Search, Bell, HelpCircle, ChevronDown, Menu } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { SidebarTrigger } from '@/components/ui/sidebar';
 
 export default function DashboardHeader() {
   return (
     <header className="sticky top-0 z-50 w-full bg-sidebar text-white">
       <div className="flex h-14 sm:h-16 items-center justify-between px-3 sm:px-6 gap-2">
-    
         <div className="flex items-center gap-2">
           <SidebarTrigger className="lg:hidden text-white hover:bg-white/10">
             <Menu className="h-5 w-5" />

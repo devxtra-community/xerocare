@@ -4,17 +4,17 @@ import {
   Column,
   CreateDateColumn,
   UpdateDateColumn,
-} from "typeorm";
+} from 'typeorm';
 
 export enum VendorStatus {
-  ACTIVE = "ACTIVE",
-  INACTIVE = "INACTIVE",
-  DELETED = "DELETED",                                  
+  ACTIVE = 'ACTIVE',
+  INACTIVE = 'INACTIVE',
+  DELETED = 'DELETED',
 }
 
-@Entity({ name: "vendors" })
+@Entity({ name: 'vendors' })
 export class Vendor {
-  @PrimaryGeneratedColumn("uuid")
+  @PrimaryGeneratedColumn('uuid')
   id!: string;
 
   @Column({ unique: true })
@@ -27,7 +27,7 @@ export class Vendor {
   phone?: string;
 
   @Column({
-    type: "enum",
+    type: 'enum',
     enum: VendorStatus,
     default: VendorStatus.ACTIVE,
   })

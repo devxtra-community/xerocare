@@ -1,16 +1,16 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Search, Plus, X, Trash2 } from "lucide-react";
+import { useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Search, Plus, X, Trash2 } from 'lucide-react';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
+} from '@/components/ui/select';
 import {
   Table,
   TableBody,
@@ -18,8 +18,8 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
-import StatCard from "@/components/StatCard";
+} from '@/components/ui/table';
+import StatCard from '@/components/StatCard';
 
 type Branch = {
   id: string;
@@ -27,48 +27,48 @@ type Branch = {
   address: string;
   location: string;
   startedDate: string;
-  status: "active" | "inactive";
+  status: 'active' | 'inactive';
   manager: string;
 };
 
 const initialBranches: Branch[] = [
   {
-    id: "1",
-    branchName: "CityWave Store",
-    address: "MG Road, Ernakulam",
-    location: "Ernakulam",
-    startedDate: "2023-11-20",
-    status: "active",
-    manager: "Rajesh Kumar",
+    id: '1',
+    branchName: 'CityWave Store',
+    address: 'MG Road, Ernakulam',
+    location: 'Ernakulam',
+    startedDate: '2023-11-20',
+    status: 'active',
+    manager: 'Rajesh Kumar',
   },
   {
-    id: "2",
-    branchName: "UrbanHub Outlet",
-    address: "Vyttila Junction",
-    location: "Kochi",
-    startedDate: "2023-02-10",
-    status: "active",
-    manager: "Priya Menon",
+    id: '2',
+    branchName: 'UrbanHub Outlet',
+    address: 'Vyttila Junction',
+    location: 'Kochi',
+    startedDate: '2023-02-10',
+    status: 'active',
+    manager: 'Priya Menon',
   },
   {
-    id: "3",
-    branchName: "PrimePoint Store",
-    address: "Pattom",
-    location: "Trivandrum",
-    startedDate: "2024-05-18",
-    status: "inactive",
-    manager: "Unassigned",
+    id: '3',
+    branchName: 'PrimePoint Store',
+    address: 'Pattom',
+    location: 'Trivandrum',
+    startedDate: '2024-05-18',
+    status: 'inactive',
+    manager: 'Unassigned',
   },
 ];
 
 const availableManagers = [
-  "Unassigned",
-  "Rajesh Kumar",
-  "Priya Menon",
-  "Arjun Nair",
-  "Lakshmi Pillai",
-  "Vijay Krishnan",
-  "Sreelatha Menon",
+  'Unassigned',
+  'Rajesh Kumar',
+  'Priya Menon',
+  'Arjun Nair',
+  'Lakshmi Pillai',
+  'Vijay Krishnan',
+  'Sreelatha Menon',
 ];
 
 const formatDate = (dateString: string) => {
@@ -76,39 +76,33 @@ const formatDate = (dateString: string) => {
   return date.toLocaleDateString('en-US', {
     year: 'numeric',
     month: '2-digit',
-    day: '2-digit'
+    day: '2-digit',
   });
 };
 
 export default function BranchReport() {
   const [branches, setBranches] = useState(initialBranches);
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState('');
 
   const [formOpen, setFormOpen] = useState(false);
   const [editingBranch, setEditingBranch] = useState<Branch | null>(null);
   const [deleteBranch, setDeleteBranch] = useState<Branch | null>(null);
 
   const filtered = branches.filter((b) =>
-    `${b.branchName} ${b.address} ${b.location}`
-      .toLowerCase()
-      .includes(search.toLowerCase())
+    `${b.branchName} ${b.address} ${b.location}`.toLowerCase().includes(search.toLowerCase()),
   );
 
-                                                                                                                                                        
   const totalBranches = branches.length;
-  const activeBranches = branches.filter(b => b.status === "active").length;
-  const inactiveBranches = branches.filter(b => b.status === "inactive").length;
-  
-  
+  const activeBranches = branches.filter((b) => b.status === 'active').length;
+  const inactiveBranches = branches.filter((b) => b.status === 'inactive').length;
+
   const twoYearsAgo = new Date();
   twoYearsAgo.setFullYear(twoYearsAgo.getFullYear() - 2);
-  const newBranches = branches.filter(b => new Date(b.startedDate) >= twoYearsAgo).length;
+  const newBranches = branches.filter((b) => new Date(b.startedDate) >= twoYearsAgo).length;
 
   const handleSave = (data: Branch) => {
     if (editingBranch) {
-      setBranches((prev) =>
-        prev.map((b) => (b.id === data.id ? data : b))
-      );
+      setBranches((prev) => prev.map((b) => (b.id === data.id ? data : b)));
     } else {
       setBranches((prev) => [...prev, data]);
     }
@@ -126,32 +120,26 @@ export default function BranchReport() {
     <div className="bg-blue-100 min-h-screen p-3 sm:p-4 md:p-6 space-y-8 sm:space-y-10">
       {/* BRANCHES */}
       <div className="space-y-4 sm:space-y-6">
-        <h3 className="text-xl sm:text-2xl font-bold text-blue-900">
-          Branches
-        </h3>
+        <h3 className="text-xl sm:text-2xl font-bold text-blue-900">Branches</h3>
 
         {/* SUMMARY CARDS */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 sm:gap-2 md:gap-4">
-          <StatCard 
-            title="Total Branches" 
-            value={totalBranches.toString()} 
-            subtitle="All registered" 
+          <StatCard
+            title="Total Branches"
+            value={totalBranches.toString()}
+            subtitle="All registered"
           />
-          <StatCard 
-            title="Active Branches" 
-            value={activeBranches.toString()} 
-            subtitle="Currently operational" 
+          <StatCard
+            title="Active Branches"
+            value={activeBranches.toString()}
+            subtitle="Currently operational"
           />
-          <StatCard 
-            title="Inactive Branches" 
-            value={inactiveBranches.toString()} 
-            subtitle="Temporarily closed" 
+          <StatCard
+            title="Inactive Branches"
+            value={inactiveBranches.toString()}
+            subtitle="Temporarily closed"
           />
-          <StatCard 
-            title="New Branches" 
-            value={newBranches.toString()} 
-            subtitle="Last 2 years" 
-          />
+          <StatCard title="New Branches" value={newBranches.toString()} subtitle="Last 2 years" />
         </div>
 
         {/* HEADER & SEARCH */}
@@ -182,45 +170,39 @@ export default function BranchReport() {
           <Table>
             <TableHeader>
               <TableRow>
-                {[
-                  "BRANCH",
-                  "ADDRESS",
-                  "LOCATION",
-                  "MANAGER",
-                  "STARTED",
-                  "STATUS",
-                  "ACTION",
-                ].map((h) => (
-                  <TableHead
-                    key={h}
-                    className="text-[11px] font-semibold text-blue-900 uppercase px-4"
-                  >
-                    {h}
-                  </TableHead>
-                ))}
+                {['BRANCH', 'ADDRESS', 'LOCATION', 'MANAGER', 'STARTED', 'STATUS', 'ACTION'].map(
+                  (h) => (
+                    <TableHead
+                      key={h}
+                      className="text-[11px] font-semibold text-blue-900 uppercase px-4"
+                    >
+                      {h}
+                    </TableHead>
+                  ),
+                )}
               </TableRow>
             </TableHeader>
 
             <TableBody>
               {filtered.map((b, i) => (
-                <TableRow key={b.id} className={i % 2 ? "bg-sky-100/60" : ""}>
+                <TableRow key={b.id} className={i % 2 ? 'bg-sky-100/60' : ''}>
                   <TableCell className="px-4 font-medium">{b.branchName}</TableCell>
                   <TableCell className="px-4">{b.address}</TableCell>
                   <TableCell className="px-4">{b.location}</TableCell>
                   <TableCell className="px-4">
-                    <span className={`${b.manager === "Unassigned" ? "text-slate-400" : "text-gray-900"}`}>
+                    <span
+                      className={`${b.manager === 'Unassigned' ? 'text-slate-400' : 'text-gray-900'}`}
+                    >
                       {b.manager}
                     </span>
                   </TableCell>
-                  <TableCell className="px-4">
-                    {formatDate(b.startedDate)}
-                  </TableCell>
+                  <TableCell className="px-4">{formatDate(b.startedDate)}</TableCell>
                   <TableCell className="px-4">
                     <span
                       className={`px-2.5 py-1 rounded-full text-xs font-medium ${
-                        b.status === "active"
-                          ? "bg-green-100 text-green-700"
-                          : "bg-red-100 text-red-700"
+                        b.status === 'active'
+                          ? 'bg-green-100 text-green-700'
+                          : 'bg-red-100 text-red-700'
                       }`}
                     >
                       {b.status}
@@ -284,13 +266,13 @@ function BranchFormModal({
   const [form, setForm] = useState<Branch>(
     initialData ?? {
       id: crypto.randomUUID(),
-      branchName: "",
-      address: "",
-      location: "",
-      startedDate: "",
-      status: "active",
-      manager: "Unassigned",
-    }
+      branchName: '',
+      address: '',
+      location: '',
+      startedDate: '',
+      status: 'active',
+      manager: 'Unassigned',
+    },
   );
 
   return (
@@ -298,7 +280,7 @@ function BranchFormModal({
       <div className="w-full max-w-md rounded-2xl bg-white shadow-xl px-6 py-5 relative">
         <div className="flex items-center justify-between mb-5">
           <h2 className="text-lg font-semibold text-gray-900">
-            {initialData ? "Update Branch" : "Add Branch"}
+            {initialData ? 'Update Branch' : 'Add Branch'}
           </h2>
           <button
             onClick={onClose}
@@ -313,9 +295,7 @@ function BranchFormModal({
             <Input
               placeholder="Full name"
               value={form.branchName}
-              onChange={(e) =>
-                setForm({ ...form, branchName: e.target.value })
-              }
+              onChange={(e) => setForm({ ...form, branchName: e.target.value })}
             />
           </Field>
 
@@ -323,9 +303,7 @@ function BranchFormModal({
             <Input
               placeholder="Address"
               value={form.address}
-              onChange={(e) =>
-                setForm({ ...form, address: e.target.value })
-              }
+              onChange={(e) => setForm({ ...form, address: e.target.value })}
             />
           </Field>
 
@@ -333,9 +311,7 @@ function BranchFormModal({
             <Input
               placeholder="City / Area"
               value={form.location}
-              onChange={(e) =>
-                setForm({ ...form, location: e.target.value })
-              }
+              onChange={(e) => setForm({ ...form, location: e.target.value })}
             />
           </Field>
 
@@ -343,26 +319,22 @@ function BranchFormModal({
             <Input
               type="date"
               value={form.startedDate}
-              onChange={(e) =>
-                setForm({ ...form, startedDate: e.target.value })
-              }
+              onChange={(e) => setForm({ ...form, startedDate: e.target.value })}
             />
           </Field>
 
           <Field label="Assign Manager">
             <Select
               value={form.manager}
-              onValueChange={(value) =>
-                setForm({ ...form, manager: value })
-              }
+              onValueChange={(value) => setForm({ ...form, manager: value })}
             >
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Select manager" />
               </SelectTrigger>
               <SelectContent>
                 {availableManagers.map((manager) => (
-                  <SelectItem 
-                    key={manager} 
+                  <SelectItem
+                    key={manager}
                     value={manager}
                     className="focus:bg-primary focus:text-white"
                   >
@@ -377,7 +349,7 @@ function BranchFormModal({
             <Select
               value={form.status}
               onValueChange={(value) =>
-                setForm({ ...form, status: value as "active" | "inactive" })
+                setForm({ ...form, status: value as 'active' | 'inactive' })
               }
             >
               <SelectTrigger className="w-full">
@@ -442,18 +414,10 @@ function ConfirmDeleteModal({
   );
 }
 
-function Field({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <label className="block text-sm font-medium text-gray-700 mb-1">
-        {label}
-      </label>
+      <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
       {children}
     </div>
   );

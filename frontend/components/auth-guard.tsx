@@ -1,34 +1,35 @@
-"use client";
+'use client';
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { getUserFromToken } from "@/lib/auth";
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { getUserFromToken } from '@/lib/auth';
 
 interface AuthGuardProps {
-    children: React.ReactNode;
-    loginUrl?: string;
+  children: React.ReactNode;
+  loginUrl?: string;
 }
 
-export default function AuthGuard({ children, loginUrl = "/login" }: AuthGuardProps) {
-    const router = useRouter();
-    const [authorized, setAuthorized] = useState(false);
+export default function AuthGuard({ children, loginUrl = '/login' }: AuthGuardProps) {
+  const router = useRouter();
+  const [authorized, setAuthorized] = useState(false);
 
-    useEffect(() => {
-        const user = getUserFromToken();
-        if (!user) {
-            router.push(loginUrl);
-        } else {
-            setAuthorized(true);
-        }
-    }, [router, loginUrl]);
-
-    if (!authorized) {
-        return (
-            <div className="flex h-screen w-full items-center justify-center">
-                <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-            </div>
-        );
+  useEffect(() => {
+    const user = getUserFromToken();
+    if (!user) {
+      router.push(loginUrl);
+    } else {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setAuthorized(true);
     }
+  }, [router, loginUrl]);
 
-    return <>{children}</>;
+  if (!authorized) {
+    return (
+      <div className="flex h-screen w-full items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+      </div>
+    );
+  }
+
+  return <>{children}</>;
 }

@@ -1,10 +1,10 @@
-import next from "next";
-import BranchReport from "@/components/AdminDahboardComponents/branchComponents/BranchTable";
+import next from 'next';
+import BranchReport from '@/components/AdminDahboardComponents/branchComponents/BranchTable';
 
-export default function BranchPage(){
-    return(
-        <>
-        <BranchReport/>
-        </>
-    )
+export default function BranchPage() {
+  return (
+    <>
+      <BranchReport />
+    </>
+  );
 }

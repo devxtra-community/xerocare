@@ -1,16 +1,17 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Search, Plus, X, Trash2 } from "lucide-react";
+import { useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Search, Plus, X, Trash2 } from 'lucide-react';
+import Image from 'next/image';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
+} from '@/components/ui/select';
 import {
   Table,
   TableBody,
@@ -18,10 +19,8 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
-import StatCard from "@/components/StatCard";
-
-
+} from '@/components/ui/table';
+import StatCard from '@/components/StatCard';
 
 type Product = {
   id: string;
@@ -30,59 +29,52 @@ type Product = {
   category: string;
   price: number;
   stock: number;
-  status: "in-stock" | "out-of-stock";
+  status: 'in-stock' | 'out-of-stock';
   image?: string;
 };
 
-
-
 const initialProducts: Product[] = [
   {
-    id: "1",
-    name: "HP LaserJet Pro",
-    Model: "HP-LJ-982345",
-    category: "Printer",
+    id: '1',
+    name: 'HP LaserJet Pro',
+    Model: 'HP-LJ-982345',
+    category: 'Printer',
     price: 30000,
     stock: 12,
-    status: "in-stock",
-    image: "",
+    status: 'in-stock',
+    image: '',
   },
   {
-    id: "2",
-    name: "Canon ImageCLASS",
-    Model: "CN-IMG-774521",
-    category: "Printer",
+    id: '2',
+    name: 'Canon ImageCLASS',
+    Model: 'CN-IMG-774521',
+    category: 'Printer',
     price: 26000,
     stock: 8,
-    status: "in-stock",
-    image: "",
+    status: 'in-stock',
+    image: '',
   },
 ];
 
-
-
 export default function ManagerProduct() {
   const [products, setProducts] = useState(initialProducts);
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState('');
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Product | null>(null);
   const [deleting, setDeleting] = useState<Product | null>(null);
 
   const filtered = products.filter((p) =>
-    `${p.name} ${p.Model} ${p.category}`
-      .toLowerCase()
-      .includes(search.toLowerCase())
+    `${p.name} ${p.Model} ${p.category}`.toLowerCase().includes(search.toLowerCase()),
   );
 
-
   const total = products.length;
-  const inStock = products.filter(p => p.status === "in-stock").length;
-  const outStock = products.filter(p => p.status === "out-of-stock").length;
-  const lowStock = products.filter(p => p.stock > 0 && p.stock < 5).length;
+  const inStock = products.filter((p) => p.status === 'in-stock').length;
+  const outStock = products.filter((p) => p.status === 'out-of-stock').length;
+  const lowStock = products.filter((p) => p.stock > 0 && p.stock < 5).length;
 
   const handleSave = (data: Product) => {
-    setProducts(prev =>
-      editing ? prev.map(p => p.id === data.id ? data : p) : [...prev, data]
+    setProducts((prev) =>
+      editing ? prev.map((p) => (p.id === data.id ? data : p)) : [...prev, data],
     );
     setFormOpen(false);
     setEditing(null);
@@ -90,17 +82,13 @@ export default function ManagerProduct() {
 
   const confirmDelete = () => {
     if (!deleting) return;
-    setProducts(prev => prev.filter(p => p.id !== deleting.id));
+    setProducts((prev) => prev.filter((p) => p.id !== deleting.id));
     setDeleting(null);
   };
 
   return (
     <div className="bg-blue-100 min-h-screen p-3 sm:p-4 md:p-6 space-y-8">
-
-      <h3 className="text-xl sm:text-2xl font-bold text-blue-900">
-        Products
-      </h3>
-
+      <h3 className="text-xl sm:text-2xl font-bold text-blue-900">Products</h3>
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
         <StatCard title="Total Products" value={total.toString()} subtitle="All items" />
@@ -135,20 +123,30 @@ export default function ManagerProduct() {
         <Table>
           <TableHeader>
             <TableRow>
-              {["IMAGE", "PRODUCT", "Model", "CATEGORY", "PRICE", "STOCK", "STATUS", "ACTION"].map(h => (
-                <TableHead key={h} className="text-[11px] font-semibold text-blue-900 px-4">
-                  {h}
-                </TableHead>
-              ))}
+              {['IMAGE', 'PRODUCT', 'Model', 'CATEGORY', 'PRICE', 'STOCK', 'STATUS', 'ACTION'].map(
+                (h) => (
+                  <TableHead key={h} className="text-[11px] font-semibold text-blue-900 px-4">
+                    {h}
+                  </TableHead>
+                ),
+              )}
             </TableRow>
           </TableHeader>
 
           <TableBody>
             {filtered.map((p, i) => (
-              <TableRow key={p.id} className={i % 2 ? "bg-sky-100/60" : ""}>
+              <TableRow key={p.id} className={i % 2 ? 'bg-sky-100/60' : ''}>
                 <TableCell className="px-4">
                   {p.image ? (
-                    <img src={p.image} className="h-8 w-8 rounded object-cover" />
+                    <div className="relative h-8 w-8 rounded overflow-hidden">
+                      <Image
+                        src={p.image}
+                        alt={p.name}
+                        fill
+                        className="object-cover"
+                        unoptimized={p.image.startsWith('data:')}
+                      />
+                    </div>
                   ) : (
                     <div className="h-8 w-8 rounded bg-gray-100 flex items-center justify-center text-xs text-gray-400">
                       N/A
@@ -161,11 +159,13 @@ export default function ManagerProduct() {
                 <TableCell className="px-4">₹{p.price}</TableCell>
                 <TableCell className="px-4">{p.stock}</TableCell>
                 <TableCell className="px-4">
-                  <span className={`px-2 py-1 rounded-full text-xs ${
-                    p.status === "in-stock"
-                      ? "bg-green-100 text-green-700"
-                      : "bg-red-100 text-red-700"
-                  }`}>
+                  <span
+                    className={`px-2 py-1 rounded-full text-xs ${
+                      p.status === 'in-stock'
+                        ? 'bg-green-100 text-green-700'
+                        : 'bg-red-100 text-red-700'
+                    }`}
+                  >
                     {p.status}
                   </span>
                 </TableCell>
@@ -180,10 +180,7 @@ export default function ManagerProduct() {
                     >
                       Update
                     </button>
-                    <button
-                      className="text-red-600 hover:underline"
-                      onClick={() => setDeleting(p)}
-                    >
+                    <button className="text-red-600 hover:underline" onClick={() => setDeleting(p)}>
                       Delete
                     </button>
                   </div>
@@ -213,7 +210,6 @@ export default function ManagerProduct() {
   );
 }
 
-
 function ProductFormModal({
   initialData,
   onClose,
@@ -226,30 +222,36 @@ function ProductFormModal({
   const [form, setForm] = useState<Product>(
     initialData ?? {
       id: crypto.randomUUID(),
-      name: "",
-      Model: "",
-      category: "Printer",
+      name: '',
+      Model: '',
+      category: 'Printer',
       price: 0,
       stock: 0,
-      status: "in-stock",
-      image: "",
-    }
+      status: 'in-stock',
+      image: '',
+    },
   );
 
   const handleImageUpload = (file: File) => {
     const reader = new FileReader();
-    reader.onloadend = () =>
-      setForm({ ...form, image: reader.result as string });
+    reader.onloadend = () => setForm({ ...form, image: reader.result as string });
     reader.readAsDataURL(file);
   };
 
   return (
-    <Modal title={initialData ? "Update Product" : "Add Product"} onClose={onClose}>
-      
+    <Modal title={initialData ? 'Update Product' : 'Add Product'} onClose={onClose}>
       <Field label="Product Image">
         <div className="flex items-center gap-4">
           {form.image ? (
-            <img src={form.image} className="h-16 w-16 rounded object-cover border" />
+            <div className="relative h-16 w-16 rounded overflow-hidden border">
+              <Image
+                src={form.image}
+                alt="Product preview"
+                fill
+                className="object-cover"
+                unoptimized={form.image.startsWith('data:')}
+              />
+            </div>
           ) : (
             <div className="h-16 w-16 rounded border flex items-center justify-center text-xs text-gray-400">
               No Image
@@ -264,31 +266,44 @@ function ProductFormModal({
       </Field>
 
       <Field label="Product Name">
-        <Input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
+        <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
       </Field>
 
       <Field label="SKU">
-        <Input value={form.Model} onChange={e => setForm({ ...form, Model: e.target.value })} />
+        <Input value={form.Model} onChange={(e) => setForm({ ...form, Model: e.target.value })} />
       </Field>
 
       <Field label="Category">
-        <Input value={form.category} onChange={e => setForm({ ...form, category: e.target.value })} />
+        <Input
+          value={form.category}
+          onChange={(e) => setForm({ ...form, category: e.target.value })}
+        />
       </Field>
 
       <Field label="Price">
-        <Input type="number" value={form.price} onChange={e => setForm({ ...form, price: +e.target.value })} />
+        <Input
+          type="number"
+          value={form.price}
+          onChange={(e) => setForm({ ...form, price: +e.target.value })}
+        />
       </Field>
 
       <Field label="Stock">
-        <Input type="number" value={form.stock} onChange={e => setForm({ ...form, stock: +e.target.value })} />
+        <Input
+          type="number"
+          value={form.stock}
+          onChange={(e) => setForm({ ...form, stock: +e.target.value })}
+        />
       </Field>
 
       <Field label="Status">
         <Select
           value={form.status}
-          onValueChange={(v) => setForm({ ...form, status: v as Product["status"] })}
+          onValueChange={(v) => setForm({ ...form, status: v as Product['status'] })}
         >
-          <SelectTrigger><SelectValue /></SelectTrigger>
+          <SelectTrigger>
+            <SelectValue />
+          </SelectTrigger>
           <SelectContent>
             <SelectItem value="in-stock">In Stock</SelectItem>
             <SelectItem value="out-of-stock">Out of Stock</SelectItem>
@@ -297,7 +312,9 @@ function ProductFormModal({
       </Field>
 
       <div className="flex justify-end gap-3 mt-6">
-        <Button variant="outline" onClick={onClose}>Cancel</Button>
+        <Button variant="outline" onClick={onClose}>
+          Cancel
+        </Button>
         <Button className="bg-primary text-white" onClick={() => onConfirm(form)}>
           Confirm
         </Button>
@@ -306,14 +323,23 @@ function ProductFormModal({
   );
 }
 
-
-function Modal({ title, children, onClose }: any) {
+function Modal({
+  title,
+  children,
+  onClose,
+}: {
+  title: string;
+  children: React.ReactNode;
+  onClose: () => void;
+}) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
       <div className="bg-white rounded-2xl w-full max-w-md p-6">
         <div className="flex justify-between mb-4">
           <h2 className="font-semibold">{title}</h2>
-          <button onClick={onClose}><X size={16} /></button>
+          <button onClick={onClose}>
+            <X size={16} />
+          </button>
         </div>
         <div className="space-y-4">{children}</div>
       </div>
@@ -321,22 +347,36 @@ function Modal({ title, children, onClose }: any) {
   );
 }
 
-function ConfirmDeleteModal({ name, onCancel, onConfirm }: any) {
+function ConfirmDeleteModal({
+  name,
+  onCancel,
+  onConfirm,
+}: {
+  name: string;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
   return (
     <div className="fixed inset-0 flex items-center justify-center bg-black/40">
       <div className="bg-white rounded-2xl p-6 text-center">
         <Trash2 className="mx-auto text-red-600 mb-2" />
-        <p>Delete <b>{name}</b>?</p>
+        <p>
+          Delete <b>{name}</b>?
+        </p>
         <div className="flex justify-center gap-4 mt-4">
-          <Button variant="outline" onClick={onCancel}>Cancel</Button>
-          <Button className="bg-red-600 text-white" onClick={onConfirm}>Delete</Button>
+          <Button variant="outline" onClick={onCancel}>
+            Cancel
+          </Button>
+          <Button className="bg-red-600 text-white" onClick={onConfirm}>
+            Delete
+          </Button>
         </div>
       </div>
     </div>
   );
 }
 
-function Field({ label, children }: any) {
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
       <label className="block text-sm font-medium mb-1">{label}</label>

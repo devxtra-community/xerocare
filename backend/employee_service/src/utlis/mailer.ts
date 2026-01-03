@@ -1,22 +1,19 @@
-import nodemailer from "nodemailer";
-import { OtpPurpose } from "../constants/otpPurpose";
+import nodemailer from 'nodemailer';
+import { OtpPurpose } from '../constants/otpPurpose';
 
 export const mailer = nodemailer.createTransport({
-  service: "gmail",
+  service: 'gmail',
   auth: {
     user: process.env.MAIL_USER,
     pass: process.env.MAIL_PASS,
   },
 });
 
-export async function sendEmployeeWelcomeMail(
-  to: string,
-  password: string
-) {
+export async function sendEmployeeWelcomeMail(to: string, password: string) {
   await mailer.sendMail({
     from: process.env.MAIL_USER,
     to,
-    subject: "Welcome to XeroCare – Your Login Details",
+    subject: 'Welcome to XeroCare – Your Login Details',
     html: `
       <h2>Welcome to XeroCare</h2>
       <p>Your account has been created.</p>
@@ -32,11 +29,11 @@ export async function sendEmployeeWelcomeMail(
   });
 }
 
-export async function sendOtpMail(to: string, otp: string ,purpose: OtpPurpose) {
+export async function sendOtpMail(to: string, otp: string, purpose: OtpPurpose) {
   await mailer.sendMail({
     from: process.env.MAIL_USER,
     to,
-    subject: "Your Login OTP",
+    subject: 'Your Login OTP',
     html: `
       <h2>OTP Verification</h2>
       <p>Your OTP is:</p>
@@ -46,14 +43,11 @@ export async function sendOtpMail(to: string, otp: string ,purpose: OtpPurpose) 
   });
 }
 
-export async function sendMagicLinkMail(
-  to: string,
-  link: string
-) {
+export async function sendMagicLinkMail(to: string, link: string) {
   await mailer.sendMail({
     from: process.env.MAIL_USER,
     to,
-    subject: "Login to your account",
+    subject: 'Login to your account',
     html: `
       <h2>Passwordless Login</h2>
       <p>Click the link below to log in:</p>
@@ -63,14 +57,11 @@ export async function sendMagicLinkMail(
   });
 }
 
-export async function sendVendorWelcomeMail(
-  to: string,
-  vendorName: string
-) {
+export async function sendVendorWelcomeMail(to: string, vendorName: string) {
   await mailer.sendMail({
     from: process.env.MAIL_USER,
     to,
-    subject: "Welcome to XeroCare – Vendor Registration Successful",
+    subject: 'Welcome to XeroCare – Vendor Registration Successful',
     html: `
       <h2>Welcome, ${vendorName} </h2>
 
@@ -94,4 +85,3 @@ export async function sendVendorWelcomeMail(
     `,
   });
 }
-

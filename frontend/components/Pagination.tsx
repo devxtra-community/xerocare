@@ -1,5 +1,5 @@
-"use client";
-import { Button } from "@/components/ui/button";
+'use client';
+import { Button } from '@/components/ui/button';
 
 type PaginationProps = {
   page: number;
@@ -7,11 +7,7 @@ type PaginationProps = {
   onPageChange: (page: number) => void;
 };
 
-export default function Pagination({
-  page,
-  totalPages,
-  onPageChange,
-}: PaginationProps) {
+export default function Pagination({ page, totalPages, onPageChange }: PaginationProps) {
   return (
     <div className="flex items-center justify-between">
       <p className="text-sm text-muted-foreground">

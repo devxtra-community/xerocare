@@ -1,17 +1,17 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Search, Plus, X, Trash2 } from "lucide-react";
+import { useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Search, Plus, X, Trash2 } from 'lucide-react';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
-import StatCard from "@/components/StatCard";
+} from '@/components/ui/select';
+import StatCard from '@/components/StatCard';
 
 type Warehouse = {
   id: string;
@@ -20,104 +20,92 @@ type Warehouse = {
   branch: string;
   location: string;
   address: string;
-  type: "Central" | "Regional" | "Dark Store";
+  type: 'Central' | 'Regional' | 'Dark Store';
   capacity: string;
-  status: "active" | "inactive";
+  status: 'active' | 'inactive';
 };
 
 const initialWarehouses: Warehouse[] = [
   {
-    id: "1",
-    warehouseName: "Central Distribution Hub",
-    warehouseCode: "WH-001",
-    branch: "CityWave Store",
-    location: "Ernakulam",
-    address: "MG Road, Near Metro Station",
-    type: "Central",
-    capacity: "50000 sqft",
-    status: "active",
+    id: '1',
+    warehouseName: 'Central Distribution Hub',
+    warehouseCode: 'WH-001',
+    branch: 'CityWave Store',
+    location: 'Ernakulam',
+    address: 'MG Road, Near Metro Station',
+    type: 'Central',
+    capacity: '50000 sqft',
+    status: 'active',
   },
   {
-    id: "2",
-    warehouseName: "South Regional Warehouse",
-    warehouseCode: "WH-002",
-    branch: "UrbanHub Outlet",
-    location: "Kochi",
-    address: "Vyttila Industrial Area",
-    type: "Regional",
-    capacity: "30000 sqft",
-    status: "active",
+    id: '2',
+    warehouseName: 'South Regional Warehouse',
+    warehouseCode: 'WH-002',
+    branch: 'UrbanHub Outlet',
+    location: 'Kochi',
+    address: 'Vyttila Industrial Area',
+    type: 'Regional',
+    capacity: '30000 sqft',
+    status: 'active',
   },
   {
-    id: "3",
-    warehouseName: "North Storage Unit",
-    warehouseCode: "WH-003",
-    branch: "PrimePoint Store",
-    location: "Trivandrum",
-    address: "Pattom Junction, NH-66",
-    type: "Dark Store",
-    capacity: "15000 sqft",
-    status: "inactive",
+    id: '3',
+    warehouseName: 'North Storage Unit',
+    warehouseCode: 'WH-003',
+    branch: 'PrimePoint Store',
+    location: 'Trivandrum',
+    address: 'Pattom Junction, NH-66',
+    type: 'Dark Store',
+    capacity: '15000 sqft',
+    status: 'inactive',
   },
   {
-    id: "4",
-    warehouseName: "East Logistics Center",
-    warehouseCode: "WH-004",
-    branch: "CityWave Store",
-    location: "Thrissur",
-    address: "Bypass Road, East Gate",
-    type: "Regional",
-    capacity: "35000 sqft",
-    status: "active",
+    id: '4',
+    warehouseName: 'East Logistics Center',
+    warehouseCode: 'WH-004',
+    branch: 'CityWave Store',
+    location: 'Thrissur',
+    address: 'Bypass Road, East Gate',
+    type: 'Regional',
+    capacity: '35000 sqft',
+    status: 'active',
   },
   {
-    id: "5",
-    warehouseName: "Backup Storage Facility",
-    warehouseCode: "WH-005",
-    branch: "UrbanHub Outlet",
-    location: "Kozhikode",
-    address: "Beach Road, Port Area",
-    type: "Dark Store",
-    capacity: "20000 sqft",
-    status: "inactive",
+    id: '5',
+    warehouseName: 'Backup Storage Facility',
+    warehouseCode: 'WH-005',
+    branch: 'UrbanHub Outlet',
+    location: 'Kozhikode',
+    address: 'Beach Road, Port Area',
+    type: 'Dark Store',
+    capacity: '20000 sqft',
+    status: 'inactive',
   },
 ];
 
-const availableBranches = [
-  "CityWave Store",
-  "UrbanHub Outlet",
-  "PrimePoint Store",
-];
+const availableBranches = ['CityWave Store', 'UrbanHub Outlet', 'PrimePoint Store'];
 
-const warehouseTypes = ["Central", "Regional", "Dark Store"];
+const warehouseTypes = ['Central', 'Regional', 'Dark Store'];
 
 export default function WarehouseReport() {
   const [warehouses, setWarehouses] = useState(initialWarehouses);
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState('');
 
   const [formOpen, setFormOpen] = useState(false);
-  const [editingWarehouse, setEditingWarehouse] = useState<Warehouse | null>(
-    null
-  );
-  const [deleteWarehouse, setDeleteWarehouse] = useState<Warehouse | null>(
-    null
-  );
+  const [editingWarehouse, setEditingWarehouse] = useState<Warehouse | null>(null);
+  const [deleteWarehouse, setDeleteWarehouse] = useState<Warehouse | null>(null);
 
   const filtered = warehouses.filter((w) =>
     `${w.warehouseName} ${w.warehouseCode} ${w.location} ${w.branch}`
       .toLowerCase()
-      .includes(search.toLowerCase())
+      .includes(search.toLowerCase()),
   );
 
   // Calculate statistics
   const totalWarehouses = warehouses.length;
-  const activeWarehouses = warehouses.filter(
-    (w) => w.status === "active"
-  ).length;
-  const inactiveWarehouses = warehouses.filter(
-    (w) => w.status === "inactive"
-  ).length;
-  
+  const activeWarehouses = warehouses.filter((w) => w.status === 'active').length;
+  const inactiveWarehouses = warehouses.filter((w) => w.status === 'inactive').length;
+
   // Calculate average capacity from string values
   const totalCapacity = warehouses.reduce((sum, w) => {
     const numValue = parseInt(w.capacity.replace(/\D/g, '')) || 0;
@@ -145,9 +133,7 @@ export default function WarehouseReport() {
     <div className="bg-blue-100 min-h-screen p-3 sm:p-4 md:p-6 space-y-8 sm:space-y-10">
       {/* WAREHOUSES */}
       <div className="space-y-4 sm:space-y-6">
-        <h3 className="text-xl sm:text-2xl font-bold text-blue-900">
-          Warehouses
-        </h3>
+        <h3 className="text-xl sm:text-2xl font-bold text-blue-900">Warehouses</h3>
 
         {/* SUMMARY CARDS */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 sm:gap-2 md:gap-4">
@@ -201,14 +187,14 @@ export default function WarehouseReport() {
             <thead>
               <tr className="border-b border-gray-200">
                 {[
-                  "WAREHOUSE NAME",
-                  "CODE",
-                  "BRANCH",
-                  "LOCATION",
-                  "ADDRESS",
-                  "CAPACITY",
-                  "STATUS",
-                  "ACTION",
+                  'WAREHOUSE NAME',
+                  'CODE',
+                  'BRANCH',
+                  'LOCATION',
+                  'ADDRESS',
+                  'CAPACITY',
+                  'STATUS',
+                  'ACTION',
                 ].map((h) => (
                   <th
                     key={h}
@@ -222,13 +208,12 @@ export default function WarehouseReport() {
 
             <tbody>
               {filtered.map((w, i) => (
-                <tr key={w.id} className={`border-b border-gray-100 ${i % 2 ? "bg-sky-100/60" : ""}`}>
-                  <td className="px-4 py-3 text-sm font-medium">
-                    {w.warehouseName}
-                  </td>
-                  <td className="px-4 py-3 text-sm text-blue-900 font-medium">
-                    {w.warehouseCode}
-                  </td>
+                <tr
+                  key={w.id}
+                  className={`border-b border-gray-100 ${i % 2 ? 'bg-sky-100/60' : ''}`}
+                >
+                  <td className="px-4 py-3 text-sm font-medium">{w.warehouseName}</td>
+                  <td className="px-4 py-3 text-sm text-blue-900 font-medium">{w.warehouseCode}</td>
                   <td className="px-4 py-3 text-sm">{w.branch}</td>
                   <td className="px-4 py-3 text-sm">{w.location}</td>
                   <td className="px-4 py-3 text-sm">{w.address}</td>
@@ -236,9 +221,9 @@ export default function WarehouseReport() {
                   <td className="px-4 py-3">
                     <span
                       className={`px-2.5 py-1 rounded-full text-xs font-medium ${
-                        w.status === "active"
-                          ? "bg-green-100 text-green-700"
-                          : "bg-red-100 text-red-700"
+                        w.status === 'active'
+                          ? 'bg-green-100 text-green-700'
+                          : 'bg-red-100 text-red-700'
                       }`}
                     >
                       {w.status}
@@ -302,15 +287,15 @@ function WarehouseFormModal({
   const [form, setForm] = useState<Warehouse>(
     initialData ?? {
       id: crypto.randomUUID(),
-      warehouseName: "",
-      warehouseCode: "",
+      warehouseName: '',
+      warehouseCode: '',
       branch: availableBranches[0],
-      location: "",
-      address: "",
-      type: "Regional",
-      capacity: "",
-      status: "active",
-    }
+      location: '',
+      address: '',
+      type: 'Regional',
+      capacity: '',
+      status: 'active',
+    },
   );
 
   return (
@@ -318,7 +303,7 @@ function WarehouseFormModal({
       <div className="w-full max-w-lg rounded-2xl bg-white shadow-xl px-6 py-5 relative max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-5">
           <h2 className="text-lg font-semibold text-gray-900">
-            {initialData ? "Update Warehouse" : "Add Warehouse"}
+            {initialData ? 'Update Warehouse' : 'Add Warehouse'}
           </h2>
           <button
             onClick={onClose}
@@ -333,9 +318,7 @@ function WarehouseFormModal({
             <Input
               placeholder="Enter warehouse name"
               value={form.warehouseName}
-              onChange={(e) =>
-                setForm({ ...form, warehouseName: e.target.value })
-              }
+              onChange={(e) => setForm({ ...form, warehouseName: e.target.value })}
             />
           </Field>
 
@@ -343,9 +326,7 @@ function WarehouseFormModal({
             <Input
               placeholder="e.g., WH-001"
               value={form.warehouseCode}
-              onChange={(e) =>
-                setForm({ ...form, warehouseCode: e.target.value })
-              }
+              onChange={(e) => setForm({ ...form, warehouseCode: e.target.value })}
             />
           </Field>
 
@@ -393,7 +374,7 @@ function WarehouseFormModal({
               onValueChange={(value) =>
                 setForm({
                   ...form,
-                  type: value as "Central" | "Regional" | "Dark Store",
+                  type: value as 'Central' | 'Regional' | 'Dark Store',
                 })
               }
             >
@@ -402,11 +383,7 @@ function WarehouseFormModal({
               </SelectTrigger>
               <SelectContent>
                 {warehouseTypes.map((type) => (
-                  <SelectItem
-                    key={type}
-                    value={type}
-                    className="focus:bg-primary focus:text-white"
-                  >
+                  <SelectItem key={type} value={type} className="focus:bg-primary focus:text-white">
                     {type}
                   </SelectItem>
                 ))}
@@ -418,9 +395,7 @@ function WarehouseFormModal({
             <Input
               placeholder="e.g., 30000 sqft"
               value={form.capacity}
-              onChange={(e) =>
-                setForm({ ...form, capacity: e.target.value })
-              }
+              onChange={(e) => setForm({ ...form, capacity: e.target.value })}
             />
           </Field>
 
@@ -428,23 +403,17 @@ function WarehouseFormModal({
             <Select
               value={form.status}
               onValueChange={(value) =>
-                setForm({ ...form, status: value as "active" | "inactive" })
+                setForm({ ...form, status: value as 'active' | 'inactive' })
               }
             >
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Select status" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem
-                  value="active"
-                  className="focus:bg-primary focus:text-white"
-                >
+                <SelectItem value="active" className="focus:bg-primary focus:text-white">
                   Active
                 </SelectItem>
-                <SelectItem
-                  value="inactive"
-                  className="focus:bg-primary focus:text-white"
-                >
+                <SelectItem value="inactive" className="focus:bg-primary focus:text-white">
                   Inactive
                 </SelectItem>
               </SelectContent>
@@ -453,11 +422,7 @@ function WarehouseFormModal({
         </div>
 
         <div className="mt-6 flex justify-end gap-3">
-          <Button
-            variant="outline"
-            className="rounded-full px-6"
-            onClick={onClose}
-          >
+          <Button variant="outline" className="rounded-full px-6" onClick={onClose}>
             Cancel
           </Button>
           <Button
@@ -503,18 +468,10 @@ function ConfirmDeleteModal({
   );
 }
 
-function Field({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <label className="block text-sm font-medium text-gray-700 mb-1">
-        {label}
-      </label>
+      <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
       {children}
     </div>
   );

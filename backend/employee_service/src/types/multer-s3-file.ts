@@ -1,7 +1,7 @@
-import { Express } from "express";
+import { Express } from 'express';
 
 export interface MulterS3File extends Express.Multer.File {
-  location: string; 
+  location: string;
   key: string;
   bucket: string;
 }

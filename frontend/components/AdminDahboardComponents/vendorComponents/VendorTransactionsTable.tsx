@@ -1,5 +1,5 @@
-"use client";
-import React, { useState } from "react";
+'use client';
+import React, { useState } from 'react';
 import {
   Table,
   TableBody,
@@ -7,50 +7,50 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
-import { Button } from "@/components/ui/button";
-import { Eye, FileText } from "lucide-react";
+} from '@/components/ui/table';
+import { Button } from '@/components/ui/button';
+import { FileText } from 'lucide-react';
 
 const transactionData = [
   {
-    id: "TXN-001",
-    date: "2023-12-25",
-    type: "Purchase",
+    id: 'TXN-001',
+    date: '2023-12-25',
+    type: 'Purchase',
     amount: 150000,
-    status: "Completed",
-    paymentMethod: "Bank Transfer",
+    status: 'Completed',
+    paymentMethod: 'Bank Transfer',
   },
   {
-    id: "TXN-002",
-    date: "2023-12-20",
-    type: "Return",
+    id: 'TXN-002',
+    date: '2023-12-20',
+    type: 'Return',
     amount: 12000,
-    status: "Refunded",
-    paymentMethod: "Credit Note",
+    status: 'Refunded',
+    paymentMethod: 'Credit Note',
   },
   {
-    id: "TXN-003",
-    date: "2023-12-15",
-    type: "Purchase",
+    id: 'TXN-003',
+    date: '2023-12-15',
+    type: 'Purchase',
     amount: 85000,
-    status: "Pending",
-    paymentMethod: "UPI",
+    status: 'Pending',
+    paymentMethod: 'UPI',
   },
   {
-    id: "TXN-004",
-    date: "2023-12-10",
-    type: "Purchase",
+    id: 'TXN-004',
+    date: '2023-12-10',
+    type: 'Purchase',
     amount: 220000,
-    status: "Completed",
-    paymentMethod: "Bank Transfer",
+    status: 'Completed',
+    paymentMethod: 'Bank Transfer',
   },
   {
-    id: "TXN-005",
-    date: "2023-12-05",
-    type: "Purchase",
+    id: 'TXN-005',
+    date: '2023-12-05',
+    type: 'Purchase',
     amount: 45000,
-    status: "Cancelled",
-    paymentMethod: "Cash",
+    status: 'Cancelled',
+    paymentMethod: 'Cash',
   },
 ];
 
@@ -67,38 +67,71 @@ export default function VendorTransactionsTable() {
         <Table>
           <TableHeader>
             <TableRow className="hover:bg-transparent">
-              <TableHead className="text-[10px] font-semibold text-blue-900 uppercase px-4 py-3">ID</TableHead>
-              <TableHead className="text-[10px] font-semibold text-blue-900 uppercase px-4 py-3">Date</TableHead>
-              <TableHead className="text-[10px] font-semibold text-blue-900 uppercase px-4 py-3">Type</TableHead>
-              <TableHead className="text-[10px] font-semibold text-blue-900 uppercase px-4 py-3 text-right">Amount</TableHead>
-              <TableHead className="text-[10px] font-semibold text-blue-900 uppercase px-4 py-3 text-center">Status</TableHead>
-              <TableHead className="text-[10px] font-semibold text-blue-900 uppercase px-4 py-3 text-right pr-6">Action</TableHead>
+              <TableHead className="text-[10px] font-semibold text-blue-900 uppercase px-4 py-3">
+                ID
+              </TableHead>
+              <TableHead className="text-[10px] font-semibold text-blue-900 uppercase px-4 py-3">
+                Date
+              </TableHead>
+              <TableHead className="text-[10px] font-semibold text-blue-900 uppercase px-4 py-3">
+                Type
+              </TableHead>
+              <TableHead className="text-[10px] font-semibold text-blue-900 uppercase px-4 py-3 text-right">
+                Amount
+              </TableHead>
+              <TableHead className="text-[10px] font-semibold text-blue-900 uppercase px-4 py-3 text-center">
+                Status
+              </TableHead>
+              <TableHead className="text-[10px] font-semibold text-blue-900 uppercase px-4 py-3 text-right pr-6">
+                Action
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {currentData.map((item, index) => (
-              <TableRow key={item.id} className={`hover:bg-gray-50/30 transition-colors ${index % 2 ? "bg-sky-100/60" : ""}`}>
-                <TableCell className="px-4 py-3 text-xs font-medium text-gray-900">{item.id}</TableCell>
+              <TableRow
+                key={item.id}
+                className={`hover:bg-gray-50/30 transition-colors ${index % 2 ? 'bg-sky-100/60' : ''}`}
+              >
+                <TableCell className="px-4 py-3 text-xs font-medium text-gray-900">
+                  {item.id}
+                </TableCell>
                 <TableCell className="px-4 py-3 text-xs text-gray-600">{item.date}</TableCell>
                 <TableCell className="px-4 py-3 text-xs text-gray-600">
-                    <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${
-                        item.type === "Purchase" ? "bg-blue-50 text-blue-700" : "bg-purple-50 text-purple-700"
-                    }`}>
-                        {item.type}
-                    </span>
+                  <span
+                    className={`px-2 py-0.5 rounded text-[10px] font-medium ${
+                      item.type === 'Purchase'
+                        ? 'bg-blue-50 text-blue-700'
+                        : 'bg-purple-50 text-purple-700'
+                    }`}
+                  >
+                    {item.type}
+                  </span>
                 </TableCell>
-                <TableCell className="px-4 py-3 text-xs text-right font-bold text-gray-900">₹{item.amount.toLocaleString()}</TableCell>
+                <TableCell className="px-4 py-3 text-xs text-right font-bold text-gray-900">
+                  ₹{item.amount.toLocaleString()}
+                </TableCell>
                 <TableCell className="px-4 py-3 text-center">
-                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${
-                    item.status === "Completed" ? "bg-green-100 text-green-700" : 
-                    item.status === "Pending" ? "bg-yellow-100 text-yellow-700" :
-                    item.status === "Refunded" ? "bg-blue-100 text-blue-700" : "bg-red-100 text-red-700"
-                  }`}>
+                  <span
+                    className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${
+                      item.status === 'Completed'
+                        ? 'bg-green-100 text-green-700'
+                        : item.status === 'Pending'
+                          ? 'bg-yellow-100 text-yellow-700'
+                          : item.status === 'Refunded'
+                            ? 'bg-blue-100 text-blue-700'
+                            : 'bg-red-100 text-red-700'
+                    }`}
+                  >
                     {item.status}
                   </span>
                 </TableCell>
                 <TableCell className="px-4 py-3 text-right pr-6">
-                  <Button variant="ghost" size="icon" className="h-7 w-7 text-gray-400 hover:text-primary">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 text-gray-400 hover:text-primary"
+                  >
                     <FileText className="h-3.5 w-3.5" />
                   </Button>
                 </TableCell>
@@ -129,7 +162,9 @@ export default function VendorTransactionsTable() {
             Next
           </Button>
         </div>
-        <span className="text-[10px] text-gray-500">Page {page} of {totalPages}</span>
+        <span className="text-[10px] text-gray-500">
+          Page {page} of {totalPages}
+        </span>
       </div>
     </div>
   );
