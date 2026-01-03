@@ -80,6 +80,16 @@ export class AuthService {
     return user;
   }
 
+  async findUserById(id: string) {
+    const user = await this.employeeRepo.findById(id);
+
+    if (!user) {
+      throw new AppError('User not found', 404);
+    }
+
+    return user;
+  }
+
   async resetPassword(userId: string, newPassword: string) {
     const hash = await bcrypt.hash(newPassword, 10);
     await this.employeeRepo.updatePassword(userId, hash);

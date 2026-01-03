@@ -44,7 +44,7 @@ export async function requestMagicLink(email: string) {
   return res.data;
 }
 
-export async function verifyMagicLink( token: string) {
+export async function verifyMagicLink(token: string) {
   const res = await api.post('/e/auth/magic-link/verify', { token });
   localStorage.setItem('accessToken', res.data.accessToken);
 
@@ -83,5 +83,10 @@ export async function adminLogin(email: string, password: string) {
     password,
   });
   localStorage.setItem('accessToken', res.data.accessToken);
+  return res.data;
+}
+
+export async function getProfile() {
+  const res = await api.get('/e/auth/me');
   return res.data;
 }

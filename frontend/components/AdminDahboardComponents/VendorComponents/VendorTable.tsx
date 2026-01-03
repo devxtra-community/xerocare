@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   Table,
   TableBody,
@@ -20,11 +20,9 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { useRouter } from 'next/navigation';
 import {
-  getVendors,
   createVendor,
   updateVendor,
   deleteVendor as apiDeleteVendor,
-  Vendor as ApiVendor,
 } from '@/lib/vendor';
 import { toast } from 'sonner';
 import { AxiosError } from 'axios';
@@ -60,10 +58,20 @@ type VendorFormData = {
   status: 'Active' | 'On Hold';
 };
 
-export default function VendorTable() {
+export { type Vendor }; // Export so parent can use it
+
+export default function VendorTable({
+  vendors,
+  loading,
+  onRefresh,
+}: {
+  vendors: Vendor[];
+  loading: boolean;
+  onRefresh: () => void;
+}) {
   const router = useRouter();
-  const [vendors, setVendors] = useState<Vendor[]>([]);
-  const [loading, setLoading] = useState(true);
+  // const [vendors, setVendors] = useState<Vendor[]>([]); // Lifted up
+  // const [loading, setLoading] = useState(true); // Lifted up
   const [search, setSearch] = useState('');
   const [filterType, setFilterType] = useState<'All' | 'Supplier' | 'Distributor' | 'Service'>(
     'All',
@@ -73,46 +81,7 @@ export default function VendorTable() {
   const [editingVendor, setEditingVendor] = useState<Vendor | null>(null);
   const [deleteVendor, setDeleteVendorTarget] = useState<Vendor | null>(null);
 
-  const fetchVendors = async () => {
-    setLoading(true);
-    try {
-      const res = await getVendors();
-      const apiVendors: ApiVendor[] = res.data || []; // Adjust based on actual API response structure
-
-      const mappedVendors: Vendor[] = apiVendors.map((v) => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const raw = v as any;
-        return {
-          id: v.id,
-          name: v.name,
-          type: raw.type || 'Supplier', // Default if missing
-          contactPerson: raw.contactPerson || 'N/A', // Default if missing
-          phone: v.phone || 'N/A',
-          email: v.email || 'N/A',
-          totalOrders: raw.totalOrders || 0, // Mock
-          purchaseValue: raw.purchaseValue || 0, // Mock
-          outstandingAmount: raw.outstandingAmount || 0, // Mock
-          status: raw.status === 'ACTIVE' ? 'Active' : 'On Hold',
-        };
-      });
-
-      setVendors(mappedVendors);
-    } catch (err: unknown) {
-      if (err instanceof AxiosError) {
-        toast.error(err.response?.data?.message || err.message);
-      } else if (err instanceof Error) {
-        toast.error(err.message);
-      } else {
-        toast.error('Failed to fetch vendors');
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchVendors();
-  }, []);
+  /* Fetched in parent */
 
   const filteredVendors = vendors.filter((vendor) => {
     const matchesSearch =
@@ -129,7 +98,7 @@ export default function VendorTable() {
         name: data.name,
         email: data.email,
         phone: data.phone,
-        status: data.status === 'Active' ? 'ACTIVE' : 'INACTIVE',
+        status: (data.status === 'Active' ? 'ACTIVE' : 'INACTIVE') as 'ACTIVE' | 'INACTIVE',
         // Add other fields if backend supports them later
       };
 
@@ -139,7 +108,7 @@ export default function VendorTable() {
         await createVendor(apiData);
       }
 
-      await fetchVendors(); // Refresh list
+      onRefresh(); // Refresh list
       setFormOpen(false);
       setEditingVendor(null);
     } catch (err: unknown) {
@@ -158,7 +127,7 @@ export default function VendorTable() {
     if (!deleteVendor) return;
     try {
       await apiDeleteVendor(deleteVendor.id);
-      await fetchVendors(); // Refresh list
+      onRefresh(); // Refresh list
       setDeleteVendorTarget(null);
     } catch (err: unknown) {
       if (err instanceof AxiosError) {
@@ -268,13 +237,12 @@ export default function VendorTable() {
                   </TableCell>
                   <TableCell>
                     <span
-                      className={`px-2 py-1 rounded-full text-xs font-medium ${
-                        vendor.type === 'Supplier'
-                          ? 'bg-blue-100 text-blue-700'
-                          : vendor.type === 'Distributor'
-                            ? 'bg-purple-100 text-purple-700'
-                            : 'bg-orange-100 text-orange-700'
-                      }`}
+                      className={`px-2 py-1 rounded-full text-xs font-medium ${vendor.type === 'Supplier'
+                        ? 'bg-blue-100 text-blue-700'
+                        : vendor.type === 'Distributor'
+                          ? 'bg-purple-100 text-purple-700'
+                          : 'bg-orange-100 text-orange-700'
+                        }`}
                     >
                       {vendor.type}
                     </span>
@@ -299,11 +267,10 @@ export default function VendorTable() {
                   </TableCell>
                   <TableCell>
                     <span
-                      className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        vendor.status === 'Active'
-                          ? 'bg-green-100 text-green-700'
-                          : 'bg-yellow-100 text-yellow-700'
-                      }`}
+                      className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium ${vendor.status === 'Active'
+                        ? 'bg-green-100 text-green-700'
+                        : 'bg-yellow-100 text-yellow-700'
+                        }`}
                     >
                       <span
                         className={`h-1.5 w-1.5 rounded-full ${vendor.status === 'Active' ? 'bg-green-600' : 'bg-yellow-600'}`}
@@ -389,21 +356,21 @@ function VendorFormModal({
   const [form, setForm] = useState<VendorFormData>(
     initialData
       ? {
-          name: initialData.name,
-          type: initialData.type,
-          contactPerson: initialData.contactPerson,
-          phone: initialData.phone,
-          email: initialData.email,
-          status: initialData.status,
-        }
+        name: initialData.name,
+        type: initialData.type,
+        contactPerson: initialData.contactPerson,
+        phone: initialData.phone,
+        email: initialData.email,
+        status: initialData.status,
+      }
       : {
-          name: '',
-          type: 'Supplier',
-          contactPerson: '',
-          phone: '',
-          email: '',
-          status: 'Active',
-        },
+        name: '',
+        type: 'Supplier',
+        contactPerson: '',
+        phone: '',
+        email: '',
+        status: 'Active',
+      },
   );
 
   return (
