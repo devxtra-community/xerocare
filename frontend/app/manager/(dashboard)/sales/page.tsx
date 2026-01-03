@@ -1,12 +1,6 @@
+import next from 'next';
+import ManagerSalesPage from '@/components/ManagerDashboardComponents/salesComponents/managerSales';
 
-import BranchProductSales from "@/components/ManagerDashboardComponents/salesComponents/salesReport"
-
-
-export default function managerSalesPage(){
-
-    return(
-        <>
-        <BranchProductSales/>
-        </>
-    )
+export default function MnagerSalesDashboard() {
+  return <ManagerSalesPage />;
 }
