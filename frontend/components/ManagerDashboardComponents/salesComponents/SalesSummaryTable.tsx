@@ -2,34 +2,30 @@
 
 const data = [
   {
-    product: 'Paracetamol 500mg',
-    model: 'Strip of 10',
-    quantity: 150,
-    branch: 'Branch A',
-    amount: '₹750',
+    product: 'HP LaserJet Pro',
+    model: 'M404dn',
+    quantity: 15,
+    amount: '₹45,000',
     date: '2026-01-01',
   },
   {
-    product: 'Amoxicillin 250mg',
-    model: 'Capsule',
-    quantity: 80,
-    branch: 'Branch B',
-    amount: '₹1,200',
+    product: 'Canon PIXMA',
+    model: 'G3010',
+    quantity: 8,
+    amount: '₹12,800',
     date: '2026-01-01',
   },
   {
-    product: 'Hand Sanitizer',
-    model: '500ml Bottle',
-    quantity: 45,
-    branch: 'Branch A',
-    amount: '₹3,150',
+    product: 'Epson EcoTank',
+    model: 'L3210',
+    quantity: 12,
+    amount: '₹31,500',
     date: '2026-01-02',
   },
   {
-    product: 'Digital Thermometer',
-    model: 'Infrared',
-    quantity: 12,
-    branch: 'Branch C',
+    product: 'Brother HL-L2350DW',
+    model: 'Monochrome',
+    quantity: 5,
     amount: '₹14,400',
     date: '2026-01-03',
   },
@@ -52,9 +48,6 @@ export default function SalesSummaryTable() {
                 Qty
               </th>
               <th className="text-left text-[10px] sm:text-xs font-bold text-blue-900/60 uppercase tracking-wider py-3 px-2">
-                Branch
-              </th>
-              <th className="text-left text-[10px] sm:text-xs font-bold text-blue-900/60 uppercase tracking-wider py-3 px-2">
                 Amount
               </th>
               <th className="text-left text-[10px] sm:text-xs font-bold text-blue-900/60 uppercase tracking-wider py-3 px-2">
@@ -74,11 +67,6 @@ export default function SalesSummaryTable() {
                 </td>
                 <td className="py-3 px-2 text-[10px] sm:text-sm text-blue-800/80">
                   {row.quantity}
-                </td>
-                <td className="py-3 px-2 text-[10px] sm:text-sm">
-                  <span className="px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-medium">
-                    {row.branch}
-                  </span>
                 </td>
                 <td className="py-3 px-2 text-[10px] sm:text-sm font-bold text-blue-900">
                   {row.amount}

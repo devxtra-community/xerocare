@@ -3,12 +3,12 @@
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis, Legend } from 'recharts';
 
 const data = [
-  { month: 'Jan', BranchA: 12000, BranchB: 8000, BranchC: 5000 },
-  { month: 'Feb', BranchA: 18000, BranchB: 12000, BranchC: 7000 },
-  { month: 'Mar', BranchA: 15000, BranchB: 15000, BranchC: 9000 },
-  { month: 'Apr', BranchA: 22000, BranchB: 10000, BranchC: 11000 },
-  { month: 'May', BranchA: 26000, BranchB: 14000, BranchC: 13000 },
-  { month: 'Jun', BranchA: 30000, BranchB: 18000, BranchC: 15000 },
+  { month: 'Jan', BranchA: 25000 },
+  { month: 'Feb', BranchA: 37000 },
+  { month: 'Mar', BranchA: 39000 },
+  { month: 'Apr', BranchA: 43000 },
+  { month: 'May', BranchA: 53000 },
+  { month: 'Jun', BranchA: 63000 },
 ];
 
 export default function MonthlySalesBarChart() {
@@ -48,9 +48,7 @@ export default function MonthlySalesBarChart() {
               iconType="circle"
               wrapperStyle={{ fontSize: '11px', paddingBottom: '20px' }}
             />
-            <Bar dataKey="BranchA" name="Branch A" fill="#0D47A1" radius={[4, 4, 0, 0]} stackId="a" />
-            <Bar dataKey="BranchB" name="Branch B" fill="#1976D2" radius={[4, 4, 0, 0]} stackId="a" />
-            <Bar dataKey="BranchC" name="Branch C" fill="#42A5F5" radius={[4, 4, 0, 0]} stackId="a" />
+            <Bar dataKey="BranchA" name="Branch A" fill="#0D47A1" radius={[4, 4, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
       </div>

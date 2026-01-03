@@ -17,7 +17,7 @@ export default function ManagerSalesPage() {
           <StatCard title="Total Revenue" value="₹100,000" subtitle="Last 30 days" />
           <StatCard title="Total Orders" value="420" subtitle="Last 30 days" />
           <StatCard title="Products Sold" value="3,400" subtitle="Last 30 days" />
-          <StatCard title="Top Product" value="iPhone 15 Pro" subtitle="This month" />
+          <StatCard title="Top Product" value="HP LaserJet Pro" subtitle="This month" />
         </div>
 
         {/* TABLE + TREND */}

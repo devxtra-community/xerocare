@@ -60,7 +60,11 @@ type VendorFormData = {
   status: 'Active' | 'On Hold';
 };
 
-export default function VendorTable() {
+interface VendorTableProps {
+  basePath?: string;
+}
+
+export default function VendorTable({ basePath = '/admin' }: VendorTableProps) {
   const router = useRouter();
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [loading, setLoading] = useState(true);
@@ -185,7 +189,7 @@ export default function VendorTable() {
             placeholder="Search vendors..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="pl-9 h-10"
+            className="pl-9 h-10 bg-white border-blue-400/60 focus:border-blue-400 focus:ring-4 focus:ring-blue-100 outline-none shadow-sm transition-all"
           />
         </div>
         <div className="flex gap-2 w-full sm:w-auto">
@@ -317,8 +321,8 @@ export default function VendorTable() {
                         variant="ghost"
                         size="icon"
                         className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                        onClick={() => router.push(`/admin/vendors/${vendor.id}`)}
-                      >
+                        onClick={() => router.push(`${basePath}/vendors/${vendor.id}`)}
+                   >
                         <Eye className="h-4 w-4" />
                       </Button>
                       <Button
@@ -375,7 +379,7 @@ export default function VendorTable() {
   );
 }
 
-// ------------------- Helper Components ------------------- //
+
 
 function VendorFormModal({
   initialData,

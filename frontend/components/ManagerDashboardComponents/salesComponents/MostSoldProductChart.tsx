@@ -3,11 +3,11 @@
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 
 const data = [
-  { product: 'Paracetamol', qty: 450 },
-  { product: 'Aspirin', qty: 320 },
-  { product: 'Amoxicillin', qty: 280 },
-  { product: 'Metformin', qty: 210 },
-  { product: 'Vitamin C', qty: 180 },
+  { product: 'HP LaserJet Pro', qty: 450 },
+  { product: 'Canon PIXMA', qty: 320 },
+  { product: 'Epson EcoTank', qty: 280 },
+  { product: 'Brother HL-L2350DW', qty: 210 },
+  { product: 'Xerox VersaLink', qty: 180 },
 ];
 
 export default function MostSoldProductChart() {
