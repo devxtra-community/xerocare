@@ -17,7 +17,7 @@ export class Inventory {
   sku!: string | null;
 
   @Column({ type: 'varchar', length: 100 })
-    printer_model!: string;
+  printer_model!: string;
 
   @Column({ type: 'varchar', length: 255 })
   name!: string;
