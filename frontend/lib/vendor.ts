@@ -5,7 +5,10 @@ export interface Vendor {
   name: string;
   email: string;
   phone: string;
-  address: string;
+  address?: string;
+  status: 'ACTIVE' | 'INACTIVE' | 'DELETED';
+  createdAt: string;
+  updatedAt: string;
 }
 
 export async function createVendor(data: Partial<Vendor>) {
