@@ -242,9 +242,10 @@ export const logoutSession = async (req: Request, res: Response, next: NextFunct
 export const getMe = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const userId = req.user.userId;
-    const user = await authService.findUserById(userId);
+    const role = req.user.role;
+    const user = await authService.findUserById(userId, role);
     return res.json({
-      success: true, 
+      success: true,
       data: user,
     });
   } catch (err: any) {
