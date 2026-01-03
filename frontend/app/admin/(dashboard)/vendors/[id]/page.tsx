@@ -12,8 +12,6 @@ import {
   MapPin,
   Building2,
   User,
-  CreditCard,
-  ShoppingCart,
   TrendingUp,
   Clock,
 } from 'lucide-react';
@@ -21,8 +19,8 @@ import StatCard from '@/components/StatCard';
 import VendorTransactionsTable from '@/components/AdminDahboardComponents/vendorComponents/VendorTransactionsTable';
 import VendorSpendingTrend from '@/components/AdminDahboardComponents/vendorComponents/VendorSpendingTrend';
 
-export default function VendorProfilePage() {
-  const params = useParams();
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export default function Page({ params }: { params: { id: string } }) {
   const router = useRouter();
   const id = params.id as string;
 

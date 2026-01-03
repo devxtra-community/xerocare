@@ -2,12 +2,7 @@
 
 import { useState } from 'react';
 import {
-  Table,
-  TableHeader,
-  TableBody,
-  TableHead,
-  TableRow,
-  TableCell,
+  // Table imports removed as they were unused
 } from '@/components/ui/table';
 
 export default function ProductsTable() {
@@ -105,9 +100,8 @@ export default function ProductsTable() {
             <button
               key={pageNum}
               onClick={() => setPage(pageNum)}
-              className={`px-1.5 sm:px-2 py-0.5 rounded-md transition ${
-                page === pageNum ? 'bg-primary text-white' : 'border hover:bg-gray-50'
-              }`}
+              className={`px-1.5 sm:px-2 py-0.5 rounded-md transition ${page === pageNum ? 'bg-primary text-white' : 'border hover:bg-gray-50'
+                }`}
             >
               {pageNum}
             </button>
@@ -117,9 +111,8 @@ export default function ProductsTable() {
         {totalPages > 4 && (
           <button
             onClick={() => setPage(totalPages)}
-            className={`px-1.5 sm:px-2 py-0.5 rounded-md border transition ${
-              page === totalPages ? 'bg-primary text-white' : 'hover:bg-gray-50'
-            }`}
+            className={`px-1.5 sm:px-2 py-0.5 rounded-md border transition ${page === totalPages ? 'bg-primary text-white' : 'hover:bg-gray-50'
+              }`}
           >
             {totalPages}
           </button>
