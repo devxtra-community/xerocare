@@ -242,13 +242,12 @@ export default function VendorTable({
                   </TableCell>
                   <TableCell>
                     <span
-                      className={`px-2 py-1 rounded-full text-xs font-medium ${
-                        vendor.type === 'Supplier'
-                          ? 'bg-blue-100 text-blue-700'
-                          : vendor.type === 'Distributor'
-                            ? 'bg-purple-100 text-purple-700'
-                            : 'bg-orange-100 text-orange-700'
-                      }`}
+                      className={`px-2 py-1 rounded-full text-xs font-medium ${vendor.type === 'Supplier'
+                        ? 'bg-blue-100 text-blue-700'
+                        : vendor.type === 'Distributor'
+                          ? 'bg-purple-100 text-purple-700'
+                          : 'bg-orange-100 text-orange-700'
+                        }`}
                     >
                       {vendor.type}
                     </span>
@@ -273,11 +272,10 @@ export default function VendorTable({
                   </TableCell>
                   <TableCell>
                     <span
-                      className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        vendor.status === 'Active'
-                          ? 'bg-green-100 text-green-700'
-                          : 'bg-yellow-100 text-yellow-700'
-                      }`}
+                      className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium ${vendor.status === 'Active'
+                        ? 'bg-green-100 text-green-700'
+                        : 'bg-yellow-100 text-yellow-700'
+                        }`}
                     >
                       <span
                         className={`h-1.5 w-1.5 rounded-full ${vendor.status === 'Active' ? 'bg-green-600' : 'bg-yellow-600'}`}
@@ -361,21 +359,21 @@ function VendorFormModal({
   const [form, setForm] = useState<VendorFormData>(
     initialData
       ? {
-          name: initialData.name,
-          type: initialData.type,
-          contactPerson: initialData.contactPerson,
-          phone: initialData.phone,
-          email: initialData.email,
-          status: initialData.status,
-        }
+        name: initialData.name,
+        type: initialData.type,
+        contactPerson: initialData.contactPerson,
+        phone: initialData.phone,
+        email: initialData.email,
+        status: initialData.status,
+      }
       : {
-          name: '',
-          type: 'Supplier',
-          contactPerson: '',
-          phone: '',
-          email: '',
-          status: 'Active',
-        },
+        name: '',
+        type: 'Supplier',
+        contactPerson: '',
+        phone: '',
+        email: '',
+        status: 'Active',
+      },
   );
 
   return (
