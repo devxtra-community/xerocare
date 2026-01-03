@@ -15,8 +15,8 @@ export default function LoginPage() {
 
         <div className="bg-muted relative hidden lg:block">
           <Image
-            src="/placeholder.svg"
-            alt="Image"
+            src="/office-login.png"
+            alt="Modern Office Environment"
             fill
             className="absolute inset-0 h-full w-full object-cover dark:brightness-[0.2] dark:grayscale"
           />

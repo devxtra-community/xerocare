@@ -3,12 +3,15 @@ import { EmployeeRepository } from '../repositories/employeeRepository';
 import { verifyRefreshToken } from '../utlis/jwt';
 import { AuthRepository } from '../repositories/authRepository';
 import { AppError } from '../errors/appError';
+import { AdminRepository } from '../repositories/adminRepository';
 
 export class AuthService {
   private employeeRepo = new EmployeeRepository();
   private authRepo = new AuthRepository();
+  private adminRepo = new AdminRepository();
 
   async login(payload: { email: string; password: string }) {
+    // ... existing login code ...
     const { email, password } = payload;
 
     const user = await this.employeeRepo.findByEmail(email);
@@ -24,6 +27,7 @@ export class AuthService {
     return { user };
   }
 
+  // ... existing refresh, logout, changePassword methods ...
   async refresh(refreshToken: string) {
     const payload = verifyRefreshToken<{ id: string }>(refreshToken);
     if (!payload) {
@@ -80,8 +84,14 @@ export class AuthService {
     return user;
   }
 
-  async findUserById(id: string) {
-    const user = await this.employeeRepo.findById(id);
+  async findUserById(id: string, role: string = 'EMPLOYEE') {
+    let user;
+
+    if (role === 'ADMIN') {
+      user = await this.adminRepo.findById(id);
+    } else {
+      user = await this.employeeRepo.findById(id);
+    }
 
     if (!user) {
       throw new AppError('User not found', 404);
