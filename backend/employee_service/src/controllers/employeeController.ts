@@ -61,7 +61,7 @@ export const getAllEmployees = async (req: Request, res: Response, next: NextFun
     const limit = Number(req.query.limit) || 20;
 
     const result = await service.getAllEmployees(page, limit);
-
+    console.log(result);
     return res.json({
       success: true,
       data: result,
