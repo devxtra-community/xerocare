@@ -1,5 +1,6 @@
 import { Source } from '../config/dataSource';
 import { Employee } from '../entities/employeeEntities';
+import { EmployeeRole } from '../constants/employeeRole';
 
 export class EmployeeRepository {
   private repo = Source.getRepository(Employee);
@@ -27,8 +28,11 @@ export class EmployeeRepository {
     });
   }
 
-  async findAll(skip = 0, take = 20) {
+  async findAll(skip = 0, take = 20, role?: EmployeeRole) {
+    const whereCondition = role ? { role } : {};
+
     const [data, total] = await this.repo.findAndCount({
+      where: whereCondition,
       select: [
         'id',
         'email',
@@ -65,5 +69,12 @@ export class EmployeeRepository {
         'expire_date',
       ],
     });
+  }
+  async updateById(id: string, payload: Partial<Employee>): Promise<Employee | null> {
+    const employee = await this.findById(id);
+    if (!employee) return null;
+
+    Object.assign(employee, payload);
+    return this.repo.save(employee);
   }
 }

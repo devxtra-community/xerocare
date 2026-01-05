@@ -8,9 +8,9 @@ export interface VendorStatsProps {
 }
 
 export default function VendorStats({
-  totalVendors = 0,
-  activeVendors = 0,
-  newVendors = 0,
+  totalVendors,
+  activeVendors,
+  newVendors,
 }: VendorStatsProps) {
   return (
     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">

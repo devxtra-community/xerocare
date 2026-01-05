@@ -50,3 +50,8 @@ export async function getEmployeeIdProof(id: string) {
   const res = await api.get(`/e/employee/${id}/id-proof`);
   return res.data;
 }
+
+export async function getManagersByRole() {
+  const res = await api.get('/e/employee?role=MANAGER');
+  return res.data;
+}

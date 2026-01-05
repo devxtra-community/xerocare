@@ -5,6 +5,7 @@ import {
   getAllEmployees,
   getEmployeeById,
   getEmployeeIdProof,
+  updateEmployee,
 } from '../controllers/employeeController';
 import { authMiddleware } from '../middleware/authMiddleware';
 import { requireRole } from '../middleware/roleMiddleware';
@@ -28,6 +29,8 @@ employeeRouter.get('/:id/id-proof', authMiddleware, requireRole('ADMIN', 'HR'), 
 
 employeeRouter.get('/', requireRole('ADMIN', 'HR'), getAllEmployees);
 employeeRouter.get('/:id', requireRole('ADMIN', 'HR'), getEmployeeById);
+employeeRouter.put('/:id', requireRole('ADMIN', 'HR'), updateEmployee);
+
 employeeRouter.delete('/:id', requireRole('ADMIN', 'HR'), deleteEmployee);
 
 export default employeeRouter;
