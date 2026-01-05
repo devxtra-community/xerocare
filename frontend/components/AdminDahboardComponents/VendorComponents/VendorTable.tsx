@@ -64,12 +64,10 @@ export default function VendorTable({
   vendors,
   loading,
   onRefresh,
-  basePath = '/admin',
 }: {
   vendors: Vendor[];
   loading: boolean;
-  onRefresh: () => void | Promise<void>;
-  basePath?: string;
+  onRefresh: () => void;
 }) {
   const router = useRouter();
   // const [vendors, setVendors] = useState<Vendor[]>([]); // Lifted up
