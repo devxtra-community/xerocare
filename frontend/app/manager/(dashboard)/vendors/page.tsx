@@ -2,14 +2,14 @@
 
 import React, { useEffect, useState } from 'react';
 import VendorStats from '@/components/AdminDahboardComponents/VendorComponents/VendorStats'; // Reusing stats layout
-import VendorTable from '@/components/ManagerDashboardComponents/vendorComponents/VendorTable';
+import VendorTable, { Vendor as UiVendor } from '@/components/AdminDahboardComponents/VendorComponents/VendorTable';
 import { getVendors, Vendor as ApiVendor } from '@/lib/vendor';
 import { toast } from 'sonner';
 
 export default function VendorsPage() {
   const [loading, setLoading] = useState(true);
   const [apiVendors, setApiVendors] = useState<ApiVendor[]>([]);
-  const [uiVendors, setUiVendors] = useState<any[]>([]);
+  const [uiVendors, setUiVendors] = useState<UiVendor[]>([]);
 
   const fetchVendorsData = async () => {
     setLoading(true);
@@ -20,12 +20,12 @@ export default function VendorsPage() {
       setApiVendors(rawVendors);
 
       // Map to UI model
-      const mappedVendors = rawVendors.map((v) => {
+      const mappedVendors: UiVendor[] = rawVendors.map((v) => {
         const raw = v as any;
         return {
           id: v.id,
           name: v.name,
-          type: raw.type || 'Supplier',
+          type: (raw.type as 'Supplier' | 'Distributor' | 'Service') || 'Supplier',
           contactPerson: raw.contactPerson || 'N/A',
           phone: v.phone || 'N/A',
           email: v.email || 'N/A',
@@ -33,7 +33,7 @@ export default function VendorsPage() {
           purchaseValue: raw.purchaseValue || 0,
           outstandingAmount: raw.outstandingAmount || 0,
           status: v.status === 'ACTIVE' ? 'Active' : 'On Hold',
-        };
+        } as UiVendor;
       });
 
       setUiVendors(mappedVendors);
@@ -80,13 +80,11 @@ export default function VendorsPage() {
           />
         </div>
         
-        <div className="bg-white rounded-2xl shadow-sm border border-blue-100 overflow-hidden mx-4">
-          <VendorTable 
-            vendors={uiVendors}
-            loading={loading}
-            onRefresh={fetchVendorsData}
-          />
-        </div>
+        <VendorTable 
+          vendors={uiVendors}
+          loading={loading}
+          onRefresh={fetchVendorsData}
+        />
       </div>
     </div>
   );

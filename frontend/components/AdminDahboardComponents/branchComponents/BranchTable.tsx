@@ -19,6 +19,13 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog';
 import StatCard from '@/components/StatCard';
 
 type Branch = {
@@ -235,31 +242,31 @@ export default function BranchReport() {
       </div>
 
       {/* MODALS */}
-      {formOpen && (
-        <BranchFormModal
-          initialData={editingBranch}
-          onClose={() => setFormOpen(false)}
-          onConfirm={handleSave}
-        />
-      )}
+      <BranchFormModal
+        initialData={editingBranch}
+        open={formOpen}
+        onClose={() => setFormOpen(false)}
+        onConfirm={handleSave}
+      />
 
-      {deleteBranch && (
-        <ConfirmDeleteModal
-          name={deleteBranch.branchName}
-          onCancel={() => setDeleteBranch(null)}
-          onConfirm={confirmDelete}
-        />
-      )}
+      <ConfirmDeleteModal
+        open={!!deleteBranch}
+        name={deleteBranch?.branchName || ''}
+        onCancel={() => setDeleteBranch(null)}
+        onConfirm={confirmDelete}
+      />
     </div>
   );
 }
 
 function BranchFormModal({
   initialData,
+  open,
   onClose,
   onConfirm,
 }: {
   initialData: Branch | null;
+  open: boolean;
   onClose: () => void;
   onConfirm: (data: Branch) => void;
 }) {
@@ -276,141 +283,157 @@ function BranchFormModal({
   );
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="w-full max-w-md rounded-2xl bg-white shadow-xl px-6 py-5 relative">
-        <div className="flex items-center justify-between mb-5">
-          <h2 className="text-lg font-semibold text-gray-900">
+    <Dialog open={open} onOpenChange={(val) => !val && onClose()}>
+      <DialogContent className="sm:max-w-xl">
+        <DialogHeader>
+          <DialogTitle className="text-2xl font-bold text-blue-900">
             {initialData ? 'Update Branch' : 'Add Branch'}
-          </h2>
-          <button
-            onClick={onClose}
-            className="h-7 w-7 flex items-center justify-center rounded-full border text-gray-500 hover:text-gray-800"
-          >
-            <X size={14} />
-          </button>
-        </div>
+          </DialogTitle>
+        </DialogHeader>
 
-        <div className="space-y-4">
-          <Field label="Branch Name">
-            <Input
-              placeholder="Full name"
-              value={form.branchName}
-              onChange={(e) => setForm({ ...form, branchName: e.target.value })}
-            />
-          </Field>
+        <div className="space-y-6 pt-6">
+          <div className="grid grid-cols-2 gap-x-8 gap-y-6">
+            <div className="col-span-2 space-y-2">
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Branch Name</label>
+              <Input
+                placeholder="Full name"
+                value={form.branchName}
+                onChange={(e) => setForm({ ...form, branchName: e.target.value })}
+                className="h-12 rounded-xl bg-white border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
+              />
+            </div>
 
-          <Field label="Branch Address">
-            <Input
-              placeholder="Address"
-              value={form.address}
-              onChange={(e) => setForm({ ...form, address: e.target.value })}
-            />
-          </Field>
+            <div className="col-span-2 space-y-2">
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Branch Address</label>
+              <Input
+                placeholder="Address"
+                value={form.address}
+                onChange={(e) => setForm({ ...form, address: e.target.value })}
+                className="h-12 rounded-xl bg-white border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
+              />
+            </div>
 
-          <Field label="Location">
-            <Input
-              placeholder="City / Area"
-              value={form.location}
-              onChange={(e) => setForm({ ...form, location: e.target.value })}
-            />
-          </Field>
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Location</label>
+              <Input
+                placeholder="City / Area"
+                value={form.location}
+                onChange={(e) => setForm({ ...form, location: e.target.value })}
+                className="h-12 rounded-xl bg-white border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
+              />
+            </div>
 
-          <Field label="Started Date">
-            <Input
-              type="date"
-              value={form.startedDate}
-              onChange={(e) => setForm({ ...form, startedDate: e.target.value })}
-            />
-          </Field>
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Started Date</label>
+              <Input
+                type="date"
+                value={form.startedDate}
+                onChange={(e) => setForm({ ...form, startedDate: e.target.value })}
+                className="h-12 rounded-xl bg-white border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
+              />
+            </div>
 
-          <Field label="Assign Manager">
-            <Select
-              value={form.manager}
-              onValueChange={(value) => setForm({ ...form, manager: value })}
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Assign Manager</label>
+              <Select
+                value={form.manager}
+                onValueChange={(value) => setForm({ ...form, manager: value })}
+              >
+                <SelectTrigger className="h-12 rounded-xl bg-white border-none shadow-sm focus:ring-2 focus:ring-blue-400">
+                  <SelectValue placeholder="Select manager" />
+                </SelectTrigger>
+                <SelectContent className="rounded-xl">
+                  {availableManagers.map((manager) => (
+                    <SelectItem key={manager} value={manager}>
+                      {manager}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Branch Status</label>
+              <Select
+                value={form.status}
+                onValueChange={(value) =>
+                  setForm({ ...form, status: value as 'active' | 'inactive' })
+                }
+              >
+                <SelectTrigger className="h-12 rounded-xl bg-white border-none shadow-sm focus:ring-2 focus:ring-blue-400">
+                  <SelectValue placeholder="Select status" />
+                </SelectTrigger>
+                <SelectContent className="rounded-xl">
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="inactive">Inactive</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="flex justify-end items-center gap-6 pt-8">
+            <button 
+              type="button" 
+              onClick={onClose} 
+              className="text-sm font-bold text-gray-900 hover:text-gray-600 transition-colors"
             >
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Select manager" />
-              </SelectTrigger>
-              <SelectContent>
-                {availableManagers.map((manager) => (
-                  <SelectItem
-                    key={manager}
-                    value={manager}
-                    className="focus:bg-primary focus:text-white"
-                  >
-                    {manager}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </Field>
-
-          <Field label="Branch Status">
-            <Select
-              value={form.status}
-              onValueChange={(value) =>
-                setForm({ ...form, status: value as 'active' | 'inactive' })
-              }
+              Cancel
+            </button>
+            <Button
+              className="h-12 px-10 rounded-xl bg-[#004a8d] text-white hover:bg-[#003f7d] font-bold shadow-lg"
+              onClick={() => onConfirm(form)}
             >
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Select status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="active" className="focus:bg-primary focus:text-white">
-                  Active
-                </SelectItem>
-                <SelectItem value="inactive" className="focus:bg-primary focus:text-white">
-                  Inactive
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          </Field>
+              {initialData ? 'Update' : 'Confirm'}
+            </Button>
+          </div>
         </div>
-
-        <div className="mt-6 flex justify-end gap-3">
-          <Button variant="outline" className="rounded-full px-6" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button
-            className="rounded-full px-6 bg-primary hover:bg-primary/90 text-white"
-            onClick={() => onConfirm(form)}
-          >
-            Confirm
-          </Button>
-        </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
 function ConfirmDeleteModal({
+  open,
   name,
   onCancel,
   onConfirm,
 }: {
+  open: boolean;
   name: string;
   onCancel: () => void;
   onConfirm: () => void;
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="bg-white max-w-sm w-full rounded-2xl p-6 text-center">
-        <Trash2 className="mx-auto text-red-600 mb-3" />
-        <h3 className="text-lg font-semibold">Delete Branch</h3>
-        <p className="text-sm text-slate-500 mt-1">
-          Are you sure you want to delete <b>{name}</b>?
-        </p>
-
-        <div className="flex justify-center gap-4 mt-6">
-          <Button variant="outline" onClick={onCancel}>
+    <Dialog open={open} onOpenChange={(val) => !val && onCancel()}>
+      <DialogContent className="sm:max-w-[450px]">
+        <DialogHeader>
+          <div className="flex items-center gap-4 text-red-600 mb-4">
+            <div className="h-12 w-12 rounded-2xl bg-red-50 flex items-center justify-center text-red-600 shadow-sm">
+              <Trash2 className="h-6 w-6" />
+            </div>
+            <DialogTitle className="text-xl font-bold text-blue-900">Delete Branch</DialogTitle>
+          </div>
+          <DialogDescription className="text-base text-gray-600 leading-relaxed">
+            Are you sure you want to delete <strong>{name}</strong>?
+          </DialogDescription>
+        </DialogHeader>
+        <div className="flex justify-end items-center gap-6 pt-8">
+          <button 
+            type="button" 
+            onClick={onCancel} 
+            className="text-sm font-bold text-gray-900 hover:text-gray-600 transition-colors"
+          >
             Cancel
-          </Button>
-          <Button className="bg-red-600 text-white" onClick={onConfirm}>
+          </button>
+          <Button
+            className="h-12 px-8 rounded-xl bg-red-600 text-white hover:bg-red-700 font-bold shadow-lg"
+            onClick={onConfirm}
+          >
             Delete
           </Button>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 

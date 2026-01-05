@@ -11,6 +11,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog';
 import StatCard from '@/components/StatCard';
 
 type Warehouse = {
@@ -256,31 +263,31 @@ export default function WarehouseReport() {
       </div>
 
       {/* MODALS */}
-      {formOpen && (
-        <WarehouseFormModal
-          initialData={editingWarehouse}
-          onClose={() => setFormOpen(false)}
-          onConfirm={handleSave}
-        />
-      )}
+      <WarehouseFormModal
+        initialData={editingWarehouse}
+        open={formOpen}
+        onClose={() => setFormOpen(false)}
+        onConfirm={handleSave}
+      />
 
-      {deleteWarehouse && (
-        <ConfirmDeleteModal
-          name={deleteWarehouse.warehouseName}
-          onCancel={() => setDeleteWarehouse(null)}
-          onConfirm={confirmDelete}
-        />
-      )}
+      <ConfirmDeleteModal
+        open={!!deleteWarehouse}
+        name={deleteWarehouse?.warehouseName || ''}
+        onCancel={() => setDeleteWarehouse(null)}
+        onConfirm={confirmDelete}
+      />
     </div>
   );
 }
 
 function WarehouseFormModal({
   initialData,
+  open,
   onClose,
   onConfirm,
 }: {
   initialData: Warehouse | null;
+  open: boolean;
   onClose: () => void;
   onConfirm: (data: Warehouse) => void;
 }) {
@@ -299,172 +306,191 @@ function WarehouseFormModal({
   );
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="w-full max-w-lg rounded-2xl bg-white shadow-xl px-6 py-5 relative max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between mb-5">
-          <h2 className="text-lg font-semibold text-gray-900">
+    <Dialog open={open} onOpenChange={(val) => !val && onClose()}>
+      <DialogContent className="sm:max-w-xl">
+        <DialogHeader>
+          <DialogTitle className="text-2xl font-bold text-blue-900">
             {initialData ? 'Update Warehouse' : 'Add Warehouse'}
-          </h2>
-          <button
-            onClick={onClose}
-            className="h-7 w-7 flex items-center justify-center rounded-full border text-gray-500 hover:text-gray-800"
-          >
-            <X size={14} />
-          </button>
-        </div>
+          </DialogTitle>
+        </DialogHeader>
 
-        <div className="space-y-4">
-          <Field label="Warehouse Name">
-            <Input
-              placeholder="Enter warehouse name"
-              value={form.warehouseName}
-              onChange={(e) => setForm({ ...form, warehouseName: e.target.value })}
-            />
-          </Field>
+        <div className="space-y-6 pt-6">
+          <div className="grid grid-cols-2 gap-x-8 gap-y-6">
+            <div className="col-span-2 space-y-2">
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Warehouse Name</label>
+              <Input
+                placeholder="Enter warehouse name"
+                value={form.warehouseName}
+                onChange={(e) => setForm({ ...form, warehouseName: e.target.value })}
+                className="h-12 rounded-xl bg-white border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
+              />
+            </div>
 
-          <Field label="Warehouse Code">
-            <Input
-              placeholder="e.g., WH-001"
-              value={form.warehouseCode}
-              onChange={(e) => setForm({ ...form, warehouseCode: e.target.value })}
-            />
-          </Field>
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Warehouse Code</label>
+              <Input
+                placeholder="e.g., WH-001"
+                value={form.warehouseCode}
+                onChange={(e) => setForm({ ...form, warehouseCode: e.target.value })}
+                className="h-12 rounded-xl bg-white border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
+              />
+            </div>
 
-          <Field label="Branch">
-            <Select
-              value={form.branch}
-              onValueChange={(value) => setForm({ ...form, branch: value })}
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Branch</label>
+              <Select
+                value={form.branch}
+                onValueChange={(value) => setForm({ ...form, branch: value })}
+              >
+                <SelectTrigger className="h-12 rounded-xl bg-white border-none shadow-sm focus:ring-2 focus:ring-blue-400">
+                  <SelectValue placeholder="Select branch" />
+                </SelectTrigger>
+                <SelectContent className="rounded-xl">
+                  {availableBranches.map((branch) => (
+                    <SelectItem key={branch} value={branch}>
+                      {branch}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Location / City</label>
+              <Input
+                placeholder="Enter city"
+                value={form.location}
+                onChange={(e) => setForm({ ...form, location: e.target.value })}
+                className="h-12 rounded-xl bg-white border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Warehouse Type</label>
+              <Select
+                value={form.type}
+                onValueChange={(value) =>
+                  setForm({
+                    ...form,
+                    type: value as 'Central' | 'Regional' | 'Dark Store',
+                  })
+                }
+              >
+                <SelectTrigger className="h-12 rounded-xl bg-white border-none shadow-sm focus:ring-2 focus:ring-blue-400">
+                  <SelectValue placeholder="Select type" />
+                </SelectTrigger>
+                <SelectContent className="rounded-xl">
+                  {warehouseTypes.map((type) => (
+                    <SelectItem key={type} value={type}>
+                      {type}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="col-span-2 space-y-2">
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Full Address</label>
+              <Input
+                placeholder="Enter complete address"
+                value={form.address}
+                onChange={(e) => setForm({ ...form, address: e.target.value })}
+                className="h-12 rounded-xl bg-white border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Capacity</label>
+              <Input
+                placeholder="e.g., 30000 sqft"
+                value={form.capacity}
+                onChange={(e) => setForm({ ...form, capacity: e.target.value })}
+                className="h-12 rounded-xl bg-white border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Status</label>
+              <Select
+                value={form.status}
+                onValueChange={(value) =>
+                  setForm({ ...form, status: value as 'active' | 'inactive' })
+                }
+              >
+                <SelectTrigger className="h-12 rounded-xl bg-white border-none shadow-sm focus:ring-2 focus:ring-blue-400">
+                  <SelectValue placeholder="Select status" />
+                </SelectTrigger>
+                <SelectContent className="rounded-xl">
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="inactive">Inactive</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="flex justify-end items-center gap-6 pt-8">
+            <button 
+              type="button" 
+              onClick={onClose} 
+              className="text-sm font-bold text-gray-900 hover:text-gray-600 transition-colors"
             >
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Select branch" />
-              </SelectTrigger>
-              <SelectContent>
-                {availableBranches.map((branch) => (
-                  <SelectItem
-                    key={branch}
-                    value={branch}
-                    className="focus:bg-primary focus:text-white"
-                  >
-                    {branch}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </Field>
-
-          <Field label="Location / City">
-            <Input
-              placeholder="Enter city"
-              value={form.location}
-              onChange={(e) => setForm({ ...form, location: e.target.value })}
-            />
-          </Field>
-
-          <Field label="Full Address">
-            <Input
-              placeholder="Enter complete address"
-              value={form.address}
-              onChange={(e) => setForm({ ...form, address: e.target.value })}
-            />
-          </Field>
-
-          <Field label="Warehouse Type">
-            <Select
-              value={form.type}
-              onValueChange={(value) =>
-                setForm({
-                  ...form,
-                  type: value as 'Central' | 'Regional' | 'Dark Store',
-                })
-              }
+              Cancel
+            </button>
+            <Button
+              className="h-12 px-10 rounded-xl bg-[#004a8d] text-white hover:bg-[#003f7d] font-bold shadow-lg"
+              onClick={() => onConfirm(form)}
             >
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Select type" />
-              </SelectTrigger>
-              <SelectContent>
-                {warehouseTypes.map((type) => (
-                  <SelectItem key={type} value={type} className="focus:bg-primary focus:text-white">
-                    {type}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </Field>
-
-          <Field label="Capacity">
-            <Input
-              placeholder="e.g., 30000 sqft"
-              value={form.capacity}
-              onChange={(e) => setForm({ ...form, capacity: e.target.value })}
-            />
-          </Field>
-
-          <Field label="Status">
-            <Select
-              value={form.status}
-              onValueChange={(value) =>
-                setForm({ ...form, status: value as 'active' | 'inactive' })
-              }
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Select status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="active" className="focus:bg-primary focus:text-white">
-                  Active
-                </SelectItem>
-                <SelectItem value="inactive" className="focus:bg-primary focus:text-white">
-                  Inactive
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          </Field>
+              {initialData ? 'Update' : 'Confirm'}
+            </Button>
+          </div>
         </div>
-
-        <div className="mt-6 flex justify-end gap-3">
-          <Button variant="outline" className="rounded-full px-6" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button
-            className="rounded-full px-6 bg-primary hover:bg-primary/90 text-white"
-            onClick={() => onConfirm(form)}
-          >
-            Confirm
-          </Button>
-        </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
 function ConfirmDeleteModal({
+  open,
   name,
   onCancel,
   onConfirm,
 }: {
+  open: boolean;
   name: string;
   onCancel: () => void;
   onConfirm: () => void;
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="bg-white max-w-sm w-full rounded-2xl p-6 text-center">
-        <Trash2 className="mx-auto text-red-600 mb-3" />
-        <h3 className="text-lg font-semibold">Delete Warehouse</h3>
-        <p className="text-sm text-slate-500 mt-1">
-          Are you sure you want to delete <b>{name}</b>?
-        </p>
-
-        <div className="flex justify-center gap-4 mt-6">
-          <Button variant="outline" onClick={onCancel}>
+    <Dialog open={open} onOpenChange={(val) => !val && onCancel()}>
+      <DialogContent className="sm:max-w-[450px]">
+        <DialogHeader>
+          <div className="flex items-center gap-4 text-red-600 mb-4">
+            <div className="h-12 w-12 rounded-2xl bg-red-50 flex items-center justify-center text-red-600 shadow-sm">
+              <Trash2 className="h-6 w-6" />
+            </div>
+            <DialogTitle className="text-xl font-bold text-blue-900">Delete Warehouse</DialogTitle>
+          </div>
+          <DialogDescription className="text-base text-gray-600 leading-relaxed">
+            Are you sure you want to delete <strong>{name}</strong>?
+          </DialogDescription>
+        </DialogHeader>
+        <div className="flex justify-end items-center gap-6 pt-8">
+          <button 
+            type="button" 
+            onClick={onCancel} 
+            className="text-sm font-bold text-gray-900 hover:text-gray-600 transition-colors"
+          >
             Cancel
-          </Button>
-          <Button className="bg-red-600 text-white" onClick={onConfirm}>
+          </button>
+          <Button
+            className="h-12 px-8 rounded-xl bg-red-600 text-white hover:bg-red-700 font-bold shadow-lg"
+            onClick={onConfirm}
+          >
             Delete
           </Button>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 

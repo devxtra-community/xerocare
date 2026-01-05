@@ -46,7 +46,7 @@ const menuItems = [
   {
     title: 'Human Resources',
     icon: Users,
-    href: '/hr',
+    href: '/admin/human-resource',
   },
   {
     title: 'Warehouse',

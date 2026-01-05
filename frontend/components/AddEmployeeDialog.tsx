@@ -79,87 +79,110 @@ export default function AddEmployeeDialog() {
 
       <DialogOverlay className="fixed inset-0 z-50 bg-background/70 backdrop-blur-md" />
 
-      <DialogContent className="z-50 rounded-2xl bg-white text-foreground border border-border shadow-lg sm:max-w-md">
+      <DialogContent className="sm:max-w-xl">
         <DialogHeader>
-          <DialogTitle>Add Employee</DialogTitle>
+          <DialogTitle className="text-2xl font-bold text-blue-900">Add New Employee</DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-2">
-            <Input
-              name="firstName"
-              placeholder="First Name"
-              value={formData.firstName}
-              onChange={handleInputChange}
-            />
-            <Input
-              name="lastName"
-              placeholder="Last Name"
-              value={formData.lastName}
-              onChange={handleInputChange}
-            />
-          </div>
+        <div className="space-y-6 pt-6">
+          <div className="grid grid-cols-2 gap-x-8 gap-y-6">
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">First Name</label>
+              <Input
+                name="firstName"
+                placeholder="John"
+                value={formData.firstName}
+                onChange={handleInputChange}
+                className="h-12 rounded-xl bg-white border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Last Name</label>
+              <Input
+                name="lastName"
+                placeholder="Doe"
+                value={formData.lastName}
+                onChange={handleInputChange}
+                className="h-12 rounded-xl bg-white border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
+              />
+            </div>
 
-          <RoleSelect
-            value={formData.role}
-            onChange={(val: string) => setFormData((prev) => ({ ...prev, role: val }))}
-          />
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Role</label>
+              <RoleSelect
+                value={formData.role}
+                onChange={(val: string) => setFormData((prev) => ({ ...prev, role: val }))}
+              />
+            </div>
 
-          <div className="grid grid-cols-2 gap-2">
-            <div className="space-y-1">
-              <label className="text-xs font-medium">Contract Expiry</label>
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Email Address</label>
+              <Input
+                name="email"
+                type="email"
+                placeholder="john.doe@example.com"
+                value={formData.email}
+                onChange={handleInputChange}
+                className="h-12 rounded-xl bg-white border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Contract Expiry</label>
               <Input
                 type="date"
                 name="expireDate"
                 value={formData.expireDate}
                 onChange={handleInputChange}
+                className="h-12 rounded-xl bg-white border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
               />
             </div>
-            <div className="space-y-1">
-              <label className="text-xs font-medium">Salary</label>
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Salary</label>
               <Input
                 name="salary"
                 placeholder="Salary"
                 type="number"
                 value={formData.salary}
                 onChange={handleInputChange}
+                className="h-12 rounded-xl bg-white border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
               />
             </div>
-          </div>
 
-          <Input
-            name="email"
-            type="email"
-            placeholder="Email"
-            value={formData.email}
-            onChange={handleInputChange}
-          />
-
-          <div className="space-y-2">
-            <div className="space-y-1">
-              <label className="text-xs font-medium">Profile Image</label>
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Profile Image</label>
               <Input
                 type="file"
                 accept="image/*"
                 onChange={(e) => handleFileChange(e, 'profile_image')}
+                className="h-12 rounded-xl bg-white border-none shadow-sm text-xs file:bg-blue-50 file:text-blue-600 file:border-none file:rounded-lg file:px-2 file:py-1 file:mr-2 flex items-center"
               />
             </div>
-            <div className="space-y-1">
-              <label className="text-xs font-medium">ID Proof</label>
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">ID Proof</label>
               <Input
                 type="file"
                 accept="application/pdf,image/*"
                 onChange={(e) => handleFileChange(e, 'id_proof')}
+                className="h-12 rounded-xl bg-white border-none shadow-sm text-xs file:bg-blue-50 file:text-blue-600 file:border-none file:rounded-lg file:px-2 file:py-1 file:mr-2 flex items-center"
               />
             </div>
           </div>
 
-          <div className="flex justify-end gap-3 pt-4">
-            <Button variant="outline" onClick={() => setOpen(false)}>
+          <div className="flex justify-end items-center gap-6 pt-8">
+            <button 
+              type="button" 
+              onClick={() => setOpen(false)} 
+              className="text-sm font-bold text-gray-900 hover:text-gray-600 transition-colors"
+            >
               Cancel
-            </Button>
-            <Button onClick={handleSubmit} disabled={loading}>
-              {loading ? 'Creating...' : 'Confirm'}
+            </button>
+            <Button 
+              onClick={handleSubmit} 
+              disabled={loading} 
+              className="h-12 px-10 rounded-xl bg-[#004a8d] text-white hover:bg-[#003f7d] font-bold shadow-lg"
+            >
+              {loading ? 'Creating...' : 'Create'}
             </Button>
           </div>
         </div>
