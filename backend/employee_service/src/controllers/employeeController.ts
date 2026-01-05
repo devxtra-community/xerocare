@@ -3,6 +3,7 @@ import { AppError } from '../errors/appError';
 import { EmployeeService } from '../services/employeeService';
 import { MulterS3File } from '../types/multer-s3-file';
 import { logger } from '../config/logger';
+import { EmployeeRole } from '../constants/employeeRole';
 
 const service = new EmployeeService();
 
@@ -60,9 +61,10 @@ export const getAllEmployees = async (req: Request, res: Response, next: NextFun
   try {
     const page = Number(req.query.page) || 1;
     const limit = Number(req.query.limit) || 20;
+    const role = req.query.role as EmployeeRole | undefined;
 
-    const result = await service.getAllEmployees(page, limit);
-    logger.debug('Fetched employees', { count: result.employees.length, page, limit });
+    const result = await service.getAllEmployees(page, limit, role);
+    logger.debug('Fetched employees', { count: result.employees.length, page, limit, role });
     return res.json({
       success: true,
       data: result,

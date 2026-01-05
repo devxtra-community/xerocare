@@ -10,7 +10,7 @@ export class BranchRepository {
 
   findAll() {
     return this.db.getRepository(Branch).find({
-      where: { status: BranchStatus.ACTIVE },
+      where: [{ status: BranchStatus.ACTIVE }, { status: BranchStatus.INACTIVE }],
     });
   }
 

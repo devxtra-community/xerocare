@@ -100,10 +100,10 @@ export class EmployeeService {
     };
   }
 
-  async getAllEmployees(page = 1, limit = 20) {
+  async getAllEmployees(page = 1, limit = 20, role?: EmployeeRole) {
     const skip = (page - 1) * limit;
 
-    const { data, total } = await this.employeeRepo.findAll(skip, limit);
+    const { data, total } = await this.employeeRepo.findAll(skip, limit, role);
 
     return {
       employees: data,
