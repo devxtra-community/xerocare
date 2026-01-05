@@ -66,4 +66,11 @@ export class EmployeeRepository {
       ],
     });
   }
+  async updateById(id: string, payload: Partial<Employee>): Promise<Employee | null> {
+    const employee = await this.findById(id);
+    if (!employee) return null;
+
+    Object.assign(employee, payload);
+    return this.repo.save(employee);
+  }
 }

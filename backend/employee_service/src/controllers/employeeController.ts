@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { AppError } from '../errors/appError';
 import { EmployeeService } from '../services/employeeService';
 import { MulterS3File } from '../types/multer-s3-file';
+import { logger } from '../config/logger';
 
 const service = new EmployeeService();
 
@@ -61,7 +62,7 @@ export const getAllEmployees = async (req: Request, res: Response, next: NextFun
     const limit = Number(req.query.limit) || 20;
 
     const result = await service.getAllEmployees(page, limit);
-    console.log(result);
+    logger.debug('Fetched employees', { count: result.employees.length, page, limit });
     return res.json({
       success: true,
       data: result,
@@ -86,13 +87,26 @@ export const getEmployeeById = async (req: Request, res: Response, next: NextFun
   }
 };
 
-export const deleteEmployee = async (req: Request, res: Response, next: NextFunction) => {
+export const updateEmployee = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const employee = await service.getEmployeeById(req.params.id);
+    const updatedEmployee = await service.updateEmployee(req.params.id, req.body);
 
     return res.json({
       success: true,
-      data: employee,
+      message: 'Employee updated successfully',
+      data: updatedEmployee,
+    });
+  } catch (err: any) {
+    next(new AppError(err.message, err.statusCode || 400));
+  }
+};
+
+export const deleteEmployee = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    await service.deleteEmployee(req.params.id);
+
+    return res.json({
+      success: true,
       message: 'Employee deleted successfully',
     });
   } catch (err: any) {

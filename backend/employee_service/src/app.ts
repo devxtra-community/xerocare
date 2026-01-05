@@ -29,16 +29,16 @@ const startServer = async () => {
   try {
     await Source.initialize();
     await getRabbitChannel();
-    console.log('rabbit mq channel connected');
+    logger.info('RabbitMQ channel connected');
     await startWorker();
-    console.log('Database connected');
+    logger.info('Database connected');
 
     const PORT = process.env.PORT;
     app.listen(PORT, () => {
       logger.info(`Server running on port ${PORT}`);
     });
   } catch (error) {
-    console.error('DB connection failed', error);
+    logger.error('DB connection failed', error);
     process.exit(1);
   }
 };

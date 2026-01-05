@@ -3,6 +3,8 @@ import { DataSource } from 'typeorm';
 import './env';
 
 import { Vendor } from '../entities/vendorEntity';
+import { Branch } from '../entities/branchEntity';
+import { EmployeeManager } from '../entities/employeeManagerEntity';
 
 export const Source = new DataSource({
   type: 'postgres',
@@ -11,5 +13,5 @@ export const Source = new DataSource({
     rejectUnauthorized: false,
   },
   synchronize: true,
-  entities: [Vendor],
+  entities: [Vendor, Branch, EmployeeManager],
 });

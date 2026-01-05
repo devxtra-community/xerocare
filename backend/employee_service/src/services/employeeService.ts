@@ -6,6 +6,9 @@ import { getSignedIdProofUrl } from '../utlis/r2SignedUrl';
 import { publishEmailJob } from '../queues/emailProducer';
 import { AppError } from '../errors/appError';
 import { EmployeeStatus } from '../entities/employeeEntities';
+import { publishEmployeeEvent } from '../events/publishers/eventPublisher';
+import { EmployeeEventType } from '../events/employeeEvents';
+import { logger } from '../config/logger';
 
 export class EmployeeService {
   private employeeRepo = new EmployeeRepository();
@@ -62,11 +65,18 @@ export class EmployeeService {
       expire_date: expireDate ?? null,
     });
 
+    await publishEmployeeEvent(EmployeeEventType.CREATED, {
+      employeeId: employee.id,
+      email: employee.email,
+      role: employee.role,
+      status: employee.status,
+    });
+
     publishEmailJob({
       type: 'WELCOME',
       email,
       password: plainPassword,
-    }).catch(console.error);
+    }).catch((err) => logger.error('Failed to publish employee welcome email job', err));
 
     return employee;
   }
@@ -116,6 +126,51 @@ export class EmployeeService {
     return employee;
   }
 
+  async updateEmployee(
+    id: string,
+    payload: {
+      first_name?: string;
+      last_name?: string;
+      role?: EmployeeRole;
+      salary?: number | null;
+      profile_image_url?: string | null;
+      expireDate?: Date | null;
+      status?: EmployeeStatus;
+    },
+  ) {
+    const employee = await this.employeeRepo.findById(id);
+
+    if (!employee) {
+      throw new AppError('Employee not found', 404);
+    }
+
+    if (employee.status === EmployeeStatus.DELETED) {
+      throw new AppError('Cannot update deleted employee', 400);
+    }
+
+    if (payload.role && !Object.values(EmployeeRole).includes(payload.role)) {
+      throw new AppError('Invalid role', 400);
+    }
+
+    const updated = await this.employeeRepo.updateById(id, {
+      ...payload,
+      expire_date: payload.expireDate,
+    });
+
+    if (!updated) {
+      throw new AppError('Failed to update employee', 500);
+    }
+
+    await publishEmployeeEvent(EmployeeEventType.UPDATED, {
+      employeeId: updated.id,
+      email: updated.email,
+      role: updated.role,
+      status: updated.status,
+    });
+
+    return updated;
+  }
+
   async deleteEmployee(id: string) {
     const employee = await this.employeeRepo.findById(id);
 
@@ -130,6 +185,10 @@ export class EmployeeService {
     employee.status = EmployeeStatus.DELETED;
 
     await this.employeeRepo.save(employee);
+
+    await publishEmployeeEvent(EmployeeEventType.DELETED, {
+      employeeId: employee.id,
+    });
 
     return true;
   }

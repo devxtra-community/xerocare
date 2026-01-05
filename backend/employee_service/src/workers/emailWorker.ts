@@ -7,6 +7,7 @@ import {
   sendVendorWelcomeMail,
 } from '../utlis/mailer';
 import { OtpPurpose } from '../constants/otpPurpose';
+import { logger } from '../config/logger';
 
 export const startWorker = async () => {
   const channel = await getRabbitChannel();
@@ -35,9 +36,9 @@ export const startWorker = async () => {
 
       channel.ack(msg);
     } catch (err) {
-      console.error('Email failed', err);
+      logger.error('Email worker failed to send email', err);
     }
   });
 
-  console.log('Email worker running');
+  logger.info('Email worker started and listening for jobs');
 };
