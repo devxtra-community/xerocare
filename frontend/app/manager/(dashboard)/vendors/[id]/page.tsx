@@ -12,8 +12,6 @@ import {
   MapPin,
   Building2,
   User,
-  CreditCard,
-  ShoppingCart,
   TrendingUp,
   Clock,
 } from 'lucide-react';

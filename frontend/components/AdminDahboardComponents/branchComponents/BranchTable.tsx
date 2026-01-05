@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Search, Plus, X, Trash2 } from 'lucide-react';
+import { Search, Plus, Trash2 } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -294,7 +294,9 @@ function BranchFormModal({
         <div className="space-y-6 pt-6">
           <div className="grid grid-cols-2 gap-x-8 gap-y-6">
             <div className="col-span-2 space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Branch Name</label>
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                Branch Name
+              </label>
               <Input
                 placeholder="Full name"
                 value={form.branchName}
@@ -304,7 +306,9 @@ function BranchFormModal({
             </div>
 
             <div className="col-span-2 space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Branch Address</label>
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                Branch Address
+              </label>
               <Input
                 placeholder="Address"
                 value={form.address}
@@ -314,7 +318,9 @@ function BranchFormModal({
             </div>
 
             <div className="space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Location</label>
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                Location
+              </label>
               <Input
                 placeholder="City / Area"
                 value={form.location}
@@ -324,7 +330,9 @@ function BranchFormModal({
             </div>
 
             <div className="space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Started Date</label>
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                Started Date
+              </label>
               <Input
                 type="date"
                 value={form.startedDate}
@@ -334,7 +342,9 @@ function BranchFormModal({
             </div>
 
             <div className="space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Assign Manager</label>
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                Assign Manager
+              </label>
               <Select
                 value={form.manager}
                 onValueChange={(value) => setForm({ ...form, manager: value })}
@@ -353,7 +363,9 @@ function BranchFormModal({
             </div>
 
             <div className="space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Branch Status</label>
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                Branch Status
+              </label>
               <Select
                 value={form.status}
                 onValueChange={(value) =>
@@ -372,9 +384,9 @@ function BranchFormModal({
           </div>
 
           <div className="flex justify-end items-center gap-6 pt-8">
-            <button 
-              type="button" 
-              onClick={onClose} 
+            <button
+              type="button"
+              onClick={onClose}
               className="text-sm font-bold text-gray-900 hover:text-gray-600 transition-colors"
             >
               Cancel
@@ -418,9 +430,9 @@ function ConfirmDeleteModal({
           </DialogDescription>
         </DialogHeader>
         <div className="flex justify-end items-center gap-6 pt-8">
-          <button 
-            type="button" 
-            onClick={onCancel} 
+          <button
+            type="button"
+            onClick={onCancel}
             className="text-sm font-bold text-gray-900 hover:text-gray-600 transition-colors"
           >
             Cancel
@@ -434,14 +446,5 @@ function ConfirmDeleteModal({
         </div>
       </DialogContent>
     </Dialog>
-  );
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
-      {children}
-    </div>
   );
 }

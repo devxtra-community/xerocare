@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Search, Plus, X, Trash2 } from 'lucide-react';
+import { Search, Plus, Trash2 } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -317,7 +317,9 @@ function WarehouseFormModal({
         <div className="space-y-6 pt-6">
           <div className="grid grid-cols-2 gap-x-8 gap-y-6">
             <div className="col-span-2 space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Warehouse Name</label>
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                Warehouse Name
+              </label>
               <Input
                 placeholder="Enter warehouse name"
                 value={form.warehouseName}
@@ -327,7 +329,9 @@ function WarehouseFormModal({
             </div>
 
             <div className="space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Warehouse Code</label>
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                Warehouse Code
+              </label>
               <Input
                 placeholder="e.g., WH-001"
                 value={form.warehouseCode}
@@ -337,7 +341,9 @@ function WarehouseFormModal({
             </div>
 
             <div className="space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Branch</label>
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                Branch
+              </label>
               <Select
                 value={form.branch}
                 onValueChange={(value) => setForm({ ...form, branch: value })}
@@ -356,7 +362,9 @@ function WarehouseFormModal({
             </div>
 
             <div className="space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Location / City</label>
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                Location / City
+              </label>
               <Input
                 placeholder="Enter city"
                 value={form.location}
@@ -366,7 +374,9 @@ function WarehouseFormModal({
             </div>
 
             <div className="space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Warehouse Type</label>
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                Warehouse Type
+              </label>
               <Select
                 value={form.type}
                 onValueChange={(value) =>
@@ -390,7 +400,9 @@ function WarehouseFormModal({
             </div>
 
             <div className="col-span-2 space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Full Address</label>
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                Full Address
+              </label>
               <Input
                 placeholder="Enter complete address"
                 value={form.address}
@@ -400,7 +412,9 @@ function WarehouseFormModal({
             </div>
 
             <div className="space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Capacity</label>
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                Capacity
+              </label>
               <Input
                 placeholder="e.g., 30000 sqft"
                 value={form.capacity}
@@ -410,7 +424,9 @@ function WarehouseFormModal({
             </div>
 
             <div className="space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Status</label>
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                Status
+              </label>
               <Select
                 value={form.status}
                 onValueChange={(value) =>
@@ -429,9 +445,9 @@ function WarehouseFormModal({
           </div>
 
           <div className="flex justify-end items-center gap-6 pt-8">
-            <button 
-              type="button" 
-              onClick={onClose} 
+            <button
+              type="button"
+              onClick={onClose}
               className="text-sm font-bold text-gray-900 hover:text-gray-600 transition-colors"
             >
               Cancel
@@ -475,9 +491,9 @@ function ConfirmDeleteModal({
           </DialogDescription>
         </DialogHeader>
         <div className="flex justify-end items-center gap-6 pt-8">
-          <button 
-            type="button" 
-            onClick={onCancel} 
+          <button
+            type="button"
+            onClick={onCancel}
             className="text-sm font-bold text-gray-900 hover:text-gray-600 transition-colors"
           >
             Cancel
@@ -491,14 +507,5 @@ function ConfirmDeleteModal({
         </div>
       </DialogContent>
     </Dialog>
-  );
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
-      {children}
-    </div>
   );
 }

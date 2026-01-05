@@ -9,6 +9,11 @@ export interface Vendor {
   status: 'ACTIVE' | 'INACTIVE' | 'DELETED';
   createdAt: string;
   updatedAt: string;
+  type?: 'Supplier' | 'Distributor' | 'Service';
+  contactPerson?: string;
+  totalOrders?: number;
+  purchaseValue?: number;
+  outstandingAmount?: number;
 }
 
 export async function createVendor(data: Partial<Vendor>) {

@@ -14,7 +14,8 @@ export default function RevenueBySourceChart() {
   const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
-    setIsClient(true);
+    const timer = setTimeout(() => setIsClient(true), 0);
+    return () => clearTimeout(timer);
   }, []);
 
   return (
@@ -37,14 +38,14 @@ export default function RevenueBySourceChart() {
                   <Cell key={`cell-${index}`} fill={entry.color} />
                 ))}
               </Pie>
-              <Tooltip 
+              <Tooltip
                 formatter={(val: number) => `₹${val.toLocaleString()}`}
-                contentStyle={{ 
-                  borderRadius: '8px', 
-                  border: 'none', 
+                contentStyle={{
+                  borderRadius: '8px',
+                  border: 'none',
                   boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
                   padding: '4px 8px',
-                  fontSize: '10px'
+                  fontSize: '10px',
                 }}
                 itemStyle={{ padding: 0, fontWeight: 'bold' }}
               />

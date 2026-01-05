@@ -11,7 +11,7 @@ import {
 } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Search, Filter, Eye, Edit, Plus, Trash2, X } from 'lucide-react';
+import { Search, Filter, Eye, Edit, Plus, Trash2 } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -26,11 +26,7 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import { useRouter } from 'next/navigation';
-import {
-  createVendor,
-  updateVendor,
-  deleteVendor as apiDeleteVendor,
-} from '@/lib/vendor';
+import { createVendor, updateVendor, deleteVendor as apiDeleteVendor } from '@/lib/vendor';
 import { toast } from 'sonner';
 import { AxiosError } from 'axios';
 import {
@@ -362,21 +358,21 @@ function VendorFormModal({
   const [form, setForm] = useState<VendorFormData>(
     initialData
       ? {
-        name: initialData.name,
-        type: initialData.type,
-        contactPerson: initialData.contactPerson,
-        phone: initialData.phone,
-        email: initialData.email,
-        status: initialData.status,
-      }
+          name: initialData.name,
+          type: initialData.type,
+          contactPerson: initialData.contactPerson,
+          phone: initialData.phone,
+          email: initialData.email,
+          status: initialData.status,
+        }
       : {
-        name: '',
-        type: 'Supplier',
-        contactPerson: '',
-        phone: '',
-        email: '',
-        status: 'Active',
-      },
+          name: '',
+          type: 'Supplier',
+          contactPerson: '',
+          phone: '',
+          email: '',
+          status: 'Active',
+        },
   );
 
   return (
@@ -391,7 +387,9 @@ function VendorFormModal({
         <div className="space-y-6 pt-6">
           <div className="grid grid-cols-2 gap-x-8 gap-y-6">
             <div className="col-span-2 space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Vendor Name</label>
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                Vendor Name
+              </label>
               <Input
                 placeholder="Enter vendor name"
                 value={form.name}
@@ -401,7 +399,9 @@ function VendorFormModal({
             </div>
 
             <div className="space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Contact Person</label>
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                Contact Person
+              </label>
               <Input
                 placeholder="Enter contact person"
                 value={form.contactPerson}
@@ -411,7 +411,9 @@ function VendorFormModal({
             </div>
 
             <div className="space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Type</label>
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                Type
+              </label>
               <Select
                 value={form.type}
                 onValueChange={(value) =>
@@ -430,7 +432,9 @@ function VendorFormModal({
             </div>
 
             <div className="space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Phone</label>
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                Phone
+              </label>
               <Input
                 placeholder="Enter phone number"
                 value={form.phone}
@@ -440,7 +444,9 @@ function VendorFormModal({
             </div>
 
             <div className="space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Email</label>
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                Email
+              </label>
               <Input
                 placeholder="Enter email address"
                 value={form.email}
@@ -450,7 +456,9 @@ function VendorFormModal({
             </div>
 
             <div className="col-span-2 space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Status</label>
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                Status
+              </label>
               <Select
                 value={form.status}
                 onValueChange={(value) =>
@@ -469,9 +477,9 @@ function VendorFormModal({
           </div>
 
           <div className="flex justify-end items-center gap-6 pt-8">
-            <button 
-              type="button" 
-              onClick={onClose} 
+            <button
+              type="button"
+              onClick={onClose}
               className="text-sm font-bold text-gray-900 hover:text-gray-600 transition-colors"
             >
               Cancel
@@ -515,9 +523,9 @@ function ConfirmDeleteModal({
           </DialogDescription>
         </DialogHeader>
         <div className="flex justify-end items-center gap-6 pt-8">
-          <button 
-            type="button" 
-            onClick={onCancel} 
+          <button
+            type="button"
+            onClick={onCancel}
             className="text-sm font-bold text-gray-900 hover:text-gray-600 transition-colors"
           >
             Cancel
@@ -531,14 +539,5 @@ function ConfirmDeleteModal({
         </div>
       </DialogContent>
     </Dialog>
-  );
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
-      {children}
-    </div>
   );
 }

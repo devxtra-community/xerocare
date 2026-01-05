@@ -14,7 +14,8 @@ export default function TeamDistributionChart() {
   const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
-    setIsClient(true);
+    const timer = setTimeout(() => setIsClient(true), 0);
+    return () => clearTimeout(timer);
   }, []);
 
   const total = data.reduce((acc, curr) => acc + curr.value, 0);
@@ -24,7 +25,7 @@ export default function TeamDistributionChart() {
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-sm font-bold text-blue-900 uppercase">Team Distribution</h3>
       </div>
-      
+
       <div className="flex-1 flex flex-col sm:flex-row items-center gap-6">
         <div className="relative w-[180px] h-[180px]">
           {isClient && (
@@ -44,7 +45,7 @@ export default function TeamDistributionChart() {
                     <Cell key={`cell-${index}`} fill={entry.color} stroke="none" />
                   ))}
                 </Pie>
-                <Tooltip 
+                <Tooltip
                   content={({ active, payload }) => {
                     if (active && payload && payload.length) {
                       return (

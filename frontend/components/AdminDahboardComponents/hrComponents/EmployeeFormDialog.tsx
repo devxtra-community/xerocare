@@ -1,21 +1,35 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+
+export interface Employee {
+  id?: string;
+  name: string;
+  role: string;
+  department: string;
+  branch: string;
+  type: string;
+  status: string;
+  joiningDate: string;
+  manager: string;
+  salary: string;
+}
 
 interface EmployeeFormDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  initialData?: any;
-  onSubmit: (data: any) => void;
+  initialData?: Employee | null;
+  onSubmit: (data: Employee) => void;
 }
 
 export default function EmployeeFormDialog({
@@ -37,21 +51,24 @@ export default function EmployeeFormDialog({
   });
 
   useEffect(() => {
-    if (initialData) {
-      setFormData(initialData);
-    } else {
-      setFormData({
-        name: '',
-        role: '',
-        department: '',
-        branch: '',
-        type: 'Full-time',
-        status: 'Active',
-        joiningDate: new Date().toISOString().split('T')[0],
-        manager: '',
-        salary: '',
-      });
-    }
+    const timer = setTimeout(() => {
+      if (initialData) {
+        setFormData(initialData);
+      } else {
+        setFormData({
+          name: '',
+          role: '',
+          department: '',
+          branch: '',
+          type: 'Full-time',
+          status: 'Active',
+          joiningDate: new Date().toISOString().split('T')[0],
+          manager: '',
+          salary: '',
+        });
+      }
+    }, 0);
+    return () => clearTimeout(timer);
   }, [initialData, open]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -80,7 +97,9 @@ export default function EmployeeFormDialog({
         <form onSubmit={handleSubmit} className="space-y-6 pt-6">
           <div className="grid grid-cols-2 gap-x-8 gap-y-6">
             <div className="space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Full Name</label>
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                Full Name
+              </label>
               <Input
                 name="name"
                 placeholder="John Doe"
@@ -91,7 +110,9 @@ export default function EmployeeFormDialog({
               />
             </div>
             <div className="space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Role / Designation</label>
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                Role / Designation
+              </label>
               <Input
                 name="role"
                 placeholder="Software Engineer"
@@ -103,8 +124,13 @@ export default function EmployeeFormDialog({
             </div>
 
             <div className="space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Department</label>
-              <Select value={formData.department} onValueChange={(val) => handleSelectChange('department', val)}>
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                Department
+              </label>
+              <Select
+                value={formData.department}
+                onValueChange={(val) => handleSelectChange('department', val)}
+              >
                 <SelectTrigger className="h-12 rounded-xl bg-white border-none shadow-sm focus:ring-2 focus:ring-blue-400">
                   <SelectValue placeholder="Select department" />
                 </SelectTrigger>
@@ -117,7 +143,9 @@ export default function EmployeeFormDialog({
               </Select>
             </div>
             <div className="space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Branch / Location</label>
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                Branch / Location
+              </label>
               <Input
                 name="branch"
                 placeholder="Dubai Main"
@@ -129,8 +157,13 @@ export default function EmployeeFormDialog({
             </div>
 
             <div className="space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Employment Type</label>
-              <Select value={formData.type} onValueChange={(val) => handleSelectChange('type', val)}>
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                Employment Type
+              </label>
+              <Select
+                value={formData.type}
+                onValueChange={(val) => handleSelectChange('type', val)}
+              >
                 <SelectTrigger className="h-12 rounded-xl bg-white border-none shadow-sm focus:ring-2 focus:ring-blue-400">
                   <SelectValue placeholder="Select type" />
                 </SelectTrigger>
@@ -143,8 +176,13 @@ export default function EmployeeFormDialog({
               </Select>
             </div>
             <div className="space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Status</label>
-              <Select value={formData.status} onValueChange={(val) => handleSelectChange('status', val)}>
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                Status
+              </label>
+              <Select
+                value={formData.status}
+                onValueChange={(val) => handleSelectChange('status', val)}
+              >
                 <SelectTrigger className="h-12 rounded-xl bg-white border-none shadow-sm focus:ring-2 focus:ring-blue-400">
                   <SelectValue placeholder="Select status" />
                 </SelectTrigger>
@@ -157,7 +195,9 @@ export default function EmployeeFormDialog({
             </div>
 
             <div className="space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Joining Date</label>
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                Joining Date
+              </label>
               <Input
                 name="joiningDate"
                 type="date"
@@ -168,7 +208,9 @@ export default function EmployeeFormDialog({
               />
             </div>
             <div className="space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Reporting Manager</label>
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                Reporting Manager
+              </label>
               <Input
                 name="manager"
                 placeholder="Manager Name"
@@ -179,7 +221,9 @@ export default function EmployeeFormDialog({
               />
             </div>
             <div className="space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Salary (AED)</label>
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                Salary (AED)
+              </label>
               <Input
                 name="salary"
                 type="number"
@@ -193,15 +237,15 @@ export default function EmployeeFormDialog({
           </div>
 
           <div className="flex justify-end items-center gap-6 pt-8">
-            <button 
-              type="button" 
-              onClick={() => onOpenChange(false)} 
+            <button
+              type="button"
+              onClick={() => onOpenChange(false)}
               className="text-sm font-bold text-gray-900 hover:text-gray-600 transition-colors"
             >
               Cancel
             </button>
-            <Button 
-              type="submit" 
+            <Button
+              type="submit"
               className="h-12 px-10 rounded-xl bg-[#004a8d] text-white hover:bg-[#003f7d] font-bold shadow-lg"
             >
               {initialData ? 'Update' : 'Create'}

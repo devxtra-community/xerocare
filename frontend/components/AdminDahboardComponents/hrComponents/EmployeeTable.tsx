@@ -1,16 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import {
-  MoreVertical,
-  Eye,
-  UserX,
-  UserCog,
-  Search,
-  Filter,
-  Download,
-  Plus,
-} from 'lucide-react';
+import { MoreVertical, Eye, UserX, UserCog, Search, Filter, Download, Plus } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,7 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { useRouter } from 'next/navigation';
-import EmployeeFormDialog from './EmployeeFormDialog';
+import EmployeeFormDialog, { Employee } from './EmployeeFormDialog';
 import DeleteEmployeeDialog from './DeleteEmployeeDialog';
 import { toast } from 'sonner';
 
@@ -94,33 +85,32 @@ export default function EmployeeTable() {
   const [departmentFilter, setDepartmentFilter] = useState('All');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
-  const [selectedEmployee, setSelectedEmployee] = useState<any>(null);
+  const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
 
-  const filteredEmployees = mockEmployees.filter(
-    (emp) => {
-      const matchesSearch = emp.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        emp.id.toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesDepartment = departmentFilter === 'All' || emp.department === departmentFilter;
-      return matchesSearch && matchesDepartment;
-    }
-  );
+  const filteredEmployees = mockEmployees.filter((emp) => {
+    const matchesSearch =
+      emp.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      emp.id.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesDepartment = departmentFilter === 'All' || emp.department === departmentFilter;
+    return matchesSearch && matchesDepartment;
+  });
 
   const handleAdd = () => {
     setSelectedEmployee(null);
     setIsFormOpen(true);
   };
 
-  const handleEdit = (emp: any) => {
+  const handleEdit = (emp: Employee) => {
     setSelectedEmployee(emp);
     setIsFormOpen(true);
   };
 
-  const handleDeleteTrigger = (emp: any) => {
+  const handleDeleteTrigger = (emp: Employee) => {
     setSelectedEmployee(emp);
     setIsDeleteOpen(true);
   };
 
-  const handleFormSubmit = (data: any) => {
+  const handleFormSubmit = (data: Employee) => {
     if (selectedEmployee) {
       toast.success(`Employee ${data.name} updated successfully`);
     } else {
@@ -129,7 +119,9 @@ export default function EmployeeTable() {
   };
 
   const handleDeleteConfirm = () => {
-    toast.error(`Employee ${selectedEmployee.name} disabled`);
+    if (selectedEmployee) {
+      toast.error(`Employee ${selectedEmployee.name} disabled`);
+    }
   };
 
   return (
@@ -155,18 +147,29 @@ export default function EmployeeTable() {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-40 rounded-xl">
-                <DropdownMenuItem onClick={() => setDepartmentFilter('All')}>All Departments</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setDepartmentFilter('Manager')}>Manager</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setDepartmentFilter('All')}>
+                  All Departments
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setDepartmentFilter('Manager')}>
+                  Manager
+                </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setDepartmentFilter('HR')}>HR</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setDepartmentFilter('Employee')}>Employee</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setDepartmentFilter('Finance')}>Finance</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setDepartmentFilter('Employee')}>
+                  Employee
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setDepartmentFilter('Finance')}>
+                  Finance
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
             <Button variant="outline" className="rounded-xl border-gray-200">
               <Download className="h-4 w-4 mr-2" />
               Export
             </Button>
-            <Button className="rounded-xl bg-primary hover:bg-primary/90 text-white" onClick={handleAdd}>
+            <Button
+              className="rounded-xl bg-primary hover:bg-primary/90 text-white"
+              onClick={handleAdd}
+            >
               <Plus className="h-4 w-4 mr-2" />
               Add Employee
             </Button>
@@ -178,15 +181,33 @@ export default function EmployeeTable() {
         <table className="w-full text-left">
           <thead className="bg-gray-50/50">
             <tr>
-              <th className="px-6 py-4 text-xs font-semibold text-primary uppercase tracking-wider">Employee ID</th>
-              <th className="px-6 py-4 text-xs font-semibold text-primary uppercase tracking-wider">Name</th>
-              <th className="px-6 py-4 text-xs font-semibold text-primary uppercase tracking-wider">Role</th>
-              <th className="px-6 py-4 text-xs font-semibold text-primary uppercase tracking-wider">Department</th>
-              <th className="px-6 py-4 text-xs font-semibold text-primary uppercase tracking-wider">Branch</th>
-              <th className="px-6 py-4 text-xs font-semibold text-primary uppercase tracking-wider">Salary</th>
-              <th className="px-6 py-4 text-xs font-semibold text-primary uppercase tracking-wider">Status</th>
-              <th className="px-6 py-4 text-xs font-semibold text-primary uppercase tracking-wider">Joining Date</th>
-              <th className="px-6 py-4 text-xs font-semibold text-primary uppercase tracking-wider text-right">Actions</th>
+              <th className="px-6 py-4 text-xs font-semibold text-primary uppercase tracking-wider">
+                Employee ID
+              </th>
+              <th className="px-6 py-4 text-xs font-semibold text-primary uppercase tracking-wider">
+                Name
+              </th>
+              <th className="px-6 py-4 text-xs font-semibold text-primary uppercase tracking-wider">
+                Role
+              </th>
+              <th className="px-6 py-4 text-xs font-semibold text-primary uppercase tracking-wider">
+                Department
+              </th>
+              <th className="px-6 py-4 text-xs font-semibold text-primary uppercase tracking-wider">
+                Branch
+              </th>
+              <th className="px-6 py-4 text-xs font-semibold text-primary uppercase tracking-wider">
+                Salary
+              </th>
+              <th className="px-6 py-4 text-xs font-semibold text-primary uppercase tracking-wider">
+                Status
+              </th>
+              <th className="px-6 py-4 text-xs font-semibold text-primary uppercase tracking-wider">
+                Joining Date
+              </th>
+              <th className="px-6 py-4 text-xs font-semibold text-primary uppercase tracking-wider text-right">
+                Actions
+              </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
@@ -204,17 +225,21 @@ export default function EmployeeTable() {
                     </div>
                   </div>
                 </td>
-                <td className="px-6 py-4 text-sm text-gray-600 truncate max-w-[150px]">{emp.role}</td>
+                <td className="px-6 py-4 text-sm text-gray-600 truncate max-w-[150px]">
+                  {emp.role}
+                </td>
                 <td className="px-6 py-4 text-sm text-gray-600">{emp.department}</td>
                 <td className="px-6 py-4 text-sm text-gray-600">{emp.branch}</td>
                 <td className="px-6 py-4 text-sm font-semibold text-blue-700">AED {emp.salary}</td>
                 <td className="px-6 py-4">
-                  <Badge 
-                    variant="outline" 
+                  <Badge
+                    variant="outline"
                     className={`text-[10px] font-semibold border-none ${
-                        emp.status === 'Active' ? 'bg-green-100 text-green-700' :
-                        emp.status === 'Leave' ? 'bg-amber-100 text-amber-700' :
-                        'bg-red-100 text-red-700'
+                      emp.status === 'Active'
+                        ? 'bg-green-100 text-green-700'
+                        : emp.status === 'Leave'
+                          ? 'bg-amber-100 text-amber-700'
+                          : 'bg-red-100 text-red-700'
                     }`}
                   >
                     {emp.status}
@@ -223,8 +248,8 @@ export default function EmployeeTable() {
                 <td className="px-6 py-4 text-sm text-gray-600">{emp.joiningDate}</td>
                 <td className="px-6 py-4 text-right">
                   <div className="flex items-center justify-end gap-2">
-                    <Button 
-                      variant="ghost" 
+                    <Button
+                      variant="ghost"
                       className="h-8 w-8 p-0 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
                       onClick={() => router.push(`/admin/human-resource/${emp.id}`)}
                       title="View Profile"
@@ -238,10 +263,16 @@ export default function EmployeeTable() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="w-40 rounded-xl">
-                        <DropdownMenuItem className="gap-2 cursor-pointer" onClick={() => handleEdit(emp)}>
+                        <DropdownMenuItem
+                          className="gap-2 cursor-pointer"
+                          onClick={() => handleEdit(emp)}
+                        >
                           <UserCog className="h-4 w-4" /> Edit / Assign
                         </DropdownMenuItem>
-                        <DropdownMenuItem className="gap-2 cursor-pointer text-red-600 focus:text-red-600" onClick={() => handleDeleteTrigger(emp)}>
+                        <DropdownMenuItem
+                          className="gap-2 cursor-pointer text-red-600 focus:text-red-600"
+                          onClick={() => handleDeleteTrigger(emp)}
+                        >
                           <UserX className="h-4 w-4" /> Disable
                         </DropdownMenuItem>
                       </DropdownMenuContent>
@@ -254,27 +285,41 @@ export default function EmployeeTable() {
         </table>
       </div>
 
-      <EmployeeFormDialog 
-        open={isFormOpen} 
-        onOpenChange={setIsFormOpen} 
+      <EmployeeFormDialog
+        open={isFormOpen}
+        onOpenChange={setIsFormOpen}
         initialData={selectedEmployee}
         onSubmit={handleFormSubmit}
       />
 
-      <DeleteEmployeeDialog 
+      <DeleteEmployeeDialog
         open={isDeleteOpen}
         onOpenChange={setIsDeleteOpen}
         employeeName={selectedEmployee?.name || ''}
         onConfirm={handleDeleteConfirm}
       />
-      
+
       <div className="p-6 border-t border-gray-100 flex items-center justify-between">
-        <p className="text-sm text-gray-500">Showing {filteredEmployees.length} of {mockEmployees.length} employees</p>
+        <p className="text-sm text-gray-500">
+          Showing {filteredEmployees.length} of {mockEmployees.length} employees
+        </p>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" className="rounded-lg h-8">Previous</Button>
-          <Button variant="outline" size="sm" className="rounded-lg h-8 bg-primary text-white hover:bg-primary/90">1</Button>
-          <Button variant="outline" size="sm" className="rounded-lg h-8">2</Button>
-          <Button variant="outline" size="sm" className="rounded-lg h-8">Next</Button>
+          <Button variant="outline" size="sm" className="rounded-lg h-8">
+            Previous
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="rounded-lg h-8 bg-primary text-white hover:bg-primary/90"
+          >
+            1
+          </Button>
+          <Button variant="outline" size="sm" className="rounded-lg h-8">
+            2
+          </Button>
+          <Button variant="outline" size="sm" className="rounded-lg h-8">
+            Next
+          </Button>
         </div>
       </div>
     </div>
