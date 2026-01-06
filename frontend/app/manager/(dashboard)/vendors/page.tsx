@@ -2,14 +2,16 @@
 
 import React, { useEffect, useState } from 'react';
 import VendorStats from '@/components/AdminDahboardComponents/VendorComponents/VendorStats'; // Reusing stats layout
-import VendorTable from '@/components/ManagerDashboardComponents/vendorComponents/VendorTable';
+import VendorTable, {
+  Vendor as UiVendor,
+} from '@/components/AdminDahboardComponents/VendorComponents/VendorTable';
 import { getVendors, Vendor as ApiVendor } from '@/lib/vendor';
 import { toast } from 'sonner';
 
 export default function VendorsPage() {
   const [loading, setLoading] = useState(true);
   const [apiVendors, setApiVendors] = useState<ApiVendor[]>([]);
-  const [uiVendors, setUiVendors] = useState<any[]>([]);
+  const [uiVendors, setUiVendors] = useState<UiVendor[]>([]);
 
   const fetchVendorsData = async () => {
     setLoading(true);
@@ -20,20 +22,19 @@ export default function VendorsPage() {
       setApiVendors(rawVendors);
 
       // Map to UI model
-      const mappedVendors = rawVendors.map((v) => {
-        const raw = v as any;
+      const mappedVendors: UiVendor[] = rawVendors.map((v) => {
         return {
           id: v.id,
           name: v.name,
-          type: raw.type || 'Supplier',
-          contactPerson: raw.contactPerson || 'N/A',
+          type: v.type || 'Supplier',
+          contactPerson: v.contactPerson || 'N/A',
           phone: v.phone || 'N/A',
           email: v.email || 'N/A',
-          totalOrders: raw.totalOrders || 0,
-          purchaseValue: raw.purchaseValue || 0,
-          outstandingAmount: raw.outstandingAmount || 0,
+          totalOrders: v.totalOrders || 0,
+          purchaseValue: v.purchaseValue || 0,
+          outstandingAmount: v.outstandingAmount || 0,
           status: v.status === 'ACTIVE' ? 'Active' : 'On Hold',
-        };
+        } as UiVendor;
       });
 
       setUiVendors(mappedVendors);
@@ -64,7 +65,9 @@ export default function VendorsPage() {
     <div className="p-3 sm:p-4 md:p-6 space-y-8 sm:space-y-10 bg-blue-100 min-h-screen">
       <div className="flex justify-between items-center px-4">
         <div className="space-y-1">
-          <h2 className="text-xl sm:text-2xl font-bold text-blue-900 tracking-tight">Vendor Management</h2>
+          <h2 className="text-xl sm:text-2xl font-bold text-blue-900 tracking-tight">
+            Vendor Management
+          </h2>
           <p className="text-sm text-slate-500 font-medium">
             Manage suppliers, distributors, and service providers
           </p>
@@ -79,14 +82,8 @@ export default function VendorsPage() {
             newVendors={newVendors}
           />
         </div>
-        
-        <div className="bg-white rounded-2xl shadow-sm border border-blue-100 overflow-hidden mx-4">
-          <VendorTable 
-            vendors={uiVendors}
-            loading={loading}
-            onRefresh={fetchVendorsData}
-          />
-        </div>
+
+        <VendorTable vendors={uiVendors} loading={loading} onRefresh={fetchVendorsData} />
       </div>
     </div>
   );

@@ -14,9 +14,6 @@ import {
   FileText,
   User,
   GraduationCap,
-  Clock,
-  CheckCircle2,
-  XCircle,
 } from 'lucide-react';
 import StatCard from '@/components/StatCard';
 
@@ -88,26 +85,10 @@ export default function EmployeeProfilePage() {
 
       {/* QUICK STATS */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard 
-          title="Attendance" 
-          value={employee.attendance} 
-          subtitle="Monthly Avg" 
-        />
-        <StatCard 
-          title="Leaves Taken" 
-          value={employee.leaves} 
-          subtitle="Annual Balance" 
-        />
-        <StatCard 
-          title="Performance" 
-          value={employee.performance} 
-          subtitle="Q4 Review" 
-        />
-        <StatCard 
-          title="Monthly Pay" 
-          value={employee.salary} 
-          subtitle="Base + HRA" 
-        />
+        <StatCard title="Attendance" value={employee.attendance} subtitle="Monthly Avg" />
+        <StatCard title="Leaves Taken" value={employee.leaves} subtitle="Annual Balance" />
+        <StatCard title="Performance" value={employee.performance} subtitle="Q4 Review" />
+        <StatCard title="Monthly Pay" value={employee.salary} subtitle="Base + HRA" />
       </div>
 
       {/* DETAILED INFO GRID */}
@@ -122,7 +103,12 @@ export default function EmployeeProfilePage() {
               <InfoRow icon={<Mail />} label="Email" value={employee.email} />
               <InfoRow icon={<Phone />} label="Phone" value={employee.phone} />
               <InfoRow icon={<MapPin />} label="Address" value={employee.address} isLarge />
-              <InfoRow icon={<GraduationCap />} label="Education" value={employee.education} isLarge />
+              <InfoRow
+                icon={<GraduationCap />}
+                label="Education"
+                value={employee.education}
+                isLarge
+              />
             </div>
           </div>
 
@@ -151,7 +137,12 @@ export default function EmployeeProfilePage() {
                 <InfoRow icon={<Calendar />} label="Probation End" value="15 Apr 2023" />
               </div>
               <div className="space-y-6">
-                <InfoRow icon={<ShieldCheck />} label="Visa Expiry" value={employee.visaExpire} isCritical />
+                <InfoRow
+                  icon={<ShieldCheck />}
+                  label="Visa Expiry"
+                  value={employee.visaExpire}
+                  isCritical
+                />
                 <InfoRow icon={<User />} label="Report To" value="Riyas (Manager)" />
                 <InfoRow icon={<Calendar />} label="Last Promotion" value="N/A" />
               </div>
@@ -163,12 +154,18 @@ export default function EmployeeProfilePage() {
   );
 }
 
-function InfoRow({ icon, label, value, isLarge = false, isCritical = false }: { 
-  icon: React.ReactElement, 
-  label: string, 
-  value: string, 
-  isLarge?: boolean,
-  isCritical?: boolean
+function InfoRow({
+  icon,
+  label,
+  value,
+  isLarge = false,
+  isCritical = false,
+}: {
+  icon: React.ReactElement;
+  label: string;
+  value: string;
+  isLarge?: boolean;
+  isCritical?: boolean;
 }) {
   return (
     <div className="flex items-start gap-4 group">
@@ -177,7 +174,9 @@ function InfoRow({ icon, label, value, isLarge = false, isCritical = false }: {
       </div>
       <div className="space-y-1">
         <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{label}</p>
-        <p className={`text-sm font-bold ${isCritical ? 'text-red-600' : 'text-gray-900'} ${isLarge ? 'leading-relaxed' : ''}`}>
+        <p
+          className={`text-sm font-bold ${isCritical ? 'text-red-600' : 'text-gray-900'} ${isLarge ? 'leading-relaxed' : ''}`}
+        >
           {value}
         </p>
       </div>
@@ -185,7 +184,7 @@ function InfoRow({ icon, label, value, isLarge = false, isCritical = false }: {
   );
 }
 
-function DocumentRow({ name, size }: { name: string, size: string }) {
+function DocumentRow({ name, size }: { name: string; size: string }) {
   return (
     <div className="flex items-center justify-between p-3 rounded-xl border border-gray-50 hover:border-blue-200 hover:bg-blue-50/30 transition-all duration-200 group">
       <div className="flex items-center gap-3">
@@ -197,7 +196,11 @@ function DocumentRow({ name, size }: { name: string, size: string }) {
           <p className="text-[10px] text-gray-400 font-bold">{size}</p>
         </div>
       </div>
-      <Button variant="ghost" size="sm" className="text-blue-600 font-bold hover:bg-white shadow-sm ring-1 ring-blue-100">
+      <Button
+        variant="ghost"
+        size="sm"
+        className="text-blue-600 font-bold hover:bg-white shadow-sm ring-1 ring-blue-100"
+      >
         VIEW
       </Button>
     </div>

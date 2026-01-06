@@ -29,6 +29,9 @@ export function middleware(request: NextRequest) {
 
     if (!token) {
       // Redirect to login if no token
+      if (path.startsWith('/admin')) {
+        return NextResponse.redirect(new URL('/adminlogin', request.url));
+      }
       return NextResponse.redirect(new URL('/login', request.url));
     }
 
@@ -50,6 +53,9 @@ export function middleware(request: NextRequest) {
       }
     } catch {
       // If token is invalid, redirect to login
+      if (path.startsWith('/admin')) {
+        return NextResponse.redirect(new URL('/adminlogin', request.url));
+      }
       return NextResponse.redirect(new URL('/login', request.url));
     }
   }

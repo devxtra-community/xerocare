@@ -1,9 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Search, Plus, X, Trash2 } from 'lucide-react';
+import { Search, Plus, Trash2, X } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -19,57 +19,33 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog';
 import StatCard from '@/components/StatCard';
+import {
+  getBranches,
+  createBranch,
+  updateBranch,
+  deleteBranch as apiDeleteBranch,
+  Branch,
+} from '@/lib/branch';
+import { getManagersByRole, Employee } from '@/lib/employee';
+import { toast } from 'sonner';
 
-type Branch = {
-  id: string;
-  branchName: string;
+type BranchFormData = {
+  id?: string;
+  name: string;
   address: string;
   location: string;
-  startedDate: string;
-  status: 'active' | 'inactive';
-  manager: string;
+  started_date: string;
+  status: 'ACTIVE' | 'INACTIVE';
+  manager_id: string;
 };
-
-const initialBranches: Branch[] = [
-  {
-    id: '1',
-    branchName: 'CityWave Store',
-    address: 'MG Road, Ernakulam',
-    location: 'Ernakulam',
-    startedDate: '2023-11-20',
-    status: 'active',
-    manager: 'Rajesh Kumar',
-  },
-  {
-    id: '2',
-    branchName: 'UrbanHub Outlet',
-    address: 'Vyttila Junction',
-    location: 'Kochi',
-    startedDate: '2023-02-10',
-    status: 'active',
-    manager: 'Priya Menon',
-  },
-  {
-    id: '3',
-    branchName: 'PrimePoint Store',
-    address: 'Pattom',
-    location: 'Trivandrum',
-    startedDate: '2024-05-18',
-    status: 'inactive',
-    manager: 'Unassigned',
-  },
-];
-
-const availableManagers = [
-  'Unassigned',
-  'Rajesh Kumar',
-  'Priya Menon',
-  'Arjun Nair',
-  'Lakshmi Pillai',
-  'Vijay Krishnan',
-  'Sreelatha Menon',
-];
 
 const formatDate = (dateString: string) => {
   const date = new Date(dateString);
@@ -81,40 +57,122 @@ const formatDate = (dateString: string) => {
 };
 
 export default function BranchReport() {
-  const [branches, setBranches] = useState(initialBranches);
+  const [branches, setBranches] = useState<Branch[]>([]);
+  const [managers, setManagers] = useState<Employee[]>([]);
   const [search, setSearch] = useState('');
-
+  const [loading, setLoading] = useState(true);
   const [formOpen, setFormOpen] = useState(false);
   const [editingBranch, setEditingBranch] = useState<Branch | null>(null);
-  const [deleteBranch, setDeleteBranch] = useState<Branch | null>(null);
+  const [branchToDelete, setBranchToDelete] = useState<Branch | null>(null);
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      const [branchesRes, managersRes] = await Promise.all([getBranches(), getManagersByRole()]);
+
+      if (branchesRes.success) {
+        setBranches(branchesRes.data);
+      }
+
+      if (managersRes.success) {
+        setManagers(managersRes.data.employees || []);
+      }
+    } catch {
+      toast.error('Failed to fetch data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getManagerName = (managerId: string) => {
+    const manager = managers.find((m) => m.id === managerId);
+    return manager ? `${manager.first_name} ${manager.last_name}` : 'Unassigned';
+  };
 
   const filtered = branches.filter((b) =>
-    `${b.branchName} ${b.address} ${b.location}`.toLowerCase().includes(search.toLowerCase()),
+    `${b.name} ${b.address} ${b.location}`.toLowerCase().includes(search.toLowerCase()),
   );
 
   const totalBranches = branches.length;
-  const activeBranches = branches.filter((b) => b.status === 'active').length;
-  const inactiveBranches = branches.filter((b) => b.status === 'inactive').length;
+  const activeBranches = branches.filter((b) => b.status === 'ACTIVE').length;
+  const inactiveBranches = branches.filter((b) => b.status === 'INACTIVE').length;
 
   const twoYearsAgo = new Date();
   twoYearsAgo.setFullYear(twoYearsAgo.getFullYear() - 2);
-  const newBranches = branches.filter((b) => new Date(b.startedDate) >= twoYearsAgo).length;
+  const newBranches = branches.filter((b) => new Date(b.started_date) >= twoYearsAgo).length;
 
-  const handleSave = (data: Branch) => {
-    if (editingBranch) {
-      setBranches((prev) => prev.map((b) => (b.id === data.id ? data : b)));
-    } else {
-      setBranches((prev) => [...prev, data]);
+  const handleSave = async (data: BranchFormData) => {
+    try {
+      if (editingBranch) {
+        const res = await updateBranch(editingBranch.id, {
+          name: data.name,
+          address: data.address,
+          location: data.location,
+          manager_id: data.manager_id,
+          started_date: data.started_date,
+          status: data.status,
+        });
+
+        if (res.success) {
+          toast.success('Branch updated successfully');
+          await fetchData();
+        }
+      } else {
+        const res = await createBranch({
+          name: data.name,
+          address: data.address,
+          location: data.location,
+          manager_id: data.manager_id,
+          started_date: data.started_date,
+        });
+
+        if (res.success) {
+          toast.success('Branch created successfully');
+          await fetchData();
+        }
+      }
+      setFormOpen(false);
+      setEditingBranch(null);
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error && 'response' in error
+          ? (error as { response?: { data?: { message?: string } } }).response?.data?.message
+          : undefined;
+      toast.error(message || 'Failed to save branch');
     }
-    setFormOpen(false);
-    setEditingBranch(null);
   };
 
-  const confirmDelete = () => {
-    if (!deleteBranch) return;
-    setBranches((prev) => prev.filter((b) => b.id !== deleteBranch.id));
-    setDeleteBranch(null);
+  const confirmDelete = async () => {
+    if (!branchToDelete) return;
+
+    try {
+      const res = await apiDeleteBranch(branchToDelete.id);
+
+      if (res.success) {
+        toast.success('Branch deleted successfully');
+        await fetchData();
+      }
+      setBranchToDelete(null);
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error && 'response' in error
+          ? (error as { response?: { data?: { message?: string } } }).response?.data?.message
+          : undefined;
+      toast.error(message || 'Failed to delete branch');
+    }
   };
+
+  if (loading) {
+    return (
+      <div className="bg-blue-100 min-h-screen p-3 sm:p-4 md:p-6 flex items-center justify-center">
+        <div className="text-blue-900 text-lg">Loading...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-blue-100 min-h-screen p-3 sm:p-4 md:p-6 space-y-8 sm:space-y-10">
@@ -186,24 +244,23 @@ export default function BranchReport() {
             <TableBody>
               {filtered.map((b, i) => (
                 <TableRow key={b.id} className={i % 2 ? 'bg-sky-100/60' : ''}>
-                  <TableCell className="px-4 font-medium">{b.branchName}</TableCell>
+                  <TableCell className="px-4 font-medium">{b.name}</TableCell>
                   <TableCell className="px-4">{b.address}</TableCell>
                   <TableCell className="px-4">{b.location}</TableCell>
                   <TableCell className="px-4">
                     <span
-                      className={`${b.manager === 'Unassigned' ? 'text-slate-400' : 'text-gray-900'}`}
+                      className={`${getManagerName(b.manager_id) === 'Unassigned' ? 'text-slate-400' : 'text-gray-900'}`}
                     >
-                      {b.manager}
+                      {getManagerName(b.manager_id)}
                     </span>
                   </TableCell>
-                  <TableCell className="px-4">{formatDate(b.startedDate)}</TableCell>
+                  <TableCell className="px-4">{formatDate(b.started_date)}</TableCell>
                   <TableCell className="px-4">
                     <span
-                      className={`px-2.5 py-1 rounded-full text-xs font-medium ${
-                        b.status === 'active'
-                          ? 'bg-green-100 text-green-700'
-                          : 'bg-red-100 text-red-700'
-                      }`}
+                      className={`px-2.5 py-1 rounded-full text-xs font-medium ${b.status === 'ACTIVE'
+                        ? 'bg-green-100 text-green-700'
+                        : 'bg-red-100 text-red-700'
+                        }`}
                     >
                       {b.status}
                     </span>
@@ -221,7 +278,7 @@ export default function BranchReport() {
                       </button>
                       <button
                         className="text-red-600 hover:underline"
-                        onClick={() => setDeleteBranch(b)}
+                        onClick={() => setBranchToDelete(b)}
                       >
                         Delete
                       </button>
@@ -238,15 +295,17 @@ export default function BranchReport() {
       {formOpen && (
         <BranchFormModal
           initialData={editingBranch}
+          managers={managers}
           onClose={() => setFormOpen(false)}
           onConfirm={handleSave}
         />
       )}
 
-      {deleteBranch && (
+      {branchToDelete && (
         <ConfirmDeleteModal
-          name={deleteBranch.branchName}
-          onCancel={() => setDeleteBranch(null)}
+          name={branchToDelete.name}
+          open={true}
+          onCancel={() => setBranchToDelete(null)}
           onConfirm={confirmDelete}
         />
       )}
@@ -256,56 +315,71 @@ export default function BranchReport() {
 
 function BranchFormModal({
   initialData,
+  managers,
   onClose,
   onConfirm,
 }: {
   initialData: Branch | null;
+  managers: Employee[];
   onClose: () => void;
-  onConfirm: (data: Branch) => void;
+  onConfirm: (data: BranchFormData) => void;
 }) {
-  const [form, setForm] = useState<Branch>(
-    initialData ?? {
-      id: crypto.randomUUID(),
-      branchName: '',
-      address: '',
-      location: '',
-      startedDate: '',
-      status: 'active',
-      manager: 'Unassigned',
-    },
+  const [form, setForm] = useState<BranchFormData>(
+    initialData
+      ? {
+        id: initialData.id,
+        name: initialData.name,
+        address: initialData.address,
+        location: initialData.location,
+        started_date: initialData.started_date,
+        status: initialData.status as 'ACTIVE' | 'INACTIVE',
+        manager_id: initialData.manager_id,
+      }
+      : {
+        name: '',
+        address: '',
+        location: '',
+        started_date: '',
+        status: 'ACTIVE',
+        manager_id: '',
+      },
   );
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="w-full max-w-md rounded-2xl bg-white shadow-xl px-6 py-5 relative">
-        <div className="flex items-center justify-between mb-5">
-          <h2 className="text-lg font-semibold text-gray-900">
+    <Dialog open={true} onOpenChange={(val) => !val && onClose()}>
+      <DialogContent className="sm:max-w-xl">
+        <DialogHeader>
+          <DialogTitle className="text-2xl font-bold text-blue-900">
             {initialData ? 'Update Branch' : 'Add Branch'}
-          </h2>
+          </DialogTitle>
           <button
             onClick={onClose}
             className="h-7 w-7 flex items-center justify-center rounded-full border text-gray-500 hover:text-gray-800"
           >
             <X size={14} />
           </button>
-        </div>
+        </DialogHeader>
 
         <div className="space-y-4">
           <Field label="Branch Name">
             <Input
               placeholder="Full name"
-              value={form.branchName}
-              onChange={(e) => setForm({ ...form, branchName: e.target.value })}
+              value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
             />
           </Field>
 
-          <Field label="Branch Address">
+          <div className="col-span-2 space-y-2">
+            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+              Branch Address
+            </label>
             <Input
               placeholder="Address"
               value={form.address}
               onChange={(e) => setForm({ ...form, address: e.target.value })}
+              className="h-12 rounded-xl bg-white border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
             />
-          </Field>
+          </div>
 
           <Field label="Location">
             <Input
@@ -318,27 +392,27 @@ function BranchFormModal({
           <Field label="Started Date">
             <Input
               type="date"
-              value={form.startedDate}
-              onChange={(e) => setForm({ ...form, startedDate: e.target.value })}
+              value={form.started_date}
+              onChange={(e) => setForm({ ...form, started_date: e.target.value })}
             />
           </Field>
 
           <Field label="Assign Manager">
             <Select
-              value={form.manager}
-              onValueChange={(value) => setForm({ ...form, manager: value })}
+              value={form.manager_id}
+              onValueChange={(value) => setForm({ ...form, manager_id: value })}
             >
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Select manager" />
               </SelectTrigger>
               <SelectContent>
-                {availableManagers.map((manager) => (
+                {managers.map((manager) => (
                   <SelectItem
-                    key={manager}
-                    value={manager}
+                    key={manager.id}
+                    value={manager.id}
                     className="focus:bg-primary focus:text-white"
                   >
-                    {manager}
+                    {manager.first_name} {manager.last_name}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -349,17 +423,17 @@ function BranchFormModal({
             <Select
               value={form.status}
               onValueChange={(value) =>
-                setForm({ ...form, status: value as 'active' | 'inactive' })
+                setForm({ ...form, status: value as 'ACTIVE' | 'INACTIVE' })
               }
             >
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Select status" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="active" className="focus:bg-primary focus:text-white">
+                <SelectItem value="ACTIVE" className="focus:bg-primary focus:text-white">
                   Active
                 </SelectItem>
-                <SelectItem value="inactive" className="focus:bg-primary focus:text-white">
+                <SelectItem value="INACTIVE" className="focus:bg-primary focus:text-white">
                   Inactive
                 </SelectItem>
               </SelectContent>
@@ -378,46 +452,62 @@ function BranchFormModal({
             Confirm
           </Button>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
 function ConfirmDeleteModal({
+  open,
   name,
   onCancel,
   onConfirm,
 }: {
+  open: boolean;
   name: string;
   onCancel: () => void;
   onConfirm: () => void;
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="bg-white max-w-sm w-full rounded-2xl p-6 text-center">
-        <Trash2 className="mx-auto text-red-600 mb-3" />
-        <h3 className="text-lg font-semibold">Delete Branch</h3>
-        <p className="text-sm text-slate-500 mt-1">
-          Are you sure you want to delete <b>{name}</b>?
-        </p>
-
-        <div className="flex justify-center gap-4 mt-6">
-          <Button variant="outline" onClick={onCancel}>
+    <Dialog open={open} onOpenChange={(val) => !val && onCancel()}>
+      <DialogContent className="sm:max-w-[450px]">
+        <DialogHeader>
+          <div className="flex items-center gap-4 text-red-600 mb-4">
+            <div className="h-12 w-12 rounded-2xl bg-red-50 flex items-center justify-center text-red-600 shadow-sm">
+              <Trash2 className="h-6 w-6" />
+            </div>
+            <DialogTitle className="text-xl font-bold text-blue-900">Delete Branch</DialogTitle>
+          </div>
+          <DialogDescription className="text-base text-gray-600 leading-relaxed">
+            Are you sure you want to delete <strong>{name}</strong>?
+          </DialogDescription>
+        </DialogHeader>
+        <div className="flex justify-end items-center gap-6 pt-8">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="text-sm font-bold text-gray-900 hover:text-gray-600 transition-colors"
+          >
             Cancel
-          </Button>
-          <Button className="bg-red-600 text-white" onClick={onConfirm}>
+          </button>
+          <Button
+            className="h-12 px-8 rounded-xl bg-red-600 text-white hover:bg-red-700 font-bold shadow-lg"
+            onClick={onConfirm}
+          >
             Delete
           </Button>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div>
-      <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
+    <div className="space-y-2">
+      <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+        {label}
+      </label>
       {children}
     </div>
   );

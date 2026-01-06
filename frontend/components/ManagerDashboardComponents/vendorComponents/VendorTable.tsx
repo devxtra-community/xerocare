@@ -11,19 +11,22 @@ import {
 } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Search, Filter, Eye, Edit, Plus, Trash2, X } from 'lucide-react';
+import { Search, Filter, Eye, Edit, Plus, Trash2 } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { useRouter } from 'next/navigation';
 import {
-  createVendor,
-  updateVendor,
-  deleteVendor as apiDeleteVendor,
-} from '@/lib/vendor';
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog';
+import { useRouter } from 'next/navigation';
+import { createVendor, updateVendor, deleteVendor as apiDeleteVendor } from '@/lib/vendor';
 import { toast } from 'sonner';
 import { AxiosError } from 'axios';
 import {
@@ -324,31 +327,31 @@ export default function VendorTable({
       </div>
 
       {/* MODALS */}
-      {formOpen && (
-        <VendorFormModal
-          initialData={editingVendor}
-          onClose={() => setFormOpen(false)}
-          onConfirm={handleSave}
-        />
-      )}
+      <VendorFormModal
+        initialData={editingVendor}
+        open={formOpen}
+        onClose={() => setFormOpen(false)}
+        onConfirm={handleSave}
+      />
 
-      {deleteVendorTarget && (
-        <ConfirmDeleteModal
-          name={deleteVendorTarget.name}
-          onCancel={() => setDeleteVendorTarget(null)}
-          onConfirm={confirmDelete}
-        />
-      )}
+      <ConfirmDeleteModal
+        open={!!deleteVendorTarget}
+        name={deleteVendorTarget?.name || ''}
+        onCancel={() => setDeleteVendorTarget(null)}
+        onConfirm={confirmDelete}
+      />
     </div>
   );
 }
 
 function VendorFormModal({
   initialData,
+  open,
   onClose,
   onConfirm,
 }: {
   initialData: Vendor | null;
+  open: boolean;
   onClose: () => void;
   onConfirm: (data: VendorFormData) => void;
 }) {
@@ -373,142 +376,168 @@ function VendorFormModal({
   );
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="w-full max-w-lg rounded-2xl bg-white shadow-xl px-6 py-5 relative max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between mb-5">
-          <h2 className="text-lg font-semibold text-gray-900">
+    <Dialog open={open} onOpenChange={(val) => !val && onClose()}>
+      <DialogContent className="sm:max-w-xl">
+        <DialogHeader>
+          <DialogTitle className="text-2xl font-bold text-blue-900">
             {initialData ? 'Update Vendor' : 'Add Vendor'}
-          </h2>
-          <button
-            onClick={onClose}
-            className="h-7 w-7 flex items-center justify-center rounded-full border text-gray-500 hover:text-gray-800"
-          >
-            <X size={14} />
-          </button>
-        </div>
+          </DialogTitle>
+        </DialogHeader>
 
-        <div className="space-y-4">
-          <Field label="Vendor Name">
-            <Input
-              placeholder="Enter vendor name"
-              value={form.name}
-              onChange={(e) => setForm({ ...form, name: e.target.value })}
-            />
-          </Field>
+        <div className="space-y-6 pt-6">
+          <div className="grid grid-cols-2 gap-x-8 gap-y-6">
+            <div className="col-span-2 space-y-2">
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                Vendor Name
+              </label>
+              <Input
+                placeholder="Enter vendor name"
+                value={form.name}
+                onChange={(e) => setForm({ ...form, name: e.target.value })}
+                className="h-12 rounded-xl bg-white border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
+              />
+            </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <Field label="Contact Person">
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                Contact Person
+              </label>
               <Input
                 placeholder="Enter contact person"
                 value={form.contactPerson}
                 onChange={(e) => setForm({ ...form, contactPerson: e.target.value })}
+                className="h-12 rounded-xl bg-white border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
               />
-            </Field>
-            <Field label="Type">
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                Type
+              </label>
               <Select
                 value={form.type}
                 onValueChange={(value) =>
                   setForm({ ...form, type: value as VendorFormData['type'] })
                 }
               >
-                <SelectTrigger className="w-full">
+                <SelectTrigger className="h-12 rounded-xl bg-white border-none shadow-sm focus:ring-2 focus:ring-blue-400">
                   <SelectValue placeholder="Select type" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="rounded-xl">
                   <SelectItem value="Supplier">Supplier</SelectItem>
                   <SelectItem value="Distributor">Distributor</SelectItem>
                   <SelectItem value="Service">Service</SelectItem>
                 </SelectContent>
               </Select>
-            </Field>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                Phone
+              </label>
+              <Input
+                placeholder="Enter phone number"
+                value={form.phone}
+                onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                className="h-12 rounded-xl bg-white border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                Email
+              </label>
+              <Input
+                placeholder="Enter email address"
+                value={form.email}
+                onChange={(e) => setForm({ ...form, email: e.target.value })}
+                className="h-12 rounded-xl bg-white border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
+              />
+            </div>
+
+            <div className="col-span-2 space-y-2">
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                Status
+              </label>
+              <Select
+                value={form.status}
+                onValueChange={(value) =>
+                  setForm({ ...form, status: value as VendorFormData['status'] })
+                }
+              >
+                <SelectTrigger className="h-12 rounded-xl bg-white border-none shadow-sm focus:ring-2 focus:ring-blue-400">
+                  <SelectValue placeholder="Select status" />
+                </SelectTrigger>
+                <SelectContent className="rounded-xl">
+                  <SelectItem value="Active">Active</SelectItem>
+                  <SelectItem value="On Hold">On Hold</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
-          <Field label="Phone">
-            <Input
-              placeholder="Enter phone number"
-              value={form.phone}
-              onChange={(e) => setForm({ ...form, phone: e.target.value })}
-            />
-          </Field>
-
-          <Field label="Email">
-            <Input
-              placeholder="Enter email address"
-              value={form.email}
-              onChange={(e) => setForm({ ...form, email: e.target.value })}
-            />
-          </Field>
-
-          <Field label="Status">
-            <Select
-              value={form.status}
-              onValueChange={(value) =>
-                setForm({ ...form, status: value as VendorFormData['status'] })
-              }
+          <div className="flex justify-end items-center gap-6 pt-8">
+            <button
+              type="button"
+              onClick={onClose}
+              className="text-sm font-bold text-gray-900 hover:text-gray-600 transition-colors"
             >
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Select status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Active">Active</SelectItem>
-                <SelectItem value="On Hold">On Hold</SelectItem>
-              </SelectContent>
-            </Select>
-          </Field>
+              Cancel
+            </button>
+            <Button
+              className="h-12 px-10 rounded-xl bg-[#004a8d] text-white hover:bg-[#003f7d] font-bold shadow-lg"
+              onClick={() => onConfirm(form)}
+            >
+              {initialData ? 'Update' : 'Confirm'}
+            </Button>
+          </div>
         </div>
-
-        <div className="mt-6 flex justify-end gap-3">
-          <Button variant="outline" className="rounded-full px-6" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button
-            className="rounded-full px-6 bg-primary hover:bg-primary/90 text-white"
-            onClick={() => onConfirm(form)}
-          >
-            Confirm
-          </Button>
-        </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
 function ConfirmDeleteModal({
+  open,
   name,
   onCancel,
   onConfirm,
 }: {
+  open: boolean;
   name: string;
   onCancel: () => void;
   onConfirm: () => void;
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="bg-white max-w-sm w-full rounded-2xl p-6 text-center">
-        <Trash2 className="mx-auto text-red-600 mb-3" />
-        <h3 className="text-lg font-semibold">Delete Vendor</h3>
-        <p className="text-sm text-slate-500 mt-1">
-          Are you sure you want to delete <b>{name}</b>?
-        </p>
-
-        <div className="flex justify-center gap-4 mt-6">
-          <Button variant="outline" onClick={onCancel}>
+    <Dialog open={open} onOpenChange={(val) => !val && onCancel()}>
+      <DialogContent className="sm:max-w-[450px]">
+        <DialogHeader>
+          <div className="flex items-center gap-4 text-red-600 mb-4">
+            <div className="h-12 w-12 rounded-2xl bg-red-50 flex items-center justify-center text-red-600 shadow-sm">
+              <Trash2 className="h-6 w-6" />
+            </div>
+            <DialogTitle className="text-xl font-bold text-blue-900">Delete Vendor</DialogTitle>
+          </div>
+          <DialogDescription className="text-base text-gray-600 leading-relaxed">
+            Are you sure you want to delete <strong>{name}</strong>?
+          </DialogDescription>
+        </DialogHeader>
+        <div className="flex justify-end items-center gap-6 pt-8">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="text-sm font-bold text-gray-900 hover:text-gray-600 transition-colors"
+          >
             Cancel
-          </Button>
-          <Button className="bg-red-600 text-white" onClick={onConfirm}>
+          </button>
+          <Button
+            className="h-12 px-8 rounded-xl bg-red-600 text-white hover:bg-red-700 font-bold shadow-lg"
+            onClick={onConfirm}
+          >
             Delete
           </Button>
         </div>
-      </div>
-    </div>
-  );
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
-      {children}
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

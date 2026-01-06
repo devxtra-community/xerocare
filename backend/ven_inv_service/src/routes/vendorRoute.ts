@@ -12,10 +12,35 @@ const vendorRepo = new VendorRepository(Source);
 const vendorService = new VendorService(vendorRepo);
 const vendorController = new VendorController(vendorService);
 
-router.post('/', authMiddleware, roleMiddleware(['ADMIN']), vendorController.createVendor);
-router.get('/', authMiddleware, roleMiddleware(['ADMIN', 'HR']), vendorController.getVendors);
-router.get('/:id', authMiddleware, roleMiddleware(['ADMIN', 'HR']), vendorController.getVendorById);
-router.patch('/:id', authMiddleware, roleMiddleware(['ADMIN']), vendorController.updateVendor);
-router.delete('/:id', authMiddleware, roleMiddleware(['ADMIN']), vendorController.deleteVendor);
+router.post(
+  '/',
+  authMiddleware,
+  roleMiddleware(['ADMIN', 'MANAGER']),
+  vendorController.createVendor,
+);
+router.get(
+  '/',
+  authMiddleware,
+  roleMiddleware(['ADMIN', 'HR', 'MANAGER']),
+  vendorController.getVendors,
+);
+router.get(
+  '/:id',
+  authMiddleware,
+  roleMiddleware(['ADMIN', 'HR', 'MANAGER']),
+  vendorController.getVendorById,
+);
+router.patch(
+  '/:id',
+  authMiddleware,
+  roleMiddleware(['ADMIN', 'MANAGER']),
+  vendorController.updateVendor,
+);
+router.delete(
+  '/:id',
+  authMiddleware,
+  roleMiddleware(['ADMIN', 'MANAGER']),
+  vendorController.deleteVendor,
+);
 
 export default router;

@@ -8,6 +8,9 @@ import healthRouter from './routes/health';
 import { Source } from './config/db';
 import productRoute from './routes/productRoute';
 // import inventoryRouter from './routes/inventoryRoute';
+import branchRouter from './routes/branchRoutes';
+import { startEmployeeConsumer } from './events/consumers/employeeConsumer';
+import { getRabbitChannel } from './config/rabbitmq';
 
 const app = express();
 
@@ -15,6 +18,7 @@ app.use(express.json());
 
 app.use('/', healthRouter);
 app.use('/vendors', vendorRouter);
+app.use('/branch', branchRouter);
 // app.use('/inventory',inventoryRouter)
 app.use('/products', productRoute);
 app.use(errorHandler);
@@ -22,6 +26,8 @@ app.use(errorHandler);
 const startServer = async () => {
   try {
     await Source.initialize();
+    await getRabbitChannel();
+    await startEmployeeConsumer();
     logger.info('Database connected');
 
     const PORT = process.env.PORT;
@@ -29,7 +35,7 @@ const startServer = async () => {
       logger.info(`Server running on port ${PORT}`);
     });
   } catch (error) {
-    console.error('DB connection failed', error);
+    logger.error('DB connection failed', error);
     process.exit(1);
   }
 };

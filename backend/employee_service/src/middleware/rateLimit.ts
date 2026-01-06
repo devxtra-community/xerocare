@@ -1,6 +1,7 @@
 import { redis } from '../config/redis';
 import { Request, Response, NextFunction } from 'express';
 import { AppError } from '../errors/appError';
+import { logger } from '../config/logger';
 
 interface RateLimitOptions {
   keyPrefix: string;
@@ -32,7 +33,7 @@ export const redisRateLimiter =
 
       return next();
     } catch (err: any) {
-      console.error('Rate limiter skipped:', err.message);
+      logger.warn('Rate limiter skipped', { error: err.message });
       return next();
     }
   };

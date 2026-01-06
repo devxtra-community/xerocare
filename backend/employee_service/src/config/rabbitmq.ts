@@ -1,4 +1,5 @@
 import amqp from 'amqplib';
+import { logger } from './logger';
 
 let channel: amqp.Channel;
 
@@ -15,7 +16,7 @@ export const getRabbitChannel = async () => {
     durable: true,
   });
 
-  console.log('RabbitMQ connected');
+  logger.info('RabbitMQ connected');
 
   return channel;
 };

@@ -10,74 +10,74 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
-import { Search, Mail, Eye, User } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { Search, User } from 'lucide-react';
 
 const mockOrders = [
-  { 
-    id: 'ORD-1024', 
-    date: '2024-03-25', 
-    customer: 'Tech Corp Systems', 
-    type: 'Sale', 
-    branch: 'Downtown Branch', 
-    assigned: 'Arjun Mehta', 
-    status: 'Delivered', 
-    amount: '₹45,200', 
-    payment: 'Paid' 
+  {
+    id: 'ORD-1024',
+    date: '2024-03-25',
+    customer: 'Tech Corp Systems',
+    type: 'Sale',
+    branch: 'Downtown Branch',
+    assigned: 'Arjun Mehta',
+    status: 'Delivered',
+    amount: '₹45,200',
+    payment: 'Paid',
   },
-  { 
-    id: 'ORD-1025', 
-    date: '2024-03-24', 
-    customer: 'Green Valley Ltd', 
-    type: 'Rental', 
-    branch: 'East Side', 
-    assigned: 'Suhail Khan', 
-    status: 'Processing', 
-    amount: '₹12,800', 
-    payment: 'Partial' 
+  {
+    id: 'ORD-1025',
+    date: '2024-03-24',
+    customer: 'Green Valley Ltd',
+    type: 'Rental',
+    branch: 'East Side',
+    assigned: 'Suhail Khan',
+    status: 'Processing',
+    amount: '₹12,800',
+    payment: 'Partial',
   },
-  { 
-    id: 'ORD-1026', 
-    date: '2024-03-24', 
-    customer: 'Apex Innovations', 
-    type: 'Lease', 
-    branch: 'Downtown Branch', 
-    assigned: 'Priya Sharma', 
-    status: 'Pending', 
-    amount: '₹85,000', 
-    payment: 'Pending' 
+  {
+    id: 'ORD-1026',
+    date: '2024-03-24',
+    customer: 'Apex Innovations',
+    type: 'Lease',
+    branch: 'Downtown Branch',
+    assigned: 'Priya Sharma',
+    status: 'Pending',
+    amount: '₹85,000',
+    payment: 'Pending',
   },
-  { 
-    id: 'ORD-1027', 
-    date: '2024-03-23', 
-    customer: 'Horizon Media', 
-    type: 'Sale', 
-    branch: 'West Branch', 
-    assigned: 'Aditya Rao', 
-    status: 'Dispatched', 
-    amount: '₹32,500', 
-    payment: 'Paid' 
+  {
+    id: 'ORD-1027',
+    date: '2024-03-23',
+    customer: 'Horizon Media',
+    type: 'Sale',
+    branch: 'West Branch',
+    assigned: 'Aditya Rao',
+    status: 'Dispatched',
+    amount: '₹32,500',
+    payment: 'Paid',
   },
-  { 
-    id: 'ORD-1028', 
-    date: '2024-03-23', 
-    customer: 'Blue Sky Org', 
-    type: 'Rental', 
-    branch: 'Downtown Branch', 
-    assigned: 'Zoya Ahmed', 
-    status: 'Completed', 
-    amount: '₹9,400', 
-    payment: 'Paid' 
+  {
+    id: 'ORD-1028',
+    date: '2024-03-23',
+    customer: 'Blue Sky Org',
+    type: 'Rental',
+    branch: 'Downtown Branch',
+    assigned: 'Zoya Ahmed',
+    status: 'Completed',
+    amount: '₹9,400',
+    payment: 'Paid',
   },
 ];
 
 export default function OrderTable() {
   const [search, setSearch] = useState('');
 
-  const filteredOrders = mockOrders.filter(order => 
-    order.id.toLowerCase().includes(search.toLowerCase()) || 
-    order.customer.toLowerCase().includes(search.toLowerCase()) ||
-    order.assigned.toLowerCase().includes(search.toLowerCase())
+  const filteredOrders = mockOrders.filter(
+    (order) =>
+      order.id.toLowerCase().includes(search.toLowerCase()) ||
+      order.customer.toLowerCase().includes(search.toLowerCase()) ||
+      order.assigned.toLowerCase().includes(search.toLowerCase()),
   );
 
   return (
@@ -99,18 +99,35 @@ export default function OrderTable() {
           <Table className="min-w-[900px]">
             <TableHeader className="bg-slate-50/50">
               <TableRow className="border-b border-blue-50/50 hover:bg-transparent">
-                <TableHead className="text-[10px] font-bold text-blue-900 uppercase py-3 px-4">Order Details</TableHead>
-                <TableHead className="text-[10px] font-bold text-blue-900 uppercase">Customer</TableHead>
-                <TableHead className="text-[10px] font-bold text-blue-900 uppercase">Type</TableHead>
-                <TableHead className="text-[10px] font-bold text-blue-900 uppercase">Assigned To</TableHead>
-                <TableHead className="text-[10px] font-bold text-blue-900 uppercase">Status</TableHead>
-                <TableHead className="text-[10px] font-bold text-blue-900 uppercase">Amount</TableHead>
-                <TableHead className="text-[10px] font-bold text-blue-900 uppercase">Payment</TableHead>
+                <TableHead className="text-[10px] font-bold text-blue-900 uppercase py-3 px-4">
+                  Order Details
+                </TableHead>
+                <TableHead className="text-[10px] font-bold text-blue-900 uppercase">
+                  Customer
+                </TableHead>
+                <TableHead className="text-[10px] font-bold text-blue-900 uppercase">
+                  Type
+                </TableHead>
+                <TableHead className="text-[10px] font-bold text-blue-900 uppercase">
+                  Assigned To
+                </TableHead>
+                <TableHead className="text-[10px] font-bold text-blue-900 uppercase">
+                  Status
+                </TableHead>
+                <TableHead className="text-[10px] font-bold text-blue-900 uppercase">
+                  Amount
+                </TableHead>
+                <TableHead className="text-[10px] font-bold text-blue-900 uppercase">
+                  Payment
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filteredOrders.map((order, index) => (
-                <TableRow key={order.id} className={`hover:bg-blue-50/30 transition-colors border-b border-blue-50/20 ${index % 2 ? 'bg-sky-50/20' : ''}`}>
+                <TableRow
+                  key={order.id}
+                  className={`hover:bg-blue-50/30 transition-colors border-b border-blue-50/20 ${index % 2 ? 'bg-sky-50/20' : ''}`}
+                >
                   <TableCell className="px-4 py-2">
                     <div className="flex flex-col">
                       <span className="text-xs font-bold text-blue-900">{order.id}</span>
@@ -121,10 +138,16 @@ export default function OrderTable() {
                     <span className="text-xs font-semibold text-gray-800">{order.customer}</span>
                   </TableCell>
                   <TableCell className="py-2">
-                    <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase
-                      ${order.type === 'Sale' ? 'bg-blue-100 text-blue-700' : 
-                        order.type === 'Rental' ? 'bg-purple-100 text-purple-700' :
-                        'bg-orange-100 text-orange-700'}`}>
+                    <span
+                      className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase
+                      ${
+                        order.type === 'Sale'
+                          ? 'bg-blue-100 text-blue-700'
+                          : order.type === 'Rental'
+                            ? 'bg-purple-100 text-purple-700'
+                            : 'bg-orange-100 text-orange-700'
+                      }`}
+                    >
                       {order.type}
                     </span>
                   </TableCell>
@@ -137,16 +160,29 @@ export default function OrderTable() {
                     </div>
                   </TableCell>
                   <TableCell className="py-2">
-                    <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-tight
-                      ${order.status === 'Completed' || order.status === 'Delivered' ? 'bg-green-100 text-green-700' : 
-                        order.status === 'Cancelled' ? 'bg-red-100 text-red-700' :
-                        order.status === 'Pending' ? 'bg-yellow-100 text-yellow-700' :
-                        'bg-blue-100 text-blue-700'}`}>
-                      <span className={`h-1 w-1 rounded-full ${
-                        order.status === 'Completed' || order.status === 'Delivered' ? 'bg-green-600' : 
-                        order.status === 'Cancelled' ? 'bg-red-600' :
-                        order.status === 'Pending' ? 'bg-yellow-600' : 'bg-blue-600'
-                      }`} />
+                    <span
+                      className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-tight
+                      ${
+                        order.status === 'Completed' || order.status === 'Delivered'
+                          ? 'bg-green-100 text-green-700'
+                          : order.status === 'Cancelled'
+                            ? 'bg-red-100 text-red-700'
+                            : order.status === 'Pending'
+                              ? 'bg-yellow-100 text-yellow-700'
+                              : 'bg-blue-100 text-blue-700'
+                      }`}
+                    >
+                      <span
+                        className={`h-1 w-1 rounded-full ${
+                          order.status === 'Completed' || order.status === 'Delivered'
+                            ? 'bg-green-600'
+                            : order.status === 'Cancelled'
+                              ? 'bg-red-600'
+                              : order.status === 'Pending'
+                                ? 'bg-yellow-600'
+                                : 'bg-blue-600'
+                        }`}
+                      />
                       {order.status}
                     </span>
                   </TableCell>
@@ -154,10 +190,16 @@ export default function OrderTable() {
                     {order.amount}
                   </TableCell>
                   <TableCell className="py-2">
-                     <span className={`px-2 py-0.5 rounded-md text-[9px] font-bold uppercase
-                      ${order.payment === 'Paid' ? 'bg-green-100 text-green-700' : 
-                        order.payment === 'Partial' ? 'bg-blue-100 text-blue-700' :
-                        'bg-red-100 text-red-700'}`}>
+                    <span
+                      className={`px-2 py-0.5 rounded-md text-[9px] font-bold uppercase
+                      ${
+                        order.payment === 'Paid'
+                          ? 'bg-green-100 text-green-700'
+                          : order.payment === 'Partial'
+                            ? 'bg-blue-100 text-blue-700'
+                            : 'bg-red-100 text-red-700'
+                      }`}
+                    >
                       {order.payment}
                     </span>
                   </TableCell>

@@ -2,6 +2,7 @@ import { OtpPurpose } from '../constants/otpPurpose';
 import { redis } from '../config/redis';
 import { publishEmailJob } from '../queues/emailProducer';
 import { AppError } from '../errors/appError';
+import { logger } from '../config/logger';
 
 export class OtpService {
   private generateOtp() {
@@ -23,7 +24,7 @@ export class OtpService {
       email,
       otp,
     }).catch((err) => {
-      console.error('Failed to queue OTP email', err);
+      logger.error('Failed to queue OTP email', err);
     });
   }
 

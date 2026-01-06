@@ -25,7 +25,8 @@ export default function AttendanceTrendChart() {
   const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
-    setIsClient(true);
+    const timer = setTimeout(() => setIsClient(true), 0);
+    return () => clearTimeout(timer);
   }, []);
 
   return (
@@ -43,22 +44,22 @@ export default function AttendanceTrendChart() {
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={data} margin={{ top: 5, right: 20, left: -20, bottom: 5 }}>
               <CartesianGrid vertical={false} strokeDasharray="3 3" strokeOpacity={0.2} />
-              <XAxis 
-                dataKey="name" 
-                axisLine={false} 
+              <XAxis
+                dataKey="name"
+                axisLine={false}
                 tickLine={false}
                 tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 600 }}
                 dy={10}
               />
-              <YAxis 
-                axisLine={false} 
+              <YAxis
+                axisLine={false}
                 tickLine={false}
                 tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 600 }}
                 domain={[0, 100]}
                 ticks={[0, 25, 50, 75, 100]}
                 tickFormatter={(value) => `${value}%`}
               />
-              <Tooltip 
+              <Tooltip
                 content={({ active, payload }) => {
                   if (active && payload && payload.length) {
                     return (

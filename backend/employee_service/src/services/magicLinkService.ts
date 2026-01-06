@@ -2,6 +2,7 @@ import { redis } from '../config/redis';
 import crypto from 'crypto';
 import { publishEmailJob } from '../queues/emailProducer';
 import { AppError } from '../errors/appError';
+import { logger } from '../config/logger';
 
 export class MagicLinkService {
   async sendMagicLink(email: string) {
@@ -13,7 +14,9 @@ export class MagicLinkService {
 
     const link = `${process.env.CLIENT_URL}/magic-login?token=${token}`;
 
-    publishEmailJob({ type: 'MAGIC', email, link }).catch(console.error);
+    publishEmailJob({ type: 'MAGIC', email, link }).catch((err) =>
+      logger.error('Failed to publish magic link email job', err),
+    );
   }
 
   async verifyMagicLink(token: string) {

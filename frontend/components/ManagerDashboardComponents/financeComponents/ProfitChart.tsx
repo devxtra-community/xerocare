@@ -1,15 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-} from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 const data = [
   { month: 'Jan', profit: 130000 },
@@ -24,7 +16,8 @@ export default function ProfitChart() {
   const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
-    setIsClient(true);
+    const timer = setTimeout(() => setIsClient(true), 0);
+    return () => clearTimeout(timer);
   }, []);
 
   return (
@@ -35,24 +28,34 @@ export default function ProfitChart() {
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} strokeOpacity={0.2} />
-              <XAxis 
-                dataKey="month" 
-                axisLine={false} 
+              <XAxis
+                dataKey="month"
+                axisLine={false}
                 tickLine={false}
                 tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 600 }}
               />
-              <YAxis 
-                axisLine={false} 
+              <YAxis
+                axisLine={false}
                 tickLine={false}
                 tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 600 }}
-                tickFormatter={(val) => `₹${val/1000}k`}
+                tickFormatter={(val) => `₹${val / 1000}k`}
               />
-              <Tooltip 
+              <Tooltip
                 formatter={(val: number) => `₹${val.toLocaleString()}`}
-                contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                contentStyle={{
+                  borderRadius: '12px',
+                  border: 'none',
+                  boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)',
+                }}
                 itemStyle={{ fontSize: '10px', fontWeight: 'bold', color: '#1d4ed8' }}
               />
-              <Bar dataKey="profit" name="Net Profit" fill="#1d4ed8" radius={[4, 4, 0, 0]} barSize={30} />
+              <Bar
+                dataKey="profit"
+                name="Net Profit"
+                fill="#1d4ed8"
+                radius={[4, 4, 0, 0]}
+                barSize={30}
+              />
             </BarChart>
           </ResponsiveContainer>
         )}
