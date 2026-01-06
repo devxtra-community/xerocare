@@ -38,22 +38,31 @@ export class AuthRepository {
     return this.authRepo
       .createQueryBuilder()
       .delete()
-      .where('employeeId = :userId', { userId })
-      .andWhere('token != :currentToken', { currentToken })
+      .where('(employee_id = :userId OR admin_id = :userId)', { userId })
+      .andWhere('refresh_token != :currentToken', { currentToken })
       .execute();
   }
 
-  async getUserSessions(userId: string) {
+  async getUserSessions(userId: string, is_admin: boolean = false) {
     return this.authRepo.find({
-      where: { employee: { id: userId } },
+      where: is_admin ? { admin: { id: userId } } : { employee: { id: userId } },
       order: { createdAt: 'DESC' },
     });
   }
 
   async deleteSessionById(sessionId: string, userId: string) {
-    return this.authRepo.delete({
+    // Attempt deletion for either employee or admin
+    const result = await this.authRepo.delete({
       id: sessionId,
       employee: { id: userId },
     });
+
+    if (result.affected === 0) {
+      return this.authRepo.delete({
+        id: sessionId,
+        admin: { id: userId },
+      });
+    }
+    return result;
   }
 }

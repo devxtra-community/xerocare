@@ -1,5 +1,5 @@
 import { Source } from '../config/dataSource';
-import { Employee } from '../entities/employeeEntities';
+import { Employee, EmployeeStatus } from '../entities/employeeEntities';
 import { EmployeeRole } from '../constants/employeeRole';
 
 export class EmployeeRepository {
@@ -33,18 +33,6 @@ export class EmployeeRepository {
 
     const [data, total] = await this.repo.findAndCount({
       where: whereCondition,
-      select: [
-        'id',
-        'email',
-        'first_name',
-        'last_name',
-        'role',
-        'salary',
-        'profile_image_url',
-        'createdAt',
-        'updatedAt',
-        'expire_date',
-      ],
       order: { createdAt: 'DESC' },
       skip,
       take,
@@ -56,18 +44,6 @@ export class EmployeeRepository {
   async findByIdSafe(id: string) {
     return this.repo.findOne({
       where: { id },
-      select: [
-        'id',
-        'email',
-        'first_name',
-        'last_name',
-        'role',
-        'salary',
-        'profile_image_url',
-        'createdAt',
-        'updatedAt',
-        'expire_date',
-      ],
     });
   }
   async updateById(id: string, payload: Partial<Employee>): Promise<Employee | null> {
@@ -76,5 +52,17 @@ export class EmployeeRepository {
 
     Object.assign(employee, payload);
     return this.repo.save(employee);
+  }
+
+  async count() {
+    return this.repo.count();
+  }
+
+  async countByStatus(status: EmployeeStatus) {
+    return this.repo.count({ where: { status } });
+  }
+
+  async countByRole(role: EmployeeRole) {
+    return this.repo.count({ where: { role } });
   }
 }

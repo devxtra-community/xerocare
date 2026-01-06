@@ -6,6 +6,7 @@ import {
   getEmployeeById,
   getEmployeeIdProof,
   updateEmployee,
+  getHRStats,
 } from '../controllers/employeeController';
 import { authMiddleware } from '../middleware/authMiddleware';
 import { requireRole } from '../middleware/roleMiddleware';
@@ -27,9 +28,19 @@ employeeRouter.post(
 
 employeeRouter.get('/:id/id-proof', authMiddleware, requireRole('ADMIN', 'HR'), getEmployeeIdProof);
 
+employeeRouter.get('/stats', requireRole('ADMIN', 'HR'), getHRStats);
+
 employeeRouter.get('/', requireRole('ADMIN', 'HR'), getAllEmployees);
 employeeRouter.get('/:id', requireRole('ADMIN', 'HR'), getEmployeeById);
-employeeRouter.put('/:id', requireRole('ADMIN', 'HR'), updateEmployee);
+employeeRouter.put(
+  '/:id',
+  requireRole('ADMIN', 'HR'),
+  uploadEmployeeFiles.fields([
+    { name: 'profile_image', maxCount: 1 },
+    { name: 'id_proof', maxCount: 1 },
+  ]),
+  updateEmployee,
+);
 
 employeeRouter.delete('/:id', requireRole('ADMIN', 'HR'), deleteEmployee);
 

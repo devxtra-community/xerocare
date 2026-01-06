@@ -39,7 +39,7 @@ export class AuthService {
       throw new AppError('Token not found', 401);
     }
 
-    const user = storedToken.employee;
+    const user = storedToken.employee || storedToken.admin;
     if (!user) {
       throw new AppError('User not found for this token', 404);
     }
@@ -115,8 +115,8 @@ export class AuthService {
     return true;
   }
 
-  async getSessions(userId: string, currentToken: string) {
-    const sessions = await this.authRepo.getUserSessions(userId);
+  async getSessions(userId: string, currentToken: string, is_admin: boolean = false) {
+    const sessions = await this.authRepo.getUserSessions(userId, is_admin);
 
     return sessions.map((s) => ({
       id: s.id,

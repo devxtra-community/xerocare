@@ -20,6 +20,10 @@ export class Employee {
   id!: string;
 
   @Index({ unique: true })
+  @Column({ type: 'varchar', length: 20, nullable: true })
+  display_id!: string | null;
+
+  @Index({ unique: true })
   @Column({ type: 'varchar', length: 255 })
   email!: string;
 

@@ -2,7 +2,7 @@ import axios from 'axios';
 import { requestRefresh } from './auth-refresh';
 
 const api = axios.create({
-  baseURL: 'http://localhost:3001',
+  baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001',
   withCredentials: true,
 });
 
@@ -42,7 +42,8 @@ api.interceptors.response.use(
     const status = error.response?.status;
     const errorCode = error.response?.data?.code;
 
-    if (status === 401 && errorCode === 'TOKEN_REVOKED') {
+    // If token is invalid or revoked, force logout immediately
+    if (status === 401 && (errorCode === 'TOKEN_REVOKED' || errorCode === 'TOKEN_INVALID')) {
       localStorage.clear();
 
       if (window.location.pathname.startsWith('/admin')) {
@@ -54,6 +55,7 @@ api.interceptors.response.use(
       return Promise.reject(error);
     }
 
+    // Handle token expiration (retry logic)
     if (status === 401 && !originalRequest._retry) {
       if (isRefreshing) {
         return new Promise((resolve, reject) => {

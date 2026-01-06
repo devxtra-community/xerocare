@@ -49,6 +49,17 @@ export class EmployeeService {
 
     const roleEnum = (role ?? EmployeeRole.EMPLOYEE) as EmployeeRole;
 
+    const count = await this.employeeRepo.countByRole(roleEnum);
+    const prefix =
+      roleEnum === EmployeeRole.ADMIN
+        ? 'A'
+        : roleEnum === EmployeeRole.HR
+          ? 'H'
+          : roleEnum === EmployeeRole.MANAGER
+            ? 'M'
+            : 'E';
+    const display_id = `${prefix}${String(count + 1).padStart(2, '0')}`;
+
     const plainPassword = generateRandomPassword();
 
     const passwordHash = await bcrypt.hash(plainPassword, 10);
@@ -57,6 +68,7 @@ export class EmployeeService {
       first_name,
       last_name,
       email,
+      display_id,
       password_hash: passwordHash,
       role: roleEnum,
       salary: salary ?? null,
@@ -134,6 +146,7 @@ export class EmployeeService {
       role?: EmployeeRole;
       salary?: number | null;
       profile_image_url?: string | null;
+      id_proof_key?: string | null;
       expireDate?: Date | null;
       status?: EmployeeStatus;
     },
@@ -154,7 +167,7 @@ export class EmployeeService {
 
     const updated = await this.employeeRepo.updateById(id, {
       ...payload,
-      expire_date: payload.expireDate,
+      expire_date: payload.expireDate !== undefined ? payload.expireDate : employee.expire_date,
     });
 
     if (!updated) {
@@ -178,18 +191,34 @@ export class EmployeeService {
       throw new AppError('Employee not exist', 404);
     }
 
-    if (employee.status === EmployeeStatus.DELETED) {
-      throw new AppError('Employee Already deleted', 400);
-    }
-
-    employee.status = EmployeeStatus.DELETED;
-
-    await this.employeeRepo.save(employee);
+    // Toggle status to INACTIVE instead of hard delete
+    const updated = await this.employeeRepo.updateById(id, { status: EmployeeStatus.INACTIVE });
 
     await publishEmployeeEvent(EmployeeEventType.DELETED, {
       employeeId: employee.id,
     });
 
-    return true;
+    return !!updated;
+  }
+
+  async getHRStats() {
+    const total = await this.employeeRepo.count();
+    const active = await this.employeeRepo.countByStatus(EmployeeStatus.ACTIVE);
+    const inactive = await this.employeeRepo.countByStatus(EmployeeStatus.INACTIVE);
+
+    // Get counts by role
+    const roles = Object.values(EmployeeRole);
+    const byRole: Record<string, number> = {};
+
+    for (const role of roles) {
+      byRole[role] = await this.employeeRepo.countByRole(role as EmployeeRole);
+    }
+
+    return {
+      total,
+      active,
+      inactive,
+      byRole,
+    };
   }
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,25 +11,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-
-export interface Employee {
-  id?: string;
-  name: string;
-  role: string;
-  department: string;
-  branch: string;
-  type: string;
-  status: string;
-  joiningDate: string;
-  manager: string;
-  salary: string;
-}
+import { ImagePlus, FileText, X } from 'lucide-react';
+import { Employee } from '@/lib/employee';
 
 interface EmployeeFormDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   initialData?: Employee | null;
-  onSubmit: (data: Employee) => void;
+  onSubmit: (formData: FormData) => Promise<void>;
 }
 
 export default function EmployeeFormDialog({
@@ -39,36 +28,51 @@ export default function EmployeeFormDialog({
   onSubmit,
 }: EmployeeFormDialogProps) {
   const [formData, setFormData] = useState({
-    name: '',
-    role: '',
-    department: '',
-    branch: '',
-    type: 'Full-time',
-    status: 'Active',
-    joiningDate: '',
-    manager: '',
+    first_name: '',
+    last_name: '',
+    email: '',
+    role: 'EMPLOYEE',
     salary: '',
+    expire_date: '',
+    status: 'ACTIVE',
   });
 
+  const [profileImage, setProfileImage] = useState<File | null>(null);
+  const [idProof, setIdProof] = useState<File | null>(null);
+  const [profilePreview, setProfilePreview] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const profileInputRef = useRef<HTMLInputElement>(null);
+  const idProofInputRef = useRef<HTMLInputElement>(null);
+
   useEffect(() => {
-    const timer = setTimeout(() => {
-      if (initialData) {
-        setFormData(initialData);
-      } else {
-        setFormData({
-          name: '',
-          role: '',
-          department: '',
-          branch: '',
-          type: 'Full-time',
-          status: 'Active',
-          joiningDate: new Date().toISOString().split('T')[0],
-          manager: '',
-          salary: '',
-        });
-      }
-    }, 0);
-    return () => clearTimeout(timer);
+    if (initialData) {
+      setFormData({
+        first_name: initialData.first_name || '',
+        last_name: initialData.last_name || '',
+        email: initialData.email || '',
+        role: initialData.role || 'EMPLOYEE',
+        salary: initialData.salary?.toString() || '',
+        expire_date: initialData.expire_date
+          ? new Date(initialData.expire_date).toISOString().split('T')[0]
+          : '',
+        status: initialData.status || 'ACTIVE',
+      });
+      setProfilePreview(initialData.profile_image_url);
+    } else {
+      setFormData({
+        first_name: '',
+        last_name: '',
+        email: '',
+        role: 'EMPLOYEE',
+        salary: '',
+        expire_date: '',
+        status: 'ACTIVE',
+      });
+      setProfilePreview(null);
+      setProfileImage(null);
+      setIdProof(null);
+    }
   }, [initialData, open]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -80,146 +84,157 @@ export default function EmployeeFormDialog({
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleFileChange = (
+    e: React.ChangeEvent<HTMLInputElement>,
+    type: 'profile' | 'id_proof',
+  ) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (type === 'profile') {
+      setProfileImage(file);
+      const reader = new FileReader();
+      reader.onloadend = () => setProfilePreview(reader.result as string);
+      reader.readAsDataURL(file);
+    } else {
+      setIdProof(file);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    onSubmit(formData);
-    onOpenChange(false);
+    setIsSubmitting(true);
+    try {
+      const data = new FormData();
+      data.append('first_name', formData.first_name);
+      data.append('last_name', formData.last_name);
+      data.append('email', formData.email);
+      data.append('role', formData.role);
+      data.append('salary', formData.salary);
+      if (formData.expire_date) {
+        data.append('expireDate', formData.expire_date);
+      }
+      data.append('status', formData.status);
+
+      if (profileImage) {
+        data.append('profile_image', profileImage);
+      }
+      if (idProof) {
+        data.append('id_proof', idProof);
+      }
+
+      await onSubmit(data);
+      onOpenChange(false);
+    } catch (error) {
+      console.error('Failed to submit employee form:', error);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[650px]">
+      <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-2xl font-bold text-blue-900">
+          <DialogTitle className="text-2xl font-bold text-blue-900 text-center">
             {initialData ? 'Update Employee' : 'Add New Employee'}
           </DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-6 pt-6">
+        <form onSubmit={handleSubmit} className="space-y-6 pt-4">
+          {/* Profile Image Section */}
+          <div className="flex flex-col items-center gap-4">
+            <div
+              className="relative h-24 w-24 rounded-full bg-blue-50 border-2 border-dashed border-blue-200 flex items-center justify-center cursor-pointer overflow-hidden group"
+              onClick={() => profileInputRef.current?.click()}
+            >
+              {profilePreview ? (
+                <img
+                  src={profilePreview}
+                  alt="Profile preview"
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                <ImagePlus className="h-8 w-8 text-blue-400 group-hover:text-blue-500 transition-colors" />
+              )}
+              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                <span className="text-[10px] text-white font-bold">CHANGE</span>
+              </div>
+            </div>
+            <input
+              type="file"
+              ref={profileInputRef}
+              className="hidden"
+              accept="image/*"
+              onChange={(e) => handleFileChange(e, 'profile')}
+            />
+            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+              Profile Picture
+            </span>
+          </div>
+
           <div className="grid grid-cols-2 gap-x-8 gap-y-6">
             <div className="space-y-2">
               <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                Full Name
+                First Name
               </label>
               <Input
-                name="name"
-                placeholder="John Doe"
-                value={formData.name}
+                name="first_name"
+                placeholder="John"
+                value={formData.first_name}
                 onChange={handleChange}
                 required
-                className="h-12 rounded-xl bg-white border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
+                className="h-12 rounded-xl bg-gray-50 border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
               />
             </div>
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                Last Name
+              </label>
+              <Input
+                name="last_name"
+                placeholder="Doe"
+                value={formData.last_name}
+                onChange={handleChange}
+                required
+                className="h-12 rounded-xl bg-gray-50 border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                Email Address
+              </label>
+              <Input
+                name="email"
+                type="email"
+                placeholder="john.doe@xerocare.com"
+                value={formData.email}
+                onChange={handleChange}
+                required
+                disabled={!!initialData}
+                className="h-12 rounded-xl bg-gray-50 border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400 disabled:opacity-50"
+              />
+            </div>
+
             <div className="space-y-2">
               <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
                 Role / Designation
               </label>
-              <Input
-                name="role"
-                placeholder="Software Engineer"
+              <Select
                 value={formData.role}
-                onChange={handleChange}
-                required
-                className="h-12 rounded-xl bg-white border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                Department
-              </label>
-              <Select
-                value={formData.department}
-                onValueChange={(val) => handleSelectChange('department', val)}
+                onValueChange={(val) => handleSelectChange('role', val)}
               >
-                <SelectTrigger className="h-12 rounded-xl bg-white border-none shadow-sm focus:ring-2 focus:ring-blue-400">
-                  <SelectValue placeholder="Select department" />
+                <SelectTrigger className="h-12 rounded-xl bg-gray-50 border-none shadow-sm focus:ring-2 focus:ring-blue-400">
+                  <SelectValue placeholder="Select role" />
                 </SelectTrigger>
                 <SelectContent className="rounded-xl">
-                  <SelectItem value="Manager">Manager</SelectItem>
                   <SelectItem value="HR">HR</SelectItem>
-                  <SelectItem value="Employee">Employee</SelectItem>
-                  <SelectItem value="Finance">Finance</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                Branch / Location
-              </label>
-              <Input
-                name="branch"
-                placeholder="Dubai Main"
-                value={formData.branch}
-                onChange={handleChange}
-                required
-                className="h-12 rounded-xl bg-white border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                Employment Type
-              </label>
-              <Select
-                value={formData.type}
-                onValueChange={(val) => handleSelectChange('type', val)}
-              >
-                <SelectTrigger className="h-12 rounded-xl bg-white border-none shadow-sm focus:ring-2 focus:ring-blue-400">
-                  <SelectValue placeholder="Select type" />
-                </SelectTrigger>
-                <SelectContent className="rounded-xl">
-                  <SelectItem value="Full-time">Full-time</SelectItem>
-                  <SelectItem value="Part-time">Part-time</SelectItem>
-                  <SelectItem value="Contract">Contract</SelectItem>
-                  <SelectItem value="Intern">Intern</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                Status
-              </label>
-              <Select
-                value={formData.status}
-                onValueChange={(val) => handleSelectChange('status', val)}
-              >
-                <SelectTrigger className="h-12 rounded-xl bg-white border-none shadow-sm focus:ring-2 focus:ring-blue-400">
-                  <SelectValue placeholder="Select status" />
-                </SelectTrigger>
-                <SelectContent className="rounded-xl">
-                  <SelectItem value="Active">Active</SelectItem>
-                  <SelectItem value="On Leave">On Leave</SelectItem>
-                  <SelectItem value="Resigned">Resigned</SelectItem>
+                  <SelectItem value="MANAGER">Manager</SelectItem>
+                  <SelectItem value="EMPLOYEE">Employee</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
-            <div className="space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                Joining Date
-              </label>
-              <Input
-                name="joiningDate"
-                type="date"
-                value={formData.joiningDate}
-                onChange={handleChange}
-                required
-                className="h-12 rounded-xl bg-white border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                Reporting Manager
-              </label>
-              <Input
-                name="manager"
-                placeholder="Manager Name"
-                value={formData.manager}
-                onChange={handleChange}
-                required
-                className="h-12 rounded-xl bg-white border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
-              />
-            </div>
             <div className="space-y-2">
               <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
                 Salary (AED)
@@ -231,12 +246,90 @@ export default function EmployeeFormDialog({
                 value={formData.salary}
                 onChange={handleChange}
                 required
-                className="h-12 rounded-xl bg-white border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
+                className="h-12 rounded-xl bg-gray-50 border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
               />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                Contract Expire Date
+              </label>
+              <Input
+                name="expire_date"
+                type="date"
+                value={formData.expire_date}
+                onChange={handleChange}
+                className="h-12 rounded-xl bg-gray-50 border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                Employee Status
+              </label>
+              <Select
+                value={formData.status}
+                onValueChange={(val) => handleSelectChange('status', val)}
+              >
+                <SelectTrigger className="h-12 rounded-xl bg-gray-50 border-none shadow-sm focus:ring-2 focus:ring-blue-400">
+                  <SelectValue placeholder="Select status" />
+                </SelectTrigger>
+                <SelectContent className="rounded-xl">
+                  <SelectItem value="ACTIVE" className="text-green-600 font-medium">
+                    Active
+                  </SelectItem>
+                  <SelectItem value="INACTIVE" className="text-amber-600 font-medium">
+                    Inactive
+                  </SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
 
-          <div className="flex justify-end items-center gap-6 pt-8">
+          {/* ID Proof Section */}
+          <div className="space-y-2">
+            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+              ID Proof Document (Passport/Emirates ID)
+            </label>
+            <div
+              className={`h-20 rounded-xl border-2 border-dashed flex items-center justify-between px-6 cursor-pointer transition-colors ${
+                idProof
+                  ? 'border-green-200 bg-green-50'
+                  : 'border-gray-200 bg-gray-50 hover:border-blue-200'
+              }`}
+              onClick={() => idProofInputRef.current?.click()}
+            >
+              <div className="flex items-center gap-3">
+                <FileText className={`h-5 w-5 ${idProof ? 'text-green-500' : 'text-gray-400'}`} />
+                <span
+                  className={`text-sm ${idProof ? 'text-green-700 font-medium' : 'text-gray-500'}`}
+                >
+                  {idProof ? idProof.name : 'Click to upload ID proof'}
+                </span>
+              </div>
+              {idProof && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIdProof(null);
+                  }}
+                  className="p-1 hover:bg-green-100 rounded-full text-green-700"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+            <input
+              type="file"
+              ref={idProofInputRef}
+              className="hidden"
+              accept=".pdf,.jpg,.jpeg,.png"
+              onChange={(e) => handleFileChange(e, 'id_proof')}
+            />
+          </div>
+
+          <div className="flex justify-end items-center gap-6 pt-6">
             <button
               type="button"
               onClick={() => onOpenChange(false)}
@@ -246,9 +339,10 @@ export default function EmployeeFormDialog({
             </button>
             <Button
               type="submit"
-              className="h-12 px-10 rounded-xl bg-[#004a8d] text-white hover:bg-[#003f7d] font-bold shadow-lg"
+              disabled={isSubmitting}
+              className="h-12 px-10 rounded-xl bg-primary text-white hover:bg-primary/90 font-bold shadow-lg disabled:opacity-70"
             >
-              {initialData ? 'Update' : 'Create'}
+              {isSubmitting ? 'Processing...' : initialData ? 'Update Employee' : 'Create Employee'}
             </Button>
           </div>
         </form>

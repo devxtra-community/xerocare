@@ -40,8 +40,9 @@ export const addEmployee = async (req: Request, res: Response, next: NextFunctio
       data: employee,
       success: true,
     });
-  } catch (err: any) {
-    next(new AppError(err.message, err.statusCode || 400));
+  } catch (err: unknown) {
+    const error = err as { message: string; statusCode?: number };
+    next(new AppError(error.message, error.statusCode || 400));
   }
 };
 
@@ -52,8 +53,9 @@ export const getEmployeeIdProof = async (req: Request, res: Response, next: Next
     const result = await service.getEmployeeIdProof(employeeId);
 
     return res.json({ success: true, data: result });
-  } catch (err: any) {
-    next(new AppError(err.message, err.statusCode || 404));
+  } catch (err: unknown) {
+    const error = err as { message: string; statusCode?: number };
+    next(new AppError(error.message, error.statusCode || 404));
   }
 };
 
@@ -70,8 +72,9 @@ export const getAllEmployees = async (req: Request, res: Response, next: NextFun
       data: result,
       message: 'Employees fetched successfully',
     });
-  } catch (err: any) {
-    next(new AppError(err.message, err.statusCode || 500));
+  } catch (err: unknown) {
+    const error = err as { message: string; statusCode?: number };
+    next(new AppError(error.message, error.statusCode || 500));
   }
 };
 
@@ -84,22 +87,43 @@ export const getEmployeeById = async (req: Request, res: Response, next: NextFun
       data: employee,
       message: 'Employee fetched successfully',
     });
-  } catch (err: any) {
-    next(new AppError(err.message, err.statusCode || 404));
+  } catch (err: unknown) {
+    const error = err as { message: string; statusCode?: number };
+    next(new AppError(error.message, error.statusCode || 404));
   }
 };
 
 export const updateEmployee = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const updatedEmployee = await service.updateEmployee(req.params.id, req.body);
+    const files = req.files as {
+      profile_image?: MulterS3File[];
+      id_proof?: MulterS3File[];
+    };
+
+    const profileImageKey = files?.profile_image?.[0]?.key ?? null;
+    const profileImageUrl = profileImageKey
+      ? `${process.env.R2_PUBLIC_URL}/${process.env.R2_BUCKET}/${profileImageKey}`
+      : null;
+
+    const idProofKey = files?.id_proof?.[0]?.key ?? null;
+
+    const payload = {
+      ...req.body,
+      salary: req.body.salary ? Number(req.body.salary) : undefined,
+      profile_image_url: profileImageUrl || undefined,
+      id_proof_key: idProofKey || undefined,
+    };
+
+    const updatedEmployee = await service.updateEmployee(req.params.id, payload);
 
     return res.json({
       success: true,
       message: 'Employee updated successfully',
       data: updatedEmployee,
     });
-  } catch (err: any) {
-    next(new AppError(err.message, err.statusCode || 400));
+  } catch (err: unknown) {
+    const error = err as { message: string; statusCode?: number };
+    next(new AppError(error.message, error.statusCode || 400));
   }
 };
 
@@ -111,7 +135,22 @@ export const deleteEmployee = async (req: Request, res: Response, next: NextFunc
       success: true,
       message: 'Employee deleted successfully',
     });
-  } catch (err: any) {
-    next(new AppError(err.message, err.statusCode || 500));
+  } catch (err: unknown) {
+    const error = err as { message: string; statusCode?: number };
+    next(new AppError(error.message, error.statusCode || 500));
+  }
+};
+
+export const getHRStats = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const stats = await service.getHRStats();
+    return res.json({
+      success: true,
+      data: stats,
+      message: 'HR stats fetched successfully',
+    });
+  } catch (err: unknown) {
+    const error = err as { message: string; statusCode?: number };
+    next(new AppError(error.message, error.statusCode || 500));
   }
 };
