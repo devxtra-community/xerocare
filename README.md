@@ -1,11 +1,18 @@
 # Xerocare
 
-Xerocare is a **microservices-based backend system** designed for secure authentication, employee management, and vendor & inventory operations.  
-The system is built with **scalability, clean architecture, and production readiness** as core principles.
+**Xerocare** is a **full-stack, role-based authenticated asset management system** built using modern web technologies.  
+The project follows **scalable microservices architecture**, **repository code pattern**, and **enterprise-grade authentication**.
+
+Xerocare includes:
+- A **frontend web application** with role-based authentication
+- An **API Gateway**
+- Multiple **independent backend microservices**
+- A **message-driven architecture** using RabbitMQ
+- Scalable data storage and caching layers
 
 ---
 
-## Architecture Overview
+## 🌐 High-Level System Architecture
 
-Xerocare follows a **Microservices Architecture** with an **API Gateway** acting as the single entry point.
+Xerocare follows a **layered microservices architecture**:
 
