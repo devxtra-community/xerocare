@@ -11,6 +11,11 @@ const authService = new AuthService();
 const otpService = new OtpService();
 const magicLinkService = new MagicLinkService();
 
+interface AuthError {
+  message?: string;
+  statusCode?: number;
+}
+
 export const login = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { user } = await authService.login(req.body);
@@ -21,8 +26,9 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
       message: 'Otp sent to registered email',
       success: true,
     });
-  } catch (err: any) {
-    next(new AppError(err.message, err.statusCode || 500));
+  } catch (err: unknown) {
+    const error = err as AuthError;
+    next(new AppError(error.message || 'Internal Server Error', error.statusCode || 500));
   }
 };
 
@@ -36,7 +42,7 @@ export const loginVerify = async (req: Request, res: Response, next: NextFunctio
     const user = await authService.findUserByEmail(email);
 
     const accessToken = await issueTokens(user, req, res);
-    logger.info("login successfull")
+    logger.info('login successfull');
 
     return res.json({
       message: 'Login successfull',
@@ -44,8 +50,9 @@ export const loginVerify = async (req: Request, res: Response, next: NextFunctio
       data: user,
       success: true,
     });
-  } catch (err: any) {
-    next(new AppError(err.message, err.statusCode || 400));
+  } catch (err: unknown) {
+    const error = err as AuthError;
+    next(new AppError(error.message || 'Bad Request', error.statusCode || 400));
   }
 };
 
@@ -65,8 +72,9 @@ export const refresh = async (req: Request, res: Response, next: NextFunction) =
       accessToken,
       success: true,
     });
-  } catch (err: any) {
-    next(new AppError(err.message || 'Invalid refresh token', err.statusCode || 401));
+  } catch (err: unknown) {
+    const error = err as AuthError;
+    next(new AppError(error.message || 'Invalid refresh token', error.statusCode || 401));
   }
 };
 
@@ -78,8 +86,9 @@ export const logout = async (req: Request, res: Response, next: NextFunction) =>
     res.clearCookie('refreshToken');
     res.clearCookie('accessToken');
     res.json({ message: 'logout successfull', success: true });
-  } catch (err: any) {
-    next(new AppError(err.message || 'Internal server error', err.statusCode || 500));
+  } catch (err: unknown) {
+    const error = err as AuthError;
+    next(new AppError(error.message || 'Internal server error', error.statusCode || 500));
   }
 };
 
@@ -95,8 +104,9 @@ export const changePassword = async (req: Request, res: Response, next: NextFunc
     });
 
     return res.status(200).json({ message: 'Password changed successfully', success: true });
-  } catch (err: any) {
-    next(new AppError(err.message || 'Internal server error', err.statusCode || 500));
+  } catch (err: unknown) {
+    const error = err as AuthError;
+    next(new AppError(error.message || 'Internal server error', error.statusCode || 500));
   }
 };
 
@@ -118,8 +128,9 @@ export const forgotPassword = async (req: Request, res: Response, next: NextFunc
       message: 'If account exists, magic link sent',
       success: true,
     });
-  } catch (err: any) {
-    next(new AppError(err.message, err.statusCode || 400));
+  } catch (err: unknown) {
+    const error = err as AuthError;
+    next(new AppError(error.message || 'Bad Request', error.statusCode || 400));
   }
 };
 
@@ -128,7 +139,6 @@ export const resetPassword = async (req: Request, res: Response, next: NextFunct
     const email = req.body.email.toLowerCase().trim();
     const otp = String(req.body.otp).trim();
     const { newPassword } = req.body;
-    const userId = req.user.id;
     const currentRefreshToken = req.cookies.refreshToken;
 
     await otpService.verifyOtp(email, otp, OtpPurpose.FORGOT_PASSWORD);
@@ -137,14 +147,17 @@ export const resetPassword = async (req: Request, res: Response, next: NextFunct
 
     await authService.resetPassword(user.id, newPassword);
 
-    await authService.logoutOtherDevices(userId, currentRefreshToken);
+    if (currentRefreshToken) {
+      await authService.logoutOtherDevices(user.id, currentRefreshToken);
+    }
 
     return res.json({
       message: 'Password reset successfully',
       success: true,
     });
-  } catch (err: any) {
-    next(new AppError(err.message, err.statusCode || 400));
+  } catch (err: unknown) {
+    const error = err as AuthError;
+    next(new AppError(error.message || 'Bad Request', error.statusCode || 400));
   }
 };
 
@@ -158,8 +171,9 @@ export const requestMagicLink = async (req: Request, res: Response, next: NextFu
       message: 'If account exists, magic link sent',
       success: true,
     });
-  } catch (err: any) {
-    next(new AppError(err.message, err.statusCode || 400));
+  } catch (err: unknown) {
+    const error = err as AuthError;
+    next(new AppError(error.message || 'Bad Request', error.statusCode || 400));
   }
 };
 
@@ -182,8 +196,9 @@ export const verifyMagicLink = async (req: Request, res: Response, next: NextFun
       data: user,
       success: true,
     });
-  } catch (err: any) {
-    next(new AppError(err.message, err.statusCode || 400));
+  } catch (err: unknown) {
+    const error = err as AuthError;
+    next(new AppError(error.message || 'Bad Request', error.statusCode || 400));
   }
 };
 
@@ -202,8 +217,9 @@ export const logoutOtherDevices = async (req: Request, res: Response, next: Next
       message: 'Logged out from other devices',
       success: true,
     });
-  } catch (err: any) {
-    next(new AppError(err.message || 'Internal server error', err.statusCode || 500));
+  } catch (err: unknown) {
+    const error = err as AuthError;
+    next(new AppError(error.message || 'Internal server error', error.statusCode || 500));
   }
 };
 
@@ -218,8 +234,9 @@ export const getSessions = async (req: Request, res: Response, next: NextFunctio
       data: sessions,
       success: true,
     });
-  } catch (err: any) {
-    next(new AppError(err.message, err.statusCode || 500));
+  } catch (err: unknown) {
+    const error = err as AuthError;
+    next(new AppError(error.message || 'Internal Server Error', error.statusCode || 500));
   }
 };
 
@@ -234,8 +251,9 @@ export const logoutSession = async (req: Request, res: Response, next: NextFunct
       message: 'Session logged out',
       success: true,
     });
-  } catch (err: any) {
-    next(new AppError(err.message, err.statusCode || 500));
+  } catch (err: unknown) {
+    const error = err as AuthError;
+    next(new AppError(error.message || 'Internal Server Error', error.statusCode || 500));
   }
 };
 
@@ -248,7 +266,8 @@ export const getMe = async (req: Request, res: Response, next: NextFunction) => 
       success: true,
       data: user,
     });
-  } catch (err: any) {
-    next(new AppError(err.message, err.statusCode || 500));
+  } catch (err: unknown) {
+    const error = err as AuthError;
+    next(new AppError(error.message || 'Internal Server Error', error.statusCode || 500));
   }
 };
