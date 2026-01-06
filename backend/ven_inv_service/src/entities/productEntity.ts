@@ -26,7 +26,7 @@ export class Product {
 
   @ManyToOne(() => Model, (model) => model.products)
   @JoinColumn({ name: "model_id" })
-  model!: Model;
+  model_id!: Model;
 
   @Column()
   vendor_id!: number;

@@ -1,11 +1,10 @@
 import { Request, Response } from "express";
 import { AppError } from "../errors/appError";
 import { ProductService } from "../services/productService";
-import { logger } from "../config/logger";
 
 const service = new ProductService();
 export const addproduct = async (req: Request, res: Response) => {
-    try {
+    try {   
         const productData = req.body;
         const newproduct = await service.addProduct(productData);
         res.status(200).json({ message: "Product added successfully", data: newproduct, success: true });
