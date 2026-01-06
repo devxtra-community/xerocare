@@ -5,8 +5,9 @@ import {
   sendMagicLinkMail,
   sendEmployeeWelcomeMail,
   sendVendorWelcomeMail,
+  sendLoginAlertMail,
 } from '../utlis/mailer';
-import { OtpPurpose } from '../constants/otpPurpose';
+
 import { logger } from '../config/logger';
 
 export const startWorker = async () => {
@@ -19,7 +20,7 @@ export const startWorker = async () => {
 
     try {
       if (job.type === 'OTP') {
-        await sendOtpMail(job.email, job.otp, OtpPurpose.LOGIN);
+        await sendOtpMail(job.email, job.otp);
       }
 
       if (job.type === 'MAGIC') {
@@ -32,6 +33,16 @@ export const startWorker = async () => {
 
       if (job.type === 'VENDOR_WELCOME') {
         await sendVendorWelcomeMail(job.email, job.vendorName);
+      }
+
+      if (job.type === 'LOGIN_ALERT') {
+        await sendLoginAlertMail(job.email, {
+          device: job.device,
+          browser: job.browser,
+          os: job.os,
+          ip: job.ip,
+          time: job.time,
+        });
       }
 
       channel.ack(msg);

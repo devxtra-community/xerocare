@@ -1,5 +1,4 @@
 import nodemailer from 'nodemailer';
-import { OtpPurpose } from '../constants/otpPurpose';
 
 export const mailer = nodemailer.createTransport({
   service: 'gmail',
@@ -29,7 +28,7 @@ export async function sendEmployeeWelcomeMail(to: string, password: string) {
   });
 }
 
-export async function sendOtpMail(to: string, otp: string, purpose: OtpPurpose) {
+export async function sendOtpMail(to: string, otp: string) {
   await mailer.sendMail({
     from: process.env.MAIL_USER,
     to,
@@ -80,6 +79,32 @@ export async function sendVendorWelcomeMail(to: string, vendorName: string) {
         Vendors do not have direct login access to the system.
       </p>
 
+      <br/>
+      <p>— Team XeroCare</p>
+    `,
+  });
+}
+
+export async function sendLoginAlertMail(
+  to: string,
+  details: { device: string; browser: string; os: string; ip: string; time: string },
+) {
+  await mailer.sendMail({
+    from: process.env.MAIL_USER,
+    to,
+    subject: 'Security Alert: New Login Detected',
+    html: `
+      <h2>New Login Alert</h2>
+      <p>Hello,</p>
+      <p>Your XeroCare account was just logged into from a new device.</p>
+      <div style="background-color: #f4f4f4; padding: 15px; border-radius: 5px;">
+        <p><b>Device:</b> ${details.device}</p>
+        <p><b>Browser:</b> ${details.browser}</p>
+        <p><b>OS:</b> ${details.os}</p>
+        <p><b>IP Address:</b> ${details.ip}</p>
+        <p><b>Time:</b> ${details.time}</p>
+      </div>
+      <p>If this was you, you can ignore this email. If you don't recognize this activity, please change your password immediately.</p>
       <br/>
       <p>— Team XeroCare</p>
     `,
