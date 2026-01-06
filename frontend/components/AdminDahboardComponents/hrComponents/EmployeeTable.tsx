@@ -232,6 +232,7 @@ export default function EmployeeTable() {
                     <div className="flex items-center gap-3">
                       <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-semibold text-sm flex-shrink-0 overflow-hidden">
                         {emp.profile_image_url ? (
+                          // eslint-disable-next-line
                           <img
                             src={emp.profile_image_url}
                             alt=""
@@ -263,13 +264,12 @@ export default function EmployeeTable() {
                   <td className="px-6 py-4">
                     <Badge
                       variant="outline"
-                      className={`text-[10px] font-bold border-none ${
-                        emp.status === 'ACTIVE'
+                      className={`text-[10px] font-bold border-none ${emp.status === 'ACTIVE'
                           ? 'bg-green-100 text-green-700'
                           : emp.status === 'INACTIVE'
                             ? 'bg-amber-100 text-amber-700'
                             : 'bg-red-100 text-red-700'
-                      }`}
+                        }`}
                     >
                       {emp.status}
                     </Badge>

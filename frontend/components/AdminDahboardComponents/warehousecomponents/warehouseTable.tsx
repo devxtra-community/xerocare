@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Search, Plus, Trash2 } from 'lucide-react';
@@ -19,121 +19,88 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import StatCard from '@/components/StatCard';
-
-type Warehouse = {
-  id: string;
-  warehouseName: string;
-  warehouseCode: string;
-  branch: string;
-  location: string;
-  address: string;
-  type: 'Central' | 'Regional' | 'Dark Store';
-  capacity: string;
-  status: 'active' | 'inactive';
-};
-
-const initialWarehouses: Warehouse[] = [
-  {
-    id: '1',
-    warehouseName: 'Central Distribution Hub',
-    warehouseCode: 'WH-001',
-    branch: 'CityWave Store',
-    location: 'Ernakulam',
-    address: 'MG Road, Near Metro Station',
-    type: 'Central',
-    capacity: '50000 sqft',
-    status: 'active',
-  },
-  {
-    id: '2',
-    warehouseName: 'South Regional Warehouse',
-    warehouseCode: 'WH-002',
-    branch: 'UrbanHub Outlet',
-    location: 'Kochi',
-    address: 'Vyttila Industrial Area',
-    type: 'Regional',
-    capacity: '30000 sqft',
-    status: 'active',
-  },
-  {
-    id: '3',
-    warehouseName: 'North Storage Unit',
-    warehouseCode: 'WH-003',
-    branch: 'PrimePoint Store',
-    location: 'Trivandrum',
-    address: 'Pattom Junction, NH-66',
-    type: 'Dark Store',
-    capacity: '15000 sqft',
-    status: 'inactive',
-  },
-  {
-    id: '4',
-    warehouseName: 'East Logistics Center',
-    warehouseCode: 'WH-004',
-    branch: 'CityWave Store',
-    location: 'Thrissur',
-    address: 'Bypass Road, East Gate',
-    type: 'Regional',
-    capacity: '35000 sqft',
-    status: 'active',
-  },
-  {
-    id: '5',
-    warehouseName: 'Backup Storage Facility',
-    warehouseCode: 'WH-005',
-    branch: 'UrbanHub Outlet',
-    location: 'Kozhikode',
-    address: 'Beach Road, Port Area',
-    type: 'Dark Store',
-    capacity: '20000 sqft',
-    status: 'inactive',
-  },
-];
-
-const availableBranches = ['CityWave Store', 'UrbanHub Outlet', 'PrimePoint Store'];
-
-const warehouseTypes = ['Central', 'Regional', 'Dark Store'];
+import {
+  getWarehouses,
+  createWarehouse,
+  updateWarehouse,
+  deleteWarehouse,
+  Warehouse,
+} from '@/lib/warehouse';
+import { getBranches, Branch } from '@/lib/branch';
+import { toast } from 'sonner';
 
 export default function WarehouseReport() {
-  const [warehouses, setWarehouses] = useState(initialWarehouses);
+  const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
+  const [branches, setBranches] = useState<Branch[]>([]);
+
   const [search, setSearch] = useState('');
 
   const [formOpen, setFormOpen] = useState(false);
   const [editingWarehouse, setEditingWarehouse] = useState<Warehouse | null>(null);
-  const [deleteWarehouse, setDeleteWarehouse] = useState<Warehouse | null>(null);
+  const [deleteWarehouseData, setDeleteWarehouseData] = useState<Warehouse | null>(null);
+
+  const fetchInitialData = async () => {
+    try {
+      const [whRes, brRes] = await Promise.all([getWarehouses(), getBranches()]);
+      setWarehouses(whRes.data);
+      setBranches(brRes.data);
+    } catch (error) {
+      console.error('Failed to fetch data:', error);
+      toast.error('Failed to load warehouses');
+    }
+  };
+
+  useEffect(() => {
+    // eslint-disable-next-line
+    fetchInitialData();
+  }, []);
 
   const filtered = warehouses.filter((w) =>
-    `${w.warehouseName} ${w.warehouseCode} ${w.location} ${w.branch}`
+    `${w.warehouseName} ${w.warehouseCode} ${w.location} ${w.branch?.name || ''}`
       .toLowerCase()
       .includes(search.toLowerCase()),
   );
 
   // Calculate statistics
   const totalWarehouses = warehouses.length;
-  const activeWarehouses = warehouses.filter((w) => w.status === 'active').length;
-  const inactiveWarehouses = warehouses.filter((w) => w.status === 'inactive').length;
+  const activeWarehouses = warehouses.filter((w) => w.status === 'ACTIVE').length;
+  const inactiveWarehouses = warehouses.filter((w) => w.status === 'INACTIVE').length;
 
-  // Calculate average capacity from string values
   const totalCapacity = warehouses.reduce((sum, w) => {
-    const numValue = parseInt(w.capacity.replace(/\D/g, '')) || 0;
+    const numValue = parseInt(w.capacity?.replace(/\D/g, '') || '0') || 0;
     return sum + numValue;
   }, 0);
-  const averageCapacity = Math.round(totalCapacity / warehouses.length);
+  const averageCapacity = warehouses.length ? Math.round(totalCapacity / warehouses.length) : 0;
 
-  const handleSave = (data: Warehouse) => {
-    if (editingWarehouse) {
-      setWarehouses((prev) => prev.map((w) => (w.id === data.id ? data : w)));
-    } else {
-      setWarehouses((prev) => [...prev, data]);
+  const handleSave = async (data: Partial<Warehouse>) => {
+    try {
+      if (editingWarehouse) {
+        await updateWarehouse(editingWarehouse.id, data);
+        toast.success('Warehouse updated successfully');
+      } else {
+        await createWarehouse(data);
+        toast.success('Warehouse created successfully');
+      }
+      fetchInitialData();
+      setFormOpen(false);
+      setEditingWarehouse(null);
+    } catch (error) {
+      console.error('Save failed:', error);
+      toast.error('Failed to save warehouse');
     }
-    setFormOpen(false);
-    setEditingWarehouse(null);
   };
 
-  const confirmDelete = () => {
-    if (!deleteWarehouse) return;
-    setWarehouses((prev) => prev.filter((w) => w.id !== deleteWarehouse.id));
-    setDeleteWarehouse(null);
+  const confirmDelete = async () => {
+    if (!deleteWarehouseData) return;
+    try {
+      await deleteWarehouse(deleteWarehouseData.id);
+      toast.success('Warehouse deleted successfully');
+      fetchInitialData();
+      setDeleteWarehouseData(null);
+    } catch (error) {
+      console.error('Delete failed:', error);
+      toast.error('Failed to delete warehouse');
+    }
   };
 
   return (
@@ -221,17 +188,16 @@ export default function WarehouseReport() {
                 >
                   <td className="px-4 py-3 text-sm font-medium">{w.warehouseName}</td>
                   <td className="px-4 py-3 text-sm text-blue-900 font-medium">{w.warehouseCode}</td>
-                  <td className="px-4 py-3 text-sm">{w.branch}</td>
+                  <td className="px-4 py-3 text-sm">{w.branch?.name || 'N/A'}</td>
                   <td className="px-4 py-3 text-sm">{w.location}</td>
                   <td className="px-4 py-3 text-sm">{w.address}</td>
                   <td className="px-4 py-3 text-sm font-medium">{w.capacity}</td>
                   <td className="px-4 py-3">
                     <span
-                      className={`px-2.5 py-1 rounded-full text-xs font-medium ${
-                        w.status === 'active'
+                      className={`px-2.5 py-1 rounded-full text-xs font-medium ${w.status === 'ACTIVE'
                           ? 'bg-green-100 text-green-700'
                           : 'bg-red-100 text-red-700'
-                      }`}
+                        }`}
                     >
                       {w.status}
                     </span>
@@ -249,7 +215,7 @@ export default function WarehouseReport() {
                       </button>
                       <button
                         className="text-red-600 hover:underline"
-                        onClick={() => setDeleteWarehouse(w)}
+                        onClick={() => setDeleteWarehouseData(w)}
                       >
                         Delete
                       </button>
@@ -265,15 +231,16 @@ export default function WarehouseReport() {
       {/* MODALS */}
       <WarehouseFormModal
         initialData={editingWarehouse}
+        branches={branches}
         open={formOpen}
         onClose={() => setFormOpen(false)}
         onConfirm={handleSave}
       />
 
       <ConfirmDeleteModal
-        open={!!deleteWarehouse}
-        name={deleteWarehouse?.warehouseName || ''}
-        onCancel={() => setDeleteWarehouse(null)}
+        open={!!deleteWarehouseData}
+        name={deleteWarehouseData?.warehouseName || ''}
+        onCancel={() => setDeleteWarehouseData(null)}
         onConfirm={confirmDelete}
       />
     </div>
@@ -282,28 +249,46 @@ export default function WarehouseReport() {
 
 function WarehouseFormModal({
   initialData,
+  branches,
   open,
   onClose,
   onConfirm,
 }: {
   initialData: Warehouse | null;
+  branches: Branch[];
   open: boolean;
   onClose: () => void;
-  onConfirm: (data: Warehouse) => void;
+  onConfirm: (data: Partial<Warehouse>) => void;
 }) {
-  const [form, setForm] = useState<Warehouse>(
+  const [form, setForm] = useState<Partial<Warehouse>>(
     initialData ?? {
-      id: crypto.randomUUID(),
       warehouseName: '',
       warehouseCode: '',
-      branch: availableBranches[0],
+      branchId: branches[0]?.id || '',
       location: '',
       address: '',
-      type: 'Regional',
       capacity: '',
-      status: 'active',
+      status: 'ACTIVE',
     },
   );
+
+  useEffect(() => {
+    if (initialData) {
+      // eslint-disable-next-line
+      setForm(initialData);
+    } else {
+      // eslint-disable-next-line
+      setForm({
+        warehouseName: '',
+        warehouseCode: '',
+        branchId: branches[0]?.id || '',
+        location: '',
+        address: '',
+        capacity: '',
+        status: 'ACTIVE',
+      });
+    }
+  }, [initialData, branches]);
 
   return (
     <Dialog open={open} onOpenChange={(val) => !val && onClose()}>
@@ -345,16 +330,16 @@ function WarehouseFormModal({
                 Branch
               </label>
               <Select
-                value={form.branch}
-                onValueChange={(value) => setForm({ ...form, branch: value })}
+                value={form.branchId || ''}
+                onValueChange={(value) => setForm({ ...form, branchId: value })}
               >
                 <SelectTrigger className="h-12 rounded-xl bg-white border-none shadow-sm focus:ring-2 focus:ring-blue-400">
                   <SelectValue placeholder="Select branch" />
                 </SelectTrigger>
                 <SelectContent className="rounded-xl">
-                  {availableBranches.map((branch) => (
-                    <SelectItem key={branch} value={branch}>
-                      {branch}
+                  {branches.map((branch) => (
+                    <SelectItem key={branch.id} value={branch.id}>
+                      {branch.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -371,32 +356,6 @@ function WarehouseFormModal({
                 onChange={(e) => setForm({ ...form, location: e.target.value })}
                 className="h-12 rounded-xl bg-white border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
               />
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                Warehouse Type
-              </label>
-              <Select
-                value={form.type}
-                onValueChange={(value) =>
-                  setForm({
-                    ...form,
-                    type: value as 'Central' | 'Regional' | 'Dark Store',
-                  })
-                }
-              >
-                <SelectTrigger className="h-12 rounded-xl bg-white border-none shadow-sm focus:ring-2 focus:ring-blue-400">
-                  <SelectValue placeholder="Select type" />
-                </SelectTrigger>
-                <SelectContent className="rounded-xl">
-                  {warehouseTypes.map((type) => (
-                    <SelectItem key={type} value={type}>
-                      {type}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
             </div>
 
             <div className="col-span-2 space-y-2">
@@ -428,17 +387,17 @@ function WarehouseFormModal({
                 Status
               </label>
               <Select
-                value={form.status}
+                value={form.status || 'ACTIVE'}
                 onValueChange={(value) =>
-                  setForm({ ...form, status: value as 'active' | 'inactive' })
+                  setForm({ ...form, status: value as 'ACTIVE' | 'INACTIVE' })
                 }
               >
                 <SelectTrigger className="h-12 rounded-xl bg-white border-none shadow-sm focus:ring-2 focus:ring-blue-400">
                   <SelectValue placeholder="Select status" />
                 </SelectTrigger>
                 <SelectContent className="rounded-xl">
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="inactive">Inactive</SelectItem>
+                  <SelectItem value="ACTIVE">Active</SelectItem>
+                  <SelectItem value="INACTIVE">Inactive</SelectItem>
                 </SelectContent>
               </Select>
             </div>

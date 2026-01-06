@@ -42,12 +42,12 @@ export default function EmployeeProfile({ id }: EmployeeProfileProps) {
       }
     };
     fetchEmployee();
-  }, [id]);
+  }, [id, router]);
 
   const handleDownloadIdProof = async () => {
     try {
       const response = await getEmployeeIdProof(id);
-      if (response.success && response.data.url) {
+      if (response.data.url) {
         window.open(response.data.url, '_blank');
       } else {
         toast.error('ID Proof not available');
@@ -102,6 +102,7 @@ export default function EmployeeProfile({ id }: EmployeeProfileProps) {
           <div className="bg-white rounded-2xl p-6 shadow-sm flex flex-col items-center text-center">
             <div className="h-24 w-24 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-bold text-3xl mb-4 overflow-hidden">
               {emp.profile_image_url ? (
+                // eslint-disable-next-line
                 <img src={emp.profile_image_url} alt="" className="h-full w-full object-cover" />
               ) : (
                 (emp.first_name?.[0] || emp.email[0]).toUpperCase()
@@ -113,9 +114,8 @@ export default function EmployeeProfile({ id }: EmployeeProfileProps) {
             <p className="text-sm text-primary font-medium">{emp.role}</p>
             <Badge
               variant="outline"
-              className={`mt-3 border-none px-3 py-1 ${
-                emp.status === 'ACTIVE' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-              }`}
+              className={`mt-3 border-none px-3 py-1 ${emp.status === 'ACTIVE' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                }`}
             >
               {emp.status}
             </Badge>
@@ -204,10 +204,10 @@ export default function EmployeeProfile({ id }: EmployeeProfileProps) {
                   <p className="text-sm font-semibold text-gray-900">
                     {emp.expire_date
                       ? new Date(emp.expire_date).toLocaleDateString('en-GB', {
-                          day: 'numeric',
-                          month: 'long',
-                          year: 'numeric',
-                        })
+                        day: 'numeric',
+                        month: 'long',
+                        year: 'numeric',
+                      })
                       : 'No expiry set'}
                   </p>
                 </div>

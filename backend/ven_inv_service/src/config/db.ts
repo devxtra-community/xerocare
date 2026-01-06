@@ -8,6 +8,8 @@ import { Inventory } from '../entities/inventoryEntity';
 import { Branch } from '../entities/branchEntity';
 import { EmployeeManager } from '../entities/employeeManagerEntity';
 
+import { Warehouse } from '../entities/warehouseEntity';
+
 export const Source = new DataSource({
   type: 'postgres',
   url: process.env.DATABASE_URL,
@@ -15,5 +17,5 @@ export const Source = new DataSource({
     rejectUnauthorized: false,
   },
   synchronize: true,
-  entities: [Vendor,Model,Product,Inventory,Branch, EmployeeManager],
+  entities: [Vendor, Model, Product, Inventory, Branch, EmployeeManager, Warehouse],
 });

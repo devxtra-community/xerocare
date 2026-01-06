@@ -1,85 +1,79 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { getWarehouses, Warehouse } from '@/lib/warehouse';
 
 const ITEMS_PER_PAGE = 5;
 
 export default function WarehouseTable() {
   const [page, setPage] = useState(1);
+  const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const data = [
-    {
-      wearhouseName: 'First Store',
-      branch: 'Ernakulam',
-      Location: 'ABC Street',
-      productStock: '3456',
-    },
-    {
-      wearhouseName: 'Central Hub',
-      branch: 'Kochi',
-      Location: 'MG Road',
-      productStock: '2890',
-    },
-    {
-      wearhouseName: 'North Depot',
-      branch: 'Thrissur',
-      Location: 'Round North',
-      productStock: '4120',
-    },
-    {
-      wearhouseName: 'South Warehouse',
-      branch: 'Trivandrum',
-      Location: 'Kazhakkoottam',
-      productStock: '1980',
-    },
-    {
-      wearhouseName: 'Metro Store',
-      branch: 'Calicut',
-      Location: 'SM Street',
-      productStock: '3650',
-    },
-  ];
+  useEffect(() => {
+    const fetchWarehouses = async () => {
+      try {
+        const res = await getWarehouses();
+        setWarehouses(res.data);
+      } catch (error) {
+        console.error('Failed to fetch warehouses:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchWarehouses();
+  }, []);
 
-  const totalPages = Math.ceil(data.length / ITEMS_PER_PAGE);
+  const totalPages = Math.ceil(warehouses.length / ITEMS_PER_PAGE) || 1;
   const startIndex = (page - 1) * ITEMS_PER_PAGE;
-  const currentData = data.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+  const currentData = warehouses.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
   return (
     <div className="rounded-2xl bg-white p-2 sm:p-3 shadow-sm w-full h-[260px] flex flex-col">
       <div className="flex-1 overflow-hidden">
-        <table className="w-full">
-          <thead>
-            <tr className="border-b">
-              <th className="text-left text-[10px] sm:text-xs font-semibold text-blue-900 py-2 px-2">
-                WAREHOUSE
-              </th>
-              <th className="text-left text-[10px] sm:text-xs font-semibold text-blue-900 py-2 px-2">
-                BRANCH
-              </th>
-              <th className="text-left text-[10px] sm:text-xs font-semibold text-blue-900 py-2 px-2">
-                LOCATION
-              </th>
-              <th className="text-left text-[10px] sm:text-xs font-semibold text-blue-900 py-2 px-2">
-                STOCK
-              </th>
-            </tr>
-          </thead>
-
-          <tbody>
-            {currentData.map((item, index) => (
-              <tr key={index} className={index % 2 === 1 ? 'bg-sky-100/60' : ''}>
-                <td className="py-2 px-2 text-[10px] sm:text-xs font-medium text-gray-900">
-                  {item.wearhouseName}
-                </td>
-                <td className="py-2 px-2 text-[10px] sm:text-xs text-gray-700">{item.branch}</td>
-                <td className="py-2 px-2 text-[10px] sm:text-xs text-gray-700">{item.Location}</td>
-                <td className="py-2 px-2 text-[10px] sm:text-xs text-gray-700">
-                  {item.productStock}
-                </td>
+        {loading ? (
+          <div className="flex items-center justify-center h-full text-xs text-gray-500">
+            Loading...
+          </div>
+        ) : (
+          <table className="w-full">
+            <thead>
+              <tr className="border-b">
+                <th className="text-left text-[10px] sm:text-xs font-semibold text-blue-900 py-2 px-2">
+                  WAREHOUSE
+                </th>
+                <th className="text-left text-[10px] sm:text-xs font-semibold text-blue-900 py-2 px-2">
+                  BRANCH
+                </th>
+                <th className="text-left text-[10px] sm:text-xs font-semibold text-blue-900 py-2 px-2">
+                  LOCATION
+                </th>
+                <th className="text-left text-[10px] sm:text-xs font-semibold text-blue-900 py-2 px-2">
+                  CAPACITY
+                </th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+
+            <tbody>
+              {currentData.map((item, index) => (
+                <tr key={item.id} className={index % 2 === 1 ? 'bg-sky-100/60' : ''}>
+                  <td className="py-2 px-2 text-[10px] sm:text-xs font-medium text-gray-900">
+                    {item.warehouseName}
+                  </td>
+                  <td className="py-2 px-2 text-[10px] sm:text-xs text-gray-700">
+                    {item.branch?.name || 'N/A'}
+                  </td>
+                  <td className="py-2 px-2 text-[10px] sm:text-xs text-gray-700">
+                    {item.location}
+                  </td>
+                  <td className="py-2 px-2 text-[10px] sm:text-xs text-gray-700">
+                    {item.capacity}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
 
       {/* Pagination */}
