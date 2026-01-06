@@ -9,6 +9,7 @@ import {
 } from "typeorm";
 import { Model } from "./modelEntity";
 import { Inventory } from "./inventoryEntity";
+import { UUID } from "typeorm/driver/mongodb/bson.typings";
 
 
 export enum ProductStatus {
@@ -20,8 +21,8 @@ export enum ProductStatus {
 
 @Entity("products")
 export class Product {
-  @PrimaryGeneratedColumn()
-  id!: number;
+  @PrimaryGeneratedColumn('uuid')
+  id!: string;
 
   @ManyToOne(() => Model, (model) => model.products)
   @JoinColumn({ name: "model_id" })

@@ -8,6 +8,7 @@ router.get('/health', (req, res) => {
     service: 'api_gateway',
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
+    success: true,
   });
 });
 

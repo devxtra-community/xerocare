@@ -8,8 +8,8 @@ import { Product } from "./productEntity";
 
 @Entity("model")
 export class Model {
-  @PrimaryGeneratedColumn()
-  id!: number;
+  @PrimaryGeneratedColumn('uuid')
+  id!: string;
 
   @Column({ type: "varchar", length: 100, unique: true })
   model_no!: string;

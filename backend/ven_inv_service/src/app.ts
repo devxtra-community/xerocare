@@ -11,6 +11,7 @@ import productRoute from './routes/productRoute';
 import branchRouter from './routes/branchRoutes';
 import { startEmployeeConsumer } from './events/consumers/employeeConsumer';
 import { getRabbitChannel } from './config/rabbitmq';
+import modelRoute from './routes/modelRoute';
 
 const app = express();
 
@@ -19,6 +20,7 @@ app.use(express.json());
 app.use('/', healthRouter);
 app.use('/vendors', vendorRouter);
 app.use('/branch', branchRouter);
+app.use('/models', modelRoute);
 // app.use('/inventory',inventoryRouter)
 app.use('/products', productRoute);
 app.use(errorHandler);
