@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Search, Plus, Trash2 } from 'lucide-react';
+import { Search, Plus, Trash2, X } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -257,11 +257,10 @@ export default function BranchReport() {
                   <TableCell className="px-4">{formatDate(b.started_date)}</TableCell>
                   <TableCell className="px-4">
                     <span
-                      className={`px-2.5 py-1 rounded-full text-xs font-medium ${
-                        b.status === 'ACTIVE'
-                          ? 'bg-green-100 text-green-700'
-                          : 'bg-red-100 text-red-700'
-                      }`}
+                      className={`px-2.5 py-1 rounded-full text-xs font-medium ${b.status === 'ACTIVE'
+                        ? 'bg-green-100 text-green-700'
+                        : 'bg-red-100 text-red-700'
+                        }`}
                     >
                       {b.status}
                     </span>
@@ -305,6 +304,7 @@ export default function BranchReport() {
       {branchToDelete && (
         <ConfirmDeleteModal
           name={branchToDelete.name}
+          open={true}
           onCancel={() => setBranchToDelete(null)}
           onConfirm={confirmDelete}
         />
@@ -327,38 +327,38 @@ function BranchFormModal({
   const [form, setForm] = useState<BranchFormData>(
     initialData
       ? {
-          id: initialData.id,
-          name: initialData.name,
-          address: initialData.address,
-          location: initialData.location,
-          started_date: initialData.started_date,
-          status: initialData.status as 'ACTIVE' | 'INACTIVE',
-          manager_id: initialData.manager_id,
-        }
+        id: initialData.id,
+        name: initialData.name,
+        address: initialData.address,
+        location: initialData.location,
+        started_date: initialData.started_date,
+        status: initialData.status as 'ACTIVE' | 'INACTIVE',
+        manager_id: initialData.manager_id,
+      }
       : {
-          name: '',
-          address: '',
-          location: '',
-          started_date: '',
-          status: 'ACTIVE',
-          manager_id: '',
-        },
+        name: '',
+        address: '',
+        location: '',
+        started_date: '',
+        status: 'ACTIVE',
+        manager_id: '',
+      },
   );
 
   return (
-    <Dialog open={open} onOpenChange={(val) => !val && onClose()}>
+    <Dialog open={true} onOpenChange={(val) => !val && onClose()}>
       <DialogContent className="sm:max-w-xl">
         <DialogHeader>
           <DialogTitle className="text-2xl font-bold text-blue-900">
             {initialData ? 'Update Branch' : 'Add Branch'}
-          </h2>
+          </DialogTitle>
           <button
             onClick={onClose}
             className="h-7 w-7 flex items-center justify-center rounded-full border text-gray-500 hover:text-gray-800"
           >
             <X size={14} />
           </button>
-        </div>
+        </DialogHeader>
 
         <div className="space-y-4">
           <Field label="Branch Name">
@@ -369,17 +369,17 @@ function BranchFormModal({
             />
           </Field>
 
-            <div className="col-span-2 space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                Branch Address
-              </label>
-              <Input
-                placeholder="Address"
-                value={form.address}
-                onChange={(e) => setForm({ ...form, address: e.target.value })}
-                className="h-12 rounded-xl bg-white border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
-              />
-            </div>
+          <div className="col-span-2 space-y-2">
+            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+              Branch Address
+            </label>
+            <Input
+              placeholder="Address"
+              value={form.address}
+              onChange={(e) => setForm({ ...form, address: e.target.value })}
+              className="h-12 rounded-xl bg-white border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
+            />
+          </div>
 
           <Field label="Location">
             <Input
@@ -452,8 +452,8 @@ function BranchFormModal({
             Confirm
           </Button>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -499,5 +499,16 @@ function ConfirmDeleteModal({
         </div>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-2">
+      <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+        {label}
+      </label>
+      {children}
+    </div>
   );
 }

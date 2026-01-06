@@ -10,6 +10,7 @@ import {
 import { Model } from "./modelEntity";
 import { Inventory } from "./inventoryEntity";
 
+
 export enum ProductStatus {
   AVAILABLE = "available",
   RENTED = "rented",
@@ -25,9 +26,6 @@ export class Product {
   @ManyToOne(() => Model, (model) => model.products)
   @JoinColumn({ name: "model_id" })
   model!: Model;
-
-  @Column()
-  model_id!: number;
 
   @Column()
   vendor_id!: number;

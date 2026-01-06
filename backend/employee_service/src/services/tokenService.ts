@@ -20,8 +20,8 @@ export async function issueTokens(user: any, req: Request, res: Response) {
 
   res.cookie('refreshToken', refreshToken, {
     httpOnly: true,
-    secure: true,
-    sameSite: 'strict',
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
     maxAge: 15 * 24 * 60 * 60 * 1000,
   });
 

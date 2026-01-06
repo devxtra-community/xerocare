@@ -75,8 +75,6 @@ export default function VendorTable({
   basePath?: string;
 }) {
   const router = useRouter();
-  // const [vendors, setVendors] = useState<Vendor[]>([]); // Lifted up
-  // const [loading, setLoading] = useState(true); // Lifted up
   const [search, setSearch] = useState('');
   const [filterType, setFilterType] = useState<'All' | 'Supplier' | 'Distributor' | 'Service'>(
     'All',

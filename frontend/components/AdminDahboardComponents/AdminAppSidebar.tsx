@@ -82,7 +82,7 @@ export default function AppSidebar() {
         toast.error(res?.data.message);
       } else {
         if (res.data.isadmin) {
-          router.push('/admin/login');
+          router.push('/adminlogin');
         } else {
           router.push('/login');
         }
