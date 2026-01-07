@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -12,10 +12,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import RoleSelect from './RoleSelect';
 import { createEmployee } from '@/lib/employee';
+import { getBranches, Branch } from '@/lib/branch';
 
 export default function AddEmployeeDialog() {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [branches, setBranches] = useState<Branch[]>([]);
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -23,13 +25,22 @@ export default function AddEmployeeDialog() {
     role: '',
     salary: '',
     expireDate: '',
+    branchId: '',
   });
   const [files, setFiles] = useState<{ profile_image: File | null; id_proof: File | null }>({
     profile_image: null,
     id_proof: null,
   });
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  useEffect(() => {
+    if (open) {
+      getBranches()
+        .then((data) => setBranches(data))
+        .catch((err) => console.error('Failed to fetch branches', err));
+    }
+  }, [open]);
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
@@ -52,6 +63,9 @@ export default function AddEmployeeDialog() {
       data.append('email', formData.email);
       data.append('role', formData.role);
       data.append('salary', formData.salary);
+      if (formData.branchId) {
+        data.append('branchId', formData.branchId);
+      }
       if (formData.expireDate) {
         data.append('expireDate', formData.expireDate);
       }
@@ -159,6 +173,25 @@ export default function AddEmployeeDialog() {
                 onChange={handleInputChange}
                 className="h-12 rounded-xl bg-white border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
               />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                Branch
+              </label>
+              <select
+                name="branchId"
+                value={formData.branchId}
+                onChange={handleInputChange}
+                className="w-full h-12 px-3 rounded-xl bg-white border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400 text-sm"
+              >
+                <option value="">Select Branch</option>
+                {branches.map((branch) => (
+                  <option key={branch.id} value={branch.id}>
+                    {branch.name}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div className="space-y-2">

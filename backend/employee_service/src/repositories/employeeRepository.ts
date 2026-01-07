@@ -33,6 +33,7 @@ export class EmployeeRepository {
 
     const [data, total] = await this.repo.findAndCount({
       where: whereCondition,
+      relations: ['branch'],
       order: { createdAt: 'DESC' },
       skip,
       take,

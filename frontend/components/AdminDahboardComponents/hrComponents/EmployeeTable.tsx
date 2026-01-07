@@ -199,6 +199,9 @@ export default function EmployeeTable() {
                 Role
               </th>
               <th className="px-6 py-4 text-xs font-semibold text-primary uppercase tracking-wider">
+                Branch
+              </th>
+              <th className="px-6 py-4 text-xs font-semibold text-primary uppercase tracking-wider">
                 Salary
               </th>
               <th className="px-6 py-4 text-xs font-semibold text-primary uppercase tracking-wider">
@@ -256,6 +259,9 @@ export default function EmployeeTable() {
                     >
                       {emp.role}
                     </Badge>
+                  </td>
+                  <td className="px-6 py-4">
+                    <span className="text-sm text-gray-600">{emp.branch?.name || '---'}</span>
                   </td>
                   <td className="px-6 py-4 text-sm font-semibold text-blue-700 tabular-nums">
                     AED {emp.salary?.toLocaleString() || '0'}

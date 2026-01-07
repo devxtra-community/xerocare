@@ -9,6 +9,7 @@ import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import { getRabbitChannel } from './config/rabbitmq';
 import { startWorker } from './workers/emailWorker';
+import { startBranchConsumer } from './events/consumers/branchConsumer';
 import { httpLogger } from './middleware/httplogger';
 import healthRouter from './routes/health';
 import { logger } from './config/logger';
@@ -31,6 +32,7 @@ const startServer = async () => {
     await getRabbitChannel();
     logger.info('RabbitMQ channel connected');
     await startWorker();
+    await startBranchConsumer();
     logger.info('Database connected');
 
     const PORT = process.env.PORT;
