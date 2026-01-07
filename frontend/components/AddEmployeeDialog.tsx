@@ -81,13 +81,15 @@ export default function AddEmployeeDialog() {
 
       <DialogContent className="sm:max-w-xl">
         <DialogHeader>
-          <DialogTitle className="text-2xl font-bold text-blue-900">Add New Employee</DialogTitle>
+          <DialogTitle className="text-2xl font-bold text-primary">Add New Employee</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-6 pt-6">
           <div className="grid grid-cols-2 gap-x-8 gap-y-6">
             <div className="space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">First Name</label>
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                First Name
+              </label>
               <Input
                 name="firstName"
                 placeholder="John"
@@ -97,7 +99,9 @@ export default function AddEmployeeDialog() {
               />
             </div>
             <div className="space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Last Name</label>
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                Last Name
+              </label>
               <Input
                 name="lastName"
                 placeholder="Doe"
@@ -108,7 +112,9 @@ export default function AddEmployeeDialog() {
             </div>
 
             <div className="space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Role</label>
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                Role
+              </label>
               <RoleSelect
                 value={formData.role}
                 onChange={(val: string) => setFormData((prev) => ({ ...prev, role: val }))}
@@ -116,7 +122,9 @@ export default function AddEmployeeDialog() {
             </div>
 
             <div className="space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Email Address</label>
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                Email Address
+              </label>
               <Input
                 name="email"
                 type="email"
@@ -128,7 +136,9 @@ export default function AddEmployeeDialog() {
             </div>
 
             <div className="space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Contract Expiry</label>
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                Contract Expiry
+              </label>
               <Input
                 type="date"
                 name="expireDate"
@@ -138,7 +148,9 @@ export default function AddEmployeeDialog() {
               />
             </div>
             <div className="space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Salary</label>
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                Salary
+              </label>
               <Input
                 name="salary"
                 placeholder="Salary"
@@ -150,7 +162,9 @@ export default function AddEmployeeDialog() {
             </div>
 
             <div className="space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Profile Image</label>
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                Profile Image
+              </label>
               <Input
                 type="file"
                 accept="image/*"
@@ -159,7 +173,9 @@ export default function AddEmployeeDialog() {
               />
             </div>
             <div className="space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">ID Proof</label>
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                ID Proof
+              </label>
               <Input
                 type="file"
                 accept="application/pdf,image/*"
@@ -170,16 +186,16 @@ export default function AddEmployeeDialog() {
           </div>
 
           <div className="flex justify-end items-center gap-6 pt-8">
-            <button 
-              type="button" 
-              onClick={() => setOpen(false)} 
+            <button
+              type="button"
+              onClick={() => setOpen(false)}
               className="text-sm font-bold text-gray-900 hover:text-gray-600 transition-colors"
             >
               Cancel
             </button>
-            <Button 
-              onClick={handleSubmit} 
-              disabled={loading} 
+            <Button
+              onClick={handleSubmit}
+              disabled={loading}
               className="h-12 px-10 rounded-xl bg-[#004a8d] text-white hover:bg-[#003f7d] font-bold shadow-lg"
             >
               {loading ? 'Creating...' : 'Create'}

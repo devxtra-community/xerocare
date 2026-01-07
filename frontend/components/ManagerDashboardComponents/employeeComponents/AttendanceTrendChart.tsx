@@ -32,7 +32,7 @@ export default function AttendanceTrendChart() {
   return (
     <div className="bg-white rounded-xl shadow-sm p-4 border border-blue-100/30 flex flex-col h-full min-h-[260px]">
       <div className="flex items-center justify-between mb-6">
-        <h3 className="text-sm font-bold text-blue-900 uppercase">Attendance Trend</h3>
+        <h3 className="text-sm font-bold text-primary uppercase">Attendance Trend</h3>
         <div className="flex items-center gap-2">
           <span className="h-2 w-2 rounded-full bg-primary" />
           <span className="text-[10px] font-bold text-gray-500 uppercase">Avg Attendance %</span>
@@ -63,7 +63,7 @@ export default function AttendanceTrendChart() {
                 content={({ active, payload }) => {
                   if (active && payload && payload.length) {
                     return (
-                      <div className="bg-blue-900 px-3 py-1.5 shadow-xl rounded-lg text-xs font-bold text-white">
+                      <div className="bg-primary px-3 py-1.5 shadow-xl rounded-lg text-xs font-bold text-white">
                         {payload[0].value}% Attendance
                       </div>
                     );

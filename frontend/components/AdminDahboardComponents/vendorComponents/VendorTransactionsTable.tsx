@@ -67,22 +67,22 @@ export default function VendorTransactionsTable() {
         <Table>
           <TableHeader>
             <TableRow className="hover:bg-transparent">
-              <TableHead className="text-[10px] font-semibold text-blue-900 uppercase px-4 py-3">
+              <TableHead className="text-[10px] font-semibold text-primary uppercase px-4 py-3">
                 ID
               </TableHead>
-              <TableHead className="text-[10px] font-semibold text-blue-900 uppercase px-4 py-3">
+              <TableHead className="text-[10px] font-semibold text-primary uppercase px-4 py-3">
                 Date
               </TableHead>
-              <TableHead className="text-[10px] font-semibold text-blue-900 uppercase px-4 py-3">
+              <TableHead className="text-[10px] font-semibold text-primary uppercase px-4 py-3">
                 Type
               </TableHead>
-              <TableHead className="text-[10px] font-semibold text-blue-900 uppercase px-4 py-3 text-right">
+              <TableHead className="text-[10px] font-semibold text-primary uppercase px-4 py-3 text-right">
                 Amount
               </TableHead>
-              <TableHead className="text-[10px] font-semibold text-blue-900 uppercase px-4 py-3 text-center">
+              <TableHead className="text-[10px] font-semibold text-primary uppercase px-4 py-3 text-center">
                 Status
               </TableHead>
-              <TableHead className="text-[10px] font-semibold text-blue-900 uppercase px-4 py-3 text-right pr-6">
+              <TableHead className="text-[10px] font-semibold text-primary uppercase px-4 py-3 text-right pr-6">
                 Action
               </TableHead>
             </TableRow>

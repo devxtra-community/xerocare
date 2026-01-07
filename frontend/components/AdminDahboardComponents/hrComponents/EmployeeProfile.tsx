@@ -1,5 +1,7 @@
 'use client';
 
+import Image from 'next/image';
+
 import React, { useEffect, useState } from 'react';
 import {
   ArrowLeft,
@@ -86,7 +88,7 @@ export default function EmployeeProfile({ id }: EmployeeProfileProps) {
           <ArrowLeft className="h-5 w-5 text-gray-600" />
         </Button>
         <div>
-          <h2 className="text-2xl font-bold text-blue-900">Employee Profile</h2>
+          <h2 className="text-2xl font-bold text-primary">Employee Profile</h2>
           <p className="text-sm text-gray-500 font-medium">
             Employee ID:{' '}
             <span className="text-blue-600 border-b border-blue-200">
@@ -102,8 +104,7 @@ export default function EmployeeProfile({ id }: EmployeeProfileProps) {
           <div className="bg-white rounded-2xl p-6 shadow-sm flex flex-col items-center text-center">
             <div className="h-24 w-24 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-bold text-3xl mb-4 overflow-hidden">
               {emp.profile_image_url ? (
-                // eslint-disable-next-line
-                <img src={emp.profile_image_url} alt="" className="h-full w-full object-cover" />
+                <Image src={emp.profile_image_url} alt="" fill className="object-cover" />
               ) : (
                 (emp.first_name?.[0] || emp.email[0]).toUpperCase()
               )}
@@ -114,8 +115,9 @@ export default function EmployeeProfile({ id }: EmployeeProfileProps) {
             <p className="text-sm text-primary font-medium">{emp.role}</p>
             <Badge
               variant="outline"
-              className={`mt-3 border-none px-3 py-1 ${emp.status === 'ACTIVE' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-                }`}
+              className={`mt-3 border-none px-3 py-1 ${
+                emp.status === 'ACTIVE' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+              }`}
             >
               {emp.status}
             </Badge>
@@ -136,7 +138,7 @@ export default function EmployeeProfile({ id }: EmployeeProfileProps) {
           </div>
 
           <div className="bg-white rounded-2xl p-6 shadow-sm">
-            <h4 className="text-sm font-bold text-blue-900 uppercase tracking-wider mb-4">
+            <h4 className="text-sm font-bold text-primary uppercase tracking-wider mb-4">
               Documents
             </h4>
             <Button
@@ -153,7 +155,7 @@ export default function EmployeeProfile({ id }: EmployeeProfileProps) {
         {/* Right Column: Detailed Info */}
         <div className="lg:col-span-2 space-y-6">
           <div className="bg-white rounded-2xl p-8 shadow-sm">
-            <h4 className="text-lg font-bold text-blue-900 mb-6 border-b pb-4">
+            <h4 className="text-lg font-bold text-primary mb-6 border-b pb-4">
               Employment Information
             </h4>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-y-6 gap-x-12">
@@ -204,10 +206,10 @@ export default function EmployeeProfile({ id }: EmployeeProfileProps) {
                   <p className="text-sm font-semibold text-gray-900">
                     {emp.expire_date
                       ? new Date(emp.expire_date).toLocaleDateString('en-GB', {
-                        day: 'numeric',
-                        month: 'long',
-                        year: 'numeric',
-                      })
+                          day: 'numeric',
+                          month: 'long',
+                          year: 'numeric',
+                        })
                       : 'No expiry set'}
                   </p>
                 </div>

@@ -1,5 +1,7 @@
 'use client';
 
+import Image from 'next/image';
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -136,7 +138,7 @@ export default function EmployeeFormDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-2xl font-bold text-blue-900 text-center">
+          <DialogTitle className="text-2xl font-bold text-primary text-center">
             {initialData ? 'Update Employee' : 'Add New Employee'}
           </DialogTitle>
         </DialogHeader>
@@ -148,11 +150,7 @@ export default function EmployeeFormDialog({
               onClick={() => profileInputRef.current?.click()}
             >
               {profilePreview ? (
-                <img
-                  src={profilePreview}
-                  alt="Profile preview"
-                  className="h-full w-full object-cover"
-                />
+                <Image src={profilePreview} alt="Profile preview" fill className="object-cover" />
               ) : (
                 <ImagePlus className="h-8 w-8 text-blue-400 group-hover:text-blue-500 transition-colors" />
               )}

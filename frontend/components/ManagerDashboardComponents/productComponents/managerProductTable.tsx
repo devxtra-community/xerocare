@@ -88,7 +88,7 @@ export default function ManagerProduct() {
 
   return (
     <div className="bg-blue-100 min-h-screen p-3 sm:p-4 md:p-6 space-y-8">
-      <h3 className="text-xl sm:text-2xl font-bold text-blue-900">Products</h3>
+      <h3 className="text-xl sm:text-2xl font-bold text-primary">Products</h3>
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
         <StatCard title="Total Products" value={total.toString()} subtitle="All items" />
@@ -125,7 +125,7 @@ export default function ManagerProduct() {
             <TableRow>
               {['IMAGE', 'PRODUCT', 'Model', 'CATEGORY', 'PRICE', 'STOCK', 'STATUS', 'ACTION'].map(
                 (h) => (
-                  <TableHead key={h} className="text-[11px] font-semibold text-blue-900 px-4">
+                  <TableHead key={h} className="text-[11px] font-semibold text-primary px-4">
                     {h}
                   </TableHead>
                 ),
@@ -172,7 +172,7 @@ export default function ManagerProduct() {
                 <TableCell className="px-4">
                   <div className="flex gap-3 text-sm">
                     <button
-                      className="text-blue-900 hover:underline"
+                      className="text-primary hover:underline"
                       onClick={() => {
                         setEditing(p);
                         setFormOpen(true);

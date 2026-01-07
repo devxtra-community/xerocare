@@ -1,4 +1,5 @@
 'use client';
+import Image from 'next/image';
 
 import React, { useState, useEffect, useCallback } from 'react';
 import {
@@ -139,7 +140,7 @@ export default function EmployeeTable() {
       <div className="p-6 border-b border-gray-100">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <h3 className="text-lg font-semibold text-blue-900">Employee List</h3>
+            <h3 className="text-lg font-semibold text-primary">Employee List</h3>
             {isLoading && <Loader2 className="h-4 w-4 animate-spin text-blue-500" />}
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -232,12 +233,7 @@ export default function EmployeeTable() {
                     <div className="flex items-center gap-3">
                       <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-semibold text-sm flex-shrink-0 overflow-hidden">
                         {emp.profile_image_url ? (
-                          // eslint-disable-next-line
-                          <img
-                            src={emp.profile_image_url}
-                            alt=""
-                            className="h-full w-full object-cover"
-                          />
+                          <Image src={emp.profile_image_url} alt="" fill className="object-cover" />
                         ) : (
                           (emp.first_name?.[0] || emp.email[0]).toUpperCase()
                         )}
@@ -264,12 +260,13 @@ export default function EmployeeTable() {
                   <td className="px-6 py-4">
                     <Badge
                       variant="outline"
-                      className={`text-[10px] font-bold border-none ${emp.status === 'ACTIVE'
+                      className={`text-[10px] font-bold border-none ${
+                        emp.status === 'ACTIVE'
                           ? 'bg-green-100 text-green-700'
                           : emp.status === 'INACTIVE'
                             ? 'bg-amber-100 text-amber-700'
                             : 'bg-red-100 text-red-700'
-                        }`}
+                      }`}
                     >
                       {emp.status}
                     </Badge>

@@ -92,6 +92,8 @@ export default function VendorTable({
         name: data.name,
         email: data.email,
         phone: data.phone,
+        type: data.type,
+        contactPerson: data.contactPerson,
         status: (data.status === 'Active' ? 'ACTIVE' : 'INACTIVE') as 'ACTIVE' | 'INACTIVE',
       };
 
@@ -133,7 +135,7 @@ export default function VendorTable({
   };
 
   if (loading) {
-    return <div className="p-8 text-center text-blue-900 font-medium">Loading vendors...</div>;
+    return <div className="p-8 text-center text-primary font-medium">Loading vendors...</div>;
   }
 
   return (
@@ -185,34 +187,30 @@ export default function VendorTable({
           <Table className="min-w-[1050px]">
             <TableHeader className="bg-slate-50/50">
               <TableRow className="border-b border-blue-50/50 hover:bg-transparent">
-                <TableHead className="font-bold text-[10px] text-blue-900 uppercase py-3 px-4">
+                <TableHead className="font-bold text-[10px] text-primary uppercase py-3 px-4">
                   Vendor Name
                 </TableHead>
-                <TableHead className="font-bold text-[10px] text-blue-900 uppercase">
-                  Code
-                </TableHead>
-                <TableHead className="font-bold text-[10px] text-blue-900 uppercase">
-                  Type
-                </TableHead>
-                <TableHead className="font-bold text-[10px] text-blue-900 uppercase">
+                <TableHead className="font-bold text-[10px] text-primary uppercase">Code</TableHead>
+                <TableHead className="font-bold text-[10px] text-primary uppercase">Type</TableHead>
+                <TableHead className="font-bold text-[10px] text-primary uppercase">
                   Contact
                 </TableHead>
-                <TableHead className="font-bold text-[10px] text-blue-900 uppercase">
+                <TableHead className="font-bold text-[10px] text-primary uppercase">
                   Details
                 </TableHead>
-                <TableHead className="text-right font-bold text-[10px] text-blue-900 uppercase">
+                <TableHead className="text-right font-bold text-[10px] text-primary uppercase">
                   Orders
                 </TableHead>
-                <TableHead className="text-right font-bold text-[10px] text-blue-900 uppercase">
+                <TableHead className="text-right font-bold text-[10px] text-primary uppercase">
                   Purchase Value
                 </TableHead>
-                <TableHead className="text-right font-bold text-[10px] text-blue-900 uppercase">
+                <TableHead className="text-right font-bold text-[10px] text-primary uppercase">
                   Outstanding
                 </TableHead>
-                <TableHead className="font-bold text-[10px] text-blue-900 uppercase">
+                <TableHead className="font-bold text-[10px] text-primary uppercase">
                   Status
                 </TableHead>
-                <TableHead className="text-right font-bold text-[10px] text-blue-900 uppercase px-4">
+                <TableHead className="text-right font-bold text-[10px] text-primary uppercase px-4">
                   Actions
                 </TableHead>
               </TableRow>
@@ -226,7 +224,7 @@ export default function VendorTable({
                       index % 2 !== 0 ? 'bg-sky-50/20' : ''
                     }`}
                   >
-                    <TableCell className="px-4 py-3 font-semibold text-blue-900">
+                    <TableCell className="px-4 py-3 font-semibold text-primary">
                       {vendor.name}
                     </TableCell>
                     <TableCell className="text-slate-500 font-medium text-[10px]">
@@ -259,7 +257,7 @@ export default function VendorTable({
                     <TableCell className="text-right text-xs font-bold text-gray-700">
                       {vendor.totalOrders}
                     </TableCell>
-                    <TableCell className="text-right font-bold text-blue-900 text-xs">
+                    <TableCell className="text-right font-bold text-primary text-xs">
                       ₹ {vendor.purchaseValue.toLocaleString()}
                     </TableCell>
                     <TableCell className="text-right font-bold text-red-600 text-xs">
@@ -355,31 +353,44 @@ function VendorFormModal({
   onClose: () => void;
   onConfirm: (data: VendorFormData) => void;
 }) {
-  const [form, setForm] = useState<VendorFormData>(
-    initialData
-      ? {
+  const [form, setForm] = useState<VendorFormData>({
+    name: '',
+    type: 'Supplier',
+    contactPerson: '',
+    phone: '',
+    email: '',
+    status: 'Active',
+  });
+
+  React.useEffect(() => {
+    if (open) {
+      if (initialData) {
+        setForm({
           name: initialData.name,
           type: initialData.type,
           contactPerson: initialData.contactPerson,
           phone: initialData.phone,
           email: initialData.email,
           status: initialData.status,
-        }
-      : {
+        });
+      } else {
+        setForm({
           name: '',
           type: 'Supplier',
           contactPerson: '',
           phone: '',
           email: '',
           status: 'Active',
-        },
-  );
+        });
+      }
+    }
+  }, [initialData, open]);
 
   return (
     <Dialog open={open} onOpenChange={(val) => !val && onClose()}>
       <DialogContent className="sm:max-w-xl">
         <DialogHeader>
-          <DialogTitle className="text-2xl font-bold text-blue-900">
+          <DialogTitle className="text-2xl font-bold text-primary">
             {initialData ? 'Update Vendor' : 'Add Vendor'}
           </DialogTitle>
         </DialogHeader>
@@ -516,7 +527,7 @@ function ConfirmDeleteModal({
             <div className="h-12 w-12 rounded-2xl bg-red-50 flex items-center justify-center text-red-600 shadow-sm">
               <Trash2 className="h-6 w-6" />
             </div>
-            <DialogTitle className="text-xl font-bold text-blue-900">Delete Vendor</DialogTitle>
+            <DialogTitle className="text-xl font-bold text-primary">Delete Vendor</DialogTitle>
           </div>
           <DialogDescription className="text-base text-gray-600 leading-relaxed">
             Are you sure you want to delete <strong>{name}</strong>?

@@ -51,7 +51,6 @@ export default function WarehouseReport() {
   };
 
   useEffect(() => {
-    // eslint-disable-next-line
     fetchInitialData();
   }, []);
 
@@ -107,7 +106,7 @@ export default function WarehouseReport() {
     <div className="bg-blue-100 min-h-screen p-3 sm:p-4 md:p-6 space-y-8 sm:space-y-10">
       {/* WAREHOUSES */}
       <div className="space-y-4 sm:space-y-6">
-        <h3 className="text-xl sm:text-2xl font-bold text-blue-900">Warehouses</h3>
+        <h3 className="text-xl sm:text-2xl font-bold text-primary">Warehouses</h3>
 
         {/* SUMMARY CARDS */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 sm:gap-2 md:gap-4">
@@ -172,7 +171,7 @@ export default function WarehouseReport() {
                 ].map((h) => (
                   <th
                     key={h}
-                    className="text-left text-[11px] font-semibold text-blue-900 uppercase px-4 py-3"
+                    className="text-left text-[11px] font-semibold text-primary uppercase px-4 py-3"
                   >
                     {h}
                   </th>
@@ -187,17 +186,18 @@ export default function WarehouseReport() {
                   className={`border-b border-gray-100 ${i % 2 ? 'bg-sky-100/60' : ''}`}
                 >
                   <td className="px-4 py-3 text-sm font-medium">{w.warehouseName}</td>
-                  <td className="px-4 py-3 text-sm text-blue-900 font-medium">{w.warehouseCode}</td>
+                  <td className="px-4 py-3 text-sm text-primary font-medium">{w.warehouseCode}</td>
                   <td className="px-4 py-3 text-sm">{w.branch?.name || 'N/A'}</td>
                   <td className="px-4 py-3 text-sm">{w.location}</td>
                   <td className="px-4 py-3 text-sm">{w.address}</td>
                   <td className="px-4 py-3 text-sm font-medium">{w.capacity}</td>
                   <td className="px-4 py-3">
                     <span
-                      className={`px-2.5 py-1 rounded-full text-xs font-medium ${w.status === 'ACTIVE'
+                      className={`px-2.5 py-1 rounded-full text-xs font-medium ${
+                        w.status === 'ACTIVE'
                           ? 'bg-green-100 text-green-700'
                           : 'bg-red-100 text-red-700'
-                        }`}
+                      }`}
                     >
                       {w.status}
                     </span>
@@ -205,7 +205,7 @@ export default function WarehouseReport() {
                   <td className="px-4 py-3">
                     <div className="flex gap-3 text-sm">
                       <button
-                        className="text-blue-900 hover:underline"
+                        className="text-primary hover:underline"
                         onClick={() => {
                           setEditingWarehouse(w);
                           setFormOpen(true);
@@ -274,10 +274,8 @@ function WarehouseFormModal({
 
   useEffect(() => {
     if (initialData) {
-      // eslint-disable-next-line
       setForm(initialData);
     } else {
-      // eslint-disable-next-line
       setForm({
         warehouseName: '',
         warehouseCode: '',
@@ -294,7 +292,7 @@ function WarehouseFormModal({
     <Dialog open={open} onOpenChange={(val) => !val && onClose()}>
       <DialogContent className="sm:max-w-xl">
         <DialogHeader>
-          <DialogTitle className="text-2xl font-bold text-blue-900">
+          <DialogTitle className="text-2xl font-bold text-primary">
             {initialData ? 'Update Warehouse' : 'Add Warehouse'}
           </DialogTitle>
         </DialogHeader>
@@ -443,7 +441,7 @@ function ConfirmDeleteModal({
             <div className="h-12 w-12 rounded-2xl bg-red-50 flex items-center justify-center text-red-600 shadow-sm">
               <Trash2 className="h-6 w-6" />
             </div>
-            <DialogTitle className="text-xl font-bold text-blue-900">Delete Warehouse</DialogTitle>
+            <DialogTitle className="text-xl font-bold text-primary">Delete Warehouse</DialogTitle>
           </div>
           <DialogDescription className="text-base text-gray-600 leading-relaxed">
             Are you sure you want to delete <strong>{name}</strong>?

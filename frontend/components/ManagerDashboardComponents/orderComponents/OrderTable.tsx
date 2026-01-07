@@ -99,25 +99,23 @@ export default function OrderTable() {
           <Table className="min-w-[900px]">
             <TableHeader className="bg-slate-50/50">
               <TableRow className="border-b border-blue-50/50 hover:bg-transparent">
-                <TableHead className="text-[10px] font-bold text-blue-900 uppercase py-3 px-4">
+                <TableHead className="text-[10px] font-bold text-primary uppercase py-3 px-4">
                   Order Details
                 </TableHead>
-                <TableHead className="text-[10px] font-bold text-blue-900 uppercase">
+                <TableHead className="text-[10px] font-bold text-primary uppercase">
                   Customer
                 </TableHead>
-                <TableHead className="text-[10px] font-bold text-blue-900 uppercase">
-                  Type
-                </TableHead>
-                <TableHead className="text-[10px] font-bold text-blue-900 uppercase">
+                <TableHead className="text-[10px] font-bold text-primary uppercase">Type</TableHead>
+                <TableHead className="text-[10px] font-bold text-primary uppercase">
                   Assigned To
                 </TableHead>
-                <TableHead className="text-[10px] font-bold text-blue-900 uppercase">
+                <TableHead className="text-[10px] font-bold text-primary uppercase">
                   Status
                 </TableHead>
-                <TableHead className="text-[10px] font-bold text-blue-900 uppercase">
+                <TableHead className="text-[10px] font-bold text-primary uppercase">
                   Amount
                 </TableHead>
-                <TableHead className="text-[10px] font-bold text-blue-900 uppercase">
+                <TableHead className="text-[10px] font-bold text-primary uppercase">
                   Payment
                 </TableHead>
               </TableRow>
@@ -130,7 +128,7 @@ export default function OrderTable() {
                 >
                   <TableCell className="px-4 py-2">
                     <div className="flex flex-col">
-                      <span className="text-xs font-bold text-blue-900">{order.id}</span>
+                      <span className="text-xs font-bold text-primary">{order.id}</span>
                       <span className="text-[9px] text-gray-500 font-semibold">{order.date}</span>
                     </div>
                   </TableCell>
@@ -186,7 +184,7 @@ export default function OrderTable() {
                       {order.status}
                     </span>
                   </TableCell>
-                  <TableCell className="text-xs font-bold text-blue-900 py-2">
+                  <TableCell className="text-xs font-bold text-primary py-2">
                     {order.amount}
                   </TableCell>
                   <TableCell className="py-2">

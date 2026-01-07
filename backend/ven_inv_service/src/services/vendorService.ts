@@ -7,6 +7,9 @@ interface CreateVendorDTO {
   name: string;
   email: string;
   phone?: string;
+  type?: 'Supplier' | 'Distributor' | 'Service';
+  contactPerson?: string;
+  status?: VendorStatus;
 }
 
 export class VendorService {
@@ -35,6 +38,9 @@ export class VendorService {
 
   async getAllVendors(): Promise<Vendor[]> {
     return this.vendorRepo.find({
+      where: {
+        status: VendorStatus.ACTIVE, // Only Active vendors for the list (soft delete filtering)
+      },
       order: { createdAt: 'DESC' },
     });
   }
@@ -50,7 +56,14 @@ export class VendorService {
   async updateVendor(id: string, data: Partial<CreateVendorDTO>): Promise<Vendor> {
     const vendor = await this.getVendorById(id);
 
-    Object.assign(vendor, data);
+    // Filter out undefined values and update
+    Object.keys(data).forEach((key) => {
+      const val = (data as unknown as Record<string, unknown>)[key];
+      if (val !== undefined) {
+        (vendor as unknown as Record<string, unknown>)[key] = val;
+      }
+    });
+
     return this.vendorRepo.save(vendor);
   }
 

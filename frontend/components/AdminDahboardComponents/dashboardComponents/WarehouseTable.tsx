@@ -39,16 +39,16 @@ export default function WarehouseTable() {
           <table className="w-full">
             <thead>
               <tr className="border-b">
-                <th className="text-left text-[10px] sm:text-xs font-semibold text-blue-900 py-2 px-2">
+                <th className="text-left text-[10px] sm:text-xs font-semibold text-primary py-2 px-2">
                   WAREHOUSE
                 </th>
-                <th className="text-left text-[10px] sm:text-xs font-semibold text-blue-900 py-2 px-2">
+                <th className="text-left text-[10px] sm:text-xs font-semibold text-primary py-2 px-2">
                   BRANCH
                 </th>
-                <th className="text-left text-[10px] sm:text-xs font-semibold text-blue-900 py-2 px-2">
+                <th className="text-left text-[10px] sm:text-xs font-semibold text-primary py-2 px-2">
                   LOCATION
                 </th>
-                <th className="text-left text-[10px] sm:text-xs font-semibold text-blue-900 py-2 px-2">
+                <th className="text-left text-[10px] sm:text-xs font-semibold text-primary py-2 px-2">
                   CAPACITY
                 </th>
               </tr>

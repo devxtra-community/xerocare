@@ -23,7 +23,6 @@ export default function EmployeePieChart() {
   const [total, setTotal] = useState(0);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsClient(true);
     const fetchData = async () => {
       try {
@@ -66,7 +65,6 @@ export default function EmployeePieChart() {
         } else {
           setData(chartData);
         }
-
       } catch (error) {
         console.error('Failed to fetch employee stats', error);
       }
@@ -109,7 +107,7 @@ export default function EmployeePieChart() {
       </div>
 
       <div className="w-full flex-1 overflow-hidden">
-        <div className="grid grid-cols-3 text-[10px] font-semibold text-blue-900 border-b border-gray-200 pb-1.5 mb-1.5">
+        <div className="grid grid-cols-3 text-[10px] font-semibold text-primary border-b border-gray-200 pb-1.5 mb-1.5">
           <span>Department</span>
           <span className="text-center">
             Number Of
@@ -119,18 +117,19 @@ export default function EmployeePieChart() {
           <span className="text-right">%</span>
         </div>
 
-        {data.map((item) => (
-          item.name !== 'No Data' && (
-            <div key={item.name} className="grid grid-cols-3 items-center py-1.5 text-xs">
-              <div className="flex items-center gap-1.5">
-                <span className="h-2 w-2 rounded-full" style={{ backgroundColor: item.color }} />
-                <span className="font-medium text-gray-900">{item.name}</span>
+        {data.map(
+          (item) =>
+            item.name !== 'No Data' && (
+              <div key={item.name} className="grid grid-cols-3 items-center py-1.5 text-xs">
+                <div className="flex items-center gap-1.5">
+                  <span className="h-2 w-2 rounded-full" style={{ backgroundColor: item.color }} />
+                  <span className="font-medium text-gray-900">{item.name}</span>
+                </div>
+                <span className="text-center font-semibold text-gray-900">{item.value}</span>
+                <span className="text-right font-semibold text-gray-900">{item.percentage}%</span>
               </div>
-              <span className="text-center font-semibold text-gray-900">{item.value}</span>
-              <span className="text-right font-semibold text-gray-900">{item.percentage}%</span>
-            </div>
-          )
-        ))}
+            ),
+        )}
       </div>
     </div>
   );
