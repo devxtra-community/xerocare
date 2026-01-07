@@ -1,5 +1,4 @@
 'use client';
-import Image from 'next/image';
 
 import React, { useState, useEffect, useCallback } from 'react';
 import {
@@ -233,7 +232,11 @@ export default function EmployeeTable() {
                     <div className="flex items-center gap-3">
                       <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-semibold text-sm flex-shrink-0 overflow-hidden">
                         {emp.profile_image_url ? (
-                          <Image src={emp.profile_image_url} alt="" fill className="object-cover" />
+                          <img
+                            src={emp.profile_image_url}
+                            alt=""
+                            className="h-full w-full object-cover"
+                          />
                         ) : (
                           (emp.first_name?.[0] || emp.email[0]).toUpperCase()
                         )}

@@ -2,13 +2,11 @@
 
 import {
   LayoutDashboard,
-  ShoppingCart,
-  Package,
-  Boxes,
-  Truck,
-  Users,
-  Wallet,
-  Tags,
+  UsersRound,
+  UserPlus,
+  ClipboardList,
+  TrendingUp,
+  LogOut,
 } from 'lucide-react';
 
 import {
@@ -34,39 +32,24 @@ const menuItems = [
     href: '/employee/dashboard',
   },
   {
-    title: 'Products',
-    icon: Tags,
-    href: '/employee/products',
+    title: 'Customers',
+    icon: UsersRound,
+    href: '/employee/customers',
   },
   {
-    title: 'Sales',
-    icon: ShoppingCart,
-    href: '/employee/sales',
-  },
-  {
-    title: 'Vendors',
-    icon: Truck,
-    href: '/employee/vendors',
-  },
-  {
-    title: 'Employees',
-    icon: Users,
-    href: '/employee/employees',
+    title: 'Leads',
+    icon: UserPlus,
+    href: '/employee/leads',
   },
   {
     title: 'Orders',
-    icon: Package,
-    href: '/manager/orders',
+    icon: ClipboardList,
+    href: '/employee/orders',
   },
   {
-    title: 'Finance',
-    icon: Wallet,
-    href: '/employee/finance',
-  },
-  {
-    title: 'Inventory',
-    icon: Boxes,
-    href: '/employee/inventory',
+    title: 'Sales',
+    icon: TrendingUp,
+    href: '/employee/sales',
   },
 ];
 
@@ -113,12 +96,11 @@ export default function EmployeeSidebar() {
                   <SidebarMenuButton
                     asChild
                     isActive={pathname === item.href}
-                    className={`py-2.5 rounded-md
-                      ${
-                        pathname === item.href
-                          ? 'bg-white text-sidebar'
-                          : 'hover:bg-white/10 text-sidebar-accent-foreground'
-                      }`}
+                    className={`py-2.5 rounded-md ${
+                      pathname === item.href
+                        ? 'bg-white text-sidebar'
+                        : 'hover:bg-white/10 text-sidebar-accent-foreground'
+                    }`}
                   >
                     <a href={item.href} className="flex items-center gap-3 px-3">
                       <item.icon className="h-4 w-4" />
@@ -137,6 +119,7 @@ export default function EmployeeSidebar() {
           <SidebarMenuItem>
             <SidebarMenuButton asChild className="py-3 hover:bg-red-500/20 hover:text-red-300">
               <button className="flex items-center gap-3 px-3" onClick={handleLogout}>
+                <LogOut className="h-4 w-4" />
                 Logout
               </button>
             </SidebarMenuButton>
