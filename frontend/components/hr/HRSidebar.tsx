@@ -1,11 +1,12 @@
 "use client"
 import {
   LayoutDashboard,
-  ShoppingCart,
-  Building2,
   Users,
-  Package,
+  Clock,
+  CalendarDays,
+  FolderOpen,
 } from "lucide-react";
+
 
 import {
   Sidebar,
@@ -32,12 +33,12 @@ const menuItems = [
   },
   {
     title: "Attendence",
-    icon: ShoppingCart,
+    icon: Clock,
     href: "/HR/attendence",
   },
   {
     title: "Leave",
-    icon: Building2,
+    icon: CalendarDays,
     href: "/HR/leave",
   },
   {
@@ -47,7 +48,7 @@ const menuItems = [
   },
   {
     title: "Documents",
-    icon: Package,
+    icon: FolderOpen,
     href: "/HR/documents",
     disabled:true
   },

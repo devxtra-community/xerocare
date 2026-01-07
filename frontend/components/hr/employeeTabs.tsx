@@ -1,6 +1,6 @@
 import StatCard from "@/components/StatCard";
 import { getEmployeeAttendance } from "@/lib/attendanceUtils";
-import { attendanceRecords, Employee, leaveRecords, UserListItem } from "@/lib/hr";
+import { attendanceRecords, leaveRecords } from "@/lib/hr";
 import { getEmployeeLeaves } from "@/lib/leaveUtils";
 
 export type Tab = "overview" | "attendance" | "leave" | "documents";
@@ -26,11 +26,10 @@ export function EmployeeTabs({
           <button
             key={tab.value}
             onClick={() => onChange(tab.value)}
-            className={`pb-2 text-sm font-medium whitespace-nowrap ${
-              active === tab.value
+            className={`pb-2 text-sm font-medium whitespace-nowrap ${active === tab.value
                 ? "border-b-2 border-primary text-primary"
                 : "text-muted-foreground hover:text-foreground"
-            }`}
+              }`}
           >
             {tab.label}
           </button>
@@ -40,16 +39,6 @@ export function EmployeeTabs({
   );
 }
 
-// export function OverviewTab({ employee }: { employee: UserListItem }) {
-//   return (
-//     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-//       <StatCard title="Department" value={employee.department} />
-//       <StatCard title="Branch" value={employee.branch} />
-//       <StatCard title="Joined On" value={employee.visaExpiryDate} />
-//       <StatCard title="Status" value="Active" />
-//     </div>
-//   );
-// }
 
 export function AttendanceTab({ employeeId }: { employeeId: string }) {
   const { data, summary } = getEmployeeAttendance(
@@ -171,8 +160,8 @@ function LeaveStatusBadge({ status }: { status: string }) {
     status === "Approved"
       ? "bg-green-100 text-green-700"
       : status === "Pending"
-      ? "bg-yellow-100 text-yellow-700"
-      : "bg-red-100 text-red-700";
+        ? "bg-yellow-100 text-yellow-700"
+        : "bg-red-100 text-red-700";
 
   return (
     <span className={`px-2 py-1 rounded-md text-xs font-medium ${color}`}>

@@ -27,12 +27,7 @@ export type Employee = {
   address: string;
 };
 
-type EmployeeStats = {
-  presentDays: number;
-  performance: number;
-  tasksCompleted: number;
-  leaveBalance: number;
-};
+
 
 type Props = {
   employee: Employee;
@@ -54,7 +49,7 @@ type Props = {
 
 /* ---------------- COMPONENT ---------------- */
 
-export default function OverviewTab({ employee, stats, attendance,taskStatus,workingHours }: Props) {
+export default function OverviewTab({ employee, stats, attendance, taskStatus, workingHours }: Props) {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
 
@@ -122,8 +117,8 @@ export default function OverviewTab({ employee, stats, attendance,taskStatus,wor
 
         {/* CHARTS */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <EmployeeAttendanceTrend data={attendance}/>
-          <EmployeeTaskStatusChart data={taskStatus}/>
+          <EmployeeAttendanceTrend data={attendance} />
+          <EmployeeTaskStatusChart data={taskStatus} />
         </div>
 
         <WorkingHoursChart data={workingHours} />
