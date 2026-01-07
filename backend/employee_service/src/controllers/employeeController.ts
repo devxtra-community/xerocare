@@ -9,7 +9,7 @@ const service = new EmployeeService();
 
 export const addEmployee = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { first_name, last_name, email, role, expireDate, salary } = req.body;
+    const { first_name, last_name, email, role, expireDate, salary, branchId } = req.body;
 
     const files = req.files as {
       profile_image?: MulterS3File[];
@@ -33,6 +33,7 @@ export const addEmployee = async (req: Request, res: Response, next: NextFunctio
       salary: salary ? Number(salary) : null,
       profile_image_url: profileImageUrl,
       id_proof_key: idProofKey,
+      branchId,
     });
 
     res.status(201).json({
@@ -112,6 +113,7 @@ export const updateEmployee = async (req: Request, res: Response, next: NextFunc
       salary: req.body.salary ? Number(req.body.salary) : undefined,
       profile_image_url: profileImageUrl || undefined,
       id_proof_key: idProofKey || undefined,
+      branchId: req.body.branchId || undefined,
     };
 
     const updatedEmployee = await service.updateEmployee(req.params.id, payload);
