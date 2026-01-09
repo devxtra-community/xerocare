@@ -1,10 +1,10 @@
-import next from "next";
-import WarehouseReport from "@/components/warehouseReport";
+import React from 'react';
+import WarehouseReport from '@/components/AdminDahboardComponents/warehousecomponents/warehouseTable';
 
-export default function WarehousePage(){
-    return(
-        <>
-        <WarehouseReport/>
-        </>
-    )
+export default function AdminWarehousePage() {
+  return (
+    <>
+      <WarehouseReport />
+    </>
+  );
 }

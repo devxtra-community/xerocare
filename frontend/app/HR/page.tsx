@@ -1,45 +1,39 @@
-"use client";
+'use client';
 
-import AttendanceTrendChart from "@/components/hr/attendenceTrendChart";
-import PerformanceDonutChart from "@/components/hr/performanceDonutChart";
-import StatCard from "@/components/StatCard";
-import UserTable from "@/components/UserTable";
-import { EmployeeFilters, employees, orgWorkloadData } from "@/lib/hr";
-import { useMemo, useState } from "react";
-
+import AttendanceTrendChart from '@/components/hr/attendenceTrendChart';
+import PerformanceDonutChart from '@/components/hr/performanceDonutChart';
+import EmployeeStats from '@/components/ManagerDashboardComponents/employeeComponents/EmployeeStats';
+// import StatCard from "@/components/StatCard";
+import UserTable from '@/components/UserTable';
+import { EmployeeFilters, employees, orgWorkloadData } from '@/lib/hr';
+import { useMemo, useState } from 'react';
 
 export default function HROverviewPage() {
   const [filters, setFilters] = useState<EmployeeFilters>({
-    department: "All",
-    employmentType: "All",
-    status: "All",
+    department: 'All',
+    employmentType: 'All',
+    status: 'All',
   });
-  
+
   const applySingleFilter = (key: keyof EmployeeFilters, value: string) => {
     setFilters({
-      department: key === "department" ? value : "All",
-      employmentType: key === "employmentType" ? value : "All",
-      status: key === "status" ? value : "All",
+      department: key === 'department' ? value : 'All',
+      employmentType: key === 'employmentType' ? value : 'All',
+      status: key === 'status' ? value : 'All',
     });
   };
   /* ---------------- FILTER LOGIC ---------------- */
   const filteredEmployees = useMemo(() => {
     return employees.filter((emp) => {
-      if (
-        filters.department !== "All" &&
-        emp.department !== filters.department
-      ) {
+      if (filters.department !== 'All' && emp.department !== filters.department) {
         return false;
       }
 
-      if (
-        filters.employmentType !== "All" &&
-        emp.employmentType !== filters.employmentType
-      ) {
+      if (filters.employmentType !== 'All' && emp.employmentType !== filters.employmentType) {
         return false;
       }
 
-      if (filters.status !== "All" && emp.status !== filters.status) {
+      if (filters.status !== 'All' && emp.status !== filters.status) {
         return false;
       }
 
@@ -57,12 +51,13 @@ export default function HROverviewPage() {
       {/* OVERVIEW */}
       <section className="space-y-3">
         <h2 className="text-lg font-medium">Overview</h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <StatCard title="Total Employees" value="126" />
+        {/* <div className="grid grid-cols-2 md:grid-cols-4 gap-3"> */}
+        {/* <StatCard title="Total Employees" value="126" />
           <StatCard title="Present Today" value="112" />
           <StatCard title="On Leave" value="8" />
-          <StatCard title="Pending Requests" value="6" />
-        </div>
+          <StatCard title="Pending Requests" value="6" /> */}
+        <EmployeeStats />
+        {/* </div> */}
       </section>
 
       {/* WORKFORCE OVERVIEW */}
@@ -74,7 +69,7 @@ export default function HROverviewPage() {
           {/* Department */}
           <select
             value={filters.department}
-            onChange={(e) => applySingleFilter("department", e.target.value)}
+            onChange={(e) => applySingleFilter('department', e.target.value)}
             className="rounded-md border px-2 py-1 text-sm"
           >
             <option value="All">All Departments</option>
@@ -85,9 +80,7 @@ export default function HROverviewPage() {
           {/* Employment Type */}
           <select
             value={filters.employmentType}
-            onChange={(e) =>
-              applySingleFilter("employmentType", e.target.value)
-            }
+            onChange={(e) => applySingleFilter('employmentType', e.target.value)}
             className="rounded-md border px-2 py-1 text-sm"
           >
             <option value="All">All Employment Types</option>
@@ -99,7 +92,7 @@ export default function HROverviewPage() {
           {/* Status */}
           <select
             value={filters.status}
-            onChange={(e) => applySingleFilter("status", e.target.value)}
+            onChange={(e) => applySingleFilter('status', e.target.value)}
             className="rounded-md border px-2 py-1 text-sm"
           >
             <option value="All">All Status</option>
@@ -117,9 +110,7 @@ export default function HROverviewPage() {
         <h2 className="text-lg font-medium">Analytics</h2>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <AttendanceTrendChart />
-          <PerformanceDonutChart
-            data={orgWorkloadData}
-          />
+          <PerformanceDonutChart data={orgWorkloadData} />
         </div>
       </section>
     </div>

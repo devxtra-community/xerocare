@@ -1,21 +1,19 @@
-import axios from "axios";
-import { requestRefresh } from "./auth-refresh";
+import axios from 'axios';
+import { requestRefresh } from './auth-refresh';
 
 const api = axios.create({
-  baseURL: "http://localhost:3001",
+  baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001',
   withCredentials: true,
 });
 
-api.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem("accessToken");
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-  },
-  (error) => Promise.reject(error)
-);
+// Attach access token
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('accessToken');
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
 
 interface FailedRequest {
   resolve: (value?: unknown) => void;
@@ -25,7 +23,7 @@ interface FailedRequest {
 let isRefreshing = false;
 let failedQueue: FailedRequest[] = [];
 
-const processQueue = (error: Error | null, token: string | null = null) => {
+const processQueue = (error: unknown, token: string | null = null) => {
   failedQueue.forEach((prom) => {
     if (error) {
       prom.reject(error);
@@ -33,7 +31,6 @@ const processQueue = (error: Error | null, token: string | null = null) => {
       prom.resolve(token);
     }
   });
-
   failedQueue = [];
 };
 
@@ -42,18 +39,31 @@ api.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
 
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    const status = error.response?.status;
+    const errorCode = error.response?.data?.code;
+
+    // If token is invalid or revoked, force logout immediately
+    if (status === 401 && (errorCode === 'TOKEN_REVOKED' || errorCode === 'TOKEN_INVALID')) {
+      localStorage.clear();
+
+      if (window.location.pathname.startsWith('/admin')) {
+        window.location.href = '/adminlogin';
+      } else {
+        window.location.href = '/login';
+      }
+
+      return Promise.reject(error);
+    }
+
+    // Handle token expiration (retry logic)
+    if (status === 401 && !originalRequest._retry) {
       if (isRefreshing) {
         return new Promise((resolve, reject) => {
           failedQueue.push({ resolve, reject });
-        })
-          .then((token) => {
-            originalRequest.headers.Authorization = `Bearer ${token}`;
-            return api(originalRequest);
-          })
-          .catch((err) => {
-            return Promise.reject(err);
-          });
+        }).then((token) => {
+          originalRequest.headers.Authorization = `Bearer ${token}`;
+          return api(originalRequest);
+        });
       }
 
       originalRequest._retry = true;
@@ -61,7 +71,8 @@ api.interceptors.response.use(
 
       try {
         const newAccessToken = await requestRefresh();
-        localStorage.setItem("accessToken", newAccessToken);
+
+        localStorage.setItem('accessToken', newAccessToken);
         api.defaults.headers.common.Authorization = `Bearer ${newAccessToken}`;
 
         processQueue(null, newAccessToken);
@@ -70,16 +81,23 @@ api.interceptors.response.use(
         originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
         return api(originalRequest);
       } catch (refreshError) {
-        processQueue(refreshError as Error, null);
+        processQueue(refreshError, null);
         isRefreshing = false;
 
-        localStorage.removeItem("accessToken");
-        window.location.href = "/login";
+        localStorage.clear();
+
+        if (window.location.pathname.startsWith('/admin')) {
+          window.location.href = '/adminlogin';
+        } else {
+          window.location.href = '/login';
+        }
+
         return Promise.reject(refreshError);
       }
     }
+
     return Promise.reject(error);
-  }
+  },
 );
 
 export default api;

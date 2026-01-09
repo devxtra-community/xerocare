@@ -1,13 +1,9 @@
-import { employees } from "@/lib/hr";
-import EmployeeProfile from "./employeeProfile.";
-import type { Employee } from "@/components/hr/employeeOverViewTab";
+import { employees } from '@/lib/hr';
+import EmployeeProfile from './employeeProfile';
+import type { Employee } from '@/components/hr/employeeOverViewTab';
 
-export default async function EmployeePage({
-  params,
-}: {
-  params: { id: string };
-}) {
-  const { id } = await params; 
+export default async function EmployeePage({ params }: { params: { id: string } }) {
+  const { id } = await params;
 
   const listEmployee = employees.find((e) => e.id === id);
 
@@ -23,10 +19,10 @@ export default async function EmployeePage({
     employeeType: listEmployee.employmentType,
     salary: String(listEmployee.salary),
     visaExpiry: listEmployee.visaExpiryDate,
-    manager: "Branch Manager",
-    phone: "+91 90000 00000",
-    email: "employee@company.com",
-    address: "Kerala, India",
+    manager: 'Branch Manager',
+    phone: '+91 90000 00000',
+    email: 'employee@company.com',
+    address: 'Kerala, India',
   };
 
   // mock data
@@ -38,18 +34,18 @@ export default async function EmployeePage({
   };
 
   const attendance = [
-    { month: "Jan", daysPresent: 20 },
-    { month: "Feb", daysPresent: 18 },
-    { month: "Mar", daysPresent: 22 },
-    { month: "Apr", daysPresent: 19 },
+    { month: 'Jan', daysPresent: 20 },
+    { month: 'Feb', daysPresent: 18 },
+    { month: 'Mar', daysPresent: 22 },
+    { month: 'Apr', daysPresent: 19 },
   ];
 
   const workingHours = [
-    { day: "Mon", hours: 8 },
-    { day: "Tue", hours: 7.5 },
-    { day: "Wed", hours: 8 },
-    { day: "Thu", hours: 6.5 },
-    { day: "Fri", hours: 7 },
+    { day: 'Mon', hours: 8 },
+    { day: 'Tue', hours: 7.5 },
+    { day: 'Wed', hours: 8 },
+    { day: 'Thu', hours: 6.5 },
+    { day: 'Fri', hours: 7 },
   ];
 
   return (

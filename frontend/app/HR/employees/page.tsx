@@ -1,6 +1,9 @@
-import EmployeeTable from "@/components/employeeTable";
-import AddEmployeeDialog from "@/components/hr/AddEmployeeDialog";
-import { employees } from "@/lib/hr";
+// import EmployeeTable from "@/components/employeeTable";
+import AddEmployeeDialog from '@/components/AddEmployeeDialog';
+import EmployeeTable from '@/components/AdminDahboardComponents/hrComponents/EmployeeTable';
+// import AddEmployeeDialog from "@/components/hr/AddEmployeeDialog";
+// import EmployeeTable from "@/components/ManagerDashboardComponents/employeeComponents/EmployeeTable";
+// import { employees } from "@/lib/hr";
 
 export default function EmployeesPage() {
   return (
@@ -10,7 +13,8 @@ export default function EmployeesPage() {
 
         <AddEmployeeDialog />
       </div>
-           <EmployeeTable users={employees}/>
+      <EmployeeTable />
+      {/* <EmployeeTable users={employees}/> */}
     </div>
   );
 }
