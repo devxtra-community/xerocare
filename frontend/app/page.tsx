@@ -2,10 +2,7 @@ import React from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import {
-  CheckCircle2,
-  MoreHorizontal,
-} from 'lucide-react';
+import { CheckCircle2, MoreHorizontal } from 'lucide-react';
 
 export default function Home() {
   return (
@@ -25,7 +22,7 @@ export default function Home() {
           <div className="space-y-8">
             <Badge
               variant="secondary"
-              className="bg-blue-900/30 text-blue-400 hover:bg-blue-900/40 px-4 py-1.5 rounded-full text-xs font-semibold tracking-wide uppercase"
+              className="bg-primary/30 text-blue-400 hover:bg-primary/40 px-4 py-1.5 rounded-full text-xs font-semibold tracking-wide uppercase"
             >
               10k Users Around The World
             </Badge>
@@ -38,9 +35,9 @@ export default function Home() {
             </h1>
 
             <p className="text-slate-400 text-lg sm:text-xl max-w-xl leading-relaxed">
-              Manage the relation between your business and your customer perfectly
-              with AI-based Customer Relationship Management. No more
-              miscommunication, no more business value decrease.
+              Manage the relation between your business and your customer perfectly with AI-based
+              Customer Relationship Management. No more miscommunication, no more business value
+              decrease.
             </p>
 
             <div className="flex flex-col sm:flex-row gap-4 pt-2">
@@ -60,9 +57,7 @@ export default function Home() {
             {/* Main Card: Sales Overview (Back) */}
             <div className="relative z-10 bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-2xl border border-slate-700/50 w-full max-w-md mx-auto lg:ml-auto lg:mr-0 transform -rotate-2 lg:translate-x-4 hover:rotate-0 transition-transform duration-500">
               <div className="flex items-center justify-between mb-6">
-                <h3 className="font-bold text-slate-900 dark:text-white text-lg">
-                  Sales Overview
-                </h3>
+                <h3 className="font-bold text-slate-900 dark:text-white text-lg">Sales Overview</h3>
                 <div className="flex gap-2">
                   <div className="bg-slate-900 text-white text-xs px-3 py-1.5 rounded-full">
                     Month <span className="ml-1">↓</span>
@@ -79,16 +74,17 @@ export default function Home() {
                   <span className="text-xs text-slate-500 dark:text-slate-400 block mb-1">
                     Expense
                   </span>
-                  <span className="text-slate-900 dark:text-white font-bold text-lg">
-                    2.6K
-                  </span>
+                  <span className="text-slate-900 dark:text-white font-bold text-lg">2.6K</span>
                 </div>
               </div>
 
               {/* Bar Chart Simulation */}
               <div className="h-32 flex items-end justify-between gap-2 px-2">
                 {[40, 70, 45, 90, 60, 80, 50].map((h, i) => (
-                  <div key={i} className="w-full bg-slate-100 dark:bg-slate-800 rounded-t-lg relative group">
+                  <div
+                    key={i}
+                    className="w-full bg-slate-100 dark:bg-slate-800 rounded-t-lg relative group"
+                  >
                     <div
                       className="absolute bottom-0 left-0 right-0 bg-blue-500 rounded-t-lg transition-all duration-500 group-hover:bg-blue-400"
                       style={{ height: `${h}%` }}
@@ -143,9 +139,7 @@ export default function Home() {
                       >
                         {item.title}
                       </h5>
-                      <p className="text-xs text-slate-400 mt-0.5">
-                        {item.time} • David & 2+ more
-                      </p>
+                      <p className="text-xs text-slate-400 mt-0.5">{item.time} • David & 2+ more</p>
                     </div>
                   </div>
                 ))}

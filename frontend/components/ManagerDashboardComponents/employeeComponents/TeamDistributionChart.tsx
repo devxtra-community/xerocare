@@ -23,7 +23,7 @@ export default function TeamDistributionChart() {
   return (
     <div className="bg-white rounded-xl shadow-sm p-4 border border-blue-100/30 flex flex-col h-full min-h-[260px]">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-sm font-bold text-blue-900 uppercase">Team Distribution</h3>
+        <h3 className="text-sm font-bold text-primary uppercase">Team Distribution</h3>
       </div>
 
       <div className="flex-1 flex flex-col sm:flex-row items-center gap-6">
@@ -49,7 +49,7 @@ export default function TeamDistributionChart() {
                   content={({ active, payload }) => {
                     if (active && payload && payload.length) {
                       return (
-                        <div className="bg-white p-2 border border-gray-100 shadow-lg rounded-lg text-xs font-bold text-blue-900">
+                        <div className="bg-white p-2 border border-gray-100 shadow-lg rounded-lg text-xs font-bold text-primary">
                           {payload[0].name}: {payload[0].value} Employees
                         </div>
                       );
@@ -61,7 +61,7 @@ export default function TeamDistributionChart() {
             </ResponsiveContainer>
           )}
           <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-            <span className="text-2xl font-bold text-blue-900">{total}</span>
+            <span className="text-2xl font-bold text-primary">{total}</span>
             <span className="text-[10px] text-gray-500 font-bold uppercase">Total</span>
           </div>
         </div>
@@ -74,7 +74,7 @@ export default function TeamDistributionChart() {
                 <span className="text-xs font-bold text-gray-700">{item.name}</span>
               </div>
               <div className="flex items-center gap-4">
-                <span className="text-xs font-bold text-blue-900">{item.value}</span>
+                <span className="text-xs font-bold text-primary">{item.value}</span>
                 <span className="text-[10px] font-bold text-gray-400 w-8 text-right">
                   {Math.round((item.value / total) * 100)}%
                 </span>

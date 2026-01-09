@@ -169,7 +169,7 @@ export default function BranchReport() {
   if (loading) {
     return (
       <div className="bg-blue-100 min-h-screen p-3 sm:p-4 md:p-6 flex items-center justify-center">
-        <div className="text-blue-900 text-lg">Loading...</div>
+        <div className="text-primary text-lg">Loading...</div>
       </div>
     );
   }
@@ -178,7 +178,7 @@ export default function BranchReport() {
     <div className="bg-blue-100 min-h-screen p-3 sm:p-4 md:p-6 space-y-8 sm:space-y-10">
       {/* BRANCHES */}
       <div className="space-y-4 sm:space-y-6">
-        <h3 className="text-xl sm:text-2xl font-bold text-blue-900">Branches</h3>
+        <h3 className="text-xl sm:text-2xl font-bold text-primary">Branches</h3>
 
         {/* SUMMARY CARDS */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 sm:gap-2 md:gap-4">
@@ -232,7 +232,7 @@ export default function BranchReport() {
                   (h) => (
                     <TableHead
                       key={h}
-                      className="text-[11px] font-semibold text-blue-900 uppercase px-4"
+                      className="text-[11px] font-semibold text-primary uppercase px-4"
                     >
                       {h}
                     </TableHead>
@@ -257,10 +257,11 @@ export default function BranchReport() {
                   <TableCell className="px-4">{formatDate(b.started_date)}</TableCell>
                   <TableCell className="px-4">
                     <span
-                      className={`px-2.5 py-1 rounded-full text-xs font-medium ${b.status === 'ACTIVE'
-                        ? 'bg-green-100 text-green-700'
-                        : 'bg-red-100 text-red-700'
-                        }`}
+                      className={`px-2.5 py-1 rounded-full text-xs font-medium ${
+                        b.status === 'ACTIVE'
+                          ? 'bg-green-100 text-green-700'
+                          : 'bg-red-100 text-red-700'
+                      }`}
                     >
                       {b.status}
                     </span>
@@ -268,7 +269,7 @@ export default function BranchReport() {
                   <TableCell className="px-4">
                     <div className="flex gap-3 text-sm">
                       <button
-                        className="text-blue-900 hover:underline"
+                        className="text-primary hover:underline"
                         onClick={() => {
                           setEditingBranch(b);
                           setFormOpen(true);
@@ -327,29 +328,29 @@ function BranchFormModal({
   const [form, setForm] = useState<BranchFormData>(
     initialData
       ? {
-        id: initialData.id,
-        name: initialData.name,
-        address: initialData.address,
-        location: initialData.location,
-        started_date: initialData.started_date,
-        status: initialData.status as 'ACTIVE' | 'INACTIVE',
-        manager_id: initialData.manager_id,
-      }
+          id: initialData.id,
+          name: initialData.name,
+          address: initialData.address,
+          location: initialData.location,
+          started_date: initialData.started_date,
+          status: initialData.status as 'ACTIVE' | 'INACTIVE',
+          manager_id: initialData.manager_id,
+        }
       : {
-        name: '',
-        address: '',
-        location: '',
-        started_date: '',
-        status: 'ACTIVE',
-        manager_id: '',
-      },
+          name: '',
+          address: '',
+          location: '',
+          started_date: '',
+          status: 'ACTIVE',
+          manager_id: '',
+        },
   );
 
   return (
     <Dialog open={true} onOpenChange={(val) => !val && onClose()}>
       <DialogContent className="sm:max-w-xl">
         <DialogHeader>
-          <DialogTitle className="text-2xl font-bold text-blue-900">
+          <DialogTitle className="text-2xl font-bold text-primary">
             {initialData ? 'Update Branch' : 'Add Branch'}
           </DialogTitle>
           <button
@@ -476,7 +477,7 @@ function ConfirmDeleteModal({
             <div className="h-12 w-12 rounded-2xl bg-red-50 flex items-center justify-center text-red-600 shadow-sm">
               <Trash2 className="h-6 w-6" />
             </div>
-            <DialogTitle className="text-xl font-bold text-blue-900">Delete Branch</DialogTitle>
+            <DialogTitle className="text-xl font-bold text-primary">Delete Branch</DialogTitle>
           </div>
           <DialogDescription className="text-base text-gray-600 leading-relaxed">
             Are you sure you want to delete <strong>{name}</strong>?

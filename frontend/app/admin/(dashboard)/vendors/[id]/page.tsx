@@ -18,31 +18,60 @@ import {
 import StatCard from '@/components/StatCard';
 import VendorTransactionsTable from '@/components/AdminDahboardComponents/vendorComponents/VendorTransactionsTable';
 import VendorSpendingTrend from '@/components/AdminDahboardComponents/vendorComponents/VendorSpendingTrend';
+import { getVendorById, Vendor as ApiVendor } from '@/lib/vendor';
+import { toast } from 'sonner';
 
 export default function Page({ params }: { params: { id: string } }) {
   const router = useRouter();
   const id = params.id;
+  const [vendor, setVendor] = React.useState<ApiVendor | null>(null);
+  const [loading, setLoading] = React.useState(true);
 
-  const vendor = {
-    id: id || '1',
-    name: 'ABC Supplies Pvt Ltd',
-    type: 'Primary Supplier',
-    contactPerson: 'John Doe',
-    phone: '+91 9876543210',
-    email: 'john@abcsupplies.com',
-    address: '123, Industrial Area, Phase 1, New Delhi - 110020',
-    gstin: '07AABCA1234A1Z5',
-    status: 'Active',
-    totalOrders: 45,
-    purchaseValue: 1200000,
-    outstandingAmount: 50000,
-    creditLimit: 500000,
-    bankDetails: {
-      accountName: 'ABC Supplies Pvt Ltd',
-      accountNumber: '123456789012',
-      ifsc: 'HDFC0001234',
-      bankName: 'HDFC Bank',
-    },
+  React.useEffect(() => {
+    const fetchVendor = async () => {
+      try {
+        setLoading(true);
+        const res = await getVendorById(id);
+        if (res.success) {
+          setVendor(res.data);
+        } else {
+          toast.error('Failed to load vendor details');
+        }
+      } catch (error) {
+        console.error('Error fetching vendor:', error);
+        toast.error('Error loading vendor details');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (id) {
+      fetchVendor();
+    }
+  }, [id]);
+
+  if (loading) {
+    return (
+      <div className="bg-blue-100 min-h-screen flex items-center justify-center">
+        <div className="text-primary font-bold animate-pulse">Loading Vendor Details...</div>
+      </div>
+    );
+  }
+
+  if (!vendor) {
+    return (
+      <div className="bg-blue-100 min-h-screen flex items-center justify-center flex-col gap-4">
+        <div className="text-primary font-bold">Vendor not found</div>
+        <Button onClick={() => router.back()}>Go Back</Button>
+      </div>
+    );
+  }
+
+  // Helper for bank details to avoid deep nesting issues
+  const bankDetails = vendor.bankDetails || {
+    bankName: 'N/A',
+    accountNumber: 'N/A',
+    ifsc: 'N/A',
   };
 
   return (
@@ -57,10 +86,10 @@ export default function Page({ params }: { params: { id: string } }) {
               className="h-8 w-8 hover:bg-blue-200/50"
               onClick={() => router.back()}
             >
-              <ArrowLeft className="h-5 w-5 text-blue-900" />
+              <ArrowLeft className="h-5 w-5 text-primary" />
             </Button>
             <div>
-              <h3 className="text-sm sm:text-base md:text-lg font-bold text-blue-900 flex items-center gap-2 uppercase">
+              <h3 className="text-sm sm:text-base md:text-lg font-bold text-primary flex items-center gap-2 uppercase">
                 VENDOR DETAIL
                 <span className="px-2 py-0.5 rounded-full text-[10px] bg-green-100 text-green-700 uppercase font-bold">
                   {vendor.status}
@@ -92,22 +121,22 @@ export default function Page({ params }: { params: { id: string } }) {
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 sm:gap-2 md:gap-4">
           <StatCard
             title="Total Spend"
-            value={`₹${(vendor.purchaseValue / 100000).toFixed(1)}L`}
+            value={`₹${((vendor.purchaseValue || 0) / 100000).toFixed(1)}L`}
             subtitle="Lifetime Purchase"
           />
           <StatCard
             title="Total Orders"
-            value={vendor.totalOrders.toString()}
+            value={(vendor.totalOrders || 0).toString()}
             subtitle="Successful Deliveries"
           />
           <StatCard
             title="Outstanding"
-            value={`₹${(vendor.outstandingAmount / 1000).toFixed(0)}K`}
+            value={`₹${((vendor.outstandingAmount || 0) / 1000).toFixed(0)}K`}
             subtitle="Pending Payments"
           />
           <StatCard
             title="Credit Limit"
-            value={`₹${(vendor.creditLimit / 100000).toFixed(1)}L`}
+            value={`₹${((vendor.creditLimit || 0) / 100000).toFixed(1)}L`}
             subtitle="Available: ₹4.5L"
           />
         </div>
@@ -118,7 +147,7 @@ export default function Page({ params }: { params: { id: string } }) {
           <div className="lg:col-span-1 flex flex-col gap-6">
             {/* General Info Card */}
             <div className="bg-white rounded-xl shadow-sm p-4 border border-blue-100/30 flex-1 flex flex-col">
-              <h3 className="text-xs font-bold text-blue-900 uppercase flex items-center gap-2 border-b border-gray-50 pb-3 mb-4">
+              <h3 className="text-xs font-bold text-primary uppercase flex items-center gap-2 border-b border-gray-50 pb-3 mb-4">
                 <User className="h-3.5 w-3.5 text-primary" /> Contact Profile
               </h3>
               <div className="space-y-4 flex-1">
@@ -173,7 +202,7 @@ export default function Page({ params }: { params: { id: string } }) {
 
             {/* Business Details Card */}
             <div className="bg-white rounded-xl shadow-sm p-4 border border-blue-100/30 flex-1 flex flex-col">
-              <h3 className="text-xs font-bold text-blue-900 uppercase flex items-center gap-2 border-b border-gray-50 pb-3 mb-4">
+              <h3 className="text-xs font-bold text-primary uppercase flex items-center gap-2 border-b border-gray-50 pb-3 mb-4">
                 <Building2 className="h-3.5 w-3.5 text-primary" /> Business & Tax
               </h3>
               <div className="space-y-4 flex-1">
@@ -181,23 +210,21 @@ export default function Page({ params }: { params: { id: string } }) {
                   <p className="text-[10px] text-blue-600 uppercase font-bold tracking-wider">
                     GSTIN Number
                   </p>
-                  <p className="text-sm font-bold text-blue-900">{vendor.gstin}</p>
+                  <p className="text-sm font-bold text-primary">{vendor.gstin || 'N/A'}</p>
                 </div>
                 <div className="grid grid-cols-1 gap-4">
                   <div>
                     <p className="text-[10px] text-gray-400 uppercase font-bold tracking-wider">
                       Bank Name
                     </p>
-                    <p className="text-xs font-semibold text-gray-900">
-                      {vendor.bankDetails.bankName}
-                    </p>
+                    <p className="text-xs font-semibold text-gray-900">{bankDetails.bankName}</p>
                   </div>
                   <div>
                     <p className="text-[10px] text-gray-400 uppercase font-bold tracking-wider">
                       Account / IFSC
                     </p>
                     <p className="text-xs font-mono font-semibold text-gray-900 break-all">
-                      {vendor.bankDetails.accountNumber} / {vendor.bankDetails.ifsc}
+                      {bankDetails.accountNumber} / {bankDetails.ifsc}
                     </p>
                   </div>
                 </div>
@@ -207,8 +234,8 @@ export default function Page({ params }: { params: { id: string } }) {
 
           {/* COLUMN 2 & 3: TRANSACTION HISTORY */}
           <div className="lg:col-span-2">
-            <div className="bg-white rounded-xl shadow-sm border border-blue-100/30 h-full flex flex-col overflow-hidden text-blue-900 uppercase">
-              <h3 className="text-xs font-bold text-blue-900 uppercase flex items-center gap-2 p-4 border-b border-gray-50 flex-none bg-white">
+            <div className="bg-white rounded-xl shadow-sm border border-blue-100/30 h-full flex flex-col overflow-hidden text-primary uppercase">
+              <h3 className="text-xs font-bold text-primary uppercase flex items-center gap-2 p-4 border-b border-gray-50 flex-none bg-white">
                 <Clock className="h-3.5 w-3.5 text-primary" /> Transaction History
               </h3>
               <div className="flex-1 overflow-auto">
@@ -220,7 +247,7 @@ export default function Page({ params }: { params: { id: string } }) {
 
         {/* BOTTOM SECTION: ANALYTICS */}
         <div className="space-y-4">
-          <h3 className="text-sm font-bold text-blue-900 uppercase flex items-center gap-2">
+          <h3 className="text-sm font-bold text-primary uppercase flex items-center gap-2">
             <TrendingUp className="h-3.5 w-3.5 text-primary" /> Purchasing Analytics
           </h3>
           <div className="bg-white rounded-xl p-6 shadow-sm border border-blue-100/30">

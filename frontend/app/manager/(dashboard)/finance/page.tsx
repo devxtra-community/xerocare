@@ -14,7 +14,9 @@ export default function ManagerFinancePage() {
       {/* HEADER SECTION */}
       <div className="flex justify-between items-center">
         <div className="space-y-1">
-          <h2 className="text-xl sm:text-2xl font-bold text-blue-900 tracking-tight">Financial Overview</h2>
+          <h2 className="text-xl sm:text-2xl font-bold text-primary tracking-tight">
+            Financial Overview
+          </h2>
           <p className="text-sm text-slate-500 font-medium">
             Analyze revenue streams, track expenses, and manage receivables
           </p>
@@ -34,11 +36,15 @@ export default function ManagerFinancePage() {
       {/* TABLES SECTION */}
       <div className="space-y-8">
         <div className="space-y-3">
-          <h3 className="text-lg font-bold text-blue-900 uppercase tracking-tighter">Revenue Summary</h3>
+          <h3 className="text-lg font-bold text-primary uppercase tracking-tighter">
+            Revenue Summary
+          </h3>
           <RevenueSummaryTable />
         </div>
         <div className="space-y-3">
-          <h3 className="text-lg font-bold text-blue-900 uppercase tracking-tighter">Outstanding Receivables</h3>
+          <h3 className="text-lg font-bold text-primary uppercase tracking-tighter">
+            Outstanding Receivables
+          </h3>
           <OutstandingReceivablesTable />
         </div>
       </div>

@@ -2,6 +2,7 @@ import api from './api';
 
 export interface Branch {
   id: string;
+  branch_id?: string;
   name: string;
   address: string;
   location: string;

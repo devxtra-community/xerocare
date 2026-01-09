@@ -36,7 +36,9 @@ export default function HrTable() {
           if (emp.createdAt) {
             try {
               formattedDate = new Date(emp.createdAt).toLocaleDateString('en-GB'); // DD/MM/YYYY
-            } catch (e) { console.error(e) }
+            } catch (e) {
+              console.error(e);
+            }
           }
 
           return {
@@ -78,16 +80,16 @@ export default function HrTable() {
         <table className="w-full">
           <thead>
             <tr className="border-b">
-              <th className="text-left text-[10px] sm:text-xs font-semibold text-blue-900 py-1.5 sm:py-2 px-1 sm:px-2">
+              <th className="text-left text-[10px] sm:text-xs font-semibold text-primary py-1.5 sm:py-2 px-1 sm:px-2">
                 NAME
               </th>
-              <th className="text-left text-[10px] sm:text-xs font-semibold text-blue-900 py-1.5 sm:py-2 px-1 sm:px-2">
+              <th className="text-left text-[10px] sm:text-xs font-semibold text-primary py-1.5 sm:py-2 px-1 sm:px-2">
                 POSITION
               </th>
-              <th className="text-left text-[10px] sm:text-xs font-semibold text-blue-900 py-1.5 sm:py-2 px-1 sm:px-2">
+              <th className="text-left text-[10px] sm:text-xs font-semibold text-primary py-1.5 sm:py-2 px-1 sm:px-2">
                 START
               </th>
-              <th className="text-left text-[10px] sm:text-xs font-semibold text-blue-900 py-1.5 sm:py-2 px-1 sm:px-2">
+              <th className="text-left text-[10px] sm:text-xs font-semibold text-primary py-1.5 sm:py-2 px-1 sm:px-2">
                 SALARY
               </th>
             </tr>
@@ -143,8 +145,9 @@ export default function HrTable() {
             <button
               key={num}
               onClick={() => setPage(num)}
-              className={`px-1.5 sm:px-2 py-0.5 rounded-md transition ${page === num ? 'bg-primary text-white' : 'border hover:bg-gray-50'
-                }`}
+              className={`px-1.5 sm:px-2 py-0.5 rounded-md transition ${
+                page === num ? 'bg-primary text-white' : 'border hover:bg-gray-50'
+              }`}
             >
               {num}
             </button>

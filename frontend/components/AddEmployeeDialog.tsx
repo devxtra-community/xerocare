@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -12,10 +12,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import RoleSelect from './RoleSelect';
 import { createEmployee } from '@/lib/employee';
+import { getBranches, Branch } from '@/lib/branch';
 
 export default function AddEmployeeDialog() {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [branches, setBranches] = useState<Branch[]>([]);
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -23,13 +25,22 @@ export default function AddEmployeeDialog() {
     role: '',
     salary: '',
     expireDate: '',
+    branchId: '',
   });
   const [files, setFiles] = useState<{ profile_image: File | null; id_proof: File | null }>({
     profile_image: null,
     id_proof: null,
   });
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  useEffect(() => {
+    if (open) {
+      getBranches()
+        .then((data) => setBranches(data))
+        .catch((err) => console.error('Failed to fetch branches', err));
+    }
+  }, [open]);
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
@@ -52,6 +63,9 @@ export default function AddEmployeeDialog() {
       data.append('email', formData.email);
       data.append('role', formData.role);
       data.append('salary', formData.salary);
+      if (formData.branchId) {
+        data.append('branchId', formData.branchId);
+      }
       if (formData.expireDate) {
         data.append('expireDate', formData.expireDate);
       }
@@ -81,13 +95,15 @@ export default function AddEmployeeDialog() {
 
       <DialogContent className="sm:max-w-xl">
         <DialogHeader>
-          <DialogTitle className="text-2xl font-bold text-blue-900">Add New Employee</DialogTitle>
+          <DialogTitle className="text-2xl font-bold text-primary">Add New Employee</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-6 pt-6">
           <div className="grid grid-cols-2 gap-x-8 gap-y-6">
             <div className="space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">First Name</label>
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                First Name
+              </label>
               <Input
                 name="firstName"
                 placeholder="John"
@@ -97,7 +113,9 @@ export default function AddEmployeeDialog() {
               />
             </div>
             <div className="space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Last Name</label>
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                Last Name
+              </label>
               <Input
                 name="lastName"
                 placeholder="Doe"
@@ -108,7 +126,9 @@ export default function AddEmployeeDialog() {
             </div>
 
             <div className="space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Role</label>
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                Role
+              </label>
               <RoleSelect
                 value={formData.role}
                 onChange={(val: string) => setFormData((prev) => ({ ...prev, role: val }))}
@@ -116,7 +136,9 @@ export default function AddEmployeeDialog() {
             </div>
 
             <div className="space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Email Address</label>
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                Email Address
+              </label>
               <Input
                 name="email"
                 type="email"
@@ -128,7 +150,9 @@ export default function AddEmployeeDialog() {
             </div>
 
             <div className="space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Contract Expiry</label>
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                Contract Expiry
+              </label>
               <Input
                 type="date"
                 name="expireDate"
@@ -138,7 +162,9 @@ export default function AddEmployeeDialog() {
               />
             </div>
             <div className="space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Salary</label>
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                Salary
+              </label>
               <Input
                 name="salary"
                 placeholder="Salary"
@@ -150,7 +176,28 @@ export default function AddEmployeeDialog() {
             </div>
 
             <div className="space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Profile Image</label>
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                Branch
+              </label>
+              <select
+                name="branchId"
+                value={formData.branchId}
+                onChange={handleInputChange}
+                className="w-full h-12 px-3 rounded-xl bg-white border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400 text-sm"
+              >
+                <option value="">Select Branch</option>
+                {branches.map((branch) => (
+                  <option key={branch.id} value={branch.id}>
+                    {branch.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                Profile Image
+              </label>
               <Input
                 type="file"
                 accept="image/*"
@@ -159,7 +206,9 @@ export default function AddEmployeeDialog() {
               />
             </div>
             <div className="space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">ID Proof</label>
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                ID Proof
+              </label>
               <Input
                 type="file"
                 accept="application/pdf,image/*"
@@ -170,16 +219,16 @@ export default function AddEmployeeDialog() {
           </div>
 
           <div className="flex justify-end items-center gap-6 pt-8">
-            <button 
-              type="button" 
-              onClick={() => setOpen(false)} 
+            <button
+              type="button"
+              onClick={() => setOpen(false)}
               className="text-sm font-bold text-gray-900 hover:text-gray-600 transition-colors"
             >
               Cancel
             </button>
-            <Button 
-              onClick={handleSubmit} 
-              disabled={loading} 
+            <Button
+              onClick={handleSubmit}
+              disabled={loading}
               className="h-12 px-10 rounded-xl bg-[#004a8d] text-white hover:bg-[#003f7d] font-bold shadow-lg"
             >
               {loading ? 'Creating...' : 'Create'}

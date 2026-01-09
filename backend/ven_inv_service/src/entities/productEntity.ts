@@ -9,7 +9,6 @@ import {
 } from 'typeorm';
 import { Model } from './modelEntity';
 import { Inventory } from './inventoryEntity';
-
 export enum ProductStatus {
   AVAILABLE = 'available',
   RENTED = 'rented',
@@ -65,6 +64,9 @@ export class Product {
     default: ProductStatus.AVAILABLE,
   })
   product_status!: ProductStatus;
+
+  @Column({ type: 'varchar', length: 1000, nullable: true })
+  imageUrl?: string;
 
   @CreateDateColumn()
   created_at!: Date;

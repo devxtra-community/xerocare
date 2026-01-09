@@ -13,6 +13,11 @@ export interface Employee {
   updatedAt: string;
   expire_date: string | null;
   status: string;
+  branch_id?: string | null;
+  branch?: {
+    branch_id: string;
+    name: string;
+  } | null;
 }
 
 export interface HRStats {

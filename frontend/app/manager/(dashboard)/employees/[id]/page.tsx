@@ -54,14 +54,14 @@ export default function EmployeeProfilePage() {
             className="h-9 w-9 bg-white shadow-sm ring-1 ring-blue-200/50 hover:bg-blue-50"
             onClick={() => router.back()}
           >
-            <ArrowLeft className="h-5 w-5 text-blue-900" />
+            <ArrowLeft className="h-5 w-5 text-primary" />
           </Button>
           <div className="flex items-center gap-4">
             <div className="h-14 w-14 rounded-2xl bg-primary flex items-center justify-center text-white text-2xl font-bold shadow-lg shadow-primary/20">
               {employee.name.charAt(0)}
             </div>
             <div>
-              <h3 className="text-xl font-bold text-blue-900 flex items-center gap-3">
+              <h3 className="text-xl font-bold text-primary flex items-center gap-3">
                 {employee.name}
                 <span className="px-2.5 py-0.5 rounded-full text-[10px] bg-green-100 text-green-700 uppercase font-bold tracking-wider">
                   {employee.status}
@@ -74,7 +74,7 @@ export default function EmployeeProfilePage() {
           </div>
         </div>
         <div className="flex gap-2">
-          <Button className="bg-white text-blue-900 border-blue-200 hover:bg-blue-50 gap-2 h-10 font-bold px-5 rounded-xl shadow-sm">
+          <Button className="bg-white text-primary border-blue-200 hover:bg-blue-50 gap-2 h-10 font-bold px-5 rounded-xl shadow-sm">
             <Mail className="h-4 w-4" /> Message
           </Button>
           <Button className="bg-primary text-white hover:bg-primary/90 gap-2 h-10 font-bold px-5 rounded-xl shadow-lg shadow-primary/20">
@@ -96,7 +96,7 @@ export default function EmployeeProfilePage() {
         {/* PERSONAL INFO */}
         <div className="lg:col-span-1 space-y-6">
           <div className="bg-white rounded-2xl shadow-sm border border-blue-100/50 p-6">
-            <h4 className="text-xs font-bold text-blue-900 uppercase flex items-center gap-2 mb-6 tracking-widest pb-3 border-b border-gray-50">
+            <h4 className="text-xs font-bold text-primary uppercase flex items-center gap-2 mb-6 tracking-widest pb-3 border-b border-gray-50">
               <User className="h-4 w-4 text-primary" /> Personal Information
             </h4>
             <div className="space-y-5">
@@ -113,7 +113,7 @@ export default function EmployeeProfilePage() {
           </div>
 
           <div className="bg-white rounded-2xl shadow-sm border border-blue-100/50 p-6">
-            <h4 className="text-xs font-bold text-blue-900 uppercase flex items-center gap-2 mb-6 tracking-widest pb-3 border-b border-gray-50">
+            <h4 className="text-xs font-bold text-primary uppercase flex items-center gap-2 mb-6 tracking-widest pb-3 border-b border-gray-50">
               <ShieldCheck className="h-4 w-4 text-primary" /> Verified Documents
             </h4>
             <div className="space-y-4">
@@ -127,7 +127,7 @@ export default function EmployeeProfilePage() {
         {/* WORK INFO & ACTIVITY */}
         <div className="lg:col-span-2 space-y-6">
           <div className="bg-white rounded-2xl shadow-sm border border-blue-100/50 p-6">
-            <h4 className="text-xs font-bold text-blue-900 uppercase flex items-center gap-2 mb-6 tracking-widest pb-3 border-b border-gray-50">
+            <h4 className="text-xs font-bold text-primary uppercase flex items-center gap-2 mb-6 tracking-widest pb-3 border-b border-gray-50">
               <Briefcase className="h-4 w-4 text-primary" /> Employment Details
             </h4>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-8">

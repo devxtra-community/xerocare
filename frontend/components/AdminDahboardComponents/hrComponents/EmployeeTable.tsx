@@ -139,7 +139,7 @@ export default function EmployeeTable() {
       <div className="p-6 border-b border-gray-100">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <h3 className="text-lg font-semibold text-blue-900">Employee List</h3>
+            <h3 className="text-lg font-semibold text-primary">Employee List</h3>
             {isLoading && <Loader2 className="h-4 w-4 animate-spin text-blue-500" />}
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -199,6 +199,9 @@ export default function EmployeeTable() {
                 Role
               </th>
               <th className="px-6 py-4 text-xs font-semibold text-primary uppercase tracking-wider">
+                Branch
+              </th>
+              <th className="px-6 py-4 text-xs font-semibold text-primary uppercase tracking-wider">
                 Salary
               </th>
               <th className="px-6 py-4 text-xs font-semibold text-primary uppercase tracking-wider">
@@ -256,6 +259,9 @@ export default function EmployeeTable() {
                     >
                       {emp.role}
                     </Badge>
+                  </td>
+                  <td className="px-6 py-4">
+                    <span className="text-sm text-gray-600">{emp.branch?.name || '---'}</span>
                   </td>
                   <td className="px-6 py-4 text-sm font-semibold text-blue-700 tabular-nums">
                     AED {emp.salary?.toLocaleString() || '0'}

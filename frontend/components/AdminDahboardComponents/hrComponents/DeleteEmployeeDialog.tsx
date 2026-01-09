@@ -39,7 +39,7 @@ export default function DeleteEmployeeDialog({
             >
               <AlertCircle className="h-6 w-6" />
             </div>
-            <DialogTitle className="text-xl font-bold text-blue-900">
+            <DialogTitle className="text-xl font-bold text-primary">
               {isEnabling ? 'Enable Employee Access' : 'Confirm Action'}
             </DialogTitle>
           </div>

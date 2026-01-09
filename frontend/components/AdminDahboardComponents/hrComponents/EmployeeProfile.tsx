@@ -42,12 +42,12 @@ export default function EmployeeProfile({ id }: EmployeeProfileProps) {
       }
     };
     fetchEmployee();
-  }, [id]);
+  }, [id, router]);
 
   const handleDownloadIdProof = async () => {
     try {
       const response = await getEmployeeIdProof(id);
-      if (response.success && response.data.url) {
+      if (response.data.url) {
         window.open(response.data.url, '_blank');
       } else {
         toast.error('ID Proof not available');
@@ -86,7 +86,7 @@ export default function EmployeeProfile({ id }: EmployeeProfileProps) {
           <ArrowLeft className="h-5 w-5 text-gray-600" />
         </Button>
         <div>
-          <h2 className="text-2xl font-bold text-blue-900">Employee Profile</h2>
+          <h2 className="text-2xl font-bold text-primary">Employee Profile</h2>
           <p className="text-sm text-gray-500 font-medium">
             Employee ID:{' '}
             <span className="text-blue-600 border-b border-blue-200">
@@ -136,7 +136,7 @@ export default function EmployeeProfile({ id }: EmployeeProfileProps) {
           </div>
 
           <div className="bg-white rounded-2xl p-6 shadow-sm">
-            <h4 className="text-sm font-bold text-blue-900 uppercase tracking-wider mb-4">
+            <h4 className="text-sm font-bold text-primary uppercase tracking-wider mb-4">
               Documents
             </h4>
             <Button
@@ -153,7 +153,7 @@ export default function EmployeeProfile({ id }: EmployeeProfileProps) {
         {/* Right Column: Detailed Info */}
         <div className="lg:col-span-2 space-y-6">
           <div className="bg-white rounded-2xl p-8 shadow-sm">
-            <h4 className="text-lg font-bold text-blue-900 mb-6 border-b pb-4">
+            <h4 className="text-lg font-bold text-primary mb-6 border-b pb-4">
               Employment Information
             </h4>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-y-6 gap-x-12">

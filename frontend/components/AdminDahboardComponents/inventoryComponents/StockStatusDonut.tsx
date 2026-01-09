@@ -18,7 +18,6 @@ export default function StockStatusDonut() {
   const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsClient(true);
   }, []);
 
@@ -59,7 +58,7 @@ export default function StockStatusDonut() {
           </PieChart>
         </ResponsiveContainer>
         <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-[calc(50%+18px)] text-center pointer-events-none">
-          <span className="text-xl font-bold text-blue-900">140</span>
+          <span className="text-xl font-bold text-primary">140</span>
           <p className="text-[9px] text-gray-500 uppercase font-medium">Items</p>
         </div>
       </div>

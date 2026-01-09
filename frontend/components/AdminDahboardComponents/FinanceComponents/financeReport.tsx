@@ -116,7 +116,7 @@ export default function FinanceReport() {
   return (
     <div className="bg-blue-100 min-h-screen p-4 space-y-8 sm:space-y-10">
       {/* Header */}
-      <h3 className="text-xl sm:text-2xl font-bold text-blue-900">Financial Report</h3>
+      <h3 className="text-xl sm:text-2xl font-bold text-primary">Financial Report</h3>
 
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -146,7 +146,7 @@ export default function FinanceReport() {
       <div className="flex flex-col lg:flex-row gap-6">
         {/* Income vs Expense Chart */}
         <div className="flex-1 bg-white p-4 rounded-2xl shadow-sm space-y-4">
-          <h4 className="text-lg sm:text-xl font-bold text-blue-900">Income vs Expense</h4>
+          <h4 className="text-lg sm:text-xl font-bold text-primary">Income vs Expense</h4>
           <div className="h-[200px] w-full">
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
@@ -199,7 +199,7 @@ export default function FinanceReport() {
 
         {/* Profit Margin Chart */}
         <div className="flex-1 bg-white p-4 rounded-2xl shadow-sm space-y-4">
-          <h4 className="text-lg sm:text-xl font-bold text-blue-900">Profit Margin %</h4>
+          <h4 className="text-lg sm:text-xl font-bold text-primary">Profit Margin %</h4>
           <div className="h-[200px] w-full">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
@@ -280,7 +280,7 @@ export default function FinanceReport() {
           <TableHeader>
             <TableRow>
               {['MONTH', 'SOURCE', 'INCOME', 'EXPENSE', 'PROFIT', 'STATUS'].map((h) => (
-                <TableHead key={h} className="text-xs font-semibold text-blue-900 uppercase px-4">
+                <TableHead key={h} className="text-xs font-semibold text-primary uppercase px-4">
                   {h}
                 </TableHead>
               ))}

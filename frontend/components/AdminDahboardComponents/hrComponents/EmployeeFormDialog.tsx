@@ -1,5 +1,7 @@
 'use client';
 
+import Image from 'next/image';
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -13,6 +15,7 @@ import {
 } from '@/components/ui/select';
 import { ImagePlus, FileText, X } from 'lucide-react';
 import { Employee } from '@/lib/employee';
+import { getBranches, Branch } from '@/lib/branch';
 
 interface EmployeeFormDialogProps {
   open: boolean;
@@ -35,15 +38,33 @@ export default function EmployeeFormDialog({
     salary: '',
     expire_date: '',
     status: 'ACTIVE',
+    branchId: '',
   });
 
   const [profileImage, setProfileImage] = useState<File | null>(null);
   const [idProof, setIdProof] = useState<File | null>(null);
   const [profilePreview, setProfilePreview] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [branches, setBranches] = useState<Branch[]>([]);
 
   const profileInputRef = useRef<HTMLInputElement>(null);
   const idProofInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const fetchBranches = async () => {
+      try {
+        const response = await getBranches();
+        if (response && response.success && Array.isArray(response.data)) {
+          setBranches(response.data);
+        } else if (Array.isArray(response)) {
+          setBranches(response);
+        }
+      } catch (error) {
+        console.error('Failed to fetch branches:', error);
+      }
+    };
+    fetchBranches();
+  }, []);
 
   useEffect(() => {
     if (initialData) {
@@ -57,6 +78,7 @@ export default function EmployeeFormDialog({
           ? new Date(initialData.expire_date).toISOString().split('T')[0]
           : '',
         status: initialData.status || 'ACTIVE',
+        branchId: initialData.branch_id || '',
       });
       setProfilePreview(initialData.profile_image_url);
     } else {
@@ -68,6 +90,7 @@ export default function EmployeeFormDialog({
         salary: '',
         expire_date: '',
         status: 'ACTIVE',
+        branchId: '',
       });
       setProfilePreview(null);
       setProfileImage(null);
@@ -114,6 +137,9 @@ export default function EmployeeFormDialog({
       if (formData.expire_date) {
         data.append('expireDate', formData.expire_date);
       }
+      if (formData.branchId) {
+        data.append('branchId', formData.branchId);
+      }
       data.append('status', formData.status);
 
       if (profileImage) {
@@ -136,7 +162,7 @@ export default function EmployeeFormDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-2xl font-bold text-blue-900 text-center">
+          <DialogTitle className="text-2xl font-bold text-primary text-center">
             {initialData ? 'Update Employee' : 'Add New Employee'}
           </DialogTitle>
         </DialogHeader>
@@ -148,11 +174,7 @@ export default function EmployeeFormDialog({
               onClick={() => profileInputRef.current?.click()}
             >
               {profilePreview ? (
-                <img
-                  src={profilePreview}
-                  alt="Profile preview"
-                  className="h-full w-full object-cover"
-                />
+                <Image src={profilePreview} alt="Profile preview" fill className="object-cover" />
               ) : (
                 <ImagePlus className="h-8 w-8 text-blue-400 group-hover:text-blue-500 transition-colors" />
               )}
@@ -281,6 +303,30 @@ export default function EmployeeFormDialog({
                   <SelectItem value="INACTIVE" className="text-amber-600 font-medium">
                     Inactive
                   </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                Assigned Branch
+              </label>
+              <Select
+                value={formData.branchId}
+                onValueChange={(val) => handleSelectChange('branchId', val)}
+              >
+                <SelectTrigger className="h-12 rounded-xl bg-gray-50 border-none shadow-sm focus:ring-2 focus:ring-blue-400">
+                  <SelectValue placeholder="Select Branch" />
+                </SelectTrigger>
+                <SelectContent className="rounded-xl">
+                  {branches.map((branch) => (
+                    <SelectItem
+                      key={branch.id || branch.branch_id}
+                      value={branch.id || branch.branch_id || ''}
+                    >
+                      {branch.name}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>

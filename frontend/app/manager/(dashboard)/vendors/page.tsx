@@ -65,7 +65,7 @@ export default function VendorsPage() {
     <div className="p-3 sm:p-4 md:p-6 space-y-8 sm:space-y-10 bg-blue-100 min-h-screen">
       <div className="flex justify-between items-center px-4">
         <div className="space-y-1">
-          <h2 className="text-xl sm:text-2xl font-bold text-blue-900 tracking-tight">
+          <h2 className="text-xl sm:text-2xl font-bold text-primary tracking-tight">
             Vendor Management
           </h2>
           <p className="text-sm text-slate-500 font-medium">
@@ -83,7 +83,12 @@ export default function VendorsPage() {
           />
         </div>
 
-        <VendorTable vendors={uiVendors} loading={loading} onRefresh={fetchVendorsData} />
+        <VendorTable
+          vendors={uiVendors}
+          loading={loading}
+          onRefresh={fetchVendorsData}
+          basePath="/manager"
+        />
       </div>
     </div>
   );
