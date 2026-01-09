@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import Image from 'next/image';
 import {
   ArrowLeft,
   Mail,
@@ -102,7 +103,7 @@ export default function EmployeeProfile({ id }: EmployeeProfileProps) {
           <div className="bg-white rounded-2xl p-6 shadow-sm flex flex-col items-center text-center">
             <div className="h-24 w-24 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-bold text-3xl mb-4 overflow-hidden">
               {emp.profile_image_url ? (
-                <img src={emp.profile_image_url} alt="" className="h-full w-full object-cover" />
+                <Image src={emp.profile_image_url} alt="" fill className="object-cover" />
               ) : (
                 (emp.first_name?.[0] || emp.email[0]).toUpperCase()
               )}
