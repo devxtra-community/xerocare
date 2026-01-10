@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { Input } from '@/components/ui/input';
-import { Search } from 'lucide-react';
+import { Search, Edit } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -18,169 +18,251 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-
-type SaleOrder = {
-  billId: string;
-  productId: string;
-  name: string;
-  modelNo: string;
-  sellingType: 'Sale' | 'Rent' | 'Lease';
-  employeeId: string;
-  status: 'Delivered' | 'Pending' | 'Cancelled' | 'Shipped' | 'Processing';
-  date: string;
-};
+import { Button } from '@/components/ui/button';
+import OrderUpdateDialog, { SaleOrder } from './OrderUpdateDialog';
 
 const initialOrders: SaleOrder[] = [
   {
-    billId: 'BILL-1001',
-    productId: 'PROD-101',
-    name: 'HP Ink Tank 415',
-    modelNo: 'NK-AM-2024',
-    sellingType: 'Sale',
-    employeeId: 'EMP-001',
-    status: 'Delivered',
-    date: '2024-01-15',
+    orderId: 'ORD-1001',
+    customerName: 'John Doe',
+    customerPhone: '+91 98765 43210',
+    orderDate: '2024-01-15',
+    productName: 'HP Ink Tank 415',
+    quantity: 1,
+    totalAmount: '₹12,499',
+    paymentStatus: 'Paid',
+    orderStatus: 'Delivered',
+    deliveryType: 'Sale',
   },
   {
-    billId: 'BILL-1002',
-    productId: 'PROD-102',
-    name: 'Canon PIXMA G2012',
-    modelNo: 'AD-UB-2023',
-    sellingType: 'Rent',
-    employeeId: 'EMP-002',
-    status: 'Pending',
-    date: '2024-01-16',
+    orderId: 'ORD-1002',
+    customerName: 'Jane Smith',
+    customerPhone: '+91 87654 32109',
+    orderDate: '2024-01-16',
+    productName: 'Canon PIXMA G2012',
+    quantity: 2,
+    totalAmount: '₹21,000',
+    paymentStatus: 'Pending',
+    orderStatus: 'New',
+    deliveryType: 'Rental',
   },
   {
-    billId: 'BILL-1003',
-    productId: 'PROD-103',
-    name: 'HP Smart Tank 670',
-    modelNo: 'PM-RS-2024',
-    sellingType: 'Lease',
-    employeeId: 'EMP-003',
-    status: 'Cancelled',
-    date: '2024-01-14',
+    orderId: 'ORD-1003',
+    customerName: 'Michael Brown',
+    customerPhone: '+91 76543 21098',
+    orderDate: '2024-01-14',
+    productName: 'HP Smart Tank 670',
+    quantity: 1,
+    totalAmount: '₹18,500',
+    paymentStatus: 'Partial',
+    orderStatus: 'Processing',
+    deliveryType: 'Lease',
   },
   {
-    billId: 'BILL-1004',
-    productId: 'PROD-104',
-    name: 'Ricoh SP 230DNw',
-    modelNo: 'RB-CL-2023',
-    sellingType: 'Sale',
-    employeeId: 'EMP-001',
-    status: 'Shipped',
-    date: '2024-01-13',
+    orderId: 'ORD-1004',
+    customerName: 'Sarah Wilson',
+    customerPhone: '+91 65432 10987',
+    orderDate: '2024-01-13',
+    productName: 'Ricoh SP 230DNw',
+    quantity: 1,
+    totalAmount: '₹14,200',
+    paymentStatus: 'Paid',
+    orderStatus: 'Shipped',
+    deliveryType: 'Sale',
   },
   {
-    billId: 'BILL-1005',
-    productId: 'PROD-105',
-    name: 'Kyocera ECOSYS P2040dn',
-    modelNo: 'NB-574-2024',
-    sellingType: 'Rent',
-    employeeId: 'EMP-004',
-    status: 'Processing',
-    date: '2024-01-16',
+    orderId: 'ORD-1005',
+    customerName: 'David Lee',
+    customerPhone: '+91 54321 09876',
+    orderDate: '2024-01-16',
+    productName: 'Kyocera ECOSYS P2040dn',
+    quantity: 1,
+    totalAmount: '₹28,600',
+    paymentStatus: 'Pending',
+    orderStatus: 'New',
+    deliveryType: 'Rental',
   },
 ];
 
 export default function EmployeeOrdersTable() {
-  const [orders] = useState<SaleOrder[]>(initialOrders);
+  const [orders, setOrders] = useState<SaleOrder[]>(initialOrders);
   const [search, setSearch] = useState('');
   const [filterType, setFilterType] = useState<string>('All');
+  const [selectedOrder, setSelectedOrder] = useState<SaleOrder | null>(null);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
 
   const filteredOrders = orders.filter((order) => {
     const matchesSearch = Object.values(order).some((value) =>
-      value.toLowerCase().includes(search.toLowerCase()),
+      value.toString().toLowerCase().includes(search.toLowerCase()),
     );
-    const matchesFilter = filterType === 'All' || order.sellingType === filterType;
+    const matchesFilter = filterType === 'All' || order.deliveryType === filterType;
     return matchesSearch && matchesFilter;
   });
 
+  const handleUpdateClick = (order: SaleOrder) => {
+    setSelectedOrder(order);
+    setIsDialogOpen(true);
+  };
+
+  const handleUpdateOrder = (updatedOrder: SaleOrder) => {
+    setOrders((prev) => prev.map((o) => (o.orderId === updatedOrder.orderId ? updatedOrder : o)));
+  };
+
   return (
     <div className="space-y-4">
-      <div className="flex flex-col sm:flex-row gap-4 justify-between items-center">
-        <div className="relative w-full sm:w-[300px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-          <Input
-            placeholder="Search orders..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-9 h-10 bg-white border-blue-400/60 focus:border-blue-400 focus:ring-4 focus:ring-blue-100 outline-none shadow-sm transition-all"
-          />
-        </div>
+      <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
+        <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto flex-1">
+          <div className="relative w-full sm:w-[300px]">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <Input
+              placeholder="Search orders..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-9 h-10 bg-white border-blue-400/60 focus:border-blue-400 focus:ring-4 focus:ring-blue-100 outline-none shadow-sm transition-all w-full"
+            />
+          </div>
 
-        <div className="w-full sm:w-[150px]">
-          <Select value={filterType} onValueChange={setFilterType}>
-            <SelectTrigger className="h-10 bg-white border-blue-400/60 focus:ring-blue-100 rounded-lg">
-              <SelectValue placeholder="Filter by" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="All">All Types</SelectItem>
-              <SelectItem value="Sale">Sale</SelectItem>
-              <SelectItem value="Rent">Rent</SelectItem>
-              <SelectItem value="Lease">Lease</SelectItem>
-            </SelectContent>
-          </Select>
+          <div className="w-full sm:w-[150px]">
+            <Select value={filterType} onValueChange={setFilterType}>
+              <SelectTrigger className="h-10 bg-white border-blue-400/60 focus:ring-blue-100 rounded-lg w-full">
+                <SelectValue placeholder="Filter by" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="All">All Types</SelectItem>
+                <SelectItem value="Sale">Sale</SelectItem>
+                <SelectItem value="Rental">Rental</SelectItem>
+                <SelectItem value="Lease">Lease</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
       </div>
 
-      <div className="rounded-2xl bg-white shadow-sm overflow-hidden">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="text-primary font-bold">BILL ID</TableHead>
-              <TableHead className="text-primary font-bold">PRODUCT ID</TableHead>
-              <TableHead className="text-primary font-bold">NAME</TableHead>
-              <TableHead className="text-primary font-bold">MODEL NO</TableHead>
-              <TableHead className="text-primary font-bold">SELLING TYPE</TableHead>
-              <TableHead className="text-primary font-bold">STATUS</TableHead>
-              <TableHead className="text-primary font-bold">DATE</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filteredOrders.map((order, index) => (
-              <TableRow key={order.billId} className={index % 2 ? 'bg-sky-100/60' : ''}>
-                <TableCell className="text-blue-400 font-medium">{order.billId}</TableCell>
-                <TableCell className="text-gray-500">{order.productId}</TableCell>
-                <TableCell className="font-bold text-primary">{order.name}</TableCell>
-                <TableCell className="text-gray-500">{order.modelNo}</TableCell>
-                <TableCell>
-                  <span
-                    className={`inline-flex px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide
-                    ${
-                      order.sellingType === 'Sale'
-                        ? 'bg-blue-100 text-blue-600'
-                        : order.sellingType === 'Rent'
-                          ? 'bg-orange-100 text-orange-600'
-                          : 'bg-purple-100 text-purple-600'
-                    }`}
-                  >
-                    {order.sellingType}
-                  </span>
-                </TableCell>
-
-                <TableCell>
-                  <span
-                    className={`inline-flex px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide
-                    ${
-                      order.status === 'Delivered'
-                        ? 'bg-green-100 text-green-600'
-                        : order.status === 'Pending'
-                          ? 'bg-yellow-100 text-yellow-600'
-                          : order.status === 'Cancelled'
-                            ? 'bg-red-100 text-red-600'
-                            : 'bg-blue-100 text-blue-600'
-                    }`}
-                  >
-                    {order.status}
-                  </span>
-                </TableCell>
-                <TableCell className="text-gray-500">{order.date}</TableCell>
+      <div className="rounded-2xl bg-white shadow-sm overflow-hidden border">
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-slate-50">
+                <TableHead className="text-primary font-bold whitespace-nowrap">Order ID</TableHead>
+                <TableHead className="text-primary font-bold whitespace-nowrap">
+                  Customer Name
+                </TableHead>
+                <TableHead className="text-primary font-bold whitespace-nowrap">Phone</TableHead>
+                <TableHead className="text-primary font-bold whitespace-nowrap">
+                  Order Date
+                </TableHead>
+                <TableHead className="text-primary font-bold whitespace-nowrap">Product</TableHead>
+                <TableHead className="text-primary font-bold whitespace-nowrap text-center">
+                  Qty
+                </TableHead>
+                <TableHead className="text-primary font-bold whitespace-nowrap">Amount</TableHead>
+                <TableHead className="text-primary font-bold whitespace-nowrap">Payment</TableHead>
+                <TableHead className="text-primary font-bold whitespace-nowrap">Status</TableHead>
+                <TableHead className="text-primary font-bold whitespace-nowrap">Type</TableHead>
+                <TableHead className="text-primary font-bold whitespace-nowrap text-center">
+                  Actions
+                </TableHead>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+            </TableHeader>
+            <TableBody>
+              {filteredOrders.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={11} className="h-24 text-center text-muted-foreground">
+                    No orders found.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                filteredOrders.map((order, index) => (
+                  <TableRow key={order.orderId} className={index % 2 ? 'bg-sky-50/30' : ''}>
+                    <TableCell className="text-blue-600 font-medium whitespace-nowrap">
+                      {order.orderId}
+                    </TableCell>
+                    <TableCell className="font-bold text-primary whitespace-nowrap">
+                      {order.customerName}
+                    </TableCell>
+                    <TableCell className="text-slate-500 whitespace-nowrap text-xs">
+                      {order.customerPhone}
+                    </TableCell>
+                    <TableCell className="text-slate-500 whitespace-nowrap text-xs">
+                      {order.orderDate}
+                    </TableCell>
+                    <TableCell className="text-primary font-medium whitespace-nowrap">
+                      {order.productName}
+                    </TableCell>
+                    <TableCell className="text-center font-medium">{order.quantity}</TableCell>
+                    <TableCell className="font-bold text-primary whitespace-nowrap">
+                      {order.totalAmount}
+                    </TableCell>
+                    <TableCell>
+                      <span
+                        className={`inline-flex px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide
+                        ${
+                          order.paymentStatus === 'Paid'
+                            ? 'bg-green-100 text-green-600'
+                            : order.paymentStatus === 'Pending'
+                              ? 'bg-red-100 text-red-600'
+                              : 'bg-yellow-100 text-yellow-600'
+                        }`}
+                      >
+                        {order.paymentStatus}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      <span
+                        className={`inline-flex px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide
+                        ${
+                          order.orderStatus === 'Delivered'
+                            ? 'bg-green-100 text-green-600'
+                            : order.orderStatus === 'New'
+                              ? 'bg-blue-100 text-blue-600'
+                              : order.orderStatus === 'Cancelled'
+                                ? 'bg-red-100 text-red-600'
+                                : 'bg-yellow-100 text-yellow-600'
+                        }`}
+                      >
+                        {order.orderStatus}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      <span
+                        className={`inline-flex px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide
+                        ${
+                          order.deliveryType === 'Sale'
+                            ? 'bg-blue-100 text-blue-600'
+                            : order.deliveryType === 'Rental'
+                              ? 'bg-orange-100 text-orange-600'
+                              : 'bg-purple-100 text-purple-600'
+                        }`}
+                      >
+                        {order.deliveryType}
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <div className="flex items-center justify-center">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleUpdateClick(order)}
+                          className="h-8 w-8 text-primary hover:text-primary/80 hover:bg-blue-50"
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
       </div>
+
+      <OrderUpdateDialog
+        open={isDialogOpen}
+        onOpenChange={setIsDialogOpen}
+        order={selectedOrder}
+        onUpdate={handleUpdateOrder}
+      />
     </div>
   );
 }

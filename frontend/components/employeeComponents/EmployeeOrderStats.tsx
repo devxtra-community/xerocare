@@ -1,12 +1,14 @@
+'use client';
+
 import React from 'react';
 import StatCard from '@/components/StatCard';
 
-export default function EmployeeStatsCards() {
+export default function EmployeeOrderStats() {
   const cards = [
-    { title: 'Customers', value: '1,234', subtitle: '+12% from last month' },
-    { title: 'Leads', value: '567', subtitle: '+5% from last month' },
-    { title: 'Sales Closed', value: '89', subtitle: '+8% from last month' },
     { title: 'Total Orders', value: '432', subtitle: '+2% from last month' },
+    { title: 'New Orders', value: '45', subtitle: '+10% from last month' },
+    { title: 'Pending Orders', value: '12', subtitle: '-3% from last month' },
+    { title: 'Delivered Orders', value: '375', subtitle: '+5% from last month' },
   ];
 
   return (

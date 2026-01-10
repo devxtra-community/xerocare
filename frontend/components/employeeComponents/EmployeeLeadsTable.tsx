@@ -115,20 +115,20 @@ export default function EmployeeLeadsTable() {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col sm:flex-row gap-4 justify-between items-center">
-        <div className="flex gap-4 w-full sm:w-auto flex-1">
+      <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
+        <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto flex-1">
           <div className="relative w-full sm:w-[300px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
             <Input
               placeholder="Search leads..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="pl-9 h-10 bg-white border-blue-400/60 focus:border-blue-400 focus:ring-4 focus:ring-blue-100 outline-none shadow-sm transition-all"
+              className="pl-9 h-10 bg-white border-blue-400/60 focus:border-blue-400 focus:ring-4 focus:ring-blue-100 outline-none shadow-sm transition-all w-full"
             />
           </div>
-          <div className="w-[150px]">
+          <div className="w-full sm:w-[150px]">
             <Select value={filterType} onValueChange={setFilterType}>
-              <SelectTrigger className="h-10 bg-white border-blue-400/60 focus:ring-blue-100 rounded-lg">
+              <SelectTrigger className="h-10 bg-white border-blue-400/60 focus:ring-blue-100 rounded-lg w-full">
                 <SelectValue placeholder="Filter by" />
               </SelectTrigger>
               <SelectContent>
@@ -142,52 +142,56 @@ export default function EmployeeLeadsTable() {
         </div>
         <Button
           onClick={handleAddClick}
-          className="gap-2 bg-primary hover:bg-primary/90 w-full sm:w-auto"
+          className="gap-2 bg-primary hover:bg-primary/90 w-full sm:w-auto mt-2 sm:mt-0"
         >
           <Plus className="h-4 w-4" /> Add Lead
         </Button>
       </div>
 
       <div className="rounded-2xl bg-white shadow-sm overflow-hidden">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="text-primary font-bold">NAME</TableHead>
-              <TableHead className="text-primary font-bold">CONTACT</TableHead>
-              <TableHead className="text-primary font-bold">SOURCE</TableHead>
-              <TableHead className="text-primary font-bold">PRODUCT</TableHead>
-              <TableHead className="text-primary font-bold">STATUS</TableHead>
-              <TableHead className="text-primary font-bold">PRIORITY</TableHead>
-              <TableHead className="text-primary font-bold text-right">ACTION</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filteredLeads.map((lead, index) => (
-              <TableRow key={lead.id} className={index % 2 ? 'bg-sky-100/60' : ''}>
-                <TableCell className="font-bold text-primary">{lead.name}</TableCell>
-                <TableCell className="text-gray-500">{lead.contact}</TableCell>
-                <TableCell className="text-gray-500">{lead.source}</TableCell>
-                <TableCell className="text-gray-500">{lead.product}</TableCell>
-                <TableCell>
-                  <Badge className={`${getStatusColor(lead.status)} border-0`}>{lead.status}</Badge>
-                </TableCell>
-                <TableCell>
-                  <Badge className={`${getPriorityColor(lead.priority)} border-0`}>
-                    {lead.priority}
-                  </Badge>
-                </TableCell>
-                <TableCell className="text-right">
-                  <button
-                    className="text-primary hover:underline text-sm font-medium"
-                    onClick={() => handleEditClick(lead)}
-                  >
-                    Update
-                  </button>
-                </TableCell>
+        <div className="overflow-x-auto">
+          <Table className="min-w-[800px] sm:min-w-full">
+            <TableHeader>
+              <TableRow>
+                <TableHead className="text-primary font-bold">NAME</TableHead>
+                <TableHead className="text-primary font-bold">CONTACT</TableHead>
+                <TableHead className="text-primary font-bold">SOURCE</TableHead>
+                <TableHead className="text-primary font-bold">PRODUCT</TableHead>
+                <TableHead className="text-primary font-bold">STATUS</TableHead>
+                <TableHead className="text-primary font-bold">PRIORITY</TableHead>
+                <TableHead className="text-primary font-bold text-right">ACTION</TableHead>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+            </TableHeader>
+            <TableBody>
+              {filteredLeads.map((lead, index) => (
+                <TableRow key={lead.id} className={index % 2 ? 'bg-sky-100/60' : ''}>
+                  <TableCell className="font-bold text-primary">{lead.name}</TableCell>
+                  <TableCell className="text-gray-500">{lead.contact}</TableCell>
+                  <TableCell className="text-gray-500">{lead.source}</TableCell>
+                  <TableCell className="text-gray-500">{lead.product}</TableCell>
+                  <TableCell>
+                    <Badge className={`${getStatusColor(lead.status)} border-0`}>
+                      {lead.status}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <Badge className={`${getPriorityColor(lead.priority)} border-0`}>
+                      {lead.priority}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <button
+                      className="text-primary hover:underline text-sm font-medium"
+                      onClick={() => handleEditClick(lead)}
+                    >
+                      Update
+                    </button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
       </div>
 
       <LeadDialog

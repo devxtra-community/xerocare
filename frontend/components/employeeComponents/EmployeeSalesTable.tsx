@@ -114,20 +114,20 @@ export default function EmployeeSalesTable() {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col sm:flex-row gap-4 justify-between items-center">
-        <div className="flex gap-4 w-full sm:w-auto flex-1">
+      <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
+        <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto flex-1">
           <div className="relative w-full sm:w-[300px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
             <Input
               placeholder="Search orders..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="pl-9 h-10 bg-white border-blue-400/60 focus:border-blue-400 focus:ring-4 focus:ring-blue-100 outline-none shadow-sm transition-all"
+              className="pl-9 h-10 bg-white border-blue-400/60 focus:border-blue-400 focus:ring-4 focus:ring-blue-100 outline-none shadow-sm transition-all w-full"
             />
           </div>
-          <div className="w-[150px]">
+          <div className="w-full sm:w-[150px]">
             <Select value={filterType} onValueChange={setFilterType}>
-              <SelectTrigger className="h-10 bg-white border-blue-400/60 focus:ring-blue-100 rounded-lg">
+              <SelectTrigger className="h-10 bg-white border-blue-400/60 focus:ring-blue-100 rounded-lg w-full">
                 <SelectValue placeholder="Filter by" />
               </SelectTrigger>
               <SelectContent>
@@ -140,7 +140,7 @@ export default function EmployeeSalesTable() {
           </div>
         </div>
         <Button
-          className="bg-primary text-white gap-2"
+          className="bg-primary text-white gap-2 w-full sm:w-auto mt-2 sm:mt-0"
           onClick={() => {
             setEditing(null);
             setFormOpen(true);
@@ -151,29 +151,30 @@ export default function EmployeeSalesTable() {
       </div>
 
       <div className="rounded-2xl bg-white shadow-sm overflow-hidden">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="text-primary font-bold">BILL ID</TableHead>
-              <TableHead className="text-primary font-bold">PRODUCT ID</TableHead>
-              <TableHead className="text-primary font-bold">NAME</TableHead>
-              <TableHead className="text-primary font-bold">MODEL NO</TableHead>
-              <TableHead className="text-primary font-bold">SELLING TYPE</TableHead>
-              <TableHead className="text-primary font-bold">STATUS</TableHead>
-              <TableHead className="text-primary font-bold">DATE</TableHead>
-              <TableHead className="text-primary font-bold">ACTION</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filteredOrders.map((order, index) => (
-              <TableRow key={order.billId} className={index % 2 ? 'bg-sky-100/60' : ''}>
-                <TableCell className="text-blue-400 font-medium">{order.billId}</TableCell>
-                <TableCell className="text-gray-500">{order.productId}</TableCell>
-                <TableCell className="font-bold text-primary">{order.name}</TableCell>
-                <TableCell className="text-gray-500">{order.modelNo}</TableCell>
-                <TableCell>
-                  <span
-                    className={`inline-flex px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide
+        <div className="overflow-x-auto">
+          <Table className="min-w-[800px] sm:min-w-full">
+            <TableHeader>
+              <TableRow>
+                <TableHead className="text-primary font-bold">BILL ID</TableHead>
+                <TableHead className="text-primary font-bold">PRODUCT ID</TableHead>
+                <TableHead className="text-primary font-bold">NAME</TableHead>
+                <TableHead className="text-primary font-bold">MODEL NO</TableHead>
+                <TableHead className="text-primary font-bold">SELLING TYPE</TableHead>
+                <TableHead className="text-primary font-bold">STATUS</TableHead>
+                <TableHead className="text-primary font-bold">DATE</TableHead>
+                <TableHead className="text-primary font-bold">ACTION</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredOrders.map((order, index) => (
+                <TableRow key={order.billId} className={index % 2 ? 'bg-sky-100/60' : ''}>
+                  <TableCell className="text-blue-400 font-medium">{order.billId}</TableCell>
+                  <TableCell className="text-gray-500">{order.productId}</TableCell>
+                  <TableCell className="font-bold text-primary">{order.name}</TableCell>
+                  <TableCell className="text-gray-500">{order.modelNo}</TableCell>
+                  <TableCell>
+                    <span
+                      className={`inline-flex px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide
                     ${
                       order.sellingType === 'Sale'
                         ? 'bg-blue-100 text-blue-600'
@@ -181,14 +182,14 @@ export default function EmployeeSalesTable() {
                           ? 'bg-orange-100 text-orange-600'
                           : 'bg-purple-100 text-purple-600'
                     }`}
-                  >
-                    {order.sellingType}
-                  </span>
-                </TableCell>
+                    >
+                      {order.sellingType}
+                    </span>
+                  </TableCell>
 
-                <TableCell>
-                  <span
-                    className={`inline-flex px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide
+                  <TableCell>
+                    <span
+                      className={`inline-flex px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide
                     ${
                       order.status === 'Delivered'
                         ? 'bg-green-100 text-green-600'
@@ -198,26 +199,27 @@ export default function EmployeeSalesTable() {
                             ? 'bg-red-100 text-red-600'
                             : 'bg-blue-100 text-blue-600'
                     }`}
-                  >
-                    {order.status}
-                  </span>
-                </TableCell>
-                <TableCell className="text-gray-500">{order.date}</TableCell>
-                <TableCell>
-                  <button
-                    className="text-primary hover:underline text-sm font-medium"
-                    onClick={() => {
-                      setEditing(order);
-                      setFormOpen(true);
-                    }}
-                  >
-                    Update
-                  </button>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+                    >
+                      {order.status}
+                    </span>
+                  </TableCell>
+                  <TableCell className="text-gray-500">{order.date}</TableCell>
+                  <TableCell>
+                    <button
+                      className="text-primary hover:underline text-sm font-medium"
+                      onClick={() => {
+                        setEditing(order);
+                        setFormOpen(true);
+                      }}
+                    >
+                      Update
+                    </button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
       </div>
 
       {formOpen && (
