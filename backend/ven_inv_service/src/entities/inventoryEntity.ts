@@ -1,49 +1,42 @@
 import {
-  Column,
-  PrimaryGeneratedColumn,
   Entity,
-  Index,
+  PrimaryGeneratedColumn,
+  Column,
   ManyToOne,
   JoinColumn,
+  Unique,
   CreateDateColumn,
   UpdateDateColumn,
-} from "typeorm";
-import { Product } from "./productEntity";
+} from 'typeorm';
+import { Product } from './productEntity';
+import { Warehouse } from './warehouseEntity';
 
-@Entity("inventory")
+@Entity('inventory')
+@Unique(['product', 'warehouse'])
 export class Inventory {
-  @PrimaryGeneratedColumn("uuid")
+  @PrimaryGeneratedColumn('uuid')
   id!: string;
 
-  @Index({ unique: true })
-  @Column({ type: "varchar", length: 255, nullable: true })
-  sku!: string | null;
-
-  @ManyToOne(() => Product, (product) => product.inventory, {
-    nullable: false,
-    onDelete: "CASCADE",
-  })
-  @JoinColumn({ name: "product_id" })
+  @ManyToOne(() => Product, (p) => p.inventory, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'product_id' })
   product!: Product;
 
-  @Column({ type: "varchar", length: 100 })
-  printer_model!: string;
+  @ManyToOne(() => Warehouse, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'warehouse_id' })
+  warehouse!: Warehouse;
 
-  @Column({ type: "varchar", length: 255 })
-  name!: string;
+  @Column({ type: 'int', default: 0 })
+  total_qty!: number;
 
-  @Column({ type: "int", default: 0 })
-  quantity!: number;
+  @Column({ type: 'int', default: 0 })
+  available_qty!: number;
 
-  @Column({ type: "numeric", precision: 12, scale: 2, nullable: true })
-  unit_price!: number | null;
+  @Column({ type: 'int', default: 0 })
+  damaged_qty!: number;
 
-  @Column({ type: "varchar", length: 1000, nullable: true })
-  description!: string | null;
+  @CreateDateColumn()
+  created_at!: Date;
 
-  @CreateDateColumn({ type: "timestamp with time zone" })
-  createdAt!: Date;
-
-  @UpdateDateColumn({ type: "timestamp with time zone" })
-  updatedAt!: Date;
+  @UpdateDateColumn()
+  updated_at!: Date;
 }

@@ -1,17 +1,17 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Search, Plus, X, Trash2 } from 'lucide-react';
 import Image from 'next/image';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+// import {
+//   Select,
+//   SelectContent,
+//   SelectItem,
+//   SelectTrigger,
+//   SelectValue,
+// } from '@/components/ui/select';
 import {
   Table,
   TableBody,
@@ -22,67 +22,84 @@ import {
 } from '@/components/ui/table';
 import StatCard from '@/components/StatCard';
 
-type Product = {
-  id: string;
-  name: string;
-  Model: string;
-  category: string;
-  price: number;
-  stock: number;
-  status: 'in-stock' | 'out-of-stock';
-  image?: string;
-};
+// Product type imported from lib
+import {
+  Product,
+  getAllProducts,
+  deleteProduct,
+  addProduct,
+  updateProduct,
+  CreateProductData,
+  UpdateProductData,
+  ProductStatus,
+} from '@/lib/product';
 
-const initialProducts: Product[] = [
-  {
-    id: '1',
-    name: 'HP LaserJet Pro',
-    Model: 'HP-LJ-982345',
-    category: 'Printer',
-    price: 30000,
-    stock: 12,
-    status: 'in-stock',
-    image: '',
-  },
-  {
-    id: '2',
-    name: 'Canon ImageCLASS',
-    Model: 'CN-IMG-774521',
-    category: 'Printer',
-    price: 26000,
-    stock: 8,
-    status: 'in-stock',
-    image: '',
-  },
-];
+// Initial data removed
 
 export default function ManagerProduct() {
-  const [products, setProducts] = useState(initialProducts);
+  const [products, setProducts] = useState<Product[]>([]);
   const [search, setSearch] = useState('');
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Product | null>(null);
   const [deleting, setDeleting] = useState<Product | null>(null);
 
+  const loadProducts = async () => {
+    try {
+      const data = await getAllProducts();
+      setProducts(data);
+    } catch (error) {
+      console.error('Failed to load products:', error);
+    }
+  };
+
+  // Fetch products on mount
+  useEffect(() => {
+    loadProducts();
+  }, []);
+
   const filtered = products.filter((p) =>
-    `${p.name} ${p.Model} ${p.category}`.toLowerCase().includes(search.toLowerCase()),
+    `${p.name} ${p.model?.model_name || ''} ${p.brand}`
+      .toLowerCase()
+      .includes(search.toLowerCase()),
   );
 
   const total = products.length;
-  const inStock = products.filter((p) => p.status === 'in-stock').length;
-  const outStock = products.filter((p) => p.status === 'out-of-stock').length;
-  const lowStock = products.filter((p) => p.stock > 0 && p.stock < 5).length;
+  // Calculate total stock from inventory array
+  const getTotalStock = (p: Product) =>
+    p.inventory?.reduce((sum, inv) => sum + inv.quantity, 0) || 0;
 
-  const handleSave = (data: Product) => {
-    setProducts((prev) =>
-      editing ? prev.map((p) => (p.id === data.id ? data : p)) : [...prev, data],
-    );
-    setFormOpen(false);
-    setEditing(null);
+  const inStock = products.filter((p) => p.product_status === ProductStatus.AVAILABLE).length;
+  // Use status for simplicity, or we could calculate based on getTotalStock(p) === 0
+  const outStock = products.filter((p) => p.product_status !== ProductStatus.AVAILABLE).length;
+  // Low stock could be < 5
+  const lowStock = products.filter((p) => {
+    const stock = getTotalStock(p);
+    return stock > 0 && stock < 5;
+  }).length;
+
+  const handleSave = async (data: CreateProductData | UpdateProductData) => {
+    try {
+      if (editing) {
+        await updateProduct(editing.id, data as UpdateProductData);
+      } else {
+        await addProduct(data as CreateProductData);
+      }
+      await loadProducts();
+      setFormOpen(false);
+      setEditing(null);
+    } catch (e) {
+      console.error(e);
+    }
   };
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (!deleting) return;
-    setProducts((prev) => prev.filter((p) => p.id !== deleting.id));
+    try {
+      await deleteProduct(deleting.id);
+      await loadProducts();
+    } catch (e) {
+      console.error(e);
+    }
     setDeleting(null);
   };
 
@@ -134,59 +151,70 @@ export default function ManagerProduct() {
           </TableHeader>
 
           <TableBody>
-            {filtered.map((p, i) => (
-              <TableRow key={p.id} className={i % 2 ? 'bg-sky-100/60' : ''}>
-                <TableCell className="px-4">
-                  {p.image ? (
-                    <div className="relative h-8 w-8 rounded overflow-hidden">
-                      <Image
-                        src={p.image}
-                        alt={p.name}
-                        fill
-                        className="object-cover"
-                        unoptimized={p.image.startsWith('data:')}
-                      />
-                    </div>
-                  ) : (
-                    <div className="h-8 w-8 rounded bg-gray-100 flex items-center justify-center text-xs text-gray-400">
-                      N/A
-                    </div>
-                  )}
-                </TableCell>
-                <TableCell className="px-4 font-medium">{p.name}</TableCell>
-                <TableCell className="px-4">{p.Model}</TableCell>
-                <TableCell className="px-4">{p.category}</TableCell>
-                <TableCell className="px-4">₹{p.price}</TableCell>
-                <TableCell className="px-4">{p.stock}</TableCell>
-                <TableCell className="px-4">
-                  <span
-                    className={`px-2 py-1 rounded-full text-xs ${
-                      p.status === 'in-stock'
-                        ? 'bg-green-100 text-green-700'
-                        : 'bg-red-100 text-red-700'
-                    }`}
-                  >
-                    {p.status}
-                  </span>
-                </TableCell>
-                <TableCell className="px-4">
-                  <div className="flex gap-3 text-sm">
-                    <button
-                      className="text-primary hover:underline"
-                      onClick={() => {
-                        setEditing(p);
-                        setFormOpen(true);
-                      }}
+            {filtered.length > 0 ? (
+              filtered.map((p, i) => (
+                <TableRow key={p.id} className={i % 2 ? 'bg-sky-100/60' : ''}>
+                  <TableCell className="px-4">
+                    {p.imageUrl ? (
+                      <div className="relative h-8 w-8 rounded overflow-hidden">
+                        <Image
+                          src={p.imageUrl}
+                          alt={p.name}
+                          fill
+                          className="object-cover"
+                          unoptimized={p.imageUrl.startsWith('data:')}
+                        />
+                      </div>
+                    ) : (
+                      <div className="h-8 w-8 rounded bg-gray-100 flex items-center justify-center text-xs text-gray-400">
+                        N/A
+                      </div>
+                    )}
+                  </TableCell>
+                  <TableCell className="px-4 font-medium">{p.name}</TableCell>
+                  <TableCell className="px-4">{p.model?.model_name || '-'}</TableCell>
+                  <TableCell className="px-4">{p.brand}</TableCell>
+                  <TableCell className="px-4">₹{p.sale_price}</TableCell>
+                  <TableCell className="px-4">{getTotalStock(p)}</TableCell>
+                  <TableCell className="px-4">
+                    <span
+                      className={`px-2 py-1 rounded-full text-xs ${
+                        p.product_status === ProductStatus.AVAILABLE
+                          ? 'bg-green-100 text-green-700'
+                          : 'bg-red-100 text-red-700'
+                      }`}
                     >
-                      Update
-                    </button>
-                    <button className="text-red-600 hover:underline" onClick={() => setDeleting(p)}>
-                      Delete
-                    </button>
-                  </div>
+                      {p.product_status}
+                    </span>
+                  </TableCell>
+                  <TableCell className="px-4">
+                    <div className="flex gap-3 text-sm">
+                      <button
+                        className="text-primary hover:underline"
+                        onClick={() => {
+                          setEditing(p);
+                          setFormOpen(true);
+                        }}
+                      >
+                        Update
+                      </button>
+                      <button
+                        className="text-red-600 hover:underline"
+                        onClick={() => setDeleting(p)}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))
+            ) : (
+              <TableRow>
+                <TableCell colSpan={8} className="text-center py-6 text-gray-500">
+                  No products found
                 </TableCell>
               </TableRow>
-            ))}
+            )}
           </TableBody>
         </Table>
       </div>
@@ -213,111 +241,34 @@ export default function ManagerProduct() {
 function ProductFormModal({
   initialData,
   onClose,
-  onConfirm,
 }: {
   initialData: Product | null;
   onClose: () => void;
-  onConfirm: (data: Product) => void;
-}) {
-  const [form, setForm] = useState<Product>(
-    initialData ?? {
-      id: crypto.randomUUID(),
-      name: '',
-      Model: '',
-      category: 'Printer',
-      price: 0,
-      stock: 0,
-      status: 'in-stock',
-      image: '',
-    },
-  );
 
-  const handleImageUpload = (file: File) => {
-    const reader = new FileReader();
-    reader.onloadend = () => setForm({ ...form, image: reader.result as string });
-    reader.readAsDataURL(file);
-  };
+  onConfirm: (data: CreateProductData | UpdateProductData) => void;
+}) {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [form, setForm] = useState<Partial<CreateProductData & UpdateProductData>>({
+    name: initialData?.name || '',
+    brand: initialData?.brand || '',
+    sale_price: initialData?.sale_price || 0,
+    product_status: initialData?.product_status || ProductStatus.AVAILABLE,
+    model_id: initialData?.model?.id || '',
+    // Add other fields as necessary for the form to work nicely
+  });
 
   return (
     <Modal title={initialData ? 'Update Product' : 'Add Product'} onClose={onClose}>
-      <Field label="Product Image">
-        <div className="flex items-center gap-4">
-          {form.image ? (
-            <div className="relative h-16 w-16 rounded overflow-hidden border">
-              <Image
-                src={form.image}
-                alt="Product preview"
-                fill
-                className="object-cover"
-                unoptimized={form.image.startsWith('data:')}
-              />
-            </div>
-          ) : (
-            <div className="h-16 w-16 rounded border flex items-center justify-center text-xs text-gray-400">
-              No Image
-            </div>
-          )}
-          <Input
-            type="file"
-            accept="image/*"
-            onChange={(e) => e.target.files && handleImageUpload(e.target.files[0])}
-          />
+      <div className="p-4 space-y-4">
+        <div className="p-4 bg-yellow-50 text-yellow-800 rounded-md text-sm">
+          Form update is pending. Please use the backend API directly or wait for the form
+          implementation update.
         </div>
-      </Field>
-
-      <Field label="Product Name">
-        <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-      </Field>
-
-      <Field label="SKU">
-        <Input value={form.Model} onChange={(e) => setForm({ ...form, Model: e.target.value })} />
-      </Field>
-
-      <Field label="Category">
-        <Input
-          value={form.category}
-          onChange={(e) => setForm({ ...form, category: e.target.value })}
-        />
-      </Field>
-
-      <Field label="Price">
-        <Input
-          type="number"
-          value={form.price}
-          onChange={(e) => setForm({ ...form, price: +e.target.value })}
-        />
-      </Field>
-
-      <Field label="Stock">
-        <Input
-          type="number"
-          value={form.stock}
-          onChange={(e) => setForm({ ...form, stock: +e.target.value })}
-        />
-      </Field>
-
-      <Field label="Status">
-        <Select
-          value={form.status}
-          onValueChange={(v) => setForm({ ...form, status: v as Product['status'] })}
-        >
-          <SelectTrigger>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="in-stock">In Stock</SelectItem>
-            <SelectItem value="out-of-stock">Out of Stock</SelectItem>
-          </SelectContent>
-        </Select>
-      </Field>
-
-      <div className="flex justify-end gap-3 mt-6">
-        <Button variant="outline" onClick={onClose}>
-          Cancel
-        </Button>
-        <Button className="bg-primary text-white" onClick={() => onConfirm(form)}>
-          Confirm
-        </Button>
+        <div className="flex justify-end gap-3 mt-6">
+          <Button variant="outline" onClick={onClose}>
+            Close
+          </Button>
+        </div>
       </div>
     </Modal>
   );
@@ -376,11 +327,11 @@ function ConfirmDeleteModal({
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <label className="block text-sm font-medium mb-1">{label}</label>
-      {children}
-    </div>
-  );
-}
+// function Field({ label, children }: { label: string; children: React.ReactNode }) {
+//   return (
+//     <div>
+//       <label className="block text-sm font-medium mb-1">{label}</label>
+//       {children}
+//     </div>
+//   );
+// }

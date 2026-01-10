@@ -11,60 +11,60 @@ import {
 import { Button } from '@/components/ui/button';
 import { Eye, Edit2 } from 'lucide-react';
 
-const inventoryData = [
-  {
-    id: 'INV-001',
-    productName: 'HP LaserJet Pro M404n',
-    model: 'M404n',
-    activeStock: 45,
-    damagedStock: 2,
-    vendor: 'HP India',
-    warehouse: 'Main Warehouse',
-  },
-  {
-    id: 'INV-002',
-    productName: 'Canon imageCLASS LBP6230dn',
-    model: 'LBP6230dn',
-    activeStock: 30,
-    damagedStock: 5,
-    vendor: 'Canon Sales',
-    warehouse: 'North Storage',
-  },
-  {
-    id: 'INV-003',
-    productName: 'Brother HL-L2350DW',
-    model: 'HL-L2350DW',
-    activeStock: 12,
-    damagedStock: 0,
-    vendor: 'Brother Corp',
-    warehouse: 'Main Warehouse',
-  },
-  {
-    id: 'INV-004',
-    productName: 'Epson EcoTank L3210',
-    model: 'L3210',
-    activeStock: 80,
-    damagedStock: 12,
-    vendor: 'Epson Direct',
-    warehouse: 'East Wing',
-  },
-  {
-    id: 'INV-005',
-    productName: 'Samsung Xpress M2020W',
-    model: 'M2020W',
-    activeStock: 5,
-    damagedStock: 8,
-    vendor: 'Global Tech',
-    warehouse: 'North Storage',
-  },
-];
+import { useEffect } from 'react';
+import api from '@/lib/api';
+// Using any for stock calculation for now as quick fix, better to import types properly
+// import { InventoryItem } from ... (defined locally or imported)
+
+interface InventoryItem {
+  id: string;
+  warehouseId: string;
+  quantity: number;
+  unitPrice: number;
+  sku: string | null;
+  description: string | null;
+  createdAt: string;
+  updatedAt: string;
+  product: {
+    id: string;
+    name: string;
+    model: { model_name: string };
+    vendor_id: string;
+  };
+}
+
+interface InventoryResponse {
+  success: boolean;
+  data: InventoryItem[];
+  total: number;
+}
 
 export default function InventoryProductsTable() {
   const [page, setPage] = useState(1);
+  const [data, setData] = useState<InventoryItem[]>([]);
+
   const ITEMS_PER_PAGE = 5;
-  const totalPages = Math.ceil(inventoryData.length / ITEMS_PER_PAGE);
+  // Use data.length or total from API for pagination. For now using client-side slice on fetched data
+  // but better to implement server side pagination.
+  // Let's stick to client side pagination on "all" data or page size limit for consistency with previous pattern
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const res = await api.get<InventoryResponse>('/i/inventory?limit=50');
+        if (res.data.success) {
+          setData(res.data.data);
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    };
+    fetchData();
+  }, []);
+
+  const totalPages = Math.ceil(data.length / ITEMS_PER_PAGE);
   const startIndex = (page - 1) * ITEMS_PER_PAGE;
-  const currentData = inventoryData.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+  const currentData = data.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
   return (
     <div className="bg-white rounded-xl shadow-sm overflow-hidden">
@@ -96,64 +96,74 @@ export default function InventoryProductsTable() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {currentData.map((item, index) => (
-              <TableRow
-                key={item.id}
-                className={`hover:bg-gray-50/30 transition-colors ${index % 2 ? 'bg-sky-100/60' : ''}`}
-              >
-                <TableCell className="px-6 py-4 font-medium text-gray-900">
-                  {item.productName}
-                </TableCell>
-                <TableCell className="px-6 py-4 text-gray-600">{item.model}</TableCell>
-                <TableCell className="px-6 py-4 text-center font-bold text-gray-900">
-                  {item.activeStock}
-                </TableCell>
-                <TableCell className="px-6 py-4 text-center">
-                  <span
-                    className={`px-2.5 py-1 rounded-full text-xs font-medium ${
-                      item.damagedStock > 0
-                        ? 'bg-red-100 text-red-700'
-                        : 'bg-green-100 text-green-700'
-                    }`}
-                  >
-                    {item.damagedStock}
-                  </span>
-                </TableCell>
-                <TableCell className="px-6 py-4 text-gray-600">{item.vendor}</TableCell>
-                <TableCell className="px-6 py-4 text-gray-600">
-                  <div className="flex items-center gap-2">
-                    <div className="w-1.5 h-1.5 rounded-full bg-blue-500"></div>
-                    {item.warehouse}
-                  </div>
-                </TableCell>
-                <TableCell className="px-6 py-4 text-right pr-6">
-                  <div className="flex justify-end gap-1">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 text-gray-400 hover:text-primary"
+            {currentData.length > 0 ? (
+              currentData.map((item, index) => (
+                <TableRow
+                  key={item.id}
+                  className={`hover:bg-gray-50/30 transition-colors ${index % 2 ? 'bg-sky-100/60' : ''}`}
+                >
+                  <TableCell className="px-6 py-4 font-medium text-gray-900">
+                    {item.product.name}
+                  </TableCell>
+                  <TableCell className="px-6 py-4 text-gray-600">
+                    {item.product.model?.model_name || '-'}
+                  </TableCell>
+                  <TableCell className="px-6 py-4 text-center font-bold text-gray-900">
+                    {item.quantity}
+                  </TableCell>
+                  <TableCell className="px-6 py-4 text-center">
+                    <span
+                      className={`px-2.5 py-1 rounded-full text-xs font-medium ${'bg-green-100 text-green-700'}`}
                     >
-                      <Eye className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 text-gray-400 hover:text-primary"
-                    >
-                      <Edit2 className="h-4 w-4" />
-                    </Button>
-                  </div>
+                      0
+                    </span>
+                  </TableCell>
+                  <TableCell className="px-6 py-4 text-gray-600">
+                    {item.product.vendor_id}
+                  </TableCell>
+                  <TableCell className="px-6 py-4 text-gray-600">
+                    <div className="flex items-center gap-2">
+                      <div className="w-1.5 h-1.5 rounded-full bg-blue-500"></div>
+                      <span className="truncate max-w-[100px]" title={item.warehouseId}>
+                        {item.warehouseId}
+                      </span>
+                    </div>
+                  </TableCell>
+                  <TableCell className="px-6 py-4 text-right pr-6">
+                    <div className="flex justify-end gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-gray-400 hover:text-primary"
+                      >
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-gray-400 hover:text-primary"
+                      >
+                        <Edit2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))
+            ) : (
+              <TableRow>
+                <TableCell colSpan={7} className="text-center py-6 text-gray-500">
+                  No inventory items found
                 </TableCell>
               </TableRow>
-            ))}
+            )}
           </TableBody>
         </Table>
       </div>
 
       <div className="p-4 border-t border-gray-50 flex items-center justify-between bg-white">
         <p className="text-xs text-gray-500">
-          Showing {startIndex + 1} to {Math.min(startIndex + ITEMS_PER_PAGE, inventoryData.length)}{' '}
-          of {inventoryData.length} products
+          Showing {startIndex + 1} to {Math.min(startIndex + ITEMS_PER_PAGE, data.length)} of{' '}
+          {data.length} products
         </p>
         <div className="flex items-center gap-2">
           <Button

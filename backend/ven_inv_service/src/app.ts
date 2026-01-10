@@ -7,12 +7,12 @@ import { logger } from './config/logger';
 import healthRouter from './routes/health';
 import { Source } from './config/db';
 import productRoute from './routes/productRoute';
-// import inventoryRouter from './routes/inventoryRoute';
 import branchRouter from './routes/branchRoutes';
 import warehouseRouter from './routes/warehouseRoutes';
 import { startEmployeeConsumer } from './events/consumers/employeeConsumer';
 import { getRabbitChannel } from './config/rabbitmq';
 import modelRoute from './routes/modelRoute';
+import { inventoryRoute } from './routes/inventoryRoute';
 
 const app = express();
 
@@ -23,7 +23,7 @@ app.use('/vendors', vendorRouter);
 app.use('/branch', branchRouter);
 app.use('/warehouses', warehouseRouter);
 app.use('/models', modelRoute);
-// app.use('/inventory',inventoryRouter)
+app.use('/inventory', inventoryRoute);
 app.use('/products', productRoute);
 app.use(errorHandler);
 

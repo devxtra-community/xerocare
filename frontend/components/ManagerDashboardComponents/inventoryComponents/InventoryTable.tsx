@@ -13,64 +13,54 @@ import { Eye, Edit2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 
-const mockData = [
-  {
-    id: '1',
-    name: 'HP LaserJet Pro',
-    brandModel: 'HP / M404n',
-    category: 'Printer',
-    sku: 'PRN-HP-M404',
-    serialNumber: 'SN12345678',
-    quantity: 15,
-    vendor: 'HP India',
-    purchaseCost: '₹ 12,000',
-    sellingPrice: '₹ 15,500',
-    status: 'In Stock',
-    warranty: '2026-12-31',
-    imageUrl:
-      'https://images.unsplash.com/photo-1612815154858-60aa4c59eaa6?q=80&w=2070&auto=format&fit=crop',
-  },
-  {
-    id: '2',
-    name: 'Canon Toner Cartridge',
-    brandModel: 'Canon / G-27',
-    category: 'Consumable',
-    sku: 'CON-CAN-G27',
-    serialNumber: 'N/A',
-    quantity: 5,
-    vendor: 'Canon Sales',
-    purchaseCost: '₹ 2,500',
-    sellingPrice: '₹ 3,200',
-    status: 'Low Stock',
-    warranty: 'N/A',
-    imageUrl:
-      'https://images.unsplash.com/photo-1589139049405-c08126786801?q=80&w=2072&auto=format&fit=crop',
-  },
-  {
-    id: '3',
-    name: 'Printer Fuser Unit',
-    brandModel: 'Brother / B-FU',
-    category: 'Spare',
-    sku: 'SPR-BRT-FU',
-    serialNumber: 'SN98765432',
-    quantity: 0,
-    vendor: 'Brother Corp',
-    purchaseCost: '₹ 4,500',
-    sellingPrice: '₹ 6,000',
-    status: 'Out of Stock',
-    warranty: '2025-06-15',
-    imageUrl:
-      'https://images.unsplash.com/photo-1544652478-6653e09f18a2?q=80&w=2070&auto=format&fit=crop',
-  },
-  // Add more mock data as needed
-];
+import { useEffect } from 'react';
+import api from '@/lib/api';
+import { Product } from '@/lib/product';
+
+interface InventoryItem {
+  id: string;
+  warehouseId: string;
+  quantity: number;
+  unitPrice: number;
+  sku: string | null;
+  description: string | null;
+  createdAt: string;
+  updatedAt: string;
+  product: Product;
+}
+
+interface InventoryResponse {
+  success: boolean;
+  data: InventoryItem[];
+  total: number;
+}
 
 export default function InventoryTable() {
   const router = useRouter();
   const [page, setPage] = useState(1);
+  const [data, setData] = useState<InventoryItem[]>([]);
+  const [total, setTotal] = useState(0);
   const itemsPerPage = 5;
-  const totalPages = Math.ceil(mockData.length / itemsPerPage);
-  const currentData = mockData.slice((page - 1) * itemsPerPage, page * itemsPerPage);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const res = await api.get<InventoryResponse>(
+          `/i/inventory?page=${page}&limit=${itemsPerPage}`,
+        );
+        if (res.data.success) {
+          setData(res.data.data);
+          setTotal(res.data.total);
+        }
+      } catch (error) {
+        console.error(error);
+      }
+    };
+    fetchData();
+  }, [page]);
+
+  const totalPages = Math.ceil(total / itemsPerPage);
+  const currentData = data;
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
@@ -117,103 +107,109 @@ export default function InventoryTable() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {currentData.map((item, idx) => (
-              <TableRow
-                key={item.id}
-                className={`transition-colors h-11 ${idx % 2 === 0 ? 'bg-white' : 'bg-blue-50/20'}`}
-              >
-                <TableCell className="px-3 py-1.5">
-                  <div className="w-8 h-8 rounded-lg overflow-hidden bg-gray-100 flex items-center justify-center border border-gray-100 shadow-sm relative">
-                    {item.imageUrl ? (
-                      <Image src={item.imageUrl} alt={item.name} fill className="object-cover" />
-                    ) : (
-                      <span className="text-[8px] text-gray-400 font-bold uppercase">No IMG</span>
-                    )}
-                  </div>
-                </TableCell>
-                <TableCell className="px-3 py-1.5 font-medium text-gray-900 text-[12px]">
-                  {item.name}
-                </TableCell>
-                <TableCell className="px-3 py-1.5 text-gray-600 text-[11px]">
-                  {item.brandModel}
-                </TableCell>
-                <TableCell className="px-3 py-1.5">
-                  <span
-                    className={`px-1.5 py-0.5 rounded-full text-[9px] font-semibold ${
-                      item.category === 'Printer'
-                        ? 'bg-purple-100 text-purple-700'
-                        : item.category === 'Consumable'
-                          ? 'bg-orange-100 text-orange-700'
-                          : 'bg-blue-100 text-blue-700'
-                    }`}
-                  >
-                    {item.category}
-                  </span>
-                </TableCell>
-                <TableCell className="px-3 py-1.5 text-gray-500 font-mono text-[9px]">
-                  {item.sku}
-                </TableCell>
-                <TableCell className="px-3 py-1.5 text-gray-500 text-[10px]">
-                  {item.serialNumber}
-                </TableCell>
-                <TableCell className="px-3 py-1.5 text-center font-bold text-[12px]">
-                  {item.quantity}
-                </TableCell>
-                <TableCell className="px-3 py-1.5 text-gray-600 text-[11px]">
-                  {item.vendor}
-                </TableCell>
-                <TableCell className="px-3 py-1.5 text-gray-900 font-medium text-[11px]">
-                  {item.purchaseCost}
-                </TableCell>
-                <TableCell className="px-3 py-1.5 text-primary font-bold text-[12px]">
-                  {item.sellingPrice}
-                </TableCell>
-                <TableCell className="px-3 py-1.5">
-                  <span
-                    className={`px-1.5 py-0.5 rounded-full text-[9px] font-bold ${
-                      item.status === 'In Stock'
-                        ? 'bg-green-100 text-green-700'
-                        : item.status === 'Low Stock'
-                          ? 'bg-yellow-100 text-yellow-700'
-                          : 'bg-red-100 text-red-700'
-                    }`}
-                  >
-                    {item.status}
-                  </span>
-                </TableCell>
-                <TableCell className="px-3 py-1.5 text-right pr-3">
-                  <div className="flex items-center justify-end gap-2">
-                    <span className="text-[11px] text-gray-500">{item.warranty}</span>
-                    <div className="flex gap-0.5">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 text-gray-400 hover:text-primary hover:bg-primary/5"
-                        onClick={() => router.push(`/manager/inventory/${item.id}`)}
-                      >
-                        <Eye className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 text-gray-400 hover:text-primary hover:bg-primary/5"
-                      >
-                        <Edit2 className="h-3.5 w-3.5" />
-                      </Button>
+            {currentData.length > 0 ? (
+              currentData.map((item, idx) => (
+                <TableRow
+                  key={item.id}
+                  className={`transition-colors h-11 ${idx % 2 === 0 ? 'bg-white' : 'bg-blue-50/20'}`}
+                >
+                  <TableCell className="px-3 py-1.5">
+                    <div className="w-8 h-8 rounded-lg overflow-hidden bg-gray-100 flex items-center justify-center border border-gray-100 shadow-sm relative">
+                      {item.product.imageUrl ? (
+                        <Image
+                          src={item.product.imageUrl}
+                          alt={item.product.name}
+                          fill
+                          className="object-cover"
+                        />
+                      ) : (
+                        <span className="text-[8px] text-gray-400 font-bold uppercase">No IMG</span>
+                      )}
                     </div>
-                  </div>
+                  </TableCell>
+                  <TableCell className="px-3 py-1.5 font-medium text-gray-900 text-[12px]">
+                    {item.product.name}
+                  </TableCell>
+                  <TableCell className="px-3 py-1.5 text-gray-600 text-[11px]">
+                    {item.product.brand} / {item.product.model?.model_name || '-'}
+                  </TableCell>
+                  <TableCell className="px-3 py-1.5">
+                    <span
+                      className={`px-1.5 py-0.5 rounded-full text-[9px] font-semibold bg-blue-100 text-blue-700`}
+                    >
+                      Product
+                    </span>
+                  </TableCell>
+                  <TableCell className="px-3 py-1.5 text-gray-500 font-mono text-[9px]">
+                    {item.sku || '-'}
+                  </TableCell>
+                  <TableCell className="px-3 py-1.5 text-gray-500 text-[10px]">
+                    {item.product.serial_no}
+                  </TableCell>
+                  <TableCell className="px-3 py-1.5 text-center font-bold text-[12px]">
+                    {item.quantity}
+                  </TableCell>
+                  <TableCell className="px-3 py-1.5 text-gray-600 text-[11px]">
+                    {item.product.vendor_id}
+                  </TableCell>
+                  <TableCell className="px-3 py-1.5 text-gray-900 font-medium text-[11px]">
+                    {/* Cost not available in Inventory entity directly, assuming unitPrice */}₹{' '}
+                    {item.unitPrice}
+                  </TableCell>
+                  <TableCell className="px-3 py-1.5 text-primary font-bold text-[12px]">
+                    ₹ {item.product.sale_price}
+                  </TableCell>
+                  <TableCell className="px-3 py-1.5">
+                    <span
+                      className={`px-1.5 py-0.5 rounded-full text-[9px] font-bold ${
+                        item.quantity > 5
+                          ? 'bg-green-100 text-green-700'
+                          : item.quantity > 0
+                            ? 'bg-yellow-100 text-yellow-700'
+                            : 'bg-red-100 text-red-700'
+                      }`}
+                    >
+                      {item.quantity > 0 ? 'In Stock' : 'Out of Stock'}
+                    </span>
+                  </TableCell>
+                  <TableCell className="px-3 py-1.5 text-right pr-3">
+                    <div className="flex items-center justify-end gap-2">
+                      <span className="text-[11px] text-gray-500">-</span>
+                      <div className="flex gap-0.5">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-gray-400 hover:text-primary hover:bg-primary/5"
+                          onClick={() => router.push(`/manager/inventory/${item.id}`)}
+                        >
+                          <Eye className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-gray-400 hover:text-primary hover:bg-primary/5"
+                        >
+                          <Edit2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))
+            ) : (
+              <TableRow>
+                <TableCell colSpan={12} className="text-center py-6 text-gray-500">
+                  No inventory items found
                 </TableCell>
               </TableRow>
-            ))}
+            )}
           </TableBody>
         </Table>
       </div>
 
       <div className="p-4 border-t border-gray-50 flex items-center justify-between bg-white text-xs">
-        <p className="text-gray-500">
-          Showing {(page - 1) * itemsPerPage + 1} to{' '}
-          {Math.min(page * itemsPerPage, mockData.length)} of {mockData.length} items
-        </p>
+        Showing {(page - 1) * itemsPerPage + 1} to {Math.min(page * itemsPerPage, total)} of {total}{' '}
+        items
         <div className="flex items-center gap-1">
           <Button
             variant="outline"

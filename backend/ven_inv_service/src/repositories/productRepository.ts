@@ -18,6 +18,7 @@ export class ProductRepository {
     return this.repo.find({
       relations: {
         model: true,
+        inventory: true,
       },
     });
   }
