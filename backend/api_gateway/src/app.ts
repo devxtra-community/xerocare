@@ -1,5 +1,5 @@
 import './config/env';
-import express, { Express } from 'express';
+import express, { Express, Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import { createProxyMiddleware } from 'http-proxy-middleware';
 import type { Options } from 'http-proxy-middleware';
@@ -34,11 +34,12 @@ const invProxyOptions: Options = {
 };
 
 app.use(httpLogger);
-app.use('/', healthRouter);
+app.use('/health', healthRouter);
 app.use('/e', createProxyMiddleware(empProxyOptions));
 app.use('/i', createProxyMiddleware(invProxyOptions));
 
-app.use((err: any, req: any, res: any, next: any) => {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+app.use((err: Error, req: Request, res: Response, _next: NextFunction) => {
   logger.error(err);
   res.status(500).json({ message: 'Internal Server Error' });
 });

@@ -49,7 +49,7 @@ export const addEmployee = async (req: Request, res: Response, next: NextFunctio
 
 export const getEmployeeIdProof = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const employeeId = req.params.id;
+    const employeeId = req.params.id as string;
 
     const result = await service.getEmployeeIdProof(employeeId);
 
@@ -81,7 +81,7 @@ export const getAllEmployees = async (req: Request, res: Response, next: NextFun
 
 export const getEmployeeById = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const employee = await service.getEmployeeById(req.params.id);
+    const employee = await service.getEmployeeById(req.params.id as string);
 
     return res.json({
       success: true,
@@ -116,7 +116,7 @@ export const updateEmployee = async (req: Request, res: Response, next: NextFunc
       branchId: req.body.branchId || undefined,
     };
 
-    const updatedEmployee = await service.updateEmployee(req.params.id, payload);
+    const updatedEmployee = await service.updateEmployee(req.params.id as string, payload);
 
     return res.json({
       success: true,
@@ -131,7 +131,7 @@ export const updateEmployee = async (req: Request, res: Response, next: NextFunc
 
 export const deleteEmployee = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    await service.deleteEmployee(req.params.id);
+    await service.deleteEmployee(req.params.id as string);
 
     return res.json({
       success: true,

@@ -15,12 +15,12 @@ export class BranchController {
   };
 
   update = async (req: Request, res: Response) => {
-    await this.service.updateBranch(req.params.id, req.body);
+    await this.service.updateBranch(req.params.id as string, req.body);
     res.json({ success: true, message: 'Branch updated successfully' });
   };
 
   delete = async (req: Request, res: Response) => {
-    await this.service.deleteBranch(req.params.id);
+    await this.service.deleteBranch(req.params.id as string);
     res.json({ success: true, message: 'Branch deleted successfully' });
   };
 }
