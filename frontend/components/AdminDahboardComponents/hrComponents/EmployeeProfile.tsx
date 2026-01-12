@@ -101,7 +101,7 @@ export default function EmployeeProfile({ id }: EmployeeProfileProps) {
         {/* Left Column: Basic Info */}
         <div className="lg:col-span-1 space-y-6">
           <div className="bg-white rounded-2xl p-6 shadow-sm flex flex-col items-center text-center">
-            <div className="h-24 w-24 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-bold text-3xl mb-4 overflow-hidden">
+            <div className="h-24 w-24 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-bold text-3xl mb-4 overflow-hidden relative">
               {emp.profile_image_url ? (
                 <Image src={emp.profile_image_url} alt="" fill className="object-cover" />
               ) : (
@@ -222,6 +222,18 @@ export default function EmployeeProfile({ id }: EmployeeProfileProps) {
                   <p className="text-xs text-gray-500 font-medium uppercase">Last Updated</p>
                   <p className="text-sm font-semibold text-gray-900">
                     {new Date(emp.updatedAt).toLocaleDateString('en-GB')}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-4">
+                <div className="h-10 w-10 rounded-xl bg-blue-50 flex items-center justify-center flex-shrink-0">
+                  <Briefcase className="h-5 w-5 text-blue-600" />
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500 font-medium uppercase">Branch</p>
+                  <p className="text-sm font-semibold text-gray-900">
+                    {emp.branch?.name || 'No branch assigned'}
                   </p>
                 </div>
               </div>
