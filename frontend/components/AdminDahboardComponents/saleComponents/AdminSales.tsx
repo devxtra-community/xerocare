@@ -1,6 +1,5 @@
 import StatCard from '@/components/StatCard';
 import SalesSummaryTable from './SalesSummaryTable';
-import SalesChart from '../dashboardComponents/SalesChart';
 
 import MonthlySalesBarChart from './monthlysalesChart';
 import MostSoldProductChart from './MostSoldProductChart';
@@ -21,18 +20,11 @@ export default function AdminSalesPage() {
         </div>
 
         {/* TABLE + TREND */}
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 sm:gap-6 items-stretch">
-          <div className="xl:col-span-2 flex flex-col space-y-4">
+        <div className="grid grid-cols-1 gap-4 sm:gap-6 items-stretch">
+          <div className="flex flex-col space-y-4">
             <h3 className="text-lg sm:text-xl font-bold text-primary">Sales Summary</h3>
             <div className="flex-1">
               <SalesSummaryTable />
-            </div>
-          </div>
-
-          <div className="flex flex-col space-y-4">
-            <h3 className="text-lg sm:text-xl font-bold text-primary">Sales Trend</h3>
-            <div className="flex-1 bg-white rounded-xl p-3">
-              <SalesChart />
             </div>
           </div>
         </div>

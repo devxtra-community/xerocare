@@ -1,15 +1,28 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { Area, AreaChart, CartesianGrid, XAxis, YAxis, ResponsiveContainer } from 'recharts';
+import {
+  Area,
+  AreaChart,
+  CartesianGrid,
+  XAxis,
+  YAxis,
+  ResponsiveContainer,
+  Tooltip,
+} from 'recharts';
 
 const data = [
-  { day: '18', sales: 30000 },
-  { day: '20', sales: 45000 },
-  { day: '22', sales: 70000 },
-  { day: '24', sales: 55000 },
-  { day: '26', sales: 25000 },
-  { day: '28', sales: 50000 },
-  { day: '30', sales: 60000 },
+  { month: 'Jan', sales: 30000 },
+  { month: 'Feb', sales: 45000 },
+  { month: 'Mar', sales: 70000 },
+  { month: 'Apr', sales: 55000 },
+  { month: 'May', sales: 25000 },
+  { month: 'Jun', sales: 50000 },
+  { month: 'Jul', sales: 60000 },
+  { month: 'Aug', sales: 40000 },
+  { month: 'Sep', sales: 65000 },
+  { month: 'Oct', sales: 80000 },
+  { month: 'Nov', sales: 55000 },
+  { month: 'Dec', sales: 90000 },
 ];
 
 export default function SalesChart() {
@@ -23,7 +36,7 @@ export default function SalesChart() {
   return (
     <div className="rounded-2xl bg-white h-[260px] w-full shadow-sm flex flex-col p-3">
       <div className="flex flex-row items-center justify-between pb-2">
-        <p className="text-xs text-gray-600">Last 30 days</p>
+        <p className="text-xs text-gray-600">Monthly</p>
 
         <div className="flex gap-1.5 text-[10px]">
           {['1W', '1M', '3M', '1Y'].map((period) => (
@@ -56,7 +69,7 @@ export default function SalesChart() {
               <CartesianGrid vertical={false} strokeDasharray="3 3" strokeOpacity={0.3} />
 
               <XAxis
-                dataKey="day"
+                dataKey="month"
                 axisLine={false}
                 tickLine={false}
                 tickMargin={6}
@@ -72,6 +85,8 @@ export default function SalesChart() {
                 ticks={[0, 20000, 40000, 60000, 80000, 100000]}
                 tick={{ fill: '#6b7280', fontSize: 10 }}
               />
+
+              <Tooltip contentStyle={{ fontSize: 12 }} labelStyle={{ color: '#1e3a8a' }} />
 
               <Area
                 type="monotone"
