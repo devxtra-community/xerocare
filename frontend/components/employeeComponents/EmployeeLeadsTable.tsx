@@ -12,7 +12,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Plus, Search } from 'lucide-react';
+import { Plus, Search, Phone, Mail, Edit } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -26,27 +26,30 @@ const initialLeads: Lead[] = [
   {
     id: '1',
     name: 'Alice Johnson',
-    contact: 'alice@example.com',
+    email: 'alice@example.com',
+    phone: '+1 555-0100',
     source: 'Website',
-    product: 'Premium Plan',
+    product: 'Canon ImageRunner 2630',
     status: 'New',
     priority: 'Hot',
   },
   {
     id: '2',
     name: 'Bob Smith',
-    contact: '+1 555-0123',
+    email: 'bob@example.com',
+    phone: '+1 555-0123',
     source: 'Instagram',
-    product: 'Basic Plan',
+    product: 'HP LaserJet Pro M404dn',
     status: 'Contacted',
     priority: 'Warm',
   },
   {
     id: '3',
     name: 'Charlie Brown',
-    contact: 'charlie@example.com',
+    email: 'charlie@example.com',
+    phone: '+1 555-0300',
     source: 'Whatsapp',
-    product: 'Pro Plan',
+    product: 'Epson EcoTank L3250',
     status: 'Follow-up',
     priority: 'Cold',
   },
@@ -148,25 +151,30 @@ export default function EmployeeLeadsTable() {
         </Button>
       </div>
 
-      <div className="rounded-2xl bg-white shadow-sm overflow-hidden">
+      <div className="rounded-2xl bg-white shadow-sm overflow-hidden border">
         <div className="overflow-x-auto">
           <Table className="min-w-[800px] sm:min-w-full">
             <TableHeader>
-              <TableRow>
+              <TableRow className="bg-slate-50">
                 <TableHead className="text-primary font-bold">NAME</TableHead>
                 <TableHead className="text-primary font-bold">CONTACT</TableHead>
                 <TableHead className="text-primary font-bold">SOURCE</TableHead>
                 <TableHead className="text-primary font-bold">PRODUCT</TableHead>
                 <TableHead className="text-primary font-bold">STATUS</TableHead>
                 <TableHead className="text-primary font-bold">PRIORITY</TableHead>
-                <TableHead className="text-primary font-bold text-right">ACTION</TableHead>
+                <TableHead className="text-primary font-bold text-right pr-6">ACTION</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filteredLeads.map((lead, index) => (
-                <TableRow key={lead.id} className={index % 2 ? 'bg-sky-100/60' : ''}>
+                <TableRow key={lead.id} className={index % 2 ? 'bg-sky-50/30' : ''}>
                   <TableCell className="font-bold text-primary">{lead.name}</TableCell>
-                  <TableCell className="text-gray-500">{lead.contact}</TableCell>
+                  <TableCell>
+                    <div className="flex flex-col">
+                      <span className="text-xs text-slate-500">{lead.email}</span>
+                      <span className="text-xs text-slate-500">{lead.phone}</span>
+                    </div>
+                  </TableCell>
                   <TableCell className="text-gray-500">{lead.source}</TableCell>
                   <TableCell className="text-gray-500">{lead.product}</TableCell>
                   <TableCell>
@@ -179,13 +187,36 @@ export default function EmployeeLeadsTable() {
                       {lead.priority}
                     </Badge>
                   </TableCell>
-                  <TableCell className="text-right">
-                    <button
-                      className="text-primary hover:underline text-sm font-medium"
-                      onClick={() => handleEditClick(lead)}
-                    >
-                      Update
-                    </button>
+                  <TableCell className="text-right pr-4">
+                    <div className="flex items-center justify-end gap-2">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-slate-500 hover:text-blue-600 hover:bg-blue-50"
+                        onClick={() => handleEditClick(lead)}
+                        title="Edit Lead"
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <a href={`tel:${lead.phone}`}>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-slate-500 hover:text-blue-600 hover:bg-blue-50"
+                        >
+                          <Phone className="h-4 w-4" />
+                        </Button>
+                      </a>
+                      <a href={`mailto:${lead.email}`}>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-slate-500 hover:text-blue-600 hover:bg-blue-50"
+                        >
+                          <Mail className="h-4 w-4" />
+                        </Button>
+                      </a>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
