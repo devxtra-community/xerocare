@@ -193,31 +193,31 @@ export default function EmployeeTable() {
         <table className="w-full text-left">
           <thead className="bg-gray-50/50">
             <tr>
-              <th className="px-6 py-4 text-xs font-semibold text-primary uppercase tracking-wider">
+              <th className="px-3 py-4 text-xs font-semibold text-primary uppercase tracking-wider">
                 ID
               </th>
-              <th className="px-6 py-4 text-xs font-semibold text-primary uppercase tracking-wider">
+              <th className="px-3 py-4 text-xs font-semibold text-primary uppercase tracking-wider">
                 Name
               </th>
-              <th className="px-6 py-4 text-xs font-semibold text-primary uppercase tracking-wider">
+              <th className="px-3 py-4 text-xs font-semibold text-primary uppercase tracking-wider">
                 Role
               </th>
-              <th className="px-6 py-4 text-xs font-semibold text-primary uppercase tracking-wider">
+              <th className="px-3 py-4 text-xs font-semibold text-primary uppercase tracking-wider">
                 Branch
               </th>
-              <th className="px-6 py-4 text-xs font-semibold text-primary uppercase tracking-wider">
+              <th className="px-3 py-4 text-xs font-semibold text-primary uppercase tracking-wider">
                 Salary
               </th>
-              <th className="px-6 py-4 text-xs font-semibold text-primary uppercase tracking-wider">
+              <th className="px-3 py-4 text-xs font-semibold text-primary uppercase tracking-wider">
                 Status
               </th>
-              <th className="px-6 py-4 text-xs font-semibold text-primary uppercase tracking-wider">
+              <th className="px-3 py-4 text-xs font-semibold text-primary uppercase tracking-wider">
                 Expiry
               </th>
-              <th className="px-6 py-4 text-xs font-semibold text-primary uppercase tracking-wider">
+              <th className="px-3 py-4 text-xs font-semibold text-primary uppercase tracking-wider">
                 Joined
               </th>
-              <th className="px-6 py-4 text-xs font-semibold text-primary uppercase tracking-wider text-right">
+              <th className="px-3 py-4 text-xs font-semibold text-primary uppercase tracking-wider text-right">
                 Actions
               </th>
             </tr>
@@ -225,17 +225,17 @@ export default function EmployeeTable() {
           <tbody className="divide-y divide-gray-100">
             {!isLoading && filteredEmployees.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-6 py-20 text-center text-gray-500">
+                <td colSpan={7} className="px-3 py-20 text-center text-gray-500">
                   No employees found
                 </td>
               </tr>
             ) : (
               filteredEmployees.map((emp, index) => (
                 <tr key={emp.id} className={index % 2 === 1 ? 'bg-sky-50/60' : 'bg-white'}>
-                  <td className="px-6 py-4 text-xs font-bold text-blue-600">
+                  <td className="px-3 py-4 text-xs font-bold text-blue-600">
                     {emp.display_id || '---'}
                   </td>
-                  <td className="px-6 py-4">
+                  <td className="px-3 py-4">
                     <div className="flex items-center gap-3">
                       <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-semibold text-sm flex-shrink-0 overflow-hidden relative">
                         {emp.profile_image_url ? (
@@ -252,7 +252,7 @@ export default function EmployeeTable() {
                       </div>
                     </div>
                   </td>
-                  <td className="px-6 py-4">
+                  <td className="px-3 py-4">
                     <Badge
                       variant="secondary"
                       className="bg-gray-100 text-gray-700 border-none font-medium"
@@ -260,13 +260,13 @@ export default function EmployeeTable() {
                       {emp.role}
                     </Badge>
                   </td>
-                  <td className="px-6 py-4">
+                  <td className="px-3 py-4">
                     <span className="text-sm text-gray-600">{emp.branch?.name || '---'}</span>
                   </td>
-                  <td className="px-6 py-4 text-sm font-semibold text-blue-700 tabular-nums">
+                  <td className="px-3 py-4 text-sm font-semibold text-blue-700 tabular-nums">
                     AED {emp.salary?.toLocaleString() || '0'}
                   </td>
-                  <td className="px-6 py-4">
+                  <td className="px-3 py-4">
                     <Badge
                       variant="outline"
                       className={`text-[10px] font-bold border-none ${
@@ -280,15 +280,15 @@ export default function EmployeeTable() {
                       {emp.status}
                     </Badge>
                   </td>
-                  <td className="px-6 py-4 text-sm text-gray-500">
+                  <td className="px-3 py-4 text-sm text-gray-500">
                     {emp.expire_date
                       ? new Date(emp.expire_date).toLocaleDateString('en-GB')
                       : '---'}
                   </td>
-                  <td className="px-6 py-4 text-sm text-gray-500">
+                  <td className="px-3 py-4 text-sm text-gray-500">
                     {new Date(emp.createdAt).toLocaleDateString('en-GB')}
                   </td>
-                  <td className="px-6 py-4 text-right">
+                  <td className="px-3 py-4 text-right">
                     <div className="flex items-center justify-end gap-2">
                       <Button
                         variant="ghost"
