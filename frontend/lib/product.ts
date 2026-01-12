@@ -95,3 +95,12 @@ export const updateProduct = async (id: string, data: UpdateProductData): Promis
 export const deleteProduct = async (id: string): Promise<void> => {
   await api.delete<ApiResponse<void>>(`/i/products/${id}`);
 };
+
+export const bulkCreateProducts = async (
+  rows: Record<string, unknown>[],
+): Promise<{ successCount: number; failedRows: { row: number; error: string }[] }> => {
+  const response = await api.post<
+    ApiResponse<{ successCount: number; failedRows: { row: number; error: string }[] }>
+  >('/i/products/bulk', { rows });
+  return response.data.data || { successCount: 0, failedRows: [] };
+};

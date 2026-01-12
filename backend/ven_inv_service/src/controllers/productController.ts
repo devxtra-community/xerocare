@@ -7,13 +7,9 @@ const service = new ProductService();
 export const bulkCreateProducts = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const rows = req.body.rows;
-
-    if (!Array.isArray(rows) || rows.length === 0) {
-      throw new AppError('Invalid data', 400);
-    }
+    if (!Array.isArray(rows) || rows.length === 0) throw new AppError('Invalid data', 400);
 
     const result = await service.bulkCreateProducts(rows);
-
     res.json({ success: true, ...result });
   } catch (e) {
     next(e);

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Search, Plus, X, Trash2 } from 'lucide-react';
+import { Search, Plus, X, Trash2, Upload } from 'lucide-react';
 import Image from 'next/image';
 // import {
 //   Select,
@@ -33,6 +33,7 @@ import {
   UpdateProductData,
   ProductStatus,
 } from '@/lib/product';
+import { BulkUploadModal } from './BulkUploadModal';
 
 // Initial data removed
 
@@ -40,6 +41,7 @@ export default function ManagerProduct() {
   const [products, setProducts] = useState<Product[]>([]);
   const [search, setSearch] = useState('');
   const [formOpen, setFormOpen] = useState(false);
+  const [uploadOpen, setUploadOpen] = useState(false);
   const [editing, setEditing] = useState<Product | null>(null);
   const [deleting, setDeleting] = useState<Product | null>(null);
 
@@ -125,15 +127,20 @@ export default function ManagerProduct() {
           />
         </div>
 
-        <Button
-          className="bg-primary text-white gap-2"
-          onClick={() => {
-            setEditing(null);
-            setFormOpen(true);
-          }}
-        >
-          <Plus size={16} /> Add Product
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" className="gap-2" onClick={() => setUploadOpen(true)}>
+            <Upload size={16} /> Bulk Upload
+          </Button>
+          <Button
+            className="bg-primary text-white gap-2"
+            onClick={() => {
+              setEditing(null); // Ensure editing is null for Add mode
+              setFormOpen(true);
+            }}
+          >
+            <Plus size={16} /> Add Product
+          </Button>
+        </div>
       </div>
 
       <div className="rounded-2xl bg-white shadow-sm overflow-hidden">
@@ -232,6 +239,16 @@ export default function ManagerProduct() {
           name={deleting.name}
           onCancel={() => setDeleting(null)}
           onConfirm={confirmDelete}
+        />
+      )}
+
+      {uploadOpen && (
+        <BulkUploadModal
+          onClose={() => setUploadOpen(false)}
+          onSuccess={() => {
+            loadProducts();
+            setUploadOpen(false);
+          }}
         />
       )}
     </div>

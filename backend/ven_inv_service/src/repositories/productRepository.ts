@@ -4,37 +4,21 @@ import { Product } from '../entities/productEntity';
 export class ProductRepository {
   private repo = Source.getRepository(Product);
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  async addProduct(data: any) {
-    if (data.model_id) {
-      data.model = { id: data.model_id };
-      delete data.model_id;
-    }
-    const product = this.repo.create(data);
-    return this.repo.save(product);
+  async addProduct(entity: Product) {
+    return this.repo.save(entity);
   }
 
   async getAllProducts() {
     return this.repo.find({
-      relations: {
-        model: true,
-        inventory: true,
-      },
+      relations: { model: true, warehouse: true },
     });
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  async updateProduct(id: string, data: any) {
-    if (data.model_id) {
-      data.model = { id: data.model_id };
-      delete data.model_id;
-    }
+  async updateProduct(id: string, data: Partial<Product>) {
     await this.repo.update(id, data);
     return this.repo.findOne({
       where: { id },
-      relations: {
-        model: true,
-      },
+      relations: { model: true, warehouse: true },
     });
   }
 
@@ -45,9 +29,7 @@ export class ProductRepository {
   async findOne(id: string) {
     return this.repo.findOne({
       where: { id },
-      relations: {
-        model: true,
-      },
+      relations: { model: true, warehouse: true },
     });
   }
 }

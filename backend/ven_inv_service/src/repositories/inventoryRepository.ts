@@ -8,13 +8,13 @@ export class InventoryRepository {
     this.repo = ds.getRepository(Inventory);
   }
 
-  findByProductWarehouse(productId: string, warehouseId: string) {
+  findByProductWarehouse(modelId: string, warehouseId: string) {
     return this.repo.findOne({
       where: {
-        product: { id: productId },
+        model: { id: modelId },
         warehouse: { id: warehouseId },
       },
-      relations: ['product', 'warehouse'],
+      relations: ['model', 'warehouse'],
     });
   }
 
@@ -28,21 +28,21 @@ export class InventoryRepository {
 
   getAll() {
     return this.repo.find({
-      relations: ['product', 'warehouse'],
+      relations: ['model', 'warehouse'],
     });
   }
 
   getByWarehouse(warehouseId: string) {
     return this.repo.find({
       where: { warehouse: { id: warehouseId } },
-      relations: ['product'],
+      relations: ['model', 'warehouse'],
     });
   }
 
   getByBranch(branchId: string) {
     return this.repo
       .createQueryBuilder('i')
-      .leftJoinAndSelect('i.product', 'p')
+      .leftJoinAndSelect('i.model', 'm')
       .leftJoin('i.warehouse', 'w')
       .where('w.branchId = :branchId', { branchId })
       .getMany();

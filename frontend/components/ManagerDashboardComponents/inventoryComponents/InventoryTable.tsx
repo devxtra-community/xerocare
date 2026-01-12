@@ -29,12 +29,6 @@ interface InventoryItem {
   product: Product;
 }
 
-interface InventoryResponse {
-  success: boolean;
-  data: InventoryItem[];
-  total: number;
-}
-
 export default function InventoryTable() {
   const router = useRouter();
   const [page, setPage] = useState(1);
@@ -45,22 +39,23 @@ export default function InventoryTable() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const res = await api.get<InventoryResponse>(
-          `/i/inventory?page=${page}&limit=${itemsPerPage}`,
-        );
+        // Backend returns all data in { success: true, data: [...] }
+        // Pagination is handled client-side for now
+        const res = await api.get<{ success: boolean; data: InventoryItem[] }>(`/i/inventory`);
         if (res.data.success) {
           setData(res.data.data);
-          setTotal(res.data.total);
+          setTotal(res.data.data.length);
         }
       } catch (error) {
         console.error(error);
       }
     };
     fetchData();
-  }, [page]);
+  }, []); // Run once on mount
 
   const totalPages = Math.ceil(total / itemsPerPage);
-  const currentData = data;
+  const startIndex = (page - 1) * itemsPerPage;
+  const currentData = data.slice(startIndex, startIndex + itemsPerPage);
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">

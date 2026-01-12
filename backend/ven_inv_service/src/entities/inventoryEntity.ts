@@ -8,18 +8,18 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
 } from 'typeorm';
-import { Product } from './productEntity';
 import { Warehouse } from './warehouseEntity';
+import { Model } from './modelEntity';
 
 @Entity('inventory')
-@Unique(['product', 'warehouse'])
+@Unique(['model', 'warehouse'])
 export class Inventory {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
 
-  @ManyToOne(() => Product, (p) => p.inventory, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'product_id' })
-  product!: Product;
+  @ManyToOne(() => Model, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'model_id' })
+  model!: Model;
 
   @ManyToOne(() => Warehouse, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'warehouse_id' })

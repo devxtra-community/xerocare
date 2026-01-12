@@ -9,6 +9,7 @@ import {
 } from 'typeorm';
 import { Model } from './modelEntity';
 import { Inventory } from './inventoryEntity';
+import { Warehouse } from './warehouseEntity';
 export enum ProductStatus {
   AVAILABLE = 'available',
   RENTED = 'rented',
@@ -24,6 +25,9 @@ export class Product {
   @ManyToOne(() => Model, (model) => model.products)
   @JoinColumn({ name: 'model_id' })
   model!: Model;
+  @ManyToOne(() => Warehouse, { nullable: true })
+  @JoinColumn({ name: 'warehouse_id' })
+  warehouse!: Warehouse;
 
   @Column()
   vendor_id!: number;
@@ -72,6 +76,6 @@ export class Product {
   created_at!: Date;
 
   // One product can exist in multiple warehouses
-  @OneToMany(() => Inventory, (inventory) => inventory.product)
+  @OneToMany(() => Inventory, (inventory) => inventory.model)
   inventory!: Inventory[];
 }

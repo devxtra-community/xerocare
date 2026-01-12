@@ -10,10 +10,10 @@ import { authMiddleware } from '../middlewares/authMiddleware';
 import { roleMiddleware } from '../middlewares/roleMiddleware';
 const productRoute = Router();
 
-productRoute.post('/', addproduct);
-productRoute.get('/', getallproducts);
-productRoute.put('/:id', updateproduct);
-productRoute.delete('/:id', deleteproduct);
+productRoute.post('/', authMiddleware, roleMiddleware, addproduct);
+productRoute.get('/', authMiddleware, roleMiddleware, getallproducts);
+productRoute.put('/:id', authMiddleware, roleMiddleware, updateproduct);
+productRoute.delete('/:id', authMiddleware, roleMiddleware, deleteproduct);
 productRoute.post('/bulk', authMiddleware, roleMiddleware, bulkCreateProducts);
 
 export default productRoute;
