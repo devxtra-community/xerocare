@@ -18,6 +18,12 @@ export const startWorker = async () => {
 
     const job = JSON.parse(msg.content.toString());
 
+    if (!job.email) {
+      logger.error('Invalid email job: Missing recipients', { job });
+      channel.ack(msg);
+      return;
+    }
+
     try {
       if (job.type === 'OTP') {
         await sendOtpMail(job.email, job.otp);

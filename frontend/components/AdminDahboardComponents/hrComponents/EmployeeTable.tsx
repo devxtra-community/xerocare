@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
+import Image from 'next/image';
 import {
   MoreVertical,
   Eye,
@@ -233,13 +234,9 @@ export default function EmployeeTable() {
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-semibold text-sm flex-shrink-0 overflow-hidden">
+                      <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-semibold text-sm flex-shrink-0 overflow-hidden relative">
                         {emp.profile_image_url ? (
-                          <img
-                            src={emp.profile_image_url}
-                            alt=""
-                            className="h-full w-full object-cover"
-                          />
+                          <Image src={emp.profile_image_url} alt="" fill className="object-cover" />
                         ) : (
                           (emp.first_name?.[0] || emp.email[0]).toUpperCase()
                         )}
