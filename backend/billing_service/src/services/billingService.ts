@@ -1,0 +1,82 @@
+import { InvoiceRepository } from '../repositories/invoiceRepository';
+import { InvoiceStatus } from '../entities/enums/invoiceStatus';
+import { InvoiceItem } from '../entities/invoiceItemEntity';
+import { publishInvoiceCreated } from '../events/publisher/billingPublisher';
+import { SaleType } from '../entities/enums/saleType';
+import { AppError } from '../errors/appError';
+import { logger } from '../config/logger';
+
+export class BillingService {
+  private invoiceRepo = new InvoiceRepository();
+
+  private async generateInvoiceNumber(): Promise<string> {
+    const year = new Date().getFullYear();
+    const count = await this.invoiceRepo.getInvoiceCountForYear(year);
+    const paddedCount = String(count + 1).padStart(4, '0');
+    return `INV-${year}-${paddedCount}`;
+  }
+
+  async createInvoice(payload: {
+    branchId: string;
+    createdBy: string;
+    saleType: SaleType;
+
+    startDate?: Date;
+    endDate?: Date;
+    billingCycleInDays?: number;
+
+    items: {
+      description: string;
+      quantity: number;
+      unitPrice: number;
+    }[];
+  }) {
+    if (payload.saleType !== SaleType.SALE) {
+      if (!payload.startDate || !payload.endDate) {
+        throw new AppError('Start and end date required for RENT / LEASE', 400);
+      }
+    }
+
+    const totalAmount = payload.items.reduce(
+      (sum, item) => sum + item.quantity * item.unitPrice,
+      0,
+    );
+
+    const invoiceNumber = await this.generateInvoiceNumber();
+
+    const invoiceItems = payload.items.map((item) => {
+      const invoiceItem = new InvoiceItem();
+      invoiceItem.description = item.description;
+      invoiceItem.quantity = item.quantity;
+      invoiceItem.unitPrice = item.unitPrice;
+      return invoiceItem;
+    });
+
+    const invoice = await this.invoiceRepo.createInvoice({
+      invoiceNumber,
+      branchId: payload.branchId,
+      createdBy: payload.createdBy,
+      saleType: payload.saleType,
+      startDate: payload.startDate,
+      endDate: payload.endDate,
+      billingCycleInDays: payload.billingCycleInDays,
+      totalAmount,
+      status: InvoiceStatus.PAID, // Payment assumed complete at creation
+      items: invoiceItems,
+    });
+
+    try {
+      await publishInvoiceCreated({
+        invoiceId: invoice.id,
+        branchId: invoice.branchId,
+        totalAmount: invoice.totalAmount,
+        createdBy: invoice.createdBy,
+        createdAt: invoice.createdAt.toISOString(),
+      });
+    } catch (err) {
+      logger.error('Failed to publish invoice.created', err);
+    }
+
+    return invoice;
+  }
+}

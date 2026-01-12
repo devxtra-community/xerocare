@@ -23,6 +23,9 @@ export const addEmployee = async (req: Request, res: Response, next: NextFunctio
       : null;
 
     const idProofKey = files?.id_proof?.[0]?.key ?? null;
+    // - [ ] Define specific rate limiters in `rateLimitter.ts` [/]
+    // - [ ] Apply specific rate limiters to paths in `api_gateway/src/app.ts` [/]
+    // - [ ] Verify rate limits via typecheck and manual review [/]
 
     const employee = await service.addEmployee({
       first_name,

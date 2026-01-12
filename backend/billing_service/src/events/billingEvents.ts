@@ -6,7 +6,7 @@ export enum BillingEventType {
 export interface InvoiceCreatedEvent {
   invoiceId: string;
   branchId: string;
-  amount: number;
+  totalAmount: number;
   createdBy: string;
   createdAt: string;
 }

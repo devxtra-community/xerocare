@@ -1,11 +1,13 @@
 import 'reflect-metadata';
 import { DataSource } from 'typeorm';
 import './env';
+import { Invoice } from '../entities/invoiceEntity';
+import { InvoiceItem } from '../entities/invoiceItemEntity';
 
 export const Source = new DataSource({
   type: 'postgres',
   url: process.env.DATABASE_URL,
   synchronize: true,
   logging: false,
-  entities: [],
+  entities: [Invoice, InvoiceItem],
 });
