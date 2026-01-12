@@ -169,6 +169,9 @@ export default function EmployeeTable() {
                 <DropdownMenuItem onClick={() => setRoleFilter('EMPLOYEE')}>
                   Employee
                 </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setRoleFilter('FINANCE')}>
+                  Finance
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
             <Button variant="outline" className="rounded-xl border-gray-200">

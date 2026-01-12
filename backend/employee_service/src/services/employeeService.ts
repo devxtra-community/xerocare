@@ -69,7 +69,9 @@ export class EmployeeService {
           ? 'H'
           : roleEnum === EmployeeRole.MANAGER
             ? 'M'
-            : 'E';
+            : roleEnum === EmployeeRole.FINANCE
+              ? 'F'
+              : 'E';
     const display_id = `${prefix}${String(count + 1).padStart(2, '0')}`;
 
     const plainPassword = generateRandomPassword();

@@ -29,6 +29,7 @@ export interface HRStats {
     HR: number;
     MANAGER: number;
     EMPLOYEE: number;
+    FINANCE: number;
   };
 }
 
