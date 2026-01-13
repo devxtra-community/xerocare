@@ -221,7 +221,7 @@ export default function VendorTable({
                   <TableRow
                     key={vendor.id}
                     className={`border-b border-blue-50/20 hover:bg-blue-50/30 transition-colors ${
-                      index % 2 !== 0 ? 'bg-sky-50/20' : ''
+                      index % 2 !== 0 ? 'bg-blue-50/20' : 'bg-white'
                     }`}
                   >
                     <TableCell className="px-4 py-3 font-semibold text-primary">

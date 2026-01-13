@@ -167,7 +167,7 @@ export default function EmployeeSalesTable() {
             </TableHeader>
             <TableBody>
               {filteredOrders.map((order, index) => (
-                <TableRow key={order.billId} className={index % 2 ? 'bg-sky-100/60' : ''}>
+                <TableRow key={order.billId} className={index % 2 ? 'bg-blue-50/20' : 'bg-white'}>
                   <TableCell className="text-blue-400 font-medium">{order.billId}</TableCell>
                   <TableCell className="text-gray-500">{order.productId}</TableCell>
                   <TableCell className="font-bold text-primary">{order.name}</TableCell>

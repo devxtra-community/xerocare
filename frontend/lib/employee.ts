@@ -7,12 +7,14 @@ export interface Employee {
   first_name: string | null;
   last_name: string | null;
   role: string;
+  phone: string | null;
   salary: number | null;
   profile_image_url: string | null;
   createdAt: string;
   updatedAt: string;
   expire_date: string | null;
   status: string;
+  reporting_manager: string | null;
   branch_id?: string | null;
   branch?: {
     branch_id: string;
@@ -29,6 +31,7 @@ export interface HRStats {
     HR: number;
     MANAGER: number;
     EMPLOYEE: number;
+    FINANCE: number;
   };
 }
 
@@ -51,7 +54,11 @@ export const createEmployee = async (formData: FormData) => {
   return res.data;
 };
 
-export const getAllEmployees = async (page: number = 1, limit: number = 20, role?: string) => {
+export const getAllEmployees = async (
+  page: number = 1,
+  limit: number = 20,
+  role?: string,
+): Promise<{ success: boolean; data: EmployeeResponse }> => {
   const res = await api.get('/e/employee/', {
     params: { page, limit, role: role === 'All' ? undefined : role },
   });

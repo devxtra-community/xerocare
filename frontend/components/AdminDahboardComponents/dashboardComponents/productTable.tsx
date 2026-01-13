@@ -1,9 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import {
-  // Table imports removed as they were unused
-} from '@/components/ui/table';
+import {} from // Table imports removed as they were unused
+'@/components/ui/table';
 
 export default function ProductsTable() {
   const [page, setPage] = useState(1);
@@ -39,7 +38,7 @@ export default function ProductsTable() {
 
   return (
     <div className="rounded-2xl bg-white p-2 sm:p-3 shadow-sm w-full h-[260px] flex flex-col">
-      <div className="flex-1 overflow-hidden">
+      <div className="flex-1 overflow-x-auto">
         <table className="w-full">
           <thead>
             <tr className="border-b">
@@ -59,7 +58,7 @@ export default function ProductsTable() {
           </thead>
           <tbody>
             {currentData.map((item, index) => (
-              <tr key={index} className={index % 2 === 1 ? 'bg-sky-100/60' : ''}>
+              <tr key={index} className={index % 2 === 1 ? 'bg-blue-50/20' : 'bg-white'}>
                 <td className="py-1.5 sm:py-2 px-1 sm:px-2 text-[10px] sm:text-xs font-medium text-gray-900">
                   {item.name}
                 </td>
@@ -100,8 +99,9 @@ export default function ProductsTable() {
             <button
               key={pageNum}
               onClick={() => setPage(pageNum)}
-              className={`px-1.5 sm:px-2 py-0.5 rounded-md transition ${page === pageNum ? 'bg-primary text-white' : 'border hover:bg-gray-50'
-                }`}
+              className={`px-1.5 sm:px-2 py-0.5 rounded-md transition ${
+                page === pageNum ? 'bg-primary text-white' : 'border hover:bg-gray-50'
+              }`}
             >
               {pageNum}
             </button>
@@ -111,8 +111,9 @@ export default function ProductsTable() {
         {totalPages > 4 && (
           <button
             onClick={() => setPage(totalPages)}
-            className={`px-1.5 sm:px-2 py-0.5 rounded-md border transition ${page === totalPages ? 'bg-primary text-white' : 'hover:bg-gray-50'
-              }`}
+            className={`px-1.5 sm:px-2 py-0.5 rounded-md border transition ${
+              page === totalPages ? 'bg-primary text-white' : 'hover:bg-gray-50'
+            }`}
           >
             {totalPages}
           </button>

@@ -102,7 +102,7 @@ export default function DashbordTable() {
 
         <TableBody>
           {data.map((item, index) => (
-            <TableRow key={index} className={index % 2 ? 'bg-sky-100/60' : ''}>
+            <TableRow key={index} className={index % 2 ? 'bg-blue-50/20' : 'bg-white'}>
               <TableCell className="font-medium text-primary ">{item.printerName}</TableCell>
               <TableCell>{item.serialNumber}</TableCell>
               <TableCell>{item.model}</TableCell>

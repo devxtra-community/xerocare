@@ -45,6 +45,7 @@ export class EmployeeRepository {
   async findByIdSafe(id: string) {
     return this.repo.findOne({
       where: { id },
+      relations: ['branch'],
     });
   }
   async updateById(id: string, payload: Partial<Employee>): Promise<Employee | null> {

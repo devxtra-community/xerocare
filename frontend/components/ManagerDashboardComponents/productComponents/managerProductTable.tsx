@@ -29,7 +29,7 @@ type Product = {
   category: string;
   price: number;
   stock: number;
-  status: 'in-stock' | 'out-of-stock';
+  status: 'in-stock' | 'out-of-stock' | 'damaged';
   image?: string;
 };
 
@@ -54,6 +54,16 @@ const initialProducts: Product[] = [
     status: 'in-stock',
     image: '',
   },
+  {
+    id: '3',
+    name: 'Epson EcoTank',
+    Model: 'EP-ET-556812',
+    category: 'Printer',
+    price: 22000,
+    stock: 0,
+    status: 'damaged',
+    image: '',
+  },
 ];
 
 export default function ManagerProduct() {
@@ -70,7 +80,7 @@ export default function ManagerProduct() {
   const total = products.length;
   const inStock = products.filter((p) => p.status === 'in-stock').length;
   const outStock = products.filter((p) => p.status === 'out-of-stock').length;
-  const lowStock = products.filter((p) => p.stock > 0 && p.stock < 5).length;
+  const damaged = products.filter((p) => p.status === 'damaged').length;
 
   const handleSave = (data: Product) => {
     setProducts((prev) =>
@@ -94,7 +104,7 @@ export default function ManagerProduct() {
         <StatCard title="Total Products" value={total.toString()} subtitle="All items" />
         <StatCard title="In Stock" value={inStock.toString()} subtitle="Available" />
         <StatCard title="Out of Stock" value={outStock.toString()} subtitle="Unavailable" />
-        <StatCard title="Low Stock" value={lowStock.toString()} subtitle="Below 5 qty" />
+        <StatCard title="Damaged" value={damaged.toString()} subtitle="Requires repair" />
       </div>
 
       <div className="flex items-center justify-between">
@@ -135,7 +145,7 @@ export default function ManagerProduct() {
 
           <TableBody>
             {filtered.map((p, i) => (
-              <TableRow key={p.id} className={i % 2 ? 'bg-sky-100/60' : ''}>
+              <TableRow key={p.id} className={i % 2 !== 0 ? 'bg-blue-50/20' : 'bg-white'}>
                 <TableCell className="px-4">
                   {p.image ? (
                     <div className="relative h-8 w-8 rounded overflow-hidden">
@@ -160,13 +170,15 @@ export default function ManagerProduct() {
                 <TableCell className="px-4">{p.stock}</TableCell>
                 <TableCell className="px-4">
                   <span
-                    className={`px-2 py-1 rounded-full text-xs ${
+                    className={`px-2 py-1 rounded-full text-xs capitalize ${
                       p.status === 'in-stock'
                         ? 'bg-green-100 text-green-700'
-                        : 'bg-red-100 text-red-700'
+                        : p.status === 'damaged'
+                          ? 'bg-orange-100 text-orange-700'
+                          : 'bg-red-100 text-red-700'
                     }`}
                   >
-                    {p.status}
+                    {p.status.replace('-', ' ')}
                   </span>
                 </TableCell>
                 <TableCell className="px-4">
@@ -307,6 +319,7 @@ function ProductFormModal({
           <SelectContent>
             <SelectItem value="in-stock">In Stock</SelectItem>
             <SelectItem value="out-of-stock">Out of Stock</SelectItem>
+            <SelectItem value="damaged">Damaged</SelectItem>
           </SelectContent>
         </Select>
       </Field>

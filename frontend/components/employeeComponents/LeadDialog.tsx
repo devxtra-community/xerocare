@@ -22,7 +22,8 @@ import {
 export type Lead = {
   id: string;
   name: string;
-  contact: string; // Phone/Email
+  email: string;
+  phone: string;
   source: 'Website' | 'Instagram' | 'Whatsapp';
   product: string;
   status: 'New' | 'Contacted' | 'Follow-up' | 'Converted';
@@ -39,7 +40,8 @@ type LeadDialogProps = {
 const emptyLead: Lead = {
   id: '',
   name: '',
-  contact: '',
+  email: '',
+  phone: '',
   source: 'Website',
   product: '',
   status: 'New',
@@ -72,23 +74,35 @@ export default function LeadDialog({ open, onOpenChange, initialData, onSave }: 
           <DialogTitle>{initialData ? 'Update Lead' : 'Add New Lead'}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4 py-4">
+          <div className="space-y-2">
+            <Label htmlFor="name">Lead Name</Label>
+            <Input
+              id="name"
+              value={formData.name}
+              onChange={(e) => handleChange('name', e.target.value)}
+              placeholder="John Doe"
+              required
+            />
+          </div>
+
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="name">Lead Name</Label>
+              <Label htmlFor="email">Email Address</Label>
               <Input
-                id="name"
-                value={formData.name}
-                onChange={(e) => handleChange('name', e.target.value)}
-                placeholder="John Doe"
+                id="email"
+                type="email"
+                value={formData.email}
+                onChange={(e) => handleChange('email', e.target.value)}
+                placeholder="john@example.com"
                 required
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="contact">Phone / Email</Label>
+              <Label htmlFor="phone">Phone Number</Label>
               <Input
-                id="contact"
-                value={formData.contact}
-                onChange={(e) => handleChange('contact', e.target.value)}
+                id="phone"
+                value={formData.phone}
+                onChange={(e) => handleChange('phone', e.target.value)}
                 placeholder="+1 234 567 890"
                 required
               />
@@ -115,7 +129,7 @@ export default function LeadDialog({ open, onOpenChange, initialData, onSave }: 
                 id="product"
                 value={formData.product}
                 onChange={(e) => handleChange('product', e.target.value)}
-                placeholder="Product Name"
+                placeholder="Ex. Canon ImageRunner"
                 required
               />
             </div>

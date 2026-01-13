@@ -289,7 +289,7 @@ export default function FinanceReport() {
 
           <TableBody>
             {filteredFinance.map((f, i) => (
-              <TableRow key={f.id} className={i % 2 ? 'bg-sky-100/60' : ''}>
+              <TableRow key={f.id} className={i % 2 ? 'bg-blue-50/20' : 'bg-white'}>
                 <TableCell className="px-4 font-medium">{f.Month}</TableCell>
                 <TableCell className="px-4">{f.source}</TableCell>
                 <TableCell className="px-4">₹ {f.Income.toLocaleString()}</TableCell>

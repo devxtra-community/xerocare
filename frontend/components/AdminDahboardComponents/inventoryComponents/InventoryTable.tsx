@@ -70,8 +70,11 @@ export default function InventoryTable() {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {criticalStockData.map((item) => (
-            <TableRow key={item.id} className="hover:bg-gray-50/50">
+          {criticalStockData.map((item, index) => (
+            <TableRow
+              key={item.id}
+              className={`hover:bg-gray-50/50 ${index % 2 !== 0 ? 'bg-blue-50/20' : 'bg-white'}`}
+            >
               <TableCell className="font-medium text-gray-900">{item.productName}</TableCell>
               <TableCell className="text-gray-600">{item.branch}</TableCell>
               <TableCell className="text-center font-medium">{item.currentStock}</TableCell>
