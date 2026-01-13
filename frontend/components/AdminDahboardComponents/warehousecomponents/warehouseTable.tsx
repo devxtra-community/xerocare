@@ -183,7 +183,7 @@ export default function WarehouseReport() {
               {filtered.map((w, i) => (
                 <tr
                   key={w.id}
-                  className={`border-b border-gray-100 ${i % 2 ? 'bg-sky-100/60' : ''}`}
+                  className={`border-b border-gray-100 ${i % 2 !== 0 ? 'bg-blue-50/20' : 'bg-white'}`}
                 >
                   <td className="px-4 py-3 text-sm font-medium">{w.warehouseName}</td>
                   <td className="px-4 py-3 text-sm text-primary font-medium">{w.warehouseCode}</td>

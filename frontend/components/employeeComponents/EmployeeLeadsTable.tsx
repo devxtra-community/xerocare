@@ -95,7 +95,7 @@ export default function EmployeeLeadsTable() {
       case 'Warm':
         return 'bg-orange-100 text-orange-600 hover:bg-orange-200';
       case 'Cold':
-        return 'bg-blue-100 text-blue-600 hover:bg-blue-200';
+        return 'bg-blue-100 text-blue-600 hover:bg-blue-50/20';
       default:
         return 'bg-gray-100 text-gray-600';
     }
@@ -106,7 +106,7 @@ export default function EmployeeLeadsTable() {
       case 'New':
         return 'bg-purple-100 text-purple-600 hover:bg-purple-200';
       case 'Contacted':
-        return 'bg-blue-100 text-blue-600 hover:bg-blue-200';
+        return 'bg-blue-100 text-blue-600 hover:bg-blue-50/20';
       case 'Follow-up':
         return 'bg-yellow-100 text-yellow-600 hover:bg-yellow-200';
       case 'Converted':
@@ -167,7 +167,7 @@ export default function EmployeeLeadsTable() {
             </TableHeader>
             <TableBody>
               {filteredLeads.map((lead, index) => (
-                <TableRow key={lead.id} className={index % 2 ? 'bg-sky-50/30' : ''}>
+                <TableRow key={lead.id} className={index % 2 ? 'bg-blue-50/20' : 'bg-white'}>
                   <TableCell className="font-bold text-primary">{lead.name}</TableCell>
                   <TableCell>
                     <div className="flex flex-col">

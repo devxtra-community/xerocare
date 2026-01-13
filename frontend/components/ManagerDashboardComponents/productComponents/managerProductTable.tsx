@@ -145,7 +145,7 @@ export default function ManagerProduct() {
 
           <TableBody>
             {filtered.map((p, i) => (
-              <TableRow key={p.id} className={i % 2 ? 'bg-sky-100/60' : ''}>
+              <TableRow key={p.id} className={i % 2 !== 0 ? 'bg-blue-50/20' : 'bg-white'}>
                 <TableCell className="px-4">
                   {p.image ? (
                     <div className="relative h-8 w-8 rounded overflow-hidden">

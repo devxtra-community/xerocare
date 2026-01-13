@@ -72,7 +72,7 @@ export default function RevenueSummaryTable() {
           {data.map((row, i) => (
             <TableRow
               key={i}
-              className={`hover:bg-blue-50/30 transition-colors ${i % 2 ? 'bg-sky-50/40' : ''}`}
+              className={`hover:bg-blue-50/30 transition-colors ${i % 2 ? 'bg-blue-50/20' : 'bg-white'}`}
             >
               <TableCell className="text-xs font-medium text-gray-600 px-4">{row.date}</TableCell>
               <TableCell>

@@ -193,7 +193,7 @@ export default function EmployeeCustomerTable() {
                 </TableRow>
               ) : (
                 filteredCustomers.map((customer, index) => (
-                  <TableRow key={customer.id} className={index % 2 ? 'bg-sky-50/30' : ''}>
+                  <TableRow key={customer.id} className={index % 2 ? 'bg-blue-50/20' : 'bg-white'}>
                     <TableCell className="font-bold text-blue-600 whitespace-nowrap">
                       <span className="bg-blue-50 px-2 py-1 rounded-md text-xs">{customer.id}</span>
                     </TableCell>

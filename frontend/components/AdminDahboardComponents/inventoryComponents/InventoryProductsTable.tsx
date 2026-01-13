@@ -99,7 +99,7 @@ export default function InventoryProductsTable() {
             {currentData.map((item, index) => (
               <TableRow
                 key={item.id}
-                className={`hover:bg-gray-50/30 transition-colors ${index % 2 ? 'bg-sky-100/60' : ''}`}
+                className={`hover:bg-gray-50/30 transition-colors ${index % 2 ? 'bg-blue-50/20' : 'bg-white'}`}
               >
                 <TableCell className="px-6 py-4 font-medium text-gray-900">
                   {item.productName}

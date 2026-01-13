@@ -97,7 +97,7 @@ export default function OutstandingReceivablesTable() {
             {data.map((row, i) => (
               <TableRow
                 key={i}
-                className={`hover:bg-blue-50/30 transition-colors ${i % 2 ? 'bg-sky-50/40' : ''}`}
+                className={`hover:bg-blue-50/30 transition-colors ${i % 2 ? 'bg-blue-50/20' : 'bg-white'}`}
               >
                 <TableCell className="text-xs font-bold text-gray-900 px-4 whitespace-nowrap">
                   {row.customer}

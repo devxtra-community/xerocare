@@ -91,7 +91,7 @@ export default function VendorTransactionsTable() {
             {currentData.map((item, index) => (
               <TableRow
                 key={item.id}
-                className={`hover:bg-gray-50/30 transition-colors ${index % 2 ? 'bg-sky-100/60' : ''}`}
+                className={`hover:bg-gray-50/30 transition-colors ${index % 2 ? 'bg-blue-50/20' : 'bg-white'}`}
               >
                 <TableCell className="px-4 py-3 text-xs font-medium text-gray-900">
                   {item.id}

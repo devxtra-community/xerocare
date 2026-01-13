@@ -65,7 +65,7 @@ export default function SalesSummaryTable() {
         />
       </div>
 
-      <div className="flex-1 overflow-hidden">
+      <div className="flex-1 overflow-x-auto">
         <table className="w-full border-collapse">
           <thead>
             <tr className="border-b">
@@ -95,7 +95,7 @@ export default function SalesSummaryTable() {
 
           <tbody>
             {filteredData.map((row, index) => (
-              <tr key={index} className={index % 2 === 1 ? 'bg-sky-100/60' : ''}>
+              <tr key={index} className={index % 2 === 1 ? 'bg-blue-50/20' : 'bg-white'}>
                 <td className="py-1.5 sm:py-2 px-1 sm:px-2 text-[10px] sm:text-xs font-medium text-gray-900">
                   {row.productId}
                 </td>

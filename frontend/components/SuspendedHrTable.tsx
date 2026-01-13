@@ -109,7 +109,7 @@ export default function SuspendedHrTable() {
           {currentData.map((item, index) => (
             <TableRow
               key={index}
-              className={`border-none rounded-xl ${index % 2 === 1 ? 'bg-muted' : ''}`}
+              className={`border-none rounded-xl ${index % 2 === 1 ? 'bg-blue-50/20' : 'bg-white'}`}
             >
               <TableCell className="font-medium rounded-l-xl">{item.Fullname}</TableCell>
               <TableCell>{item.Possition}</TableCell>
