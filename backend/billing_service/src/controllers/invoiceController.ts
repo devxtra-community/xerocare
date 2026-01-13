@@ -6,8 +6,6 @@ const billingService = new BillingService();
 
 export const createInvoice = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    // 1. Strict Security Validation: Reject if client sends restricted fields
-    // Client MUST NOT send branchId, employeeId, createdBy
     const { branchId, employeeId, createdBy, ...allowedPayload } = req.body;
 
     if (branchId || employeeId || createdBy) {
@@ -17,7 +15,6 @@ export const createInvoice = async (req: Request, res: Response, next: NextFunct
       );
     }
 
-    // 2. Validate Authentication Context
     if (!req.user || !req.user.userId || !req.user.branchId) {
       throw new AppError('User context missing or incomplete', 401);
     }
@@ -28,10 +25,9 @@ export const createInvoice = async (req: Request, res: Response, next: NextFunct
       throw new AppError('Invalid request payload: items and saleType are required', 400);
     }
 
-    // 3. Create Invoice using Secure Context
     const invoice = await billingService.createInvoice({
-      branchId: req.user.branchId, // Enforced from JWT
-      createdBy: req.user.userId, // Enforced from JWT
+      branchId: req.user.branchId,
+      createdBy: req.user.userId,
       saleType,
       startDate,
       endDate,
