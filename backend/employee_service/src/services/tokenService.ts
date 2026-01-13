@@ -12,6 +12,7 @@ const authRepo = new AuthRepository();
 export async function issueTokens(user: Employee | Admin, req: Request, res: Response) {
   const accessToken = signAccesstoken({
     userId: user.id,
+    branchId: 'branch_id' in user ? user.branch_id || '' : '',
     email: user.email,
     role: user.role,
   });
