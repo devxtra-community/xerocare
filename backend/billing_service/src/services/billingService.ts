@@ -79,4 +79,16 @@ export class BillingService {
 
     return invoice;
   }
+
+  async getAllInvoices() {
+    return this.invoiceRepo.findAll();
+  }
+
+  async getInvoiceById(id: string) {
+    const invoice = await this.invoiceRepo.findById(id);
+    if (!invoice) {
+      throw new AppError('Invoice not found', 404);
+    }
+    return invoice;
+  }
 }

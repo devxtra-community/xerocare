@@ -97,6 +97,21 @@ export const getEmployeeById = async (req: Request, res: Response, next: NextFun
   }
 };
 
+export const getPublicEmployeeProfile = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const employee = await service.getPublicEmployeeProfile(req.params.id as string);
+
+    return res.json({
+      success: true,
+      data: employee,
+      message: 'Employee profile fetched successfully',
+    });
+  } catch (err: unknown) {
+    const error = err as { message: string; statusCode?: number };
+    next(new AppError(error.message, error.statusCode || 404));
+  }
+};
+
 export const updateEmployee = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const files = req.files as {

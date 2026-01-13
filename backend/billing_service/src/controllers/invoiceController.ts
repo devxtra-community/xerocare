@@ -44,3 +44,28 @@ export const createInvoice = async (req: Request, res: Response, next: NextFunct
     next(error);
   }
 };
+
+export const getAllInvoices = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const invoices = await billingService.getAllInvoices();
+    return res.status(200).json({
+      success: true,
+      data: invoices,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getInvoiceById = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = req.params.id as string;
+    const invoice = await billingService.getInvoiceById(id);
+    return res.status(200).json({
+      success: true,
+      data: invoice,
+    });
+  } catch (error) {
+    next(error);
+  }
+};

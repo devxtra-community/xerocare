@@ -16,6 +16,8 @@ router.post('/', authMiddleware, roleMiddleware(['ADMIN']), branchController.cre
 
 router.get('/', authMiddleware, roleMiddleware(['ADMIN']), branchController.list);
 
+router.get('/:id', authMiddleware, branchController.getById);
+
 router.put('/:id', authMiddleware, roleMiddleware(['ADMIN']), branchController.update);
 
 router.delete('/:id', authMiddleware, roleMiddleware(['ADMIN']), branchController.delete);

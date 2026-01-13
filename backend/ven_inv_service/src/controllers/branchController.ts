@@ -14,6 +14,11 @@ export class BranchController {
     res.json({ success: true, data: branches });
   };
 
+  getById = async (req: Request, res: Response) => {
+    const branch = await this.service.getBranchById(req.params.id as string);
+    res.json({ success: true, data: branch });
+  };
+
   update = async (req: Request, res: Response) => {
     await this.service.updateBranch(req.params.id as string, req.body);
     res.json({ success: true, message: 'Branch updated successfully' });

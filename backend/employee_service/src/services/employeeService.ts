@@ -153,6 +153,22 @@ export class EmployeeService {
     return employee;
   }
 
+  async getPublicEmployeeProfile(id: string) {
+    const employee = await this.employeeRepo.findByIdSafe(id);
+
+    if (!employee) {
+      throw new AppError('Employee not found', 404);
+    }
+
+    return {
+      id: employee.id,
+      name: `${employee.first_name} ${employee.last_name}`,
+      email: employee.email,
+      role: employee.role,
+      branchId: employee.branch_id,
+    };
+  }
+
   async updateEmployee(
     id: string,
     payload: {

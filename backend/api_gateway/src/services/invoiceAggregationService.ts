@@ -24,21 +24,119 @@ interface AggregatedInvoice extends Invoice {
 }
 
 export class InvoiceAggregationService {
-  async getInvoiceById(invoiceId: string): Promise<AggregatedInvoice> {
+  async getAllInvoices(
+    user: { role: string; branchId?: string },
+    token: string,
+  ): Promise<AggregatedInvoice[]> {
+    try {
+      const billingResponse = await axios.get<{ data: Invoice[] }>(
+        `${BILLING_SERVICE_URL}/invoices`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
+      let invoices = billingResponse.data.data;
+
+      if (user.role === 'ADMIN' || user.role === 'FINANCE') {
+        // No filtering required for ADMIN or FINANCE roles
+      } else if (user.role === 'EMPLOYEE') {
+        if (!user.branchId) {
+          throw new AppError('Employee has no branch assigned', 403);
+        }
+        invoices = invoices.filter((inv) => inv.branchId === user.branchId);
+      } else {
+        throw new AppError('Access Denied', 403);
+      }
+
+      if (invoices.length === 0) {
+        return [];
+      }
+
+      const aggregatedInvoices = await Promise.all(
+        invoices.map(async (inv) => {
+          try {
+            const employeeResponse = await axios.get<{ data: { name: string } }>(
+              `${EMPLOYEE_SERVICE_URL}/employee/public/${inv.createdBy}`,
+              {
+                headers: { Authorization: `Bearer ${token}` },
+              },
+            );
+            const employeeName = employeeResponse.data.data.name;
+
+            const branchResponse = await axios.get<{ data: { name: string } }>(
+              `${VENDOR_INVENTORY_SERVICE_URL}/branch/${inv.branchId}`,
+              {
+                headers: { Authorization: `Bearer ${token}` },
+              },
+            );
+            const branchName = branchResponse.data.data.name;
+
+            return {
+              ...inv,
+              employeeName,
+              branchName,
+            };
+          } catch (e: unknown) {
+            const err = e as { message?: string; response?: { status?: number; data?: unknown } };
+            logger.error('Failed to fetch details for invoice', {
+              invoiceId: inv.id,
+              error: err.message,
+              status: err.response?.status,
+              data: err.response?.data,
+            });
+            return {
+              ...inv,
+              employeeName: 'Unknown',
+              branchName: 'Unknown',
+            };
+          }
+        }),
+      );
+
+      return aggregatedInvoices;
+    } catch (error: unknown) {
+      if (axios.isAxiosError(error)) {
+        logger.error('Axios error in fetch and aggregate invoices', {
+          message: error.message,
+          code: error.code,
+          responseStatus: error.response?.status,
+          responseData: error.response?.data,
+        });
+      } else {
+        const err = error as { message?: string };
+        logger.error('Failed to fetch and aggregate invoices', {
+          error: err.message,
+          stack: (error as Error).stack,
+        });
+      }
+      throw new AppError('Failed to fetch invoices', 500);
+    }
+  }
+
+  async getInvoiceById(invoiceId: string, token: string): Promise<AggregatedInvoice> {
     try {
       const invoiceResponse = await axios.get<{ data: Invoice }>(
         `${BILLING_SERVICE_URL}/invoices/${invoiceId}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
       );
       const invoice = invoiceResponse.data.data;
 
       const employeeResponse = await axios.get<{ data: { name: string } }>(
-        `${EMPLOYEE_SERVICE_URL}/employee/${invoice.createdBy}`,
+        `${EMPLOYEE_SERVICE_URL}/employee/public/${invoice.createdBy}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
       );
 
       const employeeName = employeeResponse.data.data.name;
 
       const branchResponse = await axios.get<{ data: { name: string } }>(
         `${VENDOR_INVENTORY_SERVICE_URL}/branch/${invoice.branchId}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
       );
       const branchName = branchResponse.data.data.name;
 

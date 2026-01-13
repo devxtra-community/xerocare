@@ -21,6 +21,14 @@ export class InvoiceRepository {
     });
   }
 
+  findAll() {
+    return this.repo.find({
+      order: {
+        createdAt: 'DESC',
+      },
+    });
+  }
+
   updateStatus(id: string, status: Invoice['status']) {
     return this.repo.update(id, { status });
   }

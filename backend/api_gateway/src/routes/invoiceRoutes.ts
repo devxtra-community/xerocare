@@ -1,22 +1,12 @@
 import { Router } from 'express';
-import { Request, Response, NextFunction } from 'express';
-import { InvoiceAggregationService } from '../services/invoiceAggregationService';
+import { getAllInvoices, getInvoiceById } from '../controllers/invoiceController';
+import { authMiddleware } from '../middleware/authMiddleware';
 
 const router = Router();
-const invoiceAggregationService = new InvoiceAggregationService();
 
-router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const invoiceId = req.params.id as string;
-    const aggregatedInvoice = await invoiceAggregationService.getInvoiceById(invoiceId);
+router.use(authMiddleware);
 
-    return res.status(200).json({
-      success: true,
-      data: aggregatedInvoice,
-    });
-  } catch (error) {
-    next(error);
-  }
-});
+router.get('/', getAllInvoices);
+router.get('/:id', getInvoiceById);
 
 export default router;
