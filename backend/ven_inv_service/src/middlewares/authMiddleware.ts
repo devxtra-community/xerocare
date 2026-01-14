@@ -5,6 +5,10 @@ import { logger } from '../config/logger';
 
 interface ErrorWithName {
   name?: string;
+  role?: string;
+  userId?: string;
+  email?: string;
+  branchId?: string;
 }
 
 export const authMiddleware = (req: Request, _res: Response, next: NextFunction) => {

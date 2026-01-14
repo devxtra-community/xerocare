@@ -11,7 +11,6 @@ import { roleMiddleware } from '../middlewares/roleMiddleware';
 const inventoryRouter = Router();
 
 inventoryRouter.use(authMiddleware);
-
 inventoryRouter.get('/', roleMiddleware(['ADMIN']), getGlobalInventory);
 inventoryRouter.get('/branch', roleMiddleware(['MANAGER']), getBranchInventory);
 inventoryRouter.get('/warehouse', getWarehouseInventory);

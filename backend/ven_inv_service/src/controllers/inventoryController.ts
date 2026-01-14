@@ -15,9 +15,9 @@ export const getGlobalInventory = async (req: Request, res: Response, next: Next
 // MANAGER — uses token branchId
 export const getBranchInventory = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    // const branchId = req.user.branchId;
-    // const data = await service.getBranchInventory(branchId);
-    // res.json({ success: true, data });
+    const branchId = req.user?.branchId as string;
+    const data = await service.getBranchInventory(branchId);
+    res.json({ success: true, data });
   } catch (err) {
     next(err);
   }
@@ -26,9 +26,9 @@ export const getBranchInventory = async (req: Request, res: Response, next: Next
 // WAREHOUSE STAFF
 export const getWarehouseInventory = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    // const warehouseId = req.user.warehouseId ;
-    // const data = await service.getWarehouseInventory(warehouseId);
-    // res.json({ success: true, data });
+    const { warehouseId } = req.body;
+    const data = await service.getWarehouseInventory(warehouseId);
+    res.json({ success: true, data });
   } catch (err) {
     next(err);
   }
