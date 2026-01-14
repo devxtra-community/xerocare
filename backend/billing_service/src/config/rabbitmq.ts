@@ -6,7 +6,7 @@ let channel: amqp.Channel;
 export const getRabbitChannel = async () => {
   if (channel) return channel;
 
-  const connection = await amqp.connect(process.env.RABBITMQ_URL || 'amqp://localhost', {
+  const connection = await amqp.connect(process.env.RABBITMQ_URL || 'amqp://127.0.0.1', {
     timeout: 3000,
   });
 

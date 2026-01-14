@@ -1,5 +1,5 @@
 import './config/env';
-import express, { Express, Request, Response, NextFunction } from 'express';
+import express, { Express } from 'express';
 import cors from 'cors';
 import { createProxyMiddleware } from 'http-proxy-middleware';
 import type { Options } from 'http-proxy-middleware';
@@ -22,10 +22,10 @@ app.set('trust proxy', 1);
 app.use(globalRateLimiter);
 
 const PORT = process.env.PORT || 3001;
-const EMPLOYEE_SERVICE_URL = process.env.EMPLOYEE_SERVICE_URL || 'http://localhost:3002';
+const EMPLOYEE_SERVICE_URL = process.env.EMPLOYEE_SERVICE_URL || 'http://127.0.0.1:3002';
 const VENDOR_INVENTORY_SERVICE_URL =
-  process.env.VENDOR_INVENTORY_SERVICE_URL || 'http://localhost:3003';
-const BILLING_SERVICE_URL = process.env.BILLING_SERVICE_URL || 'http://localhost:3004';
+  process.env.VENDOR_INVENTORY_SERVICE_URL || 'http://127.0.0.1:3003';
+const BILLING_SERVICE_URL = process.env.BILLING_SERVICE_URL || 'http://127.0.0.1:3004';
 
 app.use(
   cors({
@@ -59,18 +59,12 @@ const billProxyOptions: Options = {
 
 app.use(httpLogger);
 app.use('/health', healthRouter);
-app.use('/b/invoices', invoiceRouter);
+app.use('/b/invoices', express.json(), invoiceRouter);
 app.use('/e', createProxyMiddleware(empProxyOptions));
 app.use('/i', createProxyMiddleware(invProxyOptions));
 app.use('/b', createProxyMiddleware(billProxyOptions));
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-app.use((err: Error, req: Request, res: Response, _next: NextFunction) => {
-  logger.error(err);
-  res.status(500).json({ message: 'Internal Server Error' });
-});
-
 app.use(errorHandler);
 app.listen(PORT, () => {
-  logger.info(`Server running on port ${PORT}`);
+  logger.info(`Server running on port ${PORT} `);
 });

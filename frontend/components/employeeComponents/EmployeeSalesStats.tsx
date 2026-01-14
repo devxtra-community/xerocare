@@ -1,12 +1,54 @@
-import React from 'react';
+'use client';
+
+import React, { useEffect, useState } from 'react';
 import StatCard from '@/components/StatCard';
+import { getInvoiceStats } from '@/lib/invoice';
 
 export default function EmployeeSalesStats() {
+  const [stats, setStats] = useState<Record<string, number>>({
+    SALE: 0,
+    RENT: 0,
+    LEASE: 0,
+  });
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const data = await getInvoiceStats();
+        setStats(data);
+      } catch (error) {
+        console.error('Failed to fetch invoice stats:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchStats();
+  }, []);
+
+  const totalSales = stats.SALE + stats.RENT + stats.LEASE;
+
   const cards = [
-    { title: 'Total Sales', value: '1,234', subtitle: '+12% from last month' },
-    { title: 'Rent', value: '567', subtitle: '+5% from last month' },
-    { title: 'Lease', value: '89', subtitle: '+8% from last month' },
-    { title: 'Sale', value: '432', subtitle: '+2% from last month' },
+    {
+      title: 'Total Sales',
+      value: loading ? '...' : totalSales.toLocaleString(),
+      subtitle: 'Across all types',
+    },
+    {
+      title: 'Rent',
+      value: loading ? '...' : stats.RENT.toLocaleString(),
+      subtitle: 'Active rentals',
+    },
+    {
+      title: 'Lease',
+      value: loading ? '...' : stats.LEASE.toLocaleString(),
+      subtitle: 'Active leases',
+    },
+    {
+      title: 'Sale',
+      value: loading ? '...' : stats.SALE.toLocaleString(),
+      subtitle: 'Direct sales',
+    },
   ];
 
   return (
