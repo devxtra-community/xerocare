@@ -57,6 +57,21 @@ export const getAllInvoices = async (req: Request, res: Response, next: NextFunc
   }
 };
 
+export const getMyInvoices = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    if (!req.user || !req.user.userId) {
+      throw new AppError('User context missing', 401);
+    }
+    const invoices = await billingService.getInvoicesByCreator(req.user.userId);
+    return res.status(200).json({
+      success: true,
+      data: invoices,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const getInvoiceById = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = req.params.id as string;

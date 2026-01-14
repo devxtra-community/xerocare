@@ -84,6 +84,10 @@ export class BillingService {
     return this.invoiceRepo.findAll();
   }
 
+  async getInvoicesByCreator(creatorId: string) {
+    return this.invoiceRepo.findByCreatorId(creatorId);
+  }
+
   async getInvoiceById(id: string) {
     const invoice = await this.invoiceRepo.findById(id);
     if (!invoice) {
