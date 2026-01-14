@@ -1,13 +1,8 @@
 import { Router } from 'express';
 import { WarehouseController } from '../controllers/warehouseController';
-import { WarehouseService } from '../services/warehouseService';
-import { WarehouseRepository } from '../repositories/warehouseRepository';
-import { Source } from '../config/db';
 
 const router = Router();
-const repository = new WarehouseRepository(Source);
-const service = new WarehouseService(repository);
-const controller = new WarehouseController(service);
+const controller = new WarehouseController();
 
 router.post('/', controller.create);
 router.get('/', controller.list);

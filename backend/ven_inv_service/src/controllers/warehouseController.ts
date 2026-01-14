@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import { WarehouseService } from '../services/warehouseService';
 
 export class WarehouseController {
-  constructor(private readonly service: WarehouseService) {}
+  private service = new WarehouseService();
 
   create = async (req: Request, res: Response) => {
     const warehouse = await this.service.createWarehouse(req.body);

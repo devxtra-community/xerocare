@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { X, Upload, FileSpreadsheet, AlertCircle } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { toast } from 'sonner';
-import { bulkCreateProducts } from '@/lib/product';
+import { bulkCreateProducts, BulkProductRow } from '@/lib/product';
 import {
   Table,
   TableBody,
@@ -22,7 +22,7 @@ interface BulkUploadModalProps {
 
 export function BulkUploadModal({ onClose, onSuccess }: BulkUploadModalProps) {
   const [file, setFile] = useState<File | null>(null);
-  const [previewData, setPreviewData] = useState<Record<string, unknown>[]>([]);
+  const [previewData, setPreviewData] = useState<BulkProductRow[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -35,15 +35,62 @@ export function BulkUploadModal({ onClose, onSuccess }: BulkUploadModalProps) {
 
     try {
       const data = await parseExcel(selectedFile);
-      setPreviewData(data.slice(0, 5)); // Preview first 5 rows
-    } catch {
-      setError('Failed to parse Excel file');
+      // Validate and cast data immediately for preview
+      const validatedData = validateData(data);
+      setPreviewData(validatedData);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to parse Excel file');
       setFile(null);
       setPreviewData([]);
     }
   };
 
-  const parseExcel = (file: File): Promise<Record<string, unknown>[]> => {
+  const validateData = (data: unknown[]): BulkProductRow[] => {
+    if (!Array.isArray(data) || data.length === 0) {
+      throw new Error('No data found in file');
+    }
+
+    const requiredFields = [
+      'model_no',
+      'warehouse_id',
+      'vendor_id',
+      'serial_no',
+      'name',
+      'brand',
+      'MFD',
+      'rent_price_monthly',
+      'rent_price_yearly',
+      'sale_price',
+    ];
+
+    return data.map((row, index) => {
+      const r = row as Record<string, unknown>;
+      // Basic check for required fields
+      const missing = requiredFields.filter((field) => r[field] === undefined || r[field] === '');
+      if (missing.length > 0) {
+        throw new Error(`Row ${index + 1} missing fields: ${missing.join(', ')}`);
+      }
+
+      // Return casted object
+      return {
+        model_no: String(r.model_no),
+        warehouse_id: String(r.warehouse_id),
+        vendor_id: Number(r.vendor_id),
+        serial_no: String(r.serial_no),
+        name: String(r.name),
+        brand: String(r.brand),
+        MFD: r.MFD as string | Date,
+        rent_price_monthly: Number(r.rent_price_monthly),
+        rent_price_yearly: Number(r.rent_price_yearly),
+        lease_price_monthly: Number(r.lease_price_monthly || 0),
+        lease_price_yearly: Number(r.lease_price_yearly || 0),
+        sale_price: Number(r.sale_price),
+        tax_rate: Number(r.tax_rate || 0),
+      };
+    });
+  };
+
+  const parseExcel = (file: File): Promise<unknown[]> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = (e) => {
@@ -52,7 +99,7 @@ export function BulkUploadModal({ onClose, onSuccess }: BulkUploadModalProps) {
           const workbook = XLSX.read(data, { type: 'binary' });
           const sheetName = workbook.SheetNames[0];
           const sheet = workbook.Sheets[sheetName];
-          const jsonData = XLSX.utils.sheet_to_json(sheet) as Record<string, unknown>[];
+          const jsonData = XLSX.utils.sheet_to_json(sheet);
           resolve(jsonData);
         } catch (error) {
           reject(error);
@@ -68,18 +115,20 @@ export function BulkUploadModal({ onClose, onSuccess }: BulkUploadModalProps) {
 
     try {
       setIsUploading(true);
-      const data = await parseExcel(file);
+      // Data is already validated effectively during preview, but let's re-parse to be safe or just use previewData?
+      // Better to re-parse to ensure consistency or just use what we have.
+      // If we used previewData, it might be sliced (checked handleFileChange: it sets previewData to ALL validated data? No wait, logic needed fix)
 
-      // Basic validation or mapping could go here
-      // Expected fields: name, model_no, serial_no, vendor_id, etc.
+      // Let's re-parse and validate fully
+      const rawData = await parseExcel(file);
+      const validatedData = validateData(rawData);
 
-      const result = await bulkCreateProducts(data);
+      const result = await bulkCreateProducts(validatedData);
 
       if (result.successCount > 0) {
         toast.success(`Successfully added ${result.successCount} products`);
         if (result.failedRows.length > 0) {
           toast.warning(`${result.failedRows.length} rows failed to upload`);
-          // Ideally show a report of failed rows
         }
         onSuccess();
         onClose();
@@ -163,7 +212,7 @@ export function BulkUploadModal({ onClose, onSuccess }: BulkUploadModalProps) {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {previewData.map((row, i) => (
+                        {previewData.slice(0, 5).map((row, i) => (
                           <TableRow key={i}>
                             {Object.values(row)
                               .slice(0, 5)

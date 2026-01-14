@@ -11,7 +11,7 @@ export enum ProductStatus {
 export interface Product {
   id: string;
   model: Model; // Controller returns nested model data if TypeORM loads it, need to verify or make optional. Usually it's an object.
-  vendor_id: number;
+  vendor_id: string;
   serial_no: string;
   name: string;
   brand: string;
@@ -39,7 +39,8 @@ export interface Product {
 
 export interface CreateProductData {
   model_id: string; // Sending ID to link model
-  vendor_id: number;
+  warehouse_id: string;
+  vendor_id: string;
   serial_no: string;
   name: string;
   brand: string;
@@ -55,7 +56,7 @@ export interface CreateProductData {
 
 export interface UpdateProductData {
   model_id?: string;
-  vendor_id?: number;
+  vendor_id?: string;
   serial_no?: string;
   name?: string;
   brand?: string;
@@ -76,12 +77,12 @@ interface ApiResponse<T> {
 }
 
 export const getAllProducts = async (): Promise<Product[]> => {
-  const response = await api.get<ApiResponse<Product[]>>('/i/products');
+  const response = await api.get<ApiResponse<Product[]>>('/i/products/');
   return response.data.data || [];
 };
 
 export const addProduct = async (data: CreateProductData): Promise<Product> => {
-  const response = await api.post<ApiResponse<Product>>('/i/products', data);
+  const response = await api.post<ApiResponse<Product>>('/i/products/', data);
   if (!response.data.data) {
     throw new Error('Failed to create product');
   }
@@ -96,8 +97,24 @@ export const deleteProduct = async (id: string): Promise<void> => {
   await api.delete<ApiResponse<void>>(`/i/products/${id}`);
 };
 
+export interface BulkProductRow {
+  model_no: string;
+  warehouse_id: string;
+  vendor_id: number | string;
+  serial_no: string;
+  name: string;
+  brand: string;
+  MFD: string | Date;
+  rent_price_monthly: number;
+  rent_price_yearly: number;
+  lease_price_monthly: number;
+  lease_price_yearly: number;
+  sale_price: number;
+  tax_rate: number;
+}
+
 export const bulkCreateProducts = async (
-  rows: Record<string, unknown>[],
+  rows: BulkProductRow[],
 ): Promise<{ successCount: number; failedRows: { row: number; error: string }[] }> => {
   const response = await api.post<
     ApiResponse<{ successCount: number; failedRows: { row: number; error: string }[] }>

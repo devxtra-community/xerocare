@@ -1,16 +1,24 @@
 import { NextFunction, Request, Response } from 'express';
 import { AppError } from '../errors/appError';
 import { ProductService } from '../services/productService';
+import { logger } from '../config/logger';
+import { BulkProductRow } from '../dto/product.dto';
 
 const service = new ProductService();
 
 export const bulkCreateProducts = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const rows = req.body.rows;
-    if (!Array.isArray(rows) || rows.length === 0) throw new AppError('Invalid data', 400);
+    const { rows } = req.body;
 
-    const result = await service.bulkCreateProducts(rows);
-    res.json({ success: true, ...result });
+    if (!Array.isArray(rows) || rows.length === 0) {
+      throw new AppError('Invalid data', 400);
+    }
+    const result = await service.bulkCreateProducts(rows as BulkProductRow[]);
+    return res.status(201).json({
+      success: true,
+      inserted: result.success.length,
+      failed: result.failed,
+    });
   } catch (e) {
     next(e);
   }
@@ -18,7 +26,9 @@ export const bulkCreateProducts = async (req: Request, res: Response, next: Next
 
 export const addproduct = async (req: Request, res: Response) => {
   try {
+    console.log(req.body);
     const productData = req.body;
+    logger.info('Adding new product:');
     const newproduct = await service.addProduct(productData);
     res
       .status(200)
@@ -30,7 +40,9 @@ export const addproduct = async (req: Request, res: Response) => {
 
 export const getallproducts = async (req: Request, res: Response) => {
   try {
+    logger.info('Fetching all products');
     const products = await service.getAllProducts();
+    logger.info(`Fetched ${products.length} products`);
     if (products.length === 0) {
       return res.status(200).json({ message: 'No products found', data: products, success: true });
     }

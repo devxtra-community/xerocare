@@ -8,6 +8,7 @@ interface ErrorWithName {
 }
 
 export const authMiddleware = (req: Request, _res: Response, next: NextFunction) => {
+  logger.info('Auth Middleware invoked');
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {

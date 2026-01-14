@@ -3,7 +3,7 @@ import { Warehouse, WarehouseStatus } from '../entities/warehouseEntity';
 import { AppError } from '../errors/appError';
 
 export class WarehouseService {
-  constructor(private readonly repo: WarehouseRepository) {}
+  private repo = new WarehouseRepository();
 
   async createWarehouse(payload: Partial<Warehouse>) {
     if (!payload.warehouseName || !payload.warehouseCode) {

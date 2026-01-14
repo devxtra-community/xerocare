@@ -9,6 +9,7 @@ import {
   Users,
   Wallet,
   Tags,
+  Printer,
 } from 'lucide-react';
 
 import {
@@ -37,6 +38,11 @@ const menuItems = [
     title: 'Products',
     icon: Tags,
     href: '/manager/products',
+  },
+  {
+    title: 'Models',
+    icon: Printer,
+    href: '/manager/models',
   },
   {
     title: 'Sales',

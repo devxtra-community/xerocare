@@ -1,12 +1,8 @@
-import { DataSource } from 'typeorm';
 import { Warehouse, WarehouseStatus } from '../entities/warehouseEntity';
+import { Source } from '../config/db';
 
 export class WarehouseRepository {
-  constructor(private readonly db: DataSource) {}
-
-  private get repo() {
-    return this.db.getRepository(Warehouse);
-  }
+  private repo = Source.getRepository(Warehouse);
 
   async create(payload: Partial<Warehouse>) {
     const warehouse = this.repo.create(payload);

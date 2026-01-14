@@ -4,7 +4,7 @@ import { Product } from '../entities/productEntity';
 export class ProductRepository {
   private repo = Source.getRepository(Product);
 
-  async addProduct(entity: Product) {
+  async addProduct(entity: Partial<Product>) {
     return this.repo.save(entity);
   }
 

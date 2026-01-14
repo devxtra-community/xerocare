@@ -3,18 +3,17 @@ import {
   PrimaryGeneratedColumn,
   Column,
   ManyToOne,
-  OneToMany,
   CreateDateColumn,
   JoinColumn,
 } from 'typeorm';
 import { Model } from './modelEntity';
-import { Inventory } from './inventoryEntity';
 import { Warehouse } from './warehouseEntity';
 export enum ProductStatus {
-  AVAILABLE = 'available',
-  RENTED = 'rented',
-  SOLD = 'sold',
-  DAMAGED = 'damaged',
+  AVAILABLE = 'AVAILABLE',
+  RENTED = 'RENTED',
+  LEASE = 'LEASE',
+  SOLD = 'SOLD',
+  DAMAGED = 'DAMAGED',
 }
 
 @Entity('products')
@@ -29,8 +28,8 @@ export class Product {
   @JoinColumn({ name: 'warehouse_id' })
   warehouse!: Warehouse;
 
-  @Column()
-  vendor_id!: number;
+  @Column({ type: 'uuid' })
+  vendor_id!: string;
 
   @Column({ type: 'varchar', length: 255, unique: true })
   serial_no!: string;
@@ -44,23 +43,11 @@ export class Product {
   @Column({ type: 'date' })
   MFD!: Date;
 
-  @Column({ type: 'numeric', precision: 12, scale: 2 })
-  rent_price_monthly!: number;
-
-  @Column({ type: 'numeric', precision: 12, scale: 2 })
-  rent_price_yearly!: number;
-
-  @Column({ type: 'numeric', precision: 12, scale: 2 })
-  lease_price_monthly!: number;
-
-  @Column({ type: 'numeric', precision: 12, scale: 2 })
-  lease_price_yearly!: number;
+  @Column({ type: 'numeric', precision: 5, scale: 2 })
+  tax_rate!: number;
 
   @Column({ type: 'numeric', precision: 12, scale: 2 })
   sale_price!: number;
-
-  @Column({ type: 'numeric', precision: 5, scale: 2 })
-  tax_rate!: number;
 
   @Column({
     type: 'enum',
@@ -74,8 +61,4 @@ export class Product {
 
   @CreateDateColumn()
   created_at!: Date;
-
-  // One product can exist in multiple warehouses
-  @OneToMany(() => Inventory, (inventory) => inventory.model)
-  inventory!: Inventory[];
 }
