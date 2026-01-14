@@ -6,6 +6,7 @@ declare module 'express' {
       userId: string;
       role: string;
       email?: string;
+      branchId?: string;
     };
   }
 }
