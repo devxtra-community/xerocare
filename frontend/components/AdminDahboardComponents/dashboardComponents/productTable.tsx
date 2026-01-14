@@ -31,7 +31,7 @@ export default function ProductsTable() {
 
   return (
     <div className="rounded-2xl bg-white p-2 sm:p-3 shadow-sm w-full h-[260px] flex flex-col">
-      <div className="flex-1 overflow-hidden">
+      <div className="flex-1 overflow-x-auto">
         <table className="w-full">
           <thead>
             <tr className="border-b">
@@ -109,16 +109,7 @@ export default function ProductsTable() {
           );
         })}
 
-        {totalPages > 4 && (
-          <button
-            onClick={() => setPage(totalPages)}
-            className={`px-1.5 sm:px-2 py-0.5 rounded-md border transition ${
-              page === totalPages ? 'bg-primary text-white' : 'hover:bg-gray-50'
-            }`}
-          >
-            {totalPages}
-          </button>
-        )}
+        {totalPages > 4 && <button onClick={() => setPage(totalPages)}>{totalPages}</button>}
 
         <button
           onClick={() => setPage((p) => Math.min(totalPages, p + 1))}

@@ -49,6 +49,14 @@ export class BranchService {
     return this.repo.findAll();
   }
 
+  async getBranchById(id: string) {
+    const branch = await this.repo.findById(id);
+    if (!branch) {
+      throw new AppError('Branch not found', 404);
+    }
+    return branch;
+  }
+
   async deleteBranch(id: string) {
     const branch = await this.repo.findById(id);
     if (!branch) {

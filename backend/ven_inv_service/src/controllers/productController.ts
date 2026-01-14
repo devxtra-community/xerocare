@@ -54,29 +54,44 @@ export const getallproducts = async (req: Request, res: Response) => {
   }
 };
 
-export const updateproduct = async (req: Request, res: Response) => {
+export const updateproduct = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const id = req.params.id;
-    const productData = req.body;
-    const updated = await service.updateProduct(id, productData);
+    const { id } = req.params;
+
+    if (typeof id !== 'string') {
+      throw new AppError('Invalid product id', 400);
+    }
+
+    const updated = await service.updateProduct(id, req.body);
+
     if (!updated) {
       throw new AppError('Product not found', 404);
     }
-    res.status(200).json({ message: 'Product updated successfully', success: true });
-  } catch {
-    throw new AppError('Failed to update product', 500);
+
+    res.status(200).json({
+      success: true,
+      message: 'Product updated successfully',
+    });
+  } catch (err) {
+    next(err);
   }
 };
 
-export const deleteproduct = async (req: Request, res: Response) => {
+export const deleteproduct = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const id = req.params.id;
-    const deleted = await service.deleteProduct(id);
-    if (!deleted) {
-      throw new AppError('Product not found', 404);
+    const { id } = req.params;
+
+    if (typeof id !== 'string') {
+      throw new AppError('Invalid product id', 400);
     }
-    return res.status(200).json({ message: 'Product deleted successfully', success: true });
-  } catch {
-    throw new AppError('Failed to delete product', 500);
+
+    await service.deleteProduct(id);
+
+    return res.status(200).json({
+      success: true,
+      message: 'Product deleted successfully',
+    });
+  } catch (err) {
+    next(err);
   }
 };

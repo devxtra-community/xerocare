@@ -22,6 +22,14 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { useRouter } from 'next/navigation';
 import EmployeeFormDialog from './EmployeeFormDialog';
 import DeleteEmployeeDialog from './DeleteEmployeeDialog';
@@ -136,7 +144,7 @@ export default function EmployeeTable() {
   };
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border-0 overflow-hidden">
+    <div className="bg-white rounded-2xl shadow-sm border-0 overflow-hidden text-left">
       <div className="p-6 border-b border-gray-100">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
@@ -148,14 +156,14 @@ export default function EmployeeTable() {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
               <Input
                 placeholder="Search employees..."
-                className="pl-10 w-full md:w-[250px] bg-gray-50 border-none rounded-xl"
+                className="pl-10 h-10 w-full md:w-[250px] bg-gray-50 border-none rounded-xl"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="rounded-xl border-gray-200 gap-2">
+                <Button variant="outline" className="h-10 rounded-xl border-gray-200 gap-2">
                   <Filter className="h-4 w-4" />
                   Role: {roleFilter}
                 </Button>
@@ -169,14 +177,17 @@ export default function EmployeeTable() {
                 <DropdownMenuItem onClick={() => setRoleFilter('EMPLOYEE')}>
                   Employee
                 </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setRoleFilter('FINANCE')}>
+                  Finance
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-            <Button variant="outline" className="rounded-xl border-gray-200">
+            <Button variant="outline" className="h-10 rounded-xl border-gray-200">
               <Download className="h-4 w-4 mr-2" />
               Export
             </Button>
             <Button
-              className="rounded-xl bg-primary hover:bg-primary/90 text-white"
+              className="h-10 rounded-xl bg-primary hover:bg-primary/90 text-white"
               onClick={handleAdd}
             >
               <Plus className="h-4 w-4 mr-2" />
@@ -187,54 +198,59 @@ export default function EmployeeTable() {
       </div>
 
       <div className="overflow-x-auto min-h-[400px]">
-        <table className="w-full text-left">
-          <thead className="bg-gray-50/50">
-            <tr>
-              <th className="px-6 py-4 text-xs font-semibold text-primary uppercase tracking-wider">
+        <Table className="w-full">
+          <TableHeader className="bg-gray-50/50">
+            <TableRow className="border-b border-gray-100 hover:bg-transparent">
+              <TableHead className="px-3 py-4 text-xs font-semibold text-primary uppercase tracking-wider">
                 ID
-              </th>
-              <th className="px-6 py-4 text-xs font-semibold text-primary uppercase tracking-wider">
+              </TableHead>
+              <TableHead className="px-3 py-4 text-xs font-semibold text-primary uppercase tracking-wider">
                 Name
-              </th>
-              <th className="px-6 py-4 text-xs font-semibold text-primary uppercase tracking-wider">
+              </TableHead>
+              <TableHead className="px-3 py-4 text-xs font-semibold text-primary uppercase tracking-wider">
                 Role
-              </th>
-              <th className="px-6 py-4 text-xs font-semibold text-primary uppercase tracking-wider">
+              </TableHead>
+              <TableHead className="px-3 py-4 text-xs font-semibold text-primary uppercase tracking-wider">
                 Branch
-              </th>
-              <th className="px-6 py-4 text-xs font-semibold text-primary uppercase tracking-wider">
+              </TableHead>
+              <TableHead className="px-3 py-4 text-xs font-semibold text-primary uppercase tracking-wider">
                 Salary
-              </th>
-              <th className="px-6 py-4 text-xs font-semibold text-primary uppercase tracking-wider">
+              </TableHead>
+              <TableHead className="px-3 py-4 text-xs font-semibold text-primary uppercase tracking-wider">
                 Status
-              </th>
-              <th className="px-6 py-4 text-xs font-semibold text-primary uppercase tracking-wider">
+              </TableHead>
+              <TableHead className="px-3 py-4 text-xs font-semibold text-primary uppercase tracking-wider">
                 Expiry
-              </th>
-              <th className="px-6 py-4 text-xs font-semibold text-primary uppercase tracking-wider">
+              </TableHead>
+              <TableHead className="px-3 py-4 text-xs font-semibold text-primary uppercase tracking-wider">
                 Joined
-              </th>
-              <th className="px-6 py-4 text-xs font-semibold text-primary uppercase tracking-wider text-right">
+              </TableHead>
+              <TableHead className="px-3 py-4 text-xs font-semibold text-primary uppercase tracking-wider text-right">
                 Actions
-              </th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100">
+              </TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody className="">
             {!isLoading && filteredEmployees.length === 0 ? (
-              <tr>
-                <td colSpan={7} className="px-6 py-20 text-center text-gray-500">
+              <TableRow>
+                <TableCell colSpan={9} className="px-3 py-20 text-center text-gray-500 italic">
                   No employees found
-                </td>
-              </tr>
+                </TableCell>
+              </TableRow>
             ) : (
               filteredEmployees.map((emp, index) => (
-                <tr key={emp.id} className={index % 2 === 1 ? 'bg-sky-50/60' : 'bg-white'}>
-                  <td className="px-6 py-4 text-xs font-bold text-blue-600">
+                <TableRow
+                  key={emp.id}
+                  className={`transition-colors h-11 border-b border-gray-50 hover:bg-primary/5 ${
+                    index % 2 === 0 ? 'bg-white' : 'bg-blue-50/20'
+                  }`}
+                >
+                  <TableCell className="px-3 py-4 text-xs font-bold text-blue-600">
                     {emp.display_id || '---'}
-                  </td>
-                  <td className="px-6 py-4">
+                  </TableCell>
+                  <TableCell className="px-3 py-4">
                     <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-semibold text-sm flex-shrink-0 overflow-hidden relative">
+                      <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-semibold text-sm flex-shrink-0 overflow-hidden relative border border-blue-50 shadow-sm">
                         {emp.profile_image_url ? (
                           <Image src={emp.profile_image_url} alt="" fill className="object-cover" />
                         ) : (
@@ -245,28 +261,28 @@ export default function EmployeeTable() {
                         <span className="text-sm font-medium text-gray-900 truncate">
                           {emp.first_name} {emp.last_name}
                         </span>
-                        <span className="text-xs text-gray-500">{emp.email}</span>
+                        <span className="text-[11px] text-gray-500">{emp.email}</span>
                       </div>
                     </div>
-                  </td>
-                  <td className="px-6 py-4">
+                  </TableCell>
+                  <TableCell className="px-3 py-4">
                     <Badge
                       variant="secondary"
-                      className="bg-gray-100 text-gray-700 border-none font-medium"
+                      className="bg-gray-100 text-gray-700 border-none font-medium px-2 py-0.5 text-[10px]"
                     >
                       {emp.role}
                     </Badge>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className="text-sm text-gray-600">{emp.branch?.name || '---'}</span>
-                  </td>
-                  <td className="px-6 py-4 text-sm font-semibold text-blue-700 tabular-nums">
+                  </TableCell>
+                  <TableCell className="px-3 py-4">
+                    <span className="text-xs text-gray-600">{emp.branch?.name || '---'}</span>
+                  </TableCell>
+                  <TableCell className="px-3 py-4 text-sm font-semibold text-blue-700 tabular-nums">
                     AED {emp.salary?.toLocaleString() || '0'}
-                  </td>
-                  <td className="px-6 py-4">
+                  </TableCell>
+                  <TableCell className="px-3 py-4">
                     <Badge
                       variant="outline"
-                      className={`text-[10px] font-bold border-none ${
+                      className={`text-[10px] font-bold border-none px-2 py-0.5 ${
                         emp.status === 'ACTIVE'
                           ? 'bg-green-100 text-green-700'
                           : emp.status === 'INACTIVE'
@@ -276,17 +292,17 @@ export default function EmployeeTable() {
                     >
                       {emp.status}
                     </Badge>
-                  </td>
-                  <td className="px-6 py-4 text-sm text-gray-500">
+                  </TableCell>
+                  <TableCell className="px-3 py-4 text-xs text-gray-500">
                     {emp.expire_date
                       ? new Date(emp.expire_date).toLocaleDateString('en-GB')
                       : '---'}
-                  </td>
-                  <td className="px-6 py-4 text-sm text-gray-500">
+                  </TableCell>
+                  <TableCell className="px-3 py-4 text-xs text-gray-500">
                     {new Date(emp.createdAt).toLocaleDateString('en-GB')}
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <div className="flex items-center justify-end gap-2">
+                  </TableCell>
+                  <TableCell className="px-3 py-4 text-right pr-4">
+                    <div className="flex items-center justify-end gap-1">
                       <Button
                         variant="ghost"
                         className="h-8 w-8 p-0 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
@@ -309,34 +325,34 @@ export default function EmployeeTable() {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-40 rounded-xl">
                           <DropdownMenuItem
-                            className="gap-2 cursor-pointer"
+                            className="gap-2 cursor-pointer text-xs"
                             onClick={() => handleEdit(emp)}
                           >
-                            <UserCog className="h-4 w-4" /> Edit Details
+                            <UserCog className="h-3.5 w-3.5" /> Edit Details
                           </DropdownMenuItem>
                           <DropdownMenuItem
-                            className={`gap-2 cursor-pointer ${emp.status === 'ACTIVE' ? 'text-red-600 focus:text-red-600' : 'text-green-600 focus:text-green-600'}`}
+                            className={`gap-2 cursor-pointer text-xs ${emp.status === 'ACTIVE' ? 'text-red-600 focus:text-red-600' : 'text-green-600 focus:text-green-600'}`}
                             onClick={() => handleDeleteTrigger(emp)}
                           >
                             {emp.status === 'ACTIVE' ? (
                               <>
-                                <UserX className="h-4 w-4" /> Disable Access
+                                <UserX className="h-3.5 w-3.5" /> Disable Access
                               </>
                             ) : (
                               <>
-                                <UserCog className="h-4 w-4" /> Enable Access
+                                <UserCog className="h-3.5 w-3.5" /> Enable Access
                               </>
                             )}
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </div>
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               ))
             )}
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
       </div>
 
       <EmployeeFormDialog
@@ -369,7 +385,7 @@ export default function EmployeeTable() {
             Previous
           </Button>
           <div className="flex items-center gap-1">
-            {[...Array(pagination.totalPages)].map((_, i) => (
+            {[...Array(Math.min(pagination.totalPages, 5))].map((_, i) => (
               <Button
                 key={i + 1}
                 variant={pagination.page === i + 1 ? 'default' : 'outline'}

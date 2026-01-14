@@ -233,7 +233,7 @@ export default function VendorTable({
               filteredVendors.map((vendor, index) => (
                 <TableRow
                   key={vendor.id}
-                  className={`border-b border-gray-100 hover:bg-slate-50/50 ${index % 2 !== 0 ? 'bg-sky-100/60' : ''}`}
+                  className={`border-b border-gray-100 hover:bg-slate-50/50 ${index % 2 !== 0 ? 'bg-blue-50/20' : 'bg-white'}`}
                 >
                   <TableCell className="font-medium text-primary">{vendor.name}</TableCell>
                   <TableCell className="text-slate-500 font-medium">

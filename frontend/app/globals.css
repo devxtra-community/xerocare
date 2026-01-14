@@ -80,16 +80,21 @@
   --sidebar-border: oklch(0.38 0.09 250);
   --sidebar-ring: oklch(0.72 0.19 250);
 
-  --primary-rgb: 37 99 235; /* #2563eb */
-  --primary-light-rgb: 147 197 253; /* #93c5fd */
-  --muted-rgb: 229 231 235; /* #e5e7eb */
+  --primary-rgb: 37 99 235;
+  /* #2563eb */
+  --primary-light-rgb: 147 197 253;
+  /* #93c5fd */
+  --muted-rgb: 229 231 235;
+  /* #e5e7eb */
 }
 
 @layer base {
   * {
     @apply border-border outline-ring/50;
   }
+
+  html,
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground overflow-x-hidden;
   }
 }

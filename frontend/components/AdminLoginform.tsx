@@ -5,10 +5,10 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Field, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
-
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { adminLogin } from '@/lib/auth';
+import { jwtDecode } from 'jwt-decode';
 
 interface APIError {
   response?: {
@@ -35,29 +35,39 @@ export function AdminLoginForm({ className, ...props }: React.ComponentProps<'di
     try {
       const res = await adminLogin(email, password);
 
-      if (res.success) {
-        toast.success('Login successful');
-        localStorage.setItem('accessToken', res.accessToken);
-
-        // Set cookie for middleware access
-        document.cookie = `accessToken=${res.accessToken}; path=/; max-age=86400; SameSite=Strict`;
-
-        router.push('/admin/dashboard');
-      } else {
+      if (!res.success) {
         setError(res.message || 'Login failed');
         toast.error(res.message || 'Login failed');
+        return;
+      }
+
+      toast.success('Login successful');
+
+      localStorage.setItem('accessToken', res.accessToken);
+      document.cookie = `accessToken=${res.accessToken}; path=/; max-age=86400; SameSite=Strict`;
+
+      const decoded = jwtDecode<{ role: string }>(res.accessToken);
+      const role = decoded.role;
+
+      if (role === 'ADMIN') {
+        router.push('/admin/dashboard');
+      } else if (role === 'HR') {
+        router.push('/hr/dashboard');
+      } else {
+        router.push('/admin/dashboard');
       }
     } catch (err: unknown) {
       let errorMessage = 'Login failed';
+
       if (err && typeof err === 'object' && 'response' in err) {
         const apiError = err as APIError;
-        if (apiError.response?.data?.message) {
-          errorMessage = apiError.response.data.message;
-        }
+        errorMessage = apiError.response?.data?.message ?? errorMessage;
       } else if (err instanceof Error) {
         errorMessage = err.message;
       }
+
       setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }

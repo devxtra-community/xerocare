@@ -243,7 +243,7 @@ export default function BranchReport() {
 
             <TableBody>
               {filtered.map((b, i) => (
-                <TableRow key={b.id} className={i % 2 ? 'bg-sky-100/60' : ''}>
+                <TableRow key={b.id} className={i % 2 ? 'bg-blue-50/20' : 'bg-white'}>
                   <TableCell className="px-4 font-medium">{b.name}</TableCell>
                   <TableCell className="px-4">{b.address}</TableCell>
                   <TableCell className="px-4">{b.location}</TableCell>

@@ -140,7 +140,7 @@ export default function EmployeeOrdersTable() {
 
       <div className="rounded-2xl bg-white shadow-sm overflow-hidden border">
         <div className="overflow-x-auto">
-          <Table>
+          <Table className="min-w-[1000px] sm:min-w-full">
             <TableHeader>
               <TableRow className="bg-slate-50">
                 <TableHead className="text-primary font-bold whitespace-nowrap">Order ID</TableHead>
@@ -173,7 +173,10 @@ export default function EmployeeOrdersTable() {
                 </TableRow>
               ) : (
                 filteredOrders.map((order, index) => (
-                  <TableRow key={order.orderId} className={index % 2 ? 'bg-sky-50/30' : ''}>
+                  <TableRow
+                    key={order.orderId}
+                    className={index % 2 !== 0 ? 'bg-blue-50/20' : 'bg-white'}
+                  >
                     <TableCell className="text-blue-600 font-medium whitespace-nowrap">
                       {order.orderId}
                     </TableCell>

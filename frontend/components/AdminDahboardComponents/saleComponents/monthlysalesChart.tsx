@@ -9,6 +9,12 @@ const data = [
   { month: 'Apr', sales: 22000 },
   { month: 'May', sales: 26000 },
   { month: 'Jun', sales: 30000 },
+  { month: 'Jul', sales: 35000 },
+  { month: 'Aug', sales: 28000 },
+  { month: 'Sep', sales: 42000 },
+  { month: 'Oct', sales: 38000 },
+  { month: 'Nov', sales: 45000 },
+  { month: 'Dec', sales: 50000 },
 ];
 
 export default function MonthlySalesBarChart() {
@@ -26,7 +32,7 @@ export default function MonthlySalesBarChart() {
             />
             <YAxis tick={{ fontSize: 11, fill: '#1e3a8a' }} axisLine={{ stroke: '#e5e7eb' }} />
             <Tooltip contentStyle={{ fontSize: 12 }} labelStyle={{ color: '#1e3a8a' }} />
-            <Bar dataKey="sales" fill="#0D47A1" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="sales" fill="#0D47A1" radius={[4, 4, 0, 0]} barSize={20} />
           </BarChart>
         </ResponsiveContainer>
       </div>

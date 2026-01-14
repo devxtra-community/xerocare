@@ -253,6 +253,7 @@ export default function EmployeeFormDialog({
                   <SelectItem value="HR">HR</SelectItem>
                   <SelectItem value="MANAGER">Manager</SelectItem>
                   <SelectItem value="EMPLOYEE">Employee</SelectItem>
+                  <SelectItem value="FINANCE">Finance</SelectItem>
                 </SelectContent>
               </Select>
             </div>

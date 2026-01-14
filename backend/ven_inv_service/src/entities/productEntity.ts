@@ -46,13 +46,14 @@ export class Product {
   @Column({ type: 'numeric', precision: 5, scale: 2 })
   tax_rate!: number;
 
-  @Column({ type: 'numeric', precision: 12, scale: 2 })
+  @Column({ type: 'numeric', precision: 12, scale: 2, nullable: true })
   sale_price!: number;
 
   @Column({
     type: 'enum',
     enum: ProductStatus,
     default: ProductStatus.AVAILABLE,
+    nullable: true,
   })
   product_status!: ProductStatus;
 

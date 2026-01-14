@@ -124,7 +124,7 @@ export default function OrderTable() {
               {filteredOrders.map((order, index) => (
                 <TableRow
                   key={order.id}
-                  className={`hover:bg-blue-50/30 transition-colors border-b border-blue-50/20 ${index % 2 ? 'bg-sky-50/20' : ''}`}
+                  className={`hover:bg-blue-50/30 transition-colors border-b border-blue-50/20 ${index % 2 ? 'bg-blue-50/20' : 'bg-white'}`}
                 >
                   <TableCell className="px-4 py-2">
                     <div className="flex flex-col">

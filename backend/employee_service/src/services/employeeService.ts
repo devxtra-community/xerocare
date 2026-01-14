@@ -69,7 +69,9 @@ export class EmployeeService {
           ? 'H'
           : roleEnum === EmployeeRole.MANAGER
             ? 'M'
-            : 'E';
+            : roleEnum === EmployeeRole.FINANCE
+              ? 'F'
+              : 'E';
     const display_id = `${prefix}${String(count + 1).padStart(2, '0')}`;
 
     const plainPassword = generateRandomPassword();
@@ -149,6 +151,22 @@ export class EmployeeService {
     }
 
     return employee;
+  }
+
+  async getPublicEmployeeProfile(id: string) {
+    const employee = await this.employeeRepo.findByIdSafe(id);
+
+    if (!employee) {
+      throw new AppError('Employee not found', 404);
+    }
+
+    return {
+      id: employee.id,
+      name: `${employee.first_name} ${employee.last_name}`,
+      email: employee.email,
+      role: employee.role,
+      branchId: employee.branch_id,
+    };
   }
 
   async updateEmployee(

@@ -76,7 +76,7 @@ export default function HrTable() {
   return (
     <div className="rounded-2xl bg-white p-2 sm:p-3 shadow-sm w-full h-[280px] flex flex-col">
       {/* TABLE */}
-      <div className="flex-1 overflow-hidden">
+      <div className="flex-1 overflow-x-auto">
         <table className="w-full">
           <thead>
             <tr className="border-b">
@@ -98,7 +98,7 @@ export default function HrTable() {
           <tbody>
             {currentData.length > 0 ? (
               currentData.map((item, index) => (
-                <tr key={index} className={index % 2 ? 'bg-sky-100/60' : ''}>
+                <tr key={index} className={index % 2 !== 0 ? 'bg-blue-50/20' : 'bg-white'}>
                   <td className="py-1.5 sm:py-2 px-1 sm:px-2 text-[10px] sm:text-xs font-medium">
                     <div className="flex items-center gap-1 sm:gap-2">
                       <div className="h-5 w-5 sm:h-6 sm:w-6 rounded-full bg-gray-300 flex items-center justify-center text-[10px] sm:text-xs font-medium text-gray-700">

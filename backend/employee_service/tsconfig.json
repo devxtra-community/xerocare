@@ -4,14 +4,15 @@
     "module": "CommonJS",
     "rootDir": "./src",
     "outDir": "./dist",
-
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
-
     "experimentalDecorators": true,
-    "emitDecoratorMetadata": true,
-    "typeRoots": ["./src/types", "./node_modules/@types"]
+    "emitDecoratorMetadata": true
   },
-  "include": ["src/**/*"]
+  "include": ["src/**/*"],
+  "files": ["src/types/express/index.d.ts"],
+  "ts-node": {
+    "files": true
+  }
 }
