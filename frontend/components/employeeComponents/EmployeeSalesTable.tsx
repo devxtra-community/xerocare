@@ -3,18 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import {
-  Plus,
-  Search,
-  Loader2,
-  Trash2,
-  Eye,
-  FileText,
-  Calendar,
-  IndianRupee,
-  User,
-  Building,
-} from 'lucide-react';
+import { Plus, Search, Loader2, Trash2, Eye, FileText, Calendar, IndianRupee } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -31,7 +20,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import {
-  getInvoices,
+  getMyInvoices,
   createInvoice,
   Invoice,
   CreateInvoicePayload,
@@ -58,7 +47,7 @@ export default function EmployeeSalesTable() {
   const fetchInvoices = async () => {
     try {
       setLoading(true);
-      const data = await getInvoices();
+      const data = await getMyInvoices();
       setInvoices(data);
     } catch (error) {
       console.error('Failed to fetch invoices:', error);
@@ -88,8 +77,7 @@ export default function EmployeeSalesTable() {
   const filteredInvoices = invoices.filter((inv) => {
     const matchesSearch =
       inv.invoiceNumber.toLowerCase().includes(search.toLowerCase()) ||
-      inv.items?.some((item) => item.description.toLowerCase().includes(search.toLowerCase())) ||
-      inv.employeeName.toLowerCase().includes(search.toLowerCase());
+      inv.items?.some((item) => item.description.toLowerCase().includes(search.toLowerCase()));
     const matchesFilter = filterType === 'All' || inv.saleType === filterType;
     return matchesSearch && matchesFilter;
   });
@@ -296,26 +284,6 @@ function InvoiceDetailsDialog({ invoice, onClose }: { invoice: Invoice; onClose:
 
         <div className="p-8 pt-6 space-y-8 max-h-[70vh] overflow-y-auto scrollbar-hide">
           <div className="grid grid-cols-2 gap-x-12 gap-y-6">
-            <div className="space-y-4">
-              <div className="space-y-1">
-                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                  Sold By
-                </p>
-                <div className="flex items-center gap-2">
-                  <User size={14} className="text-gray-400" />
-                  <p className="text-sm font-bold text-gray-800">{invoice.employeeName}</p>
-                </div>
-              </div>
-              <div className="space-y-1">
-                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                  Branch
-                </p>
-                <div className="flex items-center gap-2">
-                  <Building size={14} className="text-gray-400" />
-                  <p className="text-sm font-bold text-gray-800">{invoice.branchName}</p>
-                </div>
-              </div>
-            </div>
             <div className="space-y-4">
               <div className="space-y-1">
                 <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Date</p>

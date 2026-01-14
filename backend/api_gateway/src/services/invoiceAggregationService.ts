@@ -134,52 +134,12 @@ export class InvoiceAggregationService {
       );
       const invoices = billingResponse.data.data;
 
-      if (invoices.length === 0) {
-        return [];
-      }
-
-      const aggregatedInvoices = await Promise.all(
-        invoices.map(async (inv) => {
-          try {
-            const employeeResponse = await axios.get<{ data: { name: string } }>(
-              `${EMPLOYEE_SERVICE_URL}/employee/public/${inv.createdBy}`,
-              {
-                headers: { Authorization: `Bearer ${token}` },
-              },
-            );
-            const employeeName = employeeResponse.data.data.name;
-
-            const branchResponse = await axios.get<{ data: { name: string } }>(
-              `${VENDOR_INVENTORY_SERVICE_URL}/branch/${inv.branchId}`,
-              {
-                headers: { Authorization: `Bearer ${token}` },
-              },
-            );
-            const branchName = branchResponse.data.data.name;
-
-            return {
-              ...inv,
-              employeeName,
-              branchName,
-            };
-          } catch (e: unknown) {
-            const err = e as { message?: string; response?: { status?: number; data?: unknown } };
-            logger.error('Failed to fetch details for invoice', {
-              invoiceId: inv.id,
-              error: err.message,
-              status: err.response?.status,
-              data: err.response?.data,
-            });
-            return {
-              ...inv,
-              employeeName: 'Unknown',
-              branchName: 'Unknown',
-            };
-          }
-        }),
-      );
-
-      return aggregatedInvoices;
+      // For "My Invoices", we don't need to aggregate employee/branch names as per user request
+      return invoices.map((inv) => ({
+        ...inv,
+        employeeName: '',
+        branchName: '',
+      }));
     } catch (error: unknown) {
       if (axios.isAxiosError(error)) {
         logger.error('Axios error in fetch my invoices', {
