@@ -84,3 +84,16 @@ export const getInvoiceById = async (req: Request, res: Response, next: NextFunc
     next(error);
   }
 };
+export const getStats = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const createdBy = req.query.createdBy as string;
+    const branchId = req.query.branchId as string;
+    const stats = await billingService.getInvoiceStats({ createdBy, branchId });
+    return res.status(200).json({
+      success: true,
+      data: stats,
+    });
+  } catch (error) {
+    next(error);
+  }
+};

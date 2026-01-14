@@ -95,4 +95,17 @@ export class BillingService {
     }
     return invoice;
   }
+
+  async getInvoiceStats(filter: { createdBy?: string; branchId?: string } = {}) {
+    const stats = await this.invoiceRepo.getStats(filter);
+    const result: Record<string, number> = {
+      SALE: 0,
+      RENT: 0,
+      LEASE: 0,
+    };
+    stats.forEach((s) => {
+      result[s.saleType] = s.count;
+    });
+    return result;
+  }
 }
