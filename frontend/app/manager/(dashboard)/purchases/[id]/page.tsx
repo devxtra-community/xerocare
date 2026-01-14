@@ -25,27 +25,27 @@ export default function PurchaseDetailsPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    const loadPurchase = async () => {
+      setLoading(true);
+      try {
+        const data = await getPurchaseById(id);
+        if (data) {
+          setPurchase(data);
+        } else {
+          toast.error('Purchase not found');
+          router.push('/manager/purchases');
+        }
+      } catch {
+        toast.error('Failed to load purchase details');
+      } finally {
+        setLoading(false);
+      }
+    };
+
     if (id) {
       loadPurchase();
     }
-  }, [id]);
-
-  const loadPurchase = async () => {
-    setLoading(true);
-    try {
-      const data = await getPurchaseById(id);
-      if (data) {
-        setPurchase(data);
-      } else {
-        toast.error('Purchase not found');
-        router.push('/manager/purchases');
-      }
-    } catch {
-      toast.error('Failed to load purchase details');
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [id, router]);
 
   if (loading) {
     return (

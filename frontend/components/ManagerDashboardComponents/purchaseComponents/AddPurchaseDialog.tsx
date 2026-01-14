@@ -279,7 +279,7 @@ export function AddPurchaseDialog({
                   ) : (
                     <TableRow>
                       <TableCell colSpan={6} className="text-center py-6 text-gray-400">
-                        No products added. Click "Add Product" to start.
+                        No products added. Click &quot;Add Product&quot; to start.
                       </TableCell>
                     </TableRow>
                   )}
