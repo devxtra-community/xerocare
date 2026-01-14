@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { adminLogin } from '@/lib/auth';
+import { jwtDecode } from 'jwt-decode';
 
 interface APIError {
   response?: {
@@ -44,7 +45,6 @@ export function AdminLoginForm({ className, ...props }: React.ComponentProps<'di
 
         // Decode token to get role and route accordingly
         try {
-          const jwtDecode = (await import('jwt-decode')).default;
           const decoded = jwtDecode<{ role: string }>(res.accessToken);
           const role = decoded.role;
 

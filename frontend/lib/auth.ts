@@ -1,6 +1,6 @@
 import api from './api';
 
-import jwtDecode from 'jwt-decode';
+import { jwtDecode } from 'jwt-decode';
 
 export type UserRole = 'HR' | 'EMPLOYEE' | 'FINANCE' | 'MANAGER';
 
