@@ -6,10 +6,10 @@ import { BulkProductRow } from '../dto/product.dto';
 
 const service = new ProductService();
 
-export const bulkCreateProducts = async (req: Request, res: Response, next: NextFunction) => {
+export const bulkCreateProducts = async (req: Request, res: Response) => {
   try {
     const { rows } = req.body;
-
+    console.log(rows);
     if (!Array.isArray(rows) || rows.length === 0) {
       throw new AppError('Invalid data', 400);
     }
@@ -17,16 +17,17 @@ export const bulkCreateProducts = async (req: Request, res: Response, next: Next
     return res.status(201).json({
       success: true,
       inserted: result.success.length,
-      failed: result.failed,
+      failed: result.failed.length,
+      errors: result.failed,
     });
   } catch (e) {
-    next(e);
+    console.log(e);
+    throw new AppError('Failed to bulk create products', 500);
   }
 };
 
 export const addproduct = async (req: Request, res: Response) => {
   try {
-    console.log(req.body);
     const productData = req.body;
     logger.info('Adding new product:');
     const newproduct = await service.addProduct(productData);

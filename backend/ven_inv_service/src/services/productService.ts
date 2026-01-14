@@ -18,6 +18,9 @@ export class ProductService {
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i];
       try {
+        if (!row.vendor_id) {
+          throw new AppError('vendor_id missing', 400);
+        }
         const modelDetails = await this.model.findbyid(row.model_no);
         if (!modelDetails) {
           throw new AppError('model not found', 404);
@@ -40,7 +43,19 @@ export class ProductService {
         });
         success.push(row.serial_no);
       } catch (error: unknown) {
-        failed.push({ row: i + 1, error: (error as Error).message || 'Unknown error' });
+        console.error('Bulk insert error at row', i + 1, error);
+
+        if (error instanceof Error) {
+          failed.push({
+            row: i + 1,
+            error: error.message,
+          });
+        } else {
+          failed.push({
+            row: i + 1,
+            error: 'Unknown error',
+          });
+        }
       }
     }
     return { success, failed };
