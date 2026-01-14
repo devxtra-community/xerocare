@@ -44,6 +44,11 @@ const menuItems = [
     href: '/manager/sales',
   },
   {
+    title: 'Purchases',
+    icon: ShoppingCart,
+    href: '/manager/purchases',
+  },
+  {
     title: 'Vendors',
     icon: Truck,
     href: '/manager/vendors',

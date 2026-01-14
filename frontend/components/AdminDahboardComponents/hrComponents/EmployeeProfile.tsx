@@ -297,35 +297,6 @@ export default function EmployeeProfile({ id }: EmployeeProfileProps) {
                   </div>
                 </div>
               </div>
-
-              <div className="mt-12 p-8 rounded-[2rem] bg-slate-900 text-white relative overflow-hidden group">
-                <div className="absolute top-0 right-0 w-48 h-48 bg-white/5 rounded-full -mr-24 -mt-24 blur-2xl group-hover:scale-125 transition-transform" />
-                <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-                  <div>
-                    <h5 className="text-xl font-black italic tracking-tight mb-1">
-                      Performance Overview
-                    </h5>
-                    <p className="text-xs text-white/50 font-medium">
-                      Monthly efficiency and attendance metrics
-                    </p>
-                  </div>
-                  <div className="flex gap-6">
-                    <div className="flex flex-col">
-                      <span className="text-[2rem] font-black leading-none mb-1">98%</span>
-                      <span className="text-[9px] font-bold text-white/40 uppercase tracking-widest">
-                        Efficiency
-                      </span>
-                    </div>
-                    <div className="h-10 w-[1px] bg-white/10 self-center" />
-                    <div className="flex flex-col">
-                      <span className="text-[2rem] font-black leading-none mb-1">26</span>
-                      <span className="text-[9px] font-bold text-white/40 uppercase tracking-widest">
-                        Work Days
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
             </div>
           </div>
         </div>
