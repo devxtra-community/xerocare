@@ -10,7 +10,7 @@ import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { requestLoginOtp, verifyLoginOtp, requestMagicLink } from '@/lib/auth';
 import Link from 'next/link';
-import jwtDecode from 'jwt-decode';
+import { jwtDecode } from 'jwt-decode';
 
 interface APIError {
   response?: {

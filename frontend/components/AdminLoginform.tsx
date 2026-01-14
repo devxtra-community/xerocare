@@ -44,7 +44,7 @@ export function AdminLoginForm({ className, ...props }: React.ComponentProps<'di
 
         // Decode token to get role and route accordingly
         try {
-          const jwtDecode = (await import('jwt-decode')).default;
+          const { jwtDecode } = await import('jwt-decode');
           const decoded = jwtDecode<{ role: string }>(res.accessToken);
           const role = decoded.role;
 
