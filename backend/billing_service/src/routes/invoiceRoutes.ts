@@ -4,6 +4,7 @@ import {
   getAllInvoices,
   getInvoiceById,
   getMyInvoices,
+  getStats,
 } from '../controllers/invoiceController';
 import { authMiddleware } from '../middlewares/authMiddleware';
 import { requireRole } from '../middlewares/roleMiddleware';
@@ -14,6 +15,7 @@ const router = Router();
 router.post('/', authMiddleware, requireRole(EmployeeRole.EMPLOYEE), createInvoice);
 router.get('/my-invoices', authMiddleware, getMyInvoices);
 router.get('/', authMiddleware, getAllInvoices);
+router.get('/stats', authMiddleware, getStats);
 router.get('/:id', authMiddleware, getInvoiceById);
 
 export default router;

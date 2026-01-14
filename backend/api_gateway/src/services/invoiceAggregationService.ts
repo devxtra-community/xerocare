@@ -2,10 +2,17 @@ import axios from 'axios';
 import { AppError } from '../errors/appError';
 import { logger } from '../config/logger';
 
-const EMPLOYEE_SERVICE_URL = process.env.EMPLOYEE_SERVICE_URL || 'http://localhost:3002';
+const EMPLOYEE_SERVICE_URL = process.env.EMPLOYEE_SERVICE_URL || 'http://127.0.0.1:3002';
 const VENDOR_INVENTORY_SERVICE_URL =
-  process.env.VENDOR_INVENTORY_SERVICE_URL || 'http://localhost:3003';
-const BILLING_SERVICE_URL = process.env.BILLING_SERVICE_URL || 'http://localhost:3004';
+  process.env.VENDOR_INVENTORY_SERVICE_URL || 'http://127.0.0.1:3003';
+const BILLING_SERVICE_URL = process.env.BILLING_SERVICE_URL || 'http://127.0.0.1:3004';
+
+interface InvoiceItem {
+  id: string;
+  description: string;
+  quantity: number;
+  unitPrice: number;
+}
 
 interface Invoice {
   id: string;
@@ -16,6 +23,10 @@ interface Invoice {
   status: string;
   saleType: string;
   createdAt: string;
+  items?: InvoiceItem[];
+  startDate?: string;
+  endDate?: string;
+  billingCycleInDays?: number;
 }
 
 interface AggregatedInvoice extends Invoice {
@@ -227,5 +238,85 @@ export class InvoiceAggregationService {
 
       throw new AppError('Failed to fetch invoice details', 500);
     }
+  }
+
+  async createInvoice(
+    payload: {
+      items: { productId: string; description: string; quantity: number; unitPrice: number }[];
+      saleType: string;
+      startDate?: string;
+      endDate?: string;
+      billingCycleInDays?: number;
+    },
+    token: string,
+  ): Promise<AggregatedInvoice> {
+    try {
+      const billingResponse = await axios.post<{ data: Invoice }>(
+        `${BILLING_SERVICE_URL}/invoices`,
+        payload,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
+      const invoice = billingResponse.data.data;
+
+      // Aggregate creator name and branch name for immediate UI feedback
+      const employeeResponse = await axios.get<{ data: { name: string } }>(
+        `${EMPLOYEE_SERVICE_URL}/employee/public/${invoice.createdBy}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
+      const employeeName = employeeResponse.data.data.name;
+
+      const branchResponse = await axios.get<{ data: { name: string } }>(
+        `${VENDOR_INVENTORY_SERVICE_URL}/branch/${invoice.branchId}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
+      const branchName = branchResponse.data.data.name;
+
+      return {
+        ...invoice,
+        employeeName,
+        branchName,
+      };
+    } catch (error: unknown) {
+      if (axios.isAxiosError(error)) {
+        logger.error('Axios error in create invoice', {
+          message: error.message,
+          responseStatus: error.response?.status,
+          responseData: error.response?.data,
+        });
+        throw new AppError(
+          error.response?.data?.message || 'Failed to create invoice',
+          error.response?.status || 500,
+        );
+      }
+      throw new AppError('Internal Gateway Error during invoice creation', 500);
+    }
+  }
+
+  async getInvoiceStats(
+    user: { userId: string; role: string; branchId?: string },
+    token: string,
+    branchId?: string,
+  ) {
+    const url = `${BILLING_SERVICE_URL}/invoices/stats`;
+    const params: { createdBy?: string; branchId?: string } = {};
+
+    if (user.role === 'EMPLOYEE') {
+      params.createdBy = user.userId;
+    } else if (branchId) {
+      params.branchId = branchId;
+    }
+
+    const response = await axios.get(url, {
+      headers: { Authorization: `Bearer ${token}` },
+      params,
+    });
+
+    return response.data.data;
   }
 }

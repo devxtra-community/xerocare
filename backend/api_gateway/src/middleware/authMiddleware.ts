@@ -28,8 +28,8 @@ export const authMiddleware = (req: Request, res: Response, next: NextFunction) 
   } catch (error: unknown) {
     const err = error as { name?: string };
     if (err.name === 'TokenExpiredError') {
-      return next(new AppError('Access token expired', 401));
+      return next(new AppError('Access token expired', 401, 'TOKEN_EXPIRED'));
     }
-    return next(new AppError('Invalid access token', 401));
+    return next(new AppError('Invalid access token', 401, 'TOKEN_INVALID'));
   }
 };

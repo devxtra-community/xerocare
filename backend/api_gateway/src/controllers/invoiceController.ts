@@ -59,3 +59,35 @@ export const getInvoiceById = async (req: Request, res: Response, next: NextFunc
     next(error);
   }
 };
+
+export const createInvoice = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const token = req.headers.authorization?.split(' ')[1] || '';
+    console.log('API Gateway: Creating invoice with body:', JSON.stringify(req.body, null, 2));
+    const invoice = await invoiceAggregationService.createInvoice(req.body, token);
+    return res.status(201).json({
+      success: true,
+      data: invoice,
+      message: 'Invoice created successfully',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getStats = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  try {
+    const user = req.user;
+    if (!user) throw new Error('User not authenticated');
+    const token = req.headers.authorization?.split(' ')[1] || '';
+    const branchId = req.query.branchId as string;
+
+    const stats = await invoiceAggregationService.getInvoiceStats(user, token, branchId);
+    return res.status(200).json({
+      success: true,
+      data: stats,
+    });
+  } catch (error) {
+    next(error);
+  }
+};

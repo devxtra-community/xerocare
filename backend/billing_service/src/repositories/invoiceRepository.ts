@@ -26,6 +26,7 @@ export class InvoiceRepository {
       order: {
         createdAt: 'DESC',
       },
+      relations: ['items'],
     });
   }
 
@@ -35,6 +36,7 @@ export class InvoiceRepository {
       order: {
         createdAt: 'DESC',
       },
+      relations: ['items'],
     });
   }
 
@@ -51,5 +53,27 @@ export class InvoiceRepository {
         createdAt: Between(startDate, endDate),
       },
     });
+  }
+
+  async getStats(
+    filter: { createdBy?: string; branchId?: string } = {},
+  ): Promise<{ saleType: string; count: number }[]> {
+    const query = this.repo
+      .createQueryBuilder('invoice')
+      .select('invoice.saleType', 'saleType')
+      .addSelect('COUNT(*)', 'count');
+
+    if (filter.createdBy) {
+      query.andWhere('invoice.createdBy = :createdBy', { createdBy: filter.createdBy });
+    }
+    if (filter.branchId) {
+      query.andWhere('invoice.branchId = :branchId', { branchId: filter.branchId });
+    }
+
+    const results = await query.groupBy('invoice.saleType').getRawMany();
+    return results.map((r) => ({
+      saleType: r.saleType,
+      count: parseInt(r.count, 10),
+    }));
   }
 }
