@@ -14,7 +14,8 @@ export const getallModels = async (req: Request, res: Response) => {
     return res
       .status(200)
       .json({ message: 'Fetched all models successfully', data: models, success: true });
-  } catch {
+  } catch (error) {
+    logger.error('Error in getallModels:', error);
     throw new AppError('Error fetching models', 500);
   }
 };

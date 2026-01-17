@@ -16,6 +16,8 @@ router.post('/', authMiddleware, roleMiddleware(['ADMIN']), branchController.cre
 
 router.get('/', authMiddleware, roleMiddleware(['ADMIN', 'HR']), branchController.list);
 
+router.get('/my-branch', authMiddleware, roleMiddleware(['MANAGER']), branchController.getMyBranch);
+
 router.get('/:id', authMiddleware, branchController.getById);
 
 router.put('/:id', authMiddleware, roleMiddleware(['ADMIN']), branchController.update);

@@ -15,7 +15,7 @@ export class InventoryService {
     return this.repo.getWarehouseInventory(warehouseId);
   }
 
-  getInventoryStats() {
-    return this.repo.getInventoryStats();
+  getInventoryStats(branchId?: string) {
+    return this.repo.getInventoryStats(branchId);
   }
 }

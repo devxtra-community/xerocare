@@ -24,6 +24,7 @@ export class Product {
   @ManyToOne(() => Model, (model) => model.products)
   @JoinColumn({ name: 'model_id' })
   model!: Model;
+
   @ManyToOne(() => Warehouse, { nullable: true })
   @JoinColumn({ name: 'warehouse_id' })
   warehouse!: Warehouse;

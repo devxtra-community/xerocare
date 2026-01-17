@@ -57,7 +57,7 @@ export function ModelManagementDialog({ open, onClose }: ModelManagementDialogPr
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="bg-white rounded-xl w-full max-w-4xl h-[80vh] flex flex-col shadow-2xl">
+      <div className="bg-white rounded-xl w-full max-w-5xl h-[80vh] flex flex-col shadow-2xl">
         <div className="p-4 border-b flex justify-between items-center">
           <h2 className="text-xl font-bold">Model Management</h2>
           <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded-full">
@@ -80,6 +80,7 @@ export function ModelManagementDialog({ open, onClose }: ModelManagementDialogPr
                 <TableRow>
                   <TableHead>Model No</TableHead>
                   <TableHead>Name</TableHead>
+                  <TableHead>Brand</TableHead>
                   <TableHead>Sale Price</TableHead>
                   <TableHead>Rent (M/Y)</TableHead>
                   <TableHead>Actions</TableHead>
@@ -89,7 +90,13 @@ export function ModelManagementDialog({ open, onClose }: ModelManagementDialogPr
                 {models.map((model) => (
                   <TableRow key={model.id}>
                     <TableCell className="font-medium">{model.model_no}</TableCell>
-                    <TableCell>{model.model_name}</TableCell>
+                    <TableCell>
+                      <div>{model.model_name}</div>
+                      <div className="text-xs text-gray-500 truncate max-w-[200px]">
+                        {model.description}
+                      </div>
+                    </TableCell>
+                    <TableCell>{model.brand || '-'}</TableCell>
                     <TableCell>₹{model.sale_price}</TableCell>
                     <TableCell>
                       ₹{model.rent_price_monthly} / ₹{model.rent_price_yearly}
@@ -117,7 +124,7 @@ export function ModelManagementDialog({ open, onClose }: ModelManagementDialogPr
                 ))}
                 {models.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center py-8 text-gray-500">
+                    <TableCell colSpan={6} className="text-center py-8 text-gray-500">
                       No models found. Add one to get started.
                     </TableCell>
                   </TableRow>
@@ -158,6 +165,8 @@ function ModelForm({
   const [form, setForm] = useState<CreateModelDTO>({
     model_no: initialData?.model_no || '',
     model_name: initialData?.model_name || '',
+    brand: initialData?.brand || '',
+    description: initialData?.description || '',
     sale_price: initialData?.sale_price || 0,
     wholesale_price: initialData?.wholesale_price || 0,
     rent_price_monthly: initialData?.rent_price_monthly || 0,
@@ -183,13 +192,15 @@ function ModelForm({
   };
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
       <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
         <h3 className="text-lg font-bold mb-4">{initialData ? 'Edit Model' : 'Add New Model'}</h3>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium mb-1">Model No</label>
+              <label className="block text-sm font-medium mb-1">
+                Model No <span className="text-red-500">*</span>
+              </label>
               <Input
                 required
                 value={form.model_no}
@@ -197,11 +208,20 @@ function ModelForm({
               />
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1">Model Name</label>
+              <label className="block text-sm font-medium mb-1">
+                Model Name <span className="text-red-500">*</span>
+              </label>
               <Input
                 required
                 value={form.model_name}
                 onChange={(e) => setForm({ ...form, model_name: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Brand</label>
+              <Input
+                value={form.brand}
+                onChange={(e) => setForm({ ...form, brand: e.target.value })}
               />
             </div>
             <div>
@@ -211,6 +231,14 @@ function ModelForm({
                 required
                 value={form.sale_price}
                 onChange={(e) => setForm({ ...form, sale_price: Number(e.target.value) })}
+              />
+            </div>
+            <div className="col-span-2">
+              <label className="block text-sm font-medium mb-1">Description</label>
+              <textarea
+                className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                value={form.description}
+                onChange={(e) => setForm({ ...form, description: e.target.value })}
               />
             </div>
             <div>

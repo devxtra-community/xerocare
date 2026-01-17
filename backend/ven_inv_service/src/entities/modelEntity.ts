@@ -13,6 +13,12 @@ export class Model {
   @Column({ type: 'varchar', length: 255 })
   model_name!: string;
 
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  brand!: string;
+
+  @Column({ type: 'text', nullable: true })
+  description!: string;
+
   @Column({ type: 'numeric', precision: 12, scale: 2, default: 0 })
   rent_price_monthly!: number;
 
