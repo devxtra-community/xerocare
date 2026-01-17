@@ -109,28 +109,28 @@ export default function HRLeaveTable() {
         <Table>
           <TableHeader className="bg-gray-50/50">
             <TableRow>
-              <TableHead className="font-bold text-xs uppercase tracking-wider text-primary">
+              <TableHead className="px-3 py-2 font-bold text-xs uppercase tracking-wider text-primary">
                 Employee ID
               </TableHead>
-              <TableHead className="font-bold text-xs uppercase tracking-wider text-primary">
+              <TableHead className="px-3 py-2 font-bold text-xs uppercase tracking-wider text-primary">
                 Name
               </TableHead>
-              <TableHead className="font-bold text-xs uppercase tracking-wider text-primary">
+              <TableHead className="px-3 py-2 font-bold text-xs uppercase tracking-wider text-primary">
                 Email
               </TableHead>
-              <TableHead className="font-bold text-xs uppercase tracking-wider text-primary">
+              <TableHead className="px-3 py-2 font-bold text-xs uppercase tracking-wider text-primary">
                 Branch
               </TableHead>
-              <TableHead className="font-bold text-xs uppercase tracking-wider text-primary">
+              <TableHead className="px-3 py-2 font-bold text-xs uppercase tracking-wider text-primary">
                 Start Date
               </TableHead>
-              <TableHead className="font-bold text-xs uppercase tracking-wider text-primary">
+              <TableHead className="px-3 py-2 font-bold text-xs uppercase tracking-wider text-primary">
                 End Date
               </TableHead>
-              <TableHead className="font-bold text-xs uppercase tracking-wider text-primary">
+              <TableHead className="px-3 py-2 font-bold text-xs uppercase tracking-wider text-primary">
                 Reason
               </TableHead>
-              <TableHead className="text-right font-bold text-xs uppercase tracking-wider text-primary">
+              <TableHead className="px-3 py-2 text-right font-bold text-xs uppercase tracking-wider text-primary">
                 Actions
               </TableHead>
             </TableRow>
@@ -139,18 +139,20 @@ export default function HRLeaveTable() {
             {filteredLeaves.length > 0 ? (
               filteredLeaves.map((leave) => (
                 <TableRow key={leave.id} className="hover:bg-gray-50/50 transition-colors">
-                  <TableCell className="font-medium text-primary">{leave.employeeId}</TableCell>
-                  <TableCell>
+                  <TableCell className="px-3 py-1.5 font-medium text-primary">
+                    {leave.employeeId}
+                  </TableCell>
+                  <TableCell className="px-3 py-1.5">
                     <div className="font-medium text-primary">{leave.name}</div>
                   </TableCell>
-                  <TableCell className="text-muted-foreground">{leave.email}</TableCell>
-                  <TableCell>{leave.branch}</TableCell>
-                  <TableCell>{leave.startDate}</TableCell>
-                  <TableCell>{leave.endDate}</TableCell>
-                  <TableCell className="max-w-[200px] truncate" title={leave.reason}>
+                  <TableCell className="px-3 py-1.5 text-muted-foreground">{leave.email}</TableCell>
+                  <TableCell className="px-3 py-1.5">{leave.branch}</TableCell>
+                  <TableCell className="px-3 py-1.5">{leave.startDate}</TableCell>
+                  <TableCell className="px-3 py-1.5">{leave.endDate}</TableCell>
+                  <TableCell className="px-3 py-1.5 max-w-[200px] truncate" title={leave.reason}>
                     {leave.reason}
                   </TableCell>
-                  <TableCell className="text-right">
+                  <TableCell className="px-3 py-1.5 text-right">
                     <div className="flex items-center justify-end gap-2">
                       <Button
                         variant="ghost"

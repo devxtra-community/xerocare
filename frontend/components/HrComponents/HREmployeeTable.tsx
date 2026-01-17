@@ -220,31 +220,31 @@ export default function HREmployeeTable() {
           <Table className="w-full text-left">
             <TableHeader className="bg-gray-50/50">
               <TableRow className="border-b border-gray-100 hover:bg-transparent">
-                <TableHead className="px-3 py-2 text-[10px] font-bold text-primary uppercase">
+                <TableHead className="px-3 py-2 text-xs font-bold text-primary uppercase tracking-wider whitespace-nowrap">
                   Employee ID
                 </TableHead>
-                <TableHead className="px-3 py-2 text-[10px] font-bold text-primary uppercase">
+                <TableHead className="px-3 py-2 text-xs font-bold text-primary uppercase tracking-wider whitespace-nowrap">
                   Name
                 </TableHead>
-                <TableHead className="px-3 py-2 text-[10px] font-bold text-primary uppercase">
+                <TableHead className="px-3 py-2 text-xs font-bold text-primary uppercase tracking-wider whitespace-nowrap">
                   Email
                 </TableHead>
-                <TableHead className="px-3 py-2 text-[10px] font-bold text-primary uppercase">
+                <TableHead className="px-3 py-2 text-xs font-bold text-primary uppercase tracking-wider whitespace-nowrap">
                   Phone
                 </TableHead>
-                <TableHead className="px-3 py-2 text-[10px] font-bold text-primary uppercase">
+                <TableHead className="px-3 py-2 text-xs font-bold text-primary uppercase tracking-wider whitespace-nowrap text-center">
                   Role
                 </TableHead>
-                <TableHead className="px-3 py-2 text-[10px] font-bold text-primary uppercase">
+                <TableHead className="px-3 py-2 text-xs font-bold text-primary uppercase tracking-wider whitespace-nowrap">
                   Branch
                 </TableHead>
-                <TableHead className="px-3 py-2 text-[10px] font-bold text-primary uppercase">
-                  Manager
+                <TableHead className="px-3 py-2 text-xs font-bold text-primary uppercase tracking-wider whitespace-nowrap">
+                  Reporting Manager
                 </TableHead>
-                <TableHead className="px-3 py-2 text-[10px] font-bold text-primary uppercase">
+                <TableHead className="px-3 py-2 text-xs font-bold text-primary uppercase tracking-wider whitespace-nowrap text-center">
                   Status
                 </TableHead>
-                <TableHead className="px-3 py-2 text-[10px] font-bold text-primary uppercase text-center">
+                <TableHead className="px-3 py-2 text-xs font-bold text-primary uppercase tracking-wider whitespace-nowrap text-right">
                   Actions
                 </TableHead>
               </TableRow>
@@ -267,7 +267,7 @@ export default function HREmployeeTable() {
                       index % 2 === 0 ? 'bg-white' : 'bg-blue-50/20'
                     }`}
                   >
-                    <TableCell className="px-3 py-1.5 text-[11px] font-mono text-gray-500 whitespace-nowrap">
+                    <TableCell className="px-3 py-1.5 font-medium text-primary whitespace-nowrap">
                       {emp.display_id || '---'}
                     </TableCell>
                     <TableCell className="px-3 py-1.5 whitespace-nowrap">
@@ -284,80 +284,58 @@ export default function HREmployeeTable() {
                             (emp.first_name?.[0] || emp.email[0]).toUpperCase()
                           )}
                         </div>
-                        <span className="text-[12px] font-bold text-primary">
+                        <span
+                          className="font-medium text-primary cursor-pointer hover:underline"
+                          onClick={() => router.push(`/hr/employees/${emp.id}`)}
+                        >
                           {emp.first_name} {emp.last_name}
                         </span>
                       </div>
                     </TableCell>
-                    <TableCell className="px-3 py-1.5 text-[11px] text-gray-600 whitespace-nowrap">
+                    <TableCell className="px-3 py-1.5 text-muted-foreground whitespace-nowrap">
                       {emp.email}
                     </TableCell>
-                    <TableCell className="px-3 py-1.5 text-[11px] text-gray-500 whitespace-nowrap">
+                    <TableCell className="px-3 py-1.5 text-muted-foreground whitespace-nowrap">
                       {emp.phone || '---'}
                     </TableCell>
-                    <TableCell className="px-3 py-1.5 whitespace-nowrap">
+                    <TableCell className="px-3 py-1.5 whitespace-nowrap text-center">
                       <span className="px-1.5 py-0.5 rounded-full text-[9px] font-semibold uppercase bg-blue-100 text-blue-700">
                         {emp.role}
                       </span>
                     </TableCell>
-                    <TableCell className="px-3 py-1.5 text-[11px] text-gray-500 whitespace-nowrap">
+                    <TableCell className="px-3 py-1.5 text-muted-foreground whitespace-nowrap">
                       {emp.branch?.name || '---'}
                     </TableCell>
-                    <TableCell className="px-3 py-1.5 text-[11px] text-gray-500 whitespace-nowrap">
+                    <TableCell className="px-3 py-1.5 text-muted-foreground whitespace-nowrap">
                       {emp.reporting_manager || '---'}
                     </TableCell>
-                    <TableCell className="px-3 py-1.5 whitespace-nowrap">
+                    <TableCell className="px-3 py-1.5 whitespace-nowrap text-center">
                       <span
                         className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-bold
                         ${
                           emp.status === 'ACTIVE'
                             ? 'bg-green-100 text-green-700'
-                            : emp.status === 'INACTIVE'
-                              ? 'bg-amber-100 text-amber-700'
-                              : 'bg-red-100 text-red-700'
+                            : 'bg-red-100 text-red-700'
                         }`}
                       >
                         <span
-                          className={`h-1.5 w-1.5 rounded-full ${emp.status === 'ACTIVE' ? 'bg-green-600' : emp.status === 'INACTIVE' ? 'bg-amber-600' : 'bg-red-600'}`}
+                          className={`h-1.5 w-1.5 rounded-full ${emp.status === 'ACTIVE' ? 'bg-green-600' : 'bg-red-600'}`}
                         />
                         {emp.status}
                       </span>
                     </TableCell>
-                    <TableCell className="px-3 py-1.5 whitespace-nowrap">
-                      <div className="flex items-center justify-center gap-1">
+                    <TableCell className="px-3 py-1.5 text-right whitespace-nowrap">
+                      <div className="flex items-center justify-end gap-2">
                         <Button
                           variant="ghost"
+                          title="View Profile"
                           className="h-7 w-7 p-0 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
                           onClick={() => router.push(`/hr/employees/${emp.id}`)}
-                          title="View Profile"
                         >
                           <Eye className="h-3.5 w-3.5" />
                         </Button>
                         <Button
                           variant="ghost"
-                          size="icon"
-                          title="Enable Access"
-                          className={`h-7 w-7 transition-all ${emp.status === 'ACTIVE' ? 'text-gray-200 cursor-not-allowed' : 'text-gray-400 hover:text-green-600 hover:bg-green-50'}`}
-                          disabled={emp.status === 'ACTIVE'}
-                          onClick={() => handleDeleteTrigger(emp)}
-                        >
-                          <svg
-                            width="14"
-                            height="14"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2.5"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          >
-                            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-                            <polyline points="22 4 12 14.01 9 11.01" />
-                          </svg>
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
                           title="Disable Access"
                           className={`h-7 w-7 transition-all ${emp.status !== 'ACTIVE' ? 'text-gray-200 cursor-not-allowed' : 'text-gray-400 hover:text-red-600 hover:bg-red-50'}`}
                           disabled={emp.status !== 'ACTIVE'}
