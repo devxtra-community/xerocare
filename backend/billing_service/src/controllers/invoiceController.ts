@@ -19,15 +19,19 @@ export const createInvoice = async (req: Request, res: Response, next: NextFunct
       throw new AppError('User context missing or incomplete', 401);
     }
 
-    const { items, saleType, startDate, endDate, billingCycleInDays } = allowedPayload;
+    const { items, saleType, startDate, endDate, billingCycleInDays, customerId } = allowedPayload;
 
-    if (!items || !Array.isArray(items) || !saleType) {
-      throw new AppError('Invalid request payload: items and saleType are required', 400);
+    if (!items || !Array.isArray(items) || !saleType || !customerId) {
+      throw new AppError(
+        'Invalid request payload: items, saleType, and customerId are required',
+        400,
+      );
     }
 
     const invoice = await billingService.createInvoice({
       branchId: req.user.branchId,
       createdBy: req.user.userId,
+      customerId,
       saleType,
       startDate,
       endDate,

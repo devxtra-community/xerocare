@@ -19,6 +19,7 @@ export class BillingService {
   async createInvoice(payload: {
     branchId: string;
     createdBy: string;
+    customerId: string; // Added field
     saleType: SaleType;
 
     startDate?: Date;
@@ -56,6 +57,7 @@ export class BillingService {
       invoiceNumber,
       branchId: payload.branchId,
       createdBy: payload.createdBy,
+      customerId: payload.customerId, // Persist customerId
       saleType: payload.saleType,
       startDate: payload.startDate,
       endDate: payload.endDate,

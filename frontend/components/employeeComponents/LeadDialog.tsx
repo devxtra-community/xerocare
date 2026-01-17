@@ -18,52 +18,76 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-
-export type Lead = {
-  id: string;
-  name: string;
-  email: string;
-  phone: string;
-  source: 'Website' | 'Instagram' | 'Whatsapp';
-  product: string;
-  status: 'New' | 'Contacted' | 'Follow-up' | 'Converted';
-  priority: 'Hot' | 'Warm' | 'Cold';
-};
+import { Lead, CreateLeadData } from '@/lib/lead';
 
 type LeadDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   initialData?: Lead | null;
-  onSave: (lead: Lead) => void;
+  onSave: (lead: CreateLeadData & { id?: string }) => void;
 };
 
-const emptyLead: Lead = {
-  id: '',
+const emptyLead: CreateLeadData = {
   name: '',
   email: '',
   phone: '',
   source: 'Website',
-  product: '',
-  status: 'New',
-  priority: 'Warm',
+  metadata: {
+    product: '',
+    priority: 'Warm',
+  },
 };
 
 export default function LeadDialog({ open, onOpenChange, initialData, onSave }: LeadDialogProps) {
-  const [formData, setFormData] = useState<Lead>(emptyLead);
+  const [formData, setFormData] = useState<CreateLeadData>(emptyLead);
+  const [status, setStatus] = useState<Lead['status']>('new');
 
   useEffect(() => {
     if (open) {
-      setFormData(initialData || { ...emptyLead, id: Math.random().toString(36).substr(2, 9) });
+      if (initialData) {
+        setFormData({
+          name: initialData.name || '',
+          email: initialData.email || '',
+          phone: initialData.phone || '',
+          source: initialData.source || 'Website',
+          metadata: initialData.metadata || { product: '', priority: 'Warm' },
+        });
+        setStatus(initialData.status);
+      } else {
+        setFormData(emptyLead);
+        setStatus('new');
+      }
     }
   }, [open, initialData]);
 
-  const handleChange = (field: keyof Lead, value: string) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
+  const handleChange = (field: keyof CreateLeadData | 'product' | 'priority', value: string) => {
+    if (field === 'product' || field === 'priority') {
+      setFormData((prev) => ({
+        ...prev,
+        metadata: {
+          ...prev.metadata,
+          [field]: value,
+        },
+      }));
+    } else {
+      setFormData((prev) => ({ ...prev, [field]: value }));
+    }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSave(formData);
+    onSave({
+      ...formData,
+      id: initialData?._id,
+
+      // Actually CreateLeadData doesn't have status in my lib definition?
+      // Let's check lib/lead.ts.
+      // It accepts `status` in CreateLeadData? No.
+      // But backend `createLead` service sets default status 'new'.
+      // `updateLead` can update status.
+      // I will pass status separately or extend CreateLeadData in the handler.
+      status: status,
+    } as unknown as CreateLeadData & { id?: string });
     onOpenChange(false);
   };
 
@@ -91,20 +115,18 @@ export default function LeadDialog({ open, onOpenChange, initialData, onSave }: 
               <Input
                 id="email"
                 type="email"
-                value={formData.email}
+                value={formData.email || ''}
                 onChange={(e) => handleChange('email', e.target.value)}
                 placeholder="john@example.com"
-                required
               />
             </div>
             <div className="space-y-2">
               <Label htmlFor="phone">Phone Number</Label>
               <Input
                 id="phone"
-                value={formData.phone}
+                value={formData.phone || ''}
                 onChange={(e) => handleChange('phone', e.target.value)}
                 placeholder="+1 234 567 890"
-                required
               />
             </div>
           </div>
@@ -127,10 +149,9 @@ export default function LeadDialog({ open, onOpenChange, initialData, onSave }: 
               <Label htmlFor="product">Product Interested</Label>
               <Input
                 id="product"
-                value={formData.product}
+                value={(formData.metadata as { product?: string })?.product || ''}
                 onChange={(e) => handleChange('product', e.target.value)}
                 placeholder="Ex. Canon ImageRunner"
-                required
               />
             </div>
           </div>
@@ -138,22 +159,23 @@ export default function LeadDialog({ open, onOpenChange, initialData, onSave }: 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="status">Status</Label>
-              <Select value={formData.status} onValueChange={(val) => handleChange('status', val)}>
+              <Select value={status} onValueChange={(val: Lead['status']) => setStatus(val)}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select Status" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="New">New</SelectItem>
-                  <SelectItem value="Contacted">Contacted</SelectItem>
-                  <SelectItem value="Follow-up">Follow-up</SelectItem>
-                  <SelectItem value="Converted">Converted</SelectItem>
+                  <SelectItem value="new">New</SelectItem>
+                  <SelectItem value="contacted">Contacted</SelectItem>
+                  <SelectItem value="qualified">Qualified</SelectItem>
+                  <SelectItem value="converted">Converted</SelectItem>
+                  <SelectItem value="lost">Lost</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
               <Label htmlFor="priority">Priority</Label>
               <Select
-                value={formData.priority}
+                value={(formData.metadata as { priority?: string })?.priority || 'Warm'}
                 onValueChange={(val) => handleChange('priority', val)}
               >
                 <SelectTrigger>

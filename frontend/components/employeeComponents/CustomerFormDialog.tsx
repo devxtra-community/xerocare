@@ -1,7 +1,13 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -11,24 +17,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { User, Mail, Phone, Save } from 'lucide-react';
+import { Label } from '@/components/ui/label';
 
-export type Customer = {
-  id: string;
-  name: string;
-  email: string;
-  phone: string;
-  image: string;
-  totalPurchase: number;
-  source: 'LEAD' | 'DIRECT';
-  createdAt: string;
-  status: 'ACTIVE' | 'INACTIVE';
-};
+import { Customer, CreateCustomerData } from '@/lib/customer';
 
 interface CustomerFormDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   customer: Customer | null | undefined;
-  onSubmit: (customerData: Partial<Customer>) => void;
+  onSubmit: (customerData: Partial<CreateCustomerData>) => void;
 }
 
 export default function CustomerFormDialog({
@@ -37,26 +35,27 @@ export default function CustomerFormDialog({
   customer,
   onSubmit,
 }: CustomerFormDialogProps) {
-  const [formData, setFormData] = useState<Partial<Customer>>({
+  const [formData, setFormData] = useState<Partial<CreateCustomerData>>({
     name: '',
     email: '',
     phone: '',
-    source: 'DIRECT',
-    totalPurchase: 0,
     status: 'ACTIVE',
   });
 
   useEffect(() => {
     if (customer) {
-      setFormData({ ...customer });
+      // Map entity data to form data
+      setFormData({
+        name: customer.name,
+        email: customer.email,
+        phone: customer.phone,
+        status: customer.isActive ? 'ACTIVE' : 'INACTIVE',
+      });
     } else {
-      // Reset form when opening in "Add" mode
       setFormData({
         name: '',
         email: '',
         phone: '',
-        source: 'DIRECT',
-        totalPurchase: 0,
         status: 'ACTIVE',
       });
     }
@@ -67,7 +66,7 @@ export default function CustomerFormDialog({
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleSelectChange = (name: keyof Customer, value: string) => {
+  const handleSelectChange = (name: keyof CreateCustomerData, value: string) => {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
@@ -79,133 +78,122 @@ export default function CustomerFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
-        <DialogHeader>
-          <DialogTitle className="text-xl font-bold text-primary">
-            {customer ? `Update Customer: ${customer.id}` : 'Add New Customer'}
-          </DialogTitle>
-        </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4 pt-4">
-          <div className="grid grid-cols-1 gap-4">
-            <div className="space-y-1.5">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+      <DialogContent className="sm:max-w-xl p-0 overflow-hidden rounded-xl border-none shadow-2xl bg-white">
+        <form onSubmit={handleSubmit}>
+          <DialogHeader className="p-8 pb-4">
+            <div className="flex items-center gap-4">
+              <div className="h-12 w-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shadow-sm">
+                <User size={24} />
+              </div>
+              <div className="space-y-1">
+                <DialogTitle className="text-xl font-bold text-primary tracking-tight">
+                  {customer ? 'Update Customer' : 'Add New Customer'}
+                </DialogTitle>
+                <DialogDescription className="text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-none">
+                  {customer
+                    ? `Editing profile ID: ${customer.id}`
+                    : 'Create a new customer profile'}
+                </DialogDescription>
+              </div>
+            </div>
+          </DialogHeader>
+
+          <div className="p-8 pt-4 space-y-6 max-h-[70vh] overflow-y-auto scrollbar-hide">
+            <div className="space-y-2">
+              <Label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider pl-1">
                 Full Name
-              </label>
-              <Input
-                name="name"
-                value={formData.name || ''}
-                onChange={handleChange}
-                placeholder="Ex. John Doe"
-                className="h-10 rounded-lg bg-gray-50 border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
-                required
-              />
+              </Label>
+              <div className="relative">
+                <Input
+                  name="name"
+                  value={formData.name || ''}
+                  onChange={handleChange}
+                  placeholder="Ex. John Doe"
+                  className="h-12 rounded-xl bg-gray-50 border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400 pl-11"
+                  required
+                />
+                <User className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+              </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <Label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider pl-1">
                   Email Address
-                </label>
-                <Input
-                  name="email"
-                  type="email"
-                  value={formData.email || ''}
-                  onChange={handleChange}
-                  placeholder="john@example.com"
-                  className="h-10 rounded-lg bg-gray-50 border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
-                  required
-                />
+                </Label>
+                <div className="relative">
+                  <Input
+                    name="email"
+                    type="email"
+                    value={formData.email || ''}
+                    onChange={handleChange}
+                    placeholder="john@example.com"
+                    className="h-12 rounded-xl bg-gray-50 border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400 pl-11"
+                  />
+                  <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                </div>
               </div>
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+              <div className="space-y-2">
+                <Label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider pl-1">
                   Phone Number
-                </label>
-                <Input
-                  name="phone"
-                  value={formData.phone || ''}
-                  onChange={handleChange}
-                  placeholder="+1 234 567 890"
-                  className="h-10 rounded-lg bg-gray-50 border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
-                  required
-                />
+                </Label>
+                <div className="relative">
+                  <Input
+                    name="phone"
+                    value={formData.phone || ''}
+                    onChange={handleChange}
+                    placeholder="+1 234 567 890"
+                    className="h-12 rounded-xl bg-gray-50 border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400 pl-11"
+                  />
+                  <Phone className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                </div>
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                  Source
-                </label>
-                <Select
-                  value={formData.source}
-                  onValueChange={(val) => handleSelectChange('source', val)}
-                >
-                  <SelectTrigger className="h-10 rounded-lg bg-gray-50 border-none shadow-sm focus:ring-2 focus:ring-blue-400">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="DIRECT" className="font-medium text-emerald-600">
-                      DIRECT
-                    </SelectItem>
-                    <SelectItem value="LEAD" className="font-medium text-purple-600">
-                      LEAD
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                  Status
-                </label>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <Label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider pl-1">
+                  Account Status
+                </Label>
                 <Select
                   value={formData.status}
-                  onValueChange={(val) => handleSelectChange('status', val)}
+                  onValueChange={(val) =>
+                    handleSelectChange('status', val as 'ACTIVE' | 'INACTIVE')
+                  }
                 >
-                  <SelectTrigger className="h-10 rounded-lg bg-gray-50 border-none shadow-sm focus:ring-2 focus:ring-blue-400">
+                  <SelectTrigger className="h-12 rounded-xl bg-gray-50 border-none shadow-sm focus:ring-2 focus:ring-blue-400 pl-11 relative text-left">
+                    <div
+                      className={`absolute left-4 top-1/2 -translate-y-1/2 h-2 w-2 rounded-full ${formData.status === 'ACTIVE' ? 'bg-green-500' : 'bg-red-500'}`}
+                    />
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="ACTIVE" className="font-medium text-green-600">
+                  <SelectContent className="rounded-xl border-none shadow-xl">
+                    <SelectItem value="ACTIVE" className="font-bold text-green-600">
                       ACTIVE
                     </SelectItem>
-                    <SelectItem value="INACTIVE" className="font-medium text-gray-500">
+                    <SelectItem value="INACTIVE" className="font-bold text-red-600">
                       INACTIVE
                     </SelectItem>
                   </SelectContent>
                 </Select>
               </div>
             </div>
-
-            {/* Optional: Allow editing Total Purchase if needed, but usually calculated. 
-                Including it as manual override or initial value for now. */}
-            <div className="space-y-1.5">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                Total Purchase (Lifetime Value)
-              </label>
-              <Input
-                name="totalPurchase"
-                type="number"
-                value={formData.totalPurchase || 0}
-                onChange={handleChange}
-                className="h-10 rounded-lg bg-gray-50 border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
-              />
-            </div>
           </div>
 
-          <div className="flex justify-end gap-3 pt-6">
-            <Button
+          <div className="p-8 bg-gray-50 flex items-center justify-between border-t border-gray-100">
+            <button
               type="button"
-              variant="ghost"
               onClick={() => onOpenChange(false)}
-              className="font-bold text-gray-600 hover:text-gray-900"
+              className="text-sm font-bold text-gray-900 hover:text-gray-600 transition-colors"
             >
-              Cancel
-            </Button>
+              Discard
+            </button>
             <Button
               type="submit"
-              className="bg-primary text-white hover:bg-primary/90 font-bold px-8"
+              className="h-12 px-10 rounded-xl bg-primary text-white hover:bg-primary/90 font-bold shadow-lg transition-all flex items-center gap-2"
             >
-              {customer ? 'Update Customer' : 'Add Customer'}
+              <Save size={18} />
+              {customer ? 'Update Profile' : 'Create Customer'}
             </Button>
           </div>
         </form>

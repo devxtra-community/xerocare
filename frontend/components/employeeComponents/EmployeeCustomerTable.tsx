@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState } from 'react';
-import { Search, Filter, Download, Phone, Mail, Plus, Edit } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Search, Plus, Edit, Trash2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -13,73 +13,41 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import CustomerFormDialog, { Customer } from './CustomerFormDialog';
-
-// Mock Data
-const initialCustomers: Customer[] = [
-  {
-    id: 'CUST-001',
-    name: 'Sarah Johnson',
-    email: 'sarah.j@example.com',
-    phone: '+1234567890',
-    image: '',
-    totalPurchase: 12500,
-    source: 'LEAD',
-    createdAt: '2025-10-12',
-    status: 'ACTIVE',
-  },
-  {
-    id: 'CUST-002',
-    name: 'Michael Chen',
-    email: 'm.chen@example.com',
-    phone: '+1987654321',
-    image: '',
-    totalPurchase: 8900,
-    source: 'DIRECT',
-    createdAt: '2025-11-05',
-    status: 'ACTIVE',
-  },
-  {
-    id: 'CUST-003',
-    name: 'Emma Wilson',
-    email: 'emma.w@example.com',
-    phone: '+1122334455',
-    image: '',
-    totalPurchase: 45000,
-    source: 'LEAD',
-    createdAt: '2025-09-22',
-    status: 'ACTIVE',
-  },
-  {
-    id: 'CUST-004',
-    name: 'James Rodriguez',
-    email: 'j.rodriguez@example.com',
-    phone: '+1555666777',
-    image: '',
-    totalPurchase: 2100,
-    source: 'DIRECT',
-    createdAt: '2025-12-01',
-    status: 'INACTIVE',
-  },
-  {
-    id: 'CUST-005',
-    name: 'Linda Kim',
-    email: 'linda.k@example.com',
-    phone: '+1999888777',
-    image: '',
-    totalPurchase: 15600,
-    source: 'LEAD',
-    createdAt: '2025-08-15',
-    status: 'ACTIVE',
-  },
-];
+import { Customer } from '@/lib/customer';
+import {
+  getCustomers,
+  createCustomer,
+  updateCustomer,
+  deleteCustomer,
+  CreateCustomerData,
+} from '@/lib/customer';
+import CustomerFormDialog from './CustomerFormDialog';
+import { toast } from 'sonner';
 
 export default function EmployeeCustomerTable() {
-  const [customers, setCustomers] = useState<Customer[]>(initialCustomers);
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+
+  const fetchCustomers = async () => {
+    setLoading(true);
+    try {
+      const data = await getCustomers();
+      setCustomers(data);
+    } catch (error) {
+      console.error('Failed to fetch customers', error);
+      toast.error('Failed to fetch customers');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchCustomers();
+  }, []);
 
   const filteredCustomers = customers.filter(
     (c) =>
@@ -97,23 +65,45 @@ export default function EmployeeCustomerTable() {
     setDialogOpen(true);
   };
 
-  const handleFormSubmit = (data: Partial<Customer>) => {
-    if (selectedCustomer) {
-      // Update existing
-      setCustomers((prev) =>
-        prev.map((c) => (c.id === selectedCustomer.id ? ({ ...c, ...data } as Customer) : c)),
-      );
-    } else {
-      // Add new
-      const newCustomer: Customer = {
-        ...(data as Customer),
-        id: `CUST-${String(customers.length + 1).padStart(3, '0')}`,
-        createdAt: new Date().toISOString(),
-        image: '',
-      };
-      setCustomers((prev) => [newCustomer, ...prev]);
+  const handleDeleteCustomer = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this customer?')) return;
+    try {
+      await deleteCustomer(id);
+      toast.success('Customer deleted successfully');
+      fetchCustomers();
+    } catch (error) {
+      console.error(error);
+      toast.error('Failed to delete customer');
     }
-    setDialogOpen(false);
+  };
+
+  const handleFormSubmit = async (data: Partial<CreateCustomerData>) => {
+    try {
+      const payload: CreateCustomerData = {
+        name: data.name!,
+        email: data.email,
+        phone: data.phone,
+        status: data.status,
+        totalPurchase: 0,
+        source: 'DIRECT',
+      };
+
+      if (selectedCustomer) {
+        await updateCustomer(selectedCustomer.id, {
+          ...payload,
+          status: data.status, // Ensure status is passed
+        });
+        toast.success('Customer updated successfully');
+      } else {
+        await createCustomer(payload);
+        toast.success('Customer created successfully');
+      }
+      setDialogOpen(false);
+      fetchCustomers();
+    } catch (error) {
+      console.error(error);
+      toast.error(selectedCustomer ? 'Failed to update customer' : 'Failed to create customer');
+    }
   };
 
   return (
@@ -139,16 +129,9 @@ export default function EmployeeCustomerTable() {
           <Button
             variant="outline"
             className="h-10 rounded-lg border-blue-400/60 hover:bg-blue-50 text-primary"
+            onClick={fetchCustomers}
           >
-            <Filter className="h-4 w-4 mr-2" />
-            Filter
-          </Button>
-          <Button
-            variant="outline"
-            className="h-10 rounded-lg border-blue-400/60 hover:bg-blue-50 text-primary"
-          >
-            <Download className="h-4 w-4 mr-2" />
-            Export
+            Refresh
           </Button>
           <Button
             onClick={handleAddCustomer}
@@ -166,16 +149,10 @@ export default function EmployeeCustomerTable() {
           <Table>
             <TableHeader>
               <TableRow className="bg-slate-50">
-                <TableHead className="text-primary font-bold whitespace-nowrap">
-                  Customer ID
-                </TableHead>
-                <TableHead className="text-primary font-bold whitespace-nowrap">
-                  Customer Name
-                </TableHead>
-                <TableHead className="text-primary font-bold whitespace-nowrap">
-                  Total Purchase
-                </TableHead>
-                <TableHead className="text-primary font-bold whitespace-nowrap">Source</TableHead>
+                <TableHead className="text-primary font-bold whitespace-nowrap">Name</TableHead>
+                <TableHead className="text-primary font-bold whitespace-nowrap">Email</TableHead>
+                <TableHead className="text-primary font-bold whitespace-nowrap">Phone</TableHead>
+                <TableHead className="text-primary font-bold whitespace-nowrap">Status</TableHead>
                 <TableHead className="text-primary font-bold whitespace-nowrap">
                   Created At
                 </TableHead>
@@ -185,7 +162,13 @@ export default function EmployeeCustomerTable() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredCustomers.length === 0 ? (
+              {loading ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="h-24 text-center">
+                    Loading...
+                  </TableCell>
+                </TableRow>
+              ) : filteredCustomers.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
                     No customers found.
@@ -194,42 +177,26 @@ export default function EmployeeCustomerTable() {
               ) : (
                 filteredCustomers.map((customer, index) => (
                   <TableRow key={customer.id} className={index % 2 ? 'bg-blue-50/20' : 'bg-white'}>
-                    <TableCell className="font-bold text-blue-600 whitespace-nowrap">
-                      <span className="bg-blue-50 px-2 py-1 rounded-md text-xs">{customer.id}</span>
-                    </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-3">
                         <div className="h-9 w-9 rounded-full bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center text-blue-600 font-bold text-xs border border-blue-200">
                           {customer.name.charAt(0)}
                         </div>
-                        <div className="flex flex-col">
-                          <span className="text-sm font-semibold text-gray-900">
-                            {customer.name}
-                          </span>
-                          <span className="text-xs text-gray-500">{customer.email}</span>
-                        </div>
+                        <span className="text-sm font-semibold text-gray-900">{customer.name}</span>
                       </div>
                     </TableCell>
-                    <TableCell>
-                      <div className="flex flex-col">
-                        <span className="text-sm font-bold text-gray-900">
-                          ₹{customer.totalPurchase.toLocaleString()}
-                        </span>
-                        <span className="text-[10px] text-gray-500 uppercase tracking-wider">
-                          Lifetime Value
-                        </span>
-                      </div>
-                    </TableCell>
+                    <TableCell className="text-sm text-gray-500">{customer.email || '-'}</TableCell>
+                    <TableCell className="text-sm text-gray-500">{customer.phone || '-'}</TableCell>
                     <TableCell>
                       <Badge
                         variant="secondary"
                         className={`font-semibold border-none ${
-                          customer.source === 'LEAD'
-                            ? 'bg-purple-100 text-purple-700'
-                            : 'bg-emerald-100 text-emerald-700'
+                          customer.isActive
+                            ? 'bg-emerald-100 text-emerald-700'
+                            : 'bg-red-100 text-red-700'
                         }`}
                       >
-                        {customer.source}
+                        {customer.isActive ? 'ACTIVE' : 'INACTIVE'}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-slate-500 font-medium text-sm whitespace-nowrap">
@@ -250,24 +217,15 @@ export default function EmployeeCustomerTable() {
                         >
                           <Edit className="h-4 w-4" />
                         </Button>
-                        <a href={`tel:${customer.phone}`}>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-slate-500 hover:text-blue-600 hover:bg-blue-50"
-                          >
-                            <Phone className="h-4 w-4" />
-                          </Button>
-                        </a>
-                        <a href={`mailto:${customer.email}`}>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-slate-500 hover:text-blue-600 hover:bg-blue-50"
-                          >
-                            <Mail className="h-4 w-4" />
-                          </Button>
-                        </a>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-slate-500 hover:text-red-600 hover:bg-red-50"
+                          onClick={() => handleDeleteCustomer(customer.id)}
+                          title="Delete Customer"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
                       </div>
                     </TableCell>
                   </TableRow>
