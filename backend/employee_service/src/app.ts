@@ -18,6 +18,8 @@ const app = express();
 app.use(express.json());
 app.use(cookieParser());
 app.use(urlencoded({ extended: true }));
+// CORS is handled by API Gateway - do not set CORS headers here
+
 const startServer = async () => {
   try {
     await Source.initialize();

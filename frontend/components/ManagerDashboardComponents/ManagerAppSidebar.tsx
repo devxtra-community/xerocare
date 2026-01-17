@@ -65,6 +65,12 @@ const menuItems = [
     href: '/manager/orders',
   },
   {
+    title: 'Purchases',
+    icon: ShoppingCart, // Reusing ShoppingCart or a different icon if preferred, but user asked for sidebar update.
+    href: '/manager/purchases',
+  },
+
+  {
     title: 'Finance',
     icon: Wallet,
     href: '/manager/finance',
