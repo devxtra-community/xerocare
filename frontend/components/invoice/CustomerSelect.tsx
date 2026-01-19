@@ -53,16 +53,18 @@ export function CustomerSelect({ value, onChange }: CustomerSelectProps) {
           type: 'CUSTOMER',
         }));
 
-        const unifiedLeads: SelectableCustomer[] = leadsData.map((l) => ({
-          ...l,
-          id: l._id,
-          name: l.name || 'Unnamed Lead',
-          phone: l.phone,
-          email: l.email,
-          type: 'LEAD',
-          isCustomer: l.isCustomer,
-          customerId: l.customerId,
-        }));
+        const unifiedLeads: SelectableCustomer[] = leadsData
+          .filter((l) => !l.isCustomer && !l.customerId) // Filter out converted leads
+          .map((l) => ({
+            ...l,
+            id: l._id,
+            name: l.name || 'Unnamed Lead',
+            phone: l.phone,
+            email: l.email,
+            type: 'LEAD',
+            isCustomer: l.isCustomer,
+            customerId: l.customerId,
+          }));
 
         // setAllEntities([...unifiedCustomers, ...unifiedLeads]);
 

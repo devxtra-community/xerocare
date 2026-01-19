@@ -20,6 +20,7 @@ export interface Invoice {
   createdAt: string;
   employeeName: string;
   branchName: string;
+  customerName: string;
   items?: InvoiceItem[];
   startDate?: string;
   endDate?: string;
