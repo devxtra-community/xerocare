@@ -6,6 +6,7 @@ const EMPLOYEE_SERVICE_URL = process.env.EMPLOYEE_SERVICE_URL || 'http://127.0.0
 const VENDOR_INVENTORY_SERVICE_URL =
   process.env.VENDOR_INVENTORY_SERVICE_URL || 'http://127.0.0.1:3003';
 const BILLING_SERVICE_URL = process.env.BILLING_SERVICE_URL || 'http://127.0.0.1:3004';
+const CRM_SERVICE_URL = process.env.CRM_SERVICE_URL || 'http://127.0.0.1:3005';
 
 interface InvoiceItem {
   id: string;
@@ -18,6 +19,7 @@ interface Invoice {
   id: string;
   invoiceNumber: string;
   branchId: string;
+  customerId?: string;
   createdBy: string;
   totalAmount: number;
   status: string;
@@ -32,7 +34,40 @@ interface Invoice {
 interface AggregatedInvoice extends Invoice {
   employeeName: string;
   branchName: string;
+  customerName: string;
 }
+
+// Module-level cache for persistence across requests
+// Module-level cache for persistence across requests
+const employeeCache = new Map<string, { name: string; timestamp: number }>();
+const branchCache = new Map<string, { name: string; timestamp: number }>();
+const customerCache = new Map<string, { name: string; timestamp: number }>();
+const CACHE_TTL = 10 * 60 * 1000; // 5 minutes
+
+// Helper to fetch entity name with cache
+const fetchEntityName = async (
+  id: string | undefined,
+  cache: Map<string, { name: string; timestamp: number }>,
+  url: string,
+  token: string,
+  defaultName: string = 'Unknown',
+): Promise<string> => {
+  if (!id) return defaultName;
+  const cached = cache.get(id);
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+    return cached.name;
+  }
+  try {
+    const res = await axios.get<{ data: { name: string } }>(url, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const name = res.data.data.name;
+    cache.set(id, { name, timestamp: Date.now() });
+    return name;
+  } catch {
+    return defaultName;
+  }
+};
 
 export class InvoiceAggregationService {
   async getAllInvoices(
@@ -66,39 +101,40 @@ export class InvoiceAggregationService {
       const aggregatedInvoices = await Promise.all(
         invoices.map(async (inv) => {
           try {
-            const employeeResponse = await axios.get<{ data: { name: string } }>(
-              `${EMPLOYEE_SERVICE_URL}/employee/public/${inv.createdBy}`,
-              {
-                headers: { Authorization: `Bearer ${token}` },
-              },
-            );
-            const employeeName = employeeResponse.data.data.name;
-
-            const branchResponse = await axios.get<{ data: { name: string } }>(
-              `${VENDOR_INVENTORY_SERVICE_URL}/branch/${inv.branchId}`,
-              {
-                headers: { Authorization: `Bearer ${token}` },
-              },
-            );
-            const branchName = branchResponse.data.data.name;
+            const [employeeName, branchName, customerName] = await Promise.all([
+              fetchEntityName(
+                inv.createdBy,
+                employeeCache,
+                `${EMPLOYEE_SERVICE_URL}/employee/public/${inv.createdBy}`,
+                token,
+              ),
+              fetchEntityName(
+                inv.branchId,
+                branchCache,
+                `${VENDOR_INVENTORY_SERVICE_URL}/branch/${inv.branchId}`,
+                token,
+              ),
+              fetchEntityName(
+                inv.customerId,
+                customerCache,
+                `${CRM_SERVICE_URL}/customers/${inv.customerId}`,
+                token,
+                'Walk-in Customer',
+              ),
+            ]);
 
             return {
               ...inv,
               employeeName,
               branchName,
+              customerName,
             };
-          } catch (e: unknown) {
-            const err = e as { message?: string; response?: { status?: number; data?: unknown } };
-            logger.error('Failed to fetch details for invoice', {
-              invoiceId: inv.id,
-              error: err.message,
-              status: err.response?.status,
-              data: err.response?.data,
-            });
+          } catch {
             return {
               ...inv,
               employeeName: 'Unknown',
               branchName: 'Unknown',
+              customerName: 'Unknown',
             };
           }
         }),
@@ -134,12 +170,25 @@ export class InvoiceAggregationService {
       );
       const invoices = billingResponse.data.data;
 
-      // For "My Invoices", we don't need to aggregate employee/branch names as per user request
-      return invoices.map((inv) => ({
-        ...inv,
-        employeeName: '',
-        branchName: '',
-      }));
+      // For "My Invoices", we don't need to aggregate employee/branch names, but we DO need Customer Name
+      const aggregated = await Promise.all(
+        invoices.map(async (inv) => {
+          const customerName = await fetchEntityName(
+            inv.customerId,
+            customerCache,
+            `${CRM_SERVICE_URL}/customers/${inv.customerId}`,
+            token,
+            'Walk-in Customer',
+          );
+          return {
+            ...inv,
+            employeeName: '',
+            branchName: '',
+            customerName,
+          };
+        }),
+      );
+      return aggregated;
     } catch (error: unknown) {
       if (axios.isAxiosError(error)) {
         logger.error('Axios error in fetch my invoices', {
@@ -163,27 +212,33 @@ export class InvoiceAggregationService {
       );
       const invoice = invoiceResponse.data.data;
 
-      const employeeResponse = await axios.get<{ data: { name: string } }>(
-        `${EMPLOYEE_SERVICE_URL}/employee/public/${invoice.createdBy}`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        },
-      );
-
-      const employeeName = employeeResponse.data.data.name;
-
-      const branchResponse = await axios.get<{ data: { name: string } }>(
-        `${VENDOR_INVENTORY_SERVICE_URL}/branch/${invoice.branchId}`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        },
-      );
-      const branchName = branchResponse.data.data.name;
+      const [employeeName, branchName, customerName] = await Promise.all([
+        fetchEntityName(
+          invoice.createdBy,
+          employeeCache,
+          `${EMPLOYEE_SERVICE_URL}/employee/public/${invoice.createdBy}`,
+          token,
+        ),
+        fetchEntityName(
+          invoice.branchId,
+          branchCache,
+          `${VENDOR_INVENTORY_SERVICE_URL}/branch/${invoice.branchId}`,
+          token,
+        ),
+        fetchEntityName(
+          invoice.customerId,
+          customerCache,
+          `${CRM_SERVICE_URL}/customers/${invoice.customerId}`,
+          token,
+          'Walk-in Customer',
+        ),
+      ]);
 
       return {
         ...invoice,
         employeeName,
         branchName,
+        customerName,
       };
     } catch (error: unknown) {
       const err = error as { message?: string; response?: { status?: number } };
@@ -220,27 +275,34 @@ export class InvoiceAggregationService {
       );
       const invoice = billingResponse.data.data;
 
-      // Aggregate creator name and branch name for immediate UI feedback
-      const employeeResponse = await axios.get<{ data: { name: string } }>(
-        `${EMPLOYEE_SERVICE_URL}/employee/public/${invoice.createdBy}`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        },
-      );
-      const employeeName = employeeResponse.data.data.name;
-
-      const branchResponse = await axios.get<{ data: { name: string } }>(
-        `${VENDOR_INVENTORY_SERVICE_URL}/branch/${invoice.branchId}`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        },
-      );
-      const branchName = branchResponse.data.data.name;
+      // Use the same optimized fetching logic
+      const [employeeName, branchName, customerName] = await Promise.all([
+        fetchEntityName(
+          invoice.createdBy,
+          employeeCache,
+          `${EMPLOYEE_SERVICE_URL}/employee/public/${invoice.createdBy}`,
+          token,
+        ),
+        fetchEntityName(
+          invoice.branchId,
+          branchCache,
+          `${VENDOR_INVENTORY_SERVICE_URL}/branch/${invoice.branchId}`,
+          token,
+        ),
+        fetchEntityName(
+          invoice.customerId,
+          customerCache,
+          `${CRM_SERVICE_URL}/customers/${invoice.customerId}`,
+          token,
+          'Walk-in Customer',
+        ),
+      ]);
 
       return {
         ...invoice,
         employeeName,
         branchName,
+        customerName,
       };
     } catch (error: unknown) {
       if (axios.isAxiosError(error)) {
