@@ -6,6 +6,8 @@ import {
   UserPlus,
   ClipboardList,
   TrendingUp,
+  Key,
+  ScrollText,
   LogOut,
 } from 'lucide-react';
 
@@ -50,6 +52,16 @@ const menuItems = [
     title: 'Sales',
     icon: TrendingUp,
     href: '/employee/sales',
+  },
+  {
+    title: 'Rent',
+    icon: Key,
+    href: '/employee/rent',
+  },
+  {
+    title: 'Lease',
+    icon: ScrollText,
+    href: '/employee/lease',
   },
 ];
 

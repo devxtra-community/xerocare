@@ -20,6 +20,7 @@ export interface Invoice {
   createdAt: string;
   employeeName: string;
   branchName: string;
+  customerName: string;
   items?: InvoiceItem[];
   startDate?: string;
   endDate?: string;
@@ -27,9 +28,9 @@ export interface Invoice {
 }
 
 export interface CreateInvoicePayload {
+  customerId: string;
   saleType: 'SALE' | 'RENT' | 'LEASE';
   items: {
-    productId: string;
     description: string;
     quantity: number;
     unitPrice: number;

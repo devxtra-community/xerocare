@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Plus, Search, Loader2, Trash2, Eye, FileText, Calendar, IndianRupee } from 'lucide-react';
+import { toast } from 'sonner';
 import {
   Table,
   TableBody,
@@ -26,6 +27,7 @@ import {
   CreateInvoicePayload,
   getInvoiceById,
 } from '@/lib/invoice';
+import { CustomerSelect } from '@/components/invoice/CustomerSelect';
 import {
   Dialog,
   DialogContent,
@@ -77,6 +79,7 @@ export default function EmployeeSalesTable() {
   const filteredInvoices = invoices.filter((inv) => {
     const matchesSearch =
       inv.invoiceNumber.toLowerCase().includes(search.toLowerCase()) ||
+      inv.customerName?.toLowerCase().includes(search.toLowerCase()) ||
       inv.items?.some((item) => item.description.toLowerCase().includes(search.toLowerCase()));
     const matchesFilter = filterType === 'All' || inv.saleType === filterType;
     return matchesSearch && matchesFilter;
@@ -87,11 +90,11 @@ export default function EmployeeSalesTable() {
       const newInvoice = await createInvoice(data);
       setInvoices((prev) => [newInvoice, ...prev]);
       setFormOpen(false);
-      alert('Invoice created successfully.');
+      toast.success('Invoice created successfully.');
     } catch (error: unknown) {
       console.error('Failed to create invoice:', error);
       const err = error as { response?: { data?: { message?: string } } };
-      alert(err.response?.data?.message || 'Failed to create invoice.');
+      toast.error(err.response?.data?.message || 'Failed to create invoice.');
     }
   };
 
@@ -111,7 +114,7 @@ export default function EmployeeSalesTable() {
           <div className="relative w-full sm:w-[300px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
             <Input
-              placeholder="Search by invoice # or items..."
+              placeholder="Search by invoice #, customer or items..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="pl-9 h-10 bg-white border-blue-400/60 focus:border-blue-400 focus:ring-4 focus:ring-blue-100 outline-none shadow-sm transition-all w-full"
@@ -125,8 +128,6 @@ export default function EmployeeSalesTable() {
               <SelectContent>
                 <SelectItem value="All">All Types</SelectItem>
                 <SelectItem value="SALE">Sale</SelectItem>
-                <SelectItem value="RENT">Rent</SelectItem>
-                <SelectItem value="LEASE">Lease</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -147,6 +148,7 @@ export default function EmployeeSalesTable() {
             <TableHeader className="bg-slate-50/50">
               <TableRow>
                 <TableHead className="text-primary font-bold">INV NUMBER</TableHead>
+                <TableHead className="text-primary font-bold">CUSTOMER</TableHead>
                 <TableHead className="text-primary font-bold">ITEMS</TableHead>
                 <TableHead className="text-primary font-bold">AMOUNT</TableHead>
                 <TableHead className="text-primary font-bold">TYPE</TableHead>
@@ -158,7 +160,7 @@ export default function EmployeeSalesTable() {
             <TableBody>
               {filteredInvoices.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-12 text-muted-foreground">
+                  <TableCell colSpan={8} className="text-center py-12 text-muted-foreground">
                     <FileText className="h-10 w-10 mx-auto mb-2 opacity-20" />
                     No sales found matching your criteria.
                   </TableCell>
@@ -171,6 +173,9 @@ export default function EmployeeSalesTable() {
                   >
                     <TableCell className="text-blue-500 font-bold tracking-tight">
                       {inv.invoiceNumber}
+                    </TableCell>
+                    <TableCell className="font-bold text-slate-700">
+                      {inv.customerName || 'Walk-in'}
                     </TableCell>
                     <TableCell className="max-w-[250px]">
                       <div className="text-sm font-medium text-slate-700 truncate">
@@ -424,8 +429,9 @@ function SaleFormModal({
   onConfirm: (data: CreateInvoicePayload) => void;
 }) {
   const [form, setForm] = useState<CreateInvoicePayload>({
+    customerId: '',
     saleType: 'SALE',
-    items: [{ productId: 'temp-id', description: '', quantity: 1, unitPrice: 0 }],
+    items: [{ description: '', quantity: 1, unitPrice: 0 }],
     startDate: '',
     endDate: '',
     billingCycleInDays: 30,
@@ -434,10 +440,7 @@ function SaleFormModal({
   const addItem = () => {
     setForm({
       ...form,
-      items: [
-        ...form.items,
-        { productId: `temp-${Date.now()}`, description: '', quantity: 1, unitPrice: 0 },
-      ],
+      items: [...form.items, { description: '', quantity: 1, unitPrice: 0 }],
     });
   };
 
@@ -475,11 +478,23 @@ function SaleFormModal({
         </DialogHeader>
 
         <div className="p-8 pt-4 space-y-6 max-h-[70vh] overflow-y-auto scrollbar-hide">
+          <div className="space-y-2">
+            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+              Customer
+            </label>
+            <div className="w-full">
+              <CustomerSelect
+                value={form.customerId}
+                onChange={(id) => setForm({ ...form, customerId: id })}
+              />
+            </div>
+          </div>
+
           <div className="flex p-1 bg-gray-100 rounded-xl">
-            {['SALE', 'RENT', 'LEASE'].map((type) => (
+            {['SALE'].map((type) => (
               <button
                 key={type}
-                onClick={() => setForm({ ...form, saleType: type as 'SALE' | 'RENT' | 'LEASE' })}
+                onClick={() => setForm({ ...form, saleType: type as 'SALE' })}
                 className={`flex-1 py-2.5 rounded-lg text-[10px] font-bold transition-all uppercase tracking-widest
                   ${
                     form.saleType === type
@@ -491,33 +506,6 @@ function SaleFormModal({
               </button>
             ))}
           </div>
-
-          {form.saleType !== 'SALE' && (
-            <div className="grid grid-cols-2 gap-x-8 gap-y-4">
-              <div className="space-y-2">
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                  Contract Start Date
-                </label>
-                <Input
-                  type="date"
-                  value={form.startDate}
-                  onChange={(e) => setForm({ ...form, startDate: e.target.value })}
-                  className="h-12 rounded-xl border-none bg-gray-50 focus-visible:ring-2 focus-visible:ring-blue-400"
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                  Contract End Date
-                </label>
-                <Input
-                  type="date"
-                  value={form.endDate}
-                  onChange={(e) => setForm({ ...form, endDate: e.target.value })}
-                  className="h-12 rounded-xl border-none bg-gray-50 focus-visible:ring-2 focus-visible:ring-blue-400"
-                />
-              </div>
-            </div>
-          )}
 
           <div className="space-y-4">
             <div className="flex items-center justify-between">
@@ -537,7 +525,7 @@ function SaleFormModal({
             <div className="space-y-3">
               {form.items.map((item, index) => (
                 <div
-                  key={item.productId}
+                  key={index}
                   className="group relative grid grid-cols-12 gap-3 p-4 rounded-xl border border-gray-100 bg-gray-50/50 hover:bg-white hover:border-blue-200 transition-all"
                 >
                   <div className="col-span-12 md:col-span-6 space-y-1">
@@ -616,21 +604,19 @@ function SaleFormModal({
               className="h-12 px-10 rounded-xl bg-primary text-white hover:bg-primary/90 font-bold shadow-lg disabled:opacity-70 transition-all"
               onClick={() => {
                 const finalPayload: CreateInvoicePayload = {
+                  customerId: form.customerId,
                   saleType: form.saleType,
                   items: form.items.map((it) => ({
-                    productId: it.productId,
                     description: it.description,
                     quantity: it.quantity,
                     unitPrice: it.unitPrice,
                   })),
                 };
 
-                if (form.saleType !== 'SALE') {
-                  if (form.startDate) finalPayload.startDate = form.startDate;
-                  if (form.endDate) finalPayload.endDate = form.endDate;
-                  finalPayload.billingCycleInDays = form.billingCycleInDays;
+                if (!form.customerId) {
+                  alert('Please select a customer.');
+                  return;
                 }
-
                 onConfirm(finalPayload);
               }}
             >

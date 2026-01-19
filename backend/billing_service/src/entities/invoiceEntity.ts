@@ -24,6 +24,9 @@ export class Invoice {
   @Column()
   createdBy!: string; // employeeId
 
+  @Column()
+  customerId!: string;
+
   @Column({ type: 'decimal', precision: 12, scale: 2 })
   totalAmount!: number;
 

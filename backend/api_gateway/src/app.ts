@@ -21,15 +21,18 @@ app.set('trust proxy', 1);
 
 app.use(globalRateLimiter);
 
-const PORT = process.env.PORT || 3001;
-const EMPLOYEE_SERVICE_URL = process.env.EMPLOYEE_SERVICE_URL || 'http://127.0.0.1:3002';
-const VENDOR_INVENTORY_SERVICE_URL =
-  process.env.VENDOR_INVENTORY_SERVICE_URL || 'http://127.0.0.1:3003';
-const BILLING_SERVICE_URL = process.env.BILLING_SERVICE_URL || 'http://127.0.0.1:3004';
+const PORT = process.env.PORT;
+const EMPLOYEE_SERVICE_URL = process.env.EMPLOYEE_SERVICE_URL;
+const VENDOR_INVENTORY_SERVICE_URL = process.env.VENDOR_INVENTORY_SERVICE_URL;
+const BILLING_SERVICE_URL = process.env.BILLING_SERVICE_URL;
+const CRM_SERVICE_URL = process.env.CRM_SERVICE_URL;
+
+const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:3000';
+logger.info(`CORS Configured for origin: ${CLIENT_URL}`);
 
 app.use(
   cors({
-    origin: process.env.CLIENT_URL || 'http://localhost:3000',
+    origin: CLIENT_URL,
     credentials: true,
   }),
 );
@@ -57,12 +60,18 @@ const billProxyOptions: Options = {
   changeOrigin: true,
 };
 
+const crmProxyOptions: Options = {
+  target: CRM_SERVICE_URL,
+  changeOrigin: true,
+};
+
 app.use(httpLogger);
 app.use('/health', healthRouter);
 app.use('/b/invoices', express.json(), invoiceRouter);
 app.use('/e', createProxyMiddleware(empProxyOptions));
 app.use('/i', createProxyMiddleware(invProxyOptions));
 app.use('/b', createProxyMiddleware(billProxyOptions));
+app.use('/c', createProxyMiddleware(crmProxyOptions));
 
 app.use(errorHandler);
 app.listen(PORT, () => {

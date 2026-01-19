@@ -198,44 +198,53 @@ export default function HRAttendanceTable() {
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="overflow-x-auto min-h-[400px]">
-          <Table className="w-full text-left font-sans">
+          <Table className="w-full text-left">
             <TableHeader className="bg-gray-50/50">
               <TableRow className="border-b border-gray-100 hover:bg-transparent">
-                <TableHead className="px-4 py-3 text-[10px] font-bold text-primary uppercase">
+                <TableHead className="px-3 py-2 text-xs font-bold text-primary uppercase tracking-wider whitespace-nowrap">
                   Employee ID
                 </TableHead>
-                <TableHead className="px-4 py-3 text-[10px] font-bold text-primary uppercase">
+                <TableHead className="px-3 py-2 text-xs font-bold text-primary uppercase tracking-wider whitespace-nowrap">
                   Date
                 </TableHead>
-                <TableHead className="px-4 py-3 text-[10px] font-bold text-primary uppercase">
+                <TableHead className="px-3 py-2 text-xs font-bold text-primary uppercase tracking-wider whitespace-nowrap">
                   Name
                 </TableHead>
-                <TableHead className="px-4 py-3 text-[10px] font-bold text-primary uppercase">
+                <TableHead className="px-3 py-2 text-xs font-bold text-primary uppercase tracking-wider whitespace-nowrap text-center">
                   Role
                 </TableHead>
-                <TableHead className="px-4 py-3 text-[10px] font-bold text-primary uppercase">
+                <TableHead className="px-3 py-2 text-xs font-bold text-primary uppercase tracking-wider whitespace-nowrap">
                   Branch
                 </TableHead>
-                <TableHead className="px-4 py-3 text-[10px] font-bold text-primary uppercase">
+                <TableHead className="px-3 py-2 text-xs font-bold text-primary uppercase tracking-wider whitespace-nowrap text-center">
                   Status
                 </TableHead>
-                <TableHead className="px-4 py-3 text-[10px] font-bold text-primary uppercase">
+                <TableHead className="px-3 py-2 text-xs font-bold text-primary uppercase tracking-wider whitespace-nowrap text-center">
                   Attendance
                 </TableHead>
-                <TableHead className="px-4 py-3 text-[10px] font-bold text-primary uppercase">
+                <TableHead className="px-3 py-2 text-xs font-bold text-primary uppercase tracking-wider whitespace-nowrap text-center">
                   Leaves
                 </TableHead>
-                <TableHead className="px-4 py-3 text-[10px] font-bold text-primary uppercase text-center">
+                <TableHead className="px-3 py-2 text-xs font-bold text-primary uppercase tracking-wider whitespace-nowrap text-right">
                   Action
                 </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {!isLoading && filteredEmployees.length === 0 ? (
+              {isLoading ? (
                 <TableRow>
                   <TableCell
                     colSpan={9}
-                    className="px-4 py-20 text-center text-gray-500 text-sm italic"
+                    className="px-3 py-20 text-center text-gray-500 text-sm italic"
+                  >
+                    Loading attendance records...
+                  </TableCell>
+                </TableRow>
+              ) : filteredEmployees.length === 0 ? (
+                <TableRow>
+                  <TableCell
+                    colSpan={9}
+                    className="px-3 py-20 text-center text-gray-500 text-sm italic"
                   >
                     No attendance records found
                   </TableCell>
@@ -244,17 +253,17 @@ export default function HRAttendanceTable() {
                 filteredEmployees.map((emp, index) => (
                   <TableRow
                     key={emp.id}
-                    className={`transition-colors h-12 border-b border-gray-50 hover:bg-primary/5 ${
+                    className={`transition-colors h-11 border-b border-gray-50 hover:bg-primary/5 ${
                       index % 2 === 0 ? 'bg-white' : 'bg-blue-50/20'
                     }`}
                   >
-                    <TableCell className="px-4 py-2 text-[11px] font-mono text-gray-500 whitespace-nowrap">
+                    <TableCell className="px-3 py-1.5 font-medium text-primary whitespace-nowrap">
                       {emp.display_id || '---'}
                     </TableCell>
-                    <TableCell className="px-4 py-2 text-[11px] text-gray-600">
+                    <TableCell className="px-3 py-1.5 text-muted-foreground whitespace-nowrap">
                       {new Date().toLocaleDateString()}
                     </TableCell>
-                    <TableCell className="px-4 py-2">
+                    <TableCell className="px-3 py-1.5 whitespace-nowrap">
                       <div className="flex items-center gap-2">
                         <div className="h-7 w-7 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-bold text-[10px] flex-shrink-0 overflow-hidden relative">
                           {emp.profile_image_url ? (
@@ -268,20 +277,20 @@ export default function HRAttendanceTable() {
                             (emp.first_name?.[0] || emp.email[0]).toUpperCase()
                           )}
                         </div>
-                        <span className="text-[12px] font-bold text-primary">
+                        <span className="font-medium text-primary">
                           {emp.first_name} {emp.last_name}
                         </span>
                       </div>
                     </TableCell>
-                    <TableCell className="px-4 py-2">
+                    <TableCell className="px-3 py-1.5 whitespace-nowrap text-center">
                       <span className="px-1.5 py-0.5 rounded-full text-[9px] font-semibold uppercase bg-blue-100 text-blue-700">
                         {emp.role}
                       </span>
                     </TableCell>
-                    <TableCell className="px-4 py-2 text-[11px] text-gray-500">
+                    <TableCell className="px-3 py-1.5 text-muted-foreground whitespace-nowrap">
                       {emp.branch?.name || '---'}
                     </TableCell>
-                    <TableCell className="px-4 py-2 whitespace-nowrap">
+                    <TableCell className="px-3 py-1.5 whitespace-nowrap text-center">
                       <span
                         className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-bold
                         ${
@@ -296,29 +305,29 @@ export default function HRAttendanceTable() {
                         {emp.todayStatus}
                       </span>
                     </TableCell>
-                    <TableCell className="px-4 py-2">
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-[12px] font-bold text-primary">
-                          {emp.attendanceCount}
-                        </span>
+                    <TableCell className="px-3 py-1.5 whitespace-nowrap text-center">
+                      <div className="flex items-center justify-center gap-1.5">
+                        <span className="font-bold text-primary">{emp.attendanceCount}</span>
                         <span className="text-[10px] text-gray-400 font-medium italic">days</span>
                       </div>
                     </TableCell>
-                    <TableCell className="px-4 py-2">
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-[12px] font-bold text-primary">{emp.leaveCount}</span>
+                    <TableCell className="px-3 py-1.5 whitespace-nowrap text-center">
+                      <div className="flex items-center justify-center gap-1.5">
+                        <span className="font-bold text-primary">{emp.leaveCount}</span>
                         <span className="text-[10px] text-gray-400 font-medium italic">days</span>
                       </div>
                     </TableCell>
-                    <TableCell className="px-4 py-2 text-center">
-                      <Button
-                        variant="ghost"
-                        className="h-7 w-7 p-0 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                        onClick={() => handleViewDetails(emp)}
-                        title="View Attendance Details"
-                      >
-                        <Eye className="h-3.5 w-3.5" />
-                      </Button>
+                    <TableCell className="px-3 py-1.5 text-right whitespace-nowrap">
+                      <div className="flex items-center justify-end">
+                        <Button
+                          variant="ghost"
+                          className="h-7 w-7 p-0 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                          onClick={() => handleViewDetails(emp)}
+                          title="View Attendance Details"
+                        >
+                          <Eye className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))

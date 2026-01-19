@@ -1,18 +1,32 @@
 import React from 'react';
 import StatCard from '@/components/StatCard';
+import { Lead } from '@/lib/lead';
 
-const statsData = [
-  { title: 'Total Leads', value: '150', subtitle: '+12% from last month' },
-  { title: 'Cold Leads', value: '45', subtitle: '-5% from last month' },
-  { title: 'Lost Leads', value: '12', subtitle: '+2% from last month' },
-  { title: 'Follow Up', value: '38', subtitle: 'Requires attention' },
-];
+interface EmployeeLeadsStatsProps {
+  leads: Lead[];
+}
 
-export default function EmployeeLeadsStats() {
+export default function EmployeeLeadsStats({ leads }: EmployeeLeadsStatsProps) {
+  const statsData = [
+    { title: 'Total Leads', value: leads.length.toString() },
+    {
+      title: 'Website',
+      value: leads.filter((l) => l.source?.toLowerCase() === 'website').length.toString(),
+    },
+    {
+      title: 'WhatsApp',
+      value: leads.filter((l) => l.source?.toLowerCase() === 'whatsapp').length.toString(),
+    },
+    {
+      title: 'Direct',
+      value: leads.filter((l) => l.source?.toLowerCase() === 'direct').length.toString(),
+    },
+  ];
+
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 md:gap-4">
       {statsData.map((stat, index) => (
-        <StatCard key={index} title={stat.title} value={stat.value} subtitle={stat.subtitle} />
+        <StatCard key={index} title={stat.title} value={stat.value} />
       ))}
     </div>
   );
