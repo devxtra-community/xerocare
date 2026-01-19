@@ -59,8 +59,8 @@ export class BillingService {
       createdBy: payload.createdBy,
       customerId: payload.customerId, // Persist customerId
       saleType: payload.saleType,
-      startDate: payload.startDate,
-      endDate: payload.endDate,
+      startDate: payload.startDate ? new Date(payload.startDate) : undefined,
+      endDate: payload.endDate ? new Date(payload.endDate) : undefined,
       billingCycleInDays: payload.billingCycleInDays,
       totalAmount,
       status: InvoiceStatus.PAID, // Payment assumed complete at creation

@@ -128,8 +128,6 @@ export default function EmployeeSalesTable() {
               <SelectContent>
                 <SelectItem value="All">All Types</SelectItem>
                 <SelectItem value="SALE">Sale</SelectItem>
-                <SelectItem value="RENT">Rent</SelectItem>
-                <SelectItem value="LEASE">Lease</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -493,10 +491,10 @@ function SaleFormModal({
           </div>
 
           <div className="flex p-1 bg-gray-100 rounded-xl">
-            {['SALE', 'RENT', 'LEASE'].map((type) => (
+            {['SALE'].map((type) => (
               <button
                 key={type}
-                onClick={() => setForm({ ...form, saleType: type as 'SALE' | 'RENT' | 'LEASE' })}
+                onClick={() => setForm({ ...form, saleType: type as 'SALE' })}
                 className={`flex-1 py-2.5 rounded-lg text-[10px] font-bold transition-all uppercase tracking-widest
                   ${
                     form.saleType === type
@@ -508,33 +506,6 @@ function SaleFormModal({
               </button>
             ))}
           </div>
-
-          {form.saleType !== 'SALE' && (
-            <div className="grid grid-cols-2 gap-x-8 gap-y-4">
-              <div className="space-y-2">
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                  Contract Start Date
-                </label>
-                <Input
-                  type="date"
-                  value={form.startDate}
-                  onChange={(e) => setForm({ ...form, startDate: e.target.value })}
-                  className="h-12 rounded-xl border-none bg-gray-50 focus-visible:ring-2 focus-visible:ring-blue-400"
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                  Contract End Date
-                </label>
-                <Input
-                  type="date"
-                  value={form.endDate}
-                  onChange={(e) => setForm({ ...form, endDate: e.target.value })}
-                  className="h-12 rounded-xl border-none bg-gray-50 focus-visible:ring-2 focus-visible:ring-blue-400"
-                />
-              </div>
-            </div>
-          )}
 
           <div className="space-y-4">
             <div className="flex items-center justify-between">
@@ -641,12 +612,6 @@ function SaleFormModal({
                     unitPrice: it.unitPrice,
                   })),
                 };
-
-                if (form.saleType !== 'SALE') {
-                  if (form.startDate) finalPayload.startDate = form.startDate;
-                  if (form.endDate) finalPayload.endDate = form.endDate;
-                  finalPayload.billingCycleInDays = form.billingCycleInDays;
-                }
 
                 if (!form.customerId) {
                   alert('Please select a customer.');
