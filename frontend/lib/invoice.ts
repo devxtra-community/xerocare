@@ -27,9 +27,9 @@ export interface Invoice {
 }
 
 export interface CreateInvoicePayload {
+  customerId: string;
   saleType: 'SALE' | 'RENT' | 'LEASE';
   items: {
-    productId: string;
     description: string;
     quantity: number;
     unitPrice: number;

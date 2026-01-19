@@ -26,6 +26,7 @@ import {
   CreateInvoicePayload,
   getInvoiceById,
 } from '@/lib/invoice';
+import { CustomerSelect } from '@/components/invoice/CustomerSelect';
 import {
   Dialog,
   DialogContent,
@@ -424,8 +425,9 @@ function SaleFormModal({
   onConfirm: (data: CreateInvoicePayload) => void;
 }) {
   const [form, setForm] = useState<CreateInvoicePayload>({
+    customerId: '',
     saleType: 'SALE',
-    items: [{ productId: 'temp-id', description: '', quantity: 1, unitPrice: 0 }],
+    items: [{ description: '', quantity: 1, unitPrice: 0 }],
     startDate: '',
     endDate: '',
     billingCycleInDays: 30,
@@ -434,10 +436,7 @@ function SaleFormModal({
   const addItem = () => {
     setForm({
       ...form,
-      items: [
-        ...form.items,
-        { productId: `temp-${Date.now()}`, description: '', quantity: 1, unitPrice: 0 },
-      ],
+      items: [...form.items, { description: '', quantity: 1, unitPrice: 0 }],
     });
   };
 
@@ -475,6 +474,18 @@ function SaleFormModal({
         </DialogHeader>
 
         <div className="p-8 pt-4 space-y-6 max-h-[70vh] overflow-y-auto scrollbar-hide">
+          <div className="space-y-2">
+            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+              Customer
+            </label>
+            <div className="w-full">
+              <CustomerSelect
+                value={form.customerId}
+                onChange={(id) => setForm({ ...form, customerId: id })}
+              />
+            </div>
+          </div>
+
           <div className="flex p-1 bg-gray-100 rounded-xl">
             {['SALE', 'RENT', 'LEASE'].map((type) => (
               <button
@@ -537,7 +548,7 @@ function SaleFormModal({
             <div className="space-y-3">
               {form.items.map((item, index) => (
                 <div
-                  key={item.productId}
+                  key={index}
                   className="group relative grid grid-cols-12 gap-3 p-4 rounded-xl border border-gray-100 bg-gray-50/50 hover:bg-white hover:border-blue-200 transition-all"
                 >
                   <div className="col-span-12 md:col-span-6 space-y-1">
@@ -616,9 +627,9 @@ function SaleFormModal({
               className="h-12 px-10 rounded-xl bg-primary text-white hover:bg-primary/90 font-bold shadow-lg disabled:opacity-70 transition-all"
               onClick={() => {
                 const finalPayload: CreateInvoicePayload = {
+                  customerId: form.customerId,
                   saleType: form.saleType,
                   items: form.items.map((it) => ({
-                    productId: it.productId,
                     description: it.description,
                     quantity: it.quantity,
                     unitPrice: it.unitPrice,
@@ -631,6 +642,10 @@ function SaleFormModal({
                   finalPayload.billingCycleInDays = form.billingCycleInDays;
                 }
 
+                if (!form.customerId) {
+                  alert('Please select a customer.');
+                  return;
+                }
                 onConfirm(finalPayload);
               }}
             >

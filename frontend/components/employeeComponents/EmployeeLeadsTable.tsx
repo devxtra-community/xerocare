@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Table,
   TableBody,
@@ -12,7 +12,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Plus, Search, Phone, Mail, Edit } from 'lucide-react';
+import { Plus, Search, Phone, Mail, Edit, Trash2, CheckCircle, EyeOff, Eye } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -20,51 +20,40 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import LeadDialog, { Lead } from './LeadDialog';
-
-const initialLeads: Lead[] = [
-  {
-    id: '1',
-    name: 'Alice Johnson',
-    email: 'alice@example.com',
-    phone: '+1 555-0100',
-    source: 'Website',
-    product: 'Canon ImageRunner 2630',
-    status: 'New',
-    priority: 'Hot',
-  },
-  {
-    id: '2',
-    name: 'Bob Smith',
-    email: 'bob@example.com',
-    phone: '+1 555-0123',
-    source: 'Instagram',
-    product: 'HP LaserJet Pro M404dn',
-    status: 'Contacted',
-    priority: 'Warm',
-  },
-  {
-    id: '3',
-    name: 'Charlie Brown',
-    email: 'charlie@example.com',
-    phone: '+1 555-0300',
-    source: 'Whatsapp',
-    product: 'Epson EcoTank L3250',
-    status: 'Follow-up',
-    priority: 'Cold',
-  },
-];
+import LeadDialog from './LeadDialog';
+import { Lead, getLeads, createLead, updateLead, deleteLead, CreateLeadData } from '@/lib/lead';
+import { toast } from 'sonner';
 
 export default function EmployeeLeadsTable() {
-  const [leads, setLeads] = useState<Lead[]>(initialLeads);
+  const [leads, setLeads] = useState<Lead[]>([]);
+  const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [currentLead, setCurrentLead] = useState<Lead | null>(null);
   const [search, setSearch] = useState('');
   const [filterType, setFilterType] = useState<string>('All');
+  const [showDeleted, setShowDeleted] = useState(false);
+
+  const fetchLeads = async () => {
+    setLoading(true);
+    try {
+      // Pass showDeleted to API
+      const data = await getLeads(showDeleted);
+      setLeads(data);
+    } catch (error) {
+      console.error('Failed to fetch leads', error);
+      toast.error('Failed to fetch leads');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchLeads();
+  }, [showDeleted]); // Refetch when toggle changes
 
   const filteredLeads = leads.filter((lead) => {
     const matchesSearch = Object.values(lead).some((value) =>
-      value.toLowerCase().includes(search.toLowerCase()),
+      String(value).toLowerCase().includes(search.toLowerCase()),
     );
     const matchesFilter = filterType === 'All' || lead.source === filterType;
     return matchesSearch && matchesFilter;
@@ -80,11 +69,32 @@ export default function EmployeeLeadsTable() {
     setDialogOpen(true);
   };
 
-  const handleSave = (leadData: Lead) => {
-    if (currentLead) {
-      setLeads((prev) => prev.map((item) => (item.id === leadData.id ? leadData : item)));
-    } else {
-      setLeads((prev) => [...prev, { ...leadData, id: Math.random().toString() }]);
+  const handleDelete = async (id: string, isDeleted: boolean) => {
+    if (isDeleted) return; // Already deleted
+    if (!confirm('Are you sure you want to delete this lead?')) return;
+    try {
+      await deleteLead(id);
+      toast.success('Lead deleted successfully');
+      fetchLeads();
+    } catch {
+      toast.error('Failed to delete lead');
+    }
+  };
+
+  const handleSave = async (leadData: CreateLeadData & { id?: string; status?: string }) => {
+    try {
+      if (leadData.id) {
+        await updateLead(leadData.id, leadData);
+        toast.success('Lead updated successfully');
+      } else {
+        await createLead(leadData);
+        toast.success('Lead created successfully');
+      }
+      setDialogOpen(false);
+      fetchLeads();
+    } catch (error) {
+      console.error(error);
+      toast.error('Failed to save lead');
     }
   };
 
@@ -103,14 +113,17 @@ export default function EmployeeLeadsTable() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'New':
+      case 'new':
         return 'bg-purple-100 text-purple-600 hover:bg-purple-200';
-      case 'Contacted':
+      case 'contacted':
         return 'bg-blue-100 text-blue-600 hover:bg-blue-50/20';
+      case 'qualified':
       case 'Follow-up':
         return 'bg-yellow-100 text-yellow-600 hover:bg-yellow-200';
-      case 'Converted':
+      case 'converted':
         return 'bg-green-100 text-green-600 hover:bg-green-200';
+      case 'lost':
+        return 'bg-red-100 text-red-600 hover:bg-red-200';
       default:
         return 'bg-gray-100 text-gray-600';
     }
@@ -142,6 +155,14 @@ export default function EmployeeLeadsTable() {
               </SelectContent>
             </Select>
           </div>
+          <Button
+            variant={showDeleted ? 'destructive' : 'outline'}
+            onClick={() => setShowDeleted(!showDeleted)}
+            className="gap-2"
+          >
+            {showDeleted ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            {showDeleted ? 'Hide Deleted' : 'Show Deleted'}
+          </Button>
         </div>
         <Button
           onClick={handleAddClick}
@@ -166,60 +187,106 @@ export default function EmployeeLeadsTable() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredLeads.map((lead, index) => (
-                <TableRow key={lead.id} className={index % 2 ? 'bg-blue-50/20' : 'bg-white'}>
-                  <TableCell className="font-bold text-primary">{lead.name}</TableCell>
-                  <TableCell>
-                    <div className="flex flex-col">
-                      <span className="text-xs text-slate-500">{lead.email}</span>
-                      <span className="text-xs text-slate-500">{lead.phone}</span>
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-gray-500">{lead.source}</TableCell>
-                  <TableCell className="text-gray-500">{lead.product}</TableCell>
-                  <TableCell>
-                    <Badge className={`${getStatusColor(lead.status)} border-0`}>
-                      {lead.status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Badge className={`${getPriorityColor(lead.priority)} border-0`}>
-                      {lead.priority}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-right pr-4">
-                    <div className="flex items-center justify-end gap-2">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-slate-500 hover:text-blue-600 hover:bg-blue-50"
-                        onClick={() => handleEditClick(lead)}
-                        title="Edit Lead"
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <a href={`tel:${lead.phone}`}>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-slate-500 hover:text-blue-600 hover:bg-blue-50"
-                        >
-                          <Phone className="h-4 w-4" />
-                        </Button>
-                      </a>
-                      <a href={`mailto:${lead.email}`}>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-slate-500 hover:text-blue-600 hover:bg-blue-50"
-                        >
-                          <Mail className="h-4 w-4" />
-                        </Button>
-                      </a>
-                    </div>
+              {loading ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="h-24 text-center">
+                    Loading...
                   </TableCell>
                 </TableRow>
-              ))}
+              ) : filteredLeads.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
+                    No leads found.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                filteredLeads.map((lead, index) => (
+                  <TableRow key={lead._id} className={index % 2 ? 'bg-blue-50/20' : 'bg-white'}>
+                    <TableCell className="font-bold text-primary">
+                      <div className="flex flex-col">
+                        <span>{lead.name}</span>
+                        {lead.isDeleted && (
+                          <Badge variant="destructive" className="w-fit text-[10px] mt-1">
+                            DELETED
+                          </Badge>
+                        )}
+                        {lead.isCustomer && (
+                          <Badge
+                            variant="outline"
+                            className="w-fit text-[10px] mt-1 border-green-500 text-green-700 bg-green-50 flex gap-1 items-center"
+                          >
+                            <CheckCircle size={10} /> CUSTOMER
+                          </Badge>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex flex-col">
+                        <span className="text-xs text-slate-500">{lead.email}</span>
+                        <span className="text-xs text-slate-500">{lead.phone}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-gray-500">{lead.source}</TableCell>
+                    <TableCell className="text-gray-500">
+                      {(lead.metadata as { product?: string })?.product || '-'}
+                    </TableCell>
+                    <TableCell>
+                      <Badge className={`${getStatusColor(lead.status)} border-0`}>
+                        {lead.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Badge
+                        className={`${getPriorityColor((lead.metadata as { priority?: string })?.priority || 'Warm')} border-0`}
+                      >
+                        {(lead.metadata as { priority?: string })?.priority || 'Warm'}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right pr-4">
+                      <div className="flex items-center justify-end gap-2">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-slate-500 hover:text-blue-600 hover:bg-blue-50"
+                          onClick={() => handleEditClick(lead)}
+                          title="Edit Lead"
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <a href={`tel:${lead.phone}`}>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-slate-500 hover:text-blue-600 hover:bg-blue-50"
+                          >
+                            <Phone className="h-4 w-4" />
+                          </Button>
+                        </a>
+                        <a href={`mailto:${lead.email}`}>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-slate-500 hover:text-blue-600 hover:bg-blue-50"
+                          >
+                            <Mail className="h-4 w-4" />
+                          </Button>
+                        </a>
+                        {!lead.isDeleted && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-slate-500 hover:text-red-600 hover:bg-red-50"
+                            onClick={() => handleDelete(lead._id, !!lead.isDeleted)}
+                            title="Delete Lead"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
             </TableBody>
           </Table>
         </div>
