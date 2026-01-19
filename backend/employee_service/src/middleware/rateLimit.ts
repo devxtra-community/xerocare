@@ -1,5 +1,7 @@
-import { redis } from "../config/redis";
-import { Request, Response, NextFunction } from "express";
+import { redis } from '../config/redis';
+import { Request, Response, NextFunction } from 'express';
+import { AppError } from '../errors/appError';
+import { logger } from '../config/logger';
 
 interface RateLimitOptions {
   keyPrefix: string;
@@ -8,12 +10,8 @@ interface RateLimitOptions {
 }
 
 export const redisRateLimiter =
-  (options: RateLimitOptions) =>
-  async (req: Request, res: Response, next: NextFunction) => {
-    const identifier =
-      req.body?.email ??
-      req.ip ??
-      "unknown";
+  (options: RateLimitOptions) => async (req: Request, res: Response, next: NextFunction) => {
+    const identifier = req.body?.email ?? req.ip ?? 'unknown';
 
     const key = `${options.keyPrefix}:${identifier}`;
 
@@ -21,7 +19,7 @@ export const redisRateLimiter =
       const count = await Promise.race([
         redis.incr(key),
         new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error("Redis timeout")), 500)
+          setTimeout(() => reject(new Error('Redis timeout')), 500),
         ),
       ]);
 
@@ -30,15 +28,13 @@ export const redisRateLimiter =
       }
 
       if (count > options.max) {
-        return res.status(429).json({
-          success: false,
-          message: "Too many requests. Please try again later.",
-        });
+        return next(new AppError('Too many requests. Please try again later.', 429));
       }
 
       return next();
-    } catch (err:any) {
-      console.error("Rate limiter skipped:", err.message);
+    } catch (err: unknown) {
+      const error = err instanceof Error ? err.message : String(err);
+      logger.warn('Rate limiter skipped', { error });
       return next();
     }
   };

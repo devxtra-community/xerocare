@@ -1,31 +1,38 @@
-import { Request, Response } from "express";
-import { AuthService } from "../services/authService";
-import { issueTokens } from "../services/tokenService";
-import { OtpService } from "../services/otpService";
-import { OtpPurpose } from "../constants/otpPurpose";
-import { MagicLinkService } from "../services/magicLinkService";
+import { Request, Response, NextFunction } from 'express';
+import { AppError } from '../errors/appError';
+import { AuthService } from '../services/authService';
+import { issueTokens } from '../services/tokenService';
+import { OtpService } from '../services/otpService';
+import { OtpPurpose } from '../constants/otpPurpose';
+import { MagicLinkService } from '../services/magicLinkService';
+import { logger } from '../config/logger';
 
 const authService = new AuthService();
 const otpService = new OtpService();
 const magicLinkService = new MagicLinkService();
 
-export const login = async (req: Request, res: Response) => {
+interface AuthError {
+  message?: string;
+  statusCode?: number;
+}
+
+export const login = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    console.log("request reached here");
     const { user } = await authService.login(req.body);
 
     await otpService.sendOtp(user.email, OtpPurpose.LOGIN);
 
     return res.json({
-      message: "Otp sent to registered email",
+      message: 'Otp sent to registered email',
       success: true,
     });
-  } catch (err: any) {
-    return res.status(500).json({ message: err.message, success: false });
+  } catch (err: unknown) {
+    const error = err as AuthError;
+    next(new AppError(error.message || 'Internal Server Error', error.statusCode || 500));
   }
 };
 
-export const loginVerify = async (req: Request, res: Response) => {
+export const loginVerify = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const email = req.body.email.toLowerCase().trim();
     const otp = req.body.otp.trim();
@@ -35,27 +42,25 @@ export const loginVerify = async (req: Request, res: Response) => {
     const user = await authService.findUserByEmail(email);
 
     const accessToken = await issueTokens(user, req, res);
+    logger.info('login successfull');
 
     return res.json({
-      message: "Login successfull",
+      message: 'Login successfull',
       accessToken,
       data: user,
       success: true,
     });
-  } catch (err: any) {
-    return res.status(400).json({
-      message: err.message,
-      success: false,
-    });
+  } catch (err: unknown) {
+    const error = err as AuthError;
+    next(new AppError(error.message || 'Bad Request', error.statusCode || 400));
   }
 };
 
-export const refresh = async (req: Request, res: Response) => {
+export const refresh = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    console.log("inside refreshing accestoken")
     const refreshToken = req.cookies.refreshToken;
     if (!refreshToken) {
-      throw new Error("No refresh token");
+      throw new Error('No refresh token');
     }
 
     const user = await authService.refresh(refreshToken);
@@ -63,36 +68,31 @@ export const refresh = async (req: Request, res: Response) => {
     const accessToken = await issueTokens(user, req, res);
 
     return res.json({
-      message: "Access token refreshed",
+      message: 'Access token refreshed',
       accessToken,
       success: true,
     });
-  } catch (err: any) {
-    return res.status(401).json({
-      message: err.message || "Invalid refresh token",
-      success: false,
-    });
+  } catch (err: unknown) {
+    const error = err as AuthError;
+    next(new AppError(error.message || 'Invalid refresh token', error.statusCode || 401));
   }
 };
 
-export const logout = async (req: Request, res: Response) => {
+export const logout = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    console.log("inside logout :",req.cookies)
     const refreshToken = req.cookies.refreshToken;
-    console.log(refreshToken)
     await authService.logout(refreshToken);
 
-    res.clearCookie("refreshToken");
-    res.json({ message: "logout successfull", success: true });
-  } catch (err: any) {
-    return res.status(500).json({
-      message: err.message || "Internal server error",
-      success: false,
-    });
+    res.clearCookie('refreshToken');
+    res.clearCookie('accessToken');
+    res.json({ message: 'logout successfull', success: true });
+  } catch (err: unknown) {
+    const error = err as AuthError;
+    next(new AppError(error.message || 'Internal server error', error.statusCode || 500));
   }
 };
 
-export const changePassword = async (req: Request, res: Response) => {
+export const changePassword = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const userId = req.user.id;
     const { currentPassword, newPassword } = req.body;
@@ -103,25 +103,21 @@ export const changePassword = async (req: Request, res: Response) => {
       newPassword,
     });
 
-    return res
-      .status(200)
-      .json({ message: "Password changed successfully", success: true });
-  } catch (err: any) {
-    return res.status(500).json({
-      message: err.message || "Internal server error",
-      success: false,
-    });
+    return res.status(200).json({ message: 'Password changed successfully', success: true });
+  } catch (err: unknown) {
+    const error = err as AuthError;
+    next(new AppError(error.message || 'Internal server error', error.statusCode || 500));
   }
 };
 
-export const forgotPassword = async (req: Request, res: Response) => {
+export const forgotPassword = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const email = req.body.email.toLowerCase().trim();
 
     const user = await authService.findUserByEmail(email);
     if (!user) {
       return res.json({
-        message: "If account exists, magic link sent",
+        message: 'If account exists, magic link sent',
         success: true,
       });
     }
@@ -129,23 +125,20 @@ export const forgotPassword = async (req: Request, res: Response) => {
     await otpService.sendOtp(email, OtpPurpose.FORGOT_PASSWORD);
 
     return res.json({
-      message: "If account exists, magic link sent",
+      message: 'If account exists, magic link sent',
       success: true,
     });
-  } catch (err: any) {
-    return res.status(400).json({
-      message: err.message,
-      success: false,
-    });
+  } catch (err: unknown) {
+    const error = err as AuthError;
+    next(new AppError(error.message || 'Bad Request', error.statusCode || 400));
   }
 };
 
-export const resetPassword = async (req: Request, res: Response) => {
+export const resetPassword = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const email = req.body.email.toLowerCase().trim();
     const otp = String(req.body.otp).trim();
     const { newPassword } = req.body;
-    const userId = req.user.id;
     const currentRefreshToken = req.cookies.refreshToken;
 
     await otpService.verifyOtp(email, otp, OtpPurpose.FORGOT_PASSWORD);
@@ -154,39 +147,37 @@ export const resetPassword = async (req: Request, res: Response) => {
 
     await authService.resetPassword(user.id, newPassword);
 
-    await authService.logoutOtherDevices(userId, currentRefreshToken);
+    if (currentRefreshToken) {
+      await authService.logoutOtherDevices(user.id, currentRefreshToken);
+    }
 
     return res.json({
-      message: "Password reset successfully",
+      message: 'Password reset successfully',
       success: true,
     });
-  } catch (err: any) {
-    return res.status(400).json({
-      message: err.message,
-      success: false,
-    });
+  } catch (err: unknown) {
+    const error = err as AuthError;
+    next(new AppError(error.message || 'Bad Request', error.statusCode || 400));
   }
 };
 
-export const requestMagicLink = async (req: Request, res: Response) => {
+export const requestMagicLink = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const email = req.body.email.toLowerCase().trim();
 
     await magicLinkService.sendMagicLink(email);
 
     return res.json({
-      message: "If account exists, magic link sent",
+      message: 'If account exists, magic link sent',
       success: true,
     });
-  } catch (err: any) {
-    return res.status(400).json({
-      message: err.message,
-      success: false,
-    });
+  } catch (err: unknown) {
+    const error = err as AuthError;
+    next(new AppError(error.message || 'Bad Request', error.statusCode || 400));
   }
 };
 
-export const verifyMagicLink = async (req: Request, res: Response) => {
+export const verifyMagicLink = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const token = req.body.token.trim();
 
@@ -194,52 +185,45 @@ export const verifyMagicLink = async (req: Request, res: Response) => {
 
     const user = await authService.findUserByEmail(email);
     if (!user) {
-      throw new Error("User not found");
+      throw new Error('User not found');
     }
 
     const accessToken = await issueTokens(user, req, res);
 
     return res.json({
-      message: "Login successful",
+      message: 'Login successful',
       accessToken,
       data: user,
       success: true,
     });
-  } catch (err: any) {
-    return res.status(400).json({
-      message: err.message,
-      success: false,
-    });
+  } catch (err: unknown) {
+    const error = err as AuthError;
+    next(new AppError(error.message || 'Bad Request', error.statusCode || 400));
   }
 };
 
-export const logoutOtherDevices = async (req: Request, res: Response) => {
+export const logoutOtherDevices = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const userId = req.user.id;
     const currentRefreshToken = req.cookies.refreshToken;
 
     if (!currentRefreshToken) {
-      return res.status(400).json({
-        message: "No refresh token found",
-        success: false,
-      });
+      return next(new AppError('No refresh token found', 400));
     }
 
     await authService.logoutOtherDevices(userId, currentRefreshToken);
 
     return res.json({
-      message: "Logged out from other devices",
+      message: 'Logged out from other devices',
       success: true,
     });
-  } catch (err: any) {
-    return res.status(500).json({
-      message: err.message || "Internal server error",
-      success: false,
-    });
+  } catch (err: unknown) {
+    const error = err as AuthError;
+    next(new AppError(error.message || 'Internal server error', error.statusCode || 500));
   }
 };
 
-export const getSessions = async (req: Request, res: Response) => {
+export const getSessions = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const userId = req.user.id;
     const currentToken = req.cookies.refreshToken;
@@ -250,15 +234,13 @@ export const getSessions = async (req: Request, res: Response) => {
       data: sessions,
       success: true,
     });
-  } catch (err: any) {
-    return res.status(500).json({
-      message: err.message,
-      success: false,
-    });
+  } catch (err: unknown) {
+    const error = err as AuthError;
+    next(new AppError(error.message || 'Internal Server Error', error.statusCode || 500));
   }
 };
 
-export const logoutSession = async (req: Request, res: Response) => {
+export const logoutSession = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const userId = req.user.id;
     const { sessionId } = req.body;
@@ -266,13 +248,26 @@ export const logoutSession = async (req: Request, res: Response) => {
     await authService.logoutSession(userId, sessionId);
 
     return res.json({
-      message: "Session logged out",
+      message: 'Session logged out',
       success: true,
     });
-  } catch (err: any) {
-    return res.status(500).json({
-      message: err.message,
-      success: false,
+  } catch (err: unknown) {
+    const error = err as AuthError;
+    next(new AppError(error.message || 'Internal Server Error', error.statusCode || 500));
+  }
+};
+
+export const getMe = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user.userId;
+    const role = req.user.role;
+    const user = await authService.findUserById(userId, role);
+    return res.json({
+      success: true,
+      data: user,
     });
+  } catch (err: unknown) {
+    const error = err as AuthError;
+    next(new AppError(error.message || 'Internal Server Error', error.statusCode || 500));
   }
 };

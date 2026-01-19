@@ -1,7 +1,7 @@
-import multer from "multer";
-import multerS3 from "multer-s3";
-import { r2 } from "../config/r2";
-import { Request } from "express";
+import multer from 'multer';
+import multerS3 from 'multer-s3';
+import { r2 } from '../config/r2';
+import { Request } from 'express';
 
 export const uploadEmployeeFiles = multer({
   storage: multerS3({
@@ -10,11 +10,9 @@ export const uploadEmployeeFiles = multer({
     contentType: multerS3.AUTO_CONTENT_TYPE,
 
     key: (req: Request, file, cb) => {
-      const isProfile = file.fieldname === "profile_image";
+      const isProfile = file.fieldname === 'profile_image';
 
-      const folder = isProfile
-        ? "profile-images"
-        : "id-proofs";
+      const folder = isProfile ? 'profile-images' : 'id-proofs';
 
       const fileName = `${Date.now()}-${file.originalname}`;
 
@@ -22,10 +20,10 @@ export const uploadEmployeeFiles = multer({
     },
 
     acl: (req, file, cb) => {
-      if (file.fieldname === "profile_image") {
-        cb(null, "public-read");
+      if (file.fieldname === 'profile_image') {
+        cb(null, 'public-read');
       } else {
-        cb(null, "private");
+        cb(null, 'private');
       }
     },
   }),
