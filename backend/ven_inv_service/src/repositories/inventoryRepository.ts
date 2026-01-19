@@ -1,4 +1,5 @@
 import { Product } from '../entities/productEntity';
+import { Vendor } from '../entities/vendorEntity';
 import { Source } from '../config/db';
 
 export class InventoryRepository {
@@ -32,7 +33,7 @@ export class InventoryRepository {
       .createQueryBuilder('product')
       .leftJoin('product.model', 'model')
       .innerJoin('product.warehouse', 'warehouse')
-      .leftJoin('vendors', 'vendor', 'product.vendor_id = vendor.id')
+      .leftJoin(Vendor, 'vendor', 'product.vendor_id = vendor.id')
       .select([
         'warehouse.id AS warehouse_id',
         'warehouse.warehouseName AS warehouse_name',

@@ -43,15 +43,20 @@ export const getallproducts = async (req: Request, res: Response) => {
   try {
     logger.info('Fetching all products');
     const products = await service.getAllProducts();
-    logger.info(`Fetched ${products.length} products`);
-    if (products.length === 0) {
-      return res.status(200).json({ message: 'No products found', data: products, success: true });
+    logger.info(`Fetched ${products?.length || 0} products`);
+
+    if (!products || products.length === 0) {
+      return res.status(200).json({ message: 'No products found', data: [], success: true });
     }
+
     res
       .status(200)
       .json({ message: 'Fetched all products successfully', data: products, success: true });
   } catch (error) {
     logger.error('Error in getallproducts:', error);
+    // User said: "if the data cant fetch then only show error".
+    // So 500 is correct for database connection failure etc.
+    // The issue was likely treating empty results as errors (which I fixed above for products just in case).
     throw new AppError('Failed to fetch products', 500);
   }
 };

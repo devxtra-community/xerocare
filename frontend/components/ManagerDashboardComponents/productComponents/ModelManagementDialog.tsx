@@ -48,8 +48,15 @@ export function ModelManagementDialog({ open, onClose }: ModelManagementDialogPr
       await modelService.deleteModel(id);
       toast.success('Model deleted');
       fetchModels();
-    } catch {
-      toast.error('Failed to delete model');
+    } catch (error: unknown) {
+      const err = error as { response?: { status: number; data?: { message?: string } } };
+      if (err.response && err.response.status === 409) {
+        toast.error(
+          'this model contains products. first delete all associated products to delete model',
+        );
+      } else {
+        toast.error(err.response?.data?.message || 'Failed to delete model');
+      }
     }
   };
 
