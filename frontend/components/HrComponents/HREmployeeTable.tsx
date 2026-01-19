@@ -28,8 +28,8 @@ import {
   Employee,
   EmployeeResponse,
 } from '@/lib/employee';
-import EmployeeFormDialog from '@/components/AdminDahboardComponents/hrComponents/EmployeeFormDialog';
-import DeleteEmployeeDialog from '@/components/AdminDahboardComponents/hrComponents/DeleteEmployeeDialog';
+import EmployeeFormDialog from '@/components/AdminDashboardComponents/hrComponents/EmployeeFormDialog';
+import DeleteEmployeeDialog from '@/components/AdminDashboardComponents/hrComponents/DeleteEmployeeDialog';
 import { useRouter } from 'next/navigation';
 
 export default function HREmployeeTable() {

@@ -15,7 +15,7 @@ import {
 
 const data = [
   { month: 'Jan', revenue: 450000, expense: 320000 },
-  { month: 'Feb', income: 420000, expense: 300000 },
+  { month: 'Feb', revenue: 420000, expense: 300000 },
   { month: 'Mar', revenue: 500000, expense: 350000 },
   { month: 'Apr', revenue: 470000, expense: 330000 },
   { month: 'May', revenue: 520000, expense: 380000 },

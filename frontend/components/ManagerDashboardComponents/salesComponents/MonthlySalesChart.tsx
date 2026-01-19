@@ -1,6 +1,15 @@
 'use client';
 
-import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis, Legend } from 'recharts';
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+  Legend,
+} from 'recharts';
 
 const data = [
   { month: 'Jan', BranchA: 25000 },
@@ -25,26 +34,26 @@ export default function MonthlySalesBarChart() {
               tickLine={false}
               tickMargin={8}
             />
-            <YAxis 
-              tick={{ fontSize: 11, fill: '#1e3a8a', fontWeight: 500 }} 
+            <YAxis
+              tick={{ fontSize: 11, fill: '#1e3a8a', fontWeight: 500 }}
               axisLine={false}
               tickLine={false}
-              tickFormatter={(value) => `₹${value/1000}k`}
+              tickFormatter={(value) => `₹${value / 1000}k`}
             />
-            <Tooltip 
-              contentStyle={{ 
-                fontSize: 12, 
-                borderRadius: '12px', 
-                border: 'none', 
+            <Tooltip
+              contentStyle={{
+                fontSize: 12,
+                borderRadius: '12px',
+                border: 'none',
                 boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-                color: '#1e3a8a'
-              }} 
+                color: '#1e3a8a',
+              }}
               labelStyle={{ color: '#1e3a8a', fontWeight: 'bold', marginBottom: '4px' }}
               cursor={{ fill: '#f8fafc' }}
             />
-            <Legend 
-              verticalAlign="top" 
-              align="right" 
+            <Legend
+              verticalAlign="top"
+              align="right"
               iconType="circle"
               wrapperStyle={{ fontSize: '11px', paddingBottom: '20px' }}
             />

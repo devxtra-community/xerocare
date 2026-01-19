@@ -1,6 +1,6 @@
 import React from 'react';
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
-import AppSidebar from '@/components/AdminDahboardComponents/AdminAppSidebar';
+import AppSidebar from '@/components/AdminDashboardComponents/AdminAppSidebar';
 import DashboardHeader from '@/components/DashboardHeader';
 import AuthGuard from '@/components/auth-guard';
 

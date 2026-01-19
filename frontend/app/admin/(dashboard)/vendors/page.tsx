@@ -1,10 +1,10 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import VendorStats from '@/components/AdminDahboardComponents/VendorComponents/VendorStats';
+import VendorStats from '@/components/AdminDashboardComponents/VendorComponents/VendorStats';
 import VendorTable, {
   Vendor as UiVendor,
-} from '@/components/AdminDahboardComponents/VendorComponents/VendorTable';
+} from '@/components/AdminDashboardComponents/VendorComponents/VendorTable';
 import { getVendors, Vendor as ApiVendor } from '@/lib/vendor';
 import { toast } from 'sonner';
 

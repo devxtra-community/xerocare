@@ -1,4 +1,4 @@
-import BranchReport from '@/components/AdminDahboardComponents/branchComponents/BranchTable';
+import BranchReport from '@/components/AdminDashboardComponents/branchComponents/BranchTable';
 
 export default function BranchPage() {
   return (

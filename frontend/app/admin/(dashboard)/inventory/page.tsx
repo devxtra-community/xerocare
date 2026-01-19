@@ -1,10 +1,10 @@
 'use client';
 import React from 'react';
-import InventoryKPICards from '@/components/AdminDahboardComponents/inventoryComponents/InventoryKPICards';
-import InventoryProductsTable from '@/components/AdminDahboardComponents/inventoryComponents/InventoryProductsTable';
-import InventoryChart from '@/components/AdminDahboardComponents/inventoryComponents/InventoryChart';
-import StockStatusDonut from '@/components/AdminDahboardComponents/inventoryComponents/StockStatusDonut';
-import StockMovementTrend from '@/components/AdminDahboardComponents/inventoryComponents/StockMovementTrend';
+import InventoryKPICards from '@/components/AdminDashboardComponents/inventoryComponents/InventoryKPICards';
+import InventoryProductsTable from '@/components/AdminDashboardComponents/inventoryComponents/InventoryProductsTable';
+import InventoryChart from '@/components/AdminDashboardComponents/inventoryComponents/InventoryChart';
+import StockStatusDonut from '@/components/AdminDashboardComponents/inventoryComponents/StockStatusDonut';
+import StockMovementTrend from '@/components/AdminDashboardComponents/inventoryComponents/StockMovementTrend';
 
 export default function InventoryPage() {
   return (

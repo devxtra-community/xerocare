@@ -16,8 +16,8 @@ import {
   Clock,
 } from 'lucide-react';
 import StatCard from '@/components/StatCard';
-import VendorTransactionsTable from '@/components/AdminDahboardComponents/vendorComponents/VendorTransactionsTable';
-import VendorSpendingTrend from '@/components/AdminDahboardComponents/vendorComponents/VendorSpendingTrend';
+import VendorTransactionsTable from '@/components/AdminDashboardComponents/vendorComponents/VendorTransactionsTable';
+import VendorSpendingTrend from '@/components/AdminDashboardComponents/vendorComponents/VendorSpendingTrend';
 import { getVendorById, Vendor as ApiVendor } from '@/lib/vendor';
 import { toast } from 'sonner';
 

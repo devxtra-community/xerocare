@@ -1,5 +1,5 @@
 import React from 'react';
-import FinanceReport from '@/components/AdminDahboardComponents/FinanceComponents/financeReport';
+import FinanceReport from '@/components/AdminDashboardComponents/FinanceComponents/FinanceReport';
 
 export default function FinancePage() {
   return (

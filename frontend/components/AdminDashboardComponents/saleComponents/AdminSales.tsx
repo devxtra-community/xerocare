@@ -1,7 +1,7 @@
 import StatCard from '@/components/StatCard';
 import SalesSummaryTable from './SalesSummaryTable';
 
-import MonthlySalesBarChart from './monthlysalesChart';
+import MonthlySalesBarChart from './MonthlySalesChart';
 import MostSoldProductChart from './MostSoldProductChart';
 
 export default function AdminSalesPage() {

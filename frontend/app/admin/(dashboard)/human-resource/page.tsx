@@ -1,4 +1,4 @@
-import AdminHR from '@/components/AdminDahboardComponents/hrComponents/AdminHR';
+import AdminHR from '@/components/AdminDashboardComponents/hrComponents/AdminHR';
 
 export default function HumanResourcePage() {
   return <AdminHR />;

@@ -1,12 +1,12 @@
 'use client';
 
 import React from 'react';
-import FinanceStats from '@/components/ManagerDashboardComponents/financeComponents/FinanceStats';
-import RevenueSummaryTable from '@/components/ManagerDashboardComponents/financeComponents/RevenueSummaryTable';
-import OutstandingReceivablesTable from '@/components/ManagerDashboardComponents/financeComponents/OutstandingReceivablesTable';
-import RevenueVsExpenseChart from '@/components/ManagerDashboardComponents/financeComponents/RevenueVsExpenseChart';
-import RevenueBySourceChart from '@/components/ManagerDashboardComponents/financeComponents/RevenueBySourceChart';
-import ProfitChart from '@/components/ManagerDashboardComponents/financeComponents/ProfitChart';
+import FinanceStats from '@/components/ManagerDashboardComponents/FinanceComponents/FinanceStats';
+import RevenueSummaryTable from '@/components/ManagerDashboardComponents/FinanceComponents/RevenueSummaryTable';
+import OutstandingReceivablesTable from '@/components/ManagerDashboardComponents/FinanceComponents/OutstandingReceivablesTable';
+import RevenueVsExpenseChart from '@/components/ManagerDashboardComponents/FinanceComponents/RevenueVsExpenseChart';
+import RevenueBySourceChart from '@/components/ManagerDashboardComponents/FinanceComponents/RevenueBySourceChart';
+import ProfitChart from '@/components/ManagerDashboardComponents/FinanceComponents/ProfitChart';
 
 export default function ManagerFinancePage() {
   return (
