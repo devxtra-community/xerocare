@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { requestRefresh } from './auth-refresh';
+import { setAccessToken, clearAuth } from './token';
 
 const api = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001',
@@ -44,7 +45,7 @@ api.interceptors.response.use(
 
     // If token is invalid or revoked, force logout immediately
     if (status === 401 && (errorCode === 'TOKEN_REVOKED' || errorCode === 'TOKEN_INVALID')) {
-      localStorage.clear();
+      clearAuth();
 
       if (window.location.pathname.startsWith('/admin')) {
         window.location.href = '/adminlogin';
@@ -72,7 +73,7 @@ api.interceptors.response.use(
       try {
         const newAccessToken = await requestRefresh();
 
-        localStorage.setItem('accessToken', newAccessToken);
+        setAccessToken(newAccessToken);
         api.defaults.headers.common.Authorization = `Bearer ${newAccessToken}`;
 
         processQueue(null, newAccessToken);
@@ -84,7 +85,7 @@ api.interceptors.response.use(
         processQueue(refreshError, null);
         isRefreshing = false;
 
-        localStorage.clear();
+        clearAuth();
 
         if (window.location.pathname.startsWith('/admin')) {
           window.location.href = '/adminlogin';

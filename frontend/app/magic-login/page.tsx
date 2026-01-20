@@ -31,9 +31,6 @@ function MagicLoginContent() {
         if (res.success) {
           setStatus('success');
           toast.success('Login successful!');
-          localStorage.setItem('accessToken', res.accessToken);
-
-          document.cookie = `accessToken=${res.accessToken}; path=/; max-age=86400; SameSite=Strict`;
 
           try {
             const user = res.data;
@@ -43,8 +40,8 @@ function MagicLoginContent() {
               setTimeout(() => router.push('/admin/dashboard'), 500);
             } else if (role === 'HR') {
               setTimeout(() => router.push('/hr/dashboard'), 500);
-            } else if (role === 'MANAGER') {
-              setTimeout(() => router.push('/manager/dashboard'), 500);
+            } else if (role === 'FINANCE') {
+              setTimeout(() => router.push('/finance/dashboard'), 500);
             } else if (role === 'EMPLOYEE') {
               setTimeout(() => router.push('/employee/dashboard'), 500);
             } else {

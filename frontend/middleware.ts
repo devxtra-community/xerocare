@@ -19,6 +19,7 @@ export function middleware(request: NextRequest) {
     { path: '/hr', roles: ['HR'] },
     { path: '/manager', roles: ['MANAGER'] },
     { path: '/employee', roles: ['EMPLOYEE'] },
+    { path: '/finance', roles: ['FINANCE'] },
     // Add more as needed
   ];
 
@@ -70,5 +71,11 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/admin/:path*', '/hr/:path*', '/manager/:path*', '/employee/:path*'],
+  matcher: [
+    '/admin/:path*',
+    '/hr/:path*',
+    '/manager/:path*',
+    '/employee/:path*',
+    '/finance/:path*',
+  ],
 };

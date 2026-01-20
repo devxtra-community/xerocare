@@ -1,8 +1,9 @@
 import api from './api';
 
 import { jwtDecode } from 'jwt-decode';
+import { setAccessToken, clearAuth } from './token';
 
-export type UserRole = 'HR' | 'EMPLOYEE' | 'FINANCE' | 'MANAGER';
+export type UserRole = 'HR' | 'EMPLOYEE' | 'FINANCE' | 'MANAGER' | 'ADMIN';
 
 export interface JwtPayload {
   id: string;
@@ -34,7 +35,9 @@ export async function verifyLoginOtp(email: string, otp: string) {
     email,
     otp,
   });
-  localStorage.setItem('accessToken', res.data.accessToken);
+  if (res.data.success && res.data.accessToken) {
+    setAccessToken(res.data.accessToken);
+  }
 
   return res.data;
 }
@@ -46,7 +49,9 @@ export async function requestMagicLink(email: string) {
 
 export async function verifyMagicLink(token: string) {
   const res = await api.post('/e/auth/magic-link/verify', { token });
-  localStorage.setItem('accessToken', res.data.accessToken);
+  if (res.data.success && res.data.accessToken) {
+    setAccessToken(res.data.accessToken);
+  }
 
   return res.data;
 }
@@ -69,11 +74,13 @@ export async function logout() {
   try {
     const res = await api.post('/e/auth/logout');
     if (res.data.success) {
-      localStorage.clear();
+      clearAuth();
       return res;
     }
   } catch (err) {
     console.log(err);
+    // Even if logout fails on server, clear local auth
+    clearAuth();
   }
 }
 
@@ -82,7 +89,9 @@ export async function adminLogin(email: string, password: string) {
     email,
     password,
   });
-  localStorage.setItem('accessToken', res.data.accessToken);
+  if (res.data.success && res.data.accessToken) {
+    setAccessToken(res.data.accessToken);
+  }
   return res.data;
 }
 

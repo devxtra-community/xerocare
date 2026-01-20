@@ -73,10 +73,6 @@ export function LoginForm({ className, ...props }: React.ComponentProps<'div'>) 
       const res = await verifyLoginOtp(email, otp);
       if (res.success) {
         toast.success(res.message);
-        localStorage.setItem('accessToken', res.accessToken);
-
-        // Set cookie for middleware access
-        document.cookie = `accessToken=${res.accessToken}; path=/; max-age=86400; SameSite=Strict`;
 
         // Decode token to get role
         try {
@@ -91,6 +87,8 @@ export function LoginForm({ className, ...props }: React.ComponentProps<'div'>) 
             router.push('/manager/dashboard');
           } else if (role === 'EMPLOYEE') {
             router.push('/employee/dashboard');
+          } else if (role === 'FINANCE') {
+            router.push('/finance/dashboard');
           } else {
             router.push('/dashboard');
           }

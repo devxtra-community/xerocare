@@ -38,10 +38,6 @@ export function AdminLoginForm({ className, ...props }: React.ComponentProps<'di
 
       if (res.success) {
         toast.success('Login successful');
-        localStorage.setItem('accessToken', res.accessToken);
-
-        // Set cookie for middleware access
-        document.cookie = `accessToken=${res.accessToken}; path=/; max-age=86400; SameSite=Strict`;
 
         // Decode token to get role and route accordingly
         try {
@@ -52,6 +48,8 @@ export function AdminLoginForm({ className, ...props }: React.ComponentProps<'di
             router.push('/admin/dashboard');
           } else if (role === 'HR') {
             router.push('/hr/dashboard');
+          } else if (role === 'FINANCE') {
+            router.push('/finance/dashboard');
           } else {
             router.push('/admin/dashboard'); // fallback
           }
