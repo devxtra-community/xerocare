@@ -15,12 +15,17 @@ import {
 import { sparePartService, SparePartInventoryItem } from '@/services/sparePartService';
 import AddSparePartDialog from '@/components/ManagerDashboardComponents/spareParts/AddSparePartDialog';
 import BulkSparePartDialog from '@/components/ManagerDashboardComponents/spareParts/BulkSparePartDialog';
+import { toast } from 'sonner';
+import { Pencil, Trash2 } from 'lucide-react';
+import EditSparePartDialog from '@/components/ManagerDashboardComponents/spareParts/EditSparePartDialog';
 
 export default function SparePartsPage() {
   const [parts, setParts] = useState<SparePartInventoryItem[]>([]);
   const [search, setSearch] = useState('');
   const [bulkOpen, setBulkOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [selectedPart, setSelectedPart] = useState<SparePartInventoryItem | null>(null);
 
   const loadParts = async () => {
     try {
@@ -34,6 +39,26 @@ export default function SparePartsPage() {
   useEffect(() => {
     loadParts();
   }, []);
+
+  const handleDelete = async (id: string, name: string) => {
+    if (!confirm(`Are you sure you want to delete ${name}?`)) return;
+    try {
+      await sparePartService.deleteSparePart(id);
+      toast.success('Spare part deleted successfully');
+      loadParts();
+    } catch (error: unknown) {
+      console.error(error);
+      const msg =
+        (error as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+        'Failed to delete spare part';
+      toast.error(msg);
+    }
+  };
+
+  const handleEdit = (part: SparePartInventoryItem) => {
+    setSelectedPart(part);
+    setEditOpen(true);
+  };
 
   const filtered = parts.filter(
     (p) =>
@@ -83,6 +108,7 @@ export default function SparePartsPage() {
               <TableHead className="font-bold text-primary">Vendor</TableHead>
               <TableHead className="font-bold text-primary">Price</TableHead>
               <TableHead className="font-bold text-primary">Qty</TableHead>
+              <TableHead className="font-bold text-primary">Action</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -97,11 +123,21 @@ export default function SparePartsPage() {
                   <TableCell>{item.vendor_name || '-'}</TableCell>
                   <TableCell>₹{item.price}</TableCell>
                   <TableCell className="font-bold text-primary">{item.quantity}</TableCell>
+                  <TableCell>
+                    <div className="flex gap-2 text-primary">
+                      <button onClick={() => handleEdit(item)}>
+                        <Pencil size={18} />
+                      </button>
+                      <button onClick={() => handleDelete(item.id, item.part_name)}>
+                        <Trash2 size={18} className="text-red-500" />
+                      </button>
+                    </div>
+                  </TableCell>
                 </TableRow>
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={8} className="text-center py-8 text-gray-500">
+                <TableCell colSpan={9} className="text-center py-8 text-gray-500">
                   No spare parts found. Try adding some.
                 </TableCell>
               </TableRow>
@@ -116,6 +152,15 @@ export default function SparePartsPage() {
 
       {addOpen && (
         <AddSparePartDialog open={addOpen} onOpenChange={setAddOpen} onSuccess={loadParts} />
+      )}
+
+      {editOpen && selectedPart && (
+        <EditSparePartDialog
+          open={editOpen}
+          onOpenChange={setEditOpen}
+          product={selectedPart}
+          onSuccess={loadParts}
+        />
       )}
     </div>
   );

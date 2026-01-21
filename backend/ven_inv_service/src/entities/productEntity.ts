@@ -18,6 +18,7 @@ export enum ProductStatus {
   DAMAGED = 'DAMAGED',
 }
 
+import { Vendor } from './vendorEntity';
 import { SparePart } from './sparePartEntity';
 
 @Entity('products')
@@ -46,6 +47,10 @@ export class Product {
   @Column({ type: 'uuid' })
   @Index() // Optimizes GROUP BY vendor_id
   vendor_id!: string;
+
+  @ManyToOne(() => Vendor)
+  @JoinColumn({ name: 'vendor_id' })
+  vendor!: Vendor;
 
   @Column({ type: 'varchar', length: 255, unique: true })
   serial_no!: string;

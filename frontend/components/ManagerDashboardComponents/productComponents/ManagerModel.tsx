@@ -119,7 +119,15 @@ export default function ManagerModel() {
         <Table>
           <TableHeader>
             <TableRow>
-              {['MODEL NAME', 'MODEL NO', 'WHOLESALE PRICE', 'ACTION'].map((h) => (
+              {[
+                'MODEL NAME',
+                'MODEL NO',
+                'WHOLESALE PRICE',
+                'SALE PRICE',
+                'RENT PRICE (M/Y)',
+                'LEASE PRICE (M/Y)',
+                'ACTION',
+              ].map((h) => (
                 <TableHead key={h} className="text-[11px] font-semibold text-primary px-4">
                   {h}
                 </TableHead>
@@ -134,6 +142,13 @@ export default function ManagerModel() {
                   <TableCell className="px-4 font-medium">{m.model_name}</TableCell>
                   <TableCell className="px-4">{m.model_no}</TableCell>
                   <TableCell className="px-4">₹{m.wholesale_price}</TableCell>
+                  <TableCell className="px-4">₹{m.sale_price}</TableCell>
+                  <TableCell className="px-4">
+                    ₹{m.rent_price_monthly} / ₹{m.rent_price_yearly}
+                  </TableCell>
+                  <TableCell className="px-4">
+                    ₹{m.lease_price_monthly} / ₹{m.lease_price_yearly}
+                  </TableCell>
                   <TableCell className="px-4">
                     <div className="flex gap-3 text-sm">
                       <button

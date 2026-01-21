@@ -1,18 +1,17 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Upload, FileSpreadsheet, Loader2 } from 'lucide-react';
-import * as XLSX from 'xlsx';
-import { toast } from 'sonner';
-import { sparePartService } from '@/services/sparePartService';
+import { X, Upload, Save, Trash2, Plus, FileSpreadsheet } from 'lucide-react';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { Input } from '@/components/ui/input';
 import {
   Select,
   SelectContent,
@@ -20,9 +19,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Label } from '@/components/ui/label';
+import { sparePartService } from '@/services/sparePartService'; // Typo fix
 import { warehouseService, Warehouse } from '@/services/warehouseService';
-import { getUserFromToken } from '@/lib/auth';
+import { modelService } from '@/services/modelService';
+import { vendorService } from '@/services/vendorService';
+import { toast } from 'sonner';
+import * as XLSX from 'xlsx';
 
 interface BulkSparePartDialogProps {
   open: boolean;
@@ -30,214 +32,376 @@ interface BulkSparePartDialogProps {
   onSuccess: () => void;
 }
 
+interface BulkSparePartRow {
+  item_code: string;
+  part_name: string;
+  brand: string;
+  model_id: string;
+  base_price: number;
+  quantity: number;
+  vendor_id: string;
+  warehouse_id: string;
+}
+
 export default function BulkSparePartDialog({
   open,
   onOpenChange,
   onSuccess,
 }: BulkSparePartDialogProps) {
-  const [file, setFile] = useState<File | null>(null);
-  const [uploading, setUploading] = useState(false);
-  const [previewData, setPreviewData] = useState<Record<string, unknown>[]>([]);
+  const [rows, setRows] = useState<Partial<BulkSparePartRow>[]>([]);
+  const [vendors, setVendors] = useState<{ id: string; name: string }[]>([]);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
-  const [selectedWarehouseId, setSelectedWarehouseId] = useState<string>('');
-  const [loadingWarehouses, setLoadingWarehouses] = useState(false);
+  const [models, setModels] = useState<{ id: string; model_name: string }[]>([]);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [file, setFile] = useState<File | null>(null);
+
+  const loadDependencies = async () => {
+    try {
+      const [v, w, m] = await Promise.all([
+        vendorService.getVendors(),
+        warehouseService.getWarehouses(),
+        modelService.getAllModels(),
+      ]);
+      setVendors(v || []);
+      setWarehouses(w || []);
+      setModels(m || []);
+    } catch {
+      toast.error('Failed to load dependencies');
+    }
+  };
 
   useEffect(() => {
     if (open) {
-      fetchWarehouses();
+      setRows([]);
+      setFile(null);
+      loadDependencies();
     }
   }, [open]);
 
-  const fetchWarehouses = async () => {
-    setLoadingWarehouses(true);
-    try {
-      const user = getUserFromToken();
-      const data = await warehouseService.getWarehouses();
-      // Filter warehouses by user's branch if available
-      const filtered = user?.branchId
-        ? data.filter((w) => w.branchId === user.branchId && w.status === 'ACTIVE')
-        : data.filter((w) => w.status === 'ACTIVE');
-      setWarehouses(filtered);
-    } catch (error) {
-      console.error('Failed to fetch warehouses', error);
-      toast.error('Failed to load warehouses');
-    } finally {
-      setLoadingWarehouses(false);
-    }
-  };
+  const createEmptyRow = (): Partial<BulkSparePartRow> => ({
+    item_code: '',
+    part_name: '',
+    brand: '',
+    model_id: '',
+    base_price: 0,
+    quantity: 0,
+    vendor_id: '',
+    warehouse_id: '',
+  });
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const selectedFile = e.target.files[0];
-      setFile(selectedFile);
-      parseFile(selectedFile);
-    }
-  };
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = e.target.files?.[0];
+    if (!selectedFile) return;
 
-  const parseFile = (file: File) => {
+    setFile(selectedFile);
     const reader = new FileReader();
-    reader.onload = (e) => {
-      const data = new Uint8Array(e.target?.result as ArrayBuffer);
-      const workbook = XLSX.read(data, { type: 'array' });
-      const sheetName = workbook.SheetNames[0];
-      const worksheet = workbook.Sheets[sheetName];
-      const jsonData = XLSX.utils.sheet_to_json(worksheet) as Record<string, unknown>[];
-      setPreviewData(jsonData);
+
+    reader.onload = (event) => {
+      const bstr = event.target?.result;
+      const wb = XLSX.read(bstr, { type: 'binary' });
+      const wsname = wb.SheetNames[0];
+      const ws = wb.Sheets[wsname];
+      const data = XLSX.utils.sheet_to_json(ws);
+
+      parseExcelData(data);
     };
-    reader.readAsArrayBuffer(file);
+
+    reader.readAsBinaryString(selectedFile);
   };
 
-  const handleUpload = async () => {
-    if (!file || previewData.length === 0) return;
+  const findIdByName = (
+    name: string,
+    list: { id: string; name?: string; model_name?: string; warehouseName?: string }[],
+  ) => {
+    if (!name) return '';
+    const lowerName = String(name).toLowerCase().trim();
+    const found = list.find((item) => {
+      const itemName = (item.name || item.model_name || item.warehouseName || '').toLowerCase();
+      return itemName === lowerName || item.id === name;
+    });
+    return found ? found.id : '';
+  };
 
-    setUploading(true);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const parseExcelData = (data: any[]) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const parsedRows: Partial<BulkSparePartRow>[] = data.map((row: any) => {
+      const getVal = (keys: string[]) => {
+        for (const k of keys) {
+          if (row[k] !== undefined) return row[k];
+        }
+        return '';
+      };
+
+      const rawModel = getVal(['model_id', 'Model ID', 'Model', 'Compatible Model']);
+      const rawVendor = getVal(['vendor_id', 'Vendor ID', 'Vendor']);
+      const rawWarehouse = getVal(['warehouse_id', 'Warehouse ID', 'Warehouse']);
+
+      return {
+        item_code: getVal(['item_code', 'Item Code', 'ItemCode']),
+        part_name: getVal(['part_name', 'Item Name', 'Name']),
+        brand: getVal(['brand', 'Brand']),
+        model_id: findIdByName(rawModel, models),
+        base_price: Number(getVal(['base_price', 'Price'])) || 0,
+        quantity: Number(getVal(['quantity', 'Quantity', 'Qty'])) || 0,
+        vendor_id: findIdByName(rawVendor, vendors),
+        warehouse_id: findIdByName(rawWarehouse, warehouses),
+      };
+    });
+
+    if (parsedRows.length === 0) {
+      toast.warning('No data found in the file');
+    } else {
+      setRows(parsedRows);
+      toast.success(`Parsed ${parsedRows.length} rows`);
+    }
+  };
+
+  const handleAddRow = () => {
+    setRows([...rows, createEmptyRow()]);
+  };
+
+  const handleRemoveRow = (index: number) => {
+    setRows(rows.filter((_, i) => i !== index));
+  };
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const updateRow = (index: number, field: keyof BulkSparePartRow, value: any) => {
+    const newRows = [...rows];
+    newRows[index] = { ...newRows[index], [field]: value };
+    setRows(newRows);
+  };
+
+  const handleSubmit = async () => {
+    // Validate rows - require item_code
+    const validRows = rows.filter((r) => r.item_code);
+
+    if (validRows.length === 0) {
+      toast.error('Please add at least one valid spare part with Item Code');
+      return;
+    }
+
     try {
-      // Mapping
-      // Mapping
-      const mappedData = previewData.map((row) => ({
-        item_code: String(row['Item Code'] || row['item_code'] || ''),
-        part_name: String(row['Item Name'] || row['Name'] || row['part_name'] || ''),
-        brand: String(row['Brand'] || row['brand'] || ''),
-        model_id: String(row['Model ID'] || row['model_id'] || ''),
-        base_price: Number(row['Price'] || row['base_price'] || 0),
-        warehouse_id: String(
-          row['Warehouse ID'] || row['warehouse_id'] || selectedWarehouseId || '',
-        ),
-        vendor_id: String(row['Vendor ID'] || row['vendor_id'] || ''),
-        quantity: Number(row['Quantity'] || row['quantity'] || 0),
+      // Cast quantity and price to numbers to be sure
+      const payload = validRows.map((r) => ({
+        ...r,
+        // If model_id is empty string or 'universal', make it undefined
+        model_id: !r.model_id || r.model_id === 'universal' ? undefined : r.model_id,
+        base_price: Number(r.base_price),
+        quantity: Number(r.quantity),
       }));
 
-      // Validation
-      const validRows = mappedData.filter((r) => r.item_code && r.warehouse_id && r.quantity);
-
-      if (validRows.length === 0) {
-        toast.error(
-          'No valid rows found. Ensure Item Code, Quantity, and Warehouse (selected or in file) are present.',
-        );
-        setUploading(false);
-        return;
-      }
-
-      const result = await sparePartService.bulkUpload(validRows);
+      // sparePartService.bulkUpload type definition matches payload
+      const result = await sparePartService.bulkUpload(payload);
 
       if (result.success) {
-        toast.success(`Successfully uploaded ${result.data.success} spare parts.`);
+        toast.success(`Successfully uploaded ${result.data.success} spare parts`);
         if (result.data.failed > 0) {
-          toast.warning(`${result.data.failed} items failed to upload.`);
+          toast.warning(`${result.data.failed} items failed to upload`);
         }
         onSuccess();
         onOpenChange(false);
-        setFile(null);
-        setPreviewData([]);
-        setSelectedWarehouseId('');
       } else {
-        toast.error('Upload failed.');
+        toast.error('Bulk upload failed');
       }
     } catch (error) {
-      console.error(error);
-      toast.error('Failed to upload file');
-    } finally {
-      setUploading(false);
+      console.error('Bulk upload error:', error);
+      toast.error('Bulk upload failed. See console for details.');
     }
   };
 
+  if (!open) return null;
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Bulk Upload Spare Parts</DialogTitle>
-        </DialogHeader>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div className="bg-white rounded-xl w-full max-w-6xl h-[85vh] flex flex-col shadow-2xl">
+        <div className="p-4 border-b flex justify-between items-center">
+          <h2 className="text-xl font-bold flex items-center gap-2">
+            <Upload size={20} /> Bulk Spare Part Upload
+          </h2>
+          <button
+            onClick={() => onOpenChange(false)}
+            className="p-1 hover:bg-gray-100 rounded-full"
+          >
+            <X size={20} />
+          </button>
+        </div>
 
-        <div className="space-y-4 py-4">
-          <div className="grid w-full items-center gap-1.5">
-            <Label htmlFor="warehouse">Target Warehouse</Label>
-            <Select
-              value={selectedWarehouseId}
-              onValueChange={setSelectedWarehouseId}
-              disabled={loadingWarehouses}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder={loadingWarehouses ? 'Loading...' : 'Select Warehouse'} />
-              </SelectTrigger>
-              <SelectContent>
-                {warehouses.map((wh) => (
-                  <SelectItem key={wh.id} value={wh.id}>
-                    {wh.warehouseName}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <p className="text-[0.8rem] text-muted-foreground">
-              Selected warehouse will be used if &quot;Warehouse ID&quot; column is missing in file.
-            </p>
+        <div className="p-4 bg-gray-50 border-b flex flex-col sm:flex-row gap-4 items-center justify-between">
+          <div className="flex gap-4 items-center w-full sm:w-auto">
+            <div className="relative">
+              <input
+                type="file"
+                accept=".xlsx, .xls"
+                onChange={handleFileUpload}
+                className="hidden"
+                id="excel-upload-sp"
+              />
+              <label
+                htmlFor="excel-upload-sp"
+                className="cursor-pointer flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
+              >
+                <FileSpreadsheet size={18} />
+                Upload Excel
+              </label>
+            </div>
           </div>
-
-          <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:bg-gray-50 transition-colors">
-            <input
-              type="file"
-              accept=".xlsx, .xls"
-              onChange={handleFileChange}
-              className="hidden"
-              id="file-upload"
-            />
-            <label
-              htmlFor="file-upload"
-              className="cursor-pointer flex flex-col items-center gap-2"
-            >
-              {file ? (
-                <>
-                  <FileSpreadsheet className="h-8 w-8 text-green-600" />
-                  <span className="text-sm font-medium">{file.name}</span>
-                  <span className="text-xs text-gray-500">{previewData.length} rows detected</span>
-                </>
-              ) : (
-                <>
-                  <Upload className="h-8 w-8 text-gray-400" />
-                  <span className="text-sm text-gray-600">Click to upload .xlsx file</span>
-                </>
-              )}
-            </label>
-          </div>
-
-          <div className="text-xs text-gray-500 space-y-1">
-            <p className="font-semibold">Required Columns:</p>
-            <ul className="list-disc pl-4 grid grid-cols-2 gap-x-4">
-              <li>Item Code</li>
-              <li>Quantity</li>
-              <li>Item Name</li>
-              <li>Price</li>
-              <li>Brand</li>
-              <li>Warehouse ID (Optional if selected above)</li>
-              <li>Model ID (Optional)</li>
-              <li>Vendor ID (Optional)</li>
-            </ul>
+          <div className="text-sm text-gray-500">
+            {rows.length > 0 ? `${rows.length} rows loaded` : 'Upload an Excel file to get started'}
           </div>
         </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={uploading}>
-            Cancel
+        <div className="flex-1 overflow-auto p-4">
+          {rows.length > 0 ? (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[120px]">
+                    Item Code <span className="text-red-500">*</span>
+                  </TableHead>
+                  <TableHead className="w-[150px]">
+                    Part Name <span className="text-red-500">*</span>
+                  </TableHead>
+                  <TableHead className="w-[120px]">
+                    Brand <span className="text-red-500">*</span>
+                  </TableHead>
+                  <TableHead className="w-[100px]">Price</TableHead>
+                  <TableHead className="w-[80px]">Qty</TableHead>
+                  <TableHead className="w-[150px]">Vendor (for Qty)</TableHead>
+                  <TableHead className="w-[150px]">Warehouse</TableHead>
+                  <TableHead className="w-[150px]">Model</TableHead>
+                  <TableHead className="w-[50px]"></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {rows.map((row, i) => (
+                  <TableRow key={i}>
+                    <TableCell>
+                      <Input
+                        value={row.item_code}
+                        onChange={(e) => updateRow(i, 'item_code', e.target.value)}
+                        placeholder="SP-001"
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Input
+                        value={row.part_name}
+                        onChange={(e) => updateRow(i, 'part_name', e.target.value)}
+                        placeholder="Name"
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Input
+                        value={row.brand}
+                        onChange={(e) => updateRow(i, 'brand', e.target.value)}
+                        placeholder="Brand"
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Input
+                        type="number"
+                        value={row.base_price}
+                        onChange={(e) => updateRow(i, 'base_price', Number(e.target.value))}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Input
+                        type="number"
+                        value={row.quantity}
+                        onChange={(e) => updateRow(i, 'quantity', Number(e.target.value))}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Select
+                        value={row.vendor_id}
+                        onValueChange={(v) => updateRow(i, 'vendor_id', v)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {vendors.map((v) => (
+                            <SelectItem key={v.id} value={v.id}>
+                              {v.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </TableCell>
+                    <TableCell>
+                      <Select
+                        value={row.warehouse_id}
+                        onValueChange={(v) => updateRow(i, 'warehouse_id', v)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {warehouses.map((w) => (
+                            <SelectItem key={w.id} value={w.id}>
+                              {w.warehouseName}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </TableCell>
+                    <TableCell>
+                      <Select
+                        value={row.model_id}
+                        onValueChange={(v) => updateRow(i, 'model_id', v)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Universal" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="universal">Universal</SelectItem>
+                          {models.map((m) => (
+                            <SelectItem key={m.id} value={m.id}>
+                              {m.model_name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </TableCell>
+                    <TableCell>
+                      <button
+                        onClick={() => handleRemoveRow(i)}
+                        className="text-red-500 hover:text-red-700"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          ) : (
+            <div className="h-full flex flex-col items-center justify-center text-gray-400">
+              <Upload size={48} className="mb-4 opacity-20" />
+              <p>Upload an Excel file to view and edit items here</p>
+              <p className="text-sm">or click &quot;Add Row&quot; to start manually</p>
+            </div>
+          )}
+        </div>
+
+        <div className="p-4 border-t flex justify-between items-center bg-gray-50">
+          <Button variant="outline" onClick={handleAddRow} className="gap-2">
+            <Plus size={16} /> Add Row
           </Button>
-          <Button
-            onClick={handleUpload}
-            disabled={
-              !file ||
-              uploading ||
-              (!selectedWarehouseId &&
-                !previewData.some((r) => r['Warehouse ID'] || r['warehouse_id']))
-            }
-          >
-            {uploading ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Uploading...
-              </>
-            ) : (
-              'Upload'
-            )}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+          <div className="flex gap-2">
+            <Button variant="ghost" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSubmit}
+              disabled={rows.length === 0}
+              className="gap-2 bg-primary text-white"
+            >
+              <Save size={16} /> Save All
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }

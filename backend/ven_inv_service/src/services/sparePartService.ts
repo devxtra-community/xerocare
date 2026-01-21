@@ -1,6 +1,8 @@
 import { SparePartRepository } from '../repositories/sparePartRepository';
 import { ModelRepository } from '../repositories/modelRepository';
 import { WarehouseRepository } from '../repositories/warehouseRepository';
+import { SparePart } from '../entities/sparePartEntity';
+import { ProductStatus } from '../entities/productEntity';
 
 interface BulkUploadRow {
   item_code: string;
@@ -81,8 +83,73 @@ export class SparePartService {
       });
     }
 
-    // 4. No Stock Update (Derived Architecture)
-    return { success: true, message: 'Spare part master data processed' };
+    // 4. Create Stock (Product Entities)
+    const quantity = (data as BulkUploadRow & { quantity?: number }).quantity;
+    const warehouseId = (data as BulkUploadRow & { warehouse_id?: string }).warehouse_id;
+    const vendorId = (data as BulkUploadRow & { vendor_id?: string }).vendor_id;
+
+    if (quantity && quantity > 0) {
+      if (!warehouseId || !vendorId) {
+        throw new Error('Warehouse and Vendor are required when adding stock.');
+      }
+
+      const productsToCreate = [];
+      for (let i = 0; i < quantity; i++) {
+        // Generate pseudo-unique serial for bulk add
+        // In production, user might scan barcodes. Here we auto-generate.
+        const serialNo = `SP-${Date.now()}-${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
+
+        productsToCreate.push({
+          spare_part_id: master.id,
+          warehouse: { id: warehouseId }, // Relation
+          vendor_id: vendorId, // Column
+          serial_no: serialNo,
+          name: master.part_name,
+          brand: master.brand,
+          base_price: master.base_price,
+          sale_price: master.base_price, // Default sale price = base price
+          product_status: ProductStatus.AVAILABLE,
+          MFD: new Date(), // Default to today
+          tax_rate: 0, // Default tax rate
+        });
+      }
+
+      // We need a way to save these products. Repository doesn't expose ProductRepo directly.
+      // We can add a method in SparePartRepository or use ProductRepository directly if we inject it.
+      // For now, let's assume SparePartRepository can handle it or we use Source directly?
+      // Better: Add `createProducts` to SparePartRepository.
+      await this.repo.createProducts(productsToCreate);
+    }
+
+    return { success: true, message: 'Spare part master data and stock processed' };
+  }
+
+  async updateSparePart(id: string, data: Partial<SparePart>) {
+    // Only allow updating Master Data fields
+    const updateData: Partial<SparePart> = {
+      part_name: data.part_name,
+      brand: data.brand,
+      model_id: data.model_id,
+      base_price: data.base_price,
+    };
+    // Remove undefined
+    Object.keys(updateData).forEach(
+      (key) =>
+        (updateData as Record<string, unknown>)[key] === undefined &&
+        delete (updateData as Record<string, unknown>)[key],
+    );
+
+    await this.repo.updateMaster(id, updateData);
+    return { success: true, message: 'Spare part updated' };
+  }
+
+  async deleteSparePart(id: string) {
+    const hasInventory = await this.repo.hasInventory(id);
+    if (hasInventory) {
+      throw new Error('Cannot delete spare part with existing inventory.');
+    }
+    await this.repo.deleteMaster(id);
+    return { success: true, message: 'Spare part deleted' };
   }
 
   async getInventoryByBranch(branchId: string) {

@@ -62,3 +62,35 @@ export const listSpareParts = async (req: Request, res: Response) => {
     res.status(500).json({ success: false, message });
   }
 };
+
+export const updateSparePart = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params as { id: string };
+    const branchId = req.user?.branchId;
+    if (!branchId) return res.status(400).json({ success: false, message: 'Branch ID required' });
+
+    const result = await service.updateSparePart(id, req.body);
+    res.status(200).json(result);
+  } catch (error: unknown) {
+    logger.error('Error in updateSparePart:', error);
+    const message = error instanceof Error ? error.message : 'Internal server error';
+    res.status(400).json({ success: false, message });
+  }
+};
+
+export const deleteSparePart = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params as { id: string };
+    const branchId = req.user?.branchId;
+    if (!branchId) return res.status(400).json({ success: false, message: 'Branch ID required' });
+
+    const result = await service.deleteSparePart(id);
+    res.status(200).json(result);
+  } catch (error: unknown) {
+    console.log(error);
+    const message = error instanceof Error ? error.message : 'Internal server error';
+    // 409 Conflict if inventory exists
+    const status = message.includes('inventory') ? 409 : 500;
+    res.status(status).json({ success: false, message });
+  }
+};

@@ -1,6 +1,7 @@
 import { Source } from '../config/db';
 import { SparePart } from '../entities/sparePartEntity';
 import { Product } from '../entities/productEntity';
+import { DeepPartial } from 'typeorm';
 
 export class SparePartRepository {
   // Lazy Load Repositories
@@ -20,6 +21,26 @@ export class SparePartRepository {
   async createMaster(data: Partial<SparePart>) {
     const part = this.masterRepo.create(data);
     return this.masterRepo.save(part);
+  }
+
+  async updateMaster(id: string, data: Partial<SparePart>) {
+    return this.masterRepo.update(id, data);
+  }
+
+  async deleteMaster(id: string) {
+    return this.masterRepo.delete(id);
+  }
+
+  async hasInventory(sparePartId: string): Promise<boolean> {
+    const count = await this.productRepo.count({
+      where: { spare_part_id: sparePartId },
+    });
+    return count > 0;
+  }
+
+  async createProducts(data: DeepPartial<Product>[]) {
+    const products = this.productRepo.create(data);
+    return this.productRepo.save(products);
   }
 
   // --- Inventory Operations (Derived via Aggregation) ---
@@ -50,6 +71,7 @@ export class SparePartRepository {
         .leftJoin('p.warehouse', 'wh')
         .leftJoin('p.vendor', 'v') // Vendor is on Product
         .select([
+          'sp.id AS id',
           'sp.item_code AS item_code',
           'sp.part_name AS part_name',
           'sp.brand AS brand',
@@ -61,6 +83,13 @@ export class SparePartRepository {
         ])
         .where('sp.branch_id = :branchId', { branchId })
         .groupBy('sp.id')
+        .addGroupBy('sp.item_code')
+        .addGroupBy('sp.part_name')
+        .addGroupBy('sp.brand')
+        .addGroupBy('sp.base_price')
+        .addGroupBy('model.model_name')
+        .addGroupBy('wh.warehouseName')
+        .addGroupBy('v.name')
         .addGroupBy('wh.id') // Group by warehouse to show location
         .addGroupBy('v.id') // Group by vendor to show source
         .addGroupBy('model.id')

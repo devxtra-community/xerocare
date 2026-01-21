@@ -19,6 +19,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { warehouseService } from '@/services/warehouseService';
+import { vendorService } from '@/services/vendorService';
 import { modelService } from '@/services/modelService';
 
 interface AddSparePartDialogProps {
@@ -41,8 +42,13 @@ export default function AddSparePartDialog({
     id: string;
     model_name: string;
   }
+  interface Vendor {
+    id: string;
+    name: string;
+  }
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [models, setModels] = useState<Model[]>([]);
+  const [vendors, setVendors] = useState<Vendor[]>([]);
 
   const [formData, setFormData] = useState({
     item_code: '',
@@ -51,7 +57,8 @@ export default function AddSparePartDialog({
     model_id: '',
     base_price: '',
     warehouse_id: '',
-    vendor_id: '', // Optional
+    vendor_id: '',
+    quantity: '0',
   });
 
   useEffect(() => {
@@ -62,12 +69,14 @@ export default function AddSparePartDialog({
 
   const loadDependencies = async () => {
     try {
-      const [whRes, modelRes] = await Promise.all([
+      const [whRes, modelRes, vendorRes] = await Promise.all([
         warehouseService.getWarehouses(),
         modelService.getAllModels(),
+        vendorService.getVendors(),
       ]);
       setWarehouses(whRes || []);
       setModels(modelRes || []);
+      setVendors(vendorRes || []);
     } catch (error) {
       console.error('Failed to load dependencies', error);
     }
@@ -81,7 +90,9 @@ export default function AddSparePartDialog({
         ...formData,
         model_id: formData.model_id === 'null' ? undefined : formData.model_id,
         warehouse_id: formData.warehouse_id || undefined,
+        vendor_id: formData.vendor_id || undefined,
         base_price: Number(formData.base_price),
+        quantity: Number(formData.quantity) || 0,
       });
       console.log(respo);
       toast.success('Spare part added successfully');
@@ -95,6 +106,7 @@ export default function AddSparePartDialog({
         base_price: '',
         warehouse_id: '',
         vendor_id: '',
+        quantity: '0',
       });
     } catch (error: unknown) {
       console.log(error);
@@ -137,6 +149,33 @@ export default function AddSparePartDialog({
                 value={formData.brand}
                 onChange={(e) => setFormData({ ...formData, brand: e.target.value })}
               />
+            </div>
+            <div className="space-y-2">
+              <Label>Quantity (In Stock)</Label>
+              <Input
+                type="number"
+                min="0"
+                value={formData.quantity}
+                onChange={(e) => setFormData({ ...formData, quantity: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Vendor</Label>
+              <Select
+                value={formData.vendor_id}
+                onValueChange={(val) => setFormData({ ...formData, vendor_id: val })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select Vendor (Optional)" />
+                </SelectTrigger>
+                <SelectContent>
+                  {vendors.map((v) => (
+                    <SelectItem key={v.id} value={v.id}>
+                      {v.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
               <Label>Preferred Warehouse</Label>

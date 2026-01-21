@@ -89,7 +89,9 @@ export function ModelManagementDialog({ open, onClose }: ModelManagementDialogPr
                   <TableHead>Name</TableHead>
                   <TableHead>Brand</TableHead>
                   <TableHead>Sale Price</TableHead>
+                  <TableHead>Wholesale Price</TableHead>
                   <TableHead>Rent (M/Y)</TableHead>
+                  <TableHead>Lease (M/Y)</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -105,8 +107,12 @@ export function ModelManagementDialog({ open, onClose }: ModelManagementDialogPr
                     </TableCell>
                     <TableCell>{model.brand || '-'}</TableCell>
                     <TableCell>₹{model.sale_price}</TableCell>
+                    <TableCell>₹{model.wholesale_price}</TableCell>
                     <TableCell>
                       ₹{model.rent_price_monthly} / ₹{model.rent_price_yearly}
+                    </TableCell>
+                    <TableCell>
+                      ₹{model.lease_price_monthly} / ₹{model.lease_price_yearly}
                     </TableCell>
                     <TableCell>
                       <div className="flex gap-2">
