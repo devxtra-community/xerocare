@@ -2,7 +2,9 @@ import { Warehouse, WarehouseStatus } from '../entities/warehouseEntity';
 import { Source } from '../config/db';
 
 export class WarehouseRepository {
-  private repo = Source.getRepository(Warehouse);
+  private get repo() {
+    return Source.getRepository(Warehouse);
+  }
 
   async create(payload: Partial<Warehouse>) {
     const warehouse = this.repo.create(payload);

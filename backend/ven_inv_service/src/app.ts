@@ -13,6 +13,7 @@ import { startEmployeeConsumer } from './events/consumers/employeeConsumer';
 import { getRabbitChannel } from './config/rabbitmq';
 import modelRoute from './routes/modelRoute';
 import inventoryRouter from './routes/inventoryRoutes';
+import sparePartRouter from './routes/sparePartRoutes';
 
 const app = express();
 
@@ -25,6 +26,7 @@ app.use('/warehouses', warehouseRouter);
 app.use('/models', modelRoute);
 app.use('/products', productRoute);
 app.use('/inventory', inventoryRouter);
+app.use('/spare-parts', sparePartRouter);
 app.use(errorHandler);
 
 const startServer = async () => {

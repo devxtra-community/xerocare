@@ -8,13 +8,16 @@ export const getallModels = async (req: Request, res: Response) => {
   try {
     logger.info('Fetching all models');
     const models = await service.fetchAllModels();
-    if (models.length === 0) {
-      return res.status(200).json({ message: 'No models found', data: models, success: true });
+
+    if (!models || models.length === 0) {
+      return res.status(200).json({ message: 'No models found', data: [], success: true });
     }
+
     return res
       .status(200)
       .json({ message: 'Fetched all models successfully', data: models, success: true });
-  } catch {
+  } catch (error) {
+    logger.error('Error in getallModels:', error);
     throw new AppError('Error fetching models', 500);
   }
 };
@@ -51,7 +54,14 @@ export const deleteModel = async (req: Request, res: Response) => {
       throw new AppError('Model not found', 404);
     }
     return res.status(200).json({ message: 'Model deleted successfully', success: true });
-  } catch {
+  } catch (error: unknown) {
+    const err = error as { code?: string; message?: string };
+    if (err.code == '23503' || (err.message && err.message.includes('foreign key constraint'))) {
+      throw new AppError(
+        'this model contains products. first delete all associated products to delete model',
+        409,
+      );
+    }
     throw new AppError('Failed to delete model', 500);
   }
 };

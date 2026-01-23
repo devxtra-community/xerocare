@@ -8,7 +8,7 @@ export interface Vendor {
 
 export interface Warehouse {
   id: string;
-  warehouse_name: string;
+  warehouseName: string; // Updated from warehouse_name
 }
 
 export const commonService = {

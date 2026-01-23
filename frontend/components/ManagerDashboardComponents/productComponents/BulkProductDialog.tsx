@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { X, Upload, Save, Trash2, Plus, FileSpreadsheet, Download } from 'lucide-react';
+import { X, Upload, Save, Trash2, Plus, FileSpreadsheet } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -19,6 +19,7 @@ import {
 } from '@/components/ui/select';
 import { productService, BulkProductRow } from '@/services/productService';
 import { commonService, Vendor, Warehouse } from '@/services/commonService';
+import { modelService, Model } from '@/services/modelService';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
 
@@ -32,17 +33,20 @@ export function BulkProductDialog({ open, onClose, onSuccess }: BulkProductDialo
   const [rows, setRows] = useState<Partial<BulkProductRow>[]>([]);
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
+  const [models, setModels] = useState<Model[]>([]);
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [file, setFile] = useState<File | null>(null);
 
   const loadDependencies = async () => {
     try {
-      const [v, w] = await Promise.all([
+      const [v, w, m] = await Promise.all([
         commonService.getAllVendors(),
         commonService.getAllWarehouses(),
+        modelService.getAllModels(),
       ]);
       setVendors(v);
       setWarehouses(w);
+      setModels(m);
     } catch {
       toast.error('Failed to load dependencies');
     }
@@ -57,6 +61,7 @@ export function BulkProductDialog({ open, onClose, onSuccess }: BulkProductDialo
   }, [open]);
 
   const createEmptyRow = (): Partial<BulkProductRow> => ({
+    model_id: '',
     model_no: '',
     warehouse_id: '',
     vendor_id: '',
@@ -68,46 +73,6 @@ export function BulkProductDialog({ open, onClose, onSuccess }: BulkProductDialo
     sale_price: 0,
     tax_rate: 0,
   });
-
-  const handleDownloadTemplate = () => {
-    const headers = [
-      'model_no',
-      'warehouse_id',
-      'vendor_id',
-      'serial_no',
-      'name',
-      'brand',
-      'MFD',
-      'rent_price_monthly',
-      'rent_price_yearly',
-      'lease_price_monthly',
-      'lease_price_yearly',
-      'sale_price',
-      'tax_rate',
-    ];
-    const data = [
-      [
-        'MOD-ID-123',
-        'WH-ID-123',
-        'VEN-ID-123',
-        'SN-001',
-        'Product Name',
-        'Brand Name',
-        '2024-01-01',
-        0,
-        0,
-        0,
-        0,
-        100,
-        10,
-      ],
-    ];
-
-    const ws = XLSX.utils.aoa_to_sheet([headers, ...data]);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Template');
-    XLSX.writeFile(wb, 'bulk_product_template.xlsx');
-  };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
@@ -129,6 +94,18 @@ export function BulkProductDialog({ open, onClose, onSuccess }: BulkProductDialo
     reader.readAsBinaryString(selectedFile);
   };
 
+  const findModelId = (search: string, modelsList: Model[]) => {
+    if (!search) return '';
+    const lower = String(search).toLowerCase();
+    const found = modelsList.find(
+      (m) =>
+        m.id === search ||
+        m.model_no.toLowerCase() === lower ||
+        m.model_name.toLowerCase() === lower,
+    );
+    return found ? found.id : '';
+  };
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const parseExcelData = (data: any[]) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -141,6 +118,10 @@ export function BulkProductDialog({ open, onClose, onSuccess }: BulkProductDialo
       };
 
       return {
+        model_id: findModelId(
+          getVal(['model_no', 'model_id', 'Model No', 'Model ID', 'Model']),
+          models,
+        ),
         model_no: getVal(['model_no', 'model_id', 'Model No', 'Model ID']),
         serial_no: getVal(['serial_no', 'Serial No', 'Serial']),
         name: getVal(['name', 'Name', 'Product Name']),
@@ -179,18 +160,24 @@ export function BulkProductDialog({ open, onClose, onSuccess }: BulkProductDialo
   };
 
   const handleSubmit = async () => {
-    // Validate rows
+    // Validate rows - require model_id (UUID) to be present
     const validRows = rows.filter(
-      (r) => r.model_no && r.warehouse_id && r.vendor_id && r.serial_no && r.name,
+      (r) => r.model_id && r.warehouse_id && r.vendor_id && r.serial_no && r.name,
     );
 
     if (validRows.length === 0) {
-      toast.error('Please add at least one valid product');
+      toast.error('Please add at least one valid product with a selected Model');
       return;
     }
 
     try {
-      const response = await productService.bulkCreateProducts(validRows as BulkProductRow[]);
+      // Backend expects the Model UUID in the 'model_no' field
+      const payload = validRows.map((r) => ({
+        ...r,
+        model_no: r.model_id, // Overwrite with UUID
+      }));
+
+      const response = await productService.bulkCreateProducts(payload as BulkProductRow[]);
       if (response.success) {
         toast.success(`Successfully added ${response.inserted} products`);
         if (response.failed && response.failed.length > 0) {
@@ -236,9 +223,6 @@ export function BulkProductDialog({ open, onClose, onSuccess }: BulkProductDialo
                 Upload Excel
               </label>
             </div>
-            <Button variant="outline" onClick={handleDownloadTemplate} className="gap-2">
-              <Download size={18} /> Template
-            </Button>
           </div>
           <div className="text-sm text-gray-500">
             {rows.length > 0 ? `${rows.length} rows loaded` : 'Upload an Excel file to get started'}
@@ -250,8 +234,8 @@ export function BulkProductDialog({ open, onClose, onSuccess }: BulkProductDialo
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[120px]">
-                    Model ID <span className="text-red-500">*</span>
+                  <TableHead className="w-[180px]">
+                    Model <span className="text-red-500">*</span>
                   </TableHead>
                   <TableHead className="w-[120px]">
                     Serial No <span className="text-red-500">*</span>
@@ -277,11 +261,31 @@ export function BulkProductDialog({ open, onClose, onSuccess }: BulkProductDialo
                 {rows.map((row, i) => (
                   <TableRow key={i}>
                     <TableCell>
-                      <Input
-                        value={row.model_no}
-                        onChange={(e) => updateRow(i, 'model_no', e.target.value)}
-                        placeholder="Model ID"
-                      />
+                      <Select
+                        value={row.model_id}
+                        onValueChange={(v) => {
+                          const m = models.find((mod) => mod.id === v);
+                          const newRows = [...rows];
+                          newRows[i] = {
+                            ...newRows[i],
+                            model_id: v,
+                            model_no: m?.model_no || '',
+                            brand: row.brand || m?.brand || '', // Auto-fill brand if empty
+                          };
+                          setRows(newRows);
+                        }}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select Model" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {models.map((m) => (
+                            <SelectItem key={m.id} value={m.id}>
+                              {m.model_name} ({m.model_no})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </TableCell>
                     <TableCell>
                       <Input
@@ -315,7 +319,7 @@ export function BulkProductDialog({ open, onClose, onSuccess }: BulkProductDialo
                         <SelectContent>
                           {warehouses.map((w) => (
                             <SelectItem key={w.id} value={w.id}>
-                              {w.warehouse_name}
+                              {w.warehouseName}
                             </SelectItem>
                           ))}
                         </SelectContent>

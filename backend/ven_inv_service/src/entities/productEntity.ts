@@ -5,6 +5,8 @@ import {
   ManyToOne,
   CreateDateColumn,
   JoinColumn,
+  Index,
+  Check,
 } from 'typeorm';
 import { Model } from './modelEntity';
 import { Warehouse } from './warehouseEntity';
@@ -16,7 +18,13 @@ export enum ProductStatus {
   DAMAGED = 'DAMAGED',
 }
 
+import { Vendor } from './vendorEntity';
+import { SparePart } from './sparePartEntity';
+
 @Entity('products')
+@Check(
+  `("model_id" IS NOT NULL AND "spare_part_id" IS NULL) OR ("model_id" IS NULL AND "spare_part_id" IS NOT NULL)`,
+)
 export class Product {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
@@ -24,12 +32,25 @@ export class Product {
   @ManyToOne(() => Model, (model) => model.products)
   @JoinColumn({ name: 'model_id' })
   model!: Model;
+
   @ManyToOne(() => Warehouse, { nullable: true })
   @JoinColumn({ name: 'warehouse_id' })
   warehouse!: Warehouse;
 
+  @Column({ name: 'spare_part_id', nullable: true })
+  spare_part_id?: string;
+
+  @ManyToOne(() => SparePart, { nullable: true })
+  @JoinColumn({ name: 'spare_part_id' })
+  spare_part?: SparePart;
+
   @Column({ type: 'uuid' })
+  @Index() // Optimizes GROUP BY vendor_id
   vendor_id!: string;
+
+  @ManyToOne(() => Vendor)
+  @JoinColumn({ name: 'vendor_id' })
+  vendor!: Vendor;
 
   @Column({ type: 'varchar', length: 255, unique: true })
   serial_no!: string;
@@ -55,6 +76,7 @@ export class Product {
     default: ProductStatus.AVAILABLE,
     nullable: true,
   })
+  @Index() // Optimizes getInventoryStats filtering
   product_status!: ProductStatus;
 
   @Column({ type: 'varchar', length: 1000, nullable: true })

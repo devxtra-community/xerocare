@@ -1,5 +1,5 @@
 'use client';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Table,
   TableBody,
@@ -9,50 +9,44 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { Eye, Edit2 } from 'lucide-react';
-import { useRouter } from 'next/navigation';
-import Image from 'next/image';
+import { Eye } from 'lucide-react';
+import { inventoryService, InventoryItem } from '@/services/inventoryService';
 
-import { useEffect } from 'react';
-import api from '@/lib/api';
-import { Product } from '@/lib/product';
-
-interface InventoryItem {
-  id: string;
-  warehouseId: string;
-  quantity: number;
-  unitPrice: number;
-  sku: string | null;
-  description: string | null;
-  createdAt: string;
-  updatedAt: string;
-  product: Product;
+interface InventoryTableProps {
+  mode?: 'global' | 'branch' | 'warehouse';
+  warehouseId?: string;
 }
 
-export default function InventoryTable() {
-  const router = useRouter();
+export default function InventoryTable({ mode = 'global', warehouseId }: InventoryTableProps) {
+  // const router = useRouter();
   const [page, setPage] = useState(1);
   const [data, setData] = useState<InventoryItem[]>([]);
-  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
   const itemsPerPage = 5;
 
   useEffect(() => {
     const fetchData = async () => {
+      setLoading(true);
       try {
-        // Backend returns all data in { success: true, data: [...] }
-        // Pagination is handled client-side for now
-        const res = await api.get<{ success: boolean; data: InventoryItem[] }>(`/i/inventory`);
-        if (res.data.success) {
-          setData(res.data.data);
-          setTotal(res.data.data.length);
+        let res: InventoryItem[] = [];
+        if (mode === 'branch') {
+          res = await inventoryService.getBranchInventory();
+        } else if (mode === 'warehouse' && warehouseId) {
+          res = await inventoryService.getWarehouseInventory(warehouseId);
+        } else {
+          res = await inventoryService.getGlobalInventory();
         }
+        setData(res);
       } catch (error) {
         console.error(error);
+      } finally {
+        setLoading(false);
       }
     };
     fetchData();
-  }, []); // Run once on mount
+  }, [mode, warehouseId]);
 
+  const total = data.length;
   const totalPages = Math.ceil(total / itemsPerPage);
   const startIndex = (page - 1) * itemsPerPage;
   const currentData = data.slice(startIndex, startIndex + itemsPerPage);
@@ -63,138 +57,97 @@ export default function InventoryTable() {
         <Table className="min-w-[900px]">
           <TableHeader>
             <TableRow className="bg-gray-50/50 hover:bg-transparent">
+              {mode !== 'warehouse' && (
+                <TableHead className="text-[10px] font-bold text-primary uppercase py-2 px-3">
+                  Warehouse
+                </TableHead>
+              )}
               <TableHead className="text-[10px] font-bold text-primary uppercase py-2 px-3">
-                Image
+                Model Name
               </TableHead>
               <TableHead className="text-[10px] font-bold text-primary uppercase py-2 px-3">
-                Product Name
-              </TableHead>
-              <TableHead className="text-[10px] font-bold text-primary uppercase py-2 px-3">
-                Brand / Model
-              </TableHead>
-              <TableHead className="text-[10px] font-bold text-primary uppercase py-2 px-3">
-                Category
-              </TableHead>
-              <TableHead className="text-[10px] font-bold text-primary uppercase py-2 px-3">
-                SKU
-              </TableHead>
-              <TableHead className="text-[10px] font-bold text-primary uppercase py-2 px-3">
-                Serial No
+                Brand
               </TableHead>
               <TableHead className="text-[10px] font-bold text-primary uppercase py-2 px-3 text-center">
-                Qty
+                Total Qty
               </TableHead>
-              <TableHead className="text-[10px] font-bold text-primary uppercase py-2 px-3">
-                Vendor
+              <TableHead className="text-[10px] font-bold text-primary uppercase py-2 px-3 text-center">
+                Available
               </TableHead>
-              <TableHead className="text-[10px] font-bold text-primary uppercase py-2 px-3">
-                Cost
+              <TableHead className="text-[10px] font-bold text-primary uppercase py-2 px-3 text-center">
+                Rented
               </TableHead>
-              <TableHead className="text-[10px] font-bold text-primary uppercase py-2 px-3">
-                Price
-              </TableHead>
-              <TableHead className="text-[10px] font-bold text-primary uppercase py-2 px-3">
-                Status
+              <TableHead className="text-[10px] font-bold text-primary uppercase py-2 px-3 text-center">
+                Damaged
               </TableHead>
               <TableHead className="text-[10px] font-bold text-primary uppercase py-2 px-3 text-right pr-4">
-                Warranty
+                Actions
               </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {currentData.length > 0 ? (
+            {loading ? (
+              <TableRow>
+                <TableCell colSpan={8} className="text-center py-8">
+                  Loading inventory...
+                </TableCell>
+              </TableRow>
+            ) : currentData.length > 0 ? (
               currentData.map((item, idx) => (
                 <TableRow
-                  key={item.id}
+                  key={idx}
                   className={`transition-colors h-11 ${idx % 2 === 0 ? 'bg-white' : 'bg-blue-50/20'}`}
                 >
-                  <TableCell className="px-3 py-1.5">
-                    <div className="w-8 h-8 rounded-lg overflow-hidden bg-gray-100 flex items-center justify-center border border-gray-100 shadow-sm relative">
-                      {item.product.imageUrl ? (
-                        <Image
-                          src={item.product.imageUrl}
-                          alt={item.product.name}
-                          fill
-                          className="object-cover"
-                        />
-                      ) : (
-                        <span className="text-[8px] text-gray-400 font-bold uppercase">No IMG</span>
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell className="px-3 py-1.5 font-medium text-gray-900 text-[12px]">
-                    {item.product.name}
+                  {mode !== 'warehouse' && (
+                    <TableCell className="px-3 py-1.5 font-medium text-gray-900 text-[12px]">
+                      {item.warehouse_name || 'N/A'}
+                    </TableCell>
+                  )}
+                  <TableCell className="px-3 py-1.5 font-medium text-primary text-[12px]">
+                    {item.model_name}
                   </TableCell>
                   <TableCell className="px-3 py-1.5 text-gray-600 text-[11px]">
-                    {item.product.brand} / {item.product.model?.model_name || '-'}
-                  </TableCell>
-                  <TableCell className="px-3 py-1.5">
-                    <span
-                      className={`px-1.5 py-0.5 rounded-full text-[9px] font-semibold bg-blue-100 text-blue-700`}
-                    >
-                      Product
-                    </span>
-                  </TableCell>
-                  <TableCell className="px-3 py-1.5 text-gray-500 font-mono text-[9px]">
-                    {item.sku || '-'}
-                  </TableCell>
-                  <TableCell className="px-3 py-1.5 text-gray-500 text-[10px]">
-                    {item.product.serial_no}
+                    {item.brand}
                   </TableCell>
                   <TableCell className="px-3 py-1.5 text-center font-bold text-[12px]">
-                    {item.quantity}
+                    {item.total_qty}
                   </TableCell>
-                  <TableCell className="px-3 py-1.5 text-gray-600 text-[11px]">
-                    {item.product.vendor_id}
+                  <TableCell className="px-3 py-1.5 text-center">
+                    <span className="bg-green-100 text-green-700 px-2 py-0.5 rounded-full text-[10px] font-bold">
+                      {item.available_qty}
+                    </span>
                   </TableCell>
-                  <TableCell className="px-3 py-1.5 text-gray-900 font-medium text-[11px]">
-                    {/* Cost not available in Inventory entity directly, assuming unitPrice */}₹{' '}
-                    {item.unitPrice}
+                  <TableCell className="px-3 py-1.5 text-center">
+                    <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full text-[10px] font-bold">
+                      {item.rented_qty}
+                    </span>
                   </TableCell>
-                  <TableCell className="px-3 py-1.5 text-primary font-bold text-[12px]">
-                    ₹ {item.product.sale_price}
-                  </TableCell>
-                  <TableCell className="px-3 py-1.5">
-                    <span
-                      className={`px-1.5 py-0.5 rounded-full text-[9px] font-bold ${
-                        item.quantity > 5
-                          ? 'bg-green-100 text-green-700'
-                          : item.quantity > 0
-                            ? 'bg-yellow-100 text-yellow-700'
-                            : 'bg-red-100 text-red-700'
-                      }`}
-                    >
-                      {item.quantity > 0 ? 'In Stock' : 'Out of Stock'}
+                  <TableCell className="px-3 py-1.5 text-center">
+                    <span className="bg-red-100 text-red-700 px-2 py-0.5 rounded-full text-[10px] font-bold">
+                      {item.damaged_qty}
                     </span>
                   </TableCell>
                   <TableCell className="px-3 py-1.5 text-right pr-3">
-                    <div className="flex items-center justify-end gap-2">
-                      <span className="text-[11px] text-gray-500">-</span>
-                      <div className="flex gap-0.5">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7 text-gray-400 hover:text-primary hover:bg-primary/5"
-                          onClick={() => router.push(`/manager/inventory/${item.id}`)}
-                        >
-                          <Eye className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7 text-gray-400 hover:text-primary hover:bg-primary/5"
-                        >
-                          <Edit2 className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
-                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 text-gray-400 hover:text-primary hover:bg-primary/5"
+                    >
+                      <Eye className="h-3.5 w-3.5" />
+                    </Button>
                   </TableCell>
                 </TableRow>
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={12} className="text-center py-6 text-gray-500">
-                  No inventory items found
+                <TableCell colSpan={8} className="text-center py-12 text-gray-500">
+                  <div className="flex flex-col items-center justify-center gap-2">
+                    <div className="bg-gray-100 p-3 rounded-full">
+                      <span className="text-2xl">📦</span>
+                    </div>
+                    <p className="font-medium">No stock found</p>
+                    <p className="text-xs text-gray-400">Inventory items will appear here.</p>
+                  </div>
                 </TableCell>
               </TableRow>
             )}

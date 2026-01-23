@@ -8,6 +8,7 @@ import { Branch } from '../entities/branchEntity';
 import { EmployeeManager } from '../entities/employeeManagerEntity';
 
 import { Warehouse } from '../entities/warehouseEntity';
+import { SparePart } from '../entities/sparePartEntity';
 
 export const Source = new DataSource({
   type: 'postgres',
@@ -16,5 +17,5 @@ export const Source = new DataSource({
     rejectUnauthorized: false,
   },
   synchronize: true,
-  entities: [Vendor, Model, Product, Branch, EmployeeManager, Warehouse],
+  entities: [Vendor, Model, Product, Branch, EmployeeManager, Warehouse, SparePart],
 });

@@ -8,6 +8,7 @@ export interface JwtPayload {
   id: string;
   role: UserRole;
   exp: number;
+  branchId?: string;
 }
 
 export function getUserFromToken(): JwtPayload | null {

@@ -14,6 +14,6 @@ inventoryRouter.use(authMiddleware);
 inventoryRouter.get('/', roleMiddleware(['ADMIN']), getGlobalInventory);
 inventoryRouter.get('/branch', roleMiddleware(['MANAGER']), getBranchInventory);
 inventoryRouter.get('/warehouse', getWarehouseInventory);
-inventoryRouter.get('/stats', roleMiddleware(['ADMIN']), getInventoryStats);
+inventoryRouter.get('/stats', roleMiddleware(['ADMIN', 'MANAGER']), getInventoryStats);
 
 export default inventoryRouter;

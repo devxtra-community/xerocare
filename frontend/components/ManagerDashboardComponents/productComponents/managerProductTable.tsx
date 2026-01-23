@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Search, Plus, X, Trash2, Settings2 } from 'lucide-react';
+import { Search, Plus, X, Trash2 } from 'lucide-react';
 import Image from 'next/image';
 import {
   Select,
@@ -21,7 +21,6 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import StatCard from '@/components/StatCard';
-import { ModelManagementDialog } from './ModelManagementDialog';
 import { BulkProductDialog } from './BulkProductDialog';
 import { productService, Product, CreateProductDTO } from '@/services/productService';
 import { modelService, Model } from '@/services/modelService';
@@ -32,7 +31,6 @@ export default function ManagerProduct() {
   const [products, setProducts] = useState<Product[]>([]);
   const [search, setSearch] = useState('');
   const [formOpen, setFormOpen] = useState(false);
-  const [modelDialogOpen, setModelDialogOpen] = useState(false);
   const [bulkDialogOpen, setBulkDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Product | null>(null);
   const [deleting, setDeleting] = useState<Product | null>(null);
@@ -83,16 +81,9 @@ export default function ManagerProduct() {
   };
 
   return (
-    <div className="bg-blue-100 min-h-screen p-3 sm:p-4 md:p-6 space-y-8">
+    <div className="bg-blue-100 min-h-screen p-3 sm:p-4 md:p-6 space-y-4">
       <div className="flex justify-between items-center">
         <h3 className="text-xl sm:text-2xl font-bold text-primary">Products</h3>
-        <Button
-          variant="outline"
-          className="gap-2 border-primary text-primary hover:bg-primary hover:text-white"
-          onClick={() => setModelDialogOpen(true)}
-        >
-          <Settings2 size={16} /> Manage Models
-        </Button>
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -113,21 +104,23 @@ export default function ManagerProduct() {
           />
         </div>
 
-        <Button
-          className="bg-primary text-white gap-2"
-          onClick={() => {
-            setEditing(null);
-            setFormOpen(true);
-          }}
-        >
-          <Plus size={16} /> Add Product
-        </Button>
-        <Button
-          className="bg-green-600 hover:bg-green-700 text-white gap-2 ml-2"
-          onClick={() => setBulkDialogOpen(true)}
-        >
-          <Plus size={16} /> Bulk Add
-        </Button>
+        <div>
+          <Button
+            className="bg-primary text-white gap-2"
+            onClick={() => {
+              setEditing(null);
+              setFormOpen(true);
+            }}
+          >
+            <Plus size={16} /> Add Product
+          </Button>
+          <Button
+            className="bg-green-600 hover:bg-green-700 text-white gap-2 ml-2"
+            onClick={() => setBulkDialogOpen(true)}
+          >
+            <Plus size={16} /> Bulk Add
+          </Button>
+        </div>
       </div>
 
       <div className="rounded-2xl bg-white shadow-sm overflow-hidden">
@@ -232,7 +225,6 @@ export default function ManagerProduct() {
         />
       )}
 
-      <ModelManagementDialog open={modelDialogOpen} onClose={() => setModelDialogOpen(false)} />
       <BulkProductDialog
         open={bulkDialogOpen}
         onClose={() => setBulkDialogOpen(false)}
@@ -387,7 +379,7 @@ function ProductFormModal({
               <SelectContent>
                 {warehouses.map((w) => (
                   <SelectItem key={w.id} value={w.id}>
-                    {w.warehouse_name}
+                    {w.warehouseName}
                   </SelectItem>
                 ))}
               </SelectContent>
