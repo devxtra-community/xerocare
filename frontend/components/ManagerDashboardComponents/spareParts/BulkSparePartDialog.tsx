@@ -142,8 +142,8 @@ export default function BulkSparePartDialog({
         part_name: getVal(['part_name', 'Item Name', 'Name']),
         brand: getVal(['brand', 'Brand']),
         model_id: findIdByName(rawModel, models),
-        base_price: Number(getVal(['base_price', 'Price'])) || 0,
-        quantity: Number(getVal(['quantity', 'Quantity', 'Qty'])) || 0,
+        base_price: Number(getVal(['base_price', 'Price']))!,
+        quantity: Number(getVal(['quantity', 'Quantity', 'Qty']))!,
         vendor_id: findIdByName(rawVendor, vendors),
         warehouse_id: findIdByName(rawWarehouse, warehouses),
       };
@@ -280,7 +280,7 @@ export default function BulkSparePartDialog({
                       <Input
                         value={row.item_code}
                         onChange={(e) => updateRow(i, 'item_code', e.target.value)}
-                        placeholder="SP-001"
+                        placeholder="Item Code"
                       />
                     </TableCell>
                     <TableCell>
@@ -302,6 +302,7 @@ export default function BulkSparePartDialog({
                         type="number"
                         value={row.base_price}
                         onChange={(e) => updateRow(i, 'base_price', Number(e.target.value))}
+                        placeholder="Base Price"
                       />
                     </TableCell>
                     <TableCell>
@@ -309,6 +310,7 @@ export default function BulkSparePartDialog({
                         type="number"
                         value={row.quantity}
                         onChange={(e) => updateRow(i, 'quantity', Number(e.target.value))}
+                        placeholder="0"
                       />
                     </TableCell>
                     <TableCell>

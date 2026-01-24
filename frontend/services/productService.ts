@@ -17,6 +17,8 @@ export interface Product {
   tax_rate: number;
   sale_price: number;
   product_status: 'AVAILABLE' | 'RENTED' | 'LEASE' | 'SOLD' | 'DAMAGED';
+  print_colour: 'BLACK_WHITE' | 'COLOUR' | 'BOTH';
+  max_discount_amount: number;
   imageUrl?: string;
   stock?: number;
 }
@@ -32,6 +34,8 @@ export interface CreateProductDTO {
   MFD: string | Date;
   sale_price: number;
   tax_rate: number;
+  print_colour: 'BLACK_WHITE' | 'COLOUR' | 'BOTH';
+  max_discount_amount: number;
   imageUrl?: string;
 }
 
@@ -47,6 +51,8 @@ export interface BulkProductRow {
   MFD: string | Date;
   sale_price: number;
   tax_rate: number;
+  print_colour: 'BLACK_WHITE' | 'COLOUR' | 'BOTH';
+  max_discount_amount: number;
 }
 
 export interface BulkCreateResponse {

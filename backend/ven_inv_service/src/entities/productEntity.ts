@@ -18,6 +18,12 @@ export enum ProductStatus {
   DAMAGED = 'DAMAGED',
 }
 
+export enum PrintColour {
+  BLACK_WHITE = 'BLACK_WHITE',
+  COLOUR = 'COLOUR',
+  BOTH = 'BOTH',
+}
+
 import { Vendor } from './vendorEntity';
 import { SparePart } from './sparePartEntity';
 
@@ -25,6 +31,8 @@ import { SparePart } from './sparePartEntity';
 @Check(
   `("model_id" IS NOT NULL AND "spare_part_id" IS NULL) OR ("model_id" IS NULL AND "spare_part_id" IS NOT NULL)`,
 )
+@Check(`"max_discount_amount" >= 0`)
+@Check(`"max_discount_amount" <= "sale_price"`)
 export class Product {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
@@ -78,6 +86,21 @@ export class Product {
   })
   @Index() // Optimizes getInventoryStats filtering
   product_status!: ProductStatus;
+
+  @Column({
+    type: 'enum',
+    enum: PrintColour,
+    default: PrintColour.BLACK_WHITE,
+  })
+  print_colour!: PrintColour;
+
+  @Column({
+    type: 'numeric',
+    precision: 12,
+    scale: 2,
+    default: 0,
+  })
+  max_discount_amount!: number;
 
   @Column({ type: 'varchar', length: 1000, nullable: true })
   imageUrl?: string;

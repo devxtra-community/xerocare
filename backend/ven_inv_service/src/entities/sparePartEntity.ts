@@ -3,6 +3,7 @@ import {
   PrimaryGeneratedColumn,
   Column,
   ManyToOne,
+  OneToMany,
   JoinColumn,
   CreateDateColumn,
   UpdateDateColumn,
@@ -10,13 +11,14 @@ import {
 } from 'typeorm';
 import { Model } from './modelEntity';
 import { Branch } from './branchEntity';
+import { SparePartInventory } from './sparePartInventoryEntity';
 
 @Entity('spare_parts')
 export class SparePart {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
 
-  @Column({ unique: true })
+  @Column()
   @Index()
   item_code!: string; // Normalized global code
 
@@ -55,4 +57,7 @@ export class SparePart {
 
   @UpdateDateColumn()
   updated_at!: Date;
+
+  @OneToMany(() => SparePartInventory, (inv) => inv.spare_part)
+  inventory!: SparePartInventory[];
 }
