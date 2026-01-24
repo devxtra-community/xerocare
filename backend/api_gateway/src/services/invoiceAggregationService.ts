@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { AppError } from '../errors/appError';
 import { logger } from '../config/logger';
+import { redis } from '../config/redis';
 
 const EMPLOYEE_SERVICE_URL = process.env.EMPLOYEE_SERVICE_URL || 'http://127.0.0.1:3002';
 const VENDOR_INVENTORY_SERVICE_URL =
@@ -38,10 +39,8 @@ interface AggregatedInvoice extends Invoice {
 }
 
 // Module-level cache for persistence across requests
-// Module-level cache for persistence across requests
 const employeeCache = new Map<string, { name: string; timestamp: number }>();
 const branchCache = new Map<string, { name: string; timestamp: number }>();
-const customerCache = new Map<string, { name: string; timestamp: number }>();
 const CACHE_TTL = 10 * 60 * 1000; // 5 minutes
 
 // Helper to fetch entity name with cache
@@ -63,6 +62,42 @@ const fetchEntityName = async (
     });
     const name = res.data.data.name;
     cache.set(id, { name, timestamp: Date.now() });
+    return name;
+  } catch {
+    return defaultName;
+  }
+};
+
+const fetchCustomerName = async (
+  id: string | undefined,
+  url: string,
+  token: string,
+  defaultName: string = 'Walk-in Customer',
+): Promise<string> => {
+  if (!id) return defaultName;
+
+  // Try Redis first
+  try {
+    const cachedName = await redis.get(`customer:${id}`);
+    if (cachedName) return cachedName;
+  } catch (err) {
+    logger.error('Redis get error', err);
+  }
+
+  // Fetch from Service
+  try {
+    const res = await axios.get<{ data: { name: string } }>(url, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const name = res.data.data.name;
+
+    // Store in Redis (1 hour TTL to be safe, but updates are pushed via RabbitMQ)
+    try {
+      await redis.set(`customer:${id}`, name, 'EX', 3600);
+    } catch (err) {
+      logger.error('Redis set error', err);
+    }
+
     return name;
   } catch {
     return defaultName;
@@ -114,12 +149,10 @@ export class InvoiceAggregationService {
                 `${VENDOR_INVENTORY_SERVICE_URL}/branch/${inv.branchId}`,
                 token,
               ),
-              fetchEntityName(
+              fetchCustomerName(
                 inv.customerId,
-                customerCache,
                 `${CRM_SERVICE_URL}/customers/${inv.customerId}`,
                 token,
-                'Walk-in Customer',
               ),
             ]);
 
@@ -173,12 +206,10 @@ export class InvoiceAggregationService {
       // For "My Invoices", we don't need to aggregate employee/branch names, but we DO need Customer Name
       const aggregated = await Promise.all(
         invoices.map(async (inv) => {
-          const customerName = await fetchEntityName(
+          const customerName = await fetchCustomerName(
             inv.customerId,
-            customerCache,
             `${CRM_SERVICE_URL}/customers/${inv.customerId}`,
             token,
-            'Walk-in Customer',
           );
           return {
             ...inv,
@@ -225,12 +256,10 @@ export class InvoiceAggregationService {
           `${VENDOR_INVENTORY_SERVICE_URL}/branch/${invoice.branchId}`,
           token,
         ),
-        fetchEntityName(
+        fetchCustomerName(
           invoice.customerId,
-          customerCache,
           `${CRM_SERVICE_URL}/customers/${invoice.customerId}`,
           token,
-          'Walk-in Customer',
         ),
       ]);
 
@@ -289,12 +318,10 @@ export class InvoiceAggregationService {
           `${VENDOR_INVENTORY_SERVICE_URL}/branch/${invoice.branchId}`,
           token,
         ),
-        fetchEntityName(
+        fetchCustomerName(
           invoice.customerId,
-          customerCache,
           `${CRM_SERVICE_URL}/customers/${invoice.customerId}`,
           token,
-          'Walk-in Customer',
         ),
       ]);
 
