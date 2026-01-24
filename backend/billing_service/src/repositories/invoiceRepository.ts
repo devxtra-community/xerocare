@@ -14,6 +14,10 @@ export class InvoiceRepository {
     return this.repo.save(invoice);
   }
 
+  save(invoice: Invoice) {
+    return this.repo.save(invoice);
+  }
+
   findById(id: string) {
     return this.repo.findOne({
       where: { id },

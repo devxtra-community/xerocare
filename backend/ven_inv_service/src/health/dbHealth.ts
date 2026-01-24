@@ -11,10 +11,10 @@ export const checkDatabase = async () => {
     return {
       status: 'UP',
     };
-  } catch (error: any) {
+  } catch (error: unknown) {
     return {
       status: 'DOWN',
-      error: error.message,
+      error: (error as Error).message,
     };
   }
 };

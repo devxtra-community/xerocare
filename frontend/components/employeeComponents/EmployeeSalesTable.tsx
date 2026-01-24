@@ -382,7 +382,7 @@ function InvoiceDetailsDialog({ invoice, onClose }: { invoice: Invoice; onClose:
                         {item.quantity}
                       </TableCell>
                       <TableCell className="text-right font-bold text-gray-900 text-sm">
-                        ₹{(item.quantity * item.unitPrice).toLocaleString()}
+                        ₹{((item.quantity || 0) * (item.unitPrice || 0)).toLocaleString()}
                       </TableCell>
                     </TableRow>
                   ))}
@@ -440,23 +440,26 @@ function SaleFormModal({
   const addItem = () => {
     setForm({
       ...form,
-      items: [...form.items, { description: '', quantity: 1, unitPrice: 0 }],
+      items: [...(form.items || []), { description: '', quantity: 1, unitPrice: 0 }],
     });
   };
 
   const removeItem = (index: number) => {
-    if (form.items.length <= 1) return;
-    const newItems = form.items.filter((_, i) => i !== index);
+    if ((form.items || []).length <= 1) return;
+    const newItems = (form.items || []).filter((_, i) => i !== index);
     setForm({ ...form, items: newItems });
   };
 
   const updateItem = (index: number, field: string, value: string | number) => {
-    const newItems = [...form.items];
+    const newItems = [...(form.items || [])];
     newItems[index] = { ...newItems[index], [field]: value };
     setForm({ ...form, items: newItems });
   };
 
-  const totalAmount = form.items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
+  const totalAmount = (form.items || []).reduce(
+    (sum, item) => sum + item.quantity * item.unitPrice,
+    0,
+  );
 
   return (
     <Dialog open={true} onOpenChange={(val) => !val && onClose()}>
@@ -523,7 +526,7 @@ function SaleFormModal({
             </div>
 
             <div className="space-y-3">
-              {form.items.map((item, index) => (
+              {(form.items || []).map((item, index) => (
                 <div
                   key={index}
                   className="group relative grid grid-cols-12 gap-3 p-4 rounded-xl border border-gray-100 bg-gray-50/50 hover:bg-white hover:border-blue-200 transition-all"
@@ -571,7 +574,7 @@ function SaleFormModal({
                     </div>
                   </div>
                   <div className="col-span-12 md:col-span-1 flex items-center justify-end">
-                    {form.items.length > 1 && (
+                    {(form.items || []).length > 1 && (
                       <button
                         onClick={() => removeItem(index)}
                         className="h-8 w-8 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 flex items-center justify-center transition-all"
@@ -606,7 +609,7 @@ function SaleFormModal({
                 const finalPayload: CreateInvoicePayload = {
                   customerId: form.customerId,
                   saleType: form.saleType,
-                  items: form.items.map((it) => ({
+                  items: (form.items || []).map((it) => ({
                     description: it.description,
                     quantity: it.quantity,
                     unitPrice: it.unitPrice,

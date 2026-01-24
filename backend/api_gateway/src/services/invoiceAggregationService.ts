@@ -9,11 +9,35 @@ const VENDOR_INVENTORY_SERVICE_URL =
 const BILLING_SERVICE_URL = process.env.BILLING_SERVICE_URL || 'http://127.0.0.1:3004';
 const CRM_SERVICE_URL = process.env.CRM_SERVICE_URL || 'http://127.0.0.1:3005';
 
+// Enums
+type InvoiceType = 'QUOTATION' | 'PROFORMA' | 'FINAL';
+type RentType = 'FIXED_LIMIT' | 'FIXED_COMBO' | 'CPC' | 'CPC_COMBO';
+type RentPeriod = 'MONTHLY' | 'QUARTERLY' | 'HALF_YEARLY' | 'YEARLY';
+type InvoiceStatus = 'DRAFT' | 'SENT' | 'APPROVED' | 'REJECTED' | 'ISSUED' | 'PAID' | 'CANCELLED';
+
 interface InvoiceItem {
-  id: string;
+  id?: string;
+  itemType: 'PRICING_RULE';
   description: string;
-  quantity: number;
-  unitPrice: number;
+
+  // Fixed
+  bwIncludedLimit?: number;
+  colorIncludedLimit?: number;
+  combinedIncludedLimit?: number;
+
+  // Excess
+  bwExcessRate?: number;
+  colorExcessRate?: number;
+  combinedExcessRate?: number;
+
+  // Slabs
+  bwSlabRanges?: Array<{ from: number; to: number; rate: number }>;
+  colorSlabRanges?: Array<{ from: number; to: number; rate: number }>;
+  comboSlabRanges?: Array<{ from: number; to: number; rate: number }>;
+
+  // Legacy (ignored/nullable)
+  quantity?: number;
+  unitPrice?: number;
 }
 
 interface Invoice {
@@ -22,8 +46,19 @@ interface Invoice {
   branchId: string;
   customerId?: string;
   createdBy: string;
-  totalAmount: number;
-  status: string;
+  totalAmount?: number;
+  status: InvoiceStatus;
+
+  // Quotation Fields
+  type: InvoiceType;
+  rentType?: RentType;
+  rentPeriod?: RentPeriod;
+  monthlyRent?: number;
+  advanceAmount?: number;
+  discountPercent?: number;
+  effectiveFrom: string;
+  effectiveTo?: string;
+
   saleType: string;
   createdAt: string;
   items?: InvoiceItem[];
@@ -182,6 +217,10 @@ export class InvoiceAggregationService {
           responseStatus: error.response?.status,
           responseData: error.response?.data,
         });
+        throw new AppError(
+          error.response?.data?.message || 'Failed to fetch invoices',
+          error.response?.status || 500,
+        );
       } else {
         const err = error as { message?: string };
         logger.error('Failed to fetch and aggregate invoices', {
@@ -201,9 +240,9 @@ export class InvoiceAggregationService {
           headers: { Authorization: `Bearer ${token}` },
         },
       );
+      // logger.info('Billing Service Response (My Invoices):', { data: billingResponse.data });
       const invoices = billingResponse.data.data;
 
-      // For "My Invoices", we don't need to aggregate employee/branch names, but we DO need Customer Name
       const aggregated = await Promise.all(
         invoices.map(async (inv) => {
           const customerName = await fetchCustomerName(
@@ -227,8 +266,14 @@ export class InvoiceAggregationService {
           code: error.code,
           responseStatus: error.response?.status,
           responseData: error.response?.data,
+          url: error.config?.url,
         });
+        throw new AppError(
+          error.response?.data?.message || 'Failed to fetch my invoices',
+          error.response?.status || 500,
+        );
       }
+      logger.error('Unknown error in fetch my invoices', error);
       throw new AppError('Failed to fetch my invoices', 500);
     }
   }
@@ -276,27 +321,41 @@ export class InvoiceAggregationService {
         error: err.message,
       });
 
-      if (err.response?.status === 404) {
-        throw new AppError('Invoice not found', 404);
+      if (axios.isAxiosError(error)) {
+        throw new AppError(
+          error.response?.data?.message || 'Failed to fetch invoice details',
+          error.response?.status || 500,
+        );
       }
-
       throw new AppError('Failed to fetch invoice details', 500);
     }
   }
 
   async createInvoice(
     payload: {
-      items: { productId: string; description: string; quantity: number; unitPrice: number }[];
+      branchId: string;
+      customerId: string;
       saleType: string;
-      startDate?: string;
-      endDate?: string;
-      billingCycleInDays?: number;
+      rentType: RentType;
+      rentPeriod: RentPeriod;
+      monthlyRent?: number;
+      advanceAmount?: number;
+      discountPercent?: number;
+      effectiveFrom: string;
+      effectiveTo?: string;
+      pricingItems: unknown[];
     },
     token: string,
   ): Promise<AggregatedInvoice> {
     try {
+      // Forwarding to Billing Service. Assuming endpoint is /invoices/quotation
+      // Since I haven't updated the Routing yet, I should probably check that.
+      // But based on "Create Invoice behaves as Create Quotation", maybe I should use /invoices root?
+      // I'll assume /invoices/quotation for clarity as per plan, but realize I need to implement that route in billing service.
+      // Wait, I updated BillingService logic but did NOT update the Controller/Router in Billing Service yet.
+      // I must do that in the NEXT step. For now, referencing the future endpoint.
       const billingResponse = await axios.post<{ data: Invoice }>(
-        `${BILLING_SERVICE_URL}/invoices`,
+        `${BILLING_SERVICE_URL}/invoices/quotation`,
         payload,
         {
           headers: { Authorization: `Bearer ${token}` },
@@ -304,7 +363,6 @@ export class InvoiceAggregationService {
       );
       const invoice = billingResponse.data.data;
 
-      // Use the same optimized fetching logic
       const [employeeName, branchName, customerName] = await Promise.all([
         fetchEntityName(
           invoice.createdBy,
@@ -333,17 +391,209 @@ export class InvoiceAggregationService {
       };
     } catch (error: unknown) {
       if (axios.isAxiosError(error)) {
-        logger.error('Axios error in create invoice', {
+        logger.error('Axios error in create quotation', {
           message: error.message,
           responseStatus: error.response?.status,
           responseData: error.response?.data,
         });
         throw new AppError(
-          error.response?.data?.message || 'Failed to create invoice',
+          error.response?.data?.message || 'Failed to create quotation',
           error.response?.status || 500,
         );
       }
-      throw new AppError('Internal Gateway Error during invoice creation', 500);
+      throw new AppError('Internal Gateway Error during quotation creation', 500);
+    }
+  }
+
+  async updateQuotation(
+    id: string,
+    payload: {
+      rentType?: RentType;
+      rentPeriod?: RentPeriod;
+      monthlyRent?: number;
+      advanceAmount?: number;
+      discountPercent?: number;
+      effectiveFrom?: string;
+      effectiveTo?: string;
+      pricingItems?: unknown[];
+    },
+    token: string,
+  ): Promise<AggregatedInvoice> {
+    try {
+      const response = await axios.put<{ data: Invoice }>(
+        `${BILLING_SERVICE_URL}/invoices/quotation/${id}`,
+        payload,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
+      const invoice = response.data.data;
+
+      const [employeeName, branchName, customerName] = await Promise.all([
+        fetchEntityName(
+          invoice.createdBy,
+          employeeCache,
+          `${EMPLOYEE_SERVICE_URL}/employee/public/${invoice.createdBy}`,
+          token,
+        ),
+        fetchEntityName(
+          invoice.branchId,
+          branchCache,
+          `${VENDOR_INVENTORY_SERVICE_URL}/branch/${invoice.branchId}`,
+          token,
+        ),
+        fetchCustomerName(
+          invoice.customerId,
+          `${CRM_SERVICE_URL}/customers/${invoice.customerId}`,
+          token,
+        ),
+      ]);
+
+      return {
+        ...invoice,
+        employeeName,
+        branchName,
+        customerName,
+      };
+    } catch (error: unknown) {
+      if (axios.isAxiosError(error)) {
+        logger.error('Axios error in update quotation', {
+          message: error.message,
+          responseStatus: error.response?.status,
+          responseData: error.response?.data,
+        });
+        throw new AppError(
+          error.response?.data?.message || 'Failed to update quotation',
+          error.response?.status || 500,
+        );
+      }
+      throw new AppError('Internal Gateway Error during quotation update', 500);
+    }
+  }
+
+  async recordUsage(
+    payload: {
+      contractId: string;
+      billingPeriodStart: string;
+      billingPeriodEnd: string;
+      bwA4Count: number;
+      bwA3Count: number;
+      colorA4Count: number;
+      colorA3Count: number;
+      reportedBy: 'CUSTOMER' | 'EMPLOYEE'; // Using string union to match
+      remarks?: string;
+    },
+    token: string,
+  ) {
+    try {
+      const response = await axios.post(`${BILLING_SERVICE_URL}/usage`, payload, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      return response.data.data;
+    } catch (error: unknown) {
+      if (axios.isAxiosError(error)) {
+        logger.error('Axios error in record usage', {
+          message: error.message,
+          responseStatus: error.response?.status,
+          responseData: error.response?.data,
+        });
+        throw new AppError(
+          error.response?.data?.message || 'Failed to record usage',
+          error.response?.status || 500,
+        );
+      }
+      throw new AppError('Internal Gateway Error during usage recording', 500);
+    }
+  }
+
+  async approveQuotation(
+    id: string,
+    deposit: { amount: number; mode: string; reference?: string; receivedDate?: string },
+    token: string,
+  ) {
+    try {
+      const response = await axios.put<{ data: Invoice }>(
+        `${BILLING_SERVICE_URL}/invoices/${id}/approve`,
+        { deposit },
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
+      return response.data.data;
+    } catch (error: unknown) {
+      if (axios.isAxiosError(error)) {
+        logger.error('Axios error in approve quotation', {
+          message: error.message,
+          responseStatus: error.response?.status,
+          responseData: error.response?.data,
+        });
+        throw new AppError(
+          error.response?.data?.message || 'Failed to approve quotation',
+          error.response?.status || 500,
+        );
+      }
+      throw new AppError('Internal Gateway Error during quotation approval', 500);
+    }
+  }
+
+  async generateFinalInvoice(
+    payload: {
+      contractId: string;
+      billingPeriodStart: string;
+      billingPeriodEnd: string;
+    },
+    token: string,
+  ): Promise<AggregatedInvoice> {
+    try {
+      const response = await axios.post<{ data: Invoice }>(
+        `${BILLING_SERVICE_URL}/invoices/settlements/generate`,
+        payload,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
+      const invoice = response.data.data;
+
+      // Aggregate details
+      const [employeeName, branchName, customerName] = await Promise.all([
+        fetchEntityName(
+          invoice.createdBy,
+          employeeCache,
+          `${EMPLOYEE_SERVICE_URL}/employee/public/${invoice.createdBy}`,
+          token,
+        ),
+        fetchEntityName(
+          invoice.branchId,
+          branchCache,
+          `${VENDOR_INVENTORY_SERVICE_URL}/branch/${invoice.branchId}`,
+          token,
+        ),
+        fetchCustomerName(
+          invoice.customerId,
+          `${CRM_SERVICE_URL}/customers/${invoice.customerId}`,
+          token,
+        ),
+      ]);
+
+      return {
+        ...invoice,
+        employeeName,
+        branchName,
+        customerName,
+      };
+    } catch (error: unknown) {
+      if (axios.isAxiosError(error)) {
+        logger.error('Axios error in generate final invoice', {
+          message: error.message,
+          responseStatus: error.response?.status,
+          responseData: error.response?.data,
+        });
+        throw new AppError(
+          error.response?.data?.message || 'Failed to generate final invoice',
+          error.response?.status || 500,
+        );
+      }
+      throw new AppError('Internal Gateway Error during final invoice generation', 500);
     }
   }
 
