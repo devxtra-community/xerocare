@@ -10,16 +10,16 @@ import {
 } from '@/components/ui/table';
 
 import { useEffect, useState } from 'react';
-import { Product, getAllProducts } from '@/lib/product';
+import { inventoryService, InventoryItem } from '@/services/inventoryService';
 
 export default function DashbordTable() {
-  const [data, setData] = useState<Product[]>([]);
+  const [data, setData] = useState<InventoryItem[]>([]);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const products = await getAllProducts();
-        setData(products);
+        const inventory = await inventoryService.getBranchInventory();
+        setData(inventory);
       } catch (error) {
         console.error(error);
       }
@@ -27,19 +27,13 @@ export default function DashbordTable() {
     fetchData();
   }, []);
 
-  const getTotalStock = (p: Product) =>
-    p.inventory?.reduce((sum, inv) => sum + inv.quantity, 0) || 0;
-
   return (
     <div className="rounded-2xl bg-white shadow-sm overflow-hidden">
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead className="text-primary font-bold">Printer Name</TableHead>
-            <TableHead className="text-primary font-bold">Serial Number</TableHead>
             <TableHead className="text-primary font-bold">Model</TableHead>
-            <TableHead className="text-primary font-bold">Manufacture Date</TableHead>
-            <TableHead className="text-primary font-bold">Company Name</TableHead>
+            <TableHead className="text-primary font-bold">Brand</TableHead>
             <TableHead className="text-primary font-bold">Vendor Name</TableHead>
             <TableHead className="text-primary font-bold">Stock</TableHead>
           </TableRow>
@@ -48,20 +42,22 @@ export default function DashbordTable() {
         <TableBody>
           {data.length > 0 ? (
             data.map((item, index) => (
-              <TableRow key={item.id} className={index % 2 ? 'bg-sky-100/60' : ''}>
-                <TableCell className="font-medium text-primary ">{item.name}</TableCell>
-                <TableCell>{item.serial_no}</TableCell>
-                <TableCell>{item.model?.model_name || '-'}</TableCell>
-                <TableCell>{new Date(item.MFD).toLocaleDateString()}</TableCell>
-                <TableCell>{item.brand}</TableCell>
-                <TableCell>{item.vendor_id}</TableCell>
-                <TableCell className="font-bold text-primary">{getTotalStock(item)}</TableCell>
+              <TableRow
+                key={`${item.model_id}-${item.warehouse_id}-${index}`}
+                className={index % 2 ? 'bg-sky-100/60' : ''}
+              >
+                <TableCell className="font-medium text-primary ">
+                  {item.model_name || 'N/A'}
+                </TableCell>
+                <TableCell>{item.brand || '-'}</TableCell>
+                <TableCell>{item.vendor_name || item.vendor_id || 'N/A'}</TableCell>
+                <TableCell className="font-bold text-primary">{item.total_qty}</TableCell>
               </TableRow>
             ))
           ) : (
             <TableRow>
-              <TableCell colSpan={7} className="text-center py-6 text-gray-500">
-                No products found
+              <TableCell colSpan={4} className="text-center py-6 text-gray-500">
+                No inventory found for this branch.
               </TableCell>
             </TableRow>
           )}

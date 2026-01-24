@@ -10,6 +10,7 @@ import {
   Wallet,
   Tags,
   Printer,
+  Settings,
 } from 'lucide-react';
 
 import {
@@ -43,6 +44,11 @@ const menuItems = [
     title: 'Models',
     icon: Printer,
     href: '/manager/models',
+  },
+  {
+    title: 'Spare Parts',
+    icon: Settings,
+    href: '/manager/spare-parts',
   },
   {
     title: 'Sales',

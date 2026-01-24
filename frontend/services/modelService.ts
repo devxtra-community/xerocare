@@ -4,6 +4,8 @@ export interface Model {
   id: string;
   model_no: string;
   model_name: string;
+  brand: string;
+  description: string;
   rent_price_monthly: number;
   rent_price_yearly: number;
   lease_price_monthly: number;
@@ -15,6 +17,8 @@ export interface Model {
 export interface CreateModelDTO {
   model_no: string;
   model_name: string;
+  brand: string;
+  description: string;
   rent_price_monthly: number;
   rent_price_yearly: number;
   lease_price_monthly: number;

@@ -6,6 +6,7 @@ import {
   JoinColumn,
   CreateDateColumn,
   UpdateDateColumn,
+  Index,
 } from 'typeorm';
 import { Branch } from './branchEntity';
 
@@ -43,6 +44,7 @@ export class Warehouse {
   status!: WarehouseStatus;
 
   @Column({ name: 'branch_id', nullable: true })
+  @Index() // Optimizes getBranchInventory WHERE clause
   branchId!: string;
 
   @ManyToOne(() => Branch, { nullable: true, onDelete: 'SET NULL' })

@@ -1,9 +1,11 @@
 import api from '@/lib/api';
+import { Model } from './modelService';
 
 export interface Product {
   id: string;
   name: string;
   model_id: string;
+  model?: Model;
   model_no?: string;
   warehouse_id: string;
   warehouse_name?: string;
@@ -34,7 +36,8 @@ export interface CreateProductDTO {
 }
 
 export interface BulkProductRow {
-  model_no: string;
+  model_no?: string;
+  model_id?: string;
   warehouse_id: string;
   vendor_id: string;
   product_status: 'AVAILABLE' | 'RENTED' | 'LEASE' | 'SOLD' | 'DAMAGED';

@@ -19,7 +19,7 @@ export default function ManagerInventoryPage() {
         <div className="space-y-3">
           <h3 className="text-base sm:text-lg font-bold text-primary">Product Inventory</h3>
           <div className="bg-white rounded-xl shadow-sm border border-gray-100">
-            <InventoryTable />
+            <InventoryTable mode="branch" />
           </div>
         </div>
 
