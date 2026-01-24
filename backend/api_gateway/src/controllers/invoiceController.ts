@@ -74,6 +74,52 @@ export const createInvoice = async (req: Request, res: Response, next: NextFunct
     next(error);
   }
 };
+export const updateQuotation = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = req.params.id as string;
+    const token = req.headers.authorization?.split(' ')[1] || '';
+    const invoice = await invoiceAggregationService.updateQuotation(id, req.body, token);
+    return res.status(200).json({
+      success: true,
+      data: invoice,
+      message: 'Quotation updated successfully',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const approveQuotation = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = req.params.id as string;
+    const token = req.headers.authorization?.split(' ')[1] || '';
+    const { deposit } = req.body;
+
+    // deposit comes from body: { amount, mode... }
+    const invoice = await invoiceAggregationService.approveQuotation(id, deposit, token);
+    return res.status(200).json({
+      success: true,
+      data: invoice,
+      message: 'Quotation approved successfully',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const generateFinalInvoice = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const token = req.headers.authorization?.split(' ')[1] || '';
+    const invoice = await invoiceAggregationService.generateFinalInvoice(req.body, token);
+    return res.status(201).json({
+      success: true,
+      data: invoice,
+      message: 'Final Invoice generated successfully',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
 
 export const getStats = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {

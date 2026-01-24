@@ -4,6 +4,7 @@ import cors from 'cors';
 import { createProxyMiddleware } from 'http-proxy-middleware';
 import type { Options } from 'http-proxy-middleware';
 import healthRouter from './routes/health';
+import { startCustomerConsumer } from './events/consumers/customerUpdatedConsumer';
 import invoiceRouter from './routes/invoiceRoutes';
 import { httpLogger } from './middleware/httplogger';
 import { logger } from './config/logger';
@@ -20,6 +21,10 @@ const app: Express = express();
 app.set('trust proxy', 1);
 
 // app.use(globalRateLimiter);
+
+(async () => {
+  await startCustomerConsumer();
+})();
 
 const PORT = process.env.PORT;
 const EMPLOYEE_SERVICE_URL = process.env.EMPLOYEE_SERVICE_URL;

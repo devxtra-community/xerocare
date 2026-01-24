@@ -4,9 +4,9 @@ import { AppError } from '../errors/appError';
 
 const billingService = new BillingService();
 
-export const createInvoice = async (req: Request, res: Response, next: NextFunction) => {
+export const createQuotation = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { branchId, employeeId, createdBy, ...allowedPayload } = req.body;
+    const { branchId, employeeId, createdBy, ...payload } = req.body;
 
     if (branchId || employeeId || createdBy) {
       throw new AppError(
@@ -19,30 +19,128 @@ export const createInvoice = async (req: Request, res: Response, next: NextFunct
       throw new AppError('User context missing or incomplete', 401);
     }
 
-    const { items, saleType, startDate, endDate, billingCycleInDays, customerId } = allowedPayload;
+    // Extract relevant fields
+    const {
+      pricingItems,
+      rentType,
+      rentPeriod,
+      saleType,
+      customerId,
+      monthlyRent,
+      advanceAmount,
+      discountPercent,
+      effectiveFrom,
+      effectiveTo,
+    } = payload;
 
-    if (!items || !Array.isArray(items) || !saleType || !customerId) {
+    if (!pricingItems || !rentType || !customerId) {
       throw new AppError(
-        'Invalid request payload: items, saleType, and customerId are required',
+        'Invalid request payload: pricingItems, rentType, and customerId are required',
         400,
       );
     }
 
-    const invoice = await billingService.createInvoice({
+    const invoice = await billingService.createQuotation({
       branchId: req.user.branchId,
       createdBy: req.user.userId,
       customerId,
       saleType,
-      startDate,
-      endDate,
-      billingCycleInDays,
-      items,
+      rentType,
+      rentPeriod,
+      monthlyRent,
+      advanceAmount,
+      discountPercent,
+      effectiveFrom,
+      effectiveTo,
+      pricingItems,
     });
 
     return res.status(201).json({
       success: true,
       data: invoice,
-      message: 'Invoice created successfully',
+      message: 'Quotation created successfully',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const updateQuotation = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = req.params.id as string;
+    const {
+      pricingItems,
+      rentType,
+      rentPeriod,
+      monthlyRent,
+      advanceAmount,
+      discountPercent,
+      effectiveFrom,
+      effectiveTo,
+    } = req.body;
+
+    const invoice = await billingService.updateQuotation(id, {
+      rentType,
+      rentPeriod,
+      monthlyRent,
+      advanceAmount,
+      discountPercent,
+      effectiveFrom,
+      effectiveTo,
+      pricingItems,
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: invoice,
+      message: 'Quotation updated successfully',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const approveQuotation = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = req.params.id as string;
+    const { deposit } = req.body;
+
+    // deposit structure: { amount, mode ['CASH', 'CHEQUE'], reference?, receivedDate? }
+
+    const invoice = await billingService.approveQuotation(id, deposit);
+    return res.status(200).json({
+      success: true,
+      data: invoice,
+      message: 'Quotation approved and converted to Proforma',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const generateFinalInvoice = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { branchId, employeeId, createdBy, ...payload } = req.body;
+    // Payload: contractId, billingPeriodStart, billingPeriodEnd
+
+    if (!payload.contractId || !payload.billingPeriodStart || !payload.billingPeriodEnd) {
+      throw new AppError(
+        'Missing required fields: contractId, billingPeriodStart, billingPeriodEnd',
+        400,
+      );
+    }
+
+    const invoice = await billingService.generateFinalInvoice({
+      contractId: payload.contractId,
+      billingPeriodStart: payload.billingPeriodStart,
+      billingPeriodEnd: payload.billingPeriodEnd,
+    });
+
+    return res.status(201).json({
+      success: true,
+      data: invoice,
+      message: 'Final Invoice generated successfully',
     });
   } catch (error) {
     next(error);
@@ -63,7 +161,9 @@ export const getAllInvoices = async (req: Request, res: Response, next: NextFunc
 
 export const getMyInvoices = async (req: Request, res: Response, next: NextFunction) => {
   try {
+    // console.log('Billing Service: getMyInvoices called. User:', req.user);
     if (!req.user || !req.user.userId) {
+      console.error('Billing Service: User context missing or incomplete:', req.user);
       throw new AppError('User context missing', 401);
     }
     const invoices = await billingService.getInvoicesByCreator(req.user.userId);
@@ -72,6 +172,7 @@ export const getMyInvoices = async (req: Request, res: Response, next: NextFunct
       data: invoices,
     });
   } catch (error) {
+    console.error('Billing Service: Error in getMyInvoices:', error);
     next(error);
   }
 };

@@ -37,6 +37,14 @@ export class CustomerService {
     if (!updated) {
       throw new AppError('Customer not found for update', 404);
     }
+
+    // Publish event if name is updated (or always, for simplicity)
+    if (updated.name) {
+      // Avoid circular dependency if imported directly, but here it's fine
+      const { publishCustomerUpdated } = await import('../events/publishers/customerPublisher');
+      await publishCustomerUpdated({ id: updated.id, name: updated.name });
+    }
+
     return updated;
   }
 

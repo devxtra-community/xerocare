@@ -1,0 +1,93 @@
+import { UsageRepository } from '../repositories/usageRepository';
+import { InvoiceRepository } from '../repositories/invoiceRepository';
+import { AppError } from '../errors/appError';
+import { InvoiceType } from '../entities/enums/invoiceType';
+import { ReportedBy } from '../entities/usageRecordEntity';
+
+export class UsageService {
+  private usageRepo = new UsageRepository();
+  private invoiceRepo = new InvoiceRepository();
+
+  async createUsageRecord(payload: {
+    contractId: string;
+    billingPeriodStart: string;
+    billingPeriodEnd: string;
+    bwA4Count: number;
+    bwA3Count: number;
+    colorA4Count: number;
+    colorA3Count: number;
+    reportedBy: ReportedBy;
+    recordedByEmployeeId?: string;
+    remarks?: string;
+  }) {
+    // 1. Fetch Contract
+    const contract = await this.invoiceRepo.findById(payload.contractId);
+    if (!contract) {
+      throw new AppError('Contract (Proforma Invoice) not found', 404);
+    }
+
+    // 2. Validate Type = PROFORMA
+    if (contract.type !== InvoiceType.PROFORMA) {
+      throw new AppError(
+        `Usage can only be recorded for PROFORMA contracts. Current status: ${contract.type}`,
+        400,
+      );
+    }
+
+    const start = new Date(payload.billingPeriodStart);
+    const end = new Date(payload.billingPeriodEnd);
+
+    // 3. Check for Duplicates
+    const existing = await this.usageRepo.findByContractAndPeriod(payload.contractId, start, end);
+    if (existing) {
+      throw new AppError('Usage record already exists for this contract and billing period.', 409);
+    }
+
+    // 4. Create Record (Raw Data Only)
+    const usage = this.usageRepo.create({
+      contractId: payload.contractId,
+      billingPeriodStart: start,
+      billingPeriodEnd: end,
+      bwA4Count: payload.bwA4Count,
+      bwA3Count: payload.bwA3Count,
+      colorA4Count: payload.colorA4Count,
+      colorA3Count: payload.colorA3Count,
+      reportedBy: payload.reportedBy,
+      recordedByEmployeeId: payload.recordedByEmployeeId,
+      remarks: payload.remarks,
+    });
+
+    return this.usageRepo.save(usage);
+  }
+
+  async updateUsageRecord(
+    id: string,
+    payload: {
+      bwA4Count?: number;
+      bwA3Count?: number;
+      colorA4Count?: number;
+      colorA3Count?: number;
+      remarks?: string;
+    },
+  ) {
+    const usage = await this.usageRepo.findById(id);
+    if (!usage) {
+      throw new AppError('Usage record not found', 404);
+    }
+
+    // Check if settled (Phase 3 placeholder)
+    // if (usage.settled) throw new AppError('Cannot edit settled usage', 400);
+
+    if (payload.bwA4Count !== undefined) usage.bwA4Count = payload.bwA4Count;
+    if (payload.bwA3Count !== undefined) usage.bwA3Count = payload.bwA3Count;
+    if (payload.colorA4Count !== undefined) usage.colorA4Count = payload.colorA4Count;
+    if (payload.colorA3Count !== undefined) usage.colorA3Count = payload.colorA3Count;
+    if (payload.remarks !== undefined) usage.remarks = payload.remarks;
+
+    return this.usageRepo.save(usage);
+  }
+
+  async getUsageHistory(contractId: string) {
+    return this.usageRepo.getUsageHistory(contractId);
+  }
+}
