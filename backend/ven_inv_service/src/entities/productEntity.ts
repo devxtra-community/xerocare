@@ -91,6 +91,8 @@ export class Product {
     type: 'enum',
     enum: PrintColour,
     default: PrintColour.BLACK_WHITE,
+    enumName: 'print_colour_enum',
+    nullable: true,
   })
   print_colour!: PrintColour;
 

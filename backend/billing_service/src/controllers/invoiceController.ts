@@ -31,13 +31,26 @@ export const createQuotation = async (req: Request, res: Response, next: NextFun
       discountPercent,
       effectiveFrom,
       effectiveTo,
+      items,
     } = payload;
 
-    if (!pricingItems || !rentType || !customerId) {
-      throw new AppError(
-        'Invalid request payload: pricingItems, rentType, and customerId are required',
-        400,
-      );
+    if (!customerId || !saleType) {
+      throw new AppError('Invalid request payload: customerId and saleType are required', 400);
+    }
+
+    if (saleType === 'SALE') {
+      // For Sale, we expect 'items'
+      if (!items || !Array.isArray(items) || items.length === 0) {
+        throw new AppError('Invalid request payload: items array is required for SALE', 400);
+      }
+    } else {
+      // For Rent/Lease (defaulting to previous logic for safety if not explicitly SALE)
+      if (!pricingItems || !rentType) {
+        throw new AppError(
+          'Invalid request payload: pricingItems and rentType are required for RENT',
+          400,
+        );
+      }
     }
 
     const invoice = await billingService.createQuotation({
@@ -53,6 +66,7 @@ export const createQuotation = async (req: Request, res: Response, next: NextFun
       effectiveFrom,
       effectiveTo,
       pricingItems,
+      items,
     });
 
     return res.status(201).json({

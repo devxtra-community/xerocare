@@ -3,9 +3,8 @@
 import { useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createInvoice, CreateInvoicePayload } from '@/lib/invoice';
-import { Product } from '@/lib/product';
 import { CustomerSelect, SelectableCustomer } from './CustomerSelect';
-import { ProductSelect } from './ProductSelect';
+import { ProductSelect, SelectableItem } from './ProductSelect';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Trash2, Receipt, Users, Package, Save, ArrowLeft } from 'lucide-react';
@@ -38,15 +37,28 @@ export default function InvoiceForm() {
   const [items, setItems] = useState<InvoiceItemRow[]>([]);
   const [loading, setLoading] = useState(false);
 
-  const addItem = (product: Product) => {
+  const addItem = (item: SelectableItem) => {
+    let description = '';
+    let unitPrice = 0;
+
+    if ('part_name' in item) {
+      // It's a SparePart
+      description = item.part_name;
+      unitPrice = Number(item.base_price) || 0;
+    } else {
+      // It's a Product
+      description = item.name;
+      unitPrice = item.sale_price || 0;
+    }
+
     const newItem: InvoiceItemRow = {
       id: Math.random().toString(36).substr(2, 9),
-      description: product.name,
+      description,
       quantity: 1,
-      unitPrice: product.sale_price || 0,
+      unitPrice,
     };
     setItems([...items, newItem]);
-    toast.info(`Added ${product.name}`);
+    toast.info(`Added ${description}`);
   };
 
   const updateItem = (id: string, field: keyof InvoiceItemRow, value: string | number) => {

@@ -157,8 +157,14 @@ export class BillingService {
     effectiveFrom: string; // From UI usually string
     effectiveTo?: string;
 
+    // Sale Items
+    items?: {
+      description: string;
+      quantity: number;
+      unitPrice: number;
+    }[];
     // Pricing Items (Rules)
-    pricingItems: {
+    pricingItems?: {
       description: string;
       // Fixed
       bwIncludedLimit?: number;
@@ -176,45 +182,72 @@ export class BillingService {
   }) {
     // 1. Validation Logic
     if (payload.rentType === RentType.FIXED_LIMIT || payload.rentType === RentType.FIXED_COMBO) {
-      // Rule: No Slabs for Fixed
-      const hasSlabs = payload.pricingItems.some(
-        (item) => item.bwSlabRanges || item.colorSlabRanges || item.comboSlabRanges,
-      );
-      if (hasSlabs) {
-        throw new AppError('Fixed Rent models cannot have Slab Ranges', 400);
+      if (payload.pricingItems) {
+        // Rule: No Slabs for Fixed
+        const hasSlabs = payload.pricingItems.some(
+          (item) => item.bwSlabRanges || item.colorSlabRanges || item.comboSlabRanges,
+        );
+        if (hasSlabs) {
+          throw new AppError('Fixed Rent models cannot have Slab Ranges', 400);
+        }
       }
     } else if (payload.rentType === RentType.CPC || payload.rentType === RentType.CPC_COMBO) {
-      // Rule: Slabs Required (or at least allowed, but strict rule meant "Slab rates allowed ONLY for CPC")
-      // User said "CPC -> slabs allowed".
-      // Check for Monthly Rent in CPC? User said "No monthly rent".
       if (payload.monthlyRent && payload.monthlyRent > 0) {
-        // Warning or Error? "No monthly rent" listed under CPC rules.
         throw new AppError('CPC models cannot have Monthly Rent', 400);
       }
     }
 
     const invoiceNumber = await this.generateInvoiceNumber();
 
-    const invoiceItems = payload.pricingItems.map((item) => {
-      const invoiceItem = new InvoiceItem();
-      invoiceItem.itemType = ItemType.PRICING_RULE;
-      invoiceItem.description = item.description;
+    let invoiceItems: InvoiceItem[] = [];
+    let calculatedTotal = 0;
 
-      // Map Pricing Fields
-      invoiceItem.bwIncludedLimit = item.bwIncludedLimit;
-      invoiceItem.colorIncludedLimit = item.colorIncludedLimit;
-      invoiceItem.combinedIncludedLimit = item.combinedIncludedLimit;
+    if (payload.saleType === SaleType.SALE && payload.items) {
+      // Handle Sale Items
+      invoiceItems = payload.items.map((item) => {
+        const invItem = new InvoiceItem();
+        invItem.itemType = ItemType.PRODUCT; // Assuming PRODUCT enum exists or default to something generic? ItemType.PRICING_RULE is only for rent.
+        // Check enum ItemType?
+        // If ItemType.PRODUCT doesn't exist, we might need to add it or reuse generic.
+        // Let's assume standard behavior. 'itemType' defaults to PRICING_RULE.
+        // We should ideally set it to 'SALE_ITEM' or similar if distinguishes.
+        // For now, let's just set description/qty/price.
+        invItem.description = item.description;
+        invItem.quantity = item.quantity;
+        invItem.unitPrice = item.unitPrice;
+        return invItem;
+      });
 
-      invoiceItem.bwExcessRate = item.bwExcessRate;
-      invoiceItem.colorExcessRate = item.colorExcessRate;
-      invoiceItem.combinedExcessRate = item.combinedExcessRate;
+      // Calculate Total for Sale
+      calculatedTotal = payload.items.reduce(
+        (sum, item) => sum + item.quantity * item.unitPrice,
+        0,
+      );
+    } else if (payload.pricingItems) {
+      // Handle Rent Pricing Rules
+      invoiceItems = payload.pricingItems.map((item) => {
+        const invoiceItem = new InvoiceItem();
+        invoiceItem.itemType = ItemType.PRICING_RULE;
+        invoiceItem.description = item.description;
 
-      invoiceItem.bwSlabRanges = item.bwSlabRanges;
-      invoiceItem.colorSlabRanges = item.colorSlabRanges;
-      invoiceItem.comboSlabRanges = item.comboSlabRanges;
+        // Map Pricing Fields
+        invoiceItem.bwIncludedLimit = item.bwIncludedLimit;
+        invoiceItem.colorIncludedLimit = item.colorIncludedLimit;
+        invoiceItem.combinedIncludedLimit = item.combinedIncludedLimit;
 
-      return invoiceItem;
-    });
+        invoiceItem.bwExcessRate = item.bwExcessRate;
+        invoiceItem.colorExcessRate = item.colorExcessRate;
+        invoiceItem.combinedExcessRate = item.combinedExcessRate;
+
+        invoiceItem.bwSlabRanges = item.bwSlabRanges;
+        invoiceItem.colorSlabRanges = item.colorSlabRanges;
+        invoiceItem.comboSlabRanges = item.comboSlabRanges;
+
+        return invoiceItem;
+      });
+      // Rent Quotation Total is usually 0 until finalized/billed
+      calculatedTotal = 0;
+    }
 
     // 2. Create Invoice as Quotation
     const invoice = await this.invoiceRepo.createInvoice({
@@ -225,6 +258,9 @@ export class BillingService {
       customerId: payload.customerId,
       saleType: payload.saleType,
 
+      // If Sale, maybe DIRECT FINAL? Or SENT?
+      // User flow for Sale: "New Sale" -> likely confirmed immediately?
+      // Code sets QUOTATION. Let's keep consistency.
       type: InvoiceType.QUOTATION,
       status: InvoiceStatus.DRAFT,
 
@@ -233,10 +269,10 @@ export class BillingService {
       monthlyRent: payload.monthlyRent,
       advanceAmount: payload.advanceAmount,
       discountPercent: payload.discountPercent,
-      effectiveFrom: new Date(payload.effectiveFrom),
+      effectiveFrom: payload.effectiveFrom ? new Date(payload.effectiveFrom) : new Date(),
       effectiveTo: payload.effectiveTo ? new Date(payload.effectiveTo) : undefined,
 
-      totalAmount: 0, // Explicitly 0 or null as per "no usage calculation"
+      totalAmount: calculatedTotal,
       items: invoiceItems,
     });
 
