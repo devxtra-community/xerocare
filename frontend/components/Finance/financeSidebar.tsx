@@ -45,7 +45,7 @@ const financeMenu: FinanceMenuGroup[] = [
       {
         title: 'Dashboard',
         icon: LayoutDashboard,
-        href: '/finance',
+        href: '/finance/dashboard',
       },
     ],
   },
