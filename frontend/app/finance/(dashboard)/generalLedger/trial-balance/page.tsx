@@ -27,7 +27,7 @@ interface TrialBalanceRow {
 }
 
 export const buildTrialBalance = () => {
-  const rows: Record<string, TrialBalanceRow> = {};
+  const rows: Record<string, TrialBalanceRow & { totalDebit: number; totalCredit: number }> = {};
 
   mockJournals
     .filter((j) => j.status === 'Posted')
@@ -42,14 +42,25 @@ export const buildTrialBalance = () => {
             name: acc.name,
             debit: 0,
             credit: 0,
+            totalDebit: 0,
+            totalCredit: 0,
           };
         }
-        rows[line.accountId].debit += line.debit;
-        rows[line.accountId].credit += line.credit;
+        rows[line.accountId].totalDebit += line.debit;
+        rows[line.accountId].totalCredit += line.credit;
       });
     });
 
-  return Object.values(rows).sort((a, b) => a.code.localeCompare(b.code));
+  return Object.values(rows)
+    .map((row) => {
+      const net = row.totalDebit - row.totalCredit;
+      return {
+        ...row,
+        debit: net > 0 ? net : 0,
+        credit: net < 0 ? Math.abs(net) : 0,
+      };
+    })
+    .sort((a, b) => a.code.localeCompare(b.code));
 };
 
 export default function TrialBalancePage() {
@@ -150,7 +161,7 @@ export default function TrialBalancePage() {
             ))}
 
             {/* Final Totals Row */}
-            <TableRow className="bg-slate-900 hover:bg-slate-900 text-white border-t-4 border-slate-700">
+            <TableRow className="!bg-slate-900 hover:!bg-slate-900 !text-white border-t-4 border-slate-700">
               <TableCell className="pl-8 py-6 font-black uppercase text-xs tracking-widest">
                 Ledger Totals
               </TableCell>
