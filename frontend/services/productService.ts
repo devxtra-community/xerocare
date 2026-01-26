@@ -11,6 +11,8 @@ export interface Product {
   warehouse_name?: string;
   vendor_id: string;
   vendor_name?: string;
+  vendor?: { id: string; name: string };
+  warehouse?: { id: string; warehouseName: string };
   serial_no: string;
   brand: string;
   MFD: string;

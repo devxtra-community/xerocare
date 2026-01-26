@@ -2,7 +2,7 @@ import api from './api';
 
 export interface InvoiceItem {
   id?: string;
-  itemType?: 'PRICING_RULE';
+  itemType?: 'PRICING_RULE' | 'PRODUCT';
   description: string;
   // Fixed
   bwIncludedLimit?: number;
@@ -81,6 +81,7 @@ export interface CreateInvoicePayload {
     description: string;
     quantity: number;
     unitPrice: number;
+    itemType?: 'PRODUCT' | 'PRICING_RULE';
   }[];
   startDate?: string;
   endDate?: string;

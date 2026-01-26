@@ -111,17 +111,11 @@ export class Invoice {
   @Column({ type: 'decimal', precision: 5, scale: 2, nullable: true })
   discountPercent?: number;
 
-  @Column({ type: 'date' })
+  @Column({ type: 'date', nullable: true })
   effectiveFrom!: Date;
 
   @Column({ type: 'date', nullable: true })
   effectiveTo?: Date;
-
-  @Column({ type: 'date', nullable: true })
-  startDate?: Date; // Keeping for backward compatibility or actual start
-
-  @Column({ type: 'date', nullable: true })
-  endDate?: Date;
 
   @Column({ type: 'int', nullable: true })
   billingCycleInDays?: number;

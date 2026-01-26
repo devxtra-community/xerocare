@@ -54,7 +54,7 @@ export default function EmployeeSalesTable() {
       setInvoices(data);
     } catch (error) {
       console.error('Failed to fetch invoices:', error);
-      alert('Failed to fetch sales data.');
+      toast.error('Failed to fetch sales data.');
     } finally {
       setLoading(false);
     }
@@ -71,7 +71,7 @@ export default function EmployeeSalesTable() {
       setDetailsOpen(true);
     } catch (error) {
       console.error('Failed to fetch invoice details:', error);
-      alert('Failed to load invoice details.');
+      toast.error('Failed to load invoice details.');
     } finally {
       // Done loading
     }

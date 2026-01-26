@@ -115,8 +115,8 @@ export class BillingService {
       // Maybe types: FINAL status: UNPAID? Prompt says "status = UNPAID".
 
       billingCycleInDays: contract.billingCycleInDays, // or derive from dates
-      startDate: start,
-      endDate: end,
+      effectiveFrom: start,
+      effectiveTo: end,
 
       // Amounts
       monthlyRent: contract.monthlyRent, // Snapshot
@@ -162,6 +162,7 @@ export class BillingService {
       description: string;
       quantity: number;
       unitPrice: number;
+      itemType?: ItemType;
     }[];
     // Pricing Items (Rules)
     pricingItems?: {
@@ -199,33 +200,31 @@ export class BillingService {
 
     const invoiceNumber = await this.generateInvoiceNumber();
 
-    let invoiceItems: InvoiceItem[] = [];
+    const invoiceItems: InvoiceItem[] = [];
     let calculatedTotal = 0;
 
-    if (payload.saleType === SaleType.SALE && payload.items) {
-      // Handle Sale Items
-      invoiceItems = payload.items.map((item) => {
+    // 1. Handle Items (Product/Machines) - Available for both SALE and RENT
+    if (payload.items) {
+      const productItems = payload.items.map((item) => {
         const invItem = new InvoiceItem();
-        invItem.itemType = ItemType.PRODUCT; // Assuming PRODUCT enum exists or default to something generic? ItemType.PRICING_RULE is only for rent.
-        // Check enum ItemType?
-        // If ItemType.PRODUCT doesn't exist, we might need to add it or reuse generic.
-        // Let's assume standard behavior. 'itemType' defaults to PRICING_RULE.
-        // We should ideally set it to 'SALE_ITEM' or similar if distinguishes.
-        // For now, let's just set description/qty/price.
+        invItem.itemType = item.itemType || ItemType.PRODUCT;
         invItem.description = item.description;
         invItem.quantity = item.quantity;
         invItem.unitPrice = item.unitPrice;
         return invItem;
       });
+      invoiceItems.push(...productItems);
 
-      // Calculate Total for Sale
-      calculatedTotal = payload.items.reduce(
+      // Calculate Total for Sale items (machines usually 0 price in rent, but safeguards added)
+      calculatedTotal += payload.items.reduce(
         (sum, item) => sum + item.quantity * item.unitPrice,
         0,
       );
-    } else if (payload.pricingItems) {
-      // Handle Rent Pricing Rules
-      invoiceItems = payload.pricingItems.map((item) => {
+    }
+
+    // 2. Handle Pricing Rules (Rent Specific)
+    if (payload.pricingItems && payload.saleType !== SaleType.SALE) {
+      const ruleItems = payload.pricingItems.map((item) => {
         const invoiceItem = new InvoiceItem();
         invoiceItem.itemType = ItemType.PRICING_RULE;
         invoiceItem.description = item.description;
@@ -245,8 +244,7 @@ export class BillingService {
 
         return invoiceItem;
       });
-      // Rent Quotation Total is usually 0 until finalized/billed
-      calculatedTotal = 0;
+      invoiceItems.push(...ruleItems);
     }
 
     // 2. Create Invoice as Quotation
@@ -308,6 +306,12 @@ export class BillingService {
         colorSlabRanges?: Array<{ from: number; to: number; rate: number }>;
         comboSlabRanges?: Array<{ from: number; to: number; rate: number }>;
       }[];
+      items?: {
+        description: string;
+        quantity: number;
+        unitPrice: number;
+        itemType?: ItemType;
+      }[];
     },
   ) {
     const invoice = await this.invoiceRepo.findById(id);
@@ -330,16 +334,25 @@ export class BillingService {
     if (payload.effectiveFrom) invoice.effectiveFrom = new Date(payload.effectiveFrom);
     if (payload.effectiveTo) invoice.effectiveTo = new Date(payload.effectiveTo);
 
-    // Update Pricing Items (Full Replace for simplicity in Phase 1)
+    // Update Items (Machines + Pricing Rules)
+    const newInvoiceItems: InvoiceItem[] = [];
+
+    // 1. Handle Machine Items
+    if (payload.items) {
+      const machineItems = payload.items.map((item) => {
+        const invItem = new InvoiceItem();
+        invItem.itemType = item.itemType || ItemType.PRODUCT;
+        invItem.description = item.description;
+        invItem.quantity = item.quantity;
+        invItem.unitPrice = item.unitPrice;
+        return invItem;
+      });
+      newInvoiceItems.push(...machineItems);
+    }
+
+    // 2. Handle Pricing Rules
     if (payload.pricingItems) {
-      // Clear existing items? TypeORM cascade might handle insert/update but deleting requires care.
-      // For simplicity, we assume we might need to handle this manually or relies upon user ensuring ID match.
-      // Actually, replacing items collection often requires deleting old ones.
-      // Since "items" has cascade: true, we can assign new array.
-      // BUT relying on TypeORM to delete orphans needs { cascade: true, onDelete: 'CASCADE' } which we have on Inverse side?
-      // It's safer to clear manually or expected behavior.
-      // Let's map new items.
-      const newItems = payload.pricingItems.map((item) => {
+      const ruleItems = payload.pricingItems.map((item) => {
         const invoiceItem = new InvoiceItem();
         invoiceItem.itemType = ItemType.PRICING_RULE;
         invoiceItem.description = item.description;
@@ -354,9 +367,12 @@ export class BillingService {
         invoiceItem.comboSlabRanges = item.comboSlabRanges;
         return invoiceItem;
       });
+      newInvoiceItems.push(...ruleItems);
+    }
 
-      // This replaces the items relation
-      invoice.items = newItems;
+    // Replace items if any new items are provided (either machine or rules)
+    if (newInvoiceItems.length > 0) {
+      invoice.items = newInvoiceItems;
     }
 
     return this.invoiceRepo.save(invoice);

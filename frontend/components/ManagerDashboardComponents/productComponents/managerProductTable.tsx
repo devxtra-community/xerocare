@@ -127,7 +127,16 @@ export default function ManagerProduct() {
         <Table>
           <TableHeader>
             <TableRow>
-              {['IMAGE', 'PRODUCT', 'BRAND', 'SERIAL NO', 'PRICE', 'STATUS', 'ACTION'].map((h) => (
+              {[
+                'IMAGE',
+                'PRODUCT',
+                'BRAND',
+                'SERIAL NO',
+                'PRICE',
+                'PRINT COLOUR',
+                'STATUS',
+                'ACTION',
+              ].map((h) => (
                 <TableHead key={h} className="text-[11px] font-semibold text-primary px-4">
                   {h}
                 </TableHead>
@@ -138,13 +147,13 @@ export default function ManagerProduct() {
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-8">
+                <TableCell colSpan={8} className="text-center py-8">
                   Loading...
                 </TableCell>
               </TableRow>
             ) : filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-8 text-gray-500">
+                <TableCell colSpan={8} className="text-center py-8 text-gray-500">
                   No products found.
                 </TableCell>
               </TableRow>
@@ -172,6 +181,7 @@ export default function ManagerProduct() {
                   <TableCell className="px-4">{p.brand}</TableCell>
                   <TableCell className="px-4">{p.serial_no}</TableCell>
                   <TableCell className="px-4">₹{p.sale_price}</TableCell>
+                  <TableCell className="px-4">{p.print_colour}</TableCell>
                   <TableCell className="px-4">
                     <span
                       className={`px-2 py-1 rounded-full text-xs ${
@@ -252,9 +262,9 @@ function ProductFormModal({
     name: initialData?.name || '',
     brand: initialData?.brand || '',
     serial_no: initialData?.serial_no || '',
-    model_id: initialData?.model_id || '',
-    vendor_id: initialData?.vendor_id || '',
-    warehouse_id: initialData?.warehouse_id || '',
+    model_id: initialData?.model_id || initialData?.model?.id || '',
+    vendor_id: initialData?.vendor_id || initialData?.vendor?.id || '',
+    warehouse_id: initialData?.warehouse_id || initialData?.warehouse?.id || '',
     sale_price: initialData?.sale_price ?? 0,
     tax_rate: initialData?.tax_rate ?? 0,
     MFD: initialData?.MFD ? new Date(initialData.MFD).toISOString().split('T')[0] : '',

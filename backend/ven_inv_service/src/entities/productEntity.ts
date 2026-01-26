@@ -37,9 +37,17 @@ export class Product {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
 
+  @Column({ type: 'uuid' })
+  @Index()
+  model_id!: string;
+
   @ManyToOne(() => Model, (model) => model.products)
   @JoinColumn({ name: 'model_id' })
   model!: Model;
+
+  @Column({ type: 'uuid' })
+  @Index()
+  warehouse_id!: string;
 
   @ManyToOne(() => Warehouse, { nullable: true })
   @JoinColumn({ name: 'warehouse_id' })

@@ -279,223 +279,387 @@ function InvoiceDetailsDialog({
 }) {
   return (
     <Dialog open={true} onOpenChange={(val) => !val && onClose()}>
-      <DialogContent className="sm:max-w-md p-0 overflow-hidden rounded-xl border border-gray-100 shadow-2xl bg-white">
-        <DialogHeader className="p-6 pb-2">
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shadow-sm">
-              <FileText size={20} />
-            </div>
-            <div className="space-y-0.5">
-              <DialogTitle className="text-lg font-bold text-primary tracking-tight">
-                {invoice.invoiceNumber}
-              </DialogTitle>
-              <DialogDescription className="text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-none">
-                Details
-              </DialogDescription>
-
-              {/* Show Rent Type info */}
-              {invoice.rentType && (
-                <Badge
-                  variant="outline"
-                  className="mt-2 text-[10px] tracking-wide border-blue-200 text-blue-700"
-                >
-                  {invoice.rentType.replace('_', ' ')} • {invoice.rentPeriod}
-                </Badge>
-              )}
-            </div>
-          </div>
-        </DialogHeader>
-
-        <div className="p-6 pt-2 space-y-4 max-h-[70vh] overflow-y-auto scrollbar-hide">
-          <div className="grid grid-cols-2 gap-x-8 gap-y-4">
-            <div className="space-y-1">
-              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Date</p>
-              <div className="flex items-center gap-2">
-                <Calendar size={14} className="text-gray-400" />
-                <p className="text-sm font-bold text-gray-800">
-                  {new Date(invoice.createdAt).toLocaleDateString(undefined, {
-                    dateStyle: 'medium',
-                  })}
-                </p>
+      <DialogContent className="sm:max-w-xl p-0 overflow-hidden rounded-2xl border-none shadow-2xl bg-slate-50/50 backdrop-blur-sm">
+        {/* Header with Pattern */}
+        <DialogHeader className="p-6 bg-gradient-to-br from-white to-slate-50 border-b border-slate-100">
+          <div className="flex items-start justify-between">
+            <div className="flex items-center gap-4">
+              <div className="h-12 w-12 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-lg shadow-blue-200">
+                <FileText size={24} className="stroke-[2.5]" />
+              </div>
+              <div className="space-y-1">
+                <DialogTitle className="text-xl font-bold text-slate-900 tracking-tight">
+                  {invoice.invoiceNumber}
+                </DialogTitle>
+                <DialogDescription className="text-xs font-medium text-slate-500 flex items-center gap-2">
+                  {new Date(invoice.createdAt).toLocaleDateString(undefined, { dateStyle: 'long' })}
+                </DialogDescription>
               </div>
             </div>
-            <div className="space-y-1">
-              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Status</p>
-              <Badge
-                variant="secondary"
-                className={`rounded-full px-3 py-1 text-[10px] font-bold tracking-wider shadow-none
+            <Badge
+              variant="secondary"
+              className={`rounded-full px-3 py-1 text-[10px] font-bold tracking-wider shadow-none border
                   ${
                     invoice.status === 'PAID'
-                      ? 'bg-green-50 text-green-600 border-green-100'
-                      : 'bg-amber-50 text-amber-600 border-amber-100'
+                      ? 'bg-green-50 text-green-700 border-green-200'
+                      : invoice.status === 'APPROVED'
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                        : 'bg-amber-50 text-amber-700 border-amber-200'
                   }`}
+            >
+              {invoice.status}
+            </Badge>
+          </div>
+
+          {invoice.rentType && (
+            <div className="mt-4 flex gap-2">
+              <Badge
+                variant="outline"
+                className="bg-white text-slate-600 border-slate-200 text-[10px] font-bold"
               >
-                {invoice.status}
+                TYPE: {invoice.rentType.replace('_', ' ')}
+              </Badge>
+              <Badge
+                variant="outline"
+                className="bg-white text-slate-600 border-slate-200 text-[10px] font-bold"
+              >
+                BILLING: {invoice.rentPeriod}
               </Badge>
             </div>
-          </div>
+          )}
+        </DialogHeader>
 
+        <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto scrollbar-hide">
+          {/* Contract Period Card */}
           {(invoice.startDate || invoice.endDate || invoice.effectiveFrom) && (
-            <div className="grid grid-cols-2 gap-x-12 gap-y-6 p-6 bg-gray-50 rounded-xl">
-              <div className="space-y-1">
-                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                  Contract Period
+            <div className="grid grid-cols-2 divide-x divide-slate-100 rounded-xl bg-white border border-slate-100 shadow-sm overflow-hidden">
+              <div className="p-4 space-y-1">
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                  Effective From
                 </p>
-                <p className="text-xs font-bold text-gray-600">
+                <p className="text-sm font-bold text-slate-700">
                   {invoice.startDate || invoice.effectiveFrom
                     ? new Date(invoice.startDate || invoice.effectiveFrom!).toLocaleDateString()
-                    : 'N/A'}{' '}
-                  —{' '}
+                    : 'N/A'}
+                </p>
+              </div>
+              <div className="p-4 space-y-1">
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                  Effective To
+                </p>
+                <p className="text-sm font-bold text-slate-700">
                   {invoice.endDate || invoice.effectiveTo
                     ? new Date(invoice.endDate || invoice.effectiveTo!).toLocaleDateString()
-                    : 'Active'}
+                    : 'Active Contract'}
                 </p>
-              </div>
-              <div className="space-y-1">
-                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                  Billing Cycle
-                </p>
-                <p className="text-xs font-bold text-gray-600">{invoice.rentPeriod || 'MONTHLY'}</p>
               </div>
             </div>
           )}
 
-          {/* Rent & Advance Info */}
-          {invoice.monthlyRent !== undefined && invoice.monthlyRent > 0 && (
-            <div className="p-4 rounded-lg bg-blue-50/50 flex gap-8">
-              <div>
-                <p className="text-[10px] font-bold text-slate-400 uppercase">Monthly Rent</p>
-                <p className="font-bold text-slate-800">₹{invoice.monthlyRent}</p>
+          {/* Financials Row */}
+          <div className="grid grid-cols-2 gap-4">
+            {invoice.monthlyRent !== undefined && invoice.monthlyRent > 0 && (
+              <div className="p-4 rounded-xl bg-white border border-blue-100 shadow-sm space-y-1 relative overflow-hidden group">
+                <div className="absolute top-0 right-0 p-2 opacity-10 group-hover:opacity-20 transition-opacity">
+                  <Calendar size={40} className="text-blue-600" />
+                </div>
+                <p className="text-[10px] font-bold text-blue-400 uppercase tracking-wider">
+                  Monthly Rent
+                </p>
+                <p className="text-lg font-bold text-slate-800">
+                  ₹{invoice.monthlyRent.toLocaleString()}
+                </p>
               </div>
-              {invoice.advanceAmount ? (
-                <div>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase">Advance</p>
-                  <p className="font-bold text-slate-800">₹{invoice.advanceAmount}</p>
-                </div>
-              ) : null}
-            </div>
-          )}
-
-          {/* Security Deposit Section (Read Only) */}
-          <div className="p-6 bg-slate-50 border border-slate-100 rounded-xl">
-            <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-4">
-              Security Deposit
-            </h4>
-            {invoice.securityDepositAmount && invoice.securityDepositAmount > 0 ? (
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-[10px] font-medium text-slate-500">Amount</p>
-                  <p className="text-sm font-bold text-slate-900">
-                    ₹{invoice.securityDepositAmount.toLocaleString()}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-[10px] font-medium text-slate-500">Mode</p>
-                  <p className="text-sm font-bold text-slate-900">{invoice.securityDepositMode}</p>
-                </div>
-                {invoice.securityDepositReference && (
-                  <div className="col-span-2">
-                    <p className="text-[10px] font-medium text-slate-500">Reference</p>
-                    <p className="text-sm font-bold text-slate-900">
-                      {invoice.securityDepositReference}
-                    </p>
-                  </div>
-                )}
-                {invoice.securityDepositReceivedDate && (
-                  <div className="col-span-2">
-                    <p className="text-[10px] font-medium text-slate-500">Received Date</p>
-                    <p className="text-sm font-bold text-slate-900">
-                      {new Date(invoice.securityDepositReceivedDate).toLocaleDateString()}
-                    </p>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <p className="text-xs font-medium text-slate-500 italic">
-                No security deposit collected.
-              </p>
             )}
+
+            {invoice.advanceAmount ? (
+              <div className="p-4 rounded-xl bg-white border border-purple-100 shadow-sm space-y-1 relative overflow-hidden group">
+                <div className="absolute top-0 right-0 p-2 opacity-10 group-hover:opacity-20 transition-opacity">
+                  <FileText size={40} className="text-purple-600" />
+                </div>
+                <p className="text-[10px] font-bold text-purple-400 uppercase tracking-wider">
+                  Advance
+                </p>
+                <p className="text-lg font-bold text-slate-800">
+                  ₹{invoice.advanceAmount.toLocaleString()}
+                </p>
+              </div>
+            ) : null}
           </div>
 
-          <div className="space-y-4">
-            <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-              Rules / Items
+          {/* Security Deposit (Conditional) */}
+          {invoice.securityDepositAmount && invoice.securityDepositAmount > 0 && (
+            <div className="p-4 rounded-xl bg-slate-50 border border-slate-200">
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                  Security Deposit
+                </h4>
+                <Badge
+                  variant="secondary"
+                  className="bg-white text-slate-600 text-[10px] border border-slate-100"
+                >
+                  {invoice.securityDepositMode}
+                </Badge>
+              </div>
+              <div className="flex items-baseline gap-1">
+                <span className="text-sm font-bold text-slate-400">₹</span>
+                <span className="text-xl font-bold text-slate-900">
+                  {invoice.securityDepositAmount.toLocaleString()}
+                </span>
+              </div>
+              {invoice.securityDepositReference && (
+                <p className="text-xs text-slate-500 mt-1 font-medium">
+                  Ref: {invoice.securityDepositReference}
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* Machines & Rules */}
+          <div className="space-y-3">
+            <h3 className="text-[11px] font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-blue-500" /> Configured Machines
             </h3>
-            <div className="rounded-xl border border-gray-100 overflow-hidden">
-              <Table>
-                <TableHeader className="bg-gray-50/80">
-                  <TableRow>
-                    <TableHead className="text-[10px] font-bold text-gray-400">
-                      DESCRIPTION
-                    </TableHead>
-                    <TableHead className="text-[10px] font-bold text-gray-400 text-center">
-                      LIMIT/QTY
-                    </TableHead>
-                    <TableHead className="text-[10px] font-bold text-gray-400 text-right">
-                      RATE/PRICE
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {invoice.items?.map((item, idx) => (
-                    <TableRow key={idx}>
-                      <TableCell className="font-bold text-gray-700 py-3 text-sm">
-                        {item.description}
-                      </TableCell>
-                      <TableCell className="text-center font-bold text-gray-500 text-sm">
-                        {/* Display Limit if exists, else Qty */}
-                        {invoice.rentType?.startsWith('CPC') ? (
-                          <Badge
-                            variant="outline"
-                            className="border-emerald-200 text-emerald-700 bg-emerald-50"
-                          >
-                            Unlimited
-                          </Badge>
-                        ) : item.bwIncludedLimit !== undefined ||
-                          item.colorIncludedLimit !== undefined ||
-                          item.combinedIncludedLimit !== undefined ? (
-                          `Free: ${item.bwIncludedLimit ?? item.colorIncludedLimit ?? item.combinedIncludedLimit ?? 0}`
-                        ) : (
-                          item.quantity
+
+            <div className="space-y-4">
+              {(() => {
+                // Group items by machine (Serial Number)
+                // Robust filtering:
+                // Machine = itemType is PRODUCT OR (description does NOT indicate a rule)
+                const machineItems =
+                  invoice.items?.filter((i) => {
+                    const isRuleDesc =
+                      i.description.startsWith('Black') ||
+                      i.description.startsWith('Color') ||
+                      i.description.startsWith('Combined');
+                    return i.itemType === 'PRODUCT' || !isRuleDesc;
+                  }) || [];
+
+                const ruleItems =
+                  invoice.items?.filter((i) => {
+                    const isRuleDesc =
+                      i.description.startsWith('Black') ||
+                      i.description.startsWith('Color') ||
+                      i.description.startsWith('Combined');
+                    return isRuleDesc;
+                  }) || [];
+
+                // Virtual Machines from Orphan Rules
+                const virtualMachines = new Map<string, typeof ruleItems>();
+
+                ruleItems.forEach((r) => {
+                  const claimed = machineItems.some((m) => {
+                    // Start searching from the end for ' - ' separator
+                    const lastDash = m.description.lastIndexOf(' - ');
+                    const serial =
+                      lastDash !== -1 ? m.description.substring(lastDash + 3).trim() : '';
+                    return r.description.includes(`(${serial})`);
+                  });
+
+                  if (!claimed) {
+                    let suffix = r.description;
+                    if (suffix.startsWith('Black & White - '))
+                      suffix = suffix.replace('Black & White - ', '');
+                    else if (suffix.startsWith('Color - ')) suffix = suffix.replace('Color - ', '');
+                    else if (suffix.startsWith('Combined - '))
+                      suffix = suffix.replace('Combined - ', '');
+                    else if (suffix.startsWith('Black - ')) suffix = suffix.replace('Black - ', '');
+
+                    if (!virtualMachines.has(suffix)) {
+                      virtualMachines.set(suffix, []);
+                    }
+                    virtualMachines.get(suffix)?.push(r);
+                  }
+                });
+
+                const allMachines = [
+                  ...machineItems.map((m) => ({
+                    isVirtual: false,
+                    item: m,
+                    name: undefined,
+                    rules: [] as typeof ruleItems,
+                  })),
+                  ...Array.from(virtualMachines.entries()).map(([name, rules]) => ({
+                    isVirtual: true,
+                    item: undefined,
+                    name,
+                    rules,
+                  })),
+                ];
+
+                if (allMachines.length === 0) {
+                  return (
+                    <div className="p-8 text-center text-sm text-slate-400 bg-slate-50 rounded-xl border border-dashed border-slate-200">
+                      No items found
+                    </div>
+                  );
+                }
+
+                return allMachines.map((machineObj, idx) => {
+                  let name = '';
+                  let serial = '';
+                  let myRules = machineObj.rules;
+                  let quantity = 1;
+                  let unitPrice = 0;
+
+                  if (machineObj.isVirtual && machineObj.name) {
+                    const openParen = machineObj.name.lastIndexOf('(');
+                    const closeParen = machineObj.name.lastIndexOf(')');
+                    if (openParen !== -1 && closeParen !== -1) {
+                      name = machineObj.name.substring(0, openParen).trim();
+                      serial = machineObj.name.substring(openParen + 1, closeParen).trim();
+                    } else {
+                      name = machineObj.name;
+                      serial = 'Unknown';
+                    }
+                    quantity = 1;
+                  } else if (machineObj.item) {
+                    const m = machineObj.item;
+                    const lastDash = m.description.lastIndexOf(' - ');
+                    name =
+                      lastDash !== -1 ? m.description.substring(0, lastDash).trim() : m.description;
+                    serial = lastDash !== -1 ? m.description.substring(lastDash + 3).trim() : '';
+                    quantity = m.quantity || 1;
+                    unitPrice = m.unitPrice || 0;
+                    myRules = ruleItems.filter((r) => r.description.includes(`(${serial})`));
+                  }
+
+                  return (
+                    <div
+                      key={idx}
+                      className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden group hover:border-blue-200 hover:shadow-md transition-all"
+                    >
+                      {/* Machine Header */}
+                      <div className="p-4 bg-slate-50/50 border-b border-slate-100 flex justify-between items-start">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h4 className="text-sm font-bold text-slate-800">{name}</h4>
+                            {machineObj.isVirtual && (
+                              <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-orange-100 text-orange-700">
+                                Virtual
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2 mt-1.5">
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white border border-slate-200 text-[10px] font-mono text-slate-500">
+                              <span className="text-slate-300">SN:</span> {serial || 'N/A'}
+                            </span>
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-purple-50 border border-purple-100 text-[10px] font-bold text-purple-700">
+                              Qty: {quantity}
+                            </span>
+                          </div>
+                        </div>
+                        {unitPrice > 0 && (
+                          <div className="text-right">
+                            <p className="text-[9px] font-bold text-slate-400 uppercase">
+                              Unit Price
+                            </p>
+                            <p className="font-bold text-slate-700">
+                              ₹{unitPrice.toLocaleString()}
+                            </p>
+                          </div>
                         )}
-                      </TableCell>
-                      <TableCell className="text-right font-bold text-gray-900 text-sm">
-                        {item.bwExcessRate !== undefined ||
-                        item.colorExcessRate !== undefined ||
-                        item.combinedExcessRate !== undefined
-                          ? `${invoice.rentType?.startsWith('CPC') ? 'Rate' : 'Excess'}: ₹${item.bwExcessRate ?? item.colorExcessRate ?? item.combinedExcessRate}/pg`
-                          : `₹${(item.quantity || 0) * (item.unitPrice || 0)}`}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                      </div>
+
+                      {/* Rules List */}
+                      {myRules.length > 0 ? (
+                        <div className="p-3 grid grid-cols-1 gap-2">
+                          {myRules.map((rule, rIdx) => {
+                            let ruleType = rule.description;
+                            if (ruleType.startsWith('Black & White - ')) ruleType = 'Black & White';
+                            else if (ruleType.startsWith('Color - ')) ruleType = 'Color';
+                            else if (ruleType.startsWith('Combined - ')) ruleType = 'Combined';
+                            else if (ruleType.startsWith('Black - ')) ruleType = 'Black & White';
+
+                            const isCombo = ruleType === 'Combined';
+                            const isColor = ruleType === 'Color';
+
+                            return (
+                              <div
+                                key={rIdx}
+                                className="flex items-center justify-between p-2 rounded-lg bg-white border border-slate-100 hover:border-slate-200 transition-colors"
+                              >
+                                <div className="flex items-center gap-3">
+                                  <div
+                                    className={`w-8 h-8 rounded-lg flex items-center justify-center text-[10px] font-bold 
+                                         ${isCombo ? 'bg-blue-100 text-blue-700' : isColor ? 'bg-pink-100 text-pink-700' : 'bg-slate-100 text-slate-700'}
+                                      `}
+                                  >
+                                    {isCombo ? 'CMB' : isColor ? 'CLR' : 'BW'}
+                                  </div>
+                                  <div>
+                                    <p className="text-xs font-bold text-slate-700">{ruleType}</p>
+                                    <p className="text-[10px] font-medium text-slate-400">
+                                      {invoice.rentType?.startsWith('CPC') ? (
+                                        <span className="text-emerald-600">Unlimited Usage</span>
+                                      ) : (
+                                        <span>
+                                          Free Limit:{' '}
+                                          <span className="text-slate-700">
+                                            {rule.bwIncludedLimit ??
+                                              rule.colorIncludedLimit ??
+                                              rule.combinedIncludedLimit ??
+                                              0}
+                                          </span>
+                                        </span>
+                                      )}
+                                    </p>
+                                  </div>
+                                </div>
+                                <div className="text-right">
+                                  <p className="text-[9px] font-bold text-slate-400 uppercase">
+                                    X-Rate
+                                  </p>
+                                  <p className="text-xs font-bold text-slate-900 bg-slate-50 px-2 py-0.5 rounded">
+                                    ₹
+                                    {rule.bwExcessRate ??
+                                      rule.colorExcessRate ??
+                                      rule.combinedExcessRate ??
+                                      0}
+                                  </p>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <div className="p-4 text-center text-xs text-slate-400 italic">
+                          No usage limits configured for this machine.
+                        </div>
+                      )}
+                    </div>
+                  );
+                });
+              })()}
             </div>
           </div>
         </div>
 
-        <div className="p-5 bg-gray-50 border-t border-gray-100 flex items-center justify-between">
+        <div className="p-6 bg-white border-t border-slate-100 flex items-center justify-between shadow-[0_-5px_20px_-10px_rgba(0,0,0,0.1)] z-10 relative">
           <div>
-            <p className="text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">
-              Total
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+              Grand Total
             </p>
-            <p className="text-xl font-bold text-primary">
-              ₹{invoice.totalAmount?.toLocaleString() || 0}
-            </p>
+            <div className="flex items-baseline gap-1">
+              <span className="text-lg font-bold text-slate-400">₹</span>
+              <span className="text-3xl font-bold text-slate-900 tracking-tight">
+                {invoice.totalAmount?.toLocaleString() || 0}
+              </span>
+            </div>
           </div>
           <div className="flex gap-3">
             <Button
-              variant="ghost"
+              variant="outline"
               size="sm"
               onClick={() => window.print()}
-              className="gap-2 font-bold text-gray-600 h-9 px-3"
+              className="gap-2 font-bold text-slate-600 border-2 h-10 px-4 hover:bg-slate-50"
             >
-              <Printer size={14} /> Print
+              <Printer size={16} />
             </Button>
 
             <Button
               size="sm"
-              className="bg-[#25D366] hover:bg-[#128C7E] text-white font-bold gap-2 h-9 px-3"
+              className="bg-[#25D366] hover:bg-[#128C7E] text-white font-bold gap-2 h-10 px-4 shadow-lg shadow-green-100 hover:shadow-green-200 transition-all"
               onClick={() => {
                 const message =
                   `*Proforma Invoice #${invoice.invoiceNumber}*\n\n` +
@@ -509,10 +673,15 @@ function InvoiceDetailsDialog({
                 window.open(url, '_blank');
               }}
             >
-              <Share2 size={14} /> WhatsApp
+              <Share2 size={16} /> WhatsApp
             </Button>
 
-            <Button variant="outline" size="sm" onClick={onClose} className="font-bold h-9 px-3">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onClose}
+              className="font-bold text-slate-400 hover:text-slate-600 h-10 px-4"
+            >
               Close
             </Button>
 
@@ -520,9 +689,9 @@ function InvoiceDetailsDialog({
               <Button
                 size="sm"
                 onClick={onApprove}
-                className="bg-green-600 text-white hover:bg-green-700 font-bold h-9 px-3"
+                className="bg-blue-600 text-white hover:bg-blue-700 font-bold h-10 px-6 shadow-lg shadow-blue-200 hover:shadow-blue-300 transition-all"
               >
-                Approve
+                Approve Invoice
               </Button>
             )}
           </div>

@@ -91,6 +91,7 @@ export const updateQuotation = async (req: Request, res: Response, next: NextFun
       discountPercent,
       effectiveFrom,
       effectiveTo,
+      items,
     } = req.body;
 
     const invoice = await billingService.updateQuotation(id, {
@@ -102,6 +103,7 @@ export const updateQuotation = async (req: Request, res: Response, next: NextFun
       effectiveFrom,
       effectiveTo,
       pricingItems,
+      items,
     });
 
     return res.status(200).json({
