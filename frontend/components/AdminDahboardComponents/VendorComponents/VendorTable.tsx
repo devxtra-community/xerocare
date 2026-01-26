@@ -101,8 +101,9 @@ export default function VendorTable({
         name: data.name,
         email: data.email,
         phone: data.phone,
+        type: data.type,
+        contactPerson: data.contactPerson,
         status: (data.status === 'Active' ? 'ACTIVE' : 'INACTIVE') as 'ACTIVE' | 'INACTIVE',
-        // Add other fields if backend supports them later
       };
 
       if (editingVendor) {
@@ -195,34 +196,34 @@ export default function VendorTable({
         <Table>
           <TableHeader className="bg-white border-b border-gray-200">
             <TableRow>
-              <TableHead className="font-semibold text-[11px] text-blue-900 uppercase">
+              <TableHead className="font-semibold text-[11px] text-primary uppercase">
                 Vendor Name
               </TableHead>
-              <TableHead className="font-semibold text-[11px] text-blue-900 uppercase">
+              <TableHead className="font-semibold text-[11px] text-primary uppercase">
                 Code
               </TableHead>
-              <TableHead className="font-semibold text-[11px] text-blue-900 uppercase">
+              <TableHead className="font-semibold text-[11px] text-primary uppercase">
                 Type
               </TableHead>
-              <TableHead className="font-semibold text-[11px] text-blue-900 uppercase">
+              <TableHead className="font-semibold text-[11px] text-primary uppercase">
                 Contact
               </TableHead>
-              <TableHead className="font-semibold text-[11px] text-blue-900 uppercase">
+              <TableHead className="font-semibold text-[11px] text-primary uppercase">
                 Details
               </TableHead>
-              <TableHead className="text-right font-semibold text-[11px] text-blue-900 uppercase">
+              <TableHead className="text-right font-semibold text-[11px] text-primary uppercase">
                 Orders
               </TableHead>
-              <TableHead className="text-right font-semibold text-[11px] text-blue-900 uppercase">
+              <TableHead className="text-right font-semibold text-[11px] text-primary uppercase">
                 Purchase Value
               </TableHead>
-              <TableHead className="text-right font-semibold text-[11px] text-blue-900 uppercase">
+              <TableHead className="text-right font-semibold text-[11px] text-primary uppercase">
                 Outstanding
               </TableHead>
-              <TableHead className="font-semibold text-[11px] text-blue-900 uppercase">
+              <TableHead className="font-semibold text-[11px] text-primary uppercase">
                 Status
               </TableHead>
-              <TableHead className="text-right font-semibold text-[11px] text-blue-900 uppercase">
+              <TableHead className="text-right font-semibold text-[11px] text-primary uppercase">
                 Actions
               </TableHead>
             </TableRow>
@@ -232,20 +233,21 @@ export default function VendorTable({
               filteredVendors.map((vendor, index) => (
                 <TableRow
                   key={vendor.id}
-                  className={`border-b border-gray-100 hover:bg-slate-50/50 ${index % 2 !== 0 ? 'bg-sky-100/60' : ''}`}
+                  className={`border-b border-gray-100 hover:bg-slate-50/50 ${index % 2 !== 0 ? 'bg-blue-50/20' : 'bg-white'}`}
                 >
-                  <TableCell className="font-medium text-blue-900">{vendor.name}</TableCell>
+                  <TableCell className="font-medium text-primary">{vendor.name}</TableCell>
                   <TableCell className="text-slate-500 font-medium">
                     VND-{vendor.id.substring(0, 4)}
                   </TableCell>
                   <TableCell>
                     <span
-                      className={`px-2 py-1 rounded-full text-xs font-medium ${vendor.type === 'Supplier'
-                        ? 'bg-blue-100 text-blue-700'
-                        : vendor.type === 'Distributor'
-                          ? 'bg-purple-100 text-purple-700'
-                          : 'bg-orange-100 text-orange-700'
-                        }`}
+                      className={`px-2 py-1 rounded-full text-xs font-medium ${
+                        vendor.type === 'Supplier'
+                          ? 'bg-blue-100 text-blue-700'
+                          : vendor.type === 'Distributor'
+                            ? 'bg-purple-100 text-purple-700'
+                            : 'bg-orange-100 text-orange-700'
+                      }`}
                     >
                       {vendor.type}
                     </span>
@@ -270,10 +272,11 @@ export default function VendorTable({
                   </TableCell>
                   <TableCell>
                     <span
-                      className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium ${vendor.status === 'Active'
-                        ? 'bg-green-100 text-green-700'
-                        : 'bg-yellow-100 text-yellow-700'
-                        }`}
+                      className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                        vendor.status === 'Active'
+                          ? 'bg-green-100 text-green-700'
+                          : 'bg-yellow-100 text-yellow-700'
+                      }`}
                     >
                       <span
                         className={`h-1.5 w-1.5 rounded-full ${vendor.status === 'Active' ? 'bg-green-600' : 'bg-yellow-600'}`}
@@ -354,31 +357,44 @@ function VendorFormModal({
   onClose: () => void;
   onConfirm: (data: VendorFormData) => void;
 }) {
-  const [form, setForm] = useState<VendorFormData>(
-    initialData
-      ? {
-        name: initialData.name,
-        type: initialData.type,
-        contactPerson: initialData.contactPerson,
-        phone: initialData.phone,
-        email: initialData.email,
-        status: initialData.status,
+  const [form, setForm] = useState<VendorFormData>({
+    name: '',
+    type: 'Supplier',
+    contactPerson: '',
+    phone: '',
+    email: '',
+    status: 'Active',
+  });
+
+  React.useEffect(() => {
+    if (open) {
+      if (initialData) {
+        setForm({
+          name: initialData.name,
+          type: initialData.type,
+          contactPerson: initialData.contactPerson,
+          phone: initialData.phone,
+          email: initialData.email,
+          status: initialData.status,
+        });
+      } else {
+        setForm({
+          name: '',
+          type: 'Supplier',
+          contactPerson: '',
+          phone: '',
+          email: '',
+          status: 'Active',
+        });
       }
-      : {
-        name: '',
-        type: 'Supplier',
-        contactPerson: '',
-        phone: '',
-        email: '',
-        status: 'Active',
-      },
-  );
+    }
+  }, [initialData, open]);
 
   return (
     <Dialog open={open} onOpenChange={(val) => !val && onClose()}>
       <DialogContent className="sm:max-w-xl">
         <DialogHeader>
-          <DialogTitle className="text-2xl font-bold text-blue-900">
+          <DialogTitle className="text-2xl font-bold text-primary">
             {initialData ? 'Update Vendor' : 'Add Vendor'}
           </DialogTitle>
         </DialogHeader>
@@ -515,7 +531,7 @@ function ConfirmDeleteModal({
             <div className="h-12 w-12 rounded-2xl bg-red-50 flex items-center justify-center text-red-600 shadow-sm">
               <Trash2 className="h-6 w-6" />
             </div>
-            <DialogTitle className="text-xl font-bold text-blue-900">Delete Vendor</DialogTitle>
+            <DialogTitle className="text-xl font-bold text-primary">Delete Vendor</DialogTitle>
           </div>
           <DialogDescription className="text-base text-gray-600 leading-relaxed">
             Are you sure you want to delete <strong>{name}</strong>?

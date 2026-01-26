@@ -14,6 +14,14 @@ export interface Vendor {
   totalOrders?: number;
   purchaseValue?: number;
   outstandingAmount?: number;
+  gstin?: string;
+  creditLimit?: number;
+  bankDetails?: {
+    accountName: string;
+    accountNumber: string;
+    ifsc: string;
+    bankName: string;
+  };
 }
 
 export async function createVendor(data: Partial<Vendor>) {

@@ -9,7 +9,7 @@ const service = new EmployeeService();
 
 export const addEmployee = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { first_name, last_name, email, role, expireDate, salary } = req.body;
+    const { first_name, last_name, email, role, expireDate, salary, branchId } = req.body;
 
     const files = req.files as {
       profile_image?: MulterS3File[];
@@ -23,6 +23,9 @@ export const addEmployee = async (req: Request, res: Response, next: NextFunctio
       : null;
 
     const idProofKey = files?.id_proof?.[0]?.key ?? null;
+    // - [ ] Define specific rate limiters in `rateLimitter.ts` [/]
+    // - [ ] Apply specific rate limiters to paths in `api_gateway/src/app.ts` [/]
+    // - [ ] Verify rate limits via typecheck and manual review [/]
 
     const employee = await service.addEmployee({
       first_name,
@@ -33,6 +36,7 @@ export const addEmployee = async (req: Request, res: Response, next: NextFunctio
       salary: salary ? Number(salary) : null,
       profile_image_url: profileImageUrl,
       id_proof_key: idProofKey,
+      branchId,
     });
 
     res.status(201).json({
@@ -48,7 +52,7 @@ export const addEmployee = async (req: Request, res: Response, next: NextFunctio
 
 export const getEmployeeIdProof = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const employeeId = req.params.id;
+    const employeeId = req.params.id as string;
 
     const result = await service.getEmployeeIdProof(employeeId);
 
@@ -80,12 +84,27 @@ export const getAllEmployees = async (req: Request, res: Response, next: NextFun
 
 export const getEmployeeById = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const employee = await service.getEmployeeById(req.params.id);
+    const employee = await service.getEmployeeById(req.params.id as string);
 
     return res.json({
       success: true,
       data: employee,
       message: 'Employee fetched successfully',
+    });
+  } catch (err: unknown) {
+    const error = err as { message: string; statusCode?: number };
+    next(new AppError(error.message, error.statusCode || 404));
+  }
+};
+
+export const getPublicEmployeeProfile = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const employee = await service.getPublicEmployeeProfile(req.params.id as string);
+
+    return res.json({
+      success: true,
+      data: employee,
+      message: 'Employee profile fetched successfully',
     });
   } catch (err: unknown) {
     const error = err as { message: string; statusCode?: number };
@@ -112,9 +131,10 @@ export const updateEmployee = async (req: Request, res: Response, next: NextFunc
       salary: req.body.salary ? Number(req.body.salary) : undefined,
       profile_image_url: profileImageUrl || undefined,
       id_proof_key: idProofKey || undefined,
+      branchId: req.body.branchId || undefined,
     };
 
-    const updatedEmployee = await service.updateEmployee(req.params.id, payload);
+    const updatedEmployee = await service.updateEmployee(req.params.id as string, payload);
 
     return res.json({
       success: true,
@@ -129,7 +149,7 @@ export const updateEmployee = async (req: Request, res: Response, next: NextFunc
 
 export const deleteEmployee = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    await service.deleteEmployee(req.params.id);
+    await service.deleteEmployee(req.params.id as string);
 
     return res.json({
       success: true,

@@ -12,7 +12,7 @@ export default function EmployeesPage() {
       {/* HEADER SECTION */}
       <div className="flex justify-between items-center">
         <div className="space-y-1">
-          <h2 className="text-xl sm:text-2xl font-bold text-blue-900">Employee Management</h2>
+          <h2 className="text-xl sm:text-2xl font-bold text-primary">Employee Management</h2>
           <p className="text-sm text-slate-500 font-medium">
             Monitor attendance, department distribution, and visa statuses
           </p>
@@ -31,7 +31,7 @@ export default function EmployeesPage() {
       {/* TABLE SECTION */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <h3 className="text-lg font-bold text-blue-900 uppercase tracking-tight">
+          <h3 className="text-lg font-bold text-primary uppercase tracking-tight">
             Employee Directory
           </h3>
         </div>

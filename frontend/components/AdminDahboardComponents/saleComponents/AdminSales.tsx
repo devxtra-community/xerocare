@@ -1,6 +1,5 @@
 import StatCard from '@/components/StatCard';
 import SalesSummaryTable from './SalesSummaryTable';
-import SalesChart from '../dashboardComponents/SalesChart';
 
 import MonthlySalesBarChart from './monthlysalesChart';
 import MostSoldProductChart from './MostSoldProductChart';
@@ -10,7 +9,7 @@ export default function AdminSalesPage() {
     <div className="bg-blue-100 min-h-screen p-3 sm:p-4 md:p-6 space-y-8 sm:space-y-10">
       {/* SALES */}
       <div className="space-y-4 sm:space-y-6">
-        <h3 className="text-xl sm:text-2xl font-bold text-blue-900">Sales</h3>
+        <h3 className="text-xl sm:text-2xl font-bold text-primary">Sales</h3>
 
         {/* SUMMARY CARDS */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 sm:gap-2 md:gap-4">
@@ -21,18 +20,11 @@ export default function AdminSalesPage() {
         </div>
 
         {/* TABLE + TREND */}
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 sm:gap-6 items-stretch">
-          <div className="xl:col-span-2 flex flex-col space-y-4">
-            <h3 className="text-lg sm:text-xl font-bold text-blue-900">Sales Summary</h3>
+        <div className="grid grid-cols-1 gap-4 sm:gap-6 items-stretch">
+          <div className="flex flex-col space-y-4">
+            <h3 className="text-lg sm:text-xl font-bold text-primary">Sales Summary</h3>
             <div className="flex-1">
               <SalesSummaryTable />
-            </div>
-          </div>
-
-          <div className="flex flex-col space-y-4">
-            <h3 className="text-lg sm:text-xl font-bold text-blue-900">Sales Trend</h3>
-            <div className="flex-1 bg-white rounded-xl p-3">
-              <SalesChart />
             </div>
           </div>
         </div>
@@ -40,16 +32,14 @@ export default function AdminSalesPage() {
         {/* ANALYTICS */}
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 sm:gap-6">
           <div className="space-y-4">
-            <h4 className="text-lg sm:text-xl font-bold text-blue-900">Sales per Month</h4>
+            <h4 className="text-lg sm:text-xl font-bold text-primary">Sales per Month</h4>
             <div className="bg-white rounded-xl p-3">
               <MonthlySalesBarChart />
             </div>
           </div>
 
           <div className="space-y-4">
-            <h4 className="text-lg sm:text-xl font-bold text-blue-900">
-              Sold Products by Quantity
-            </h4>
+            <h4 className="text-lg sm:text-xl font-bold text-primary">Sold Products by Quantity</h4>
             <div className="bg-white rounded-xl p-3">
               <MostSoldProductChart />
             </div>

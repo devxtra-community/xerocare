@@ -7,13 +7,7 @@ import { SidebarTrigger } from '@/components/ui/sidebar';
 import { useEffect, useState } from 'react';
 import { getProfile } from '@/lib/auth';
 
-type DashboardHeaderProps = {
-  title?: string;
-};
-
-export default function DashboardHeader({
-  title = "Dashboard",
-}: DashboardHeaderProps) {
+export default function DashboardHeader({ title = 'Dashboard' }: { title?: string }) {
   const [user, setUser] = useState({
     name: '',
     email: '',

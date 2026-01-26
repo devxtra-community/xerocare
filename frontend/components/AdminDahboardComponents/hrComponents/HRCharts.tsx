@@ -71,7 +71,7 @@ export default function HRCharts() {
     <div className="flex flex-col lg:flex-row gap-6 mb-6">
       {/* Employee Growth Chart */}
       <div className="flex-1 bg-white p-6 rounded-2xl shadow-sm border-0">
-        <h3 className="text-lg font-semibold text-blue-900 mb-4">Employee Growth (Monthly)</h3>
+        <h3 className="text-lg font-semibold text-primary mb-4">Employee Growth (Monthly)</h3>
         <div className="h-[300px] w-full">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={mockGrowthData}>
@@ -99,7 +99,7 @@ export default function HRCharts() {
 
       {/* Role Distribution Chart */}
       <div className="w-full lg:w-[400px] bg-white p-6 rounded-2xl shadow-sm border-0">
-        <h3 className="text-lg font-semibold text-blue-900 mb-4">Role Distribution</h3>
+        <h3 className="text-lg font-semibold text-primary mb-4">Role Distribution</h3>
         <div className="h-[300px] w-full">
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>

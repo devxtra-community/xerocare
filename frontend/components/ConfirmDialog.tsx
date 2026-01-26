@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 import {
   AlertDialog,
@@ -9,7 +9,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+} from '@/components/ui/alert-dialog';
 
 type ConfirmDialogProps = {
   open: boolean;
@@ -24,10 +24,10 @@ type ConfirmDialogProps = {
 export default function ConfirmDialog({
   open,
   onOpenChange,
-  title = "Are you sure?",
-  description = "This action cannot be undone.",
-  confirmText = "Confirm",
-  cancelText = "Cancel",
+  title = 'Are you sure?',
+  description = 'This action cannot be undone.',
+  confirmText = 'Confirm',
+  cancelText = 'Cancel',
   onConfirm,
 }: ConfirmDialogProps) {
   return (
@@ -35,16 +35,12 @@ export default function ConfirmDialog({
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>{title}</AlertDialogTitle>
-          <AlertDialogDescription>
-            {description}
-          </AlertDialogDescription>
+          <AlertDialogDescription>{description}</AlertDialogDescription>
         </AlertDialogHeader>
 
         <AlertDialogFooter>
           <AlertDialogCancel>{cancelText}</AlertDialogCancel>
-          <AlertDialogAction onClick={onConfirm}>
-            {confirmText}
-          </AlertDialogAction>
+          <AlertDialogAction onClick={onConfirm}>{confirmText}</AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>

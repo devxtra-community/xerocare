@@ -18,6 +18,8 @@ export default function AdminLoginPage() {
             src="/office-login.png"
             alt="Modern Office Environment"
             fill
+            loading="eager" // LCP optimization
+            sizes="50vw" // Since it takes up half the width on large screens
             className="absolute inset-0 h-full w-full object-cover dark:brightness-[0.2] dark:grayscale"
           />
         </div>

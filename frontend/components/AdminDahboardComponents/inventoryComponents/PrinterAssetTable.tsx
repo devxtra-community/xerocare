@@ -94,7 +94,10 @@ export default function PrinterAssetTable() {
         </TableHeader>
         <TableBody>
           {data.map((item, idx) => (
-            <TableRow key={idx} className="hover:bg-gray-50/50">
+            <TableRow
+              key={idx}
+              className={`hover:bg-gray-50/50 ${idx % 2 !== 0 ? 'bg-blue-50/20' : 'bg-white'}`}
+            >
               <TableCell className="font-medium text-gray-900">{item.model}</TableCell>
               <TableCell className="text-gray-600">
                 <span

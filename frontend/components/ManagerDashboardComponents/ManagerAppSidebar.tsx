@@ -9,6 +9,8 @@ import {
   Users,
   Wallet,
   Tags,
+  Printer,
+  Settings,
 } from 'lucide-react';
 
 import {
@@ -39,6 +41,16 @@ const menuItems = [
     href: '/manager/products',
   },
   {
+    title: 'Models',
+    icon: Printer,
+    href: '/manager/models',
+  },
+  {
+    title: 'Spare Parts',
+    icon: Settings,
+    href: '/manager/spare-parts',
+  },
+  {
     title: 'Sales',
     icon: ShoppingCart,
     href: '/manager/sales',
@@ -58,6 +70,12 @@ const menuItems = [
     icon: Package,
     href: '/manager/orders',
   },
+  {
+    title: 'Purchases',
+    icon: ShoppingCart, // Reusing ShoppingCart or a different icon if preferred, but user asked for sidebar update.
+    href: '/manager/purchases',
+  },
+
   {
     title: 'Finance',
     icon: Wallet,

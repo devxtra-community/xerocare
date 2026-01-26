@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { adminLogin } from '@/lib/auth';
+import { jwtDecode } from 'jwt-decode';
 
 interface APIError {
   response?: {
@@ -42,7 +43,22 @@ export function AdminLoginForm({ className, ...props }: React.ComponentProps<'di
         // Set cookie for middleware access
         document.cookie = `accessToken=${res.accessToken}; path=/; max-age=86400; SameSite=Strict`;
 
-        router.push('/admin/dashboard');
+        // Decode token to get role and route accordingly
+        try {
+          const decoded = jwtDecode<{ role: string }>(res.accessToken);
+          const role = decoded.role;
+
+          if (role === 'ADMIN') {
+            router.push('/admin/dashboard');
+          } else if (role === 'HR') {
+            router.push('/hr/dashboard');
+          } else {
+            router.push('/admin/dashboard'); // fallback
+          }
+        } catch (e) {
+          console.error('Failed to decode token', e);
+          router.push('/admin/dashboard'); // fallback
+        }
       } else {
         setError(res.message || 'Login failed');
         toast.error(res.message || 'Login failed');

@@ -14,13 +14,28 @@ export class BranchController {
     res.json({ success: true, data: branches });
   };
 
+  getById = async (req: Request, res: Response) => {
+    const branch = await this.service.getBranchById(req.params.id as string);
+    res.json({ success: true, data: branch });
+  };
+
   update = async (req: Request, res: Response) => {
-    await this.service.updateBranch(req.params.id, req.body);
+    await this.service.updateBranch(req.params.id as string, req.body);
     res.json({ success: true, message: 'Branch updated successfully' });
   };
 
   delete = async (req: Request, res: Response) => {
-    await this.service.deleteBranch(req.params.id);
+    await this.service.deleteBranch(req.params.id as string);
     res.json({ success: true, message: 'Branch deleted successfully' });
+  };
+
+  getMyBranch = async (req: Request, res: Response) => {
+    const branchId = req.user?.branchId;
+    if (!branchId) {
+      res.status(400).json({ success: false, message: 'Branch ID not found in token' });
+      return;
+    }
+    const branch = await this.service.getBranchById(branchId);
+    res.json({ success: true, data: branch });
   };
 }

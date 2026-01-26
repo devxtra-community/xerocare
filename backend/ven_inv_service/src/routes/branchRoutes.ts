@@ -14,7 +14,11 @@ const branchController = new BranchController(branchService);
 
 router.post('/', authMiddleware, roleMiddleware(['ADMIN']), branchController.create);
 
-router.get('/', authMiddleware, roleMiddleware(['ADMIN']), branchController.list);
+router.get('/', authMiddleware, roleMiddleware(['ADMIN', 'HR']), branchController.list);
+
+router.get('/my-branch', authMiddleware, roleMiddleware(['MANAGER']), branchController.getMyBranch);
+
+router.get('/:id', authMiddleware, branchController.getById);
 
 router.put('/:id', authMiddleware, roleMiddleware(['ADMIN']), branchController.update);
 

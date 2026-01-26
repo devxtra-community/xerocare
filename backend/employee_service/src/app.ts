@@ -5,10 +5,10 @@ import './config/env';
 import adminRouter from './routes/adminRouter';
 import employeeRouter from './routes/employeeRouter';
 import authRouter from './routes/authRouter';
-import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import { getRabbitChannel } from './config/rabbitmq';
 import { startWorker } from './workers/emailWorker';
+import { startBranchConsumer } from './events/consumers/branchConsumer';
 import { httpLogger } from './middleware/httplogger';
 import healthRouter from './routes/health';
 import { logger } from './config/logger';
@@ -18,12 +18,7 @@ const app = express();
 app.use(express.json());
 app.use(cookieParser());
 app.use(urlencoded({ extended: true }));
-app.use(
-  cors({
-    origin: process.env.CLIENT_URL,
-    credentials: true,
-  }),
-);
+// CORS is handled by API Gateway - do not set CORS headers here
 
 const startServer = async () => {
   try {
@@ -31,6 +26,7 @@ const startServer = async () => {
     await getRabbitChannel();
     logger.info('RabbitMQ channel connected');
     await startWorker();
+    await startBranchConsumer();
     logger.info('Database connected');
 
     const PORT = process.env.PORT;

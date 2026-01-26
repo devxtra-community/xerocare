@@ -12,10 +12,10 @@ export const checkDatabase = async () => {
       status: 'UP',
     };
   } catch (error: unknown) {
-    const err = error instanceof Error ? error.message : String(error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return {
       status: 'DOWN',
-      error: err,
+      error: errorMessage,
     };
   }
 };

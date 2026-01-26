@@ -6,6 +6,8 @@ import { Admin } from '../entities/adminEntities';
 import { Employee } from '../entities/employeeEntities';
 import { Auth } from '../entities/authEntities';
 
+import { Branch } from '../entities/branchEntity';
+
 export const Source = new DataSource({
   type: 'postgres',
   url: process.env.DATABASE_URL,
@@ -13,5 +15,5 @@ export const Source = new DataSource({
     rejectUnauthorized: false,
   },
   synchronize: true,
-  entities: [Admin, Employee, Auth],
+  entities: [Admin, Employee, Auth, Branch],
 });

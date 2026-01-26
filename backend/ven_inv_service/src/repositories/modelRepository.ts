@@ -2,7 +2,9 @@ import { Source } from '../config/db';
 import { Model } from '../entities/modelEntity';
 
 export class ModelRepository {
-  private repo = Source.getRepository(Model);
+  private get repo() {
+    return Source.getRepository(Model);
+  }
 
   async addModel(data: Partial<Model>) {
     const model = this.repo.create(data);

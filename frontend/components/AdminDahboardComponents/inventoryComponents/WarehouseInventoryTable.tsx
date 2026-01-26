@@ -79,7 +79,7 @@ export default function WarehouseInventoryTable() {
             {currentData.map((item, index) => (
               <TableRow
                 key={item.id}
-                className={`border-none ${index % 2 === 1 ? 'bg-sky-100/60' : ''}`}
+                className={`border-none ${index % 2 === 1 ? 'bg-blue-50/20' : 'bg-white'}`}
               >
                 <TableCell className="py-1.5 sm:py-2 px-1 sm:px-2 text-[10px] sm:text-xs font-medium text-gray-900">
                   {item.name}

@@ -20,8 +20,8 @@ export const adminLogin = async (req: Request, res: Response, next: NextFunction
       success: true,
     });
   } catch (err: unknown) {
-    const error = err instanceof Error ? err : new Error(String(err));
-    next(new AppError(error.message, 500));
+    const error = err as { message: string; statusCode?: number };
+    next(new AppError(error.message, error.statusCode || 500));
   }
 };
 
@@ -36,7 +36,7 @@ export const adminLogout = async (req: Request, res: Response, next: NextFunctio
       isAdmin: true,
     });
   } catch (err: unknown) {
-    const error = err instanceof Error ? err : new Error(String(err));
-    next(new AppError(error.message, 500));
+    const error = err as { message: string; statusCode?: number };
+    next(new AppError(error.message, error.statusCode || 500));
   }
 };

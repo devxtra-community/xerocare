@@ -15,7 +15,6 @@ import {
   User,
   GraduationCap,
 } from 'lucide-react';
-import StatCard from '@/components/StatCard';
 
 export default function EmployeeProfilePage() {
   const params = useParams();
@@ -44,79 +43,64 @@ export default function EmployeeProfilePage() {
   };
 
   return (
-    <div className="bg-blue-100 min-h-screen p-3 sm:p-4 md:p-6 space-y-6">
+    <div className="min-h-screen bg-gray-50/50 p-6 space-y-8">
       {/* HEADER */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-4">
           <Button
-            variant="ghost"
+            variant="outline"
             size="icon"
-            className="h-9 w-9 bg-white shadow-sm ring-1 ring-blue-200/50 hover:bg-blue-50"
+            className="h-9 w-9 bg-white"
             onClick={() => router.back()}
           >
-            <ArrowLeft className="h-5 w-5 text-blue-900" />
+            <ArrowLeft className="h-4 w-4" />
           </Button>
           <div className="flex items-center gap-4">
-            <div className="h-14 w-14 rounded-2xl bg-primary flex items-center justify-center text-white text-2xl font-bold shadow-lg shadow-primary/20">
+            <div className="h-12 w-12 rounded-full bg-primary flex items-center justify-center text-white text-xl font-medium shadow-sm">
               {employee.name.charAt(0)}
             </div>
             <div>
-              <h3 className="text-xl font-bold text-blue-900 flex items-center gap-3">
+              <h3 className="text-lg font-semibold text-primary flex items-center gap-3">
                 {employee.name}
-                <span className="px-2.5 py-0.5 rounded-full text-[10px] bg-green-100 text-green-700 uppercase font-bold tracking-wider">
+                <span className="px-2 py-0.5 rounded-full text-xs bg-green-50 text-green-700 font-medium border border-green-100">
                   {employee.status}
                 </span>
               </h3>
-              <p className="text-sm text-blue-600 font-bold uppercase tracking-wide">
-                {employee.role} • {employee.department}
+              <p className="text-sm text-gray-500">
+                {employee.role} &middot; {employee.department}
               </p>
             </div>
           </div>
         </div>
         <div className="flex gap-2">
-          <Button className="bg-white text-blue-900 border-blue-200 hover:bg-blue-50 gap-2 h-10 font-bold px-5 rounded-xl shadow-sm">
+          <Button variant="outline" className="bg-white gap-2 h-9 font-medium px-4">
             <Mail className="h-4 w-4" /> Message
           </Button>
-          <Button className="bg-primary text-white hover:bg-primary/90 gap-2 h-10 font-bold px-5 rounded-xl shadow-lg shadow-primary/20">
-            Edit Profile
-          </Button>
+          <Button className="gap-2 h-9 font-medium px-4">Edit Profile</Button>
         </div>
-      </div>
-
-      {/* QUICK STATS */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard title="Attendance" value={employee.attendance} subtitle="Monthly Avg" />
-        <StatCard title="Leaves Taken" value={employee.leaves} subtitle="Annual Balance" />
-        <StatCard title="Performance" value={employee.performance} subtitle="Q4 Review" />
-        <StatCard title="Monthly Pay" value={employee.salary} subtitle="Base + HRA" />
       </div>
 
       {/* DETAILED INFO GRID */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* PERSONAL INFO */}
         <div className="lg:col-span-1 space-y-6">
-          <div className="bg-white rounded-2xl shadow-sm border border-blue-100/50 p-6">
-            <h4 className="text-xs font-bold text-blue-900 uppercase flex items-center gap-2 mb-6 tracking-widest pb-3 border-b border-gray-50">
-              <User className="h-4 w-4 text-primary" /> Personal Information
+          <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+            <h4 className="text-sm font-semibold text-gray-900 flex items-center gap-2 mb-6 pb-3 border-b border-gray-100">
+              <User className="h-4 w-4 text-gray-500" /> Personal Information
             </h4>
             <div className="space-y-5">
-              <InfoRow icon={<Mail />} label="Email" value={employee.email} />
+              <InfoRow icon={<Mail />} label="Email" value={employee.email} isCritical />
               <InfoRow icon={<Phone />} label="Phone" value={employee.phone} />
-              <InfoRow icon={<MapPin />} label="Address" value={employee.address} isLarge />
-              <InfoRow
-                icon={<GraduationCap />}
-                label="Education"
-                value={employee.education}
-                isLarge
-              />
+              <InfoRow icon={<MapPin />} label="Address" value={employee.address} />
+              <InfoRow icon={<GraduationCap />} label="Education" value={employee.education} />
             </div>
           </div>
 
-          <div className="bg-white rounded-2xl shadow-sm border border-blue-100/50 p-6">
-            <h4 className="text-xs font-bold text-blue-900 uppercase flex items-center gap-2 mb-6 tracking-widest pb-3 border-b border-gray-50">
-              <ShieldCheck className="h-4 w-4 text-primary" /> Verified Documents
+          <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+            <h4 className="text-sm font-semibold text-gray-900 flex items-center gap-2 mb-6 pb-3 border-b border-gray-100">
+              <ShieldCheck className="h-4 w-4 text-gray-500" /> Documents
             </h4>
-            <div className="space-y-4">
+            <div className="space-y-3">
               <DocumentRow name="VisaCopy_2025.pdf" size="2.4 MB" />
               <DocumentRow name="ID_Proof_Aadhar.pdf" size="1.2 MB" />
               <DocumentRow name="Joining_Letter.pdf" size="845 KB" />
@@ -124,16 +108,26 @@ export default function EmployeeProfilePage() {
           </div>
         </div>
 
-        {/* WORK INFO & ACTIVITY */}
+        {/* WORK INFO */}
         <div className="lg:col-span-2 space-y-6">
-          <div className="bg-white rounded-2xl shadow-sm border border-blue-100/50 p-6">
-            <h4 className="text-xs font-bold text-blue-900 uppercase flex items-center gap-2 mb-6 tracking-widest pb-3 border-b border-gray-50">
-              <Briefcase className="h-4 w-4 text-primary" /> Employment Details
+          <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+            <h4 className="text-sm font-semibold text-gray-900 flex items-center gap-2 mb-6 pb-3 border-b border-gray-100">
+              <Briefcase className="h-4 w-4 text-gray-500" /> Employment Details
             </h4>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-8">
               <div className="space-y-6">
-                <InfoRow icon={<Calendar />} label="Joining Date" value={employee.joiningDate} />
-                <InfoRow icon={<Briefcase />} label="Department" value={employee.department} />
+                <InfoRow
+                  icon={<Calendar />}
+                  label="Joining Date"
+                  value={employee.joiningDate}
+                  isCritical
+                />
+                <InfoRow
+                  icon={<Briefcase />}
+                  label="Department"
+                  value={employee.department}
+                  isCritical
+                />
                 <InfoRow icon={<Calendar />} label="Probation End" value="15 Apr 2023" />
               </div>
               <div className="space-y-6">
@@ -158,7 +152,6 @@ function InfoRow({
   icon,
   label,
   value,
-  isLarge = false,
   isCritical = false,
 }: {
   icon: React.ReactElement;
@@ -168,15 +161,11 @@ function InfoRow({
   isCritical?: boolean;
 }) {
   return (
-    <div className="flex items-start gap-4 group">
-      <div className="mt-1 p-2 bg-blue-50 rounded-xl text-blue-600 group-hover:bg-primary group-hover:text-white transition-colors duration-200 *:h-4 *:w-4">
-        {icon}
-      </div>
+    <div className="flex items-start gap-4">
+      <div className="mt-0.5 text-gray-400 *:h-4 *:w-4">{icon}</div>
       <div className="space-y-1">
-        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{label}</p>
-        <p
-          className={`text-sm font-bold ${isCritical ? 'text-red-600' : 'text-gray-900'} ${isLarge ? 'leading-relaxed' : ''}`}
-        >
+        <p className="text-xs font-medium text-gray-500">{label}</p>
+        <p className={`text-sm font-medium ${isCritical ? 'text-primary' : 'text-gray-900'}`}>
           {value}
         </p>
       </div>
@@ -186,22 +175,22 @@ function InfoRow({
 
 function DocumentRow({ name, size }: { name: string; size: string }) {
   return (
-    <div className="flex items-center justify-between p-3 rounded-xl border border-gray-50 hover:border-blue-200 hover:bg-blue-50/30 transition-all duration-200 group">
+    <div className="flex items-center justify-between p-3 rounded-lg border border-gray-100 hover:bg-gray-50 transition-colors">
       <div className="flex items-center gap-3">
-        <div className="h-9 w-9 bg-red-50 text-red-600 rounded-lg flex items-center justify-center">
-          <FileText className="h-5 w-5" />
+        <div className="h-8 w-8 bg-gray-100 text-gray-500 rounded flex items-center justify-center">
+          <FileText className="h-4 w-4" />
         </div>
         <div className="flex flex-col">
-          <p className="text-xs font-bold text-gray-900 truncate max-w-[150px]">{name}</p>
-          <p className="text-[10px] text-gray-400 font-bold">{size}</p>
+          <p className="text-sm font-medium text-gray-900 truncate max-w-[150px]">{name}</p>
+          <p className="text-xs text-gray-500">{size}</p>
         </div>
       </div>
       <Button
         variant="ghost"
         size="sm"
-        className="text-blue-600 font-bold hover:bg-white shadow-sm ring-1 ring-blue-100"
+        className="text-primary hover:text-primary hover:bg-transparent px-2 h-8"
       >
-        VIEW
+        View
       </Button>
     </div>
   );

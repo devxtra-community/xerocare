@@ -33,6 +33,7 @@ export class EmployeeRepository {
 
     const [data, total] = await this.repo.findAndCount({
       where: whereCondition,
+      relations: ['branch'],
       order: { createdAt: 'DESC' },
       skip,
       take,
@@ -44,6 +45,7 @@ export class EmployeeRepository {
   async findByIdSafe(id: string) {
     return this.repo.findOne({
       where: { id },
+      relations: ['branch'],
     });
   }
   async updateById(id: string, payload: Partial<Employee>): Promise<Employee | null> {

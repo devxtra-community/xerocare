@@ -13,13 +13,12 @@ export default function CategoryPieChart() {
   const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsClient(true);
   }, []);
 
   return (
     <div className="rounded-2xl bg-white shadow-sm w-full p-4 h-[260px] flex flex-col">
-      <h3 className="text-base font-semibold text-blue-900 mb-3">Category</h3>
+      <h3 className="text-base font-semibold text-primary mb-3">Category</h3>
 
       <div className="relative w-[120px] h-[120px] mx-auto mb-4">
         {isClient && (

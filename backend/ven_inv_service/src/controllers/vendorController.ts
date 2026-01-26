@@ -32,7 +32,7 @@ export class VendorController {
 
   getVendorById = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const vendor = await this.vendorService.getVendorById(req.params.id);
+      const vendor = await this.vendorService.getVendorById(req.params.id as string);
 
       return res.json({
         success: true,
@@ -45,7 +45,7 @@ export class VendorController {
 
   updateVendor = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const vendor = await this.vendorService.updateVendor(req.params.id, req.body);
+      const vendor = await this.vendorService.updateVendor(req.params.id as string, req.body);
 
       return res.json({
         success: true,
@@ -58,7 +58,7 @@ export class VendorController {
 
   deleteVendor = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      await this.vendorService.deleteVendor(req.params.id);
+      await this.vendorService.deleteVendor(req.params.id as string);
 
       return res.json({
         success: true,

@@ -22,7 +22,7 @@ export default function Home() {
           <div className="space-y-8">
             <Badge
               variant="secondary"
-              className="bg-blue-900/30 text-blue-400 hover:bg-blue-900/40 px-4 py-1.5 rounded-full text-xs font-semibold tracking-wide uppercase"
+              className="bg-primary/30 text-blue-400 hover:bg-primary/40 px-4 py-1.5 rounded-full text-xs font-semibold tracking-wide uppercase"
             >
               10k Users Around The World
             </Badge>

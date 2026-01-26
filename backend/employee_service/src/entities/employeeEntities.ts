@@ -5,8 +5,11 @@ import {
   PrimaryGeneratedColumn,
   Entity,
   Index,
+  ManyToOne,
+  JoinColumn,
 } from 'typeorm';
 import { EmployeeRole } from '../constants/employeeRole';
+import { Branch } from './branchEntity';
 
 export enum EmployeeStatus {
   ACTIVE = 'ACTIVE',
@@ -63,4 +66,11 @@ export class Employee {
 
   @Column({ type: 'timestamp with time zone', nullable: true })
   expire_date!: Date | null;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  branch_id!: string | null;
+
+  @ManyToOne(() => Branch, { nullable: true })
+  @JoinColumn({ name: 'branch_id' })
+  branch!: Branch | null;
 }

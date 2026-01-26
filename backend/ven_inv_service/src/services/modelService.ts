@@ -6,11 +6,11 @@ export class ModelService {
   private modelRepository = new ModelRepository();
 
   async createModel(data: Partial<Model>) {
-    const product = this.modelRepository.addModel(data);
-    if (!product) {
+    const newmodel = this.modelRepository.addModel(data);
+    if (!newmodel) {
       throw new AppError('Model creation failed', 404);
     }
-    return product;
+    return newmodel;
   }
 
   async fetchAllModels() {

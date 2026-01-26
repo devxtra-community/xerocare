@@ -9,6 +9,8 @@ import { EmployeeStatus } from '../entities/employeeEntities';
 import { publishEmployeeEvent } from '../events/publishers/eventPublisher';
 import { EmployeeEventType } from '../events/employeeEvents';
 import { logger } from '../config/logger';
+import { Branch } from '../entities/branchEntity';
+import { Source } from '../config/dataSource';
 
 export class EmployeeService {
   private employeeRepo = new EmployeeRepository();
@@ -22,6 +24,7 @@ export class EmployeeService {
     salary?: number | null;
     profile_image_url?: string | null;
     id_proof_key?: string | null;
+    branchId?: string;
   }) {
     const {
       first_name,
@@ -32,6 +35,7 @@ export class EmployeeService {
       salary,
       profile_image_url,
       id_proof_key,
+      branchId,
     } = payload;
 
     const existing = await this.employeeRepo.findByEmail(email);
@@ -47,6 +51,14 @@ export class EmployeeService {
       throw new AppError('Invalid role', 400);
     }
 
+    if (branchId) {
+      const branchRepo = Source.getRepository(Branch);
+      const branch = await branchRepo.findOne({ where: { branch_id: branchId } });
+      if (!branch) {
+        throw new AppError('Invalid Branch ID', 400);
+      }
+    }
+
     const roleEnum = (role ?? EmployeeRole.EMPLOYEE) as EmployeeRole;
 
     const count = await this.employeeRepo.countByRole(roleEnum);
@@ -57,7 +69,9 @@ export class EmployeeService {
           ? 'H'
           : roleEnum === EmployeeRole.MANAGER
             ? 'M'
-            : 'E';
+            : roleEnum === EmployeeRole.FINANCE
+              ? 'F'
+              : 'E';
     const display_id = `${prefix}${String(count + 1).padStart(2, '0')}`;
 
     const plainPassword = generateRandomPassword();
@@ -75,6 +89,7 @@ export class EmployeeService {
       profile_image_url: profile_image_url ?? null,
       id_proof_key: id_proof_key ?? null,
       expire_date: expireDate ?? null,
+      branch_id: branchId ?? null,
     });
 
     await publishEmployeeEvent(EmployeeEventType.CREATED, {
@@ -138,6 +153,22 @@ export class EmployeeService {
     return employee;
   }
 
+  async getPublicEmployeeProfile(id: string) {
+    const employee = await this.employeeRepo.findByIdSafe(id);
+
+    if (!employee) {
+      throw new AppError('Employee not found', 404);
+    }
+
+    return {
+      id: employee.id,
+      name: `${employee.first_name} ${employee.last_name}`,
+      email: employee.email,
+      role: employee.role,
+      branchId: employee.branch_id,
+    };
+  }
+
   async updateEmployee(
     id: string,
     payload: {
@@ -149,6 +180,7 @@ export class EmployeeService {
       id_proof_key?: string | null;
       expireDate?: Date | null;
       status?: EmployeeStatus;
+      branchId?: string | null;
     },
   ) {
     const employee = await this.employeeRepo.findById(id);
@@ -165,9 +197,18 @@ export class EmployeeService {
       throw new AppError('Invalid role', 400);
     }
 
+    if (payload.branchId) {
+      const branchRepo = Source.getRepository(Branch);
+      const branch = await branchRepo.findOne({ where: { branch_id: payload.branchId } });
+      if (!branch) {
+        throw new AppError('Invalid Branch ID', 400);
+      }
+    }
+
     const updated = await this.employeeRepo.updateById(id, {
       ...payload,
       expire_date: payload.expireDate !== undefined ? payload.expireDate : employee.expire_date,
+      branch_id: payload.branchId !== undefined ? payload.branchId : employee.branch_id,
     });
 
     if (!updated) {

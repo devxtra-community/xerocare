@@ -15,8 +15,10 @@ export function middleware(request: NextRequest) {
 
   // Define protected routes and their allowed roles
   const protectedRoutes = [
-    { path: '/admin', roles: ['ADMIN', 'HR'] },
+    { path: '/admin', roles: ['ADMIN'] },
+    { path: '/hr', roles: ['HR'] },
     { path: '/manager', roles: ['MANAGER'] },
+    { path: '/employee', roles: ['EMPLOYEE'] },
     // Add more as needed
   ];
 
@@ -43,10 +45,14 @@ export function middleware(request: NextRequest) {
       if (!protectedRoute.roles.includes(decoded.role)) {
         // Redirect to unauthorized page or dashboard if role doesn't match
         // For now, let's redirect to their appropriate dashboard or home
-        if (decoded.role === 'MANAGER') {
-          return NextResponse.redirect(new URL('/manager/dashboard', request.url));
-        } else if (['ADMIN', 'HR'].includes(decoded.role)) {
+        if (decoded.role === 'ADMIN') {
           return NextResponse.redirect(new URL('/admin/dashboard', request.url));
+        } else if (decoded.role === 'HR') {
+          return NextResponse.redirect(new URL('/hr/dashboard', request.url));
+        } else if (decoded.role === 'MANAGER') {
+          return NextResponse.redirect(new URL('/manager/dashboard', request.url));
+        } else if (decoded.role === 'EMPLOYEE') {
+          return NextResponse.redirect(new URL('/employee/dashboard', request.url));
         } else {
           return NextResponse.redirect(new URL('/', request.url)); // Or /unauthorized
         }
@@ -64,5 +70,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/admin/:path*', '/manager/:path*'],
+  matcher: ['/admin/:path*', '/hr/:path*', '/manager/:path*', '/employee/:path*'],
 };

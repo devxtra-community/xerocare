@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import { WarehouseService } from '../services/warehouseService';
 
 export class WarehouseController {
-  constructor(private readonly service: WarehouseService) {}
+  private service = new WarehouseService();
 
   create = async (req: Request, res: Response) => {
     const warehouse = await this.service.createWarehouse(req.body);
@@ -15,17 +15,17 @@ export class WarehouseController {
   };
 
   getOne = async (req: Request, res: Response) => {
-    const warehouse = await this.service.getWarehouseById(req.params.id);
+    const warehouse = await this.service.getWarehouseById(req.params.id as string);
     res.json({ success: true, data: warehouse });
   };
 
   update = async (req: Request, res: Response) => {
-    const warehouse = await this.service.updateWarehouse(req.params.id, req.body);
+    const warehouse = await this.service.updateWarehouse(req.params.id as string, req.body);
     res.json({ success: true, data: warehouse });
   };
 
   delete = async (req: Request, res: Response) => {
-    await this.service.deleteWarehouse(req.params.id);
+    await this.service.deleteWarehouse(req.params.id as string);
     res.json({ success: true, message: 'Warehouse deleted successfully' });
   };
 }

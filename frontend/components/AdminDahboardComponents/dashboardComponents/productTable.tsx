@@ -1,36 +1,28 @@
 'use client';
 
-import { useState } from 'react';
-import {
-  // Table imports removed as they were unused
-} from '@/components/ui/table';
+import { useState, useEffect } from 'react';
+import {} from // Table imports removed as they were unused
+'@/components/ui/table';
+import { Product, getAllProducts } from '@/lib/product';
 
 export default function ProductsTable() {
   const [page, setPage] = useState(1);
+  const [data, setData] = useState<Product[]>([]);
 
-  const data = [
-    { name: 'Macbook Pro', qty: 2, price: '2999 AZN', date: '20.09.2024' },
-    { name: 'Macbook Air', qty: 4, price: '1499 AZN', date: '19.09.2024' },
-    { name: 'Iphone 15 Pro', qty: 15, price: '3999 AZN', date: '18.09.2024' },
-    {
-      name: 'Iphone 15 Pro Max',
-      qty: 10,
-      price: '4499 AZN',
-      date: '19.09.2024',
-    },
-    { name: 'Iphone 15', qty: 12, price: '1999 AZN', date: '17.09.2024' },
-    { name: 'Macbook Pro', qty: 2, price: '2999 AZN', date: '20.09.2024' },
-    { name: 'Macbook Air', qty: 4, price: '1499 AZN', date: '19.09.2024' },
-    { name: 'Iphone 15 Pro', qty: 15, price: '3999 AZN', date: '18.09.2024' },
-    {
-      name: 'Iphone 15 Pro Max',
-      qty: 10,
-      price: '4499 AZN',
-      date: '19.09.2024',
-    },
-    { name: 'Iphone 15', qty: 12, price: '1999 AZN', date: '17.09.2024' },
-    { name: 'Iphone 15', qty: 12, price: '1999 AZN', date: '17.09.2024' },
-  ];
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const products = await getAllProducts();
+        setData(products);
+      } catch (error) {
+        console.error(error);
+      }
+    };
+    fetchData();
+  }, []);
+
+  const getTotalStock = (p: Product) =>
+    p.inventory?.reduce((sum, inv) => sum + inv.quantity, 0) || 0;
 
   const ITEMS_PER_PAGE = 5;
   const totalPages = Math.ceil(data.length / ITEMS_PER_PAGE);
@@ -39,7 +31,7 @@ export default function ProductsTable() {
 
   return (
     <div className="rounded-2xl bg-white p-2 sm:p-3 shadow-sm w-full h-[260px] flex flex-col">
-      <div className="flex-1 overflow-hidden">
+      <div className="flex-1 overflow-x-auto">
         <table className="w-full">
           <thead>
             <tr className="border-b">
@@ -58,22 +50,30 @@ export default function ProductsTable() {
             </tr>
           </thead>
           <tbody>
-            {currentData.map((item, index) => (
-              <tr key={index} className={index % 2 === 1 ? 'bg-sky-100/60' : ''}>
-                <td className="py-1.5 sm:py-2 px-1 sm:px-2 text-[10px] sm:text-xs font-medium text-gray-900">
-                  {item.name}
-                </td>
-                <td className="py-1.5 sm:py-2 px-1 sm:px-2 text-[10px] sm:text-xs text-gray-700">
-                  {item.qty}
-                </td>
-                <td className="py-1.5 sm:py-2 px-1 sm:px-2 text-[10px] sm:text-xs text-gray-700">
-                  {item.price}
-                </td>
-                <td className="py-1.5 sm:py-2 px-1 sm:px-2 text-[10px] sm:text-xs text-gray-700">
-                  {item.date}
+            {currentData.length > 0 ? (
+              currentData.map((item, index) => (
+                <tr key={item.id} className={index % 2 === 1 ? 'bg-sky-100/60' : ''}>
+                  <td className="py-1.5 sm:py-2 px-1 sm:px-2 text-[10px] sm:text-xs font-medium text-gray-900">
+                    {item.name}
+                  </td>
+                  <td className="py-1.5 sm:py-2 px-1 sm:px-2 text-[10px] sm:text-xs text-gray-700">
+                    {getTotalStock(item)}
+                  </td>
+                  <td className="py-1.5 sm:py-2 px-1 sm:px-2 text-[10px] sm:text-xs text-gray-700">
+                    {item.sale_price}
+                  </td>
+                  <td className="py-1.5 sm:py-2 px-1 sm:px-2 text-[10px] sm:text-xs text-gray-700">
+                    {item.created_at ? new Date(item.created_at).toLocaleDateString() : 'N/A'}
+                  </td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan={4} className="text-center py-6 text-xs text-gray-500">
+                  No products found
                 </td>
               </tr>
-            ))}
+            )}
           </tbody>
         </table>
       </div>
@@ -100,23 +100,16 @@ export default function ProductsTable() {
             <button
               key={pageNum}
               onClick={() => setPage(pageNum)}
-              className={`px-1.5 sm:px-2 py-0.5 rounded-md transition ${page === pageNum ? 'bg-primary text-white' : 'border hover:bg-gray-50'
-                }`}
+              className={`px-1.5 sm:px-2 py-0.5 rounded-md transition ${
+                page === pageNum ? 'bg-primary text-white' : 'border hover:bg-gray-50'
+              }`}
             >
               {pageNum}
             </button>
           );
         })}
 
-        {totalPages > 4 && (
-          <button
-            onClick={() => setPage(totalPages)}
-            className={`px-1.5 sm:px-2 py-0.5 rounded-md border transition ${page === totalPages ? 'bg-primary text-white' : 'hover:bg-gray-50'
-              }`}
-          >
-            {totalPages}
-          </button>
-        )}
+        {totalPages > 4 && <button onClick={() => setPage(totalPages)}>{totalPages}</button>}
 
         <button
           onClick={() => setPage((p) => Math.min(totalPages, p + 1))}

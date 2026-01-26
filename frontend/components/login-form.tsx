@@ -83,10 +83,16 @@ export function LoginForm({ className, ...props }: React.ComponentProps<'div'>) 
           const decoded = jwtDecode<{ role: string }>(res.accessToken);
           const role = decoded.role;
 
-          if (role === 'ADMIN' || role === 'HR') {
+          if (role === 'ADMIN') {
             router.push('/admin/dashboard');
+          } else if (role === 'HR') {
+            router.push('/hr/dashboard');
           } else if (role === 'MANAGER') {
             router.push('/manager/dashboard');
+          } else if (role === 'FINANCE') {
+            router.push('/finance/dashboard');
+          } else if (role === 'EMPLOYEE') {
+            router.push('/employee/dashboard');
           } else {
             router.push('/dashboard');
           }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Search, Plus, X, Trash2 } from 'lucide-react';
@@ -21,172 +21,190 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import StatCard from '@/components/StatCard';
-
-type Product = {
-  id: string;
-  name: string;
-  Model: string;
-  category: string;
-  price: number;
-  stock: number;
-  status: 'in-stock' | 'out-of-stock';
-  image?: string;
-};
-
-const initialProducts: Product[] = [
-  {
-    id: '1',
-    name: 'HP LaserJet Pro',
-    Model: 'HP-LJ-982345',
-    category: 'Printer',
-    price: 30000,
-    stock: 12,
-    status: 'in-stock',
-    image: '',
-  },
-  {
-    id: '2',
-    name: 'Canon ImageCLASS',
-    Model: 'CN-IMG-774521',
-    category: 'Printer',
-    price: 26000,
-    stock: 8,
-    status: 'in-stock',
-    image: '',
-  },
-];
+import { BulkProductDialog } from './BulkProductDialog';
+import { productService, Product, CreateProductDTO } from '@/services/productService';
+import { modelService, Model } from '@/services/modelService';
+import { commonService, Vendor, Warehouse } from '@/services/commonService';
+import { toast } from 'sonner';
 
 export default function ManagerProduct() {
-  const [products, setProducts] = useState(initialProducts);
+  const [products, setProducts] = useState<Product[]>([]);
   const [search, setSearch] = useState('');
   const [formOpen, setFormOpen] = useState(false);
+  const [bulkDialogOpen, setBulkDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Product | null>(null);
   const [deleting, setDeleting] = useState<Product | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const fetchProducts = async () => {
+    try {
+      setLoading(true);
+      const data = await productService.getAllProducts();
+      setProducts(data);
+    } catch {
+      toast.error('Failed to fetch products');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchProducts();
+  }, []);
 
   const filtered = products.filter((p) =>
-    `${p.name} ${p.Model} ${p.category}`.toLowerCase().includes(search.toLowerCase()),
+    `${p.name} ${p.brand} ${p.serial_no}`.toLowerCase().includes(search.toLowerCase()),
   );
 
   const total = products.length;
-  const inStock = products.filter((p) => p.status === 'in-stock').length;
-  const outStock = products.filter((p) => p.status === 'out-of-stock').length;
-  const lowStock = products.filter((p) => p.stock > 0 && p.stock < 5).length;
+  // Stats calculation based on available data
+  const inStock = products.filter((p) => p.product_status === 'AVAILABLE').length;
+  const rented = products.filter((p) => p.product_status === 'RENTED').length;
+  const sold = products.filter((p) => p.product_status === 'SOLD').length;
 
-  const handleSave = (data: Product) => {
-    setProducts((prev) =>
-      editing ? prev.map((p) => (p.id === data.id ? data : p)) : [...prev, data],
-    );
+  const handleSave = async () => {
     setFormOpen(false);
     setEditing(null);
+    fetchProducts(); // Refresh list
   };
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (!deleting) return;
-    setProducts((prev) => prev.filter((p) => p.id !== deleting.id));
+    try {
+      await productService.deleteProduct(deleting.id);
+      toast.success('Product deleted successfully');
+      fetchProducts();
+    } catch {
+      toast.error('Failed to delete product');
+    }
     setDeleting(null);
   };
 
   return (
-    <div className="bg-blue-100 min-h-screen p-3 sm:p-4 md:p-6 space-y-8">
-      <h3 className="text-xl sm:text-2xl font-bold text-blue-900">Products</h3>
+    <div className="bg-blue-100 min-h-screen p-3 sm:p-4 md:p-6 space-y-4">
+      <div className="flex justify-between items-center">
+        <h3 className="text-xl sm:text-2xl font-bold text-primary">Products</h3>
+      </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-        <StatCard title="Total Products" value={total.toString()} subtitle="All items" />
-        <StatCard title="In Stock" value={inStock.toString()} subtitle="Available" />
-        <StatCard title="Out of Stock" value={outStock.toString()} subtitle="Unavailable" />
-        <StatCard title="Low Stock" value={lowStock.toString()} subtitle="Below 5 qty" />
+        <StatCard title="Total Inventory" value={total.toString()} subtitle="All Items" />
+        <StatCard title="Available" value={inStock.toString()} subtitle="In Warehouse" />
+        <StatCard title="Rented" value={rented.toString()} subtitle="Active Rentals" />
+        <StatCard title="Sold" value={sold.toString()} subtitle="Total Sales" />
       </div>
 
       <div className="flex items-center justify-between">
         <div className="relative w-[260px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
           <Input
-            placeholder="Search product"
+            placeholder="Search by name, brand, serial..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="pl-9"
           />
         </div>
 
-        <Button
-          className="bg-primary text-white gap-2"
-          onClick={() => {
-            setEditing(null);
-            setFormOpen(true);
-          }}
-        >
-          <Plus size={16} /> Add Product
-        </Button>
+        <div>
+          <Button
+            className="bg-primary text-white gap-2"
+            onClick={() => {
+              setEditing(null);
+              setFormOpen(true);
+            }}
+          >
+            <Plus size={16} /> Add Product
+          </Button>
+          <Button
+            className="bg-green-600 hover:bg-green-700 text-white gap-2 ml-2"
+            onClick={() => setBulkDialogOpen(true)}
+          >
+            <Plus size={16} /> Bulk Add
+          </Button>
+        </div>
       </div>
 
       <div className="rounded-2xl bg-white shadow-sm overflow-hidden">
         <Table>
           <TableHeader>
             <TableRow>
-              {['IMAGE', 'PRODUCT', 'Model', 'CATEGORY', 'PRICE', 'STOCK', 'STATUS', 'ACTION'].map(
-                (h) => (
-                  <TableHead key={h} className="text-[11px] font-semibold text-blue-900 px-4">
-                    {h}
-                  </TableHead>
-                ),
-              )}
+              {['IMAGE', 'PRODUCT', 'BRAND', 'SERIAL NO', 'PRICE', 'STATUS', 'ACTION'].map((h) => (
+                <TableHead key={h} className="text-[11px] font-semibold text-primary px-4">
+                  {h}
+                </TableHead>
+              ))}
             </TableRow>
           </TableHeader>
 
           <TableBody>
-            {filtered.map((p, i) => (
-              <TableRow key={p.id} className={i % 2 ? 'bg-sky-100/60' : ''}>
-                <TableCell className="px-4">
-                  {p.image ? (
-                    <div className="relative h-8 w-8 rounded overflow-hidden">
-                      <Image
-                        src={p.image}
-                        alt={p.name}
-                        fill
-                        className="object-cover"
-                        unoptimized={p.image.startsWith('data:')}
-                      />
-                    </div>
-                  ) : (
-                    <div className="h-8 w-8 rounded bg-gray-100 flex items-center justify-center text-xs text-gray-400">
-                      N/A
-                    </div>
-                  )}
-                </TableCell>
-                <TableCell className="px-4 font-medium">{p.name}</TableCell>
-                <TableCell className="px-4">{p.Model}</TableCell>
-                <TableCell className="px-4">{p.category}</TableCell>
-                <TableCell className="px-4">₹{p.price}</TableCell>
-                <TableCell className="px-4">{p.stock}</TableCell>
-                <TableCell className="px-4">
-                  <span
-                    className={`px-2 py-1 rounded-full text-xs ${
-                      p.status === 'in-stock'
-                        ? 'bg-green-100 text-green-700'
-                        : 'bg-red-100 text-red-700'
-                    }`}
-                  >
-                    {p.status}
-                  </span>
-                </TableCell>
-                <TableCell className="px-4">
-                  <div className="flex gap-3 text-sm">
-                    <button
-                      className="text-blue-900 hover:underline"
-                      onClick={() => {
-                        setEditing(p);
-                        setFormOpen(true);
-                      }}
-                    >
-                      Update
-                    </button>
-                    <button className="text-red-600 hover:underline" onClick={() => setDeleting(p)}>
-                      Delete
-                    </button>
-                  </div>
+            {loading ? (
+              <TableRow>
+                <TableCell colSpan={7} className="text-center py-8">
+                  Loading...
                 </TableCell>
               </TableRow>
-            ))}
+            ) : filtered.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={7} className="text-center py-8 text-gray-500">
+                  No products found.
+                </TableCell>
+              </TableRow>
+            ) : (
+              filtered.map((p, i) => (
+                <TableRow key={p.id} className={i % 2 ? 'bg-sky-100/60' : ''}>
+                  <TableCell className="px-4">
+                    {p.imageUrl ? (
+                      <div className="relative h-8 w-8 rounded overflow-hidden">
+                        <Image
+                          src={p.imageUrl}
+                          alt={p.name}
+                          fill
+                          className="object-cover"
+                          unoptimized={p.imageUrl.startsWith('data:')}
+                        />
+                      </div>
+                    ) : (
+                      <div className="h-8 w-8 rounded bg-gray-100 flex items-center justify-center text-xs text-gray-400">
+                        N/A
+                      </div>
+                    )}
+                  </TableCell>
+                  <TableCell className="px-4 font-medium">{p.name}</TableCell>
+                  <TableCell className="px-4">{p.brand}</TableCell>
+                  <TableCell className="px-4">{p.serial_no}</TableCell>
+                  <TableCell className="px-4">₹{p.sale_price}</TableCell>
+                  <TableCell className="px-4">
+                    <span
+                      className={`px-2 py-1 rounded-full text-xs ${
+                        p.product_status === 'AVAILABLE'
+                          ? 'bg-green-100 text-green-700'
+                          : 'bg-yellow-100 text-yellow-700'
+                      }`}
+                    >
+                      {p.product_status}
+                    </span>
+                  </TableCell>
+                  <TableCell className="px-4">
+                    <div className="flex gap-3 text-sm">
+                      <button
+                        className="text-primary hover:underline"
+                        onClick={() => {
+                          setEditing(p);
+                          setFormOpen(true);
+                        }}
+                      >
+                        Update
+                      </button>
+                      <button
+                        className="text-red-600 hover:underline"
+                        onClick={() => setDeleting(p)}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
           </TableBody>
         </Table>
       </div>
@@ -206,6 +224,12 @@ export default function ManagerProduct() {
           onConfirm={confirmDelete}
         />
       )}
+
+      <BulkProductDialog
+        open={bulkDialogOpen}
+        onClose={() => setBulkDialogOpen(false)}
+        onSuccess={fetchProducts}
+      />
     </div>
   );
 }
@@ -217,105 +241,202 @@ function ProductFormModal({
 }: {
   initialData: Product | null;
   onClose: () => void;
-  onConfirm: (data: Product) => void;
+  onConfirm: () => void;
 }) {
-  const [form, setForm] = useState<Product>(
-    initialData ?? {
-      id: crypto.randomUUID(),
-      name: '',
-      Model: '',
-      category: 'Printer',
-      price: 0,
-      stock: 0,
-      status: 'in-stock',
-      image: '',
-    },
-  );
+  // Load dependencies
+  const [models, setModels] = useState<Model[]>([]);
+  const [vendors, setVendors] = useState<Vendor[]>([]);
+  const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
+
+  const [form, setForm] = useState<Partial<CreateProductDTO>>({
+    name: initialData?.name || '',
+    brand: initialData?.brand || '',
+    serial_no: initialData?.serial_no || '',
+    model_id: initialData?.model_id || '',
+    vendor_id: initialData?.vendor_id || '',
+    warehouse_id: initialData?.warehouse_id || '',
+    sale_price: initialData?.sale_price || 0,
+    tax_rate: initialData?.tax_rate || 0,
+    MFD: initialData?.MFD ? new Date(initialData.MFD).toISOString().split('T')[0] : '',
+    product_status: initialData?.product_status || 'AVAILABLE',
+    imageUrl: initialData?.imageUrl || '',
+  });
+
+  useEffect(() => {
+    const loadDependencies = async () => {
+      try {
+        const [m, v, w] = await Promise.all([
+          modelService.getAllModels(),
+          commonService.getAllVendors(),
+          commonService.getAllWarehouses(),
+        ]);
+        setModels(m);
+        setVendors(v);
+        setWarehouses(w);
+      } catch {
+        toast.error('Failed to load form dependencies');
+      }
+    };
+    loadDependencies();
+  }, []);
 
   const handleImageUpload = (file: File) => {
     const reader = new FileReader();
-    reader.onloadend = () => setForm({ ...form, image: reader.result as string });
+    reader.onloadend = () => setForm({ ...form, imageUrl: reader.result as string });
     reader.readAsDataURL(file);
+  };
+
+  const handleSubmit = async () => {
+    try {
+      if (initialData) {
+        await productService.updateProduct(initialData.id, form);
+        toast.success('Product updated!');
+      } else {
+        await productService.createProduct(form as CreateProductDTO);
+        toast.success('Product created!');
+      }
+      onConfirm();
+    } catch {
+      toast.error('Operation failed');
+    }
   };
 
   return (
     <Modal title={initialData ? 'Update Product' : 'Add Product'} onClose={onClose}>
-      <Field label="Product Image">
-        <div className="flex items-center gap-4">
-          {form.image ? (
-            <div className="relative h-16 w-16 rounded overflow-hidden border">
-              <Image
-                src={form.image}
-                alt="Product preview"
-                fill
-                className="object-cover"
-                unoptimized={form.image.startsWith('data:')}
-              />
-            </div>
-          ) : (
-            <div className="h-16 w-16 rounded border flex items-center justify-center text-xs text-gray-400">
-              No Image
-            </div>
-          )}
-          <Input
-            type="file"
-            accept="image/*"
-            onChange={(e) => e.target.files && handleImageUpload(e.target.files[0])}
-          />
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Left Column */}
+        <div className="space-y-4">
+          <Field label="Product Name">
+            <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+          </Field>
+
+          <Field label="Brand">
+            <Input
+              value={form.brand}
+              onChange={(e) => setForm({ ...form, brand: e.target.value })}
+            />
+          </Field>
+
+          <Field label="Serial Number">
+            <Input
+              value={form.serial_no}
+              onChange={(e) => setForm({ ...form, serial_no: e.target.value })}
+            />
+          </Field>
+
+          <Field label="Date of Manufacture (MFD)">
+            <Input
+              type="date"
+              value={form.MFD as string}
+              onChange={(e) => setForm({ ...form, MFD: e.target.value })}
+            />
+          </Field>
         </div>
-      </Field>
 
-      <Field label="Product Name">
-        <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-      </Field>
+        {/* Right Column */}
+        <div className="space-y-4">
+          <Field label="Model">
+            <Select value={form.model_id} onValueChange={(v) => setForm({ ...form, model_id: v })}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select Model" />
+              </SelectTrigger>
+              <SelectContent>
+                {models.map((m) => (
+                  <SelectItem key={m.id} value={m.id}>
+                    {m.model_name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Field>
 
-      <Field label="SKU">
-        <Input value={form.Model} onChange={(e) => setForm({ ...form, Model: e.target.value })} />
-      </Field>
+          <Field label="Vendor">
+            <Select
+              value={String(form.vendor_id)}
+              onValueChange={(v) => setForm({ ...form, vendor_id: v })}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select Vendor" />
+              </SelectTrigger>
+              <SelectContent>
+                {vendors.map((v) => (
+                  <SelectItem key={v.id} value={String(v.id)}>
+                    {v.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Field>
 
-      <Field label="Category">
-        <Input
-          value={form.category}
-          onChange={(e) => setForm({ ...form, category: e.target.value })}
-        />
-      </Field>
+          <Field label="Warehouse">
+            <Select
+              value={form.warehouse_id}
+              onValueChange={(v) => setForm({ ...form, warehouse_id: v })}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select Warehouse" />
+              </SelectTrigger>
+              <SelectContent>
+                {warehouses.map((w) => (
+                  <SelectItem key={w.id} value={w.id}>
+                    {w.warehouseName}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Field>
 
-      <Field label="Price">
-        <Input
-          type="number"
-          value={form.price}
-          onChange={(e) => setForm({ ...form, price: +e.target.value })}
-        />
-      </Field>
+          <div className="grid grid-cols-2 gap-2">
+            <Field label="Sale Price">
+              <Input
+                type="number"
+                value={form.sale_price}
+                onChange={(e) => setForm({ ...form, sale_price: Number(e.target.value) })}
+              />
+            </Field>
+            <Field label="Tax Rate (%)">
+              <Input
+                type="number"
+                value={form.tax_rate}
+                onChange={(e) => setForm({ ...form, tax_rate: Number(e.target.value) })}
+              />
+            </Field>
+          </div>
+        </div>
+      </div>
 
-      <Field label="Stock">
-        <Input
-          type="number"
-          value={form.stock}
-          onChange={(e) => setForm({ ...form, stock: +e.target.value })}
-        />
-      </Field>
-
-      <Field label="Status">
-        <Select
-          value={form.status}
-          onValueChange={(v) => setForm({ ...form, status: v as Product['status'] })}
-        >
-          <SelectTrigger>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="in-stock">In Stock</SelectItem>
-            <SelectItem value="out-of-stock">Out of Stock</SelectItem>
-          </SelectContent>
-        </Select>
-      </Field>
+      <div className="mt-4">
+        <Field label="Product Image">
+          <div className="flex items-center gap-4">
+            {form.imageUrl ? (
+              <div className="relative h-16 w-16 rounded overflow-hidden border">
+                <Image
+                  src={form.imageUrl}
+                  alt="Preview"
+                  fill
+                  className="object-cover"
+                  unoptimized={form.imageUrl.startsWith('data:')}
+                />
+              </div>
+            ) : (
+              <div className="h-16 w-16 rounded border flex items-center justify-center text-xs text-gray-400">
+                No Image
+              </div>
+            )}
+            <Input
+              type="file"
+              accept="image/*"
+              onChange={(e) => e.target.files && handleImageUpload(e.target.files[0])}
+            />
+          </div>
+        </Field>
+      </div>
 
       <div className="flex justify-end gap-3 mt-6">
         <Button variant="outline" onClick={onClose}>
           Cancel
         </Button>
-        <Button className="bg-primary text-white" onClick={() => onConfirm(form)}>
+        <Button className="bg-primary text-white" onClick={handleSubmit}>
           Confirm
         </Button>
       </div>
@@ -333,12 +454,12 @@ function Modal({
   onClose: () => void;
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="bg-white rounded-2xl w-full max-w-md p-6">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="bg-white rounded-2xl w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto">
         <div className="flex justify-between mb-4">
-          <h2 className="font-semibold">{title}</h2>
+          <h2 className="font-semibold text-lg">{title}</h2>
           <button onClick={onClose}>
-            <X size={16} />
+            <X size={20} />
           </button>
         </div>
         <div className="space-y-4">{children}</div>
@@ -357,13 +478,14 @@ function ConfirmDeleteModal({
   onConfirm: () => void;
 }) {
   return (
-    <div className="fixed inset-0 flex items-center justify-center bg-black/40">
-      <div className="bg-white rounded-2xl p-6 text-center">
-        <Trash2 className="mx-auto text-red-600 mb-2" />
-        <p>
+    <div className="fixed inset-0 flex items-center justify-center bg-black/40 z-[60]">
+      <div className="bg-white rounded-2xl p-6 text-center shadow-xl">
+        <Trash2 className="mx-auto text-red-600 mb-2 h-10 w-10" />
+        <p className="text-lg">
           Delete <b>{name}</b>?
         </p>
-        <div className="flex justify-center gap-4 mt-4">
+        <p className="text-sm text-gray-500 mb-4">This action cannot be undone.</p>
+        <div className="flex justify-center gap-4">
           <Button variant="outline" onClick={onCancel}>
             Cancel
           </Button>
