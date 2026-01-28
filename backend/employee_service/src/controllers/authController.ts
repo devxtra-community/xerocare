@@ -94,7 +94,7 @@ export const logout = async (req: Request, res: Response, next: NextFunction) =>
 
 export const changePassword = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const userId = req.user.id;
+    const userId = req.user.userId;
     const { currentPassword, newPassword } = req.body;
 
     await authService.changePassword({
@@ -204,7 +204,7 @@ export const verifyMagicLink = async (req: Request, res: Response, next: NextFun
 
 export const logoutOtherDevices = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const userId = req.user.id;
+    const userId = req.user.userId;
     const currentRefreshToken = req.cookies.refreshToken;
 
     if (!currentRefreshToken) {
@@ -225,7 +225,7 @@ export const logoutOtherDevices = async (req: Request, res: Response, next: Next
 
 export const getSessions = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const userId = req.user.id;
+    const userId = req.user.userId;
     const currentToken = req.cookies.refreshToken;
 
     const sessions = await authService.getSessions(userId, currentToken);
@@ -242,7 +242,7 @@ export const getSessions = async (req: Request, res: Response, next: NextFunctio
 
 export const logoutSession = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const userId = req.user.id;
+    const userId = req.user.userId;
     const { sessionId } = req.body;
 
     await authService.logoutSession(userId, sessionId);

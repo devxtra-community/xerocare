@@ -87,6 +87,29 @@ export async function adminLogin(email: string, password: string) {
   return res.data;
 }
 
+export async function changePassword(currentPassword: string, newPassword: string) {
+  const res = await api.post('/e/auth/change-password', {
+    currentPassword,
+    newPassword,
+  });
+  return res.data;
+}
+
+export async function getSessions() {
+  const res = await api.get('/e/auth/sessions');
+  return res.data;
+}
+
+export async function logoutOtherDevices() {
+  const res = await api.post('/e/auth/logout-other-devices');
+  return res.data;
+}
+
+export async function logoutSession(sessionId: string) {
+  const res = await api.post('/e/auth/sessions/logout', { sessionId });
+  return res.data;
+}
+
 export async function getProfile() {
   const res = await api.get('/e/auth/me');
   return res.data;

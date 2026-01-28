@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Field, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
+import { PasswordInput } from '@/components/ui/password-input';
 
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
@@ -211,9 +212,8 @@ export function LoginForm({ className, ...props }: React.ComponentProps<'div'>) 
 
                 <Field>
                   <FieldLabel htmlFor="password">Password</FieldLabel>
-                  <Input
+                  <PasswordInput
                     id="password"
-                    type="password"
                     required
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}

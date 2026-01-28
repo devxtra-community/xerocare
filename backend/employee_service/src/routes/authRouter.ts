@@ -21,7 +21,7 @@ authRouter.post('/login', login);
 authRouter.post('/login/verify', loginVerify);
 authRouter.post('/refresh', refresh);
 authRouter.post('/logout', logout);
-authRouter.post('/change-password', changePassword);
+authRouter.post('/change-password', authMiddleware, changePassword);
 authRouter.post('/forgot-password', forgotPassword);
 authRouter.post('/forgot-password/verify', resetPassword);
 authRouter.post('/magic-link', requestMagicLink);

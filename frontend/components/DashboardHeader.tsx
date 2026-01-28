@@ -1,18 +1,33 @@
 'use client';
 
-import { Search, Bell, HelpCircle, ChevronDown, Menu } from 'lucide-react';
+import { Search, Bell, HelpCircle, ChevronDown, Menu, LogOut, Key, Monitor } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { useEffect, useState } from 'react';
-import { getProfile } from '@/lib/auth';
+import { getProfile, logout } from '@/lib/auth';
+import { useRouter } from 'next/navigation';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { ChangePasswordDialog } from './ChangePasswordDialog';
+import { SessionsDialog } from './SessionsDialog';
 
 export default function DashboardHeader({ title = 'Dashboard' }: { title?: string }) {
+  const router = useRouter();
   const [user, setUser] = useState({
     name: '',
     email: '',
     initial: '',
   });
+
+  const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false);
+  const [isSessionsDialogOpen, setIsSessionsDialogOpen] = useState(false);
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -32,6 +47,15 @@ export default function DashboardHeader({ title = 'Dashboard' }: { title?: strin
     };
     fetchProfile();
   }, []);
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+      router.push('/login');
+    } catch (error) {
+      console.error('Failed to logout', error);
+    }
+  };
 
   return (
     <header className="sticky top-0 z-50 w-full bg-sidebar text-white">
@@ -76,24 +100,45 @@ export default function DashboardHeader({ title = 'Dashboard' }: { title?: strin
           </Button>
 
           {/* User Profile */}
-          <div className="flex items-center gap-2 sm:gap-3 pl-2 sm:pl-4 border-l border-white/20">
-            <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-full bg-white/20 flex items-center justify-center text-xs sm:text-sm font-medium">
-              {user.initial}
-            </div>
-            <div className="hidden sm:flex flex-col">
-              <span className="text-sm font-medium">{user.name}</span>
-              <span className="text-xs text-gray-300">{user.email}</span>
-            </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="hidden sm:flex text-white hover:bg-white/10 h-6 w-6"
-            >
-              <ChevronDown className="h-4 w-4" />
-            </Button>
-          </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <div className="flex items-center gap-2 sm:gap-3 pl-2 sm:pl-4 border-l border-white/20 cursor-pointer hover:bg-white/5 py-2 px-1 rounded transition-colors">
+                <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-full bg-white/20 flex items-center justify-center text-xs sm:text-sm font-medium shrink-0">
+                  {user.initial}
+                </div>
+                <div className="hidden sm:flex flex-col min-w-0">
+                  <span className="text-sm font-medium truncate">{user.name}</span>
+                  <span className="text-xs text-gray-300 truncate">{user.email}</span>
+                </div>
+                <ChevronDown className="hidden sm:block h-4 w-4 text-gray-300" />
+              </div>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56 bg-white text-black">
+              <DropdownMenuLabel>My Account</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => setIsSessionsDialogOpen(true)}>
+                <Monitor className="mr-2 h-4 w-4" />
+                <span>Session Info</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setIsPasswordDialogOpen(true)}>
+                <Key className="mr-2 h-4 w-4" />
+                <span>Change Password</span>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={handleLogout}
+                className="text-red-600 focus:text-red-600 focus:bg-red-50"
+              >
+                <LogOut className="mr-2 h-4 w-4" />
+                <span>Log out</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
+
+      <ChangePasswordDialog open={isPasswordDialogOpen} onOpenChange={setIsPasswordDialogOpen} />
+      <SessionsDialog open={isSessionsDialogOpen} onOpenChange={setIsSessionsDialogOpen} />
     </header>
   );
 }
