@@ -89,6 +89,8 @@ export function LoginForm({ className, ...props }: React.ComponentProps<'div'>) 
             router.push('/hr/dashboard');
           } else if (role === 'MANAGER') {
             router.push('/manager/dashboard');
+          } else if (role === 'FINANCE') {
+            router.push('/finance/dashboard');
           } else if (role === 'EMPLOYEE') {
             router.push('/employee/dashboard');
           } else {
