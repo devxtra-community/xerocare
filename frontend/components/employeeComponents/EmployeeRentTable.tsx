@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Search, Loader2, Eye, FileText, Plus, Trash2 } from 'lucide-react';
+import { Search, Loader2, Eye, FileText, Plus, Printer, Share2 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   Table,
@@ -11,13 +11,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import {
-  getMyInvoices,
-  Invoice,
-  getInvoiceById,
-  createInvoice,
-  CreateInvoicePayload,
-} from '@/lib/invoice';
+import { getMyInvoices, Invoice, createInvoice, CreateInvoicePayload } from '@/lib/invoice';
+import RentFormModal from './RentFormModal';
 import {
   Dialog,
   DialogContent,
@@ -26,23 +21,20 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, Clock } from 'lucide-react';
-import { CustomerSelect } from '@/components/invoice/CustomerSelect';
+import { Calendar } from 'lucide-react';
+import { ApproveQuotationDialog } from '@/components/invoice/ApproveQuotationDialog';
 
-const calculateDays = (start: string | Date | undefined, end: string | Date | undefined) => {
-  if (!start || !end) return 0;
-  const s = new Date(start);
-  const e = new Date(end);
-  const diffTime = Math.abs(e.getTime() - s.getTime());
-  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-  return diffDays;
-};
+import { updateQuotation } from '@/lib/invoice'; // Ensure import
+
+// ...
 
 export default function EmployeeRentTable() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [formOpen, setFormOpen] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [approveOpen, setApproveOpen] = useState(false);
+  const [editInvoice, setEditInvoice] = useState<Invoice | undefined>(undefined); // For Edit Mode
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [search, setSearch] = useState('');
 
@@ -50,10 +42,11 @@ export default function EmployeeRentTable() {
     try {
       setLoading(true);
       const data = await getMyInvoices();
-      // Filter for RENT only
-      setInvoices(data.filter((inv) => inv.saleType === 'RENT'));
+      // Filter only RENT type invoices
+      setInvoices(data.filter((i) => i.saleType === 'RENT'));
     } catch (error) {
-      console.error('Failed to fetch rent data:', error);
+      console.error('Failed to fetch invoices:', error);
+      toast.error('Failed to load rent agreements.');
     } finally {
       setLoading(false);
     }
@@ -63,520 +56,645 @@ export default function EmployeeRentTable() {
     fetchInvoices();
   }, []);
 
-  const handleCreate = async (data: CreateInvoicePayload) => {
-    try {
-      const newInvoice = await createInvoice(data);
-      setInvoices((prev) => [newInvoice, ...prev]);
-      setFormOpen(false);
-      toast.success('Rent record created successfully.');
-    } catch (error: unknown) {
-      console.error('Failed to create rent record:', error);
-      const err = error as { response?: { data?: { message?: string } } };
-      toast.error(err.response?.data?.message || 'Failed to create rent record.');
-    }
-  };
-
-  const handleViewDetails = async (invoiceId: string) => {
-    try {
-      const data = await getInvoiceById(invoiceId);
-      setSelectedInvoice(data);
+  const handleViewDetails = (id: string) => {
+    const invoice = invoices.find((i) => i.id === id);
+    if (invoice) {
+      setSelectedInvoice(invoice);
       setDetailsOpen(true);
-    } catch (error) {
-      console.error('Failed to fetch rent details:', error);
     }
   };
 
-  const filteredInvoices = invoices.filter((inv) => {
-    return (
-      inv.invoiceNumber.toLowerCase().includes(search.toLowerCase()) ||
-      inv.customerName?.toLowerCase().includes(search.toLowerCase()) ||
-      inv.items?.some((item) => item.description.toLowerCase().includes(search.toLowerCase()))
-    );
-  });
+  const handleCreateOrUpdate = async (data: CreateInvoicePayload) => {
+    try {
+      if (editInvoice) {
+        // Update Mode
+        const updated = await updateQuotation(editInvoice.id, data);
+        setInvoices((prev) => prev.map((inv) => (inv.id === updated.id ? updated : inv)));
+        toast.success('Quotation updated successfully.');
+      } else {
+        // Create Mode
+        const newInvoice = await createInvoice(data);
+        setInvoices((prev) => [newInvoice, ...prev]);
+        toast.success('Rent quotation created successfully.');
+      }
+      setFormOpen(false);
+      setEditInvoice(undefined);
+    } catch (error: unknown) {
+      console.error('Failed to save rent record:', error);
+      const err = error as { response?: { data?: { message?: string } } };
+      toast.error(err.response?.data?.message || 'Failed to save rent record.');
+    }
+  };
 
-  if (loading) {
-    return (
-      <div className="flex flex-col items-center justify-center h-64 space-y-4">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        <p className="text-sm text-muted-foreground">Loading rent data...</p>
-      </div>
-    );
-  }
+  const openCreateModal = () => {
+    setEditInvoice(undefined);
+    setFormOpen(true);
+  };
+
+  const openEditModal = (invoice: Invoice) => {
+    setEditInvoice(invoice);
+    setFormOpen(true);
+  };
+
+  // ...
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
-        <div className="relative w-full sm:w-[300px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div className="relative flex-1 w-full sm:max-w-xs">
+          <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search by invoice # or customer..."
+            placeholder="Search customer..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="pl-9 h-10 bg-white border-blue-400/60 focus:border-blue-400 focus:ring-4 focus:ring-blue-100 outline-none shadow-sm transition-all w-full"
+            className="pl-8"
           />
         </div>
         <Button
-          className="bg-primary text-white gap-2 w-full sm:w-auto mt-2 sm:mt-0 shadow-md hover:shadow-lg transition-all"
-          onClick={() => {
-            setFormOpen(true);
-          }}
+          className="bg-primary text-white gap-2 w-full sm:w-auto shadow-md hover:shadow-lg transition-all"
+          onClick={openCreateModal}
         >
           <Plus size={16} /> New Rent
         </Button>
       </div>
 
-      <div className="rounded-2xl bg-white shadow-sm overflow-hidden border">
+      <div className="rounded-2xl bg-white shadow-sm overflow-hidden border border-slate-100">
         <div className="overflow-x-auto">
           <Table className="min-w-[800px] sm:min-w-full">
-            <TableHeader>
-              <TableRow className="bg-slate-50">
-                <TableHead className="text-primary font-bold whitespace-nowrap uppercase text-[11px]">
-                  INV NUMBER
-                </TableHead>
-                <TableHead className="text-primary font-bold whitespace-nowrap uppercase text-[11px]">
-                  CUSTOMER
-                </TableHead>
-                <TableHead className="text-primary font-bold whitespace-nowrap uppercase text-[11px]">
-                  ITEMS
-                </TableHead>
-                <TableHead className="text-primary font-bold whitespace-nowrap uppercase text-[11px]">
-                  CONTRACT PERIOD
-                </TableHead>
-                <TableHead className="text-primary font-bold whitespace-nowrap uppercase text-[11px]">
-                  DURATION
-                </TableHead>
-                <TableHead className="text-primary font-bold whitespace-nowrap uppercase text-[11px]">
-                  AMOUNT
-                </TableHead>
-                <TableHead className="text-primary font-bold whitespace-nowrap uppercase text-[11px]">
-                  STATUS
-                </TableHead>
-                <TableHead className="text-primary font-bold whitespace-nowrap uppercase text-[11px]">
-                  DATE
-                </TableHead>
-                <TableHead className="text-primary font-bold whitespace-nowrap text-center uppercase text-[11px]">
-                  ACTION
-                </TableHead>
+            <TableHeader className="bg-slate-50/50">
+              <TableRow>
+                <TableHead className="text-primary font-bold">INV NUMBER</TableHead>
+                <TableHead className="text-primary font-bold">CUSTOMER</TableHead>
+                <TableHead className="text-primary font-bold">RENT TYPE</TableHead>
+                <TableHead className="text-primary font-bold">PERIOD</TableHead>
+                <TableHead className="text-primary font-bold">AMOUNT</TableHead>
+                <TableHead className="text-primary font-bold">STATUS</TableHead>
+                <TableHead className="text-primary font-bold text-center">ACTION</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredInvoices.length === 0 ? (
+              {loading ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-12 text-muted-foreground">
-                    <FileText className="h-10 w-10 mx-auto mb-2 opacity-20" />
-                    No rentals found.
+                  <TableCell colSpan={7} className="h-32 text-center">
+                    <div className="flex justify-center items-center h-full">
+                      <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ) : invoices.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">
+                    No rent agreements found. Create one to get started.
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredInvoices.map((inv, index) => (
-                  <TableRow key={inv.id} className={index % 2 !== 0 ? 'bg-blue-50/20' : 'bg-white'}>
-                    <TableCell className="text-blue-500 font-bold tracking-tight">
-                      {inv.invoiceNumber}
-                    </TableCell>
-                    <TableCell className="font-bold text-primary">
-                      {inv.customerName || 'Walk-in'}
-                    </TableCell>
-                    <TableCell className="max-w-[250px]">
-                      <div className="text-xs font-medium text-slate-700 truncate">
-                        {inv.items?.map((item) => item.description).join(', ') || 'No items'}
-                      </div>
-                    </TableCell>
-                    <TableCell className="whitespace-nowrap">
-                      <div className="text-[10px] font-bold text-slate-600">
-                        {inv.startDate ? new Date(inv.startDate).toLocaleDateString() : 'N/A'} —{' '}
-                        {inv.endDate ? new Date(inv.endDate).toLocaleDateString() : 'N/A'}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        variant="secondary"
-                        className="bg-blue-50 text-blue-700 hover:bg-blue-50 text-[10px] font-bold px-2 py-0.5 whitespace-nowrap"
-                      >
-                        <Clock className="w-3 h-3 mr-1" />
-                        {calculateDays(inv.startDate, inv.endDate)} Days
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="font-bold text-primary">
-                      ₹{inv.totalAmount.toLocaleString()}
-                    </TableCell>
-                    <TableCell>
-                      <span
-                        className={`inline-flex px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide
-                        ${
-                          inv.status === 'PAID'
-                            ? 'bg-green-100 text-green-600'
-                            : inv.status === 'PENDING'
-                              ? 'bg-yellow-100 text-yellow-600'
-                              : 'bg-red-100 text-red-600'
-                        }`}
-                      >
-                        {inv.status}
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-slate-500 text-[11px] font-medium whitespace-nowrap">
-                      {new Date(inv.createdAt).toLocaleDateString(undefined, {
-                        day: '2-digit',
-                        month: 'short',
-                        year: 'numeric',
-                      })}
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-primary hover:text-primary/80 hover:bg-blue-50"
-                        onClick={() => handleViewDetails(inv.id)}
-                      >
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))
+                invoices
+                  .filter((inv) =>
+                    search
+                      ? inv.customerName?.toLowerCase().includes(search.toLowerCase()) ||
+                        inv.invoiceNumber?.toLowerCase().includes(search.toLowerCase())
+                      : true,
+                  )
+                  .map((inv) => (
+                    <TableRow key={inv.id} className="hover:bg-slate-50/50">
+                      <TableCell className="font-medium text-slate-700">
+                        {inv.invoiceNumber}
+                      </TableCell>
+                      <TableCell className="font-medium">{inv.customerName}</TableCell>
+                      <TableCell>
+                        <Badge
+                          variant="outline"
+                          className={`rounded-full px-3 py-0.5 text-[10px] font-bold tracking-wider
+                            ${
+                              inv.rentType?.startsWith('FIXED')
+                                ? 'border-blue-200 text-blue-600 bg-blue-50'
+                                : inv.rentType?.startsWith('CPC')
+                                  ? 'border-purple-200 text-purple-600 bg-purple-50'
+                                  : 'border-slate-200 text-slate-600 bg-slate-50'
+                            }
+                          `}
+                        >
+                          {inv.rentType?.replace('_', ' ')}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground font-medium">
+                        {inv.rentPeriod}
+                      </TableCell>
+                      <TableCell className="font-bold text-slate-700">
+                        ₹{inv.totalAmount?.toLocaleString()}
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant="secondary"
+                          className={`rounded-full px-3 py-0.5 text-[10px] font-bold tracking-wider shadow-none
+                            ${
+                              inv.status === 'PAID' ||
+                              inv.status === 'APPROVED' ||
+                              inv.status === 'ISSUED'
+                                ? 'bg-green-100 text-green-700 hover:bg-green-100'
+                                : inv.status === 'SENT'
+                                  ? 'bg-blue-100 text-blue-700 hover:bg-blue-100'
+                                  : inv.status === 'REJECTED' || inv.status === 'CANCELLED'
+                                    ? 'bg-red-100 text-red-700 hover:bg-red-100'
+                                    : 'bg-slate-100 text-slate-700 hover:bg-slate-100'
+                            }
+                          `}
+                        >
+                          {inv.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <div className="flex items-center justify-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-slate-400 hover:text-blue-600 hover:bg-blue-50"
+                            onClick={() => handleViewDetails(inv.id)}
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                          {(inv.status === 'DRAFT' || inv.status === 'SENT') && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-slate-400 hover:text-orange-600 hover:bg-orange-50"
+                              onClick={() => openEditModal(inv)}
+                            >
+                              <FileText className="h-4 w-4" /> {/* Edit Icon replacement */}
+                            </Button>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
               )}
             </TableBody>
           </Table>
         </div>
+
+        {formOpen && (
+          <RentFormModal
+            initialData={editInvoice}
+            onClose={() => setFormOpen(false)}
+            onConfirm={handleCreateOrUpdate}
+          />
+        )}
+
+        {detailsOpen && selectedInvoice && (
+          <InvoiceDetailsDialog
+            invoice={selectedInvoice}
+            onClose={() => setDetailsOpen(false)}
+            onApprove={() => {
+              setDetailsOpen(false);
+              setApproveOpen(true);
+            }}
+          />
+        )}
+
+        {approveOpen && selectedInvoice && (
+          <ApproveQuotationDialog
+            invoiceId={selectedInvoice.id}
+            onClose={() => setApproveOpen(false)}
+            onSuccess={() => {
+              setApproveOpen(false);
+              fetchInvoices();
+            }}
+          />
+        )}
       </div>
-
-      {formOpen && <RentFormModal onClose={() => setFormOpen(false)} onConfirm={handleCreate} />}
-
-      {detailsOpen && selectedInvoice && (
-        <InvoiceDetailsDialog invoice={selectedInvoice} onClose={() => setDetailsOpen(false)} />
-      )}
     </div>
   );
 }
 
-function RentFormModal({
+// RentFormModal has been moved to its own file ./RentFormModal.tsx
+
+function InvoiceDetailsDialog({
+  invoice,
   onClose,
-  onConfirm,
+  onApprove,
 }: {
+  invoice: Invoice;
   onClose: () => void;
-  onConfirm: (data: CreateInvoicePayload) => void;
+  onApprove: () => void;
 }) {
-  const [form, setForm] = useState<CreateInvoicePayload>({
-    customerId: '',
-    saleType: 'RENT',
-    items: [{ description: '', quantity: 1, unitPrice: 0 }],
-    startDate: '',
-    endDate: '',
-    billingCycleInDays: 30,
-  });
-
-  const addItem = () => {
-    setForm({
-      ...form,
-      items: [...form.items, { description: '', quantity: 1, unitPrice: 0 }],
-    });
-  };
-
-  const removeItem = (index: number) => {
-    if (form.items.length <= 1) return;
-    const newItems = form.items.filter((_, i) => i !== index);
-    setForm({ ...form, items: newItems });
-  };
-
-  const updateItem = (index: number, field: string, value: string | number) => {
-    const newItems = [...form.items];
-    newItems[index] = { ...newItems[index], [field]: value };
-    setForm({ ...form, items: newItems });
-  };
-
-  const totalAmount = form.items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
-
   return (
     <Dialog open={true} onOpenChange={(val) => !val && onClose()}>
-      <DialogContent className="sm:max-w-2xl p-0 overflow-hidden rounded-xl border-none shadow-2xl bg-white">
-        <DialogHeader className="p-8 pb-4">
-          <div className="flex items-center gap-4">
-            <div className="h-12 w-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shadow-sm">
-              <Calendar size={24} />
-            </div>
-            <div className="space-y-1">
-              <DialogTitle className="text-xl font-bold text-primary tracking-tight">
-                New Rent Invoice
-              </DialogTitle>
-              <DialogDescription className="text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-none">
-                Create a new rental record
-              </DialogDescription>
-            </div>
-          </div>
-        </DialogHeader>
-
-        <div className="p-8 pt-4 space-y-6 max-h-[70vh] overflow-y-auto scrollbar-hide">
-          <div className="space-y-2">
-            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-              Customer
-            </label>
-            <div className="w-full">
-              <CustomerSelect
-                value={form.customerId}
-                onChange={(id) => setForm({ ...form, customerId: id })}
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-x-8 gap-y-4">
-            <div className="space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                Contract Start Date
-              </label>
-              <Input
-                type="date"
-                value={form.startDate}
-                onChange={(e) => setForm({ ...form, startDate: e.target.value })}
-                className="h-12 rounded-xl border-none bg-gray-50 focus-visible:ring-2 focus-visible:ring-blue-400"
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                Contract End Date
-              </label>
-              <Input
-                type="date"
-                value={form.endDate}
-                onChange={(e) => setForm({ ...form, endDate: e.target.value })}
-                className="h-12 rounded-xl border-none bg-gray-50 focus-visible:ring-2 focus-visible:ring-blue-400"
-              />
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                Line Items
-              </h3>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={addItem}
-                className="h-8 text-primary font-bold text-[10px] uppercase tracking-widest hover:bg-gray-50 rounded-lg"
-              >
-                <Plus size={14} className="mr-1" /> Add Another Item
-              </Button>
-            </div>
-
-            <div className="space-y-3">
-              {form.items.map((item, index) => (
-                <div
-                  key={index}
-                  className="group relative grid grid-cols-12 gap-3 p-4 rounded-xl border border-gray-100 bg-gray-50/50 hover:bg-white hover:border-blue-200 transition-all"
-                >
-                  <div className="col-span-12 md:col-span-6 space-y-1">
-                    <label className="text-[9px] font-bold text-gray-400 uppercase tracking-wider pl-1">
-                      Description
-                    </label>
-                    <Input
-                      value={item.description}
-                      onChange={(e) => updateItem(index, 'description', e.target.value)}
-                      placeholder="e.g. Printer Model"
-                      className="h-10 border-none bg-transparent font-bold text-gray-800 placeholder:text-gray-300 shadow-none focus-visible:ring-0 px-1"
-                    />
-                  </div>
-                  <div className="col-span-4 md:col-span-2 space-y-1">
-                    <label className="text-[9px] font-bold text-gray-400 uppercase tracking-wider pl-1">
-                      Qty
-                    </label>
-                    <Input
-                      type="number"
-                      min="1"
-                      value={item.quantity}
-                      onChange={(e) => updateItem(index, 'quantity', parseInt(e.target.value) || 1)}
-                      className="h-10 border-none bg-transparent font-bold text-gray-500 shadow-none focus-visible:ring-0 text-center"
-                    />
-                  </div>
-                  <div className="col-span-8 md:col-span-3 space-y-1 text-right">
-                    <label className="text-[9px] font-bold text-gray-400 uppercase tracking-wider pr-1">
-                      Unit Price
-                    </label>
-                    <div className="relative">
-                      <Input
-                        type="number"
-                        min="0"
-                        value={item.unitPrice}
-                        onChange={(e) =>
-                          updateItem(index, 'unitPrice', parseFloat(e.target.value) || 0)
-                        }
-                        className="h-10 border-none bg-transparent font-bold text-gray-900 shadow-none focus-visible:ring-0 pl-6 text-right"
-                      />
-                      <span className="absolute left-1 top-1/2 -translate-y-1/2 text-gray-300 font-bold text-xs">
-                        ₹
-                      </span>
-                    </div>
-                  </div>
-                  <div className="col-span-12 md:col-span-1 flex items-center justify-end">
-                    {form.items.length > 1 && (
-                      <button
-                        onClick={() => removeItem(index)}
-                        className="h-8 w-8 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 flex items-center justify-center transition-all"
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        <div className="p-8 bg-gray-50 flex items-center justify-between border-t border-gray-100">
-          <div>
-            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider leading-none mb-1">
-              Estimated Total
-            </p>
-            <p className="text-2xl font-bold text-primary">₹{totalAmount.toLocaleString()}</p>
-          </div>
-          <div className="flex gap-6 items-center">
-            <button
-              onClick={onClose}
-              className="text-sm font-bold text-gray-900 hover:text-gray-600 transition-colors"
-            >
-              Discard
-            </button>
-            <Button
-              className="h-12 px-10 rounded-xl bg-primary text-white hover:bg-primary/90 font-bold shadow-lg disabled:opacity-70 transition-all"
-              onClick={() => {
-                if (!form.customerId) {
-                  alert('Please select a customer.');
-                  return;
-                }
-                if (!form.startDate || !form.endDate) {
-                  alert('Please select start and end dates.');
-                  return;
-                }
-                onConfirm(form);
-              }}
-            >
-              Finalize Rent
-            </Button>
-          </div>
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-function InvoiceDetailsDialog({ invoice, onClose }: { invoice: Invoice; onClose: () => void }) {
-  return (
-    <Dialog open={true} onOpenChange={(val) => !val && onClose()}>
-      <DialogContent className="sm:max-w-xl p-0 overflow-hidden rounded-xl border border-gray-100 shadow-2xl bg-white">
-        <DialogHeader className="p-8 pb-4">
-          <div className="flex items-center gap-4">
-            <div className="h-12 w-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shadow-sm">
-              <FileText size={24} />
-            </div>
-            <div className="space-y-1">
-              <DialogTitle className="text-xl font-bold text-primary tracking-tight">
-                {invoice.invoiceNumber}
-              </DialogTitle>
-              <DialogDescription className="text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-none">
-                {invoice.saleType} Details
-              </DialogDescription>
-            </div>
-          </div>
-        </DialogHeader>
-
-        <div className="p-8 pt-6 space-y-8 max-h-[70vh] overflow-y-auto scrollbar-hide">
-          <div className="grid grid-cols-2 gap-x-12 gap-y-6">
-            <div className="space-y-1">
-              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Date</p>
-              <div className="flex items-center gap-2">
-                <Calendar size={14} className="text-gray-400" />
-                <p className="text-sm font-bold text-gray-800">
-                  {new Date(invoice.createdAt).toLocaleDateString(undefined, {
-                    dateStyle: 'medium',
-                  })}
-                </p>
+      <DialogContent className="sm:max-w-xl p-0 overflow-hidden rounded-2xl border-none shadow-2xl bg-slate-50/50 backdrop-blur-sm">
+        {/* Header with Pattern */}
+        <DialogHeader className="p-6 bg-gradient-to-br from-white to-slate-50 border-b border-slate-100">
+          <div className="flex items-start justify-between">
+            <div className="flex items-center gap-4">
+              <div className="h-12 w-12 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-lg shadow-blue-200">
+                <FileText size={24} className="stroke-[2.5]" />
+              </div>
+              <div className="space-y-1">
+                <DialogTitle className="text-xl font-bold text-slate-900 tracking-tight">
+                  {invoice.invoiceNumber}
+                </DialogTitle>
+                <DialogDescription className="text-xs font-medium text-slate-500 flex items-center gap-2">
+                  {new Date(invoice.createdAt).toLocaleDateString(undefined, { dateStyle: 'long' })}
+                </DialogDescription>
               </div>
             </div>
-            <div className="space-y-1">
-              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Status</p>
-              <Badge
-                variant="secondary"
-                className={`rounded-full px-3 py-1 text-[10px] font-bold tracking-wider shadow-none
+            <Badge
+              variant="secondary"
+              className={`rounded-full px-3 py-1 text-[10px] font-bold tracking-wider shadow-none border
                   ${
                     invoice.status === 'PAID'
-                      ? 'bg-green-50 text-green-600 border-green-100'
-                      : 'bg-amber-50 text-amber-600 border-amber-100'
+                      ? 'bg-green-50 text-green-700 border-green-200'
+                      : invoice.status === 'APPROVED'
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                        : 'bg-amber-50 text-amber-700 border-amber-200'
                   }`}
-              >
-                {invoice.status}
-              </Badge>
-            </div>
+            >
+              {invoice.status}
+            </Badge>
           </div>
 
-          {(invoice.startDate || invoice.endDate) && (
-            <div className="grid grid-cols-2 gap-x-12 gap-y-6 p-6 bg-gray-50 rounded-xl">
-              <div className="space-y-1">
-                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                  Contract Period
+          {invoice.rentType && (
+            <div className="mt-4 flex gap-2">
+              <Badge
+                variant="outline"
+                className="bg-white text-slate-600 border-slate-200 text-[10px] font-bold"
+              >
+                TYPE: {invoice.rentType.replace('_', ' ')}
+              </Badge>
+              <Badge
+                variant="outline"
+                className="bg-white text-slate-600 border-slate-200 text-[10px] font-bold"
+              >
+                BILLING: {invoice.rentPeriod}
+              </Badge>
+            </div>
+          )}
+        </DialogHeader>
+
+        <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto scrollbar-hide">
+          {/* Contract Period Card */}
+          {(invoice.startDate || invoice.endDate || invoice.effectiveFrom) && (
+            <div className="grid grid-cols-2 divide-x divide-slate-100 rounded-xl bg-white border border-slate-100 shadow-sm overflow-hidden">
+              <div className="p-4 space-y-1">
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                  Effective From
                 </p>
-                <p className="text-xs font-bold text-gray-600">
-                  {invoice.startDate ? new Date(invoice.startDate).toLocaleDateString() : 'N/A'} —{' '}
-                  {invoice.endDate ? new Date(invoice.endDate).toLocaleDateString() : 'N/A'}
+                <p className="text-sm font-bold text-slate-700">
+                  {invoice.startDate || invoice.effectiveFrom
+                    ? new Date(invoice.startDate || invoice.effectiveFrom!).toLocaleDateString()
+                    : 'N/A'}
                 </p>
               </div>
-              <div className="space-y-1">
-                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                  Billing Cycle
+              <div className="p-4 space-y-1">
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                  Effective To
                 </p>
-                <p className="text-xs font-bold text-gray-600">
-                  Every {invoice.billingCycleInDays || 30} Days
+                <p className="text-sm font-bold text-slate-700">
+                  {invoice.endDate || invoice.effectiveTo
+                    ? new Date(invoice.endDate || invoice.effectiveTo!).toLocaleDateString()
+                    : 'Active Contract'}
                 </p>
               </div>
             </div>
           )}
 
-          <div className="space-y-4">
-            <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Items</h3>
-            <div className="rounded-xl border border-gray-100 overflow-hidden">
-              <Table>
-                <TableHeader className="bg-gray-50/80">
-                  <TableRow>
-                    <TableHead className="text-[10px] font-bold text-gray-400">
-                      DESCRIPTION
-                    </TableHead>
-                    <TableHead className="text-[10px] font-bold text-gray-400 text-center">
-                      QTY
-                    </TableHead>
-                    <TableHead className="text-[10px] font-bold text-gray-400 text-right">
-                      TOTAL
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {invoice.items?.map((item, idx) => (
-                    <TableRow key={idx}>
-                      <TableCell className="font-bold text-gray-700 py-3 text-sm">
-                        {item.description}
-                      </TableCell>
-                      <TableCell className="text-center font-bold text-gray-500 text-sm">
-                        {item.quantity}
-                      </TableCell>
-                      <TableCell className="text-right font-bold text-gray-900 text-sm">
-                        ₹{(item.quantity * item.unitPrice).toLocaleString()}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+          {/* Financials Row */}
+          <div className="grid grid-cols-2 gap-4">
+            {invoice.monthlyRent !== undefined && invoice.monthlyRent > 0 && (
+              <div className="p-4 rounded-xl bg-white border border-blue-100 shadow-sm space-y-1 relative overflow-hidden group">
+                <div className="absolute top-0 right-0 p-2 opacity-10 group-hover:opacity-20 transition-opacity">
+                  <Calendar size={40} className="text-blue-600" />
+                </div>
+                <p className="text-[10px] font-bold text-blue-400 uppercase tracking-wider">
+                  Monthly Rent
+                </p>
+                <p className="text-lg font-bold text-slate-800">
+                  ₹{invoice.monthlyRent.toLocaleString()}
+                </p>
+              </div>
+            )}
+
+            {invoice.advanceAmount ? (
+              <div className="p-4 rounded-xl bg-white border border-purple-100 shadow-sm space-y-1 relative overflow-hidden group">
+                <div className="absolute top-0 right-0 p-2 opacity-10 group-hover:opacity-20 transition-opacity">
+                  <FileText size={40} className="text-purple-600" />
+                </div>
+                <p className="text-[10px] font-bold text-purple-400 uppercase tracking-wider">
+                  Advance
+                </p>
+                <p className="text-lg font-bold text-slate-800">
+                  ₹{invoice.advanceAmount.toLocaleString()}
+                </p>
+              </div>
+            ) : null}
+          </div>
+
+          {/* Security Deposit (Conditional) */}
+          {invoice.securityDepositAmount && invoice.securityDepositAmount > 0 && (
+            <div className="p-4 rounded-xl bg-slate-50 border border-slate-200">
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                  Security Deposit
+                </h4>
+                <Badge
+                  variant="secondary"
+                  className="bg-white text-slate-600 text-[10px] border border-slate-100"
+                >
+                  {invoice.securityDepositMode}
+                </Badge>
+              </div>
+              <div className="flex items-baseline gap-1">
+                <span className="text-sm font-bold text-slate-400">₹</span>
+                <span className="text-xl font-bold text-slate-900">
+                  {invoice.securityDepositAmount.toLocaleString()}
+                </span>
+              </div>
+              {invoice.securityDepositReference && (
+                <p className="text-xs text-slate-500 mt-1 font-medium">
+                  Ref: {invoice.securityDepositReference}
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* Machines & Rules */}
+          <div className="space-y-3">
+            <h3 className="text-[11px] font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-blue-500" /> Configured Machines
+            </h3>
+
+            <div className="space-y-4">
+              {(() => {
+                // Group items by machine (Serial Number)
+                // Robust filtering:
+                // Machine = itemType is PRODUCT OR (description does NOT indicate a rule)
+                const machineItems =
+                  invoice.items?.filter((i) => {
+                    const isRuleDesc =
+                      i.description.startsWith('Black') ||
+                      i.description.startsWith('Color') ||
+                      i.description.startsWith('Combined');
+                    return i.itemType === 'PRODUCT' || !isRuleDesc;
+                  }) || [];
+
+                const ruleItems =
+                  invoice.items?.filter((i) => {
+                    const isRuleDesc =
+                      i.description.startsWith('Black') ||
+                      i.description.startsWith('Color') ||
+                      i.description.startsWith('Combined');
+                    return isRuleDesc;
+                  }) || [];
+
+                // Virtual Machines from Orphan Rules
+                const virtualMachines = new Map<string, typeof ruleItems>();
+
+                ruleItems.forEach((r) => {
+                  const claimed = machineItems.some((m) => {
+                    // Start searching from the end for ' - ' separator
+                    const lastDash = m.description.lastIndexOf(' - ');
+                    const serial =
+                      lastDash !== -1 ? m.description.substring(lastDash + 3).trim() : '';
+                    return r.description.includes(`(${serial})`);
+                  });
+
+                  if (!claimed) {
+                    let suffix = r.description;
+                    if (suffix.startsWith('Black & White - '))
+                      suffix = suffix.replace('Black & White - ', '');
+                    else if (suffix.startsWith('Color - ')) suffix = suffix.replace('Color - ', '');
+                    else if (suffix.startsWith('Combined - '))
+                      suffix = suffix.replace('Combined - ', '');
+                    else if (suffix.startsWith('Black - ')) suffix = suffix.replace('Black - ', '');
+
+                    if (!virtualMachines.has(suffix)) {
+                      virtualMachines.set(suffix, []);
+                    }
+                    virtualMachines.get(suffix)?.push(r);
+                  }
+                });
+
+                const allMachines = [
+                  ...machineItems.map((m) => ({
+                    isVirtual: false,
+                    item: m,
+                    name: undefined,
+                    rules: [] as typeof ruleItems,
+                  })),
+                  ...Array.from(virtualMachines.entries()).map(([name, rules]) => ({
+                    isVirtual: true,
+                    item: undefined,
+                    name,
+                    rules,
+                  })),
+                ];
+
+                if (allMachines.length === 0) {
+                  return (
+                    <div className="p-8 text-center text-sm text-slate-400 bg-slate-50 rounded-xl border border-dashed border-slate-200">
+                      No items found
+                    </div>
+                  );
+                }
+
+                return allMachines.map((machineObj, idx) => {
+                  let name = '';
+                  let serial = '';
+                  let myRules = machineObj.rules;
+                  let quantity = 1;
+                  let unitPrice = 0;
+
+                  if (machineObj.isVirtual && machineObj.name) {
+                    const openParen = machineObj.name.lastIndexOf('(');
+                    const closeParen = machineObj.name.lastIndexOf(')');
+                    if (openParen !== -1 && closeParen !== -1) {
+                      name = machineObj.name.substring(0, openParen).trim();
+                      serial = machineObj.name.substring(openParen + 1, closeParen).trim();
+                    } else {
+                      name = machineObj.name;
+                      serial = 'Unknown';
+                    }
+                    quantity = 1;
+                  } else if (machineObj.item) {
+                    const m = machineObj.item;
+                    const lastDash = m.description.lastIndexOf(' - ');
+                    name =
+                      lastDash !== -1 ? m.description.substring(0, lastDash).trim() : m.description;
+                    serial = lastDash !== -1 ? m.description.substring(lastDash + 3).trim() : '';
+                    quantity = m.quantity || 1;
+                    unitPrice = m.unitPrice || 0;
+                    myRules = ruleItems.filter((r) => r.description.includes(`(${serial})`));
+                  }
+
+                  return (
+                    <div
+                      key={idx}
+                      className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden group hover:border-blue-200 hover:shadow-md transition-all"
+                    >
+                      {/* Machine Header */}
+                      <div className="p-4 bg-slate-50/50 border-b border-slate-100 flex justify-between items-start">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h4 className="text-sm font-bold text-slate-800">{name}</h4>
+                            {machineObj.isVirtual && (
+                              <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-orange-100 text-orange-700">
+                                Virtual
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2 mt-1.5">
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white border border-slate-200 text-[10px] font-mono text-slate-500">
+                              <span className="text-slate-300">SN:</span> {serial || 'N/A'}
+                            </span>
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-purple-50 border border-purple-100 text-[10px] font-bold text-purple-700">
+                              Qty: {quantity}
+                            </span>
+                          </div>
+                        </div>
+                        {unitPrice > 0 && (
+                          <div className="text-right">
+                            <p className="text-[9px] font-bold text-slate-400 uppercase">
+                              Unit Price
+                            </p>
+                            <p className="font-bold text-slate-700">
+                              ₹{unitPrice.toLocaleString()}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Rules List */}
+                      {myRules.length > 0 ? (
+                        <div className="p-3 grid grid-cols-1 gap-2">
+                          {myRules.map((rule, rIdx) => {
+                            let ruleType = rule.description;
+                            if (ruleType.startsWith('Black & White - ')) ruleType = 'Black & White';
+                            else if (ruleType.startsWith('Color - ')) ruleType = 'Color';
+                            else if (ruleType.startsWith('Combined - ')) ruleType = 'Combined';
+                            else if (ruleType.startsWith('Black - ')) ruleType = 'Black & White';
+
+                            const isCombo = ruleType === 'Combined';
+                            const isColor = ruleType === 'Color';
+
+                            return (
+                              <div
+                                key={rIdx}
+                                className="flex items-center justify-between p-2 rounded-lg bg-white border border-slate-100 hover:border-slate-200 transition-colors"
+                              >
+                                <div className="flex items-center gap-3">
+                                  <div
+                                    className={`w-8 h-8 rounded-lg flex items-center justify-center text-[10px] font-bold 
+                                         ${isCombo ? 'bg-blue-100 text-blue-700' : isColor ? 'bg-pink-100 text-pink-700' : 'bg-slate-100 text-slate-700'}
+                                      `}
+                                  >
+                                    {isCombo ? 'CMB' : isColor ? 'CLR' : 'BW'}
+                                  </div>
+                                  <div>
+                                    <p className="text-xs font-bold text-slate-700">{ruleType}</p>
+                                    <p className="text-[10px] font-medium text-slate-400">
+                                      {invoice.rentType?.startsWith('CPC') ? (
+                                        <span className="text-emerald-600">Unlimited Usage</span>
+                                      ) : (
+                                        <span>
+                                          Free Limit:{' '}
+                                          <span className="text-slate-700">
+                                            {rule.bwIncludedLimit ??
+                                              rule.colorIncludedLimit ??
+                                              rule.combinedIncludedLimit ??
+                                              0}
+                                          </span>
+                                        </span>
+                                      )}
+                                    </p>
+                                  </div>
+                                </div>
+                                <div className="text-right">
+                                  <p className="text-[9px] font-bold text-slate-400 uppercase">
+                                    X-Rate
+                                  </p>
+                                  <p className="text-xs font-bold text-slate-900 bg-slate-50 px-2 py-0.5 rounded">
+                                    ₹
+                                    {rule.bwExcessRate ??
+                                      rule.colorExcessRate ??
+                                      rule.combinedExcessRate ??
+                                      0}
+                                  </p>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <div className="p-4 text-center text-xs text-slate-400 italic">
+                          No usage limits configured for this machine.
+                        </div>
+                      )}
+                    </div>
+                  );
+                });
+              })()}
             </div>
           </div>
         </div>
 
-        <div className="p-8 bg-gray-50 border-t border-gray-100 flex items-center justify-between">
+        <div className="p-6 bg-white border-t border-slate-100 flex items-center justify-between shadow-[0_-5px_20px_-10px_rgba(0,0,0,0.1)] z-10 relative">
           <div>
-            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">
-              Total
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+              Grand Total
             </p>
-            <p className="text-2xl font-bold text-primary">
-              ₹{invoice.totalAmount.toLocaleString()}
-            </p>
+            <div className="flex items-baseline gap-1">
+              <span className="text-lg font-bold text-slate-400">₹</span>
+              <span className="text-3xl font-bold text-slate-900 tracking-tight">
+                {invoice.totalAmount?.toLocaleString() || 0}
+              </span>
+            </div>
           </div>
-          <Button onClick={onClose} className="bg-primary text-white font-bold">
-            Close
-          </Button>
+          <div className="flex gap-3">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => window.print()}
+              className="gap-2 font-bold text-slate-600 border-2 h-10 px-4 hover:bg-slate-50"
+            >
+              <Printer size={16} />
+            </Button>
+
+            <Button
+              size="sm"
+              className="bg-[#25D366] hover:bg-[#128C7E] text-white font-bold gap-2 h-10 px-4 shadow-lg shadow-green-100 hover:shadow-green-200 transition-all"
+              onClick={() => {
+                const message =
+                  `*Proforma Invoice #${invoice.invoiceNumber}*\n\n` +
+                  `*Customer:* ${invoice.customerName}\n` +
+                  `*Rent Type:* ${invoice.rentType || 'N/A'}\n` +
+                  `*Total Amount:* ₹${invoice.totalAmount?.toLocaleString()}\n\n` +
+                  `Please find the invoice details attached via this summary.\n` +
+                  `Thank you for your business!`;
+
+                const url = `https://wa.me/?text=${encodeURIComponent(message)}`;
+                window.open(url, '_blank');
+              }}
+            >
+              <Share2 size={16} /> WhatsApp
+            </Button>
+
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onClose}
+              className="font-bold text-slate-400 hover:text-slate-600 h-10 px-4"
+            >
+              Close
+            </Button>
+
+            {(invoice.status === 'SENT' || invoice.status === 'DRAFT') && (
+              <Button
+                size="sm"
+                onClick={onApprove}
+                className="bg-blue-600 text-white hover:bg-blue-700 font-bold h-10 px-6 shadow-lg shadow-blue-200 hover:shadow-blue-300 transition-all"
+              >
+                Approve Invoice
+              </Button>
+            )}
+          </div>
         </div>
       </DialogContent>
     </Dialog>

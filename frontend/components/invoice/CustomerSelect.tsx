@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { getCustomers } from '@/lib/customer';
 import { getLeads, Lead } from '@/lib/lead';
-import { Autocomplete, AutocompleteOption } from '@/components/ui/autocomplete';
+import { SearchableSelect, SearchableSelectOption } from '@/components/ui/searchable-select';
 import { LeadConversionDialog } from './LeadConversionDialog';
 
 // Unified Selectable Entity
@@ -25,18 +25,12 @@ interface CustomerSelectProps {
 }
 
 export function CustomerSelect({ value, onChange }: CustomerSelectProps) {
-  const [options, setOptions] = useState<AutocompleteOption[]>([]);
+  const [items, setItems] = useState<SelectableCustomer[]>([]);
   const [loading, setLoading] = useState(false);
-  // const [allEntities, setAllEntities] = useState<SelectableCustomer[]>([]); // unused
 
   // Dialog state
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
-
-  // const selectedOption = useMemo( // unused
-  //     () => options.find(o => o.value === value) ?? null,
-  //     [options, value]
-  // );
 
   useEffect(() => {
     const fetchData = async () => {
@@ -66,23 +60,7 @@ export function CustomerSelect({ value, onChange }: CustomerSelectProps) {
             customerId: l.customerId,
           }));
 
-        // setAllEntities([...unifiedCustomers, ...unifiedLeads]);
-
-        const customerOptions: AutocompleteOption[] = unifiedCustomers.map((c) => ({
-          value: c.id,
-          label: c.name,
-          description: `Customer • ${c.phone || c.email || 'No contact'}`,
-          raw: c,
-        }));
-
-        const leadOptions: AutocompleteOption[] = unifiedLeads.map((l) => ({
-          value: l.id,
-          label: l.name || 'Unnamed Lead',
-          description: `Lead • ${l.status || 'Active'} • ${l.phone || l.email || 'No contact'}`,
-          raw: l,
-        }));
-
-        setOptions([...customerOptions, ...leadOptions]);
+        setItems([...unifiedCustomers, ...unifiedLeads]);
       } catch (error) {
         console.error('Failed to fetch data', error);
       } finally {
@@ -92,25 +70,20 @@ export function CustomerSelect({ value, onChange }: CustomerSelectProps) {
     fetchData();
   }, []);
 
-  const handleSelect = (option: AutocompleteOption) => {
-    console.log('CustomerSelect: Option Selected:', option);
-    const entity = option.raw as SelectableCustomer;
+  const handleValueChange = (val: string) => {
+    const entity = items.find((item) => item.id === val);
+    if (!entity) return;
 
     if (entity.type === 'CUSTOMER') {
       onChange(entity.id, entity);
     } else if (entity.type === 'LEAD') {
       if (entity.isCustomer && entity.customerId) {
-        console.log(
-          'CustomerSelect: Lead is already converted, using customerId:',
-          entity.customerId,
-        );
         onChange(entity.customerId, {
           ...entity,
           id: entity.customerId,
           type: 'CUSTOMER',
         });
       } else {
-        console.log('CustomerSelect: Lead needs conversion:', entity);
         // Needs conversion
         setSelectedLead(entity as unknown as Lead);
         setDialogOpen(true);
@@ -118,16 +91,24 @@ export function CustomerSelect({ value, onChange }: CustomerSelectProps) {
     }
   };
 
+  const options: SearchableSelectOption[] = items.map((item) => ({
+    value: item.id,
+    label: item.name,
+    description:
+      item.type === 'CUSTOMER'
+        ? `Customer • ${item.phone || 'No phone'}`
+        : `Lead • ${item.phone || 'No phone'}`,
+  }));
+
   return (
     <>
-      <Autocomplete
-        options={options}
+      <SearchableSelect
         value={value}
-        onSelect={handleSelect}
-        placeholder="Search customers or leads..."
-        emptyText="No results found."
+        onValueChange={handleValueChange}
+        options={options}
         loading={loading}
-        className="w-full"
+        placeholder="Select Customer or Lead"
+        emptyText="No customers found."
       />
 
       <LeadConversionDialog

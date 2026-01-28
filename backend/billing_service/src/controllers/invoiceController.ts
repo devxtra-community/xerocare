@@ -4,9 +4,9 @@ import { AppError } from '../errors/appError';
 
 const billingService = new BillingService();
 
-export const createInvoice = async (req: Request, res: Response, next: NextFunction) => {
+export const createQuotation = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { branchId, employeeId, createdBy, ...allowedPayload } = req.body;
+    const { branchId, employeeId, createdBy, ...payload } = req.body;
 
     if (branchId || employeeId || createdBy) {
       throw new AppError(
@@ -19,30 +19,144 @@ export const createInvoice = async (req: Request, res: Response, next: NextFunct
       throw new AppError('User context missing or incomplete', 401);
     }
 
-    const { items, saleType, startDate, endDate, billingCycleInDays, customerId } = allowedPayload;
+    // Extract relevant fields
+    const {
+      pricingItems,
+      rentType,
+      rentPeriod,
+      saleType,
+      customerId,
+      monthlyRent,
+      advanceAmount,
+      discountPercent,
+      effectiveFrom,
+      effectiveTo,
+      items,
+    } = payload;
 
-    if (!items || !Array.isArray(items) || !saleType || !customerId) {
-      throw new AppError(
-        'Invalid request payload: items, saleType, and customerId are required',
-        400,
-      );
+    if (!customerId || !saleType) {
+      throw new AppError('Invalid request payload: customerId and saleType are required', 400);
     }
 
-    const invoice = await billingService.createInvoice({
+    if (saleType === 'SALE') {
+      // For Sale, we expect 'items'
+      if (!items || !Array.isArray(items) || items.length === 0) {
+        throw new AppError('Invalid request payload: items array is required for SALE', 400);
+      }
+    } else {
+      // For Rent/Lease (defaulting to previous logic for safety if not explicitly SALE)
+      if (!pricingItems || !rentType) {
+        throw new AppError(
+          'Invalid request payload: pricingItems and rentType are required for RENT',
+          400,
+        );
+      }
+    }
+
+    const invoice = await billingService.createQuotation({
       branchId: req.user.branchId,
       createdBy: req.user.userId,
       customerId,
       saleType,
-      startDate,
-      endDate,
-      billingCycleInDays,
+      rentType,
+      rentPeriod,
+      monthlyRent,
+      advanceAmount,
+      discountPercent,
+      effectiveFrom,
+      effectiveTo,
+      pricingItems,
       items,
     });
 
     return res.status(201).json({
       success: true,
       data: invoice,
-      message: 'Invoice created successfully',
+      message: 'Quotation created successfully',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const updateQuotation = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = req.params.id as string;
+    const {
+      pricingItems,
+      rentType,
+      rentPeriod,
+      monthlyRent,
+      advanceAmount,
+      discountPercent,
+      effectiveFrom,
+      effectiveTo,
+      items,
+    } = req.body;
+
+    const invoice = await billingService.updateQuotation(id, {
+      rentType,
+      rentPeriod,
+      monthlyRent,
+      advanceAmount,
+      discountPercent,
+      effectiveFrom,
+      effectiveTo,
+      pricingItems,
+      items,
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: invoice,
+      message: 'Quotation updated successfully',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const approveQuotation = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = req.params.id as string;
+    const { deposit } = req.body;
+
+    // deposit structure: { amount, mode ['CASH', 'CHEQUE'], reference?, receivedDate? }
+
+    const invoice = await billingService.approveQuotation(id, deposit);
+    return res.status(200).json({
+      success: true,
+      data: invoice,
+      message: 'Quotation approved and converted to Proforma',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const generateFinalInvoice = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { branchId, employeeId, createdBy, ...payload } = req.body;
+    // Payload: contractId, billingPeriodStart, billingPeriodEnd
+
+    if (!payload.contractId || !payload.billingPeriodStart || !payload.billingPeriodEnd) {
+      throw new AppError(
+        'Missing required fields: contractId, billingPeriodStart, billingPeriodEnd',
+        400,
+      );
+    }
+
+    const invoice = await billingService.generateFinalInvoice({
+      contractId: payload.contractId,
+      billingPeriodStart: payload.billingPeriodStart,
+      billingPeriodEnd: payload.billingPeriodEnd,
+    });
+
+    return res.status(201).json({
+      success: true,
+      data: invoice,
+      message: 'Final Invoice generated successfully',
     });
   } catch (error) {
     next(error);
@@ -63,7 +177,9 @@ export const getAllInvoices = async (req: Request, res: Response, next: NextFunc
 
 export const getMyInvoices = async (req: Request, res: Response, next: NextFunction) => {
   try {
+    // console.log('Billing Service: getMyInvoices called. User:', req.user);
     if (!req.user || !req.user.userId) {
+      console.error('Billing Service: User context missing or incomplete:', req.user);
       throw new AppError('User context missing', 401);
     }
     const invoices = await billingService.getInvoicesByCreator(req.user.userId);
@@ -72,6 +188,7 @@ export const getMyInvoices = async (req: Request, res: Response, next: NextFunct
       data: invoices,
     });
   } catch (error) {
+    console.error('Billing Service: Error in getMyInvoices:', error);
     next(error);
   }
 };
@@ -96,6 +213,28 @@ export const getStats = async (req: Request, res: Response, next: NextFunction) 
     return res.status(200).json({
       success: true,
       data: stats,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getBranchSales = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const period = (req.query.period as string) || '1M';
+    const branchId = req.user?.branchId; // Always rely on auth user's branch for Manager
+    // If admin wants to query arbitrary branch, we can check role & query param later.
+    // For now, prompt implies "Manager Dashboard".
+
+    if (!branchId) {
+      throw new AppError('Branch ID not found in user context', 400);
+    }
+
+    const result = await billingService.getBranchSales(period, branchId);
+    return res.status(200).json({
+      success: true,
+      data: result,
+      message: 'Branch sales overview fetched successfully',
     });
   } catch (error) {
     next(error);

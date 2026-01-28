@@ -127,7 +127,16 @@ export default function ManagerProduct() {
         <Table>
           <TableHeader>
             <TableRow>
-              {['IMAGE', 'PRODUCT', 'BRAND', 'SERIAL NO', 'PRICE', 'STATUS', 'ACTION'].map((h) => (
+              {[
+                'IMAGE',
+                'PRODUCT',
+                'BRAND',
+                'SERIAL NO',
+                'PRICE',
+                'PRINT COLOUR',
+                'STATUS',
+                'ACTION',
+              ].map((h) => (
                 <TableHead key={h} className="text-[11px] font-semibold text-primary px-4">
                   {h}
                 </TableHead>
@@ -138,13 +147,13 @@ export default function ManagerProduct() {
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-8">
+                <TableCell colSpan={8} className="text-center py-8">
                   Loading...
                 </TableCell>
               </TableRow>
             ) : filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-8 text-gray-500">
+                <TableCell colSpan={8} className="text-center py-8 text-gray-500">
                   No products found.
                 </TableCell>
               </TableRow>
@@ -172,6 +181,7 @@ export default function ManagerProduct() {
                   <TableCell className="px-4">{p.brand}</TableCell>
                   <TableCell className="px-4">{p.serial_no}</TableCell>
                   <TableCell className="px-4">₹{p.sale_price}</TableCell>
+                  <TableCell className="px-4">{p.print_colour}</TableCell>
                   <TableCell className="px-4">
                     <span
                       className={`px-2 py-1 rounded-full text-xs ${
@@ -252,14 +262,16 @@ function ProductFormModal({
     name: initialData?.name || '',
     brand: initialData?.brand || '',
     serial_no: initialData?.serial_no || '',
-    model_id: initialData?.model_id || '',
-    vendor_id: initialData?.vendor_id || '',
-    warehouse_id: initialData?.warehouse_id || '',
-    sale_price: initialData?.sale_price || 0,
-    tax_rate: initialData?.tax_rate || 0,
+    model_id: initialData?.model_id || initialData?.model?.id || '',
+    vendor_id: initialData?.vendor_id || initialData?.vendor?.id || '',
+    warehouse_id: initialData?.warehouse_id || initialData?.warehouse?.id || '',
+    sale_price: initialData?.sale_price ?? 0,
+    tax_rate: initialData?.tax_rate ?? 0,
     MFD: initialData?.MFD ? new Date(initialData.MFD).toISOString().split('T')[0] : '',
     product_status: initialData?.product_status || 'AVAILABLE',
     imageUrl: initialData?.imageUrl || '',
+    print_colour: initialData?.print_colour || 'BLACK_WHITE',
+    max_discount_amount: initialData?.max_discount_amount || 0,
   });
 
   useEffect(() => {
@@ -307,13 +319,20 @@ function ProductFormModal({
         {/* Left Column */}
         <div className="space-y-4">
           <Field label="Product Name">
-            <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+            <Input
+              value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
+              placeholder="Enter product name"
+              required
+            />
           </Field>
 
           <Field label="Brand">
             <Input
               value={form.brand}
               onChange={(e) => setForm({ ...form, brand: e.target.value })}
+              placeholder="Enter brand name"
+              required
             />
           </Field>
 
@@ -321,6 +340,8 @@ function ProductFormModal({
             <Input
               value={form.serial_no}
               onChange={(e) => setForm({ ...form, serial_no: e.target.value })}
+              placeholder="Enter serial number"
+              required
             />
           </Field>
 
@@ -392,6 +413,8 @@ function ProductFormModal({
                 type="number"
                 value={form.sale_price}
                 onChange={(e) => setForm({ ...form, sale_price: Number(e.target.value) })}
+                placeholder="0"
+                required
               />
             </Field>
             <Field label="Tax Rate (%)">
@@ -399,7 +422,37 @@ function ProductFormModal({
                 type="number"
                 value={form.tax_rate}
                 onChange={(e) => setForm({ ...form, tax_rate: Number(e.target.value) })}
+                placeholder="0"
+                required
               />
+            </Field>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            <Field label="Max Discount">
+              <Input
+                type="number"
+                value={form.max_discount_amount}
+                onChange={(e) => setForm({ ...form, max_discount_amount: Number(e.target.value) })}
+                placeholder="0"
+              />
+            </Field>
+            <Field label="Print Colour">
+              <Select
+                value={form.print_colour}
+                onValueChange={(v) =>
+                  setForm({ ...form, print_colour: v as 'BLACK_WHITE' | 'COLOUR' | 'BOTH' })
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select Colour" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="BLACK_WHITE">Black & White</SelectItem>
+                  <SelectItem value="COLOUR">Colour</SelectItem>
+                  <SelectItem value="BOTH">Both</SelectItem>
+                </SelectContent>
+              </Select>
             </Field>
           </div>
         </div>

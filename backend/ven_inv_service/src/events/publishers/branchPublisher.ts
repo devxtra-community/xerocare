@@ -5,6 +5,7 @@ import { logger } from '../../config/logger';
 const EXCHANGE = 'domain_events';
 let exchangeReady = false;
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function ensureExchange(channel: any) {
   if (!exchangeReady) {
     await channel.assertExchange(EXCHANGE, 'topic', { durable: true });

@@ -214,12 +214,12 @@ function ModelFormModal({
     model_no: initialData?.model_no || '',
     brand: initialData?.brand || '',
     description: initialData?.description || '',
-    rent_price_monthly: initialData?.rent_price_monthly || 0,
-    rent_price_yearly: initialData?.rent_price_yearly || 0,
-    lease_price_monthly: initialData?.lease_price_monthly || 0,
-    lease_price_yearly: initialData?.lease_price_yearly || 0,
-    sale_price: initialData?.sale_price || 0,
-    wholesale_price: initialData?.wholesale_price || 0,
+    rent_price_monthly: initialData?.rent_price_monthly ?? 0,
+    rent_price_yearly: initialData?.rent_price_yearly ?? 0,
+    lease_price_monthly: initialData?.lease_price_monthly ?? 0,
+    lease_price_yearly: initialData?.lease_price_yearly ?? 0,
+    sale_price: initialData?.sale_price ?? 0,
+    wholesale_price: initialData?.wholesale_price ?? 0,
   });
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -264,6 +264,7 @@ function ModelFormModal({
               value={formData.sale_price}
               onChange={(e) => setFormData({ ...formData, sale_price: Number(e.target.value) })}
               min={0}
+              placeholder="0"
             />
           </div>
           <div>
@@ -275,6 +276,7 @@ function ModelFormModal({
                 setFormData({ ...formData, wholesale_price: Number(e.target.value) })
               }
               min={0}
+              placeholder="0"
               required
             />
           </div>
@@ -286,6 +288,7 @@ function ModelFormModal({
             className="flex min-h-[60px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
             value={formData.description}
             onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+            placeholder="A reliable laser printer suitable for small offices."
           />
         </div>
 
@@ -299,6 +302,8 @@ function ModelFormModal({
                 setFormData({ ...formData, rent_price_monthly: Number(e.target.value) })
               }
               min={0}
+              placeholder="0"
+              required
             />
           </div>
           <div>
@@ -310,6 +315,7 @@ function ModelFormModal({
                 setFormData({ ...formData, rent_price_yearly: Number(e.target.value) })
               }
               min={0}
+              placeholder="0"
             />
           </div>
           <div>
@@ -321,6 +327,7 @@ function ModelFormModal({
                 setFormData({ ...formData, lease_price_monthly: Number(e.target.value) })
               }
               min={0}
+              placeholder="0"
             />
           </div>
           <div>
@@ -332,6 +339,7 @@ function ModelFormModal({
                 setFormData({ ...formData, lease_price_yearly: Number(e.target.value) })
               }
               min={0}
+              placeholder="0"
             />
           </div>
         </div>

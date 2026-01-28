@@ -5,6 +5,9 @@ import {
   getInvoiceById,
   getMyInvoices,
   getStats,
+  approveQuotation,
+  generateFinalInvoice,
+  updateQuotation,
 } from '../controllers/invoiceController';
 import { authMiddleware } from '../middleware/authMiddleware';
 import { requireRole } from '../middleware/roleMiddleware';
@@ -29,7 +32,12 @@ router.get(
   requireRole(UserRole.ADMIN, UserRole.FINANCE, UserRole.MANAGER, UserRole.EMPLOYEE),
   getAllInvoices,
 );
+
+router.put('/:id/approve', requireRole(UserRole.EMPLOYEE), approveQuotation);
+router.post('/settlements/generate', requireRole(UserRole.EMPLOYEE), generateFinalInvoice);
 router.post('/', requireRole(UserRole.EMPLOYEE), createInvoice);
+router.put('/:id', requireRole(UserRole.EMPLOYEE), updateQuotation);
+
 router.get(
   '/:id',
   requireRole(UserRole.ADMIN, UserRole.FINANCE, UserRole.MANAGER, UserRole.EMPLOYEE),

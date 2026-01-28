@@ -26,7 +26,7 @@ export const bulkCreateProducts = async (req: Request, res: Response) => {
   }
 };
 
-export const addproduct = async (req: Request, res: Response) => {
+export const addproduct = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const productData = req.body;
     logger.info('Adding new product:');
@@ -34,8 +34,9 @@ export const addproduct = async (req: Request, res: Response) => {
     res
       .status(200)
       .json({ message: 'Product added successfully', data: newproduct, success: true });
-  } catch {
-    throw new AppError('Failed to add product', 500);
+  } catch (err) {
+    logger.error('Error in addproduct:', err);
+    next(err);
   }
 };
 

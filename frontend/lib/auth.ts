@@ -1,17 +1,21 @@
 import api from './api';
-
 import { jwtDecode } from 'jwt-decode';
+import { EmployeeJob } from './employeeJob';
 
-export type UserRole = 'HR' | 'EMPLOYEE' | 'FINANCE' | 'MANAGER';
+export type UserRole = 'HR' | 'EMPLOYEE' | 'FINANCE' | 'MANAGER' | 'ADMIN';
 
 export interface JwtPayload {
-  id: string;
+  userId: string;
   role: UserRole;
-  exp: number;
   branchId?: string;
+  employeeJob?: EmployeeJob | null;
+  exp: number;
 }
 
 export function getUserFromToken(): JwtPayload | null {
+  // Check if we're in the browser (not SSR)
+  if (typeof window === 'undefined') return null;
+
   const token = localStorage.getItem('accessToken');
   if (!token) return null;
 

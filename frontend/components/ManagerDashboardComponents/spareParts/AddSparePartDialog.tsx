@@ -92,7 +92,7 @@ export default function AddSparePartDialog({
         warehouse_id: formData.warehouse_id || undefined,
         vendor_id: formData.vendor_id || undefined,
         base_price: Number(formData.base_price),
-        quantity: Number(formData.quantity) || 0,
+        quantity: Number(formData.quantity)!,
       });
       console.log(respo);
       toast.success('Spare part added successfully');
@@ -106,7 +106,7 @@ export default function AddSparePartDialog({
         base_price: '',
         warehouse_id: '',
         vendor_id: '',
-        quantity: '0',
+        quantity: '',
       });
     } catch (error: unknown) {
       console.log(error);
@@ -157,6 +157,7 @@ export default function AddSparePartDialog({
                 min="0"
                 value={formData.quantity}
                 onChange={(e) => setFormData({ ...formData, quantity: e.target.value })}
+                placeholder="0"
               />
             </div>
             <div className="space-y-2">

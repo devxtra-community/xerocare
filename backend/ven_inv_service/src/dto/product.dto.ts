@@ -1,4 +1,4 @@
-import { ProductStatus } from '../entities/productEntity';
+import { ProductStatus, PrintColour } from '../entities/productEntity';
 
 export interface AddProductDTO {
   model_id: string;
@@ -11,6 +11,8 @@ export interface AddProductDTO {
   MFD: string | Date;
   sale_price: number;
   tax_rate: number;
+  print_colour?: PrintColour;
+  max_discount_amount?: number;
 }
 
 export interface BulkProductRow {
@@ -24,4 +26,6 @@ export interface BulkProductRow {
   MFD: string | Date;
   sale_price: number;
   tax_rate: number;
+  print_colour?: PrintColour;
+  max_discount_amount?: number;
 }

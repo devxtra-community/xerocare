@@ -28,6 +28,7 @@ import {
   getInvoiceById,
 } from '@/lib/invoice';
 import { CustomerSelect } from '@/components/invoice/CustomerSelect';
+import { ProductSelect, SelectableItem } from '@/components/invoice/ProductSelect';
 import {
   Dialog,
   DialogContent,
@@ -53,7 +54,7 @@ export default function EmployeeSalesTable() {
       setInvoices(data);
     } catch (error) {
       console.error('Failed to fetch invoices:', error);
-      alert('Failed to fetch sales data.');
+      toast.error('Failed to fetch sales data.');
     } finally {
       setLoading(false);
     }
@@ -70,20 +71,22 @@ export default function EmployeeSalesTable() {
       setDetailsOpen(true);
     } catch (error) {
       console.error('Failed to fetch invoice details:', error);
-      alert('Failed to load invoice details.');
+      toast.error('Failed to load invoice details.');
     } finally {
       // Done loading
     }
   };
 
-  const filteredInvoices = invoices.filter((inv) => {
-    const matchesSearch =
-      inv.invoiceNumber.toLowerCase().includes(search.toLowerCase()) ||
-      inv.customerName?.toLowerCase().includes(search.toLowerCase()) ||
-      inv.items?.some((item) => item.description.toLowerCase().includes(search.toLowerCase()));
-    const matchesFilter = filterType === 'All' || inv.saleType === filterType;
-    return matchesSearch && matchesFilter;
-  });
+  const filteredInvoices = invoices
+    .filter((inv) => inv.saleType === 'SALE') // Only show SALE type, exclude RENT and LEASE
+    .filter((inv) => {
+      const matchesSearch =
+        inv.invoiceNumber.toLowerCase().includes(search.toLowerCase()) ||
+        inv.customerName?.toLowerCase().includes(search.toLowerCase()) ||
+        inv.items?.some((item) => item.description.toLowerCase().includes(search.toLowerCase()));
+      const matchesFilter = filterType === 'All' || inv.saleType === filterType;
+      return matchesSearch && matchesFilter;
+    });
 
   const handleCreate = async (data: CreateInvoicePayload) => {
     try {
@@ -382,7 +385,7 @@ function InvoiceDetailsDialog({ invoice, onClose }: { invoice: Invoice; onClose:
                         {item.quantity}
                       </TableCell>
                       <TableCell className="text-right font-bold text-gray-900 text-sm">
-                        ₹{(item.quantity * item.unitPrice).toLocaleString()}
+                        ₹{((item.quantity || 0) * (item.unitPrice || 0)).toLocaleString()}
                       </TableCell>
                     </TableRow>
                   ))}
@@ -428,31 +431,120 @@ function SaleFormModal({
   onClose: () => void;
   onConfirm: (data: CreateInvoicePayload) => void;
 }) {
-  const [form, setForm] = useState<CreateInvoicePayload>({
+  // Extended Item interface for local state
+  interface ExtendedItem {
+    description: string;
+    quantity: number;
+    unitPrice: number; // This is the Net Price (Base - Discount)
+    basePrice: number; // Original Price
+    discount: number;
+    maxDiscount: number;
+    isManual: boolean;
+  }
+
+  const [form, setForm] = useState<{
+    customerId: string;
+    saleType: 'SALE';
+    items: ExtendedItem[];
+  }>({
     customerId: '',
     saleType: 'SALE',
-    items: [{ description: '', quantity: 1, unitPrice: 0 }],
-    startDate: '',
-    endDate: '',
-    billingCycleInDays: 30,
+    items: [],
   });
 
-  const addItem = () => {
+  const [manualItemOpen, setManualItemOpen] = useState(false);
+
+  const addItem = (item: SelectableItem) => {
+    let description = '';
+    let basePrice = 0;
+    let maxDiscount = 0;
+
+    if ('part_name' in item) {
+      // SparePart
+      description = item.part_name;
+      basePrice = Number(item.base_price) || 0;
+      maxDiscount = 0;
+    } else {
+      // Product
+      description = item.name;
+      basePrice = item.sale_price || 0;
+      maxDiscount = item.max_discount_amount || 0;
+    }
+
+    const newItem: ExtendedItem = {
+      description,
+      quantity: 1,
+      basePrice,
+      discount: 0,
+      unitPrice: basePrice, // Initially same as base
+      maxDiscount,
+      isManual: false,
+    };
+
     setForm({
       ...form,
-      items: [...form.items, { description: '', quantity: 1, unitPrice: 0 }],
+      items: [...form.items, newItem],
     });
+    toast.success(`Added ${description}`);
+  };
+
+  const addManualItem = () => {
+    setForm({
+      ...form,
+      items: [
+        ...form.items,
+        {
+          description: '',
+          quantity: 1,
+          basePrice: 0,
+          discount: 0,
+          unitPrice: 0,
+          maxDiscount: 999999,
+          isManual: true,
+        },
+      ],
+    });
+    setManualItemOpen(false);
   };
 
   const removeItem = (index: number) => {
-    if (form.items.length <= 1) return;
     const newItems = form.items.filter((_, i) => i !== index);
     setForm({ ...form, items: newItems });
   };
 
-  const updateItem = (index: number, field: string, value: string | number) => {
+  const updateItem = (index: number, field: keyof ExtendedItem, value: string | number) => {
     const newItems = [...form.items];
-    newItems[index] = { ...newItems[index], [field]: value };
+    const prevItem = newItems[index];
+    const safeValue = typeof value === 'string' ? value : Number(value);
+
+    if (field === 'quantity') {
+      newItems[index] = { ...prevItem, quantity: Number(safeValue) };
+    } else if (field === 'description') {
+      newItems[index] = { ...prevItem, description: String(safeValue) };
+    } else if (field === 'discount') {
+      const discountVal = Number(safeValue);
+      // Removed strict return to allow showing error state inline
+
+      // Also discount shouldn't be > basePrice
+      if (discountVal > prevItem.basePrice) {
+        toast.error(`Discount cannot exceed base price`);
+        return;
+      }
+
+      newItems[index] = {
+        ...prevItem,
+        discount: discountVal,
+        unitPrice: prevItem.basePrice - discountVal,
+      };
+    } else if (field === 'basePrice' && prevItem.isManual) {
+      const base = Number(safeValue);
+      newItems[index] = {
+        ...prevItem,
+        basePrice: base,
+        unitPrice: base - prevItem.discount,
+      };
+    }
+
     setForm({ ...form, items: newItems });
   };
 
@@ -460,27 +552,28 @@ function SaleFormModal({
 
   return (
     <Dialog open={true} onOpenChange={(val) => !val && onClose()}>
-      <DialogContent className="sm:max-w-2xl p-0 overflow-hidden rounded-xl border-none shadow-2xl bg-white">
-        <DialogHeader className="p-8 pb-4">
+      <DialogContent className="sm:max-w-3xl p-0 overflow-hidden rounded-2xl border-none shadow-2xl bg-slate-50/50 backdrop-blur-sm h-[90vh] flex flex-col">
+        <DialogHeader className="p-6 pb-4 bg-white border-b border-slate-100 shrink-0">
           <div className="flex items-center gap-4">
-            <div className="h-12 w-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shadow-sm">
+            <div className="h-12 w-12 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-lg shadow-blue-200">
               <IndianRupee size={24} />
             </div>
             <div className="space-y-1">
-              <DialogTitle className="text-xl font-bold text-primary tracking-tight">
+              <DialogTitle className="text-xl font-bold text-slate-800 tracking-tight">
                 New Sale Invoice
               </DialogTitle>
-              <DialogDescription className="text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-none">
+              <DialogDescription className="text-xs font-semibold text-slate-400 uppercase tracking-widest">
                 Create a new transaction record
               </DialogDescription>
             </div>
           </div>
         </DialogHeader>
 
-        <div className="p-8 pt-4 space-y-6 max-h-[70vh] overflow-y-auto scrollbar-hide">
-          <div className="space-y-2">
-            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-              Customer
+        <div className="p-6 space-y-8 overflow-y-auto grow scrollbar-hide bg-white/50">
+          {/* Customer Section */}
+          <div className="space-y-2 bg-white p-5 rounded-xl border border-slate-100 shadow-sm">
+            <label className="text-[11px] font-bold text-slate-500 uppercase flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-blue-400" /> Customer Details
             </label>
             <div className="w-full">
               <CustomerSelect
@@ -490,95 +583,150 @@ function SaleFormModal({
             </div>
           </div>
 
-          <div className="flex p-1 bg-gray-100 rounded-xl">
-            {['SALE'].map((type) => (
-              <button
-                key={type}
-                onClick={() => setForm({ ...form, saleType: type as 'SALE' })}
-                className={`flex-1 py-2.5 rounded-lg text-[10px] font-bold transition-all uppercase tracking-widest
-                  ${
-                    form.saleType === type
-                      ? 'bg-white text-primary shadow-sm font-black'
-                      : 'text-gray-400 hover:text-gray-500'
-                  }`}
-              >
-                {type}
-              </button>
-            ))}
-          </div>
-
+          {/* Items Section */}
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                Line Items
-              </h3>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={addItem}
-                className="h-8 text-primary font-bold text-[10px] uppercase tracking-widest hover:bg-gray-50 rounded-lg"
-              >
-                <Plus size={14} className="mr-1" /> Add Another Item
-              </Button>
+              <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-emerald-400" /> Order Items
+              </h4>
+              {!manualItemOpen && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setManualItemOpen(true)}
+                  className="text-[10px] font-bold uppercase tracking-widest text-slate-400 hover:text-primary transition-colors h-7"
+                >
+                  + Manual Entry
+                </Button>
+              )}
             </div>
 
-            <div className="space-y-3">
+            {/* Search Logic */}
+            <div className="bg-white p-2 rounded-xl border border-slate-200 shadow-sm focus-within:ring-2 focus-within:ring-primary/20 transition-all">
+              <ProductSelect onSelect={addItem} />
+            </div>
+            {/* Secondary Manual Add */}
+            {manualItemOpen && (
+              <div className="flex justify-end mt-2 animate-in fade-in slide-in-from-top-1">
+                <Button
+                  onClick={addManualItem}
+                  size="sm"
+                  variant="secondary"
+                  className="text-xs font-bold"
+                >
+                  Add Custom Item Row
+                </Button>
+              </div>
+            )}
+
+            {/* List of Added Items */}
+            <div className="space-y-3 mt-4">
+              {form.items.length === 0 && (
+                <div className="text-center py-12 border-2 border-dashed border-slate-200 rounded-xl">
+                  <p className="text-sm font-bold text-slate-400">No items added.</p>
+                  <p className="text-xs text-slate-300 mt-1">Search above to add products.</p>
+                </div>
+              )}
+
               {form.items.map((item, index) => (
                 <div
                   key={index}
-                  className="group relative grid grid-cols-12 gap-3 p-4 rounded-xl border border-gray-100 bg-gray-50/50 hover:bg-white hover:border-blue-200 transition-all"
+                  className="group relative bg-white border border-slate-200 rounded-xl p-4 shadow-sm hover:shadow-md hover:border-blue-300 transition-all"
                 >
-                  <div className="col-span-12 md:col-span-6 space-y-1">
-                    <label className="text-[9px] font-bold text-gray-400 uppercase tracking-wider pl-1">
-                      Description
-                    </label>
-                    <Input
-                      value={item.description}
-                      onChange={(e) => updateItem(index, 'description', e.target.value)}
-                      placeholder="e.g. Printer Model"
-                      className="h-10 border-none bg-transparent font-bold text-gray-800 placeholder:text-gray-300 shadow-none focus-visible:ring-0 px-1"
-                    />
+                  <div className="absolute top-2 right-2">
+                    <button
+                      onClick={() => removeItem(index)}
+                      className="p-2 text-slate-300 hover:text-red-500 transition-colors"
+                    >
+                      <Trash2 size={16} />
+                    </button>
                   </div>
-                  <div className="col-span-4 md:col-span-2 space-y-1">
-                    <label className="text-[9px] font-bold text-gray-400 uppercase tracking-wider pl-1">
-                      Qty
-                    </label>
-                    <Input
-                      type="number"
-                      min="1"
-                      value={item.quantity}
-                      onChange={(e) => updateItem(index, 'quantity', parseInt(e.target.value) || 1)}
-                      className="h-10 border-none bg-transparent font-bold text-gray-500 shadow-none focus-visible:ring-0 text-center"
-                    />
-                  </div>
-                  <div className="col-span-8 md:col-span-3 space-y-1 text-right">
-                    <label className="text-[9px] font-bold text-gray-400 uppercase tracking-wider pr-1">
-                      Unit Price
-                    </label>
-                    <div className="relative">
+
+                  <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
+                    {/* Description */}
+                    <div className="md:col-span-4 space-y-1">
+                      <label className="text-[9px] font-bold text-slate-400 uppercase">
+                        Description
+                      </label>
+                      <Input
+                        value={item.description}
+                        onChange={(e) => updateItem(index, 'description', e.target.value)}
+                        readOnly={!item.isManual}
+                        className={`h-9 font-bold text-sm ${!item.isManual ? 'bg-slate-50 border-transparent' : 'bg-white'}`}
+                      />
+                    </div>
+
+                    {/* Qty */}
+                    <div className="md:col-span-2 space-y-1">
+                      <label className="text-[9px] font-bold text-slate-400 uppercase text-center block">
+                        Qty
+                      </label>
                       <Input
                         type="number"
-                        min="0"
-                        value={item.unitPrice}
-                        onChange={(e) =>
-                          updateItem(index, 'unitPrice', parseFloat(e.target.value) || 0)
-                        }
-                        className="h-10 border-none bg-transparent font-bold text-gray-900 shadow-none focus-visible:ring-0 pl-6 text-right"
+                        min="1"
+                        value={item.quantity}
+                        onChange={(e) => updateItem(index, 'quantity', e.target.value)}
+                        className="h-9 text-center font-bold"
                       />
-                      <span className="absolute left-1 top-1/2 -translate-y-1/2 text-gray-300 font-bold text-xs">
-                        ₹
-                      </span>
                     </div>
-                  </div>
-                  <div className="col-span-12 md:col-span-1 flex items-center justify-end">
-                    {form.items.length > 1 && (
-                      <button
-                        onClick={() => removeItem(index)}
-                        className="h-8 w-8 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 flex items-center justify-center transition-all"
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    )}
+
+                    {/* Base Price */}
+                    <div className="md:col-span-2 space-y-1">
+                      <label className="text-[9px] font-bold text-slate-400 uppercase text-right block">
+                        Rate
+                      </label>
+                      <div className="relative">
+                        <Input
+                          type="number"
+                          value={item.basePrice}
+                          readOnly={!item.isManual}
+                          onChange={(e) => updateItem(index, 'basePrice', e.target.value)}
+                          className={`h-9 text-right font-bold pr-1 ${!item.isManual ? 'bg-slate-50 text-slate-500' : ''}`}
+                        />
+                        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-300">
+                          ₹
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Discount */}
+                    <div className="md:col-span-2 space-y-1">
+                      <label className="text-[9px] font-bold text-slate-400 uppercase text-center block">
+                        Discount
+                      </label>
+                      <div className="relative">
+                        <Input
+                          type="number"
+                          min="0"
+                          // Remove max attribute to allow typing higher values
+                          value={item.discount === 0 ? '' : item.discount}
+                          placeholder="0"
+                          onChange={(e) => updateItem(index, 'discount', e.target.value)}
+                          className={`h-9 text-center font-bold border-2 focus:ring-2 transition-all ${
+                            !item.isManual &&
+                            item.maxDiscount > 0 &&
+                            item.discount > item.maxDiscount
+                              ? 'text-red-600 border-red-200 bg-red-50 focus:border-red-500 focus:ring-red-200'
+                              : 'text-emerald-600 border-emerald-100 bg-emerald-50/30 focus:border-emerald-400 focus:ring-emerald-200'
+                          }`}
+                        />
+                      </div>
+                      {!item.isManual &&
+                        item.maxDiscount > 0 &&
+                        item.discount > item.maxDiscount && (
+                          <p className="text-[9px] font-bold text-red-500 text-center animate-pulse mt-1">
+                            Max Allowed: ₹{item.maxDiscount}
+                          </p>
+                        )}
+                    </div>
+
+                    {/* Total Row */}
+                    <div className="md:col-span-2 flex flex-col items-end justify-center h-9 mt-auto">
+                      <p className="text-[9px] font-bold text-slate-400 uppercase">Net</p>
+                      <p className="font-extrabold text-slate-900">
+                        ₹{(item.quantity * item.unitPrice).toLocaleString()}
+                      </p>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -586,41 +734,61 @@ function SaleFormModal({
           </div>
         </div>
 
-        <div className="p-8 bg-gray-50 flex items-center justify-between border-t border-gray-100">
+        {/* Footer */}
+        <div className="p-6 bg-white border-t border-slate-100 flex items-center justify-between shrink-0">
           <div>
-            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider leading-none mb-1">
-              Estimated Total
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider leading-none mb-1">
+              Grand Total
             </p>
-            <p className="text-2xl font-bold text-primary">₹{totalAmount.toLocaleString()}</p>
+            <p className="text-3xl font-black text-primary tracking-tight">
+              ₹{totalAmount.toLocaleString()}
+            </p>
           </div>
-          <div className="flex gap-6 items-center">
+          <div className="flex gap-4 items-center">
             <button
               onClick={onClose}
-              className="text-sm font-bold text-gray-900 hover:text-gray-600 transition-colors"
+              className="text-sm font-bold text-slate-400 hover:text-slate-600 transition-colors"
             >
               Discard
             </button>
             <Button
-              className="h-12 px-10 rounded-xl bg-primary text-white hover:bg-primary/90 font-bold shadow-lg disabled:opacity-70 transition-all"
+              className="h-12 px-10 rounded-xl bg-blue-600 text-white hover:bg-blue-700 font-bold shadow-lg shadow-blue-200 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               onClick={() => {
+                if (!form.customerId) {
+                  toast.error('Please select a customer.');
+                  return;
+                }
+                if (form.items.length === 0) {
+                  toast.error('Please add at least one item.');
+                  return;
+                }
+
+                // Validation check for Max Discount
+                const hasInvalidDiscount = form.items.some(
+                  (item) =>
+                    !item.isManual && item.maxDiscount > 0 && item.discount > item.maxDiscount,
+                );
+                if (hasInvalidDiscount) {
+                  toast.error('Please fix invalid discounts before proceeding.');
+                  return;
+                }
+
                 const finalPayload: CreateInvoicePayload = {
                   customerId: form.customerId,
                   saleType: form.saleType,
                   items: form.items.map((it) => ({
                     description: it.description,
                     quantity: it.quantity,
+                    // We send the NET unit price to backend as 'unitPrice' usually (unless backed expects discount field)
+                    // Based on previous code, only unitPrice exists in payload.
                     unitPrice: it.unitPrice,
                   })),
                 };
 
-                if (!form.customerId) {
-                  alert('Please select a customer.');
-                  return;
-                }
                 onConfirm(finalPayload);
               }}
             >
-              Finalize Sale
+              Confirm Sale
             </Button>
           </div>
         </div>

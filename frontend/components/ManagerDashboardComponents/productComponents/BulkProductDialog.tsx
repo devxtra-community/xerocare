@@ -19,7 +19,6 @@ import {
 } from '@/components/ui/select';
 import { productService, BulkProductRow } from '@/services/productService';
 import { commonService, Vendor, Warehouse } from '@/services/commonService';
-import { modelService, Model } from '@/services/modelService';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
 
@@ -33,20 +32,17 @@ export function BulkProductDialog({ open, onClose, onSuccess }: BulkProductDialo
   const [rows, setRows] = useState<Partial<BulkProductRow>[]>([]);
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
-  const [models, setModels] = useState<Model[]>([]);
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [file, setFile] = useState<File | null>(null);
 
   const loadDependencies = async () => {
     try {
-      const [v, w, m] = await Promise.all([
+      const [v, w] = await Promise.all([
         commonService.getAllVendors(),
         commonService.getAllWarehouses(),
-        modelService.getAllModels(),
       ]);
       setVendors(v);
       setWarehouses(w);
-      setModels(m);
     } catch {
       toast.error('Failed to load dependencies');
     }
@@ -72,6 +68,8 @@ export function BulkProductDialog({ open, onClose, onSuccess }: BulkProductDialo
     MFD: '',
     sale_price: 0,
     tax_rate: 0,
+    print_colour: 'BLACK_WHITE',
+    max_discount_amount: 0,
   });
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -94,18 +92,6 @@ export function BulkProductDialog({ open, onClose, onSuccess }: BulkProductDialo
     reader.readAsBinaryString(selectedFile);
   };
 
-  const findModelId = (search: string, modelsList: Model[]) => {
-    if (!search) return '';
-    const lower = String(search).toLowerCase();
-    const found = modelsList.find(
-      (m) =>
-        m.id === search ||
-        m.model_no.toLowerCase() === lower ||
-        m.model_name.toLowerCase() === lower,
-    );
-    return found ? found.id : '';
-  };
-
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const parseExcelData = (data: any[]) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -117,11 +103,20 @@ export function BulkProductDialog({ open, onClose, onSuccess }: BulkProductDialo
         return '';
       };
 
+      const rawColour = getVal(['print_colour', 'Print Colour', 'Colour Type', 'Colour'])
+        .toString()
+        .toLowerCase();
+      let printColour: 'BLACK_WHITE' | 'COLOUR' | 'BOTH' = 'BLACK_WHITE';
+      if (rawColour.includes('colour') || rawColour.includes('color')) printColour = 'COLOUR';
+      if (
+        rawColour.includes('both') ||
+        (rawColour.includes('black') && rawColour.includes('colour'))
+      )
+        printColour = 'BOTH';
+      if (rawColour === 'bw' || rawColour.includes('black')) printColour = 'BLACK_WHITE';
+
       return {
-        model_id: findModelId(
-          getVal(['model_no', 'model_id', 'Model No', 'Model ID', 'Model']),
-          models,
-        ),
+        model_id: getVal(['model_no', 'model_id', 'Model No', 'Model ID', 'Model']),
         model_no: getVal(['model_no', 'model_id', 'Model No', 'Model ID']),
         serial_no: getVal(['serial_no', 'Serial No', 'Serial']),
         name: getVal(['name', 'Name', 'Product Name']),
@@ -133,6 +128,9 @@ export function BulkProductDialog({ open, onClose, onSuccess }: BulkProductDialo
         MFD: getVal(['MFD', 'mfd', 'Date']),
         sale_price: Number(getVal(['sale_price', 'Price'])) || 0,
         tax_rate: Number(getVal(['tax_rate', 'Tax Rate', 'Tax'])) || 0,
+        print_colour: printColour,
+        max_discount_amount:
+          Number(getVal(['max_discount_amount', 'Max Discount', 'Discount'])) || 0,
       };
     });
 
@@ -254,6 +252,8 @@ export function BulkProductDialog({ open, onClose, onSuccess }: BulkProductDialo
                   <TableHead className="w-[120px]">MFD</TableHead>
                   <TableHead className="w-[100px]">Price</TableHead>
                   <TableHead className="w-[80px]">Tax %</TableHead>
+                  <TableHead className="w-[120px]">Print Colour</TableHead>
+                  <TableHead className="w-[100px]">Max Discount</TableHead>
                   <TableHead className="w-[50px]"></TableHead>
                 </TableRow>
               </TableHeader>
@@ -261,31 +261,11 @@ export function BulkProductDialog({ open, onClose, onSuccess }: BulkProductDialo
                 {rows.map((row, i) => (
                   <TableRow key={i}>
                     <TableCell>
-                      <Select
+                      <Input
                         value={row.model_id}
-                        onValueChange={(v) => {
-                          const m = models.find((mod) => mod.id === v);
-                          const newRows = [...rows];
-                          newRows[i] = {
-                            ...newRows[i],
-                            model_id: v,
-                            model_no: m?.model_no || '',
-                            brand: row.brand || m?.brand || '', // Auto-fill brand if empty
-                          };
-                          setRows(newRows);
-                        }}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select Model" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {models.map((m) => (
-                            <SelectItem key={m.id} value={m.id}>
-                              {m.model_name} ({m.model_no})
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                        onChange={(e) => updateRow(i, 'model_id', e.target.value)}
+                        placeholder="Model ID"
+                      />
                     </TableCell>
                     <TableCell>
                       <Input
@@ -327,7 +307,7 @@ export function BulkProductDialog({ open, onClose, onSuccess }: BulkProductDialo
                     </TableCell>
                     <TableCell>
                       <Select
-                        value={row.vendor_id}
+                        value={String(row.vendor_id)}
                         onValueChange={(v) => updateRow(i, 'vendor_id', v)}
                       >
                         <SelectTrigger>
@@ -384,6 +364,31 @@ export function BulkProductDialog({ open, onClose, onSuccess }: BulkProductDialo
                         type="number"
                         value={row.tax_rate}
                         onChange={(e) => updateRow(i, 'tax_rate', Number(e.target.value))}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Select
+                        value={row.print_colour}
+                        onValueChange={(v) => updateRow(i, 'print_colour', v)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Colour" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="BLACK_WHITE">B&W</SelectItem>
+                          <SelectItem value="COLOUR">Colour</SelectItem>
+                          <SelectItem value="BOTH">Both</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </TableCell>
+                    <TableCell>
+                      <Input
+                        type="number"
+                        value={row.max_discount_amount}
+                        onChange={(e) =>
+                          updateRow(i, 'max_discount_amount', Number(e.target.value))
+                        }
+                        placeholder="0"
                       />
                     </TableCell>
                     <TableCell>

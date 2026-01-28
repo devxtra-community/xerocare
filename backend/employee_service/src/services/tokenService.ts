@@ -15,6 +15,7 @@ export async function issueTokens(user: Employee | Admin, req: Request, res: Res
     branchId: 'branch_id' in user ? user.branch_id || '' : '',
     email: user.email,
     role: user.role,
+    employeeJob: 'employee_job' in user ? user.employee_job : null,
   });
 
   const refreshToken = signRefreshtoken({ id: user.id });

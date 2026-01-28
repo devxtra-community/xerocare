@@ -23,6 +23,8 @@ export interface Product {
   sale_price: number;
   tax_rate: number;
   product_status: ProductStatus;
+  print_colour?: 'BLACK_WHITE' | 'COLOUR' | 'BOTH';
+  max_discount_amount?: number;
   imageUrl?: string;
   created_at: string;
   inventory?: {

@@ -7,6 +7,7 @@ declare module 'express' {
       role: string;
       email?: string;
       branchId?: string;
+      employeeJob?: string | null;
     };
   }
 }

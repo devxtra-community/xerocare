@@ -7,6 +7,7 @@ import healthRouter from './routes/healthRoutes';
 import { Source } from './config/dataSource';
 import { getRabbitChannel } from './config/rabbitmq';
 import invoiceRouter from './routes/invoiceRoutes';
+import usageRouter from './routes/usageRoutes';
 
 const app = express();
 
@@ -14,6 +15,7 @@ app.use(express.json());
 
 app.use('/health', healthRouter);
 app.use('/invoices', invoiceRouter);
+app.use('/usage', usageRouter);
 
 app.use(errorHandler);
 

@@ -13,7 +13,7 @@ const router = Router();
 
 router.post('/bulk', authMiddleware, roleMiddleware(['MANAGER', 'ADMIN']), bulkUploadSpareParts);
 router.post('/add', authMiddleware, roleMiddleware(['MANAGER', 'ADMIN']), addSparePart);
-router.get('/', authMiddleware, roleMiddleware(['MANAGER', 'ADMIN']), listSpareParts);
+router.get('/', authMiddleware, roleMiddleware(['MANAGER', 'ADMIN', 'EMPLOYEE']), listSpareParts);
 router.put('/:id', authMiddleware, roleMiddleware(['MANAGER', 'ADMIN']), updateSparePart);
 router.delete('/:id', authMiddleware, roleMiddleware(['MANAGER', 'ADMIN']), deleteSparePart);
 

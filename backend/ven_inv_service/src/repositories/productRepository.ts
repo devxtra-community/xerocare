@@ -1,5 +1,6 @@
 import { Source } from '../config/db';
 import { Product } from '../entities/productEntity';
+import { IsNull } from 'typeorm';
 
 export class ProductRepository {
   private repo = Source.getRepository(Product);
@@ -11,6 +12,7 @@ export class ProductRepository {
   async getAllProducts() {
     return this.repo.find({
       relations: { model: true, warehouse: true },
+      where: { spare_part_id: IsNull() },
     });
   }
 

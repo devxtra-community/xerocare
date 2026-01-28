@@ -19,6 +19,8 @@ export default function EmployeeSalesStats() {
         setStats(data);
       } catch (error) {
         console.error('Failed to fetch invoice stats:', error);
+        // Silent fail or toast
+        // toast.error('Failed to load stats');
       } finally {
         setLoading(false);
       }
