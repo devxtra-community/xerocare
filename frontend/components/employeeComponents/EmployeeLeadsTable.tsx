@@ -49,7 +49,7 @@ export default function EmployeeLeadsTable() {
 
   useEffect(() => {
     fetchLeads();
-  }, [showDeleted]); // Refetch when toggle changes
+  }, [showDeleted, fetchLeads]); // Refetch when toggle changes
 
   const filteredLeads = leads.filter((lead) => {
     const matchesSearch = Object.values(lead).some((value) =>

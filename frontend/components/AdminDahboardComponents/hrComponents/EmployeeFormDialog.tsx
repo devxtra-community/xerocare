@@ -16,6 +16,7 @@ import {
 import { ImagePlus, FileText, X } from 'lucide-react';
 import { Employee } from '@/lib/employee';
 import { getBranches, Branch } from '@/lib/branch';
+import { getEmployeeJobOptions, EmployeeJob } from '@/lib/employeeJob';
 
 interface EmployeeFormDialogProps {
   open: boolean;
@@ -35,6 +36,7 @@ export default function EmployeeFormDialog({
     last_name: '',
     email: '',
     role: 'EMPLOYEE',
+    employee_job: '' as EmployeeJob | '',
     salary: '',
     expire_date: '',
     status: 'ACTIVE',
@@ -73,6 +75,7 @@ export default function EmployeeFormDialog({
         last_name: initialData.last_name || '',
         email: initialData.email || '',
         role: initialData.role || 'EMPLOYEE',
+        employee_job: (initialData as Employee & { employee_job?: EmployeeJob }).employee_job || '',
         salary: initialData.salary?.toString() || '',
         expire_date: initialData.expire_date
           ? new Date(initialData.expire_date).toISOString().split('T')[0]
@@ -87,6 +90,7 @@ export default function EmployeeFormDialog({
         last_name: '',
         email: '',
         role: 'EMPLOYEE',
+        employee_job: '',
         salary: '',
         expire_date: '',
         status: 'ACTIVE',
@@ -133,6 +137,9 @@ export default function EmployeeFormDialog({
       data.append('last_name', formData.last_name);
       data.append('email', formData.email);
       data.append('role', formData.role);
+      if (formData.employee_job) {
+        data.append('employee_job', formData.employee_job);
+      }
       data.append('salary', formData.salary);
       if (formData.expire_date) {
         data.append('expireDate', formData.expire_date);
@@ -257,6 +264,31 @@ export default function EmployeeFormDialog({
                 </SelectContent>
               </Select>
             </div>
+
+            {/* Employee Job - Only show for EMPLOYEE role */}
+            {formData.role === 'EMPLOYEE' && (
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                  Employee Job / Responsibility *
+                </label>
+                <Select
+                  value={formData.employee_job}
+                  onValueChange={(val) => handleSelectChange('employee_job', val)}
+                  required={formData.role === 'EMPLOYEE'}
+                >
+                  <SelectTrigger className="h-12 rounded-xl bg-gray-50 border-none shadow-sm focus:ring-2 focus:ring-blue-400">
+                    <SelectValue placeholder="Select job type" />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-xl">
+                    {getEmployeeJobOptions().map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
             <div className="space-y-2">
               <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">

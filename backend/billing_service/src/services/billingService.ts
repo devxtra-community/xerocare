@@ -451,4 +451,18 @@ export class BillingService {
     });
     return result;
   }
+
+  async getBranchSales(period: string, branchId: string) {
+    let days = 30; // Default 1M
+    if (period === '1W') days = 7;
+    else if (period === '1M') days = 30;
+    else if (period === '3M') days = 90;
+    else if (period === '1Y') days = 365;
+
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - days);
+
+    const stats = await this.invoiceRepo.getBranchSalesTrend(branchId, startDate);
+    return stats;
+  }
 }

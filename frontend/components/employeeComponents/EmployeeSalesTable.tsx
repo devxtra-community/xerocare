@@ -77,14 +77,16 @@ export default function EmployeeSalesTable() {
     }
   };
 
-  const filteredInvoices = invoices.filter((inv) => {
-    const matchesSearch =
-      inv.invoiceNumber.toLowerCase().includes(search.toLowerCase()) ||
-      inv.customerName?.toLowerCase().includes(search.toLowerCase()) ||
-      inv.items?.some((item) => item.description.toLowerCase().includes(search.toLowerCase()));
-    const matchesFilter = filterType === 'All' || inv.saleType === filterType;
-    return matchesSearch && matchesFilter;
-  });
+  const filteredInvoices = invoices
+    .filter((inv) => inv.saleType === 'SALE') // Only show SALE type, exclude RENT and LEASE
+    .filter((inv) => {
+      const matchesSearch =
+        inv.invoiceNumber.toLowerCase().includes(search.toLowerCase()) ||
+        inv.customerName?.toLowerCase().includes(search.toLowerCase()) ||
+        inv.items?.some((item) => item.description.toLowerCase().includes(search.toLowerCase()));
+      const matchesFilter = filterType === 'All' || inv.saleType === filterType;
+      return matchesSearch && matchesFilter;
+    });
 
   const handleCreate = async (data: CreateInvoicePayload) => {
     try {
