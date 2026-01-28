@@ -1,5 +1,7 @@
 import { Repository, Between } from 'typeorm';
 import { Invoice } from '../entities/invoiceEntity';
+import { InvoiceStatus } from '../entities/enums/invoiceStatus';
+import { InvoiceType } from '../entities/enums/invoiceType';
 import { Source } from '../config/dataSource';
 
 export class InvoiceRepository {
@@ -78,6 +80,30 @@ export class InvoiceRepository {
     return results.map((r) => ({
       saleType: r.saleType,
       count: parseInt(r.count, 10),
+    }));
+  }
+
+  async getBranchSalesTrend(
+    branchId: string,
+    startDate: Date,
+  ): Promise<{ date: string; totalSales: number }[]> {
+    const query = this.repo
+      .createQueryBuilder('invoice')
+      .select("TO_CHAR(invoice.createdAt, 'YYYY-MM-DD')", 'date')
+      .addSelect('SUM(invoice.totalAmount)', 'totalSales')
+      .where('invoice.branchId = :branchId', { branchId })
+      .andWhere('invoice.createdAt >= :startDate', { startDate })
+      .andWhere('invoice.status IN (:...statuses)', {
+        statuses: [InvoiceStatus.PAID, InvoiceStatus.ISSUED],
+      })
+      .andWhere('invoice.type != :type', { type: InvoiceType.PROFORMA })
+      .groupBy("TO_CHAR(invoice.createdAt, 'YYYY-MM-DD')")
+      .orderBy('date', 'ASC');
+
+    const results = await query.getRawMany();
+    return results.map((r) => ({
+      date: r.date,
+      totalSales: parseFloat(r.totalSales) || 0,
     }));
   }
 }

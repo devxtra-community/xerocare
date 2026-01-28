@@ -218,3 +218,25 @@ export const getStats = async (req: Request, res: Response, next: NextFunction) 
     next(error);
   }
 };
+
+export const getBranchSales = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const period = (req.query.period as string) || '1M';
+    const branchId = req.user?.branchId; // Always rely on auth user's branch for Manager
+    // If admin wants to query arbitrary branch, we can check role & query param later.
+    // For now, prompt implies "Manager Dashboard".
+
+    if (!branchId) {
+      throw new AppError('Branch ID not found in user context', 400);
+    }
+
+    const result = await billingService.getBranchSales(period, branchId);
+    return res.status(200).json({
+      success: true,
+      data: result,
+      message: 'Branch sales overview fetched successfully',
+    });
+  } catch (error) {
+    next(error);
+  }
+};

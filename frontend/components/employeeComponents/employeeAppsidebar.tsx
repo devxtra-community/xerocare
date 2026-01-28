@@ -23,51 +23,83 @@ import {
   SidebarMenuItem,
 } from '@/components/ui/sidebar';
 
-import { logout } from '@/lib/auth';
+import { logout, getUserFromToken } from '@/lib/auth';
+import { hasJobAccess, EmployeeJob } from '@/lib/employeeJob';
 import { toast } from 'sonner';
 import { useRouter, usePathname } from 'next/navigation';
+import { useMemo, useState, useEffect } from 'react';
 
 const menuItems = [
   {
     title: 'Dashboard',
     icon: LayoutDashboard,
     href: '/employee/dashboard',
+    modules: ['*'], // Always accessible
   },
   {
     title: 'Customers',
     icon: UsersRound,
     href: '/employee/customers',
+    modules: ['customers'],
   },
   {
     title: 'Leads',
     icon: UserPlus,
     href: '/employee/leads',
+    modules: ['crm'],
   },
   {
     title: 'Orders',
     icon: ClipboardList,
     href: '/employee/orders',
+    modules: ['sales', 'rent'],
   },
   {
     title: 'Sales',
     icon: TrendingUp,
     href: '/employee/sales',
+    modules: ['sales', 'billing'],
   },
   {
     title: 'Rent',
     icon: Key,
     href: '/employee/rent',
+    modules: ['rent', 'lease'],
   },
   {
     title: 'Lease',
     icon: ScrollText,
     href: '/employee/lease',
+    modules: ['lease'],
   },
 ];
 
 export default function EmployeeSidebar() {
   const router = useRouter();
   const pathname = usePathname();
+  const [employeeJob, setEmployeeJob] = useState<EmployeeJob | null | undefined>(null);
+
+  // Get user from JWT token on client-side only
+  useEffect(() => {
+    const user = getUserFromToken();
+    setEmployeeJob(user?.employeeJob);
+  }, []);
+
+  // Filter menu items based on employee job
+  const allowedMenuItems = useMemo(() => {
+    if (!employeeJob) {
+      // If no job assigned, show only dashboard
+      return menuItems.filter((item) => item.modules.includes('*'));
+    }
+
+    return menuItems.filter((item) => {
+      // Always show items with '*' (like Dashboard)
+      if (item.modules.includes('*')) return true;
+
+      // Check if employee's job has access to any of the item's required modules
+      return item.modules.some((module) => hasJobAccess(employeeJob as EmployeeJob, module));
+    });
+  }, [employeeJob]);
 
   const handleLogout = async () => {
     try {
@@ -103,7 +135,7 @@ export default function EmployeeSidebar() {
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu className="space-y-1 px-2">
-              {menuItems.map((item) => (
+              {allowedMenuItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton
                     asChild
