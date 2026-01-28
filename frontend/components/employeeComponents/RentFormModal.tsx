@@ -43,6 +43,11 @@ export default function RentFormModal({
     discountPercent: string | number;
     effectiveFrom: string;
     effectiveTo: string;
+    leaseType: 'EMI' | 'FSM';
+    leaseTenureMonths: string | number;
+    totalLeaseAmount: string | number;
+    monthlyEmiAmount: string | number;
+    monthlyLeaseAmount: string | number;
     pricingItems: {
       description: string;
       bwIncludedLimit?: string | number;
@@ -66,6 +71,11 @@ export default function RentFormModal({
     effectiveTo: initialData?.effectiveTo
       ? new Date(initialData.effectiveTo).toISOString().split('T')[0]
       : '',
+    leaseType: 'EMI' as 'EMI' | 'FSM',
+    leaseTenureMonths: initialData?.leaseTenureMonths || '',
+    totalLeaseAmount: initialData?.totalLeaseAmount || '',
+    monthlyEmiAmount: initialData?.monthlyEmiAmount || '',
+    monthlyLeaseAmount: initialData?.monthlyLeaseAmount || '',
     pricingItems: initialData?.items
       ?.filter((i) => i.itemType === 'PRICING_RULE')
       ?.map((i) => ({
@@ -104,45 +114,105 @@ export default function RentFormModal({
 
     setIsSubmitting(true);
     try {
-      const isFixed = form.rentType.startsWith('FIXED');
+      let cleanPayload: CreateInvoicePayload;
 
-      const cleanPayload: CreateInvoicePayload = {
-        customerId: form.customerId,
-        saleType: 'RENT',
-        // Include selected products as items in invoice
-        items: selectedProducts.map((p) => ({
-          description: `${p.name} - ${p.serial_no}`,
-          quantity: p.quantity || 1,
-          unitPrice: 0,
-          itemType: 'PRODUCT' as const,
-        })),
-        rentType: form.rentType as 'FIXED_LIMIT' | 'FIXED_COMBO' | 'CPC' | 'CPC_COMBO',
-        rentPeriod: form.rentPeriod as 'MONTHLY' | 'QUARTERLY' | 'HALF_YEARLY' | 'YEARLY',
-        effectiveFrom: form.effectiveFrom,
-        effectiveTo: form.effectiveTo || undefined,
-        monthlyRent: isFixed ? cleanNumber(form.monthlyRent) : undefined,
-        advanceAmount: isFixed ? cleanNumber(form.advanceAmount) : undefined,
-        discountPercent: cleanNumber(form.discountPercent),
-        pricingItems: form.pricingItems.map((item) => {
-          const isCombinedItem = item.description.startsWith('Combined');
-          const isBwItem = item.description.startsWith('Black & White');
-          const isColorItem = item.description.startsWith('Color');
+      if (form.saleType === 'LEASE') {
+        cleanPayload = {
+          customerId: form.customerId,
+          saleType: 'LEASE',
+          leaseType: form.leaseType,
+          leaseTenureMonths: cleanNumber(form.leaseTenureMonths),
 
-          return {
-            description: item.description,
+          // EMI Fields
+          totalLeaseAmount:
+            form.leaseType === 'EMI' ? cleanNumber(form.totalLeaseAmount) : undefined,
+          monthlyEmiAmount:
+            form.leaseType === 'EMI' ? cleanNumber(form.monthlyEmiAmount) : undefined,
 
-            bwIncludedLimit: isBwItem && isFixed ? cleanNumber(item.bwIncludedLimit) : undefined,
-            colorIncludedLimit:
-              isColorItem && isFixed ? cleanNumber(item.colorIncludedLimit) : undefined,
-            combinedIncludedLimit:
-              isCombinedItem && isFixed ? cleanNumber(item.combinedIncludedLimit) : undefined,
+          // FSM Fields
+          monthlyLeaseAmount:
+            form.leaseType === 'FSM' ? cleanNumber(form.monthlyLeaseAmount) : undefined,
 
-            bwExcessRate: isBwItem ? cleanNumber(item.bwExcessRate) : undefined,
-            colorExcessRate: isColorItem ? cleanNumber(item.colorExcessRate) : undefined,
-            combinedExcessRate: isCombinedItem ? cleanNumber(item.combinedExcessRate) : undefined,
-          };
-        }),
-      };
+          effectiveFrom: form.effectiveFrom,
+          effectiveTo: form.effectiveTo || undefined,
+          discountPercent: cleanNumber(form.discountPercent),
+
+          items: selectedProducts.map((p) => ({
+            description: `${p.name} - ${p.serial_no}`,
+            quantity: p.quantity || 1,
+            unitPrice: 0,
+            itemType: 'PRODUCT' as const,
+          })),
+
+          pricingItems:
+            form.leaseType === 'FSM'
+              ? form.pricingItems.map((item) => {
+                  // Reuse CPC logic for FSM
+                  const isCombinedItem = item.description.startsWith('Combined');
+                  const isBwItem = item.description.startsWith('Black & White');
+                  const isColorItem = item.description.startsWith('Color');
+                  return {
+                    description: item.description,
+                    bwIncludedLimit: undefined, // FSM usually pure CPC or fixed base. Assuming no free limit for FSM unless prompted? Prompt says "monthly lease + CPC". CPC implies pay per copy, usually from 0.
+                    colorIncludedLimit: undefined,
+                    combinedIncludedLimit: undefined,
+                    // FSM Pricing (Excess Rate = CPC Rate)
+                    bwExcessRate: isBwItem ? cleanNumber(item.bwExcessRate) : undefined,
+                    colorExcessRate: isColorItem ? cleanNumber(item.colorExcessRate) : undefined,
+                    combinedExcessRate: isCombinedItem
+                      ? cleanNumber(item.combinedExcessRate)
+                      : undefined,
+                  };
+                })
+              : undefined,
+        };
+      } else {
+        const isFixed = form.rentType.startsWith('FIXED');
+
+        cleanPayload = {
+          customerId: form.customerId,
+          saleType: 'RENT',
+          // Include selected products as items in invoice
+          items: selectedProducts.map((p) => ({
+            description: `${p.name} - ${p.serial_no}`,
+            quantity: p.quantity || 1,
+            unitPrice: 0,
+            itemType: 'PRODUCT' as const,
+          })),
+          rentType: form.rentType as
+            | 'FIXED_LIMIT'
+            | 'FIXED_COMBO'
+            | 'FIXED_FLAT'
+            | 'CPC'
+            | 'CPC_COMBO',
+          rentPeriod: form.rentPeriod as 'MONTHLY' | 'QUARTERLY' | 'HALF_YEARLY' | 'YEARLY',
+          effectiveFrom: form.effectiveFrom,
+          effectiveTo: form.effectiveTo || undefined,
+          monthlyRent: isFixed ? cleanNumber(form.monthlyRent) : undefined,
+          advanceAmount: isFixed ? cleanNumber(form.advanceAmount) : undefined,
+          discountPercent: cleanNumber(form.discountPercent),
+          pricingItems: form.pricingItems.map((item) => {
+            const isCombinedItem = item.description.startsWith('Combined');
+            const isBwItem = item.description.startsWith('Black & White');
+            const isColorItem = item.description.startsWith('Color');
+
+            return {
+              description: item.description,
+
+              bwIncludedLimit: isBwItem && isFixed ? cleanNumber(item.bwIncludedLimit) : undefined,
+              colorIncludedLimit:
+                isColorItem && isFixed ? cleanNumber(item.colorIncludedLimit) : undefined,
+              combinedIncludedLimit:
+                isCombinedItem && isFixed ? cleanNumber(item.combinedIncludedLimit) : undefined,
+
+              bwExcessRate: isBwItem ? cleanNumber(item.bwExcessRate) : undefined,
+              colorExcessRate: isColorItem ? cleanNumber(item.colorExcessRate) : undefined,
+              combinedExcessRate: isCombinedItem ? cleanNumber(item.combinedExcessRate) : undefined,
+            };
+          }),
+        };
+      }
+
       await onConfirm(cleanPayload);
     } catch (error) {
       console.error(error);
@@ -398,6 +468,22 @@ export default function RentFormModal({
               <span className="w-2 h-2 rounded-full bg-blue-400" /> Contract Terms
             </h4>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-5 rounded-xl bg-white border border-slate-100 shadow-sm">
+              {/* Contract Type Toggle */}
+              <div className="md:col-span-2 flex gap-4 p-1 bg-slate-100 rounded-lg w-fit">
+                <button
+                  className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all ${form.saleType === 'RENT' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                  onClick={() => setForm({ ...form, saleType: 'RENT' })}
+                >
+                  Rental Contract
+                </button>
+                <button
+                  className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all ${form.saleType === 'LEASE' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                  onClick={() => setForm({ ...form, saleType: 'LEASE' })}
+                >
+                  Lease Contract
+                </button>
+              </div>
+
               <div className="space-y-2">
                 <label className="text-[11px] font-bold text-slate-500 uppercase">Customer</label>
                 {initialData ? (
@@ -415,18 +501,28 @@ export default function RentFormModal({
               </div>
               <div className="space-y-2">
                 <label className="text-[11px] font-bold text-slate-500 uppercase">
-                  Billing Period
+                  {form.saleType === 'LEASE' ? 'Tenure (Months)' : 'Billing Period'}
                 </label>
-                <select
-                  className="w-full h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 focus:ring-2 focus:ring-blue-100 outline-none"
-                  value={form.rentPeriod}
-                  onChange={(e) => setForm({ ...form, rentPeriod: e.target.value })}
-                >
-                  <option value="MONTHLY">Monthly</option>
-                  <option value="QUARTERLY">Quarterly</option>
-                  <option value="HALF_YEARLY">Half Yearly</option>
-                  <option value="YEARLY">Yearly</option>
-                </select>
+                {form.saleType === 'LEASE' ? (
+                  <Input
+                    type="number"
+                    value={form.leaseTenureMonths}
+                    onChange={(e) => setForm({ ...form, leaseTenureMonths: e.target.value })}
+                    placeholder="e.g 12, 24, 36"
+                    className="font-bold"
+                  />
+                ) : (
+                  <select
+                    className="w-full h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 focus:ring-2 focus:ring-blue-100 outline-none"
+                    value={form.rentPeriod}
+                    onChange={(e) => setForm({ ...form, rentPeriod: e.target.value })}
+                  >
+                    <option value="MONTHLY">Monthly</option>
+                    <option value="QUARTERLY">Quarterly</option>
+                    <option value="HALF_YEARLY">Half Yearly</option>
+                    <option value="YEARLY">Yearly</option>
+                  </select>
+                )}
               </div>
               <div className="space-y-2">
                 <label className="text-[11px] font-bold text-slate-500 uppercase">
@@ -538,20 +634,77 @@ export default function RentFormModal({
                   <label className="text-[11px] font-bold text-slate-500 uppercase">
                     Model Type
                   </label>
-                  <select
-                    className="w-full h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-indigo-600 focus:ring-2 focus:ring-indigo-100 outline-none"
-                    value={form.rentType}
-                    onChange={(e) => handleRentTypeChange(e.target.value)}
-                  >
-                    <option value="FIXED_LIMIT">Fixed Rent + Individual Limit</option>
-                    <option value="FIXED_COMBO">Fixed Rent + Combined Limit</option>
-                    <option value="CPC">CPC (Individual)</option>
-                    <option value="CPC_COMBO">CPC (Combined)</option>
-                  </select>
+                  {form.saleType === 'LEASE' ? (
+                    <select
+                      className="w-full h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-indigo-600 focus:ring-2 focus:ring-indigo-100 outline-none"
+                      value={form.leaseType}
+                      onChange={(e) =>
+                        setForm({ ...form, leaseType: e.target.value as 'EMI' | 'FSM' })
+                      }
+                    >
+                      <option value="EMI">EMI Based Lease</option>
+                      <option value="FSM">Lease + Full Service Maintenance (FSM)</option>
+                    </select>
+                  ) : (
+                    <select
+                      className="w-full h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-indigo-600 focus:ring-2 focus:ring-indigo-100 outline-none"
+                      value={form.rentType}
+                      onChange={(e) => handleRentTypeChange(e.target.value)}
+                    >
+                      <option value="FIXED_LIMIT">Fixed Rent + Individual Limit</option>
+                      <option value="FIXED_COMBO">Fixed Rent + Combined Limit</option>
+                      <option value="FIXED_FLAT">Fixed Flat Rent (No Limits)</option>
+                      <option value="CPC">CPC (Individual)</option>
+                      <option value="CPC_COMBO">CPC (Combined)</option>
+                    </select>
+                  )}
                 </div>
               </div>
 
-              {isFixed && (
+              {form.saleType === 'LEASE' && (
+                <div className="grid grid-cols-2 gap-6 pt-4 border-t border-slate-50">
+                  {form.leaseType === 'EMI' ? (
+                    <>
+                      <div className="space-y-2">
+                        <label className="text-[11px] font-bold text-slate-500 uppercase">
+                          Total Lease Amount
+                        </label>
+                        <Input
+                          type="number"
+                          value={form.totalLeaseAmount}
+                          onChange={(e) => setForm({ ...form, totalLeaseAmount: e.target.value })}
+                          className="font-bold text-slate-800"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[11px] font-bold text-slate-500 uppercase">
+                          Monthly EMI
+                        </label>
+                        <Input
+                          type="number"
+                          value={form.monthlyEmiAmount}
+                          onChange={(e) => setForm({ ...form, monthlyEmiAmount: e.target.value })}
+                          className="font-bold text-slate-800"
+                        />
+                      </div>
+                    </>
+                  ) : (
+                    <div className="space-y-2">
+                      <label className="text-[11px] font-bold text-slate-500 uppercase">
+                        Monthly Lease Amount
+                      </label>
+                      <Input
+                        type="number"
+                        value={form.monthlyLeaseAmount}
+                        onChange={(e) => setForm({ ...form, monthlyLeaseAmount: e.target.value })}
+                        className="font-bold text-slate-800"
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {form.saleType === 'RENT' && isFixed && (
                 <div className="grid grid-cols-2 gap-6 pt-4 border-t border-slate-50">
                   <div className="space-y-2">
                     <label className="text-[11px] font-bold text-slate-500 uppercase">
@@ -583,113 +736,120 @@ export default function RentFormModal({
           </section>
 
           {/* Section 4: Rules (Moved Down) */}
-          <section className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-emerald-400" /> Usage Rules
-              </h4>
-              {/* Rules are auto-generated from selected products */}
-            </div>
+          {(form.saleType === 'RENT' ||
+            (form.saleType === 'LEASE' && form.leaseType === 'FSM')) && (
+            <section className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400" /> Usage Rules
+                </h4>
+                {/* Rules are auto-generated from selected products */}
+              </div>
 
-            <div className="space-y-3">
-              {form.pricingItems.map((item, index) => (
-                <div
-                  key={index}
-                  className="grid grid-cols-12 gap-4 p-4 rounded-xl border border-dotted border-slate-200 bg-white hover:border-emerald-300 transition-all items-end relative group"
-                >
-                  <div className="col-span-12 md:col-span-3 space-y-1">
-                    <label className="text-[9px] font-bold text-slate-400 uppercase">
-                      Category
-                    </label>
-                    <Input
-                      value={item.description}
-                      onChange={(e) => updatePricingItem(index, 'description', e.target.value)}
-                      placeholder="e.g. B&W, Color, A3"
-                      className="h-9 text-sm font-bold border-slate-200"
-                    />
-                  </div>
-
-                  {/* Limit Fields */}
-                  {isFixed && (
-                    <div className="col-span-6 md:col-span-3 space-y-1">
+              <div className="space-y-3">
+                {form.pricingItems.map((item, index) => (
+                  <div
+                    key={index}
+                    className="grid grid-cols-12 gap-4 p-4 rounded-xl border border-dotted border-slate-200 bg-white hover:border-emerald-300 transition-all items-end relative group"
+                  >
+                    <div className="col-span-12 md:col-span-3 space-y-1">
                       <label className="text-[9px] font-bold text-slate-400 uppercase">
-                        {item.description.startsWith('Combined') ? 'Combined Limit' : 'Free Limit'}
+                        Category
                       </label>
                       <Input
-                        type="number"
-                        placeholder="0"
-                        value={
-                          (item.description.startsWith('Combined')
-                            ? item.combinedIncludedLimit
-                            : item.description.startsWith('Black & White')
-                              ? item.bwIncludedLimit
-                              : item.colorIncludedLimit) ?? ''
-                        }
-                        onChange={(e) =>
-                          updatePricingItem(
-                            index,
-                            item.description.startsWith('Combined')
-                              ? 'combinedIncludedLimit'
-                              : item.description.startsWith('Black & White')
-                                ? 'bwIncludedLimit'
-                                : 'colorIncludedLimit',
-                            e.target.value,
-                          )
-                        }
-                        className="h-9 border-slate-200"
+                        value={item.description}
+                        onChange={(e) => updatePricingItem(index, 'description', e.target.value)}
+                        placeholder="e.g. B&W, Color, A3"
+                        className="h-9 text-sm font-bold border-slate-200"
                       />
                     </div>
-                  )}
 
-                  {/* Rate Fields */}
-                  <div
-                    className={`col-span-6 ${isFixed ? 'md:col-span-3' : 'md:col-span-4'} space-y-1`}
-                  >
-                    <label className="text-[9px] font-bold text-slate-400 uppercase">
-                      {item.description.startsWith('Combined')
-                        ? 'Combined Rate (₹)'
-                        : form.rentType.includes('CPC')
-                          ? 'Rate/Page (₹)'
-                          : 'Excess Rate (₹)'}
-                    </label>
-                    <div className="relative">
-                      <Input
-                        type="number"
-                        step="0.01"
-                        placeholder="0.00"
-                        value={
-                          (item.description.startsWith('Combined')
-                            ? item.combinedExcessRate
-                            : item.description.startsWith('Black & White')
-                              ? item.bwExcessRate
-                              : item.colorExcessRate) ?? ''
-                        }
-                        onChange={(e) =>
-                          updatePricingItem(
-                            index,
-                            item.description.startsWith('Combined')
-                              ? 'combinedExcessRate'
+                    {/* Limit Fields */}
+                    {isFixed && form.rentType !== 'FIXED_FLAT' && (
+                      <div className="col-span-6 md:col-span-3 space-y-1">
+                        <label className="text-[9px] font-bold text-slate-400 uppercase">
+                          {item.description.startsWith('Combined')
+                            ? 'Combined Limit'
+                            : 'Free Limit'}
+                        </label>
+                        <Input
+                          type="number"
+                          placeholder="0"
+                          value={
+                            (item.description.startsWith('Combined')
+                              ? item.combinedIncludedLimit
                               : item.description.startsWith('Black & White')
-                                ? 'bwExcessRate'
-                                : 'colorExcessRate',
-                            e.target.value,
-                          )
-                        }
-                        className={`h-9 font-bold pl-6 ${isFixed ? 'text-red-600 bg-red-50/50 border-red-100' : 'text-emerald-700 bg-emerald-50/50 border-emerald-100'}`}
-                      />
-                      <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs font-bold opacity-30">
-                        ₹
-                      </span>
+                                ? item.bwIncludedLimit
+                                : item.colorIncludedLimit) ?? ''
+                          }
+                          onChange={(e) =>
+                            updatePricingItem(
+                              index,
+                              item.description.startsWith('Combined')
+                                ? 'combinedIncludedLimit'
+                                : item.description.startsWith('Black & White')
+                                  ? 'bwIncludedLimit'
+                                  : 'colorIncludedLimit',
+                              e.target.value,
+                            )
+                          }
+                          className="h-9 border-slate-200"
+                        />
+                      </div>
+                    )}
+
+                    {/* Rate Fields */}
+                    {form.rentType !== 'FIXED_FLAT' && (
+                      <div
+                        className={`col-span-6 ${isFixed ? 'md:col-span-3' : 'md:col-span-4'} space-y-1`}
+                      >
+                        <label className="text-[9px] font-bold text-slate-400 uppercase">
+                          {item.description.startsWith('Combined')
+                            ? 'Combined Rate (₹)'
+                            : form.rentType.includes('CPC')
+                              ? 'Rate/Page (₹)'
+                              : 'Excess Rate (₹)'}
+                        </label>
+                        <div className="relative">
+                          <Input
+                            type="number"
+                            step="0.01"
+                            placeholder="0.00"
+                            value={
+                              (item.description.startsWith('Combined')
+                                ? item.combinedExcessRate
+                                : item.description.startsWith('Black & White')
+                                  ? item.bwExcessRate
+                                  : item.colorExcessRate) ?? ''
+                            }
+                            onChange={(e) =>
+                              updatePricingItem(
+                                index,
+                                item.description.startsWith('Combined')
+                                  ? 'combinedExcessRate'
+                                  : item.description.startsWith('Black & White')
+                                    ? 'bwExcessRate'
+                                    : 'colorExcessRate',
+                                e.target.value,
+                              )
+                            }
+                            className={`h-9 font-bold pl-6 ${isFixed ? 'text-red-600 bg-red-50/50 border-red-100' : 'text-emerald-700 bg-emerald-50/50 border-emerald-100'}`}
+                          />
+                          <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs font-bold opacity-30">
+                            ₹
+                          </span>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="col-span-12 md:col-span-2 flex justify-end pb-1">
+                      {/* Delete managed by product removal */}
                     </div>
                   </div>
-
-                  <div className="col-span-12 md:col-span-2 flex justify-end pb-1">
-                    {/* Delete managed by product removal */}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
+                ))}
+              </div>
+            </section>
+          )}
 
           <section className="pt-4 border-t border-slate-100 flex justify-end gap-3">
             <Button variant="ghost" onClick={onClose} className="font-bold text-slate-500">

@@ -46,6 +46,9 @@ export class BillingCalculationService {
       case RentType.FIXED_COMBO:
         grossAmount = this.calculateFixedCombo(input.monthlyRent, totalUsage, input.pricingItems);
         break;
+      case RentType.FIXED_FLAT:
+        grossAmount = Number(input.monthlyRent);
+        break;
       case RentType.CPC:
         grossAmount = this.calculateCPC(effectiveBw, effectiveColor, input.pricingItems);
         break;

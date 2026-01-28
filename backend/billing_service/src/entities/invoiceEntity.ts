@@ -12,6 +12,7 @@ import { SaleType } from './enums/saleType';
 import { InvoiceType } from './enums/invoiceType';
 import { RentType } from './enums/rentType';
 import { RentPeriod } from './enums/rentPeriod';
+import { LeaseType } from './enums/leaseType';
 
 export enum SecurityDepositMode {
   CASH = 'CASH',
@@ -119,6 +120,26 @@ export class Invoice {
 
   @Column({ type: 'int', nullable: true })
   billingCycleInDays?: number;
+
+  // --- Lease Fields ---
+  @Column({
+    type: 'enum',
+    enum: LeaseType,
+    nullable: true,
+  })
+  leaseType!: LeaseType;
+
+  @Column({ type: 'int', nullable: true })
+  leaseTenureMonths?: number;
+
+  @Column({ type: 'decimal', precision: 12, scale: 2, nullable: true })
+  totalLeaseAmount?: number;
+
+  @Column({ type: 'decimal', precision: 12, scale: 2, nullable: true })
+  monthlyEmiAmount?: number;
+
+  @Column({ type: 'decimal', precision: 12, scale: 2, nullable: true })
+  monthlyLeaseAmount?: number;
 
   // --- Final Invoice Fields ---
 
