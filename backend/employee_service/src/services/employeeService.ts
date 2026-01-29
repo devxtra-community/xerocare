@@ -7,6 +7,7 @@ import { publishEmailJob } from '../queues/emailProducer';
 import { AppError } from '../errors/appError';
 import { EmployeeStatus } from '../entities/employeeEntities';
 import { EmployeeJob } from '../constants/employeeJob';
+import { FinanceJob } from '../constants/financeJob';
 import { publishEmployeeEvent } from '../events/publishers/eventPublisher';
 import { EmployeeEventType } from '../events/employeeEvents';
 import { logger } from '../config/logger';
@@ -22,6 +23,7 @@ export class EmployeeService {
     email: string;
     role?: string;
     employee_job?: EmployeeJob;
+    finance_job?: FinanceJob;
     expireDate?: Date;
     salary?: number | null;
     profile_image_url?: string | null;
@@ -34,6 +36,7 @@ export class EmployeeService {
       email,
       role,
       employee_job,
+      finance_job,
       expireDate,
       salary,
       profile_image_url,
@@ -64,6 +67,16 @@ export class EmployeeService {
     // Require employee_job for EMPLOYEE role
     if (roleEnum === EmployeeRole.EMPLOYEE && !employee_job) {
       throw new AppError('Employee job is required for EMPLOYEE role', 400);
+    }
+
+    // Validate finance_job if provided
+    if (finance_job && !Object.values(FinanceJob).includes(finance_job)) {
+      throw new AppError('Invalid finance job', 400);
+    }
+
+    // Require finance_job for FINANCE role
+    if (roleEnum === EmployeeRole.FINANCE && !finance_job) {
+      throw new AppError('Finance job is required for FINANCE role', 400);
     }
 
     if (branchId) {
@@ -99,6 +112,7 @@ export class EmployeeService {
       password_hash: passwordHash,
       role: roleEnum,
       employee_job: employee_job ?? null,
+      finance_job: finance_job ?? null,
       salary: salary ?? null,
       profile_image_url: profile_image_url ?? null,
       id_proof_key: id_proof_key ?? null,
@@ -190,6 +204,7 @@ export class EmployeeService {
       last_name?: string;
       role?: EmployeeRole;
       employee_job?: EmployeeJob | null;
+      finance_job?: FinanceJob | null;
       salary?: number | null;
       profile_image_url?: string | null;
       id_proof_key?: string | null;
@@ -215,6 +230,12 @@ export class EmployeeService {
     if (payload.employee_job !== undefined && payload.employee_job !== null) {
       if (!Object.values(EmployeeJob).includes(payload.employee_job)) {
         throw new AppError('Invalid employee job', 400);
+      }
+    }
+
+    if (payload.finance_job !== undefined && payload.finance_job !== null) {
+      if (!Object.values(FinanceJob).includes(payload.finance_job)) {
+        throw new AppError('Invalid finance job', 400);
       }
     }
 

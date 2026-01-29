@@ -431,6 +431,10 @@ export class BillingService {
     return this.invoiceRepo.findByCreatorId(creatorId);
   }
 
+  async getBranchInvoices(branchId: string) {
+    return this.invoiceRepo.findByBranchId(branchId);
+  }
+
   async getInvoiceById(id: string) {
     const invoice = await this.invoiceRepo.findById(id);
     if (!invoice) {
@@ -464,5 +468,9 @@ export class BillingService {
 
     const stats = await this.invoiceRepo.getBranchSalesTrend(branchId, startDate);
     return stats;
+  }
+
+  async getBranchSalesTotals(branchId: string) {
+    return await this.invoiceRepo.getBranchSalesTotals(branchId);
   }
 }

@@ -193,6 +193,24 @@ export const getMyInvoices = async (req: Request, res: Response, next: NextFunct
   }
 };
 
+export const getBranchInvoices = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const branchId = req.user?.branchId;
+
+    if (!branchId) {
+      throw new AppError('Branch ID not found in user context', 400);
+    }
+
+    const invoices = await billingService.getBranchInvoices(branchId);
+    return res.status(200).json({
+      success: true,
+      data: invoices,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const getInvoiceById = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = req.params.id as string;
@@ -235,6 +253,25 @@ export const getBranchSales = async (req: Request, res: Response, next: NextFunc
       success: true,
       data: result,
       message: 'Branch sales overview fetched successfully',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getBranchSalesTotals = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const branchId = req.user?.branchId;
+
+    if (!branchId) {
+      throw new AppError('Branch ID not found in user context', 400);
+    }
+
+    const result = await billingService.getBranchSalesTotals(branchId);
+    return res.status(200).json({
+      success: true,
+      data: result,
+      message: 'Branch sales totals fetched successfully',
     });
   } catch (error) {
     next(error);

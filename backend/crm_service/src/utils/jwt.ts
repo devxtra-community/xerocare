@@ -8,5 +8,7 @@ export const verifyAccessToken = (token: string) => {
     email: string;
     role: string;
     branchId?: string;
+    employeeJob?: string | null;
+    financeJob?: string | null;
   };
 };

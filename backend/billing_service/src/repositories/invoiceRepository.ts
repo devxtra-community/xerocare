@@ -46,6 +46,16 @@ export class InvoiceRepository {
     });
   }
 
+  findByBranchId(branchId: string) {
+    return this.repo.find({
+      where: { branchId },
+      order: {
+        createdAt: 'DESC',
+      },
+      relations: ['items'],
+    });
+  }
+
   updateStatus(id: string, status: Invoice['status']) {
     return this.repo.update(id, { status });
   }
@@ -105,5 +115,50 @@ export class InvoiceRepository {
       date: r.date,
       totalSales: parseFloat(r.totalSales) || 0,
     }));
+  }
+
+  async getBranchSalesTotals(branchId: string): Promise<{
+    totalSales: number;
+    salesByType: { saleType: string; total: number }[];
+    totalInvoices: number;
+  }> {
+    // Get total sales amount for the branch (PAID and ISSUED invoices only, excluding PROFORMA)
+    const totalResult = await this.repo
+      .createQueryBuilder('invoice')
+      .select('SUM(invoice.totalAmount)', 'totalSales')
+      .addSelect('COUNT(*)', 'totalInvoices')
+      .where('invoice.branchId = :branchId', { branchId })
+      .andWhere('invoice.status IN (:...statuses)', {
+        statuses: [InvoiceStatus.PAID, InvoiceStatus.ISSUED],
+      })
+      .andWhere('invoice.type != :type', { type: InvoiceType.PROFORMA })
+      .getRawOne();
+
+    const totalSales = parseFloat(totalResult?.totalSales) || 0;
+    const totalInvoices = parseInt(totalResult?.totalInvoices, 10) || 0;
+
+    // Get sales breakdown by sale type
+    const salesByTypeResults = await this.repo
+      .createQueryBuilder('invoice')
+      .select('invoice.saleType', 'saleType')
+      .addSelect('SUM(invoice.totalAmount)', 'total')
+      .where('invoice.branchId = :branchId', { branchId })
+      .andWhere('invoice.status IN (:...statuses)', {
+        statuses: [InvoiceStatus.PAID, InvoiceStatus.ISSUED],
+      })
+      .andWhere('invoice.type != :type', { type: InvoiceType.PROFORMA })
+      .groupBy('invoice.saleType')
+      .getRawMany();
+
+    const salesByType = salesByTypeResults.map((r) => ({
+      saleType: r.saleType,
+      total: parseFloat(r.total) || 0,
+    }));
+
+    return {
+      totalSales,
+      salesByType,
+      totalInvoices,
+    };
   }
 }

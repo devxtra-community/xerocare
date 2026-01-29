@@ -98,6 +98,11 @@ export const getMyInvoices = async (): Promise<Invoice[]> => {
   return response.data.data;
 };
 
+export const getBranchInvoices = async (): Promise<Invoice[]> => {
+  const response = await api.get('/b/invoices/branch-invoices');
+  return response.data.data;
+};
+
 export const createInvoice = async (payload: CreateInvoicePayload): Promise<Invoice> => {
   const response = await api.post('/b/invoices', payload);
   return response.data.data;

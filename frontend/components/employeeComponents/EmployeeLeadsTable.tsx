@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Table,
   TableBody,
@@ -33,7 +33,7 @@ export default function EmployeeLeadsTable() {
   const [filterType, setFilterType] = useState<string>('All');
   const [showDeleted, setShowDeleted] = useState(false);
 
-  const fetchLeads = async () => {
+  const fetchLeads = useCallback(async () => {
     setLoading(true);
     try {
       // Pass showDeleted to API
@@ -45,7 +45,7 @@ export default function EmployeeLeadsTable() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [showDeleted]);
 
   useEffect(() => {
     fetchLeads();
