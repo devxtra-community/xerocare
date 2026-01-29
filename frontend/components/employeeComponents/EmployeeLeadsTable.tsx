@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Table,
   TableBody,
@@ -33,7 +33,7 @@ export default function EmployeeLeadsTable() {
   const [filterType, setFilterType] = useState<string>('All');
   const [showDeleted, setShowDeleted] = useState(false);
 
-  const fetchLeads = useCallback(async () => {
+  const fetchLeads = React.useCallback(async () => {
     setLoading(true);
     try {
       // Pass showDeleted to API
@@ -49,7 +49,7 @@ export default function EmployeeLeadsTable() {
 
   useEffect(() => {
     fetchLeads();
-  }, [showDeleted, fetchLeads]); // Refetch when toggle changes
+  }, [fetchLeads]);
 
   const filteredLeads = leads.filter((lead) => {
     const matchesSearch = Object.values(lead).some((value) =>
