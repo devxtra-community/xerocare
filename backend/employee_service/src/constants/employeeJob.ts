@@ -6,6 +6,7 @@ export enum EmployeeJob {
   DELIVERY = 'DELIVERY',
   READING_AGENT = 'READING_AGENT',
   MULTI_ROLE = 'MULTI_ROLE',
+  EMPLOYEE_MANAGER = 'EMPLOYEE_MANAGER',
 }
 
 // Single source of truth for job-to-module mapping
@@ -17,6 +18,7 @@ export const EMPLOYEE_JOB_ACCESS: Record<EmployeeJob, string[]> = {
   [EmployeeJob.DELIVERY]: ['delivery', 'installation'],
   [EmployeeJob.READING_AGENT]: ['reading', 'meters'],
   [EmployeeJob.MULTI_ROLE]: ['*'], // Access all modules
+  [EmployeeJob.EMPLOYEE_MANAGER]: ['*'], // Access all modules
 };
 
 // Helper function to check if a job has access to a module

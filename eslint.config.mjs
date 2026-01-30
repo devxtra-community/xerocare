@@ -25,4 +25,10 @@ export default tseslint.config(
   },
   // Add specific frontend overrides if needed, 
   // though it's better if frontend has its own config which it does.
+  {
+    files: ["scripts/**/*.js"],
+    rules: {
+      "@typescript-eslint/no-require-imports": "off",
+    },
+  },
 );
