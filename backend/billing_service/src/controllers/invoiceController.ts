@@ -165,7 +165,10 @@ export const generateFinalInvoice = async (req: Request, res: Response, next: Ne
 
 export const getAllInvoices = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const invoices = await billingService.getAllInvoices();
+    // Branch filtering: Admin sees all invoices, others see only their branch
+    const branchId = req.user?.role === 'ADMIN' ? undefined : req.user?.branchId;
+
+    const invoices = await billingService.getAllInvoices(branchId);
     return res.status(200).json({
       success: true,
       data: invoices,
@@ -193,6 +196,24 @@ export const getMyInvoices = async (req: Request, res: Response, next: NextFunct
   }
 };
 
+export const getBranchInvoices = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const branchId = req.user?.branchId;
+
+    if (!branchId) {
+      throw new AppError('Branch ID not found in user context', 400);
+    }
+
+    const invoices = await billingService.getBranchInvoices(branchId);
+    return res.status(200).json({
+      success: true,
+      data: invoices,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const getInvoiceById = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = req.params.id as string;
@@ -208,7 +229,11 @@ export const getInvoiceById = async (req: Request, res: Response, next: NextFunc
 export const getStats = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const createdBy = req.query.createdBy as string;
-    const branchId = req.query.branchId as string;
+
+    // Branch filtering: Admin can query any branch via query param, others use their own branch
+    const branchId =
+      req.user?.role === 'ADMIN' ? (req.query.branchId as string) : req.user?.branchId;
+
     const stats = await billingService.getInvoiceStats({ createdBy, branchId });
     return res.status(200).json({
       success: true,
@@ -235,6 +260,25 @@ export const getBranchSales = async (req: Request, res: Response, next: NextFunc
       success: true,
       data: result,
       message: 'Branch sales overview fetched successfully',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getBranchSalesTotals = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const branchId = req.user?.branchId;
+
+    if (!branchId) {
+      throw new AppError('Branch ID not found in user context', 400);
+    }
+
+    const result = await billingService.getBranchSalesTotals(branchId);
+    return res.status(200).json({
+      success: true,
+      data: result,
+      message: 'Branch sales totals fetched successfully',
     });
   } catch (error) {
     next(error);

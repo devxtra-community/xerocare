@@ -4,4 +4,5 @@ export interface AccessTokenPayload {
   branchId: string;
   email?: string;
   employeeJob?: string | null;
+  financeJob?: string | null;
 }

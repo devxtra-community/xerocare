@@ -7,7 +7,7 @@ import { SidebarTrigger } from '@/components/ui/sidebar';
 import { useEffect, useState } from 'react';
 import { getProfile } from '@/lib/auth';
 
-export default function DashboardHeader() {
+export default function DashboardHeader({ title = 'Dashboard' }: { title?: string }) {
   const [user, setUser] = useState({
     name: '',
     email: '',
@@ -40,7 +40,7 @@ export default function DashboardHeader() {
           <SidebarTrigger className="lg:hidden text-white hover:bg-white/10">
             <Menu className="h-5 w-5" />
           </SidebarTrigger>
-          <h1 className="text-base sm:text-lg font-semibold">Dashboard</h1>
+          <h1 className="text-base sm:text-lg font-semibold">{title}</h1>
         </div>
 
         {/* Center: Search bar (hidden on mobile) */}

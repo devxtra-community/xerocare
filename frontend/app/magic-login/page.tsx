@@ -45,6 +45,8 @@ function MagicLoginContent() {
               setTimeout(() => router.push('/hr/dashboard'), 500);
             } else if (role === 'MANAGER') {
               setTimeout(() => router.push('/manager/dashboard'), 500);
+            } else if (role === 'FINANCE') {
+              setTimeout(() => router.push('/finance/dashboard'), 500);
             } else if (role === 'EMPLOYEE') {
               setTimeout(() => router.push('/employee/dashboard'), 500);
             } else {

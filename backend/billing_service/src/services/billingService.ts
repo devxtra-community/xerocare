@@ -458,12 +458,16 @@ export class BillingService {
     return this.invoiceRepo.save(invoice);
   }
 
-  async getAllInvoices() {
-    return this.invoiceRepo.findAll();
+  async getAllInvoices(branchId?: string) {
+    return this.invoiceRepo.findAll(branchId);
   }
 
   async getInvoicesByCreator(creatorId: string) {
     return this.invoiceRepo.findByCreatorId(creatorId);
+  }
+
+  async getBranchInvoices(branchId: string) {
+    return this.invoiceRepo.findByBranchId(branchId);
   }
 
   async getInvoiceById(id: string) {
@@ -499,5 +503,9 @@ export class BillingService {
 
     const stats = await this.invoiceRepo.getBranchSalesTrend(branchId, startDate);
     return stats;
+  }
+
+  async getBranchSalesTotals(branchId: string) {
+    return await this.invoiceRepo.getBranchSalesTotals(branchId);
   }
 }

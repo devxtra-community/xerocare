@@ -6,22 +6,41 @@ import BranchSalesChart from '@/components/ManagerDashboardComponents/dashboardC
 import { useState, useEffect } from 'react';
 import { inventoryService } from '@/services/inventoryService';
 import { branchService } from '@/services/branchService';
+import { salesService } from '@/services/salesService';
 
 export default function Dashboard() {
-  const [damagedCount, setDamagedCount] = useState(0);
   const [branchName, setBranchName] = useState('Branch');
+  const [totalSales, setTotalSales] = useState(0);
+  const [saleAmount, setSaleAmount] = useState(0);
+  const [rentAmount, setRentAmount] = useState(0);
+  const [leaseAmount, setLeaseAmount] = useState(0);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [stats, branch] = await Promise.all([
+        setLoading(true);
+        const [, branch, salesData] = await Promise.all([
           inventoryService.getInventoryStats(),
           branchService.getMyBranch(),
+          salesService.getBranchSalesTotals(),
         ]);
-        setDamagedCount(stats.damagedStock);
+
         if (branch?.name) setBranchName(branch.name);
+
+        // Set total sales
+        setTotalSales(salesData.totalSales);
+
+        // Set sales by type
+        salesData.salesByType.forEach((item) => {
+          if (item.saleType === 'SALE') setSaleAmount(item.total);
+          else if (item.saleType === 'RENT') setRentAmount(item.total);
+          else if (item.saleType === 'LEASE') setLeaseAmount(item.total);
+        });
       } catch (error) {
         console.error('Failed to fetch dashboard data', error);
+      } finally {
+        setLoading(false);
       }
     };
     fetchData();
@@ -33,17 +52,25 @@ export default function Dashboard() {
         <h3 className="text-xl sm:text-2xl font-bold text-primary">{branchName} Sales</h3>
 
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 md:gap-4">
-          <StatCard title="Today Sales" value="73,000" subtitle="Daily sales details and reports" />
-          <StatCard title="Pending Orders" value="27" subtitle="Today pending order count" />
           <StatCard
-            title="Today Revenue / Profit"
-            value="42,000"
-            subtitle="Daily income and revenue"
+            title="Total Revenue"
+            value={loading ? '...' : `₹${totalSales.toLocaleString()}`}
+            subtitle="All sales, rent, and lease"
           />
           <StatCard
-            title="Damaged Items"
-            value={damagedCount.toString()}
-            subtitle="Damaged product details"
+            title="Product Sales"
+            value={loading ? '...' : `₹${saleAmount.toLocaleString()}`}
+            subtitle="Products and spare parts"
+          />
+          <StatCard
+            title="Rent Revenue"
+            value={loading ? '...' : `₹${rentAmount.toLocaleString()}`}
+            subtitle="Rental income"
+          />
+          <StatCard
+            title="Lease Revenue"
+            value={loading ? '...' : `₹${leaseAmount.toLocaleString()}`}
+            subtitle="Lease income"
           />
         </div>
 

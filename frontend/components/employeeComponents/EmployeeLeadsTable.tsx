@@ -33,7 +33,7 @@ export default function EmployeeLeadsTable() {
   const [filterType, setFilterType] = useState<string>('All');
   const [showDeleted, setShowDeleted] = useState(false);
 
-  const fetchLeads = async () => {
+  const fetchLeads = React.useCallback(async () => {
     setLoading(true);
     try {
       // Pass showDeleted to API
@@ -45,11 +45,11 @@ export default function EmployeeLeadsTable() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [showDeleted]);
 
   useEffect(() => {
     fetchLeads();
-  }, [showDeleted, fetchLeads]); // Refetch when toggle changes
+  }, [fetchLeads]);
 
   const filteredLeads = leads.filter((lead) => {
     const matchesSearch = Object.values(lead).some((value) =>
