@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/input';
 import RoleSelect from './RoleSelect';
 import { createEmployee } from '@/lib/employee';
 import { getBranches, Branch } from '@/lib/branch';
+import { toast } from 'sonner';
 
 export default function AddEmployeeDialog() {
   const [open, setOpen] = useState(false);
@@ -74,12 +75,13 @@ export default function AddEmployeeDialog() {
       if (files.id_proof) data.append('id_proof', files.id_proof);
 
       await createEmployee(data);
+      toast.success('Employee created successfully');
       setOpen(false);
       // Optional: trigger refresh of list here or require page reload
       window.location.reload();
-    } catch (error) {
-      console.error('Failed to create employee', error);
-      alert('Failed to create employee');
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { message?: string } } };
+      toast.error(err.response?.data?.message || 'Failed to create employee');
     } finally {
       setLoading(false);
     }

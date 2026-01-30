@@ -117,10 +117,11 @@ export default function EmployeeTable() {
         toast.success('Employee created successfully');
       }
       fetchEmployees(pagination.page);
+      return true;
     } catch (error: unknown) {
       const err = error as { response?: { data?: { message?: string } } };
       toast.error(err.response?.data?.message || 'Action failed');
-      throw error;
+      return false;
     }
   };
 

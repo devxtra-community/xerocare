@@ -22,7 +22,7 @@ interface EmployeeFormDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   initialData?: Employee | null;
-  onSubmit: (formData: FormData) => Promise<void>;
+  onSubmit: (formData: FormData) => Promise<boolean>;
 }
 
 export default function EmployeeFormDialog({
@@ -156,10 +156,12 @@ export default function EmployeeFormDialog({
         data.append('id_proof', idProof);
       }
 
-      await onSubmit(data);
-      onOpenChange(false);
-    } catch (error) {
-      console.error('Failed to submit employee form:', error);
+      const success = await onSubmit(data);
+      if (success) {
+        onOpenChange(false);
+      }
+    } catch {
+      // Error is handled in the onSubmit parent function
     } finally {
       setIsSubmitting(false);
     }
