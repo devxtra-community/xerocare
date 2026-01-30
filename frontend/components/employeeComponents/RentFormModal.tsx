@@ -25,10 +25,14 @@ export default function RentFormModal({
   initialData,
   onClose,
   onConfirm,
+  defaultSaleType = 'RENT',
+  lockSaleType = false,
 }: {
   initialData?: Invoice;
   onClose: () => void;
   onConfirm: (data: CreateInvoicePayload) => Promise<void> | void;
+  defaultSaleType?: 'RENT' | 'LEASE';
+  lockSaleType?: boolean;
 }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -59,7 +63,7 @@ export default function RentFormModal({
     }[];
   }>({
     customerId: initialData?.customerId || '',
-    saleType: 'RENT',
+    saleType: initialData?.saleType || defaultSaleType,
     rentType: initialData?.rentType || 'FIXED_LIMIT',
     rentPeriod: initialData?.rentPeriod || 'MONTHLY',
     monthlyRent: initialData?.monthlyRent || '',
@@ -470,18 +474,26 @@ export default function RentFormModal({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-5 rounded-xl bg-white border border-slate-100 shadow-sm">
               {/* Contract Type Toggle */}
               <div className="md:col-span-2 flex gap-4 p-1 bg-slate-100 rounded-lg w-fit">
-                <button
-                  className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all ${form.saleType === 'RENT' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-                  onClick={() => setForm({ ...form, saleType: 'RENT' })}
-                >
-                  Rental Contract
-                </button>
-                <button
-                  className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all ${form.saleType === 'LEASE' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-                  onClick={() => setForm({ ...form, saleType: 'LEASE' })}
-                >
-                  Lease Contract
-                </button>
+                {lockSaleType ? (
+                  <button className="px-4 py-1.5 text-xs font-bold rounded-md bg-white text-blue-600 shadow-sm cursor-default">
+                    {form.saleType === 'RENT' ? 'Rental Contract' : 'Lease Contract'}
+                  </button>
+                ) : (
+                  <>
+                    <button
+                      className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all ${form.saleType === 'RENT' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                      onClick={() => setForm({ ...form, saleType: 'RENT' })}
+                    >
+                      Rental Contract
+                    </button>
+                    <button
+                      className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all ${form.saleType === 'LEASE' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                      onClick={() => setForm({ ...form, saleType: 'LEASE' })}
+                    >
+                      Lease Contract
+                    </button>
+                  </>
+                )}
               </div>
 
               <div className="space-y-2">

@@ -1,6 +1,6 @@
 import 'reflect-metadata';
 import express from 'express';
-import './config/env';
+import './config/env'; // Restart for Lease fix
 import { logger } from './config/logger';
 import { errorHandler } from './middlewares/errorHandler';
 import healthRouter from './routes/healthRoutes';

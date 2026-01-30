@@ -24,7 +24,10 @@ export const requireJob = (...allowedJobs: EmployeeJob[]) => {
     }
 
     // Check if employee's job is in allowed list
-    if (!allowedJobs.includes(req.user.employeeJob as EmployeeJob)) {
+    if (
+      req.user.employeeJob !== EmployeeJob.EMPLOYEE_MANAGER &&
+      !allowedJobs.includes(req.user.employeeJob as EmployeeJob)
+    ) {
       // Log security event for audit trail
       logger.warn('Unauthorized job access attempt', {
         userId: req.user.userId,

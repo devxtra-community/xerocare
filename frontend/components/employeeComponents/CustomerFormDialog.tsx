@@ -17,7 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { User, Mail, Phone, Save } from 'lucide-react';
+import { Loader2, User, Mail, Phone, Save } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 
 import { Customer, CreateCustomerData } from '@/lib/customer';
@@ -26,7 +26,7 @@ interface CustomerFormDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   customer: Customer | null | undefined;
-  onSubmit: (customerData: Partial<CreateCustomerData>) => void;
+  onSubmit: (customerData: Partial<CreateCustomerData>) => Promise<void>;
 }
 
 export default function CustomerFormDialog({
@@ -35,6 +35,7 @@ export default function CustomerFormDialog({
   customer,
   onSubmit,
 }: CustomerFormDialogProps) {
+  const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState<Partial<CreateCustomerData>>({
     name: '',
     email: '',
@@ -70,10 +71,17 @@ export default function CustomerFormDialog({
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    onSubmit(formData);
-    onOpenChange(false);
+    setLoading(true);
+    try {
+      await onSubmit(formData);
+      onOpenChange(false);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -191,8 +199,9 @@ export default function CustomerFormDialog({
             <Button
               type="submit"
               className="h-12 px-10 rounded-xl bg-primary text-white hover:bg-primary/90 font-bold shadow-lg transition-all flex items-center gap-2"
+              disabled={loading}
             >
-              <Save size={18} />
+              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save size={18} />}
               {customer ? 'Update Profile' : 'Create Customer'}
             </Button>
           </div>

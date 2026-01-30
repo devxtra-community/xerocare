@@ -43,8 +43,16 @@ export const createQuotation = async (req: Request, res: Response, next: NextFun
       if (!items || !Array.isArray(items) || items.length === 0) {
         throw new AppError('Invalid request payload: items array is required for SALE', 400);
       }
+    } else if (saleType === 'LEASE') {
+      // Lease Validation
+      if (!payload.leaseType || (!payload.leaseTenureMonths && payload.leaseTenureMonths !== 0)) {
+        throw new AppError(
+          'Invalid request payload: leaseType and leaseTenureMonths are required for LEASE',
+          400,
+        );
+      }
     } else {
-      // For Rent/Lease (defaulting to previous logic for safety if not explicitly SALE)
+      // For Rent (defaulting to previous logic for safety if not explicitly SALE or LEASE)
       if (!pricingItems || !rentType) {
         throw new AppError(
           'Invalid request payload: pricingItems and rentType are required for RENT',
@@ -67,6 +75,11 @@ export const createQuotation = async (req: Request, res: Response, next: NextFun
       effectiveTo,
       pricingItems,
       items,
+      leaseType: payload.leaseType,
+      leaseTenureMonths: payload.leaseTenureMonths,
+      monthlyEmiAmount: payload.monthlyEmiAmount,
+      totalLeaseAmount: payload.totalLeaseAmount,
+      monthlyLeaseAmount: payload.monthlyLeaseAmount,
     });
 
     return res.status(201).json({
@@ -104,6 +117,11 @@ export const updateQuotation = async (req: Request, res: Response, next: NextFun
       effectiveTo,
       pricingItems,
       items,
+      leaseType: req.body.leaseType,
+      leaseTenureMonths: req.body.leaseTenureMonths,
+      monthlyEmiAmount: req.body.monthlyEmiAmount,
+      totalLeaseAmount: req.body.totalLeaseAmount,
+      monthlyLeaseAmount: req.body.monthlyLeaseAmount,
     });
 
     return res.status(200).json({

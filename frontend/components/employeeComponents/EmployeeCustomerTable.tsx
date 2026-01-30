@@ -98,7 +98,8 @@ export default function EmployeeCustomerTable() {
         await createCustomer(payload);
         toast.success('Customer created successfully');
       }
-      setDialogOpen(false);
+      // fetchCustomers(); // Moved outside to let dialog close first if desired, or keep here.
+      // Dialog closes in FormDialog after await. State update happens here.
       fetchCustomers();
     } catch (error) {
       console.error(error);

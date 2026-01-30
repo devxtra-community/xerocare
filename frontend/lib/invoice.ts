@@ -48,6 +48,8 @@ export interface Invoice {
   employeeName: string;
   branchName: string;
   customerName: string;
+  customerPhone?: string;
+  customerEmail?: string;
   items?: InvoiceItem[];
   startDate?: string;
   endDate?: string;

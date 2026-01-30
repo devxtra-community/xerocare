@@ -90,7 +90,6 @@ export default function EmployeeLeadsTable() {
         await createLead(leadData);
         toast.success('Lead created successfully');
       }
-      setDialogOpen(false);
       fetchLeads();
     } catch (error) {
       console.error(error);

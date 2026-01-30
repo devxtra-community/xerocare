@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Plus, Search, Loader2, Trash2, Eye, FileText, Calendar, IndianRupee } from 'lucide-react';
+import { Plus, Search, Loader2, Trash2, Eye, FileText, IndianRupee } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   Table,
@@ -29,6 +29,7 @@ import {
 } from '@/lib/invoice';
 import { CustomerSelect } from '@/components/invoice/CustomerSelect';
 import { ProductSelect, SelectableItem } from '@/components/invoice/ProductSelect';
+
 import {
   Dialog,
   DialogContent,
@@ -37,6 +38,7 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
+import { InvoiceDetailsDialog } from '../invoice/InvoiceDetailsDialog';
 
 export default function EmployeeSalesTable() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
@@ -257,179 +259,12 @@ export default function EmployeeSalesTable() {
   );
 }
 
-function InvoiceDetailsDialog({ invoice, onClose }: { invoice: Invoice; onClose: () => void }) {
-  return (
-    <Dialog open={true} onOpenChange={(val) => !val && onClose()}>
-      <DialogContent className="sm:max-w-xl p-0 overflow-hidden rounded-xl border border-gray-100 shadow-2xl bg-white">
-        <DialogHeader className="p-8 pb-4">
-          <div className="flex items-center gap-4">
-            <div className="h-12 w-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shadow-sm">
-              <FileText size={24} />
-            </div>
-            <div className="space-y-1">
-              <DialogTitle className="text-xl font-bold text-primary tracking-tight">
-                {invoice.invoiceNumber}
-              </DialogTitle>
-              <DialogDescription className="text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-none">
-                Invoice Details & Summary
-              </DialogDescription>
-            </div>
-          </div>
-          <div className="absolute top-8 right-8">
-            <Badge
-              variant="secondary"
-              className={`rounded-full px-3 py-1 text-[10px] font-bold tracking-wider shadow-none
-                ${
-                  invoice.status === 'PAID'
-                    ? 'bg-green-50 text-green-600 border-green-100'
-                    : 'bg-amber-50 text-amber-600 border-amber-100'
-                }`}
-            >
-              {invoice.status}
-            </Badge>
-          </div>
-        </DialogHeader>
-
-        <div className="p-8 pt-6 space-y-8 max-h-[70vh] overflow-y-auto scrollbar-hide">
-          <div className="grid grid-cols-2 gap-x-12 gap-y-6">
-            <div className="space-y-4">
-              <div className="space-y-1">
-                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Date</p>
-                <div className="flex items-center gap-2">
-                  <Calendar size={14} className="text-gray-400" />
-                  <p className="text-sm font-bold text-gray-800">
-                    {new Date(invoice.createdAt).toLocaleDateString(undefined, {
-                      dateStyle: 'medium',
-                    })}
-                  </p>
-                </div>
-              </div>
-              <div className="space-y-1">
-                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Type</p>
-                <Badge
-                  variant="outline"
-                  className="mt-1 font-bold text-[10px] rounded-lg border-gray-100 text-gray-600"
-                >
-                  {invoice.saleType}
-                </Badge>
-              </div>
-            </div>
-          </div>
-
-          {(invoice.saleType === 'RENT' || invoice.saleType === 'LEASE') &&
-            (invoice.startDate || invoice.endDate || invoice.billingCycleInDays) && (
-              <>
-                <div className="grid grid-cols-2 gap-x-12 gap-y-6 p-6 bg-gray-50 rounded-xl">
-                  <div className="space-y-1">
-                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                      Contract Period
-                    </p>
-                    <div className="flex items-center gap-2 text-gray-600">
-                      <Calendar size={14} className="opacity-50" />
-                      <p className="text-xs font-bold">
-                        {invoice.startDate
-                          ? new Date(invoice.startDate).toLocaleDateString(undefined, {
-                              dateStyle: 'medium',
-                            })
-                          : 'N/A'}{' '}
-                        —{' '}
-                        {invoice.endDate
-                          ? new Date(invoice.endDate).toLocaleDateString(undefined, {
-                              dateStyle: 'medium',
-                            })
-                          : 'N/A'}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                      Billing Cycle
-                    </p>
-                    <div className="flex items-center gap-2 text-gray-600">
-                      <IndianRupee size={14} className="opacity-50" />
-                      <p className="text-xs font-bold">
-                        Every {invoice.billingCycleInDays || 30} Days
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </>
-            )}
-
-          <div className="space-y-4">
-            <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-              Order Items
-            </h3>
-            <div className="rounded-xl border border-gray-100 overflow-hidden">
-              <Table>
-                <TableHeader className="bg-gray-50/80">
-                  <TableRow className="hover:bg-transparent border-gray-100">
-                    <TableHead className="text-[10px] font-bold text-gray-400 h-10">
-                      DESCRIPTION
-                    </TableHead>
-                    <TableHead className="text-[10px] font-bold text-gray-400 text-center h-10">
-                      QTY
-                    </TableHead>
-                    <TableHead className="text-[10px] font-bold text-gray-400 text-right h-10">
-                      TOTAL
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {invoice.items?.map((item, idx) => (
-                    <TableRow key={item.id || idx} className="border-gray-50">
-                      <TableCell className="font-bold text-gray-700 py-3 text-sm">
-                        {item.description}
-                      </TableCell>
-                      <TableCell className="text-center font-bold text-gray-500 text-sm">
-                        {item.quantity}
-                      </TableCell>
-                      <TableCell className="text-right font-bold text-gray-900 text-sm">
-                        ₹{((item.quantity || 0) * (item.unitPrice || 0)).toLocaleString()}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          </div>
-        </div>
-
-        <div className="p-8 bg-gray-50/50 border-t border-gray-100 flex items-center justify-between">
-          <div>
-            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider leading-none mb-1">
-              Grand Total
-            </p>
-            <p className="text-2xl font-bold text-primary">
-              ₹{invoice.totalAmount.toLocaleString()}
-            </p>
-          </div>
-          <div className="flex gap-4">
-            <button
-              onClick={onClose}
-              className="text-sm font-bold text-gray-900 hover:text-gray-600 transition-colors"
-            >
-              Close
-            </button>
-            <Button
-              className="rounded-xl h-11 px-8 font-bold bg-primary text-white shadow-lg hover:bg-primary/90 transition-all"
-              onClick={() => window.print()}
-            >
-              Print
-            </Button>
-          </div>
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
 function SaleFormModal({
   onClose,
   onConfirm,
 }: {
   onClose: () => void;
-  onConfirm: (data: CreateInvoicePayload) => void;
+  onConfirm: (data: CreateInvoicePayload) => Promise<void>;
 }) {
   // Extended Item interface for local state
   interface ExtendedItem {
@@ -453,6 +288,7 @@ function SaleFormModal({
   });
 
   const [manualItemOpen, setManualItemOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const addItem = (item: SelectableItem) => {
     let description = '';
@@ -752,8 +588,9 @@ function SaleFormModal({
               Discard
             </button>
             <Button
-              className="h-12 px-10 rounded-xl bg-blue-600 text-white hover:bg-blue-700 font-bold shadow-lg shadow-blue-200 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-              onClick={() => {
+              className="h-12 px-10 rounded-xl bg-blue-600 text-white hover:bg-blue-700 font-bold shadow-lg shadow-blue-200 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              disabled={isSubmitting}
+              onClick={async () => {
                 if (!form.customerId) {
                   toast.error('Please select a customer.');
                   return;
@@ -773,22 +610,36 @@ function SaleFormModal({
                   return;
                 }
 
-                const finalPayload: CreateInvoicePayload = {
-                  customerId: form.customerId,
-                  saleType: form.saleType,
-                  items: form.items.map((it) => ({
-                    description: it.description,
-                    quantity: it.quantity,
-                    // We send the NET unit price to backend as 'unitPrice' usually (unless backed expects discount field)
-                    // Based on previous code, only unitPrice exists in payload.
-                    unitPrice: it.unitPrice,
-                  })),
-                };
+                setIsSubmitting(true);
+                try {
+                  const finalPayload: CreateInvoicePayload = {
+                    customerId: form.customerId,
+                    saleType: form.saleType,
+                    items: form.items.map((it) => ({
+                      description: it.description,
+                      quantity: it.quantity,
+                      // We send the NET unit price to backend as 'unitPrice' usually (unless backed expects discount field)
+                      // Based on previous code, only unitPrice exists in payload.
+                      unitPrice: it.unitPrice,
+                    })),
+                  };
 
-                onConfirm(finalPayload);
+                  await onConfirm(finalPayload);
+                } catch (error) {
+                  console.error(error);
+                } finally {
+                  setIsSubmitting(false);
+                }
               }}
             >
-              Confirm Sale
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Processing...
+                </>
+              ) : (
+                'Confirm Sale'
+              )}
             </Button>
           </div>
         </div>

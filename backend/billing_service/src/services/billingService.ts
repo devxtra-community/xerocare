@@ -324,6 +324,13 @@ export class BillingService {
       discountPercent?: number;
       effectiveFrom?: string;
       effectiveTo?: string;
+      // Lease Fields
+      leaseType?: LeaseType;
+      leaseTenureMonths?: number;
+      totalLeaseAmount?: number;
+      monthlyEmiAmount?: number;
+      monthlyLeaseAmount?: number;
+
       pricingItems?: {
         description: string;
         bwIncludedLimit?: number;
@@ -362,7 +369,17 @@ export class BillingService {
     if (payload.advanceAmount !== undefined) invoice.advanceAmount = payload.advanceAmount;
     if (payload.discountPercent !== undefined) invoice.discountPercent = payload.discountPercent;
     if (payload.effectiveFrom) invoice.effectiveFrom = new Date(payload.effectiveFrom);
+    if (payload.effectiveFrom) invoice.effectiveFrom = new Date(payload.effectiveFrom);
     if (payload.effectiveTo) invoice.effectiveTo = new Date(payload.effectiveTo);
+
+    // Update Lease Fields
+    if (payload.leaseType) invoice.leaseType = payload.leaseType;
+    if (payload.leaseTenureMonths !== undefined)
+      invoice.leaseTenureMonths = payload.leaseTenureMonths;
+    if (payload.totalLeaseAmount !== undefined) invoice.totalLeaseAmount = payload.totalLeaseAmount;
+    if (payload.monthlyEmiAmount !== undefined) invoice.monthlyEmiAmount = payload.monthlyEmiAmount;
+    if (payload.monthlyLeaseAmount !== undefined)
+      invoice.monthlyLeaseAmount = payload.monthlyLeaseAmount;
 
     // Update Items (Machines + Pricing Rules)
     const newInvoiceItems: InvoiceItem[] = [];
