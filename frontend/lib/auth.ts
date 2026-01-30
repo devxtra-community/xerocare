@@ -1,6 +1,7 @@
 import api from './api';
 import { jwtDecode } from 'jwt-decode';
 import { EmployeeJob } from './employeeJob';
+import { FinanceJob } from './financeJob';
 
 export type UserRole = 'HR' | 'EMPLOYEE' | 'FINANCE' | 'MANAGER' | 'ADMIN';
 
@@ -9,6 +10,7 @@ export interface JwtPayload {
   role: UserRole;
   branchId?: string;
   employeeJob?: EmployeeJob | null;
+  financeJob?: FinanceJob | null;
   exp: number;
 }
 

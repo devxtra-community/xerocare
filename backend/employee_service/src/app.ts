@@ -1,7 +1,7 @@
 import 'reflect-metadata';
 import express, { urlencoded } from 'express';
 import { Source } from './config/dataSource';
-import './config/env';
+import './config/env'; // Trigger restart
 import adminRouter from './routes/adminRouter';
 import employeeRouter from './routes/employeeRouter';
 import authRouter from './routes/authRouter';

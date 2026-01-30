@@ -187,7 +187,7 @@ export default function AddAccountDialog({
                 </div>
                 <Switch
                   checked={form.isGroup}
-                  onCheckedChange={(v) => setForm({ ...form, isGroup: v, parentId: null })}
+                  onCheckedChange={(v: boolean) => setForm({ ...form, isGroup: v, parentId: null })}
                 />
               </div>
 
@@ -223,7 +223,7 @@ export default function AddAccountDialog({
                 </div>
                 <Switch
                   checked={form.isControlAccount}
-                  onCheckedChange={(v) => setForm({ ...form, isControlAccount: v })}
+                  onCheckedChange={(v: boolean) => setForm({ ...form, isControlAccount: v })}
                 />
               </div>
 
@@ -231,7 +231,9 @@ export default function AddAccountDialog({
                 <Label className="text-xs font-bold">Active Status</Label>
                 <Switch
                   checked={form.status === 'Active'}
-                  onCheckedChange={(v) => setForm({ ...form, status: v ? 'Active' : 'Inactive' })}
+                  onCheckedChange={(v: boolean) =>
+                    setForm({ ...form, status: v ? 'Active' : 'Inactive' })
+                  }
                 />
               </div>
             </div>

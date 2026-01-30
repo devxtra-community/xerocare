@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Search, Loader2, Eye, FileText, Plus, Trash2 } from 'lucide-react';
+import { Search, Loader2, Eye, FileText, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   Table,
@@ -14,20 +14,17 @@ import {
 import {
   getMyInvoices,
   Invoice,
-  getInvoiceById,
   createInvoice,
   CreateInvoicePayload,
+  updateQuotation,
 } from '@/lib/invoice';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from '@/components/ui/dialog';
+import RentFormModal from './RentFormModal';
+
 import { Badge } from '@/components/ui/badge';
-import { Calendar, Clock } from 'lucide-react';
-import { CustomerSelect } from '@/components/invoice/CustomerSelect';
+import { Clock } from 'lucide-react';
+
+import { InvoiceDetailsDialog } from '@/components/invoice/InvoiceDetailsDialog';
+import { ApproveQuotationDialog } from '@/components/invoice/ApproveQuotationDialog';
 
 const calculateDays = (start: string | Date | undefined, end: string | Date | undefined) => {
   if (!start || !end) return 0;
@@ -43,7 +40,9 @@ export default function EmployeeLeaseTable() {
   const [loading, setLoading] = useState(true);
   const [formOpen, setFormOpen] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [approveOpen, setApproveOpen] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
+  const [editInvoice, setEditInvoice] = useState<Invoice | undefined>(undefined);
   const [search, setSearch] = useState('');
 
   const fetchInvoices = async () => {
@@ -63,26 +62,43 @@ export default function EmployeeLeaseTable() {
     fetchInvoices();
   }, []);
 
-  const handleCreate = async (data: CreateInvoicePayload) => {
+  const handleCreateOrUpdate = async (data: CreateInvoicePayload) => {
     try {
-      const newInvoice = await createInvoice(data);
-      setInvoices((prev) => [newInvoice, ...prev]);
+      if (editInvoice) {
+        // Update Mode
+        const updated = await updateQuotation(editInvoice.id, data);
+        setInvoices((prev) => prev.map((inv) => (inv.id === updated.id ? updated : inv)));
+        toast.success('Lease updated successfully.');
+      } else {
+        // Create Mode
+        const newInvoice = await createInvoice(data);
+        setInvoices((prev) => [newInvoice, ...prev]);
+        toast.success('Lease record created successfully.');
+      }
       setFormOpen(false);
-      toast.success('Lease record created successfully.');
+      setEditInvoice(undefined);
     } catch (error: unknown) {
-      console.error('Failed to create lease record:', error);
+      console.error('Failed to save lease record:', error);
       const err = error as { response?: { data?: { message?: string } } };
-      toast.error(err.response?.data?.message || 'Failed to create lease record.');
+      toast.error(err.response?.data?.message || 'Failed to save lease record.');
     }
   };
 
-  const handleViewDetails = async (invoiceId: string) => {
-    try {
-      const data = await getInvoiceById(invoiceId);
-      setSelectedInvoice(data);
+  const openCreateModal = () => {
+    setEditInvoice(undefined);
+    setFormOpen(true);
+  };
+
+  const openEditModal = (invoice: Invoice) => {
+    setEditInvoice(invoice);
+    setFormOpen(true);
+  };
+
+  const handleViewDetails = (id: string) => {
+    const invoice = invoices.find((i) => i.id === id);
+    if (invoice) {
+      setSelectedInvoice(invoice);
       setDetailsOpen(true);
-    } catch (error) {
-      console.error('Failed to fetch lease details:', error);
     }
   };
 
@@ -117,9 +133,7 @@ export default function EmployeeLeaseTable() {
         </div>
         <Button
           className="bg-primary text-white gap-2 w-full sm:w-auto mt-2 sm:mt-0 shadow-md hover:shadow-lg transition-all"
-          onClick={() => {
-            setFormOpen(true);
-          }}
+          onClick={openCreateModal}
         >
           <Plus size={16} /> New Lease
         </Button>
@@ -229,6 +243,16 @@ export default function EmployeeLeaseTable() {
                       >
                         <Eye className="h-4 w-4" />
                       </Button>
+                      {(inv.status === 'DRAFT' || inv.status === 'SENT') && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-slate-400 hover:text-orange-600 hover:bg-orange-50"
+                          onClick={() => openEditModal(inv)}
+                        >
+                          <FileText className="h-4 w-4" />
+                        </Button>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))
@@ -238,350 +262,38 @@ export default function EmployeeLeaseTable() {
         </div>
       </div>
 
-      {formOpen && <LeaseFormModal onClose={() => setFormOpen(false)} onConfirm={handleCreate} />}
+      {formOpen && (
+        <RentFormModal
+          initialData={editInvoice}
+          defaultSaleType="LEASE"
+          lockSaleType={true}
+          onClose={() => setFormOpen(false)}
+          onConfirm={handleCreateOrUpdate}
+        />
+      )}
 
       {detailsOpen && selectedInvoice && (
-        <InvoiceDetailsDialog invoice={selectedInvoice} onClose={() => setDetailsOpen(false)} />
+        <InvoiceDetailsDialog
+          invoice={selectedInvoice}
+          onClose={() => setDetailsOpen(false)}
+          onApprove={() => {
+            setDetailsOpen(false);
+            setApproveOpen(true);
+          }}
+        />
+      )}
+
+      {approveOpen && selectedInvoice && (
+        <ApproveQuotationDialog
+          invoiceId={selectedInvoice.id}
+          onClose={() => setApproveOpen(false)}
+          onSuccess={() => {
+            setApproveOpen(false);
+            fetchInvoices();
+          }}
+        />
       )}
     </div>
   );
 }
-
-function LeaseFormModal({
-  onClose,
-  onConfirm,
-}: {
-  onClose: () => void;
-  onConfirm: (data: CreateInvoicePayload) => void;
-}) {
-  const [form, setForm] = useState<CreateInvoicePayload>({
-    customerId: '',
-    saleType: 'LEASE',
-    items: [{ description: '', quantity: 1, unitPrice: 0 }],
-    startDate: '',
-    endDate: '',
-    billingCycleInDays: 30,
-  });
-
-  const addItem = () => {
-    setForm({
-      ...form,
-      items: [...(form.items || []), { description: '', quantity: 1, unitPrice: 0 }],
-    });
-  };
-
-  const removeItem = (index: number) => {
-    if ((form.items?.length || 0) <= 1) return;
-    const newItems = (form.items || []).filter((_, i) => i !== index);
-    setForm({ ...form, items: newItems });
-  };
-
-  const updateItem = (index: number, field: string, value: string | number) => {
-    const newItems = [...(form.items || [])];
-    newItems[index] = { ...newItems[index], [field]: value };
-    setForm({ ...form, items: newItems });
-  };
-
-  const totalAmount = (form.items || []).reduce(
-    (sum, item) => sum + (item.quantity || 0) * (item.unitPrice || 0),
-    0,
-  );
-
-  return (
-    <Dialog open={true} onOpenChange={(val) => !val && onClose()}>
-      <DialogContent className="sm:max-w-2xl p-0 overflow-hidden rounded-xl border-none shadow-2xl bg-white">
-        <DialogHeader className="p-8 pb-4">
-          <div className="flex items-center gap-4">
-            <div className="h-12 w-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shadow-sm">
-              <FileText size={24} />
-            </div>
-            <div className="space-y-1">
-              <DialogTitle className="text-xl font-bold text-primary tracking-tight">
-                New Lease Invoice
-              </DialogTitle>
-              <DialogDescription className="text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-none">
-                Create a new lease record
-              </DialogDescription>
-            </div>
-          </div>
-        </DialogHeader>
-
-        <div className="p-8 pt-4 space-y-6 max-h-[70vh] overflow-y-auto scrollbar-hide">
-          <div className="space-y-2">
-            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-              Customer
-            </label>
-            <div className="w-full">
-              <CustomerSelect
-                value={form.customerId}
-                onChange={(id) => setForm({ ...form, customerId: id })}
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-x-8 gap-y-4">
-            <div className="space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                Contract Start Date
-              </label>
-              <Input
-                type="date"
-                value={form.startDate}
-                onChange={(e) => setForm({ ...form, startDate: e.target.value })}
-                className="h-12 rounded-xl border-none bg-gray-50 focus-visible:ring-2 focus-visible:ring-blue-400"
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                Contract End Date
-              </label>
-              <Input
-                type="date"
-                value={form.endDate}
-                onChange={(e) => setForm({ ...form, endDate: e.target.value })}
-                className="h-12 rounded-xl border-none bg-gray-50 focus-visible:ring-2 focus-visible:ring-blue-400"
-              />
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                Line Items
-              </h3>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={addItem}
-                className="h-8 text-primary font-bold text-[10px] uppercase tracking-widest hover:bg-gray-50 rounded-lg"
-              >
-                <Plus size={14} className="mr-1" /> Add Another Item
-              </Button>
-            </div>
-
-            <div className="space-y-3">
-              {(form.items || []).map((item, index) => (
-                <div
-                  key={index}
-                  className="group relative grid grid-cols-12 gap-3 p-4 rounded-xl border border-gray-100 bg-gray-50/50 hover:bg-white hover:border-blue-200 transition-all"
-                >
-                  <div className="col-span-12 md:col-span-6 space-y-1">
-                    <label className="text-[9px] font-bold text-gray-400 uppercase tracking-wider pl-1">
-                      Description
-                    </label>
-                    <Input
-                      value={item.description}
-                      onChange={(e) => updateItem(index, 'description', e.target.value)}
-                      placeholder="e.g. Printer Model"
-                      className="h-10 border-none bg-transparent font-bold text-gray-800 placeholder:text-gray-300 shadow-none focus-visible:ring-0 px-1"
-                    />
-                  </div>
-                  <div className="col-span-4 md:col-span-2 space-y-1">
-                    <label className="text-[9px] font-bold text-gray-400 uppercase tracking-wider pl-1">
-                      Qty
-                    </label>
-                    <Input
-                      type="number"
-                      min="1"
-                      value={item.quantity}
-                      onChange={(e) => updateItem(index, 'quantity', parseInt(e.target.value) || 1)}
-                      className="h-10 border-none bg-transparent font-bold text-gray-500 shadow-none focus-visible:ring-0 text-center"
-                    />
-                  </div>
-                  <div className="col-span-8 md:col-span-3 space-y-1 text-right">
-                    <label className="text-[9px] font-bold text-gray-400 uppercase tracking-wider pr-1">
-                      Unit Price
-                    </label>
-                    <div className="relative">
-                      <Input
-                        type="number"
-                        min="0"
-                        value={item.unitPrice}
-                        onChange={(e) =>
-                          updateItem(index, 'unitPrice', parseFloat(e.target.value) || 0)
-                        }
-                        className="h-10 border-none bg-transparent font-bold text-gray-900 shadow-none focus-visible:ring-0 pl-6 text-right"
-                      />
-                      <span className="absolute left-1 top-1/2 -translate-y-1/2 text-gray-300 font-bold text-xs">
-                        ₹
-                      </span>
-                    </div>
-                  </div>
-                  <div className="col-span-12 md:col-span-1 flex items-center justify-end">
-                    {(form.items?.length || 0) > 1 && (
-                      <button
-                        onClick={() => removeItem(index)}
-                        className="h-8 w-8 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 flex items-center justify-center transition-all"
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        <div className="p-8 bg-gray-50 flex items-center justify-between border-t border-gray-100">
-          <div>
-            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider leading-none mb-1">
-              Estimated Total
-            </p>
-            <p className="text-2xl font-bold text-primary">₹{totalAmount.toLocaleString()}</p>
-          </div>
-          <div className="flex gap-6 items-center">
-            <button
-              onClick={onClose}
-              className="text-sm font-bold text-gray-900 hover:text-gray-600 transition-colors"
-            >
-              Discard
-            </button>
-            <Button
-              className="h-12 px-10 rounded-xl bg-primary text-white hover:bg-primary/90 font-bold shadow-lg disabled:opacity-70 transition-all"
-              onClick={() => {
-                if (!form.customerId) {
-                  alert('Please select a customer.');
-                  return;
-                }
-                if (!form.startDate || !form.endDate) {
-                  alert('Please select start and end dates.');
-                  return;
-                }
-                onConfirm(form);
-              }}
-            >
-              Finalize Lease
-            </Button>
-          </div>
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-function InvoiceDetailsDialog({ invoice, onClose }: { invoice: Invoice; onClose: () => void }) {
-  return (
-    <Dialog open={true} onOpenChange={(val) => !val && onClose()}>
-      <DialogContent className="sm:max-w-xl p-0 overflow-hidden rounded-xl border border-gray-100 shadow-2xl bg-white">
-        <DialogHeader className="p-8 pb-4">
-          <div className="flex items-center gap-4">
-            <div className="h-12 w-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shadow-sm">
-              <FileText size={24} />
-            </div>
-            <div className="space-y-1">
-              <DialogTitle className="text-xl font-bold text-primary tracking-tight">
-                {invoice.invoiceNumber}
-              </DialogTitle>
-              <DialogDescription className="text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-none">
-                {invoice.saleType} Details
-              </DialogDescription>
-            </div>
-          </div>
-        </DialogHeader>
-
-        <div className="p-8 pt-6 space-y-8 max-h-[70vh] overflow-y-auto scrollbar-hide">
-          <div className="grid grid-cols-2 gap-x-12 gap-y-6">
-            <div className="space-y-1">
-              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Date</p>
-              <div className="flex items-center gap-2">
-                <Calendar size={14} className="text-gray-400" />
-                <p className="text-sm font-bold text-gray-800">
-                  {new Date(invoice.createdAt).toLocaleDateString(undefined, {
-                    dateStyle: 'medium',
-                  })}
-                </p>
-              </div>
-            </div>
-            <div className="space-y-1">
-              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Status</p>
-              <Badge
-                variant="secondary"
-                className={`rounded-full px-3 py-1 text-[10px] font-bold tracking-wider shadow-none
-                  ${
-                    invoice.status === 'PAID'
-                      ? 'bg-green-50 text-green-600 border-green-100'
-                      : 'bg-amber-50 text-amber-600 border-amber-100'
-                  }`}
-              >
-                {invoice.status}
-              </Badge>
-            </div>
-          </div>
-
-          {(invoice.startDate || invoice.endDate) && (
-            <div className="grid grid-cols-2 gap-x-12 gap-y-6 p-6 bg-gray-50 rounded-xl">
-              <div className="space-y-1">
-                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                  Contract Period
-                </p>
-                <p className="text-xs font-bold text-gray-600">
-                  {invoice.startDate ? new Date(invoice.startDate).toLocaleDateString() : 'N/A'} —{' '}
-                  {invoice.endDate ? new Date(invoice.endDate).toLocaleDateString() : 'N/A'}
-                </p>
-              </div>
-              <div className="space-y-1">
-                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                  Billing Cycle
-                </p>
-                <p className="text-xs font-bold text-gray-600">
-                  Every {invoice.billingCycleInDays || 30} Days
-                </p>
-              </div>
-            </div>
-          )}
-
-          <div className="space-y-4">
-            <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Items</h3>
-            <div className="rounded-xl border border-gray-100 overflow-hidden">
-              <Table>
-                <TableHeader className="bg-gray-50/80">
-                  <TableRow>
-                    <TableHead className="text-[10px] font-bold text-gray-400">
-                      DESCRIPTION
-                    </TableHead>
-                    <TableHead className="text-[10px] font-bold text-gray-400 text-center">
-                      QTY
-                    </TableHead>
-                    <TableHead className="text-[10px] font-bold text-gray-400 text-right">
-                      TOTAL
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {invoice.items?.map((item, idx) => (
-                    <TableRow key={idx}>
-                      <TableCell className="font-bold text-gray-700 py-3 text-sm">
-                        {item.description}
-                      </TableCell>
-                      <TableCell className="text-center font-bold text-gray-500 text-sm">
-                        {item.quantity}
-                      </TableCell>
-                      <TableCell className="text-right font-bold text-gray-900 text-sm">
-                        ₹{((item.quantity || 0) * (item.unitPrice || 0)).toLocaleString()}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          </div>
-        </div>
-
-        <div className="p-8 bg-gray-50 border-t border-gray-100 flex items-center justify-between">
-          <div>
-            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">
-              Total
-            </p>
-            <p className="text-2xl font-bold text-primary">
-              ₹{invoice.totalAmount.toLocaleString()}
-            </p>
-          </div>
-          <Button onClick={onClose} className="bg-primary text-white font-bold">
-            Close
-          </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-}
+// Local LeaseFormModal removed in favor of shared RentFormModal

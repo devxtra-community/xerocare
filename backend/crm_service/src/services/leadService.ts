@@ -30,11 +30,17 @@ export class LeadService {
     userId: string,
     role: string,
     includeDeleted: boolean = false,
+    branchId?: string,
   ): Promise<ILead[]> {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const filter: any = {};
     if (role !== 'ADMIN') {
       filter.assignedTo = userId;
+    }
+
+    // Branch filtering: Add branch filter if provided (for non-admin users)
+    if (branchId) {
+      filter.branchId = branchId;
     }
 
     if (!includeDeleted) {

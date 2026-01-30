@@ -259,7 +259,10 @@ export const logoutSession = async (req: Request, res: Response, next: NextFunct
 
 export const getMe = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const userId = req.user.userId;
+    const userId = req.user.userId || req.user.id;
+    if (!userId) {
+      throw new AppError('User ID not found in token', 400);
+    }
     const role = req.user.role;
     const user = await authService.findUserById(userId, role);
     return res.json({

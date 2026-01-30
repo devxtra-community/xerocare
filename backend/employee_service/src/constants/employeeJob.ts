@@ -5,7 +5,6 @@ export enum EmployeeJob {
   TECHNICIAN = 'TECHNICIAN',
   DELIVERY = 'DELIVERY',
   READING_AGENT = 'READING_AGENT',
-  MULTI_ROLE = 'MULTI_ROLE',
   EMPLOYEE_MANAGER = 'EMPLOYEE_MANAGER',
 }
 
@@ -17,7 +16,6 @@ export const EMPLOYEE_JOB_ACCESS: Record<EmployeeJob, string[]> = {
   [EmployeeJob.TECHNICIAN]: ['service', 'repair', 'maintenance'],
   [EmployeeJob.DELIVERY]: ['delivery', 'installation'],
   [EmployeeJob.READING_AGENT]: ['reading', 'meters'],
-  [EmployeeJob.MULTI_ROLE]: ['*'], // Access all modules
   [EmployeeJob.EMPLOYEE_MANAGER]: ['*'], // Access all modules
 };
 

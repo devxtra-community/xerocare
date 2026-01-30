@@ -29,10 +29,15 @@ export class LeadController {
         throw new Error('User not authenticated');
       }
       const includeDeleted = req.query.includeDeleted === 'true';
+
+      // Branch filtering: Admin sees all leads, others see only their branch
+      const branchId = req.user.role === 'ADMIN' ? undefined : req.user.branchId;
+
       const leads = await this.leadService.getAllLeads(
         req.user.userId,
         req.user.role,
         includeDeleted,
+        branchId,
       );
       res.status(200).json({
         success: true,

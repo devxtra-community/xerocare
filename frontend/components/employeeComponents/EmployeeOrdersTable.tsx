@@ -18,14 +18,19 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { getMyInvoices, Invoice, InvoiceItem } from '@/lib/invoice';
+import { getMyInvoices, Invoice, InvoiceItem, getInvoiceById } from '@/lib/invoice';
 import { toast } from 'sonner';
+import { InvoiceDetailsDialog } from '../invoice/InvoiceDetailsDialog';
+import { Eye } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 export default function EmployeeOrdersTable() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [filterType, setFilterType] = useState<string>('All');
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
 
   useEffect(() => {
     const fetchInvoices = async () => {
@@ -53,7 +58,18 @@ export default function EmployeeOrdersTable() {
 
   const getProductNames = (items?: InvoiceItem[]) => {
     if (!items || items.length === 0) return 'N/A';
-    return items.map((item) => item.description).join(', ');
+    const names = items.map((item) => getCleanProductName(item.description));
+    // Deduplicate names
+    const uniqueNames = Array.from(new Set(names));
+    return uniqueNames.join(', ');
+  };
+
+  const getCleanProductName = (name: string) => {
+    // Remove "Black & White - " or "Color - " prefixes
+    let clean = name.replace(/^(Black & White - |Color - )/i, '');
+    // Remove serial number patterns like (SN-...) or - SN-...
+    clean = clean.replace(/(\s*-\s*SN-[^,]+|\s*\(SN-[^)]+\))/gi, '');
+    return clean.trim();
   };
 
   const getTotalQuantity = (items?: InvoiceItem[]) => {
@@ -75,6 +91,30 @@ export default function EmployeeOrdersTable() {
     const matchesFilter = filterType === 'All' || inv.saleType === filterType;
     return matchesSearch && matchesFilter;
   });
+
+  const handleViewDetails = async (invoiceId: string) => {
+    try {
+      // If we already have the full invoice details in the list (populated by aggregator), we can use it.
+      // But getInvoiceById from keys might offer more.
+      // Currently aggregation brings basic info. Let's fetch full details or use existing if robust.
+      // The aggregated invoice list already has customerPhone etc from our recent backend change.
+      // But `items` might be partial? Actually Aggregator sends full standard invoice object fields + extras.
+      // Let's first try finding in specific list.
+      const inv = invoices.find((i) => i.id === invoiceId);
+      if (inv) {
+        setSelectedInvoice(inv);
+        setDetailsOpen(true);
+      } else {
+        // Fallback fetch
+        const data = await getInvoiceById(invoiceId);
+        setSelectedInvoice(data);
+        setDetailsOpen(true);
+      }
+    } catch (error) {
+      console.error('Failed to fetch invoice details:', error);
+      toast.error('Failed to open details');
+    }
+  };
 
   if (loading) {
     return (
@@ -157,7 +197,9 @@ export default function EmployeeOrdersTable() {
                     <TableCell className="font-bold text-primary whitespace-nowrap">
                       {getCleanCustomerName(invoice.customerName)}
                     </TableCell>
-                    <TableCell className="text-slate-500 whitespace-nowrap text-xs">N/A</TableCell>
+                    <TableCell className="text-slate-500 whitespace-nowrap text-xs">
+                      {invoice.customerPhone || 'N/A'}
+                    </TableCell>
                     <TableCell className="text-slate-500 whitespace-nowrap text-xs">
                       {formatDate(invoice.createdAt)}
                     </TableCell>
@@ -214,6 +256,17 @@ export default function EmployeeOrdersTable() {
                         {invoice.saleType}
                       </span>
                     </TableCell>
+                    <TableCell>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-slate-500 hover:text-blue-600 hover:bg-blue-50"
+                        onClick={() => handleViewDetails(invoice.id)}
+                        title="View Details"
+                      >
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                    </TableCell>
                   </TableRow>
                 ))
               )}
@@ -222,13 +275,9 @@ export default function EmployeeOrdersTable() {
         </div>
       </div>
 
-      {/* TODO: Create OrderUpdateDialog component */}
-      {/* <OrderUpdateDialog
-        open={isDialogOpen}
-        onOpenChange={setIsDialogOpen}
-        invoice={selectedInvoice}
-        onUpdate={handleUpdateInvoice}
-      /> */}
+      {detailsOpen && selectedInvoice && (
+        <InvoiceDetailsDialog invoice={selectedInvoice} onClose={() => setDetailsOpen(false)} />
+      )}
     </div>
   );
 }

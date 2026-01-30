@@ -9,6 +9,7 @@ import {
   getMyInvoices,
   getStats,
   getBranchSales,
+  getBranchSalesTotals,
 } from '../controllers/invoiceController';
 import { authMiddleware } from '../middlewares/authMiddleware';
 import { requireRole } from '../middlewares/roleMiddleware';
@@ -30,6 +31,7 @@ router.get('/my-invoices', authMiddleware, getMyInvoices);
 router.get('/', authMiddleware, getAllInvoices);
 router.get('/stats', authMiddleware, getStats);
 router.get('/sales/branch-overview', authMiddleware, getBranchSales);
+router.get('/sales/branch-totals', authMiddleware, getBranchSalesTotals);
 router.post(
   '/settlements/generate',
   authMiddleware,

@@ -17,6 +17,8 @@ import { ImagePlus, FileText, X } from 'lucide-react';
 import { Employee } from '@/lib/employee';
 import { getBranches, Branch } from '@/lib/branch';
 import { getEmployeeJobOptions, EmployeeJob } from '@/lib/employeeJob';
+import { getFinanceJobOptions, FinanceJob } from '@/lib/financeJob';
+import { getUserFromToken } from '@/lib/auth';
 
 interface EmployeeFormDialogProps {
   open: boolean;
@@ -37,6 +39,7 @@ export default function EmployeeFormDialog({
     email: '',
     role: 'EMPLOYEE',
     employee_job: '' as EmployeeJob | '',
+    finance_job: '' as FinanceJob | '',
     salary: '',
     expire_date: '',
     status: 'ACTIVE',
@@ -48,25 +51,42 @@ export default function EmployeeFormDialog({
   const [profilePreview, setProfilePreview] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [branches, setBranches] = useState<Branch[]>([]);
+  const [currentUserBranch, setCurrentUserBranch] = useState<Branch | null>(null);
 
   const profileInputRef = useRef<HTMLInputElement>(null);
   const idProofInputRef = useRef<HTMLInputElement>(null);
+
+  // Get current user info
+  const currentUser = getUserFromToken();
+  const isAdmin = currentUser?.role === 'ADMIN';
+  const userBranchId = currentUser?.branchId;
 
   useEffect(() => {
     const fetchBranches = async () => {
       try {
         const response = await getBranches();
+        let branchList: Branch[] = [];
         if (response && response.success && Array.isArray(response.data)) {
+          branchList = response.data;
           setBranches(response.data);
         } else if (Array.isArray(response)) {
+          branchList = response;
           setBranches(response);
+        }
+
+        // Find and set current user's branch
+        if (userBranchId && branchList.length > 0) {
+          const userBranch = branchList.find((b) => (b.id || b.branch_id) === userBranchId);
+          if (userBranch) {
+            setCurrentUserBranch(userBranch);
+          }
         }
       } catch (error) {
         console.error('Failed to fetch branches:', error);
       }
     };
     fetchBranches();
-  }, []);
+  }, [userBranchId]);
 
   useEffect(() => {
     if (initialData) {
@@ -76,6 +96,7 @@ export default function EmployeeFormDialog({
         email: initialData.email || '',
         role: initialData.role || 'EMPLOYEE',
         employee_job: (initialData as Employee & { employee_job?: EmployeeJob }).employee_job || '',
+        finance_job: (initialData as Employee & { finance_job?: FinanceJob }).finance_job || '',
         salary: initialData.salary?.toString() || '',
         expire_date: initialData.expire_date
           ? new Date(initialData.expire_date).toISOString().split('T')[0]
@@ -85,22 +106,24 @@ export default function EmployeeFormDialog({
       });
       setProfilePreview(initialData.profile_image_url);
     } else {
+      // For new employees, auto-fill branchId with HR's branch
       setFormData({
         first_name: '',
         last_name: '',
         email: '',
         role: 'EMPLOYEE',
         employee_job: '',
+        finance_job: '',
         salary: '',
         expire_date: '',
         status: 'ACTIVE',
-        branchId: '',
+        branchId: !isAdmin && userBranchId ? userBranchId : '',
       });
       setProfilePreview(null);
       setProfileImage(null);
       setIdProof(null);
     }
-  }, [initialData, open]);
+  }, [initialData, open, isAdmin, userBranchId]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -139,6 +162,9 @@ export default function EmployeeFormDialog({
       data.append('role', formData.role);
       if (formData.employee_job) {
         data.append('employee_job', formData.employee_job);
+      }
+      if (formData.finance_job) {
+        data.append('finance_job', formData.finance_job);
       }
       data.append('salary', formData.salary);
       if (formData.expire_date) {
@@ -292,6 +318,31 @@ export default function EmployeeFormDialog({
               </div>
             )}
 
+            {/* Finance Job - Only show for FINANCE role */}
+            {formData.role === 'FINANCE' && (
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                  Finance Job / Responsibility *
+                </label>
+                <Select
+                  value={formData.finance_job}
+                  onValueChange={(val) => handleSelectChange('finance_job', val)}
+                  required={formData.role === 'FINANCE'}
+                >
+                  <SelectTrigger className="h-12 rounded-xl bg-gray-50 border-none shadow-sm focus:ring-2 focus:ring-blue-400">
+                    <SelectValue placeholder="Select finance job type" />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-xl">
+                    {getFinanceJobOptions().map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
             <div className="space-y-2">
               <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
                 Salary (AED)
@@ -346,24 +397,30 @@ export default function EmployeeFormDialog({
               <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
                 Assigned Branch
               </label>
-              <Select
-                value={formData.branchId}
-                onValueChange={(val) => handleSelectChange('branchId', val)}
-              >
-                <SelectTrigger className="h-12 rounded-xl bg-gray-50 border-none shadow-sm focus:ring-2 focus:ring-blue-400">
-                  <SelectValue placeholder="Select Branch" />
-                </SelectTrigger>
-                <SelectContent className="rounded-xl">
-                  {branches.map((branch) => (
-                    <SelectItem
-                      key={branch.id || branch.branch_id}
-                      value={branch.id || branch.branch_id || ''}
-                    >
-                      {branch.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {isAdmin ? (
+                <Select
+                  value={formData.branchId}
+                  onValueChange={(val) => handleSelectChange('branchId', val)}
+                >
+                  <SelectTrigger className="h-12 rounded-xl bg-gray-50 border-none shadow-sm focus:ring-2 focus:ring-blue-400">
+                    <SelectValue placeholder="Select Branch" />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-xl">
+                    {branches.map((branch) => (
+                      <SelectItem
+                        key={branch.id || branch.branch_id}
+                        value={branch.id || branch.branch_id || ''}
+                      >
+                        {branch.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <div className="h-12 rounded-xl bg-gray-100 border-none shadow-sm flex items-center px-4 text-gray-700 font-medium">
+                  {currentUserBranch?.name || 'Loading...'}
+                </div>
+              )}
             </div>
           </div>
 

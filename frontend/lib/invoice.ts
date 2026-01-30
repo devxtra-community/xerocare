@@ -30,8 +30,15 @@ export interface Invoice {
   totalAmount: number;
   status: string;
   saleType: string;
-  rentType?: 'FIXED_LIMIT' | 'FIXED_COMBO' | 'CPC' | 'CPC_COMBO';
+  rentType?: 'FIXED_LIMIT' | 'FIXED_COMBO' | 'FIXED_FLAT' | 'CPC' | 'CPC_COMBO';
   rentPeriod?: 'MONTHLY' | 'QUARTERLY' | 'HALF_YEARLY' | 'YEARLY';
+
+  // Lease Fields
+  leaseType?: 'EMI' | 'FSM';
+  leaseTenureMonths?: number;
+  totalLeaseAmount?: number;
+  monthlyEmiAmount?: number;
+  monthlyLeaseAmount?: number;
   monthlyRent?: number;
   advanceAmount?: number;
   discountPercent?: number;
@@ -41,6 +48,8 @@ export interface Invoice {
   employeeName: string;
   branchName: string;
   customerName: string;
+  customerPhone?: string;
+  customerEmail?: string;
   items?: InvoiceItem[];
   startDate?: string;
   endDate?: string;
@@ -56,8 +65,16 @@ export interface CreateInvoicePayload {
   saleType: 'SALE' | 'RENT' | 'LEASE';
 
   // Rent Fields
-  rentType?: 'FIXED_LIMIT' | 'FIXED_COMBO' | 'CPC' | 'CPC_COMBO';
+  rentType?: 'FIXED_LIMIT' | 'FIXED_COMBO' | 'FIXED_FLAT' | 'CPC' | 'CPC_COMBO';
   rentPeriod?: 'MONTHLY' | 'QUARTERLY' | 'HALF_YEARLY' | 'YEARLY';
+
+  // Lease Fields
+  leaseType?: 'EMI' | 'FSM';
+  leaseTenureMonths?: number;
+  totalLeaseAmount?: number;
+  monthlyEmiAmount?: number;
+  monthlyLeaseAmount?: number;
+
   monthlyRent?: number;
   advanceAmount?: number;
   discountPercent?: number;
@@ -95,6 +112,11 @@ export const getInvoices = async (): Promise<Invoice[]> => {
 
 export const getMyInvoices = async (): Promise<Invoice[]> => {
   const response = await api.get('/b/invoices/my-invoices');
+  return response.data.data;
+};
+
+export const getBranchInvoices = async (): Promise<Invoice[]> => {
+  const response = await api.get('/b/invoices/branch-invoices');
   return response.data.data;
 };
 

@@ -10,7 +10,14 @@ export enum EmployeeJob {
   TECHNICIAN = 'TECHNICIAN',
   DELIVERY = 'DELIVERY',
   READING_AGENT = 'READING_AGENT',
-  MULTI_ROLE = 'MULTI_ROLE',
+  EMPLOYEE_MANAGER = 'EMPLOYEE_MANAGER',
+}
+
+// Mirror of backend FinanceJob enum
+export enum FinanceJob {
+  FINANCE_SALES = 'FINANCE_SALES',
+  FINANCE_RENT_LEASE = 'FINANCE_RENT_LEASE',
+  FINANCE_MANAGER = 'FINANCE_MANAGER',
 }
 
 export const requireJob = (...allowedJobs: EmployeeJob[]) => {
@@ -34,7 +41,10 @@ export const requireJob = (...allowedJobs: EmployeeJob[]) => {
     }
 
     // Check if employee's job is in allowed list
-    if (!allowedJobs.includes(req.user.employeeJob as EmployeeJob)) {
+    if (
+      req.user.employeeJob !== EmployeeJob.EMPLOYEE_MANAGER &&
+      !allowedJobs.includes(req.user.employeeJob as EmployeeJob)
+    ) {
       // Log security event for audit trail
       logger.warn('Unauthorized job access attempt', {
         userId: req.user.userId,
@@ -44,6 +54,42 @@ export const requireJob = (...allowedJobs: EmployeeJob[]) => {
         method: req.method,
       });
       return next(new AppError('Access denied: job not authorized for this resource', 403));
+    }
+
+    next();
+  };
+};
+
+export const requireFinanceJob = (...allowedJobs: FinanceJob[]) => {
+  return (req: Request, res: Response, next: NextFunction) => {
+    if (!req.user) {
+      return next(new AppError('Not authenticated', 401));
+    }
+
+    // Non-finance users (ADMIN, MANAGER, HR, EMPLOYEE) bypass finance job checks
+    if (req.user.role !== 'FINANCE') {
+      return next();
+    }
+
+    // Finance users must have a finance job assigned
+    if (!req.user.financeJob) {
+      logger.warn('Finance user without finance job attempted access', {
+        userId: req.user.userId,
+        path: req.path,
+      });
+      return next(new AppError('Finance job not defined', 403));
+    }
+
+    // Check if finance user's job is in allowed list
+    if (!allowedJobs.includes(req.user.financeJob as FinanceJob)) {
+      logger.warn('Unauthorized finance job access attempt', {
+        userId: req.user.userId,
+        financeJob: req.user.financeJob,
+        requiredJobs: allowedJobs,
+        path: req.path,
+        method: req.method,
+      });
+      return next(new AppError('Access denied: finance job not authorized for this resource', 403));
     }
 
     next();

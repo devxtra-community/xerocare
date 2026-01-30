@@ -20,27 +20,28 @@ export default function BranchSalesChart() {
   const [isClient, setIsClient] = useState(false);
   const [chartData, setChartData] = useState<{ date: string; sales: number }[]>([]);
 
-  const fetchData = async () => {
-    try {
-      const sales = await salesService.getBranchSalesOverview(selectedPeriod);
-
-      // Map sales to chart data
-      // Backend returns dates, let's map them directly
-      const data = sales.map((s) => ({
-        date: s.date, // Format if needed, e.g. new Date(s.date).toLocaleDateString()
-        sales: s.totalSales,
-      }));
-
-      setChartData(data);
-    } catch (error) {
-      console.error('Failed to fetch chart data:', error);
-    }
-  };
-
   useEffect(() => {
     setIsClient(true);
+
+    const fetchData = async () => {
+      try {
+        const sales = await salesService.getBranchSalesOverview(selectedPeriod);
+
+        // Map sales to chart data
+        // Backend returns dates, let's map them directly
+        const data = sales.map((s) => ({
+          date: s.date, // Format if needed, e.g. new Date(s.date).toLocaleDateString()
+          sales: s.totalSales,
+        }));
+
+        setChartData(data);
+      } catch (error) {
+        console.error('Failed to fetch chart data:', error);
+      }
+    };
+
     fetchData();
-  }, [selectedPeriod, fetchData]);
+  }, [selectedPeriod]);
 
   return (
     <div className="rounded-2xl bg-white h-[260px] w-full shadow-sm flex flex-col p-3">

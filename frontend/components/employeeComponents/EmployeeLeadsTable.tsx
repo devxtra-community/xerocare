@@ -49,7 +49,7 @@ export default function EmployeeLeadsTable() {
 
   useEffect(() => {
     fetchLeads();
-  }, [showDeleted, fetchLeads]); // Refetch when toggle changes
+  }, [fetchLeads]);
 
   const filteredLeads = leads.filter((lead) => {
     const matchesSearch = Object.values(lead).some((value) =>
@@ -90,7 +90,6 @@ export default function EmployeeLeadsTable() {
         await createLead(leadData);
         toast.success('Lead created successfully');
       }
-      setDialogOpen(false);
       fetchLeads();
     } catch (error) {
       console.error(error);

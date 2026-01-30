@@ -65,17 +65,30 @@ interface Invoice {
   startDate?: string;
   endDate?: string;
   billingCycleInDays?: number;
+
+  // Lease Fields
+  leaseType?: string;
+  leaseTenureMonths?: number;
+  totalLeaseAmount?: number;
+  monthlyEmiAmount?: number;
 }
 
 interface AggregatedInvoice extends Invoice {
   employeeName: string;
   branchName: string;
   customerName: string;
+  customerPhone?: string;
+  customerEmail?: string;
 }
 
 // Module-level cache for persistence across requests
 const employeeCache = new Map<string, { name: string; timestamp: number }>();
 const branchCache = new Map<string, { name: string; timestamp: number }>();
+// Updated cache to store phone as well for customers
+const customerCache = new Map<
+  string,
+  { name: string; phone?: string; email?: string; timestamp: number }
+>();
 const CACHE_TTL = 10 * 60 * 1000; // 5 minutes
 
 // Helper to fetch entity name with cache
@@ -103,39 +116,61 @@ const fetchEntityName = async (
   }
 };
 
-const fetchCustomerName = async (
+const fetchCustomerDetails = async (
   id: string | undefined,
   url: string,
   token: string,
-  defaultName: string = 'Walk-in Customer',
-): Promise<string> => {
-  if (!id) return defaultName;
+): Promise<{ name: string; phone?: string; email?: string }> => {
+  const defaultRes = { name: 'Walk-in Customer', phone: 'N/A', email: '' };
+  if (!id) return defaultRes;
+
+  // Check Local Cache
+  const cached = customerCache.get(id);
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+    return { name: cached.name, phone: cached.phone, email: cached.email };
+  }
 
   // Try Redis first
   try {
-    const cachedName = await redis.get(`customer:${id}`);
-    if (cachedName) return cachedName;
+    const cachedName = await redis.get(`customer:${id}:name`);
+    const cachedPhone = await redis.get(`customer:${id}:phone`);
+    const cachedEmail = await redis.get(`customer:${id}:email`);
+    if (cachedName) {
+      // Refresh local cache if found in Redis
+      customerCache.set(id, {
+        name: cachedName,
+        phone: cachedPhone || undefined,
+        email: cachedEmail || undefined,
+        timestamp: Date.now(),
+      });
+      return { name: cachedName, phone: cachedPhone || undefined, email: cachedEmail || undefined };
+    }
   } catch (err) {
     logger.error('Redis get error', err);
   }
 
   // Fetch from Service
   try {
-    const res = await axios.get<{ data: { name: string } }>(url, {
+    const res = await axios.get<{ data: { name: string; phone?: string; email?: string } }>(url, {
       headers: { Authorization: `Bearer ${token}` },
     });
-    const name = res.data.data.name;
+    const { name, phone, email } = res.data.data;
 
-    // Store in Redis (1 hour TTL to be safe, but updates are pushed via RabbitMQ)
+    // Store in Redis
     try {
-      await redis.set(`customer:${id}`, name, 'EX', 3600);
+      await redis.set(`customer:${id}:name`, name, 'EX', 3600);
+      if (phone) await redis.set(`customer:${id}:phone`, phone, 'EX', 3600);
+      if (email) await redis.set(`customer:${id}:email`, email, 'EX', 3600);
     } catch (err) {
       logger.error('Redis set error', err);
     }
 
-    return name;
+    // Store in Local Cache
+    customerCache.set(id, { name, phone, email, timestamp: Date.now() });
+
+    return { name, phone, email };
   } catch {
-    return defaultName;
+    return defaultRes;
   }
 };
 
@@ -171,7 +206,7 @@ export class InvoiceAggregationService {
       const aggregatedInvoices = await Promise.all(
         invoices.map(async (inv) => {
           try {
-            const [employeeName, branchName, customerName] = await Promise.all([
+            const [employeeName, branchName, customerDetails] = await Promise.all([
               fetchEntityName(
                 inv.createdBy,
                 employeeCache,
@@ -184,7 +219,7 @@ export class InvoiceAggregationService {
                 `${VENDOR_INVENTORY_SERVICE_URL}/branch/${inv.branchId}`,
                 token,
               ),
-              fetchCustomerName(
+              fetchCustomerDetails(
                 inv.customerId,
                 `${CRM_SERVICE_URL}/customers/${inv.customerId}`,
                 token,
@@ -195,7 +230,11 @@ export class InvoiceAggregationService {
               ...inv,
               employeeName,
               branchName,
-              customerName,
+              customerName: customerDetails.name,
+              customerPhone: customerDetails.phone,
+              customerEmail: customerDetails.email,
+              startDate: inv.effectiveFrom || inv.createdAt,
+              endDate: inv.effectiveTo,
             };
           } catch {
             return {
@@ -203,6 +242,8 @@ export class InvoiceAggregationService {
               employeeName: 'Unknown',
               branchName: 'Unknown',
               customerName: 'Unknown',
+              customerPhone: 'N/A',
+              customerEmail: '',
             };
           }
         }),
@@ -245,7 +286,19 @@ export class InvoiceAggregationService {
 
       const aggregated = await Promise.all(
         invoices.map(async (inv) => {
-          const customerName = await fetchCustomerName(
+          // DEBUG: START
+          if (inv.invoiceNumber === 'INV-2026-0002') {
+            console.log('[Aggregation] Raw Invoice from Billing:', JSON.stringify(inv, null, 2));
+            const mapped = {
+              startDate: inv.effectiveFrom || inv.createdAt,
+              endDate: inv.effectiveTo,
+              effectiveFrom: inv.effectiveFrom,
+              createdAt: inv.createdAt,
+            };
+            console.log('[Aggregation] Mapped Dates:', mapped);
+          }
+          // DEBUG: END
+          const customerDetails = await fetchCustomerDetails(
             inv.customerId,
             `${CRM_SERVICE_URL}/customers/${inv.customerId}`,
             token,
@@ -254,7 +307,11 @@ export class InvoiceAggregationService {
             ...inv,
             employeeName: '',
             branchName: '',
-            customerName,
+            customerName: customerDetails.name,
+            customerPhone: customerDetails.phone,
+            customerEmail: customerDetails.email,
+            startDate: inv.effectiveFrom || inv.createdAt,
+            endDate: inv.effectiveTo,
           };
         }),
       );
@@ -288,7 +345,7 @@ export class InvoiceAggregationService {
       );
       const invoice = invoiceResponse.data.data;
 
-      const [employeeName, branchName, customerName] = await Promise.all([
+      const [employeeName, branchName, customerDetails] = await Promise.all([
         fetchEntityName(
           invoice.createdBy,
           employeeCache,
@@ -301,7 +358,7 @@ export class InvoiceAggregationService {
           `${VENDOR_INVENTORY_SERVICE_URL}/branch/${invoice.branchId}`,
           token,
         ),
-        fetchCustomerName(
+        fetchCustomerDetails(
           invoice.customerId,
           `${CRM_SERVICE_URL}/customers/${invoice.customerId}`,
           token,
@@ -312,7 +369,11 @@ export class InvoiceAggregationService {
         ...invoice,
         employeeName,
         branchName,
-        customerName,
+        customerName: customerDetails.name,
+        customerPhone: customerDetails.phone,
+        customerEmail: customerDetails.email,
+        startDate: invoice.effectiveFrom,
+        endDate: invoice.effectiveTo,
       };
     } catch (error: unknown) {
       const err = error as { message?: string; response?: { status?: number } };
@@ -363,7 +424,7 @@ export class InvoiceAggregationService {
       );
       const invoice = billingResponse.data.data;
 
-      const [employeeName, branchName, customerName] = await Promise.all([
+      const [employeeName, branchName, customerDetails] = await Promise.all([
         fetchEntityName(
           invoice.createdBy,
           employeeCache,
@@ -376,7 +437,7 @@ export class InvoiceAggregationService {
           `${VENDOR_INVENTORY_SERVICE_URL}/branch/${invoice.branchId}`,
           token,
         ),
-        fetchCustomerName(
+        fetchCustomerDetails(
           invoice.customerId,
           `${CRM_SERVICE_URL}/customers/${invoice.customerId}`,
           token,
@@ -387,7 +448,11 @@ export class InvoiceAggregationService {
         ...invoice,
         employeeName,
         branchName,
-        customerName,
+        customerName: customerDetails.name,
+        customerPhone: customerDetails.phone,
+        customerEmail: customerDetails.email,
+        startDate: invoice.effectiveFrom,
+        endDate: invoice.effectiveTo,
       };
     } catch (error: unknown) {
       if (axios.isAxiosError(error)) {
@@ -429,7 +494,7 @@ export class InvoiceAggregationService {
       );
       const invoice = response.data.data;
 
-      const [employeeName, branchName, customerName] = await Promise.all([
+      const [employeeName, branchName, customerDetails] = await Promise.all([
         fetchEntityName(
           invoice.createdBy,
           employeeCache,
@@ -442,7 +507,7 @@ export class InvoiceAggregationService {
           `${VENDOR_INVENTORY_SERVICE_URL}/branch/${invoice.branchId}`,
           token,
         ),
-        fetchCustomerName(
+        fetchCustomerDetails(
           invoice.customerId,
           `${CRM_SERVICE_URL}/customers/${invoice.customerId}`,
           token,
@@ -453,7 +518,11 @@ export class InvoiceAggregationService {
         ...invoice,
         employeeName,
         branchName,
-        customerName,
+        customerName: customerDetails.name,
+        customerPhone: customerDetails.phone,
+        customerEmail: customerDetails.email,
+        startDate: invoice.effectiveFrom,
+        endDate: invoice.effectiveTo,
       };
     } catch (error: unknown) {
       if (axios.isAxiosError(error)) {
@@ -555,7 +624,7 @@ export class InvoiceAggregationService {
       const invoice = response.data.data;
 
       // Aggregate details
-      const [employeeName, branchName, customerName] = await Promise.all([
+      const [employeeName, branchName, customerDetails] = await Promise.all([
         fetchEntityName(
           invoice.createdBy,
           employeeCache,
@@ -568,7 +637,7 @@ export class InvoiceAggregationService {
           `${VENDOR_INVENTORY_SERVICE_URL}/branch/${invoice.branchId}`,
           token,
         ),
-        fetchCustomerName(
+        fetchCustomerDetails(
           invoice.customerId,
           `${CRM_SERVICE_URL}/customers/${invoice.customerId}`,
           token,
@@ -579,7 +648,11 @@ export class InvoiceAggregationService {
         ...invoice,
         employeeName,
         branchName,
-        customerName,
+        customerName: customerDetails.name,
+        customerPhone: customerDetails.phone,
+        customerEmail: customerDetails.email,
+        startDate: invoice.effectiveFrom,
+        endDate: invoice.effectiveTo,
       };
     } catch (error: unknown) {
       if (axios.isAxiosError(error)) {

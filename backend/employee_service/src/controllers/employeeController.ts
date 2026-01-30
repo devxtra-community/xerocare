@@ -71,8 +71,17 @@ export const getAllEmployees = async (req: Request, res: Response, next: NextFun
     const limit = Number(req.query.limit) || 20;
     const role = req.query.role as EmployeeRole | undefined;
 
-    const result = await service.getAllEmployees(page, limit, role);
-    logger.debug('Fetched employees', { count: result.employees.length, page, limit, role });
+    // Branch filtering: Admin sees all employees, others see only their branch
+    const branchId = req.user?.role === EmployeeRole.ADMIN ? undefined : req.user?.branchId;
+
+    const result = await service.getAllEmployees(page, limit, role, branchId);
+    logger.debug('Fetched employees', {
+      count: result.employees.length,
+      page,
+      limit,
+      role,
+      branchId,
+    });
     return res.json({
       success: true,
       data: result,
@@ -165,7 +174,10 @@ export const deleteEmployee = async (req: Request, res: Response, next: NextFunc
 
 export const getHRStats = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const stats = await service.getHRStats();
+    // Branch filtering: Admin sees all stats, others see only their branch
+    const branchId = req.user?.role === EmployeeRole.ADMIN ? undefined : req.user?.branchId;
+
+    const stats = await service.getHRStats(branchId);
     return res.json({
       success: true,
       data: stats,
