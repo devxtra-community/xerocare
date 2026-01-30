@@ -27,8 +27,14 @@ export class InvoiceRepository {
     });
   }
 
-  findAll() {
+  findAll(branchId?: string) {
+    const whereCondition: Record<string, string> = {};
+    if (branchId) {
+      whereCondition.branchId = branchId;
+    }
+
     return this.repo.find({
+      where: whereCondition,
       order: {
         createdAt: 'DESC',
       },

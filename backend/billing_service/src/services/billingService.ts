@@ -423,8 +423,8 @@ export class BillingService {
     return this.invoiceRepo.save(invoice);
   }
 
-  async getAllInvoices() {
-    return this.invoiceRepo.findAll();
+  async getAllInvoices(branchId?: string) {
+    return this.invoiceRepo.findAll(branchId);
   }
 
   async getInvoicesByCreator(creatorId: string) {

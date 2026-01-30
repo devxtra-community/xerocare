@@ -155,10 +155,10 @@ export class EmployeeService {
     };
   }
 
-  async getAllEmployees(page = 1, limit = 20, role?: EmployeeRole) {
+  async getAllEmployees(page = 1, limit = 20, role?: EmployeeRole, branchId?: string) {
     const skip = (page - 1) * limit;
 
-    const { data, total } = await this.employeeRepo.findAll(skip, limit, role);
+    const { data, total } = await this.employeeRepo.findAll(skip, limit, role, branchId);
 
     return {
       employees: data,
@@ -284,17 +284,28 @@ export class EmployeeService {
     return !!updated;
   }
 
-  async getHRStats() {
-    const total = await this.employeeRepo.count();
-    const active = await this.employeeRepo.countByStatus(EmployeeStatus.ACTIVE);
-    const inactive = await this.employeeRepo.countByStatus(EmployeeStatus.INACTIVE);
+  async getHRStats(branchId?: string) {
+    // If branchId is provided, get stats for that branch only
+    const total = branchId
+      ? await this.employeeRepo.countByBranch(branchId)
+      : await this.employeeRepo.count();
+
+    const active = branchId
+      ? await this.employeeRepo.countByStatusAndBranch(EmployeeStatus.ACTIVE, branchId)
+      : await this.employeeRepo.countByStatus(EmployeeStatus.ACTIVE);
+
+    const inactive = branchId
+      ? await this.employeeRepo.countByStatusAndBranch(EmployeeStatus.INACTIVE, branchId)
+      : await this.employeeRepo.countByStatus(EmployeeStatus.INACTIVE);
 
     // Get counts by role
     const roles = Object.values(EmployeeRole);
     const byRole: Record<string, number> = {};
 
     for (const role of roles) {
-      byRole[role] = await this.employeeRepo.countByRole(role as EmployeeRole);
+      byRole[role] = branchId
+        ? await this.employeeRepo.countByRoleAndBranch(role as EmployeeRole, branchId)
+        : await this.employeeRepo.countByRole(role as EmployeeRole);
     }
 
     return {
