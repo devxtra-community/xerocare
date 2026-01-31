@@ -1,12 +1,39 @@
-import React from 'react';
+'use client';
+
+import React, { useEffect, useState } from 'react';
 import StatCard from '@/components/StatCard';
+import { getInvoiceStats } from '@/lib/invoice';
 
 export default function EmployeeStatsCards() {
+  const [stats, setStats] = useState({
+    SALE: 0,
+    RENT: 0,
+    LEASE: 0,
+  });
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const data = await getInvoiceStats();
+        setStats({
+          SALE: data.SALE || 0,
+          RENT: data.RENT || 0,
+          LEASE: data.LEASE || 0,
+        });
+      } catch (error) {
+        console.error('Failed to fetch invoice stats', error);
+      }
+    };
+    fetchStats();
+  }, []);
+
+  const totalOrders = stats.SALE + stats.RENT + stats.LEASE;
+
   const cards = [
-    { title: 'Customers', value: '1,234', subtitle: '+12% from last month' },
-    { title: 'Leads', value: '567', subtitle: '+5% from last month' },
-    { title: 'Sales Closed', value: '89', subtitle: '+8% from last month' },
-    { title: 'Total Orders', value: '432', subtitle: '+2% from last month' },
+    { title: 'Total Orders', value: totalOrders.toString(), subtitle: 'All time' },
+    { title: 'Sales', value: stats.SALE.toString(), subtitle: 'Total sales' },
+    { title: 'Rent', value: stats.RENT.toString(), subtitle: 'Active rent orders' },
+    { title: 'Lease', value: stats.LEASE.toString(), subtitle: 'Active lease orders' },
   ];
 
   return (

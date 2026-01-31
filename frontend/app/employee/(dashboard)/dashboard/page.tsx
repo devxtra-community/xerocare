@@ -1,6 +1,5 @@
 import EmployeeStatsCards from '@/components/employeeComponents/EmployeeStatsCards';
-import EmployeeSalesGraph from '@/components/employeeComponents/EmployeeSalesGraph';
-import EmployeeLeadsGraph from '@/components/employeeComponents/EmployeeLeadsGraph';
+import EmployeeDashboardGraphs from '@/components/employeeComponents/EmployeeDashboardGraphs';
 import EmployeeOrdersTable from '@/components/employeeComponents/EmployeeOrdersTable';
 
 export default function EmployeeDashboardPage() {
@@ -10,15 +9,9 @@ export default function EmployeeDashboardPage() {
         <h3 className="text-xl sm:text-2xl font-bold text-primary">Employee Report</h3>
         <EmployeeStatsCards />
 
-        <div className="flex flex-col lg:flex-row gap-6 w-full">
-          <div className="w-full lg:w-1/2 space-y-2">
-            <h3 className="text-lg sm:text-xl font-bold text-primary">Sales vs Rent vs Lease</h3>
-            <EmployeeSalesGraph />
-          </div>
-          <div className="w-full lg:w-1/2 space-y-2">
-            <h3 className="text-lg sm:text-xl font-bold text-primary">Leads Source</h3>
-            <EmployeeLeadsGraph />
-          </div>
+        <div className="space-y-3">
+          <h3 className="text-lg sm:text-xl font-bold text-primary">Performance Analytics</h3>
+          <EmployeeDashboardGraphs />
         </div>
 
         <div className="space-y-3">

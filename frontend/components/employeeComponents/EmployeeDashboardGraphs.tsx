@@ -9,31 +9,43 @@ import {
   Tooltip,
   ResponsiveContainer,
   CartesianGrid,
-  LineChart,
-  Line,
   TooltipProps,
 } from 'recharts';
 import { NameType, ValueType } from 'recharts/types/component/DefaultTooltipContent';
 import { getCustomers } from '@/lib/customer';
+import { getMyInvoices } from '@/lib/invoice';
 import { Loader2 } from 'lucide-react';
 
 interface ChartDataItem {
   name: string;
-  customers: number;
+  value: number;
 }
 
-const CustomTooltip = ({ active, payload, label }: TooltipProps<ValueType, NameType>) => {
+const CustomTooltip = ({
+  active,
+  payload,
+  label,
+  type,
+}: TooltipProps<ValueType, NameType> & { type: 'customers' | 'sales' }) => {
   if (active && payload && payload.length) {
+    const value = payload[0].value;
     return (
       <div className="bg-white p-3 rounded-xl shadow-lg border border-blue-100">
         <p className="font-bold text-[#2563eb] text-[10px] mb-2 uppercase tracking-widest border-b border-blue-50 pb-1">
           {label}
         </p>
-        {payload.map((entry, index) => (
-          <p key={index} className="text-[11px] font-bold text-gray-500 uppercase tracking-tighter">
-            {entry.name}: <span className="text-[#2563eb] ml-1">{entry.value}</span>
-          </p>
-        ))}
+        <p className="text-[11px] font-bold text-gray-400 uppercase tracking-tighter">
+          {type === 'customers' ? (
+            <>
+              Customers: <span className="text-[#2563eb] ml-1">{value}</span>
+            </>
+          ) : (
+            <>
+              Revenue:{' '}
+              <span className="text-[#2563eb] ml-1">₹{Number(value).toLocaleString()}</span>
+            </>
+          )}
+        </p>
       </div>
     );
   }
@@ -42,20 +54,23 @@ const CustomTooltip = ({ active, payload, label }: TooltipProps<ValueType, NameT
 
 const ChartCard = ({ title, children }: { title: string; children: React.ReactNode }) => (
   <div className="bg-white p-5 rounded-2xl shadow-sm border border-blue-100/50 flex flex-col h-[300px] w-full">
-    <h4 className="text-[10px] font-bold text-primary uppercase tracking-[0.2em] mb-6">{title}</h4>
+    <h4 className="text-[10px] font-bold text-primary uppercase tracking-[0.2em] mb-8">{title}</h4>
     <div className="flex-1 w-full min-h-0">{children}</div>
   </div>
 );
 
-export default function EmployeeCustomerGraphs() {
+export default function EmployeeDashboardGraphs() {
   const [loading, setLoading] = useState(true);
-  const [monthlyData, setMonthlyData] = useState<ChartDataItem[]>([]);
-  const [dailyData, setDailyData] = useState<ChartDataItem[]>([]);
+  const [customerData, setCustomerData] = useState<ChartDataItem[]>([]);
+  const [salesData, setSalesData] = useState<ChartDataItem[]>([]);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const customers = await getCustomers();
+        // Fetch customers and invoices in parallel
+        const [customers, invoices] = await Promise.all([getCustomers(), getMyInvoices()]);
+
+        const salesInvoices = invoices.filter((inv) => inv.saleType === 'SALE');
 
         // Initialize Monthly Data
         const months = [
@@ -72,42 +87,34 @@ export default function EmployeeCustomerGraphs() {
           'Nov',
           'Dec',
         ];
-        const mData = months.map((name) => ({
+
+        const custData = months.map((name) => ({
           name,
-          customers: 0,
+          value: 0,
         }));
 
-        // Initialize Daily Data (Current Month)
-        const now = new Date();
-        const currentMonth = now.getMonth();
-        const currentYear = now.getFullYear();
-        const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
-
-        const dData = Array.from({ length: daysInMonth }, (_, i) => ({
-          name: (i + 1).toString(),
-          customers: 0,
+        const saleData = months.map((name) => ({
+          name,
+          value: 0,
         }));
 
+        // Populate Customer Data
         customers.forEach((customer) => {
-          const d = new Date(customer.createdAt);
-
-          // Populate Monthly Data
-          const monthIndex = d.getMonth();
-          mData[monthIndex].customers++;
-
-          // Populate Daily Data (only for current month/year)
-          if (d.getMonth() === currentMonth && d.getFullYear() === currentYear) {
-            const dayIndex = d.getDate() - 1;
-            if (dData[dayIndex]) {
-              dData[dayIndex].customers++;
-            }
-          }
+          const monthIndex = new Date(customer.createdAt).getMonth();
+          custData[monthIndex].value++;
         });
 
-        setMonthlyData(mData);
-        setDailyData(dData);
+        // Populate Sales Data
+        salesInvoices.forEach((inv) => {
+          const monthIndex = new Date(inv.createdAt).getMonth();
+          const amount = parseFloat(String(inv.totalAmount)) || 0;
+          saleData[monthIndex].value += amount;
+        });
+
+        setCustomerData(custData);
+        setSalesData(saleData);
       } catch (error) {
-        console.error('Failed to fetch customer graph data:', error);
+        console.error('Failed to fetch dashboard graph data:', error);
       } finally {
         setLoading(false);
       }
@@ -133,10 +140,10 @@ export default function EmployeeCustomerGraphs() {
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-      {/* 1. Customers Per Month (Bar) */}
+      {/* Customers Per Month */}
       <ChartCard title="Customers Per Month">
         <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={monthlyData} margin={{ top: 5, right: 5, left: -20, bottom: 5 }}>
+          <BarChart data={customerData} margin={{ top: 5, right: 5, left: -30, bottom: 5 }}>
             <CartesianGrid
               strokeDasharray="3 3"
               vertical={false}
@@ -156,18 +163,19 @@ export default function EmployeeCustomerGraphs() {
               tickLine={false}
               tick={{ fill: '#94a3b8', fontSize: 9, fontWeight: 700 }}
             />
-            <Tooltip content={<CustomTooltip />} cursor={{ fill: '#f1f5f9', opacity: 0.4 }} />
-            <Bar dataKey="customers" fill="#2563eb" radius={[4, 4, 0, 0]} barSize={10} />
+            <Tooltip
+              content={<CustomTooltip type="customers" />}
+              cursor={{ fill: '#f1f5f9', opacity: 0.4 }}
+            />
+            <Bar dataKey="value" fill="#3b82f6" radius={[4, 4, 0, 0]} barSize={10} />
           </BarChart>
         </ResponsiveContainer>
       </ChartCard>
 
-      {/* 2. Customers Per Day (Line) */}
-      <ChartCard
-        title={`Customers Per Day (${new Date().toLocaleString('default', { month: 'short' })})`}
-      >
+      {/* Sales Per Month */}
+      <ChartCard title="Sales Per Month">
         <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={dailyData} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
+          <BarChart data={salesData} margin={{ top: 5, right: 5, left: -30, bottom: 5 }}>
             <CartesianGrid
               strokeDasharray="3 3"
               vertical={false}
@@ -178,29 +186,22 @@ export default function EmployeeCustomerGraphs() {
               dataKey="name"
               axisLine={false}
               tickLine={false}
-              tick={{ fill: '#64748b', fontSize: 9, fontWeight: 700 }}
+              tick={{ fill: '#94a3b8', fontSize: 9, fontWeight: 700 }}
               dy={10}
-              interval={2}
+              interval={0}
             />
             <YAxis
               axisLine={false}
               tickLine={false}
-              tick={{ fill: '#64748b', fontSize: 9, fontWeight: 700 }}
-              domain={['auto', 'auto']}
+              tick={{ fill: '#94a3b8', fontSize: 9, fontWeight: 700 }}
+              tickFormatter={(val) => `₹${val >= 1000 ? (val / 1000).toFixed(0) + 'k' : val}`}
             />
             <Tooltip
-              content={<CustomTooltip />}
-              cursor={{ stroke: '#2563eb', strokeWidth: 1, strokeDasharray: '4 4' }}
+              content={<CustomTooltip type="sales" />}
+              cursor={{ fill: '#f1f5f9', opacity: 0.4 }}
             />
-            <Line
-              type="monotone"
-              dataKey="customers"
-              stroke="#2563eb"
-              strokeWidth={2}
-              dot={{ r: 3, fill: '#2563eb', strokeWidth: 2, stroke: '#fff' }}
-              activeDot={{ r: 6, fill: '#2563eb', stroke: '#fff', strokeWidth: 2 }}
-            />
-          </LineChart>
+            <Bar dataKey="value" fill="#2563eb" radius={[4, 4, 0, 0]} barSize={10} />
+          </BarChart>
         </ResponsiveContainer>
       </ChartCard>
     </div>

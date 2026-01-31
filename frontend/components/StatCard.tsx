@@ -1,3 +1,5 @@
+'use client';
+
 import * as React from 'react';
 import { Card, CardContent, CardTitle, CardDescription } from '@/components/ui/card';
 

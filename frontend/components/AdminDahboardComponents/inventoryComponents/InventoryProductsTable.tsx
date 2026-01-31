@@ -99,14 +99,14 @@ export default function InventoryProductsTable() {
             {currentData.length > 0 ? (
               currentData.map((item, index) => (
                 <TableRow
-                  key={item.id}
+                  key={item.id || `inventory-${index}`}
                   className={`hover:bg-gray-50/30 transition-colors ${index % 2 ? 'bg-sky-100/60' : ''}`}
                 >
                   <TableCell className="px-6 py-4 font-medium text-gray-900">
-                    {item.product.name}
+                    {item.product?.name || '-'}
                   </TableCell>
                   <TableCell className="px-6 py-4 text-gray-600">
-                    {item.product.model?.model_name || '-'}
+                    {item.product?.model?.model_name || '-'}
                   </TableCell>
                   <TableCell className="px-6 py-4 text-center font-bold text-gray-900">
                     {item.quantity}
@@ -119,7 +119,7 @@ export default function InventoryProductsTable() {
                     </span>
                   </TableCell>
                   <TableCell className="px-6 py-4 text-gray-600">
-                    {item.product.vendor_id}
+                    {item.product?.vendor_id || '-'}
                   </TableCell>
                   <TableCell className="px-6 py-4 text-gray-600">
                     <div className="flex items-center gap-2">

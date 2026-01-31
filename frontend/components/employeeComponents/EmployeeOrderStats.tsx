@@ -2,31 +2,34 @@
 
 import React, { useEffect, useState } from 'react';
 import StatCard from '@/components/StatCard';
-import { getInvoiceStats } from '@/lib/invoice'; // Use the stats endpoint
+import { getMyInvoices } from '@/lib/invoice';
 import { Loader2 } from 'lucide-react';
 
 export default function EmployeeOrderStats() {
   const [stats, setStats] = useState({
     total: 0,
-    sale: 0,
-    rent: 0,
-    lease: 0,
+    month: 0,
+    today: 0,
   });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const data = await getInvoiceStats();
-        // data matches { SALE: number, RENT: number, LEASE: number }
+        const invoices = await getMyInvoices();
 
-        const total = (data.SALE || 0) + (data.RENT || 0) + (data.LEASE || 0);
+        const now = new Date();
+        const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+        const total = invoices.length;
+        const month = invoices.filter((inv) => new Date(inv.createdAt) >= startOfMonth).length;
+        const today = invoices.filter((inv) => new Date(inv.createdAt) >= startOfDay).length;
 
         setStats({
           total,
-          sale: data.SALE || 0,
-          rent: data.RENT || 0,
-          lease: data.LEASE || 0,
+          month,
+          today,
         });
       } catch (error) {
         console.error('Failed to fetch order stats:', error);
@@ -44,26 +47,21 @@ export default function EmployeeOrderStats() {
       subtitle: 'All time orders',
     },
     {
-      title: 'Sales',
-      value: loading ? '...' : stats.sale.toLocaleString(),
-      subtitle: 'Direct sales',
+      title: 'Orders This Month',
+      value: loading ? '...' : stats.month.toLocaleString(),
+      subtitle: 'Current month',
     },
     {
-      title: 'Rent',
-      value: loading ? '...' : stats.rent.toLocaleString(),
-      subtitle: 'Rental agreements',
-    },
-    {
-      title: 'Lease',
-      value: loading ? '...' : stats.lease.toLocaleString(),
-      subtitle: 'Lease contracts',
+      title: 'Today Orders',
+      value: loading ? '...' : stats.today.toLocaleString(),
+      subtitle: "Today's orders",
     },
   ];
 
   if (loading) {
     return (
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 md:gap-4">
-        {[1, 2, 3, 4].map((i) => (
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3 md:gap-4">
+        {[1, 2, 3].map((i) => (
           <div
             key={i}
             className="bg-white p-4 rounded-xl shadow-sm h-32 flex items-center justify-center"
@@ -76,7 +74,7 @@ export default function EmployeeOrderStats() {
   }
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 md:gap-4">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3 md:gap-4">
       {cards.map((c) => (
         <StatCard key={c.title} title={c.title} value={c.value} subtitle={c.subtitle} />
       ))}
