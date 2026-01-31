@@ -1,6 +1,7 @@
 'use client';
 
 import EmployeeOrderStats from '@/components/employeeComponents/EmployeeOrderStats';
+import EmployeeOrdersGraphs from '@/components/employeeComponents/EmployeeOrdersGraphs';
 import EmployeeOrdersTable from '@/components/employeeComponents/EmployeeOrdersTable';
 
 export default function EmployeeOrdersPage() {
@@ -9,6 +10,7 @@ export default function EmployeeOrdersPage() {
       <div className="flex flex-col space-y-4 sm:space-y-6">
         <h3 className="text-xl sm:text-2xl font-bold text-primary">Orders Management</h3>
         <EmployeeOrderStats />
+        <EmployeeOrdersGraphs />
 
         <div className="space-y-3">
           <h3 className="text-lg sm:text-xl font-bold text-primary">All Orders</h3>

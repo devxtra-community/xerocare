@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import EmployeeLeaseStats from '@/components/employeeComponents/EmployeeLeaseStats';
+import EmployeeLeaseGraphs from '@/components/employeeComponents/EmployeeLeaseGraphs';
 import EmployeeLeaseTable from '@/components/employeeComponents/EmployeeLeaseTable';
 import { getMyInvoices, Invoice } from '@/lib/invoice';
 import ProtectedRoute from '@/components/ProtectedRoute';
@@ -27,6 +28,7 @@ export default function EmployeeLeasePage() {
         <div className="flex flex-col space-y-4 sm:space-y-6">
           <h3 className="text-xl sm:text-2xl font-bold text-primary">Lease Management</h3>
           <EmployeeLeaseStats invoices={invoices} />
+          <EmployeeLeaseGraphs />
 
           <div className="space-y-3">
             <h3 className="text-lg sm:text-xl font-bold text-primary">All Leases</h3>

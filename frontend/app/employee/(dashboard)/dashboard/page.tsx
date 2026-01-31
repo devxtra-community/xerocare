@@ -9,10 +9,7 @@ export default function EmployeeDashboardPage() {
         <h3 className="text-xl sm:text-2xl font-bold text-primary">Employee Report</h3>
         <EmployeeStatsCards />
 
-        <div className="space-y-3">
-          <h3 className="text-lg sm:text-xl font-bold text-primary">Performance Analytics</h3>
-          <EmployeeDashboardGraphs />
-        </div>
+        <EmployeeDashboardGraphs />
 
         <div className="space-y-3">
           <h3 className="text-lg sm:text-xl font-bold text-primary">Recent Orders</h3>

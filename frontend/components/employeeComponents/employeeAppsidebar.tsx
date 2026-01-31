@@ -58,7 +58,7 @@ const menuItems = [
     title: 'Sales',
     icon: TrendingUp,
     href: '/employee/sales',
-    modules: ['sales', 'billing'],
+    modules: ['sales'], // Only for SALES employees
   },
   {
     title: 'Rent',
