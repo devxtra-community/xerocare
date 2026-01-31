@@ -496,15 +496,38 @@ export class BillingService {
   }
 
   async getInvoiceStats(filter: { createdBy?: string; branchId?: string } = {}) {
-    const stats = await this.invoiceRepo.getStats(filter);
+    const now = new Date();
+    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+    const stats = await this.invoiceRepo.getStats({ ...filter, startOfDay, startOfMonth });
+
     const result: Record<string, number> = {
       SALE: 0,
       RENT: 0,
       LEASE: 0,
+      SALE_TODAY: 0,
+      SALE_THIS_MONTH: 0,
     };
+
     stats.forEach((s) => {
+      // Base Counts
       result[s.saleType] = s.count;
+
+      // Time-based Aggregation (Specifically for SALE type as per requirement, or ALL?)
+      // User asked for "Sale This Month" and "Today Count".
+      // "Today Count" likely implies ALL orders today.
+      // "Sale This Month" implies ALL orders (or Sales?) this month.
+      // Let's aggregate ALL types for Today and Month to be safe, or just SALE?
+      // Prompt: "add sale this month count today count".
+      // Assuming "Today Count" = All Orders Today.
+      // "Sale This Month" = All Orders This Month (or just Sales?).
+      // Let's sum up everything for now.
+
+      result.SALE_TODAY += s.todayCount;
+      result.SALE_THIS_MONTH += s.monthCount;
     });
+
     return result;
   }
 

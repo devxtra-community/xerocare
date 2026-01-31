@@ -678,11 +678,15 @@ export class InvoiceAggregationService {
     const url = `${BILLING_SERVICE_URL}/invoices/stats`;
     const params: { createdBy?: string; branchId?: string } = {};
 
-    if (user.role === 'EMPLOYEE') {
+    const role = user.role ? user.role.toUpperCase() : '';
+    if (role === 'EMPLOYEE') {
       params.createdBy = user.userId;
     } else if (branchId) {
       params.branchId = branchId;
     }
+
+    console.log('[API Gateway] getInvoiceStats - User:', user);
+    console.log('[API Gateway] getInvoiceStats - Params:', params);
 
     const response = await axios.get(url, {
       headers: { Authorization: `Bearer ${token}` },

@@ -78,12 +78,33 @@ export class InvoiceRepository {
   }
 
   async getStats(
-    filter: { createdBy?: string; branchId?: string } = {},
-  ): Promise<{ saleType: string; count: number }[]> {
+    filter: {
+      createdBy?: string;
+      branchId?: string;
+      startOfDay?: Date;
+      startOfMonth?: Date;
+    } = {},
+  ): Promise<{ saleType: string; count: number; todayCount: number; monthCount: number }[]> {
     const query = this.repo
       .createQueryBuilder('invoice')
       .select('invoice.saleType', 'saleType')
       .addSelect('COUNT(*)', 'count');
+
+    // Conditional Aggregation for Time-based stats
+    if (filter.startOfDay) {
+      query.addSelect(
+        'SUM(CASE WHEN invoice.createdAt >= :startOfDay THEN 1 ELSE 0 END)',
+        'todayCount',
+      );
+      query.setParameter('startOfDay', filter.startOfDay);
+    }
+    if (filter.startOfMonth) {
+      query.addSelect(
+        'SUM(CASE WHEN invoice.createdAt >= :startOfMonth THEN 1 ELSE 0 END)',
+        'monthCount',
+      );
+      query.setParameter('startOfMonth', filter.startOfMonth);
+    }
 
     if (filter.createdBy) {
       query.andWhere('invoice.createdBy = :createdBy', { createdBy: filter.createdBy });
@@ -93,9 +114,13 @@ export class InvoiceRepository {
     }
 
     const results = await query.groupBy('invoice.saleType').getRawMany();
+    // console.log('Invoice Stats Raw Results:', results);
+
     return results.map((r) => ({
-      saleType: r.saleType,
+      saleType: r.saleType || r.saletype,
       count: parseInt(r.count, 10),
+      todayCount: filter.startOfDay ? parseInt(r.todayCount || r.todaycount || '0', 10) : 0,
+      monthCount: filter.startOfMonth ? parseInt(r.monthCount || r.monthcount || '0', 10) : 0,
     }));
   }
 

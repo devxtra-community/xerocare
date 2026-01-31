@@ -252,6 +252,9 @@ export const getStats = async (req: Request, res: Response, next: NextFunction) 
     const branchId =
       req.user?.role === 'ADMIN' ? (req.query.branchId as string) : req.user?.branchId;
 
+    console.log('[Billing Service] getStats - Incoming Query:', req.query);
+    console.log('[Billing Service] getStats - Filter:', { createdBy, branchId });
+
     const stats = await billingService.getInvoiceStats({ createdBy, branchId });
     return res.status(200).json({
       success: true,
