@@ -9,34 +9,64 @@ import {
   ResponsiveContainer,
   Tooltip,
 } from 'recharts';
+import { getInvoices, Invoice } from '@/lib/invoice';
 
-const data = [
-  { month: 'Jan', sales: 30000 },
-  { month: 'Feb', sales: 45000 },
-  { month: 'Mar', sales: 70000 },
-  { month: 'Apr', sales: 55000 },
-  { month: 'May', sales: 25000 },
-  { month: 'Jun', sales: 50000 },
-  { month: 'Jul', sales: 60000 },
-  { month: 'Aug', sales: 40000 },
-  { month: 'Sep', sales: 65000 },
-  { month: 'Oct', sales: 80000 },
-  { month: 'Nov', sales: 55000 },
-  { month: 'Dec', sales: 90000 },
-];
+// Removed unused static data
 
 export default function SalesChart() {
   const [selectedPeriod, setSelectedPeriod] = useState('1M');
   const [isClient, setIsClient] = useState(false);
+  const [data, setData] = useState<{ month: string; sales: number; fullMonth: string }[]>([]);
 
   useEffect(() => {
     setIsClient(true);
   }, []);
 
+  useEffect(() => {
+    const fetchSalesData = async () => {
+      try {
+        const invoices = await getInvoices();
+
+        // Initialize all months with 0
+        const monthlyData = [
+          { month: 'Jan', sales: 0, fullMonth: 'January' },
+          { month: 'Feb', sales: 0, fullMonth: 'February' },
+          { month: 'Mar', sales: 0, fullMonth: 'March' },
+          { month: 'Apr', sales: 0, fullMonth: 'April' },
+          { month: 'May', sales: 0, fullMonth: 'May' },
+          { month: 'Jun', sales: 0, fullMonth: 'June' },
+          { month: 'Jul', sales: 0, fullMonth: 'July' },
+          { month: 'Aug', sales: 0, fullMonth: 'August' },
+          { month: 'Sep', sales: 0, fullMonth: 'September' },
+          { month: 'Oct', sales: 0, fullMonth: 'October' },
+          { month: 'Nov', sales: 0, fullMonth: 'November' },
+          { month: 'Dec', sales: 0, fullMonth: 'December' },
+        ];
+
+        // Filter for sales invoices from the current year
+        const currentYear = new Date().getFullYear();
+        invoices.forEach((inv: Invoice) => {
+          if (inv.saleType === 'SALE') {
+            const date = new Date(inv.createdAt);
+            if (date.getFullYear() === currentYear) {
+              const monthIndex = date.getMonth(); // 0-11
+              monthlyData[monthIndex].sales += Number(inv.totalAmount) || 0;
+            }
+          }
+        });
+
+        setData(monthlyData);
+      } catch (error) {
+        console.error('Failed to fetch sales chart data', error);
+      }
+    };
+    fetchSalesData();
+  }, []);
+
   return (
     <div className="rounded-2xl bg-white h-[260px] w-full shadow-sm flex flex-col p-3">
       <div className="flex flex-row items-center justify-between pb-2">
-        <p className="text-xs text-gray-600">Monthly</p>
+        <p className="text-xs text-gray-600">Monthly Sales ({new Date().getFullYear()})</p>
 
         <div className="flex gap-1.5 text-[10px]">
           {['1W', '1M', '3M', '1Y'].map((period) => (
@@ -81,12 +111,15 @@ export default function SalesChart() {
                 tickLine={false}
                 tickFormatter={(v) => `${v / 1000}k`}
                 tickMargin={6}
-                domain={[0, 100000]}
-                ticks={[0, 20000, 40000, 60000, 80000, 100000]}
+                // allowDecimals={false}
                 tick={{ fill: '#6b7280', fontSize: 10 }}
               />
 
-              <Tooltip contentStyle={{ fontSize: 12 }} labelStyle={{ color: '#1e3a8a' }} />
+              <Tooltip
+                contentStyle={{ fontSize: 12 }}
+                labelStyle={{ color: '#1e3a8a' }}
+                formatter={(value: number) => [`${value.toFixed(2)} AZN`, 'Sales']}
+              />
 
               <Area
                 type="monotone"
