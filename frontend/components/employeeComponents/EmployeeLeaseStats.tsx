@@ -1,14 +1,36 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import StatCard from '@/components/StatCard';
-import { Invoice } from '@/lib/invoice';
+import { Invoice, getMyInvoices } from '@/lib/invoice';
 
 interface EmployeeLeaseStatsProps {
-  invoices: Invoice[];
+  invoices?: Invoice[];
 }
 
-export default function EmployeeLeaseStats({ invoices }: EmployeeLeaseStatsProps) {
+export default function EmployeeLeaseStats({ invoices: propInvoices }: EmployeeLeaseStatsProps) {
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchInvoices = async () => {
+      if (propInvoices) {
+        setInvoices(propInvoices);
+        setLoading(false);
+        return;
+      }
+      try {
+        const data = await getMyInvoices();
+        setInvoices(data);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchInvoices();
+  }, [propInvoices]);
+
   const leaseInvoices = invoices.filter((inv) => inv.saleType === 'LEASE');
 
   const now = new Date();
@@ -24,17 +46,17 @@ export default function EmployeeLeaseStats({ invoices }: EmployeeLeaseStatsProps
   const cards = [
     {
       title: 'Total Lease',
-      value: leaseInvoices.length.toString(),
+      value: loading ? '...' : leaseInvoices.length.toString(),
       subtitle: 'All time leases',
     },
     {
       title: 'Lease Per Month',
-      value: monthlyLease.length.toString(),
+      value: loading ? '...' : monthlyLease.length.toString(),
       subtitle: 'Current month',
     },
     {
       title: 'Total Revenue from Lease',
-      value: `₹${totalRevenue.toLocaleString()}`,
+      value: loading ? '...' : `₹${totalRevenue.toLocaleString()}`,
       subtitle: 'Collected revenue',
     },
   ];

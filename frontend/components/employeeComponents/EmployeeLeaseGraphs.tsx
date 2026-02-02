@@ -14,7 +14,7 @@ import {
   Area,
 } from 'recharts';
 import { NameType, ValueType } from 'recharts/types/component/DefaultTooltipContent';
-import { getMyInvoices } from '@/lib/invoice';
+import { getMyInvoices, Invoice } from '@/lib/invoice';
 import { Loader2 } from 'lucide-react';
 
 interface ChartDataItem {
@@ -47,7 +47,11 @@ const ChartCard = ({ title, children }: { title: string; children: React.ReactNo
   </div>
 );
 
-export default function EmployeeLeaseGraphs() {
+interface EmployeeLeaseGraphsProps {
+  invoices?: Invoice[];
+}
+
+export default function EmployeeLeaseGraphs({ invoices: propInvoices }: EmployeeLeaseGraphsProps) {
   const [loading, setLoading] = useState(true);
   const [monthlyData, setMonthlyData] = useState<ChartDataItem[]>([]);
   const [dailyData, setDailyData] = useState<ChartDataItem[]>([]);
@@ -55,7 +59,10 @@ export default function EmployeeLeaseGraphs() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const invoices = await getMyInvoices();
+        let invoices = propInvoices;
+        if (!invoices) {
+          invoices = await getMyInvoices();
+        }
         const leaseInvoices = invoices.filter((inv) => inv.saleType === 'LEASE');
 
         const now = new Date();
@@ -110,7 +117,7 @@ export default function EmployeeLeaseGraphs() {
     };
 
     fetchData();
-  }, []);
+  }, [propInvoices]);
 
   if (loading) {
     return (

@@ -5,7 +5,13 @@ import StatCard from '@/components/StatCard';
 import { getMyInvoices } from '@/lib/invoice';
 import { Loader2 } from 'lucide-react';
 
-export default function EmployeeOrderStats() {
+import { Invoice } from '@/lib/invoice';
+
+interface EmployeeOrderStatsProps {
+  invoices?: Invoice[];
+}
+
+export default function EmployeeOrderStats({ invoices: propInvoices }: EmployeeOrderStatsProps) {
   const [stats, setStats] = useState({
     total: 0,
     month: 0,
@@ -16,7 +22,10 @@ export default function EmployeeOrderStats() {
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const invoices = await getMyInvoices();
+        let invoices = propInvoices;
+        if (!invoices) {
+          invoices = await getMyInvoices();
+        }
 
         const now = new Date();
         const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -38,7 +47,7 @@ export default function EmployeeOrderStats() {
       }
     };
     fetchStats();
-  }, []);
+  }, [propInvoices]);
 
   const cards = [
     {

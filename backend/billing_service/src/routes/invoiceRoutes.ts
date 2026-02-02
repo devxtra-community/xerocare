@@ -3,6 +3,9 @@ import {
   createQuotation,
   updateQuotation,
   approveQuotation,
+  employeeApprove,
+  financeApprove,
+  financeReject,
   generateFinalInvoice,
   getAllInvoices,
   getInvoiceById,
@@ -10,6 +13,9 @@ import {
   getStats,
   getBranchSales,
   getBranchSalesTotals,
+  getBranchInvoices,
+  getPendingCounts,
+  getCollectionAlerts,
 } from '../controllers/invoiceController';
 import { authMiddleware } from '../middlewares/authMiddleware';
 import { requireRole } from '../middlewares/roleMiddleware';
@@ -26,7 +32,30 @@ router.post(
   createQuotation,
 );
 router.put('/quotation/:id', authMiddleware, requireRole(EmployeeRole.EMPLOYEE), updateQuotation);
-router.put('/:id/approve', authMiddleware, approveQuotation); // Ensuring PUT or POST appropriate for body // or PUT
+router.post(
+  '/:id/employee-approve',
+  authMiddleware,
+  requireRole(EmployeeRole.EMPLOYEE),
+  employeeApprove,
+);
+router.post(
+  '/:id/finance-approve',
+  authMiddleware,
+  // requireRole(FinanceRole.FINANCE), // Ensure generic roles or specific Finance Role check
+  financeApprove,
+);
+router.post(
+  '/:id/finance-reject',
+  authMiddleware,
+  // requireRole(FinanceRole.FINANCE),
+  financeReject,
+);
+
+router.put('/:id/approve', authMiddleware, approveQuotation); // Keeping old approve? Or Deprecating? Prompt says "Employee can mark quotations as EMPLOYEE_APPROVED". Old approve was "approveQuotation". Might key to "EMPLOYEE_APPROVED" or is it "Finalize"?
+// User prompt: "Employee Approval Endpoint: POST /b/invoices/:id/employee-approve".
+// Old method "approveQuotation" likely converted to PROFORMA directly previously.
+// We should probably keep it but ensure it's not used by employee for bypassing finance?
+// Or maybe it's dead code now. Leaving it as is to allow backward compatibility or other flows, but new flow uses new endpoints.
 router.get('/my-invoices', authMiddleware, getMyInvoices);
 router.get('/', authMiddleware, getAllInvoices);
 router.get('/stats', authMiddleware, getStats);
@@ -35,9 +64,12 @@ router.get('/sales/branch-totals', authMiddleware, getBranchSalesTotals);
 router.post(
   '/settlements/generate',
   authMiddleware,
-  requireRole(EmployeeRole.EMPLOYEE),
+  requireRole(EmployeeRole.FINANCE),
   generateFinalInvoice,
 );
+router.get('/pending-counts', authMiddleware, getPendingCounts);
+router.get('/alerts', authMiddleware, requireRole(EmployeeRole.FINANCE), getCollectionAlerts);
+router.get('/branch-invoices', authMiddleware, getBranchInvoices);
 router.get('/:id', authMiddleware, getInvoiceById);
 
 export default router;

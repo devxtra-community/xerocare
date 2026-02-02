@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import { MulterS3File } from '../types/multer-s3-file';
 import { UsageService } from '../services/usageService';
 import { AppError } from '../errors/appError';
 
@@ -21,6 +22,9 @@ export const createUsageRecord = async (req: Request, res: Response, next: NextF
       remarks,
     } = payload;
 
+    const file = req.file as MulterS3File | undefined;
+    const meterImageUrl = file?.location; // Public URL from MulterS3/R2
+
     if (!contractId || !billingPeriodStart || !billingPeriodEnd || !reportedBy) {
       throw new AppError('Missing required fields', 400);
     }
@@ -35,8 +39,9 @@ export const createUsageRecord = async (req: Request, res: Response, next: NextF
       colorA4Count: Number(colorA4Count) || 0,
       colorA3Count: Number(colorA3Count) || 0,
       reportedBy,
-      recordedByEmployeeId: req.user?.userId, // Assuming auth middleware populates this
+      recordedByEmployeeId: req.user?.userId,
       remarks,
+      meterImageUrl,
     });
 
     return res.status(201).json({

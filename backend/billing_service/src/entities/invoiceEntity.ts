@@ -63,6 +63,22 @@ export class Invoice {
   })
   status!: InvoiceStatus;
 
+  // --- Audit Fields ---
+  @Column({ nullable: true })
+  employeeApprovedBy?: string;
+
+  @Column({ type: 'timestamp', nullable: true })
+  employeeApprovedAt?: Date;
+
+  @Column({ nullable: true })
+  financeApprovedBy?: string;
+
+  @Column({ type: 'timestamp', nullable: true })
+  financeApprovedAt?: Date;
+
+  @Column({ type: 'text', nullable: true })
+  financeRemarks?: string;
+
   @OneToMany(() => InvoiceItem, (item) => item.invoice, {
     cascade: true,
   })
@@ -121,6 +137,19 @@ export class Invoice {
   @Column({ type: 'int', nullable: true })
   billingCycleInDays?: number;
 
+  @Column({ type: 'date', nullable: true })
+  billingPeriodStart?: Date;
+
+  @Column({ type: 'date', nullable: true })
+  billingPeriodEnd?: Date;
+
+  // --- Delivery Status ---
+  @Column({ type: 'timestamp', nullable: true })
+  emailSentAt?: Date;
+
+  @Column({ type: 'timestamp', nullable: true })
+  whatsappSentAt?: Date;
+
   // --- Lease Fields ---
   @Column({
     type: 'enum',
@@ -145,6 +174,9 @@ export class Invoice {
 
   @Column({ nullable: true })
   referenceContractId?: string; // Link to PROFORMA contract
+
+  @Column({ nullable: true })
+  usageRecordId?: string; // Link to Usage Record (for Monthly Invoice)
 
   @Column({ type: 'decimal', precision: 12, scale: 2, nullable: true })
   grossAmount?: number;

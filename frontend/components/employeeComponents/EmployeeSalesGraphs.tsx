@@ -16,7 +16,7 @@ import {
   Brush,
 } from 'recharts';
 import { NameType, ValueType } from 'recharts/types/component/DefaultTooltipContent';
-import { getMyInvoices } from '@/lib/invoice';
+import { getMyInvoices, Invoice } from '@/lib/invoice';
 import { Loader2 } from 'lucide-react';
 
 interface SalesChartDataItem {
@@ -191,7 +191,11 @@ const ForexChartContainer = ({
   );
 };
 
-export default function EmployeeSalesGraphs() {
+interface EmployeeSalesGraphsProps {
+  invoices?: Invoice[];
+}
+
+export default function EmployeeSalesGraphs({ invoices: propInvoices }: EmployeeSalesGraphsProps) {
   const [loading, setLoading] = useState(true);
   const [monthlyData, setMonthlyData] = useState<SalesChartDataItem[]>([]);
   const [dailyData, setDailyData] = useState<SalesChartDataItem[]>([]);
@@ -203,7 +207,10 @@ export default function EmployeeSalesGraphs() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const invoices = await getMyInvoices();
+        let invoices = propInvoices;
+        if (!invoices) {
+          invoices = await getMyInvoices();
+        }
         const salesInvoices = invoices.filter((inv) => inv.saleType === 'SALE');
 
         // Initialize Monthly Data
@@ -268,7 +275,7 @@ export default function EmployeeSalesGraphs() {
     };
 
     fetchData();
-  }, []);
+  }, [propInvoices]);
 
   if (loading) {
     return (

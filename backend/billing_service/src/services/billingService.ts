@@ -143,7 +143,10 @@ export class BillingService {
       totalAmount: payableAmount,
 
       referenceContractId: contract.id,
+      usageRecordId: usage.id, // Link Usage
       rentType: contract.rentType,
+      billingPeriodStart: start,
+      billingPeriodEnd: end,
     });
 
     // 7. Lock Usage
@@ -475,6 +478,71 @@ export class BillingService {
     return this.invoiceRepo.save(invoice);
   }
 
+  async employeeApprove(id: string, userId: string) {
+    const invoice = await this.invoiceRepo.findById(id);
+    if (!invoice) throw new AppError('Quotation not found', 404);
+
+    if (invoice.status !== InvoiceStatus.DRAFT && invoice.status !== InvoiceStatus.SENT) {
+      throw new AppError('Only DRAFT or SENT quotations can be submitted for approval', 400);
+    }
+
+    invoice.status = InvoiceStatus.EMPLOYEE_APPROVED;
+    invoice.employeeApprovedBy = userId;
+    invoice.employeeApprovedAt = new Date();
+
+    return this.invoiceRepo.save(invoice);
+  }
+
+  async financeApprove(id: string, userId: string) {
+    const invoice = await this.invoiceRepo.findById(id);
+    if (!invoice) throw new AppError('Quotation not found', 404);
+
+    if (invoice.status !== InvoiceStatus.EMPLOYEE_APPROVED) {
+      throw new AppError('Only Employee Approved quotations can be finalized by Finance', 400);
+    }
+
+    invoice.status = InvoiceStatus.FINANCE_APPROVED;
+    invoice.financeApprovedBy = userId;
+    invoice.financeApprovedAt = new Date();
+
+    // Final Transition Logic
+    if (invoice.saleType === SaleType.SALE) {
+      invoice.type = InvoiceType.FINAL; // Converts to Final Invoice
+      invoice.status = InvoiceStatus.ISSUED; // Or kept as FINANCE_APPROVED? Prompt says "Sale -> FINAL Invoice". Usually Final Invoices are ISSUED/UNPAID. Let's use ISSUED for consistency with Final Invoice flows.
+      // Wait, "Only FINANCE_APPROVED can trigger final transitions".
+      // "SALE type = FINAL (Invoice)"
+      // Let's set Status to FINANCE_APPROVED as the gate, but maybe immediately transition to ISSUED?
+      // Prompt says "Rules: Employee approval -> EMPLOYEE_APPROVED, Finance approval -> FINANCE_APPROVED".
+      // "Status flow: DRAFT -> EMPLOYEE_APPROVED -> FINANCE_APPROVED -> (Final State)"
+      // "Final State: SALE Invoice -> FINAL".
+      // So I will stick to setting it to FINANCE_APPROVED, but changing TYPE to FINAL.
+      // Actually, if I change type to FINAL, it IS a Final Invoice.
+    } else if (invoice.saleType === SaleType.RENT) {
+      invoice.type = InvoiceType.PROFORMA; // Converts to Contract
+      // Keep status as FINANCE_APPROVED (which implies Active Contract)
+    } else if (invoice.saleType === SaleType.LEASE) {
+      invoice.status = InvoiceStatus.ACTIVE_LEASE; // Explicit requirement: "LEASE status = ACTIVE_LEASE"
+    }
+
+    return this.invoiceRepo.save(invoice);
+  }
+
+  async financeReject(id: string, userId: string, reason: string) {
+    const invoice = await this.invoiceRepo.findById(id);
+    if (!invoice) throw new AppError('Quotation not found', 404);
+
+    if (invoice.status !== InvoiceStatus.EMPLOYEE_APPROVED) {
+      throw new AppError('Only Employee Approved quotations can be rejected by Finance', 400);
+    }
+
+    invoice.status = InvoiceStatus.REJECTED;
+    invoice.financeApprovedBy = userId; // Record who rejected
+    invoice.financeApprovedAt = new Date();
+    invoice.financeRemarks = reason;
+
+    return this.invoiceRepo.save(invoice);
+  }
+
   async getAllInvoices(branchId?: string) {
     return this.invoiceRepo.findAll(branchId);
   }
@@ -547,5 +615,73 @@ export class BillingService {
 
   async getBranchSalesTotals(branchId: string) {
     return await this.invoiceRepo.getBranchSalesTotals(branchId);
+  }
+
+  async getPendingCounts(branchId: string) {
+    const counts = await this.invoiceRepo.getPendingCounts(branchId);
+    // Convert array to object { RENT: 5, SALE: 2, ... }
+    const result: Record<string, number> = {
+      RENT: 0,
+      LEASE: 0,
+      SALE: 0,
+    };
+    counts.forEach((c) => {
+      if (c.saleType) result[c.saleType] = c.count;
+    });
+    return result;
+  }
+
+  async getCollectionAlerts(branchId: string) {
+    const activeContracts = await this.invoiceRepo.findActiveContracts(branchId);
+    const alerts: Array<{
+      contractId: string;
+      // customerName is fetched by API Gateway
+      customerId: string;
+      invoiceNumber: string;
+      type: 'USAGE_PENDING' | 'INVOICE_PENDING';
+      dueDate: Date;
+    }> = [];
+
+    const now = new Date();
+    const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
+    // Optimization: Bulk fetch usage/invoices? For now, Loop (N is small per branch usually).
+    for (const contract of activeContracts) {
+      // Check Usage for Current Month
+      // We can use UsageRepo.findByContractAndPeriod logic but need loose check "Starts in Current Month"
+      // Or "Is there any usage where billingPeriodStart >= currentMonthStart?"
+
+      // Simplified Logic:
+      // 1. Get latest usage. If latest usage < current month -> Usage Pending.
+      // 2. If usage exists for current month -> Check if Final Invoice exists locked to it.
+
+      const history = await this.usageRepo.getUsageHistory(contract.id);
+      const latestUsage = history[0]; // Ordered DESC
+
+      const isUsageDone =
+        latestUsage && new Date(latestUsage.billingPeriodStart) >= currentMonthStart;
+
+      if (!isUsageDone) {
+        alerts.push({
+          contractId: contract.id,
+          customerId: contract.customerId,
+          invoiceNumber: contract.invoiceNumber,
+          type: 'USAGE_PENDING',
+          dueDate: currentMonthStart, // or specific BILLING DATE from contract?
+        });
+      } else {
+        // Usage Done. Check Invoice.
+        if (!latestUsage.finalInvoiceId) {
+          alerts.push({
+            contractId: contract.id,
+            customerId: contract.customerId,
+            invoiceNumber: contract.invoiceNumber,
+            type: 'INVOICE_PENDING',
+            dueDate: new Date(),
+          });
+        }
+      }
+    }
+    return alerts;
   }
 }

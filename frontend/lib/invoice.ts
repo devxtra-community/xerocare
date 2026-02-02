@@ -58,6 +58,13 @@ export interface Invoice {
   securityDepositMode?: 'CASH' | 'CHEQUE';
   securityDepositReference?: string;
   securityDepositReceivedDate?: string;
+
+  // Audit Fields
+  employeeApprovedBy?: string;
+  employeeApprovedAt?: string;
+  financeApprovedBy?: string;
+  financeApprovedAt?: string;
+  financeRemarks?: string;
 }
 
 export interface CreateInvoicePayload {
@@ -146,11 +153,62 @@ export const approveQuotation = async (
   return response.data.data;
 };
 
+export const employeeApproveInvoice = async (id: string): Promise<Invoice> => {
+  const response = await api.post(`/b/invoices/${id}/employee-approve`);
+  return response.data.data;
+};
+
+export const financeApproveInvoice = async (id: string): Promise<Invoice> => {
+  const response = await api.post(`/b/invoices/${id}/finance-approve`);
+  return response.data.data;
+};
+
+export const financeRejectInvoice = async (id: string, reason: string): Promise<Invoice> => {
+  const response = await api.post(`/b/invoices/${id}/finance-reject`, { reason });
+  return response.data.data;
+};
+
 export const getInvoiceById = async (id: string): Promise<Invoice> => {
   const response = await api.get(`/b/invoices/${id}`);
   return response.data.data;
 };
 export const getInvoiceStats = async (): Promise<Record<string, number>> => {
   const response = await api.get('/b/invoices/stats');
+  return response.data.data;
+};
+
+export const getPendingCounts = async (): Promise<Record<string, number>> => {
+  const response = await api.get('/b/invoices/pending-counts');
+  return response.data.data;
+};
+// Alerts & Collection
+export interface CollectionAlert {
+  contractId: string;
+  customerId: string;
+  customerName: string;
+  invoiceNumber: string;
+  type: 'USAGE_PENDING' | 'INVOICE_PENDING';
+  dueDate: string;
+}
+
+export const getCollectionAlerts = async (): Promise<CollectionAlert[]> => {
+  const response = await api.get('/b/invoices/alerts');
+  return response.data.data;
+};
+
+export const recordUsage = async (payload: FormData): Promise<unknown> => {
+  const response = await api.post('/b/usage', payload, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+  return response.data.data;
+};
+
+export const generateMonthlyInvoice = async (payload: {
+  contractId: string;
+  billingPeriodStart: string;
+  billingPeriodEnd: string;
+}): Promise<Invoice> => {
+  const response = await api.post('/b/invoices/settlements/generate', payload);
+  // Returns Final Invoice
   return response.data.data;
 };

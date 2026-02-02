@@ -45,6 +45,19 @@ export const getMyInvoices = async (req: Request, res: Response, next: NextFunct
   }
 };
 
+export const getBranchInvoices = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const token = req.headers.authorization?.split(' ')[1] || '';
+    const invoices = await invoiceAggregationService.getBranchInvoices(token);
+    return res.status(200).json({
+      success: true,
+      data: invoices,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const getInvoiceById = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const invoiceId = req.params.id as string;
@@ -107,6 +120,57 @@ export const approveQuotation = async (req: Request, res: Response, next: NextFu
   }
 };
 
+export const employeeApprove = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = req.params.id as string;
+    const token = req.headers.authorization?.split(' ')[1] || '';
+
+    // Check user context? Service validates token anyway.
+
+    const invoice = await invoiceAggregationService.employeeApprove(id, token);
+    return res.status(200).json({
+      success: true,
+      data: invoice,
+      message: 'Quotation sent for Finance Approval',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const financeApprove = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = req.params.id as string;
+    const token = req.headers.authorization?.split(' ')[1] || '';
+
+    const invoice = await invoiceAggregationService.financeApprove(id, token);
+    return res.status(200).json({
+      success: true,
+      data: invoice,
+      message: 'Finance approved successfully',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const financeReject = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = req.params.id as string;
+    const token = req.headers.authorization?.split(' ')[1] || '';
+    const { reason } = req.body;
+
+    const invoice = await invoiceAggregationService.financeReject(id, reason, token);
+    return res.status(200).json({
+      success: true,
+      data: invoice,
+      message: 'Finance rejected successfully',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const generateFinalInvoice = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const token = req.headers.authorization?.split(' ')[1] || '';
@@ -132,6 +196,56 @@ export const getStats = async (req: AuthenticatedRequest, res: Response, next: N
     return res.status(200).json({
       success: true,
       data: stats,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getPendingCounts = async (
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const user = req.user;
+    if (!user) throw new Error('User not authenticated');
+    const token = req.headers.authorization?.split(' ')[1] || '';
+
+    // Only Finance, Manager, Admin should need this?
+    // User prompt implies it's for Sidebar dots. All role-based?
+    // "Sidebar items Rent / Lease / Sale must show a red dot"
+    // Assuming FINANCE role primarily as per goal "Refactor Finance UI".
+
+    const branchId = user.branchId;
+    if (!branchId) throw new Error('Branch ID missing');
+
+    const counts = await invoiceAggregationService.getPendingCounts(token, branchId);
+    return res.status(200).json({
+      success: true,
+      data: counts,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getCollectionAlerts = async (
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const user = req.user;
+    if (!user) throw new Error('User not authenticated');
+    const token = req.headers.authorization?.split(' ')[1] || '';
+
+    // Authorization: Finance Only (Gateway Route checks this too, but good to have)
+    // assuming service handles logic or passes through
+    const alerts = await invoiceAggregationService.getCollectionAlerts(user, token);
+    return res.status(200).json({
+      success: true,
+      data: alerts,
     });
   } catch (error) {
     next(error);

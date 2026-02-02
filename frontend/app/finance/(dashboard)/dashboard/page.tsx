@@ -8,7 +8,6 @@ import APDueAgingChart from '@/components/Finance/APAgingChart';
 import APDueTable from '@/components/Finance/ APDuetable';
 import ARAgingChart from '@/components/Finance/ARAgingChart';
 import CashFlowMiniChart from '@/components/Finance/ CashFlowMIniChart';
-import RecentJournalTable from '@/components/Finance/RecentJournals';
 import RevenueExpenseChart from '@/components/Finance/RevenueExpenseChart';
 
 export default function FinanceDashboard() {
@@ -64,12 +63,11 @@ export default function FinanceDashboard() {
 
       {/* TABLES */}
       <section className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6">
-        <div className="lg:col-span-5">
-          <APDueTable />
-        </div>
-        <div className="lg:col-span-7">
-          <RecentJournalTable />
-        </div>
+        <section className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6">
+          <div className="lg:col-span-12">
+            <APDueTable />
+          </div>
+        </section>
       </section>
     </div>
   );

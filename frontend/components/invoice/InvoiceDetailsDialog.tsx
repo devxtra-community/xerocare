@@ -23,9 +23,22 @@ interface InvoiceDetailsDialogProps {
   invoice: Invoice;
   onClose: () => void;
   onApprove?: () => void;
+  onReject?: (reason: string) => void;
+  approveLabel?: string;
+  mode?: 'EMPLOYEE' | 'FINANCE';
+  onSuccess?: () => void; // Optional callback for internal dialog state if needed
 }
 
-export function InvoiceDetailsDialog({ invoice, onClose, onApprove }: InvoiceDetailsDialogProps) {
+export function InvoiceDetailsDialog({
+  invoice,
+  onClose,
+  onApprove,
+  onReject,
+  approveLabel = 'Approve',
+  mode = 'EMPLOYEE',
+}: InvoiceDetailsDialogProps) {
+  const [rejectReason, setRejectReason] = React.useState('');
+  const [rejecting, setRejecting] = React.useState(false);
   const handleShareWhatsApp = () => {
     if (!invoice.customerPhone) {
       alert('Customer phone number not available.');
@@ -334,13 +347,72 @@ export function InvoiceDetailsDialog({ invoice, onClose, onApprove }: InvoiceDet
               Print
             </Button>
 
-            {onApprove && (invoice.status === 'DRAFT' || invoice.status === 'SENT') && (
-              <Button
-                className="rounded-xl h-11 px-6 font-bold bg-blue-600 text-white shadow-lg hover:bg-blue-700 transition-all"
-                onClick={onApprove}
-              >
-                Approve
-              </Button>
+            {mode === 'FINANCE' && invoice.status === 'EMPLOYEE_APPROVED' ? (
+              <>
+                <div className="relative">
+                  {rejecting ? (
+                    <div className="absolute bottom-full mb-2 right-0 bg-white p-3 rounded-xl shadow-xl border border-red-100 w-64 animate-in slide-in-from-bottom-2">
+                      <p className="text-[10px] font-bold text-slate-400 uppercase mb-2">
+                        Rejection Reason
+                      </p>
+                      <textarea
+                        className="w-full text-xs p-2 border rounded-md mb-2 h-20"
+                        placeholder="Why is this being rejected?"
+                        value={rejectReason}
+                        onChange={(e) => setRejectReason(e.target.value)}
+                      />
+                      <div className="flex justify-end gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 text-xs"
+                          onClick={() => setRejecting(false)}
+                        >
+                          Cancel
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          className="h-7 text-xs"
+                          onClick={() => {
+                            if (onReject && rejectReason) {
+                              onReject(rejectReason);
+                            } else {
+                              alert('Please provide a reason');
+                            }
+                          }}
+                        >
+                          Confirm Reject
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <Button
+                      className="rounded-xl h-11 px-6 font-bold bg-red-50 text-red-600 border border-red-100 hover:bg-red-100 transition-all"
+                      onClick={() => setRejecting(true)}
+                    >
+                      Reject
+                    </Button>
+                  )}
+                </div>
+
+                <Button
+                  className="rounded-xl h-11 px-6 font-bold bg-green-600 text-white shadow-lg hover:bg-green-700 transition-all"
+                  onClick={onApprove}
+                >
+                  Approve
+                </Button>
+              </>
+            ) : (
+              onApprove &&
+              (invoice.status === 'DRAFT' || invoice.status === 'SENT') && (
+                <Button
+                  className="rounded-xl h-11 px-6 font-bold bg-blue-600 text-white shadow-lg hover:bg-blue-700 transition-all"
+                  onClick={onApprove}
+                >
+                  {approveLabel}
+                </Button>
+              )
             )}
           </div>
         </div>

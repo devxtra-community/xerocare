@@ -2,10 +2,14 @@
 
 import React, { useEffect, useState } from 'react';
 import StatCard from '@/components/StatCard';
-import { getMyInvoices } from '@/lib/invoice';
+import { getMyInvoices, Invoice } from '@/lib/invoice';
 import { Loader2 } from 'lucide-react';
 
-export default function EmployeeSalesStats() {
+interface EmployeeSalesStatsProps {
+  invoices?: Invoice[];
+}
+
+export default function EmployeeSalesStats({ invoices: propInvoices }: EmployeeSalesStatsProps) {
   const [stats, setStats] = useState({
     totalOrders: 0,
     salesCount: 0,
@@ -17,7 +21,10 @@ export default function EmployeeSalesStats() {
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const invoices = await getMyInvoices();
+        let invoices = propInvoices;
+        if (!invoices) {
+          invoices = await getMyInvoices();
+        }
 
         const now = new Date();
         const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -48,7 +55,7 @@ export default function EmployeeSalesStats() {
       }
     };
     fetchStats();
-  }, []);
+  }, [propInvoices]);
 
   const cards = [
     {

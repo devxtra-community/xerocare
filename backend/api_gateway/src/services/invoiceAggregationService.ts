@@ -335,6 +335,62 @@ export class InvoiceAggregationService {
     }
   }
 
+  async getBranchInvoices(token: string): Promise<AggregatedInvoice[]> {
+    try {
+      const billingResponse = await axios.get<{ data: Invoice[] }>(
+        `${BILLING_SERVICE_URL}/invoices/branch-invoices`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
+      const invoices = billingResponse.data.data;
+
+      const aggregated = await Promise.all(
+        invoices.map(async (inv) => {
+          const [employeeName, customerDetails] = await Promise.all([
+            fetchEntityName(
+              inv.createdBy,
+              employeeCache,
+              `${EMPLOYEE_SERVICE_URL}/employee/public/${inv.createdBy}`,
+              token,
+            ),
+            fetchCustomerDetails(
+              inv.customerId,
+              `${CRM_SERVICE_URL}/customers/${inv.customerId}`,
+              token,
+            ),
+          ]);
+          return {
+            ...inv,
+            employeeName,
+            branchName: '', // Usually not needed for branch view as it is same branch, or fetch if needed
+            customerName: customerDetails.name,
+            customerPhone: customerDetails.phone,
+            customerEmail: customerDetails.email,
+            startDate: inv.effectiveFrom || inv.createdAt,
+            endDate: inv.effectiveTo,
+          };
+        }),
+      );
+      return aggregated;
+    } catch (error: unknown) {
+      if (axios.isAxiosError(error)) {
+        logger.error('Axios error in fetch branch invoices', {
+          message: error.message,
+          code: error.code,
+          responseStatus: error.response?.status,
+          responseData: error.response?.data,
+          url: error.config?.url,
+        });
+        throw new AppError(
+          error.response?.data?.message || 'Failed to fetch branch invoices',
+          error.response?.status || 500,
+        );
+      }
+      throw new AppError('Failed to fetch branch invoices', 500);
+    }
+  }
+
   async getInvoiceById(invoiceId: string, token: string): Promise<AggregatedInvoice> {
     try {
       const invoiceResponse = await axios.get<{ data: Invoice }>(
@@ -605,6 +661,87 @@ export class InvoiceAggregationService {
     }
   }
 
+  async employeeApprove(id: string, token: string) {
+    try {
+      const response = await axios.post<{ data: Invoice }>(
+        `${BILLING_SERVICE_URL}/invoices/${id}/employee-approve`,
+        {},
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
+      return response.data.data;
+    } catch (error: unknown) {
+      if (axios.isAxiosError(error)) {
+        logger.error('Axios error in employee approve', {
+          message: error.message,
+          responseStatus: error.response?.status,
+          responseData: error.response?.data,
+        });
+        throw new AppError(
+          error.response?.data?.message || 'Failed to submit for finance approval',
+          error.response?.status || 500,
+        );
+      }
+      throw new AppError('Internal Gateway Error during employee approval', 500);
+    }
+  }
+
+  async financeApprove(id: string, token: string) {
+    try {
+      const response = await axios.post<{ data: Invoice }>(
+        `${BILLING_SERVICE_URL}/invoices/${id}/finance-approve`,
+        {},
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
+      const invoice = response.data.data;
+
+      // Log success but just return data
+      return invoice;
+    } catch (error: unknown) {
+      if (axios.isAxiosError(error)) {
+        logger.error('Axios error in finance approve', {
+          message: error.message,
+          responseStatus: error.response?.status,
+          responseData: error.response?.data,
+        });
+        throw new AppError(
+          error.response?.data?.message || 'Failed to approve quotation',
+          error.response?.status || 500,
+        );
+      }
+      throw new AppError('Internal Gateway Error during finance approval', 500);
+    }
+  }
+
+  async financeReject(id: string, reason: string, token: string) {
+    try {
+      const response = await axios.post<{ data: Invoice }>(
+        `${BILLING_SERVICE_URL}/invoices/${id}/finance-reject`,
+        { reason },
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
+      return response.data.data;
+    } catch (error: unknown) {
+      if (axios.isAxiosError(error)) {
+        logger.error('Axios error in finance reject', {
+          message: error.message,
+          responseStatus: error.response?.status,
+          responseData: error.response?.data,
+        });
+        throw new AppError(
+          error.response?.data?.message || 'Failed to reject quotation',
+          error.response?.status || 500,
+        );
+      }
+      throw new AppError('Internal Gateway Error during finance rejection', 500);
+    }
+  }
+
   async generateFinalInvoice(
     payload: {
       contractId: string;
@@ -670,29 +807,100 @@ export class InvoiceAggregationService {
     }
   }
 
+  async getCollectionAlerts(user: { role: string; branchId?: string }, token: string) {
+    try {
+      if (!user.branchId) {
+        throw new AppError('Branch ID not found in user context', 400);
+      }
+      const response = await axios.get(`${BILLING_SERVICE_URL}/invoices/alerts`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const alerts = response.data.data; // Array of { contractId, customerId, ... }
+
+      // Aggregate Customer Names
+      const enrichedAlerts = await Promise.all(
+        alerts.map(async (alert: { customerId: string } & Record<string, unknown>) => {
+          const customerDetails = await fetchCustomerDetails(
+            alert.customerId,
+            `${CRM_SERVICE_URL}/customers/${alert.customerId}`,
+            token,
+          );
+          return {
+            ...alert,
+            customerName: customerDetails.name,
+          };
+        }),
+      );
+
+      return enrichedAlerts;
+    } catch (error: unknown) {
+      if (axios.isAxiosError(error)) {
+        logger.error('Axios error in get collection alerts', {
+          message: error.message,
+          responseStatus: error.response?.status,
+        });
+        throw new AppError(
+          error.response?.data?.message || 'Failed to fetch alerts',
+          error.response?.status || 500,
+        );
+      }
+      throw new AppError('Internal Gateway Error during alerts fetch', 500);
+    }
+  }
+
   async getInvoiceStats(
     user: { userId: string; role: string; branchId?: string },
     token: string,
     branchId?: string,
   ) {
-    const url = `${BILLING_SERVICE_URL}/invoices/stats`;
-    const params: { createdBy?: string; branchId?: string } = {};
+    try {
+      const url = `${BILLING_SERVICE_URL}/invoices/stats`;
+      const params: { createdBy?: string; branchId?: string } = {};
 
-    const role = user.role ? user.role.toUpperCase() : '';
-    if (role === 'EMPLOYEE') {
-      params.createdBy = user.userId;
-    } else if (branchId) {
-      params.branchId = branchId;
+      const role = user.role ? user.role.toUpperCase() : '';
+      if (role === 'EMPLOYEE') {
+        params.createdBy = user.userId;
+      } else if (branchId) {
+        params.branchId = branchId;
+      }
+
+      const response = await axios.get(url, {
+        headers: { Authorization: `Bearer ${token}` },
+        params,
+      });
+
+      return response.data.data;
+    } catch (error: unknown) {
+      if (axios.isAxiosError(error)) {
+        throw new AppError(
+          error.response?.data?.message || 'Failed to fetch stats',
+          error.response?.status || 500,
+        );
+      }
+      throw new AppError('Failed to fetch stats', 500);
     }
+  }
 
-    console.log('[API Gateway] getInvoiceStats - User:', user);
-    console.log('[API Gateway] getInvoiceStats - Params:', params);
-
-    const response = await axios.get(url, {
-      headers: { Authorization: `Bearer ${token}` },
-      params,
-    });
-
-    return response.data.data;
+  async getPendingCounts(token: string, branchId: string) {
+    try {
+      const response = await axios.get(`${BILLING_SERVICE_URL}/invoices/pending-counts`, {
+        headers: { Authorization: `Bearer ${token}` },
+        params: { branchId },
+      });
+      return response.data.data;
+    } catch (error: unknown) {
+      if (axios.isAxiosError(error)) {
+        logger.error('Axios error in get pending counts', {
+          message: error.message,
+          responseStatus: error.response?.status,
+          responseData: error.response?.data,
+        });
+        throw new AppError(
+          error.response?.data?.message || 'Failed to fetch pending counts',
+          error.response?.status || 500,
+        );
+      }
+      throw new AppError('Internal Gateway Error during pending counts fetch', 500);
+    }
   }
 }

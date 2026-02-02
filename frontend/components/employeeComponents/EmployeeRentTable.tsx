@@ -11,7 +11,13 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { getMyInvoices, Invoice, createInvoice, CreateInvoicePayload } from '@/lib/invoice';
+import {
+  getMyInvoices,
+  Invoice,
+  createInvoice,
+  CreateInvoicePayload,
+  employeeApproveInvoice,
+} from '@/lib/invoice';
 import RentFormModal from './RentFormModal';
 import { Badge } from '@/components/ui/badge';
 import { Clock } from 'lucide-react';
@@ -31,7 +37,11 @@ const calculateRemainingDays = (end: string | Date | undefined) => {
 
 // ...
 
-export default function EmployeeRentTable() {
+interface EmployeeRentTableProps {
+  mode?: 'EMPLOYEE' | 'FINANCE';
+}
+
+export default function EmployeeRentTable({ mode = 'EMPLOYEE' }: EmployeeRentTableProps) {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [formOpen, setFormOpen] = useState(false);
@@ -44,8 +54,13 @@ export default function EmployeeRentTable() {
   const fetchInvoices = async () => {
     try {
       setLoading(true);
-      const data = await getMyInvoices();
-      // Filter only RENT type invoices
+      let data: Invoice[] = [];
+      if (mode === 'FINANCE') {
+        const { getBranchInvoices } = await import('@/lib/invoice');
+        data = await getBranchInvoices();
+      } else {
+        data = await getMyInvoices();
+      }
       setInvoices(data.filter((i) => i.saleType === 'RENT'));
     } catch (error) {
       console.error('Failed to fetch invoices:', error);
@@ -99,6 +114,19 @@ export default function EmployeeRentTable() {
     setFormOpen(true);
   };
 
+  const handleSendForApproval = async () => {
+    if (!selectedInvoice) return;
+    try {
+      await employeeApproveInvoice(selectedInvoice.id);
+      toast.success('Sent for Finance Approval');
+      setDetailsOpen(false);
+      fetchInvoices();
+    } catch (error) {
+      console.error(error);
+      toast.error('Failed to send for approval');
+    }
+  };
+
   // ...
 
   return (
@@ -113,12 +141,14 @@ export default function EmployeeRentTable() {
             className="pl-8"
           />
         </div>
-        <Button
-          className="bg-primary text-white gap-2 w-full sm:w-auto shadow-md hover:shadow-lg transition-all"
-          onClick={openCreateModal}
-        >
-          <Plus size={16} /> New Rent
-        </Button>
+        {mode === 'EMPLOYEE' && (
+          <Button
+            className="bg-primary text-white gap-2 w-full sm:w-auto shadow-md hover:shadow-lg transition-all"
+            onClick={openCreateModal}
+          >
+            <Plus size={16} /> New Rent
+          </Button>
+        )}
       </div>
 
       <div className="rounded-2xl bg-white shadow-sm overflow-hidden border border-slate-100">
@@ -271,9 +301,48 @@ export default function EmployeeRentTable() {
           <InvoiceDetailsDialog
             invoice={selectedInvoice}
             onClose={() => setDetailsOpen(false)}
-            onApprove={() => {
+            // EMPLOYEE Mode
+            onApprove={
+              mode === 'EMPLOYEE'
+                ? handleSendForApproval
+                : async () => {
+                    // FINANCE Mode Approve
+                    try {
+                      const { financeApproveInvoice } = await import('@/lib/invoice');
+                      await financeApproveInvoice(selectedInvoice.id);
+                      toast.success('Rent Agreement Approved');
+                      setDetailsOpen(false);
+                      fetchInvoices();
+                    } catch (err: unknown) {
+                      console.error(err);
+                      const error = err as { response?: { data?: { message?: string } } };
+                      toast.error(error.response?.data?.message || 'Failed to approve');
+                    }
+                  }
+            }
+            // FINANCE Mode Reject
+            onReject={
+              mode === 'FINANCE'
+                ? async (reason) => {
+                    try {
+                      const { financeRejectInvoice } = await import('@/lib/invoice');
+                      await financeRejectInvoice(selectedInvoice.id, reason);
+                      toast.success('Rent Agreement Rejected');
+                      setDetailsOpen(false);
+                      fetchInvoices();
+                    } catch (err: unknown) {
+                      console.error(err);
+                      const error = err as { response?: { data?: { message?: string } } };
+                      toast.error(error.response?.data?.message || 'Failed to reject');
+                    }
+                  }
+                : undefined
+            }
+            approveLabel={mode === 'EMPLOYEE' ? 'Send for Finance Approval' : 'Approve'}
+            mode={mode}
+            onSuccess={() => {
               setDetailsOpen(false);
-              setApproveOpen(true);
+              fetchInvoices();
             }}
           />
         )}

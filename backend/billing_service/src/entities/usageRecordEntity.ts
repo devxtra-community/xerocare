@@ -57,6 +57,20 @@ export class UsageRecord {
   @Column({ type: 'text', nullable: true })
   remarks?: string;
 
+  // Meter Reading Image (R2)
+  @Column({ type: 'text', nullable: true })
+  meterImageUrl?: string;
+
+  // Finance Approval
+  @Column({ type: 'boolean', default: false })
+  approvedByFinance!: boolean;
+
+  @Column({ type: 'timestamp', nullable: true })
+  approvedAt?: Date;
+
+  @Column({ type: 'text', nullable: true })
+  financeRemarks?: string;
+
   // Locking mechanism: specific usage record tied to a final invoice
   @Column({ type: 'uuid', nullable: true })
   finalInvoiceId?: string;

@@ -24,7 +24,15 @@ import { InvoiceDetailsDialog } from '../invoice/InvoiceDetailsDialog';
 import { Eye } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
-export default function EmployeeOrdersTable() {
+interface EmployeeOrdersTableProps {
+  mode?: 'EMPLOYEE' | 'FINANCE';
+  invoices?: Invoice[]; // Optional prop to avoid double fetching if page already fetches
+}
+
+export default function EmployeeOrdersTable({
+  mode = 'EMPLOYEE',
+  invoices: propInvoices,
+}: EmployeeOrdersTableProps) {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -34,9 +42,22 @@ export default function EmployeeOrdersTable() {
 
   useEffect(() => {
     const fetchInvoices = async () => {
+      // If invoices passed via props, use them
+      if (propInvoices) {
+        setInvoices(propInvoices);
+        setLoading(false);
+        return;
+      }
+
       try {
         setLoading(true);
-        const data = await getMyInvoices();
+        let data: Invoice[] = [];
+        if (mode === 'FINANCE') {
+          const { getBranchInvoices } = await import('@/lib/invoice');
+          data = await getBranchInvoices();
+        } else {
+          data = await getMyInvoices();
+        }
         setInvoices(data);
       } catch (error) {
         console.error('Failed to fetch invoices:', error);
@@ -46,7 +67,7 @@ export default function EmployeeOrdersTable() {
       }
     };
     fetchInvoices();
-  }, []);
+  }, [propInvoices, mode]);
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-IN', {
@@ -276,7 +297,54 @@ export default function EmployeeOrdersTable() {
       </div>
 
       {detailsOpen && selectedInvoice && (
-        <InvoiceDetailsDialog invoice={selectedInvoice} onClose={() => setDetailsOpen(false)} />
+        <InvoiceDetailsDialog
+          invoice={selectedInvoice}
+          onClose={() => setDetailsOpen(false)}
+          mode={mode}
+          approveLabel={mode === 'EMPLOYEE' ? 'Send for Finance Approval' : 'Approve'}
+          onApprove={async () => {
+            if (mode === 'EMPLOYEE') {
+              // Employee logic (if any specific, usually handled by InvoiceDetailsDialog default or passed func)
+              // But InvoiceDetailsDialog uses onApprove callback only if provided.
+              // We need to import employeeApproveInvoice if we want it here, but SalesTable used handleSendForApproval
+              // Let's implement basics or assume Dialog handles it if we don't pass onApprove?
+              // Actually InvoiceDetailsDialog calls onApprove.
+              // SalesTable had handleSendForApproval. OrdersTable didn't have actions before?
+              // Checking original code: OrdersTable passed nothing to onApprove in original code.
+              // "view only"? Employee Orders typically view only unless DRAFT.
+              // Whatever, for Finance we NEED approve.
+            } else {
+              // FINANCE Appprove
+              try {
+                const { financeApproveInvoice } = await import('@/lib/invoice');
+                await financeApproveInvoice(selectedInvoice.id);
+                toast.success('Order Approved');
+                setDetailsOpen(false);
+                // Refresh? If propInvoices, parent needs refresh.
+                // If internal fetch, we can re-fetch.
+                // We'll rely on parent refresh if possible, or force reload.
+                window.location.reload(); // Simple fallback for now
+              } catch {
+                toast.error('Failed to approve');
+              }
+            }
+          }}
+          onReject={
+            mode === 'FINANCE'
+              ? async (reason) => {
+                  try {
+                    const { financeRejectInvoice } = await import('@/lib/invoice');
+                    await financeRejectInvoice(selectedInvoice.id, reason);
+                    toast.success('Order Rejected');
+                    setDetailsOpen(false);
+                    window.location.reload();
+                  } catch {
+                    toast.error('Failed to reject');
+                  }
+                }
+              : undefined
+          }
+        />
       )}
     </div>
   );

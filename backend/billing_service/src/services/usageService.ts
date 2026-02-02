@@ -19,6 +19,7 @@ export class UsageService {
     reportedBy: ReportedBy;
     recordedByEmployeeId?: string;
     remarks?: string;
+    meterImageUrl?: string;
   }) {
     // 1. Fetch Contract
     const contract = await this.invoiceRepo.findById(payload.contractId);
@@ -55,6 +56,7 @@ export class UsageService {
       reportedBy: payload.reportedBy,
       recordedByEmployeeId: payload.recordedByEmployeeId,
       remarks: payload.remarks,
+      meterImageUrl: payload.meterImageUrl,
     });
 
     return this.usageRepo.save(usage);

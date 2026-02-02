@@ -24,6 +24,7 @@ app.set('trust proxy', 1);
 
 (async () => {
   await startCustomerConsumer();
+  logger.info('Customer Consumer initialized');
 })();
 
 const PORT = process.env.PORT;

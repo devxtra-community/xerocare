@@ -152,6 +152,73 @@ export const approveQuotation = async (req: Request, res: Response, next: NextFu
   }
 };
 
+export const employeeApprove = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = req.params.id as string;
+
+    if (!req.user || !req.user.userId) {
+      throw new AppError('User context missing', 401);
+    }
+
+    // Ensure only status update happens, no type conversion
+    const invoice = await billingService.employeeApprove(id, req.user.userId);
+
+    return res.status(200).json({
+      success: true,
+      data: invoice,
+      message: 'Quotation sent for Finance Approval',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const financeApprove = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = req.params.id as string;
+
+    if (!req.user || !req.user.userId) {
+      throw new AppError('User context missing', 401);
+    }
+
+    // Trigger final state transitions based on SaleType
+    const invoice = await billingService.financeApprove(id, req.user.userId);
+
+    return res.status(200).json({
+      success: true,
+      data: invoice,
+      message: 'Finance approved successfully',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const financeReject = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = req.params.id as string;
+    const { reason } = req.body;
+
+    if (!req.user || !req.user.userId) {
+      throw new AppError('User context missing', 401);
+    }
+
+    if (!reason) {
+      throw new AppError('Rejection reason is required', 400);
+    }
+
+    const invoice = await billingService.financeReject(id, req.user.userId, reason);
+
+    return res.status(200).json({
+      success: true,
+      data: invoice,
+      message: 'Finance rejected successfully',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const generateFinalInvoice = async (req: Request, res: Response, next: NextFunction) => {
   try {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -216,6 +283,7 @@ export const getMyInvoices = async (req: Request, res: Response, next: NextFunct
 
 export const getBranchInvoices = async (req: Request, res: Response, next: NextFunction) => {
   try {
+    console.log('Billing: getBranchInvoices hit. User:', req.user);
     const branchId = req.user?.branchId;
 
     if (!branchId) {
@@ -300,6 +368,39 @@ export const getBranchSalesTotals = async (req: Request, res: Response, next: Ne
       success: true,
       data: result,
       message: 'Branch sales totals fetched successfully',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getPendingCounts = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    console.log('Billing: getPendingCounts hit. User:', req.user);
+    const branchId = req.user?.branchId;
+    if (!branchId) {
+      throw new AppError('Branch ID not found in user context', 400);
+    }
+    const counts = await billingService.getPendingCounts(branchId);
+    return res.status(200).json({
+      success: true,
+      data: counts,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getCollectionAlerts = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const branchId = req.user?.branchId;
+    if (!branchId) {
+      throw new AppError('Branch ID not found in user context', 400);
+    }
+    const alerts = await billingService.getCollectionAlerts(branchId);
+    return res.status(200).json({
+      success: true,
+      data: alerts,
     });
   } catch (error) {
     next(error);

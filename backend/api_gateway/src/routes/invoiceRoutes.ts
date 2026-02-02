@@ -6,8 +6,14 @@ import {
   getMyInvoices,
   getStats,
   approveQuotation,
+  employeeApprove,
+  financeApprove,
+  financeReject,
   generateFinalInvoice,
   updateQuotation,
+  getBranchInvoices,
+  getPendingCounts,
+  getCollectionAlerts,
 } from '../controllers/invoiceController';
 import { authMiddleware } from '../middleware/authMiddleware';
 import { requireRole } from '../middleware/roleMiddleware';
@@ -33,8 +39,33 @@ router.get(
   getAllInvoices,
 );
 
+router.get(
+  '/branch-invoices',
+  requireRole(UserRole.ADMIN, UserRole.FINANCE, UserRole.MANAGER),
+  getBranchInvoices,
+);
+
+router.get(
+  '/pending-counts',
+  requireRole(UserRole.ADMIN, UserRole.FINANCE, UserRole.MANAGER),
+  getPendingCounts,
+);
+
+router.get(
+  '/alerts',
+  requireRole(UserRole.FINANCE),
+  getCollectionAlerts, // Ensure import!
+);
+
 router.put('/:id/approve', requireRole(UserRole.EMPLOYEE), approveQuotation);
-router.post('/settlements/generate', requireRole(UserRole.EMPLOYEE), generateFinalInvoice);
+router.post(
+  '/:id/employee-approve',
+  requireRole(UserRole.EMPLOYEE, UserRole.MANAGER),
+  employeeApprove,
+);
+router.post('/:id/finance-approve', requireRole(UserRole.FINANCE), financeApprove);
+router.post('/:id/finance-reject', requireRole(UserRole.FINANCE), financeReject);
+router.post('/settlements/generate', requireRole(UserRole.FINANCE), generateFinalInvoice);
 router.post('/', requireRole(UserRole.EMPLOYEE), createInvoice);
 router.put('/:id', requireRole(UserRole.EMPLOYEE), updateQuotation);
 

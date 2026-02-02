@@ -23,6 +23,28 @@ const startServer = async () => {
   try {
     await Source.initialize();
     logger.info('Database connected');
+
+    // FIX: Manually add missing enum values if they don't exist (TypeORM sync issue with Enums)
+    try {
+      // Check if type exists first
+      const typeExists = await Source.query(
+        `SELECT 1 FROM pg_type WHERE typname = 'invoice_status_enum'`,
+      );
+      if (typeExists && typeExists.length > 0) {
+        await Source.query(
+          `ALTER TYPE public.invoice_status_enum ADD VALUE IF NOT EXISTS 'EMPLOYEE_APPROVED'`,
+        );
+        await Source.query(
+          `ALTER TYPE public.invoice_status_enum ADD VALUE IF NOT EXISTS 'FINANCE_APPROVED'`,
+        );
+        await Source.query(
+          `ALTER TYPE public.invoice_status_enum ADD VALUE IF NOT EXISTS 'ACTIVE_LEASE'`,
+        );
+      }
+    } catch (err) {
+      console.warn('Enum migration warning (handled):', err);
+    }
+
     await getRabbitChannel();
     const PORT = process.env.PORT || 3004;
 

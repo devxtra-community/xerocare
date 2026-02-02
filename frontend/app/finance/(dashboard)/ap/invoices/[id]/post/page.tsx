@@ -4,7 +4,7 @@ import { notFound, useParams, useRouter } from 'next/navigation';
 import { arInvoices } from '@/lib/finance/ar';
 
 import PageHeader from '@/components/Finance/pageHeader';
-import PostingPreview from '@/components/Finance/PostingPreview';
+// import PostingPreview from '@/components/Finance/PostingPreview';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft } from 'lucide-react';
 
@@ -22,7 +22,10 @@ export default function ARPostPreviewPage() {
         description={`Preview GL impact for ${invoice.invoiceNumber}`}
       />
 
-      <PostingPreview type="AP_INVOICE" invoice={invoice} />
+      {/* <PostingPreview type="AP_INVOICE" invoice={invoice} /> */}
+      <div className="p-4 border border-dashed rounded text-center text-muted-foreground">
+        Posting Preview Component is missing.
+      </div>
 
       <div className="flex justify-between">
         <Button variant="outline" onClick={() => router.back()}>

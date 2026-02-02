@@ -192,4 +192,45 @@ export class InvoiceRepository {
       totalInvoices,
     };
   }
+  async getPendingCounts(branchId?: string) {
+    console.log('InvoiceRepo: getPendingCounts branchId:', branchId);
+    const qb = this.repo
+      .createQueryBuilder('invoice')
+      .select('invoice.saleType', 'saleType')
+      .addSelect('COUNT(invoice.id)', 'count')
+      .where('invoice.status = :status', { status: InvoiceStatus.EMPLOYEE_APPROVED });
+
+    if (branchId) {
+      qb.andWhere('invoice.branchId = :branchId', { branchId });
+    }
+
+    const results = await qb.groupBy('invoice.saleType').getRawMany();
+    // returns array like [{ saleType: 'SALE', count: '5' }, ...]
+    console.log('InvoiceRepo: getPendingCounts results:', results);
+
+    return results.map((r) => ({
+      saleType: r.saleType || r.saletype, // Handle potential lowercase alias from Postgres
+      count: Number(r.count),
+    }));
+  }
+
+  async findActiveContracts(branchId?: string) {
+    const qb = this.repo.createQueryBuilder('invoice');
+
+    // Rent = PROFORMA (Contract), Lease = ACTIVE_LEASE
+    // Filter by Branch if provided
+
+    qb.where('(invoice.type = :proforma OR invoice.status = :activeLease)', {
+      proforma: InvoiceType.PROFORMA,
+      activeLease: InvoiceStatus.ACTIVE_LEASE,
+    });
+
+    if (branchId) {
+      qb.andWhere('invoice.branchId = :branchId', { branchId });
+    }
+
+    // Also maybe SaleType check? PROFORMA implies Rent usually.
+    // ACTIVE_LEASE implies Lease.
+    return qb.getMany();
+  }
 }
