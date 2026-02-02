@@ -12,6 +12,5 @@ export const uploadProductImage = multer({
       const fileName = `products/${Date.now()}-${file.originalname}`;
       cb(null, fileName);
     },
-    acl: 'public-read',
   }),
 });

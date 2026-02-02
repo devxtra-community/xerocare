@@ -46,9 +46,7 @@ export const addproduct = async (req: Request, res: Response, next: NextFunction
 
     const file = req.file as MulterS3File;
     const imageKey = file?.key ?? null;
-    const imageUrl = imageKey
-      ? `${process.env.R2_PUBLIC_URL}/${process.env.R2_BUCKET}/${imageKey}`
-      : null;
+    const imageUrl = imageKey ? `${process.env.R2_PUBLIC_URL}/${imageKey}` : null;
 
     logger.info('Adding new product:');
     const newproduct = await service.addProduct({
@@ -115,7 +113,7 @@ export const updateproduct = async (req: Request, res: Response, next: NextFunct
 
     const file = req.file as MulterS3File;
     if (file && file.key) {
-      payload.imageUrl = `${process.env.R2_PUBLIC_URL}/${process.env.R2_BUCKET}/${file.key}`;
+      payload.imageUrl = `${process.env.R2_PUBLIC_URL}/${file.key}`;
     } else {
       payload.imageUrl = undefined;
     }
