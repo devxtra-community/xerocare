@@ -107,6 +107,7 @@ export class ProductService {
         product_status: data.product_status,
         print_colour: data.print_colour,
         max_discount_amount: maxDiscount,
+        imageUrl: data.imageUrl,
       });
     } catch (err: unknown) {
       if (err instanceof AppError) throw err;

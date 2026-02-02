@@ -109,11 +109,12 @@ export class Product {
     precision: 12,
     scale: 2,
     default: 0,
+    nullable: true,
   })
-  max_discount_amount!: number;
+  max_discount_amount!: number | null;
 
   @Column({ type: 'varchar', length: 1000, nullable: true })
-  imageUrl?: string;
+  imageUrl?: string | null;
 
   @CreateDateColumn()
   created_at!: Date;
