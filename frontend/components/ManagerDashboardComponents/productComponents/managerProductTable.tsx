@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Search, Plus, X, Trash2 } from 'lucide-react';
+import { Search, Plus, X, Trash2, Eye } from 'lucide-react';
 import Image from 'next/image';
 import {
   Select,
@@ -20,6 +20,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import StatCard from '@/components/StatCard';
 import { BulkProductDialog } from './BulkProductDialog';
 import { productService, Product, CreateProductDTO } from '@/services/productService';
@@ -35,6 +36,7 @@ export default function ManagerProduct() {
   const [editing, setEditing] = useState<Product | null>(null);
   const [deleting, setDeleting] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
 
   const fetchProducts = async () => {
     try {
@@ -162,14 +164,20 @@ export default function ManagerProduct() {
                 <TableRow key={p.id} className={i % 2 ? 'bg-sky-100/60' : ''}>
                   <TableCell className="px-4">
                     {p.imageUrl ? (
-                      <div className="relative h-8 w-8 rounded overflow-hidden">
+                      <div className="relative h-8 w-8 rounded overflow-hidden group cursor-pointer">
                         <Image
                           src={p.imageUrl}
                           alt={p.name}
                           fill
                           className="object-cover"
-                          unoptimized={p.imageUrl.startsWith('data:')}
+                          unoptimized={true}
                         />
+                        <div
+                          className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+                          onClick={() => setPreviewImage(p.imageUrl || null)}
+                        >
+                          <Eye size={14} className="text-white" />
+                        </div>
                       </div>
                     ) : (
                       <div className="h-8 w-8 rounded bg-gray-100 flex items-center justify-center text-xs text-gray-400">
@@ -240,6 +248,25 @@ export default function ManagerProduct() {
         onClose={() => setBulkDialogOpen(false)}
         onSuccess={fetchProducts}
       />
+
+      <Dialog open={!!previewImage} onOpenChange={() => setPreviewImage(null)}>
+        <DialogContent className="max-w-3xl p-0 overflow-hidden bg-transparent border-none shadow-none">
+          <DialogHeader className="sr-only">
+            <DialogTitle>Image Preview</DialogTitle>
+          </DialogHeader>
+          <div className="relative w-full aspect-square md:aspect-video flex items-center justify-center bg-black/20 backdrop-blur-sm rounded-lg">
+            {previewImage && (
+              <Image
+                src={previewImage}
+                alt="Preview"
+                fill
+                className="object-contain"
+                unoptimized={true}
+              />
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -273,6 +300,8 @@ function ProductFormModal({
     print_colour: initialData?.print_colour || 'BLACK_WHITE',
     max_discount_amount: initialData?.max_discount_amount || 0,
   });
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string>(initialData?.imageUrl || '');
 
   useEffect(() => {
     const loadDependencies = async () => {
@@ -293,18 +322,29 @@ function ProductFormModal({
   }, []);
 
   const handleImageUpload = (file: File) => {
+    setSelectedFile(file);
     const reader = new FileReader();
-    reader.onloadend = () => setForm({ ...form, imageUrl: reader.result as string });
+    reader.onloadend = () => setImagePreview(reader.result as string);
     reader.readAsDataURL(file);
   };
 
   const handleSubmit = async () => {
     try {
+      const formData = new FormData();
+      Object.entries(form).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) {
+          formData.append(key, value.toString());
+        }
+      });
+      if (selectedFile) {
+        formData.append('image', selectedFile);
+      }
+
       if (initialData) {
-        await productService.updateProduct(initialData.id, form);
+        await productService.updateProduct(initialData.id, formData);
         toast.success('Product updated!');
       } else {
-        await productService.createProduct(form as CreateProductDTO);
+        await productService.createProduct(formData);
         toast.success('Product created!');
       }
       onConfirm();
@@ -461,14 +501,14 @@ function ProductFormModal({
       <div className="mt-4">
         <Field label="Product Image">
           <div className="flex items-center gap-4">
-            {form.imageUrl ? (
+            {imagePreview ? (
               <div className="relative h-16 w-16 rounded overflow-hidden border">
                 <Image
-                  src={form.imageUrl}
+                  src={imagePreview}
                   alt="Preview"
                   fill
                   className="object-cover"
-                  unoptimized={form.imageUrl.startsWith('data:')}
+                  unoptimized={true}
                 />
               </div>
             ) : (

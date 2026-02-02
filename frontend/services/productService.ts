@@ -69,7 +69,7 @@ export const productService = {
     return response.data.data;
   },
 
-  createProduct: async (data: CreateProductDTO): Promise<Product> => {
+  createProduct: async (data: CreateProductDTO | FormData): Promise<Product> => {
     const response = await api.post('/i/products', data);
     return response.data.data;
   },
@@ -79,7 +79,7 @@ export const productService = {
     return response.data;
   },
 
-  updateProduct: async (id: string, data: Partial<CreateProductDTO>): Promise<void> => {
+  updateProduct: async (id: string, data: Partial<CreateProductDTO> | FormData): Promise<void> => {
     await api.put(`/i/products/${id}`, data);
   },
 

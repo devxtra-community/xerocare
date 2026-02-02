@@ -30,6 +30,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useRouter } from 'next/navigation';
 import EmployeeFormDialog from './EmployeeFormDialog';
 import DeleteEmployeeDialog from './DeleteEmployeeDialog';
@@ -58,6 +59,7 @@ export default function EmployeeTable() {
     totalPages: 0,
   });
   const [isLoading, setIsLoading] = useState(true);
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
 
   const fetchEmployees = useCallback(
     async (page = 1) => {
@@ -251,9 +253,23 @@ export default function EmployeeTable() {
                   </TableCell>
                   <TableCell className="px-3 py-4">
                     <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-semibold text-sm flex-shrink-0 overflow-hidden relative border border-blue-50 shadow-sm">
+                      <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-semibold text-sm flex-shrink-0 overflow-hidden relative border border-blue-50 shadow-sm group cursor-pointer">
                         {emp.profile_image_url ? (
-                          <Image src={emp.profile_image_url} alt="" fill className="object-cover" />
+                          <>
+                            <Image
+                              src={emp.profile_image_url}
+                              alt=""
+                              fill
+                              className="object-cover"
+                              unoptimized={true}
+                            />
+                            <div
+                              className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+                              onClick={() => setPreviewImage(emp.profile_image_url || null)}
+                            >
+                              <Eye size={16} className="text-white" />
+                            </div>
+                          </>
                         ) : (
                           (emp.first_name?.[0] || emp.email[0]).toUpperCase()
                         )}
@@ -409,6 +425,25 @@ export default function EmployeeTable() {
           </Button>
         </div>
       </div>
+
+      <Dialog open={!!previewImage} onOpenChange={() => setPreviewImage(null)}>
+        <DialogContent className="max-w-3xl p-0 overflow-hidden bg-transparent border-none shadow-none">
+          <DialogHeader className="sr-only">
+            <DialogTitle>Profile Image Preview</DialogTitle>
+          </DialogHeader>
+          <div className="relative w-full aspect-square flex items-center justify-center bg-black/20 backdrop-blur-sm rounded-lg">
+            {previewImage && (
+              <Image
+                src={previewImage}
+                alt="Profile Preview"
+                fill
+                className="object-contain"
+                unoptimized={true}
+              />
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

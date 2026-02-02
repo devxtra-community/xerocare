@@ -280,6 +280,7 @@ export default function HREmployeeTable() {
                               alt=""
                               fill
                               className="object-cover"
+                              unoptimized={true}
                             />
                           ) : (
                             (emp.first_name?.[0] || emp.email[0]).toUpperCase()
