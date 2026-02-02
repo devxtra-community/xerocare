@@ -12,7 +12,22 @@ export class ModelRepository {
   }
 
   async getAllModels() {
-    return this.repo.find();
+    return (
+      this.repo
+        .createQueryBuilder('model')
+        .leftJoin('model.products', 'product')
+        .loadRelationCountAndMap('model.quantity', 'model.products')
+        .select([
+          'model.id',
+          'model.model_no',
+          'model.model_name',
+          'model.brand',
+          'model.description',
+        ])
+        // If the user wants the quantity to be available in the entity result, `loadRelationCountAndMap` is the cleanest way.
+        // It maps the count to the `quantity` property of the entity.
+        .getMany()
+    );
   }
 
   async updateModel(id: string, data: Partial<Model>) {
@@ -23,6 +38,7 @@ export class ModelRepository {
   async deleteModel(id: string) {
     return this.repo.delete(id);
   }
+
   async findbyid(id: string) {
     return this.repo.findOne({ where: { id } });
   }

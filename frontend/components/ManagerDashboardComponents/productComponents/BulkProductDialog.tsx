@@ -39,7 +39,7 @@ export function BulkProductDialog({ open, onClose, onSuccess }: BulkProductDialo
     try {
       const [v, w] = await Promise.all([
         commonService.getAllVendors(),
-        commonService.getAllWarehouses(),
+        commonService.getWarehousesByBranch(),
       ]);
       setVendors(v);
       setWarehouses(w);
@@ -227,182 +227,192 @@ export function BulkProductDialog({ open, onClose, onSuccess }: BulkProductDialo
           </div>
         </div>
 
-        <div className="flex-1 overflow-auto p-4">
+        <div className="flex-1 overflow-x-auto p-4">
           {rows.length > 0 ? (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[180px]">
-                    Model <span className="text-red-500">*</span>
-                  </TableHead>
-                  <TableHead className="w-[120px]">
-                    Serial No <span className="text-red-500">*</span>
-                  </TableHead>
-                  <TableHead className="w-[150px]">
-                    Name <span className="text-red-500">*</span>
-                  </TableHead>
-                  <TableHead className="w-[120px]">Brand</TableHead>
-                  <TableHead className="w-[150px]">
-                    Warehouse <span className="text-red-500">*</span>
-                  </TableHead>
-                  <TableHead className="w-[150px]">
-                    Vendor <span className="text-red-500">*</span>
-                  </TableHead>
-                  <TableHead className="w-[120px]">Status</TableHead>
-                  <TableHead className="w-[120px]">MFD</TableHead>
-                  <TableHead className="w-[100px]">Price</TableHead>
-                  <TableHead className="w-[80px]">Tax %</TableHead>
-                  <TableHead className="w-[120px]">Print Colour</TableHead>
-                  <TableHead className="w-[100px]">Max Discount</TableHead>
-                  <TableHead className="w-[50px]"></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {rows.map((row, i) => (
-                  <TableRow key={i}>
-                    <TableCell>
-                      <Input
-                        value={row.model_id}
-                        onChange={(e) => updateRow(i, 'model_id', e.target.value)}
-                        placeholder="Model ID"
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Input
-                        value={row.serial_no}
-                        onChange={(e) => updateRow(i, 'serial_no', e.target.value)}
-                        placeholder="Serial #"
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Input
-                        value={row.name}
-                        onChange={(e) => updateRow(i, 'name', e.target.value)}
-                        placeholder="Product Name"
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Input
-                        value={row.brand}
-                        onChange={(e) => updateRow(i, 'brand', e.target.value)}
-                        placeholder="Brand"
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Select
-                        value={row.warehouse_id}
-                        onValueChange={(v) => updateRow(i, 'warehouse_id', v)}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {warehouses.map((w) => (
-                            <SelectItem key={w.id} value={w.id}>
-                              {w.warehouseName}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </TableCell>
-                    <TableCell>
-                      <Select
-                        value={String(row.vendor_id)}
-                        onValueChange={(v) => updateRow(i, 'vendor_id', v)}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {vendors.map((v) => (
-                            <SelectItem key={v.id} value={String(v.id)}>
-                              {v.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </TableCell>
-                    <TableCell>
-                      <Select
-                        value={row.product_status}
-                        onValueChange={(v) => updateRow(i, 'product_status', v)}
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="AVAILABLE">Available</SelectItem>
-                          <SelectItem value="RENTED">Rented</SelectItem>
-                          <SelectItem value="LEASE">Lease</SelectItem>
-                          <SelectItem value="SOLD">Sold</SelectItem>
-                          <SelectItem value="DAMAGED">Damaged</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </TableCell>
-                    <TableCell>
-                      <Input
-                        type="date"
-                        value={
-                          row.MFD
-                            ? row.MFD instanceof Date
-                              ? row.MFD.toISOString().split('T')[0]
-                              : String(row.MFD).split('T')[0]
-                            : ''
-                        }
-                        onChange={(e) => updateRow(i, 'MFD', e.target.value)}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Input
-                        type="number"
-                        value={row.sale_price}
-                        onChange={(e) => updateRow(i, 'sale_price', Number(e.target.value))}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Input
-                        type="number"
-                        value={row.tax_rate}
-                        onChange={(e) => updateRow(i, 'tax_rate', Number(e.target.value))}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Select
-                        value={row.print_colour}
-                        onValueChange={(v) => updateRow(i, 'print_colour', v)}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Colour" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="BLACK_WHITE">B&W</SelectItem>
-                          <SelectItem value="COLOUR">Colour</SelectItem>
-                          <SelectItem value="BOTH">Both</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </TableCell>
-                    <TableCell>
-                      <Input
-                        type="number"
-                        value={row.max_discount_amount}
-                        onChange={(e) =>
-                          updateRow(i, 'max_discount_amount', Number(e.target.value))
-                        }
-                        placeholder="0"
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <button
-                        onClick={() => handleRemoveRow(i)}
-                        className="text-red-500 hover:text-red-700"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </TableCell>
+            <div className="min-w-max">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="min-w-[200px]">
+                      Model <span className="text-red-500">*</span>
+                    </TableHead>
+                    <TableHead className="min-w-[150px]">
+                      Serial No <span className="text-red-500">*</span>
+                    </TableHead>
+                    <TableHead className="min-w-[180px]">
+                      Name <span className="text-red-500">*</span>
+                    </TableHead>
+                    <TableHead className="min-w-[140px]">Brand</TableHead>
+                    <TableHead className="min-w-[180px]">
+                      Warehouse <span className="text-red-500">*</span>
+                    </TableHead>
+                    <TableHead className="min-w-[180px]">
+                      Vendor <span className="text-red-500">*</span>
+                    </TableHead>
+                    <TableHead className="min-w-[130px]">Status</TableHead>
+                    <TableHead className="min-w-[150px]">MFD</TableHead>
+                    <TableHead className="min-w-[120px]">Price</TableHead>
+                    <TableHead className="min-w-[100px]">Tax %</TableHead>
+                    <TableHead className="min-w-[140px]">Print Colour</TableHead>
+                    <TableHead className="min-w-[130px]">Max Discount</TableHead>
+                    <TableHead className="min-w-[60px]"></TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {rows.map((row, i) => (
+                    <TableRow key={i}>
+                      <TableCell className="min-w-[200px]">
+                        <Input
+                          value={row.model_id}
+                          onChange={(e) => updateRow(i, 'model_id', e.target.value)}
+                          placeholder="Model ID"
+                          className="min-w-full"
+                        />
+                      </TableCell>
+                      <TableCell className="min-w-[150px]">
+                        <Input
+                          value={row.serial_no}
+                          onChange={(e) => updateRow(i, 'serial_no', e.target.value)}
+                          placeholder="Serial #"
+                          className="min-w-full"
+                        />
+                      </TableCell>
+                      <TableCell className="min-w-[180px]">
+                        <Input
+                          value={row.name}
+                          onChange={(e) => updateRow(i, 'name', e.target.value)}
+                          placeholder="Product Name"
+                          className="min-w-full"
+                        />
+                      </TableCell>
+                      <TableCell className="min-w-[140px]">
+                        <Input
+                          value={row.brand}
+                          onChange={(e) => updateRow(i, 'brand', e.target.value)}
+                          placeholder="Brand"
+                          className="min-w-full"
+                        />
+                      </TableCell>
+                      <TableCell className="min-w-[180px]">
+                        <Select
+                          value={row.warehouse_id}
+                          onValueChange={(v) => updateRow(i, 'warehouse_id', v)}
+                        >
+                          <SelectTrigger className="min-w-full">
+                            <SelectValue placeholder="Select" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {warehouses.map((w) => (
+                              <SelectItem key={w.id} value={w.id}>
+                                {w.warehouseName}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </TableCell>
+                      <TableCell className="min-w-[180px]">
+                        <Select
+                          value={String(row.vendor_id)}
+                          onValueChange={(v) => updateRow(i, 'vendor_id', v)}
+                        >
+                          <SelectTrigger className="min-w-full">
+                            <SelectValue placeholder="Select" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {vendors.map((v) => (
+                              <SelectItem key={v.id} value={String(v.id)}>
+                                {v.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </TableCell>
+                      <TableCell className="min-w-[130px]">
+                        <Select
+                          value={row.product_status}
+                          onValueChange={(v) => updateRow(i, 'product_status', v)}
+                        >
+                          <SelectTrigger className="min-w-full">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="AVAILABLE">Available</SelectItem>
+                            <SelectItem value="RENTED">Rented</SelectItem>
+                            <SelectItem value="LEASE">Lease</SelectItem>
+                            <SelectItem value="SOLD">Sold</SelectItem>
+                            <SelectItem value="DAMAGED">Damaged</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </TableCell>
+                      <TableCell className="min-w-[150px]">
+                        <Input
+                          type="date"
+                          value={
+                            row.MFD
+                              ? row.MFD instanceof Date
+                                ? row.MFD.toISOString().split('T')[0]
+                                : String(row.MFD).split('T')[0]
+                              : ''
+                          }
+                          onChange={(e) => updateRow(i, 'MFD', e.target.value)}
+                          className="min-w-full"
+                        />
+                      </TableCell>
+                      <TableCell className="min-w-[120px]">
+                        <Input
+                          type="number"
+                          value={row.sale_price}
+                          onChange={(e) => updateRow(i, 'sale_price', Number(e.target.value))}
+                          className="min-w-full"
+                        />
+                      </TableCell>
+                      <TableCell className="min-w-[100px]">
+                        <Input
+                          type="number"
+                          value={row.tax_rate}
+                          onChange={(e) => updateRow(i, 'tax_rate', Number(e.target.value))}
+                          className="min-w-full"
+                        />
+                      </TableCell>
+                      <TableCell className="min-w-[140px]">
+                        <Select
+                          value={row.print_colour}
+                          onValueChange={(v) => updateRow(i, 'print_colour', v)}
+                        >
+                          <SelectTrigger className="min-w-full">
+                            <SelectValue placeholder="Colour" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="BLACK_WHITE">B&W</SelectItem>
+                            <SelectItem value="COLOUR">Colour</SelectItem>
+                            <SelectItem value="BOTH">Both</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </TableCell>
+                      <TableCell className="min-w-[130px]">
+                        <Input
+                          type="number"
+                          value={row.max_discount_amount}
+                          onChange={(e) =>
+                            updateRow(i, 'max_discount_amount', Number(e.target.value))
+                          }
+                          placeholder="0"
+                          className="min-w-full"
+                        />
+                      </TableCell>
+                      <TableCell className="min-w-[60px]">
+                        <button
+                          onClick={() => handleRemoveRow(i)}
+                          className="text-red-500 hover:text-red-700"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           ) : (
             <div className="h-full flex flex-col items-center justify-center text-gray-400">
               <Upload size={48} className="mb-4 opacity-20" />

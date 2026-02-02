@@ -70,7 +70,7 @@ export default function AddSparePartDialog({
   const loadDependencies = async () => {
     try {
       const [whRes, modelRes, vendorRes] = await Promise.all([
-        warehouseService.getWarehouses(),
+        warehouseService.getWarehousesByBranch(),
         modelService.getAllModels(),
         vendorService.getVendors(),
       ]);

@@ -32,7 +32,7 @@ import { SparePart } from './sparePartEntity';
   `("model_id" IS NOT NULL AND "spare_part_id" IS NULL) OR ("model_id" IS NULL AND "spare_part_id" IS NOT NULL)`,
 )
 @Check(`"max_discount_amount" >= 0`)
-@Check(`"max_discount_amount" <= "sale_price"`)
+// Removed: @Check(`"max_discount_amount" <= "sale_price"`) - validation moved to application layer
 export class Product {
   @PrimaryGeneratedColumn('uuid')
   id!: string;

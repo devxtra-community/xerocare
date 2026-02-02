@@ -280,7 +280,7 @@ function ProductFormModal({
         const [m, v, w] = await Promise.all([
           modelService.getAllModels(),
           commonService.getAllVendors(),
-          commonService.getAllWarehouses(),
+          commonService.getWarehousesByBranch(),
         ]);
         setModels(m);
         setVendors(v);

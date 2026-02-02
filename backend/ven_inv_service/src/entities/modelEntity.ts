@@ -19,24 +19,8 @@ export class Model {
   @Column({ type: 'text', nullable: true })
   description!: string;
 
-  // Pricing columns currently missing in DB schema, commenting out to fix 500 error
-  // @Column({ type: 'numeric', precision: 12, scale: 2, default: 0 })
-  // rent_price_monthly!: number;
-
-  // @Column({ type: 'numeric', precision: 12, scale: 2, default: 0 })
-  // rent_price_yearly!: number;
-
-  // @Column({ type: 'numeric', precision: 12, scale: 2, default: 0 })
-  // lease_price_monthly!: number;
-
-  // @Column({ type: 'numeric', precision: 12, scale: 2, default: 0 })
-  // lease_price_yearly!: number;
-
-  // @Column({ type: 'numeric', precision: 12, scale: 2, default: 0 })
-  // sale_price!: number;
-
-  // @Column({ type: 'numeric', precision: 12, scale: 2, default: 0 })
-  // wholesale_price!: number;
+  @Column({ type: 'numeric', default: 0 })
+  quantity!: number;
 
   @OneToMany(() => Product, (product) => product.model)
   products!: Product[];

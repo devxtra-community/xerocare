@@ -28,7 +28,6 @@ import HRAttendanceDetailDialog, {
 export default function HRAttendanceTable() {
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState('All');
-  const [branchFilter, setBranchFilter] = useState('All');
   const [statusFilter, setStatusFilter] = useState('All');
   const [employees, setEmployees] = useState<AttendanceEmployee[]>([]);
   const [pagination, setPagination] = useState<EmployeeResponse['pagination']>({
@@ -71,10 +70,6 @@ export default function HRAttendanceTable() {
     fetchEmployees(1);
   }, [fetchEmployees]);
 
-  const branches = Array.from(
-    new Set(employees.map((emp) => emp.branch?.name).filter(Boolean)),
-  ) as string[];
-
   const filteredEmployees = employees.filter((emp) => {
     const fullName = `${emp.first_name || ''} ${emp.last_name || ''}`.toLowerCase();
     const matchesSearch =
@@ -82,9 +77,8 @@ export default function HRAttendanceTable() {
       emp.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       emp.display_id?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesRole = roleFilter === 'All' || emp.role === roleFilter;
-    const matchesBranch = branchFilter === 'All' || emp.branch?.name === branchFilter;
     const matchesStatus = statusFilter === 'All' || emp.todayStatus === statusFilter;
-    return matchesSearch && matchesRole && matchesBranch && matchesStatus;
+    return matchesSearch && matchesRole && matchesStatus;
   });
 
   const handleViewDetails = (emp: AttendanceEmployee) => {
@@ -128,33 +122,6 @@ export default function HRAttendanceTable() {
                 <DropdownMenuItem onClick={() => setRoleFilter('FINANCE')}>
                   Finance
                 </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="outline"
-                  className="h-10 bg-white border-blue-400/60 focus:ring-blue-100 rounded-xl justify-between px-3 min-w-[120px]"
-                >
-                  <Filter className="h-4 w-4 mr-2" />
-                  <span className="truncate">
-                    {branchFilter === 'All' ? 'All Branches' : branchFilter}
-                  </span>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent
-                align="end"
-                className="rounded-xl max-h-[300px] overflow-y-auto w-48"
-              >
-                <DropdownMenuItem onClick={() => setBranchFilter('All')}>
-                  All Branches
-                </DropdownMenuItem>
-                {branches.map((branch) => (
-                  <DropdownMenuItem key={branch} onClick={() => setBranchFilter(branch)}>
-                    {branch}
-                  </DropdownMenuItem>
-                ))}
               </DropdownMenuContent>
             </DropdownMenu>
 
