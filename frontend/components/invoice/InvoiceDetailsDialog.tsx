@@ -17,14 +17,14 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { FileText, Calendar, IndianRupee, Printer, Mail, Phone } from 'lucide-react';
+import { FileText, Calendar, IndianRupee, Printer, Mail, Phone, X, Loader2 } from 'lucide-react';
 import { Invoice } from '@/lib/invoice';
 
 interface InvoiceDetailsDialogProps {
   invoice: Invoice;
   onClose: () => void;
-  onApprove?: () => void;
-  onReject?: (reason: string) => void;
+  onApprove?: () => Promise<void> | void;
+  onReject?: (reason: string) => Promise<void> | void;
   approveLabel?: string;
   mode?: 'EMPLOYEE' | 'FINANCE';
   onSuccess?: () => void; // Optional callback for internal dialog state if needed
@@ -40,6 +40,35 @@ export function InvoiceDetailsDialog({
 }: InvoiceDetailsDialogProps) {
   const [rejectReason, setRejectReason] = React.useState('');
   const [rejecting, setRejecting] = React.useState(false);
+  const [isLoading, setIsLoading] = React.useState(false);
+
+  const handleApprove = async () => {
+    if (!onApprove) return;
+    setIsLoading(true);
+    try {
+      await onApprove();
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleReject = async () => {
+    if (!onReject) return;
+    if (!rejectReason.trim()) {
+      toast.error('Please provide a rejection reason');
+      return;
+    }
+    setIsLoading(true);
+    try {
+      await onReject(rejectReason);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
   const handleShareWhatsApp = () => {
     if (!invoice.customerPhone) {
       alert('Customer phone number not available.');
@@ -78,7 +107,7 @@ export function InvoiceDetailsDialog({
               </DialogDescription>
             </div>
           </div>
-          <div className="absolute top-8 right-8">
+          <div className="absolute top-6 right-6 flex items-center gap-3">
             <Badge
               variant="secondary"
               className={`rounded-full px-3 py-1 text-[10px] font-bold tracking-wider shadow-none
@@ -90,6 +119,12 @@ export function InvoiceDetailsDialog({
             >
               {invoice.status}
             </Badge>
+            <button
+              onClick={onClose}
+              className="p-2 rounded-full bg-gray-50 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
+            >
+              <X size={18} />
+            </button>
           </div>
         </DialogHeader>
 
@@ -153,6 +188,36 @@ export function InvoiceDetailsDialog({
                   </p>
                 </div>
               </div>
+
+              {/* Monthly Rent Display */}
+              {invoice.monthlyRent !== undefined && invoice.monthlyRent > 0 && (
+                <div className="space-y-1">
+                  <p className="text-[10px] font-bold text-orange-400 uppercase tracking-wider">
+                    Monthly Rent
+                  </p>
+                  <div className="flex items-center gap-2 text-gray-700">
+                    <IndianRupee size={14} className="opacity-50" />
+                    <p className="text-xs font-bold">
+                      ₹{invoice.monthlyRent.toLocaleString('en-IN')}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Advance Amount Display */}
+              {invoice.advanceAmount !== undefined && invoice.advanceAmount > 0 && (
+                <div className="space-y-1">
+                  <p className="text-[10px] font-bold text-orange-400 uppercase tracking-wider">
+                    Advance Amount
+                  </p>
+                  <div className="flex items-center gap-2 text-gray-700">
+                    <IndianRupee size={14} className="opacity-50" />
+                    <p className="text-xs font-bold">
+                      ₹{invoice.advanceAmount.toLocaleString('en-IN')}
+                    </p>
+                  </div>
+                </div>
+              )}
               {/* Show Included Limits / Excess if relevant (simplified view) */}
               {invoice.items?.some((i) => i.itemType === 'PRICING_RULE') && (
                 <div className="col-span-2 mt-2 pt-4 border-t border-orange-200/50">
@@ -304,8 +369,8 @@ export function InvoiceDetailsDialog({
           </div>
         </div>
 
-        <div className="p-8 bg-gray-50/50 border-t border-gray-100 flex items-center justify-between">
-          <div>
+        <div className="p-6 bg-gray-50/50 border-t border-gray-100 flex flex-col md:flex-row items-center justify-between gap-6">
+          <div className="flex flex-col items-center md:items-start">
             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider leading-none mb-1">
               Grand Total
             </p>
@@ -313,100 +378,113 @@ export function InvoiceDetailsDialog({
               ₹{(invoice.totalAmount || 0).toLocaleString()}
             </p>
           </div>
-          <div className="flex gap-4">
-            <button
-              onClick={onClose}
-              className="text-sm font-bold text-gray-900 hover:text-gray-600 transition-colors"
-            >
-              Close
-            </button>
 
-            <Button
-              variant="outline"
-              size="icon"
-              className="rounded-xl h-11 w-11 border-green-200 text-green-600 hover:bg-green-50 hover:text-green-700"
-              onClick={handleShareWhatsApp}
-              title="Share on WhatsApp"
-            >
-              <Phone size={18} />
-            </Button>
+          <div className="flex flex-col sm:flex-row items-center gap-4 w-full md:w-auto">
+            {/* Utility Actions */}
+            <div className="flex items-center gap-2 p-1 bg-white rounded-xl border border-gray-100 shadow-sm">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="rounded-lg h-9 w-9 text-gray-500 hover:text-green-600 hover:bg-green-50"
+                onClick={handleShareWhatsApp}
+                title="Share on WhatsApp"
+              >
+                <Phone size={16} />
+              </Button>
+              <div className="w-px h-4 bg-gray-100" />
+              <Button
+                variant="ghost"
+                size="icon"
+                className="rounded-lg h-9 w-9 text-gray-500 hover:text-blue-600 hover:bg-blue-50"
+                onClick={handleSendEmail}
+                title="Send Email"
+              >
+                <Mail size={16} />
+              </Button>
+              <div className="w-px h-4 bg-gray-100" />
+              <Button
+                variant="ghost"
+                size="icon"
+                className="rounded-lg h-9 w-9 text-gray-500 hover:text-indigo-600 hover:bg-indigo-50"
+                onClick={() => window.print()}
+                title="Print Invoice"
+              >
+                <Printer size={16} />
+              </Button>
+            </div>
 
-            <Button
-              variant="outline"
-              size="icon"
-              className="rounded-xl h-11 w-11 border-blue-200 text-blue-600 hover:bg-blue-50 hover:text-blue-700"
-              onClick={handleSendEmail}
-              title="Send Email"
-            >
-              <Mail size={18} />
-            </Button>
+            {/* Separator on Desktop */}
+            <div className="hidden md:block w-px h-8 bg-gray-200" />
 
-            <Button
-              className="rounded-xl h-11 px-6 font-bold bg-primary text-white shadow-lg hover:bg-primary/90 transition-all"
-              onClick={() => window.print()}
-            >
-              Print
-            </Button>
-
-            {mode === 'FINANCE' && invoice.status === 'EMPLOYEE_APPROVED' ? (
-              rejecting ? (
-                <div className="flex-1 flex gap-2 items-center animate-in slide-in-from-right-4">
-                  <input
-                    className="flex-1 text-xs p-2 border border-red-200 rounded-lg bg-red-50 focus:bg-white focus:border-red-400 outline-none transition-all placeholder:text-red-300"
-                    placeholder="Reason for rejection..."
-                    value={rejectReason}
-                    onChange={(e) => setRejectReason(e.target.value)}
-                    autoFocus
-                  />
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setRejecting(false)}
-                    className="text-slate-500 hover:text-slate-800"
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    size="sm"
-                    className="bg-red-600 hover:bg-red-700 text-white shadow-sm border border-red-700"
-                    onClick={() => {
-                      if (onReject && rejectReason.trim()) {
-                        onReject(rejectReason);
-                      } else {
-                        toast.error('Please provide a rejection reason');
-                      }
-                    }}
-                  >
-                    Confirm Reject
-                  </Button>
-                </div>
-              ) : (
-                <>
-                  <Button
-                    className="rounded-xl h-11 px-6 font-bold bg-red-50 text-red-600 border border-red-100 hover:bg-red-100 transition-all"
-                    onClick={() => setRejecting(true)}
-                  >
-                    Reject
-                  </Button>
-                  <Button
-                    className="rounded-xl h-11 px-6 font-bold bg-green-600 text-white shadow-lg hover:bg-green-700 transition-all"
-                    onClick={onApprove}
-                  >
-                    Approve
-                  </Button>
-                </>
-              )
-            ) : (
-              onApprove &&
-              (invoice.status === 'DRAFT' || invoice.status === 'SENT') && (
+            {/* Main Decision Actions */}
+            <div className="flex items-center gap-3 w-full sm:w-auto">
+              {mode === 'FINANCE' && invoice.status === 'EMPLOYEE_APPROVED' ? (
+                rejecting ? (
+                  <div className="flex-1 flex gap-2 items-center animate-in slide-in-from-right-4 w-full sm:w-auto">
+                    <input
+                      className="flex-1 min-w-[140px] text-xs p-2 h-10 border border-red-200 rounded-lg bg-red-50 focus:bg-white focus:border-red-400 outline-none transition-all placeholder:text-red-300"
+                      placeholder="Reason..."
+                      value={rejectReason}
+                      onChange={(e) => setRejectReason(e.target.value)}
+                      autoFocus
+                    />
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setRejecting(false)}
+                      className="h-10 text-slate-500 hover:text-slate-800"
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      size="sm"
+                      className="h-10 bg-red-600 hover:bg-red-700 text-white shadow-sm border border-red-700 px-4"
+                      onClick={handleReject}
+                      disabled={isLoading}
+                    >
+                      {isLoading ? <Loader2 className="animate-spin h-4 w-4 mr-2" /> : null}
+                      Confirm
+                    </Button>
+                  </div>
+                ) : (
+                  <>
+                    <Button
+                      variant="outline"
+                      className="flex-1 sm:flex-none rounded-xl h-10 px-6 font-bold text-red-600 border-red-100 hover:bg-red-50 hover:text-red-700 hover:border-red-200"
+                      onClick={() => setRejecting(true)}
+                      disabled={isLoading}
+                    >
+                      Reject
+                    </Button>
+                    <Button
+                      className="flex-1 sm:flex-none rounded-xl h-10 px-8 font-bold bg-green-600 text-white shadow-lg shadow-green-100 hover:bg-green-700 hover:shadow-green-200 transition-all"
+                      onClick={handleApprove}
+                      disabled={isLoading}
+                    >
+                      {isLoading ? <Loader2 className="animate-spin h-4 w-4 mr-2" /> : null}
+                      Approve
+                    </Button>
+                  </>
+                )
+              ) : onApprove && (invoice.status === 'DRAFT' || invoice.status === 'SENT') ? (
                 <Button
-                  className="rounded-xl h-11 px-6 font-bold bg-blue-600 text-white shadow-lg hover:bg-blue-700 transition-all"
-                  onClick={onApprove}
+                  className="flex-1 sm:flex-none rounded-xl h-10 px-8 font-bold bg-blue-600 text-white shadow-lg shadow-blue-100 hover:bg-blue-700 hover:shadow-blue-200 transition-all"
+                  onClick={handleApprove}
+                  disabled={isLoading}
                 >
+                  {isLoading ? <Loader2 className="animate-spin h-4 w-4 mr-2" /> : null}
                   {approveLabel}
                 </Button>
-              )
-            )}
+              ) : (
+                <Button
+                  variant="ghost"
+                  className="flex-1 sm:flex-none rounded-xl h-10 px-6 font-bold text-gray-500 hover:bg-gray-100"
+                  onClick={onClose}
+                >
+                  Close
+                </Button>
+              )}
+            </div>
           </div>
         </div>
       </DialogContent>

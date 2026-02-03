@@ -189,6 +189,7 @@ export interface CollectionAlert {
   customerPhone?: string; // Added for display
   invoiceNumber: string;
   type: 'USAGE_PENDING' | 'INVOICE_PENDING';
+  saleType: string;
   dueDate: string;
 }
 

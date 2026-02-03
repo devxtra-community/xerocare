@@ -10,8 +10,6 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Label } from '@/components/ui/label';
 import { CustomerSelect } from '@/components/invoice/CustomerSelect';
 import { CreateInvoicePayload, Invoice } from '@/lib/invoice';
 import { ProductSelect, SelectableItem } from '@/components/invoice/ProductSelect';
@@ -44,7 +42,6 @@ export default function RentFormModal({
   lockSaleType?: boolean;
 }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [machineType, setMachineType] = useState<'BW' | 'COLOR' | 'BOTH'>('BOTH');
 
   // Initialize state. Use '' or undefined for numbers to avoid "0"
   const [form, setForm] = useState<{
@@ -663,46 +660,6 @@ export default function RentFormModal({
               <span className="w-2 h-2 rounded-full bg-indigo-400" /> Pricing Model
             </h4>
 
-            {/* Machine Configuration Selector */}
-            <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
-              <Label className="text-xs font-bold text-slate-500 uppercase block mb-3">
-                Machine Capabilities
-              </Label>
-              <RadioGroup
-                defaultValue="BOTH"
-                value={machineType}
-                onValueChange={(val: string) => setMachineType(val as 'BW' | 'COLOR' | 'BOTH')}
-                className="flex gap-6"
-              >
-                <div className="flex items-center space-x-2 bg-white px-3 py-2 rounded-lg border border-slate-100 shadow-sm">
-                  <RadioGroupItem value="BW" id="r-bw" />
-                  <Label
-                    htmlFor="r-bw"
-                    className="cursor-pointer text-sm font-semibold text-slate-700"
-                  >
-                    Black & White Only
-                  </Label>
-                </div>
-                <div className="flex items-center space-x-2 bg-white px-3 py-2 rounded-lg border border-slate-100 shadow-sm">
-                  <RadioGroupItem value="COLOR" id="r-color" />
-                  <Label
-                    htmlFor="r-color"
-                    className="cursor-pointer text-sm font-semibold text-slate-700"
-                  >
-                    Color Only
-                  </Label>
-                </div>
-                <div className="flex items-center space-x-2 bg-white px-3 py-2 rounded-lg border border-slate-100 shadow-sm">
-                  <RadioGroupItem value="BOTH" id="r-both" />
-                  <Label
-                    htmlFor="r-both"
-                    className="cursor-pointer text-sm font-semibold text-slate-700"
-                  >
-                    Both
-                  </Label>
-                </div>
-              </RadioGroup>
-            </div>
             <div className="p-5 rounded-xl bg-white border border-slate-100 shadow-sm space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
@@ -861,48 +818,37 @@ export default function RentFormModal({
                     {/* Limit Fields */}
                     {isFixed && form.rentType !== 'FIXED_FLAT' && (
                       <div className="col-span-6 md:col-span-3 space-y-1">
-                        {/* Logic to Hide B&W fields if COLOR only, etc */}
-                        {(!item.description.toLowerCase().includes('color') ||
-                          machineType !== 'BW') &&
-                          (!item.description.toLowerCase().includes('black') ||
-                            machineType !== 'COLOR') && (
-                            <>
-                              <label className="text-[9px] font-bold text-slate-400 uppercase">
-                                {item.description.startsWith('Combined')
-                                  ? 'Combined Limit'
-                                  : 'Free Limit'}
-                              </label>
-                              <Input
-                                type="number"
-                                placeholder="0"
-                                disabled={
-                                  (item.description.toLowerCase().includes('color') &&
-                                    machineType === 'BW') ||
-                                  (item.description.toLowerCase().includes('black') &&
-                                    machineType === 'COLOR')
-                                }
-                                value={
-                                  (item.description.startsWith('Combined')
-                                    ? item.combinedIncludedLimit
-                                    : item.description.startsWith('Black & White')
-                                      ? item.bwIncludedLimit
-                                      : item.colorIncludedLimit) ?? ''
-                                }
-                                onChange={(e) =>
-                                  updatePricingItem(
-                                    index,
-                                    item.description.startsWith('Combined')
-                                      ? 'combinedIncludedLimit'
-                                      : item.description.startsWith('Black & White')
-                                        ? 'bwIncludedLimit'
-                                        : 'colorIncludedLimit',
-                                    handleNumberInput(e.target.value),
-                                  )
-                                }
-                                className={`h-9 border-slate-200 ${(item.description.toLowerCase().includes('color') && machineType === 'BW') || (item.description.toLowerCase().includes('black') && machineType === 'COLOR') ? 'opacity-50' : ''}`}
-                              />
-                            </>
-                          )}
+                        {/* Logic to Hide B&W fields if COLOR only, etc - REMOVED, showing all */}
+                        <>
+                          <label className="text-[9px] font-bold text-slate-400 uppercase">
+                            {item.description.startsWith('Combined')
+                              ? 'Combined Limit'
+                              : 'Free Limit'}
+                          </label>
+                          <Input
+                            type="number"
+                            placeholder="0"
+                            value={
+                              (item.description.startsWith('Combined')
+                                ? item.combinedIncludedLimit
+                                : item.description.startsWith('Black & White')
+                                  ? item.bwIncludedLimit
+                                  : item.colorIncludedLimit) ?? ''
+                            }
+                            onChange={(e) =>
+                              updatePricingItem(
+                                index,
+                                item.description.startsWith('Combined')
+                                  ? 'combinedIncludedLimit'
+                                  : item.description.startsWith('Black & White')
+                                    ? 'bwIncludedLimit'
+                                    : 'colorIncludedLimit',
+                                handleNumberInput(e.target.value),
+                              )
+                            }
+                            className={`h-9 border-slate-200`}
+                          />
+                        </>
                       </div>
                     )}
 
