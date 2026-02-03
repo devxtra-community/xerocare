@@ -679,6 +679,7 @@ export class BillingService {
       customerId: string;
       invoiceNumber: string;
       type: 'USAGE_PENDING' | 'INVOICE_PENDING';
+      saleType: string;
       dueDate: Date;
     }> = [];
 
@@ -722,6 +723,7 @@ export class BillingService {
           customerId: contract.customerId,
           invoiceNumber: contract.invoiceNumber,
           type: 'USAGE_PENDING',
+          saleType: contract.saleType,
           dueDate: due,
         });
       } else {
@@ -732,6 +734,7 @@ export class BillingService {
             customerId: contract.customerId,
             invoiceNumber: contract.invoiceNumber,
             type: 'INVOICE_PENDING',
+            saleType: contract.saleType,
             dueDate: new Date(),
           });
         }

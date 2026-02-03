@@ -17,7 +17,7 @@ import { toast } from 'sonner';
 import UsageRecordingModal from './UsageRecordingModal';
 import { format, differenceInDays } from 'date-fns';
 
-export default function MonthlyCollectionTable() {
+export default function MonthlyCollectionTable({ mode }: { mode?: 'RENT' | 'LEASE' }) {
   const [alerts, setAlerts] = useState<CollectionAlert[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedContract, setSelectedContract] = useState<CollectionAlert | null>(null);
@@ -28,7 +28,9 @@ export default function MonthlyCollectionTable() {
     setLoading(true);
     try {
       const data = await getCollectionAlerts();
-      setAlerts(data);
+      // Client-side filtering
+      const filtered = mode ? data.filter((a) => a.saleType === mode) : data;
+      setAlerts(filtered);
     } catch (error) {
       console.error('Failed to fetch alerts', error);
       toast.error('Failed to load collection alerts');

@@ -40,8 +40,11 @@ export class InvoiceRepository {
       qb.andWhere('invoice.branchId = :branchId', { branchId });
     }
 
-    // EXCLUDE FINAL Invoices (Monthly Settlements) from the main list
-    qb.andWhere('invoice.type != :finalType', { finalType: InvoiceType.FINAL });
+    // EXCLUDE FINAL Invoices (Monthly Settlements) from the main list, UNLESS it's a direct SALE
+    qb.andWhere('(invoice.type != :finalType OR invoice.saleType = :saleType)', {
+      finalType: InvoiceType.FINAL,
+      saleType: 'SALE',
+    });
 
     return qb.getMany();
   }
@@ -63,8 +66,11 @@ export class InvoiceRepository {
       .where('invoice.branchId = :branchId', { branchId })
       .orderBy('invoice.createdAt', 'DESC');
 
-    // EXCLUDE FINAL Invoices
-    qb.andWhere('invoice.type != :finalType', { finalType: InvoiceType.FINAL });
+    // EXCLUDE FINAL Invoices (Monthly Settlements) from the main list, UNLESS it's a direct SALE which becomes FINAL
+    qb.andWhere('(invoice.type != :finalType OR invoice.saleType = :saleType)', {
+      finalType: InvoiceType.FINAL,
+      saleType: 'SALE',
+    });
 
     return qb.getMany();
   }

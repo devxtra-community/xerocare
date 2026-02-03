@@ -55,7 +55,7 @@ export default function RentPage() {
               Monthly Usage & Billing
             </h3>
             <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-1">
-              <MonthlyCollectionTable />
+              <MonthlyCollectionTable mode="RENT" />
             </div>
           </TabsContent>
         </Tabs>
