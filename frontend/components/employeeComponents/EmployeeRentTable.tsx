@@ -58,6 +58,7 @@ export default function EmployeeRentTable({ mode = 'EMPLOYEE' }: EmployeeRentTab
       if (mode === 'FINANCE') {
         const { getBranchInvoices } = await import('@/lib/invoice');
         data = await getBranchInvoices();
+        console.log('Finance Rent Invoices:', data);
       } else {
         data = await getMyInvoices();
       }

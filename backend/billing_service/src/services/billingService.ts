@@ -74,14 +74,29 @@ export class BillingService {
     // Rule: CPC models -> advanceConsumed = 0 (as per prompt)
     if (contract.rentType === RentType.FIXED_LIMIT || contract.rentType === RentType.FIXED_COMBO) {
       if (contract.advanceAmount && contract.advanceAmount > 0) {
-        // Deduct rent from advance (simplified logic: Assuming advance covers rent)
-        const maxDeductible = Number(contract.monthlyRent || 0); // Consumes 1 month rent
-        advanceAdjusted = Math.min(calcResult.netAmount, maxDeductible);
+        // Logic Update: Only consume advance for the FIRST month rent if Advance matches Monthly Rent.
+        // User Request: "if the customer has paid the 1st month rent as advance then no need to collect the first month rent again"
 
-        // Ensure strictly consumes monthlyRent if available
-        advanceAdjusted = Number(contract.monthlyRent || 0);
-        payableAmount = calcResult.netAmount - advanceAdjusted;
-        if (payableAmount < 0) payableAmount = 0;
+        // Check if this is the first invoice
+        const priorInvoiceCount = await this.invoiceRepo.countFinalInvoicesByContractId(
+          contract.id,
+        );
+        const isFirstInvoice = priorInvoiceCount === 0;
+
+        if (isFirstInvoice) {
+          // Deduct the rent portion from the total because it was already paid as advance.
+          // Usually this means we subtract Monthly Rent from the Net Amount.
+          // If Net Amount < Monthly Rent (e.g. partial month?), we cap it.
+
+          const rentComponent = Number(contract.monthlyRent || 0);
+          if (rentComponent > 0) {
+            // Set advanceAdjusted to the Rent Amount to indicate it's covered
+            advanceAdjusted = rentComponent;
+            // Reduce payable
+            payableAmount = calcResult.netAmount - advanceAdjusted;
+            if (payableAmount < 0) payableAmount = 0;
+          }
+        }
       }
     } else {
       // CPC
@@ -662,12 +677,27 @@ export class BillingService {
         latestUsage && new Date(latestUsage.billingPeriodStart) >= currentMonthStart;
 
       if (!isUsageDone) {
+        // Usage Due Date Rule: End of Billing Period + Grace Period (e.g. 5 days).
+        // Billing Period = Current Month (e.g. Feb 1 - Feb 28).
+        // Due Date = Feb 28 + 5 days = March 5.
+        // Alert is for "Current Month Usage", which is collected at cycle end.
+
+        const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0); // Last day of current month
+        const due = new Date(endOfMonth);
+        due.setDate(due.getDate() + 5); // Add 5 days grace period
+
+        // If today is past the due date?
+        // Actually, if we are in Feb, usage is due in March?
+        // Yes, usually usage is post-paid.
+        // Prompt says "due date proper". Maybe they want it to match contract effective date?
+        // Let's stick to "End of Period + 5 Days" as standard.
+
         alerts.push({
           contractId: contract.id,
           customerId: contract.customerId,
           invoiceNumber: contract.invoiceNumber,
           type: 'USAGE_PENDING',
-          dueDate: currentMonthStart, // or specific BILLING DATE from contract?
+          dueDate: due,
         });
       } else {
         // Usage Done. Check Invoice.

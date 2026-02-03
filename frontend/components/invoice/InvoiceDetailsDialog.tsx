@@ -6,6 +6,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog';
+import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import {
   Table,
@@ -348,61 +349,53 @@ export function InvoiceDetailsDialog({
             </Button>
 
             {mode === 'FINANCE' && invoice.status === 'EMPLOYEE_APPROVED' ? (
-              <>
-                <div className="relative">
-                  {rejecting ? (
-                    <div className="absolute bottom-full mb-2 right-0 bg-white p-3 rounded-xl shadow-xl border border-red-100 w-64 animate-in slide-in-from-bottom-2">
-                      <p className="text-[10px] font-bold text-slate-400 uppercase mb-2">
-                        Rejection Reason
-                      </p>
-                      <textarea
-                        className="w-full text-xs p-2 border rounded-md mb-2 h-20"
-                        placeholder="Why is this being rejected?"
-                        value={rejectReason}
-                        onChange={(e) => setRejectReason(e.target.value)}
-                      />
-                      <div className="flex justify-end gap-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 text-xs"
-                          onClick={() => setRejecting(false)}
-                        >
-                          Cancel
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="destructive"
-                          className="h-7 text-xs"
-                          onClick={() => {
-                            if (onReject && rejectReason) {
-                              onReject(rejectReason);
-                            } else {
-                              alert('Please provide a reason');
-                            }
-                          }}
-                        >
-                          Confirm Reject
-                        </Button>
-                      </div>
-                    </div>
-                  ) : (
-                    <Button
-                      className="rounded-xl h-11 px-6 font-bold bg-red-50 text-red-600 border border-red-100 hover:bg-red-100 transition-all"
-                      onClick={() => setRejecting(true)}
-                    >
-                      Reject
-                    </Button>
-                  )}
+              rejecting ? (
+                <div className="flex-1 flex gap-2 items-center animate-in slide-in-from-right-4">
+                  <input
+                    className="flex-1 text-xs p-2 border border-red-200 rounded-lg bg-red-50 focus:bg-white focus:border-red-400 outline-none transition-all placeholder:text-red-300"
+                    placeholder="Reason for rejection..."
+                    value={rejectReason}
+                    onChange={(e) => setRejectReason(e.target.value)}
+                    autoFocus
+                  />
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setRejecting(false)}
+                    className="text-slate-500 hover:text-slate-800"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    size="sm"
+                    className="bg-red-600 hover:bg-red-700 text-white shadow-sm border border-red-700"
+                    onClick={() => {
+                      if (onReject && rejectReason.trim()) {
+                        onReject(rejectReason);
+                      } else {
+                        toast.error('Please provide a rejection reason');
+                      }
+                    }}
+                  >
+                    Confirm Reject
+                  </Button>
                 </div>
-
-                <Button
-                  className="rounded-xl h-11 px-6 font-bold bg-green-600 text-white shadow-lg hover:bg-green-700 transition-all"
-                  onClick={onApprove}
-                >
-                  Approve
-                </Button>
-              </>
+              ) : (
+                <>
+                  <Button
+                    className="rounded-xl h-11 px-6 font-bold bg-red-50 text-red-600 border border-red-100 hover:bg-red-100 transition-all"
+                    onClick={() => setRejecting(true)}
+                  >
+                    Reject
+                  </Button>
+                  <Button
+                    className="rounded-xl h-11 px-6 font-bold bg-green-600 text-white shadow-lg hover:bg-green-700 transition-all"
+                    onClick={onApprove}
+                  >
+                    Approve
+                  </Button>
+                </>
+              )
             ) : (
               onApprove &&
               (invoice.status === 'DRAFT' || invoice.status === 'SENT') && (

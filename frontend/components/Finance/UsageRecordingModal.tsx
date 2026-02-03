@@ -12,9 +12,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { recordUsage } from '@/lib/invoice';
+import { recordUsage, getInvoiceById, Invoice } from '@/lib/invoice';
 import { toast } from 'sonner';
-import { Loader2 } from 'lucide-react';
+import { Loader2, IndianRupee } from 'lucide-react';
 
 interface UsageRecordingModalProps {
   isOpen: boolean;
@@ -32,16 +32,98 @@ export default function UsageRecordingModal({
   onSuccess,
 }: UsageRecordingModalProps) {
   const [loading, setLoading] = useState(false);
+  const [contract, setContract] = useState<Invoice | null>(null);
+  const [estimatedCost, setEstimatedCost] = useState<number>(0);
+
   const [formData, setFormData] = useState({
     billingPeriodStart: '',
     billingPeriodEnd: '',
-    bwA4Count: 0,
-    bwA3Count: 0,
-    colorA4Count: 0,
-    colorA3Count: 0,
+    bwA4Count: '', // Initialize as empty strings
+    bwA3Count: '',
+    colorA4Count: '',
+    colorA3Count: '',
     remarks: '',
   });
   const [file, setFile] = useState<File | null>(null);
+
+  React.useEffect(() => {
+    if (contractId) {
+      getInvoiceById(contractId)
+        .then((data) => {
+          setContract(data);
+          // Auto-calculate estimate if data exists (e.g. editing)
+        })
+        .catch((err) => console.error('Failed to fetch contract details:', err));
+    }
+  }, [contractId]);
+
+  // Determine Machine Capabilities from pricing items
+  const isBw = React.useMemo(() => {
+    if (!contract?.items) return true; // Default show all
+    return contract.items.some(
+      (i) =>
+        i.itemType === 'PRICING_RULE' &&
+        (i.description.includes('Black') || i.description.includes('Combined')),
+    );
+  }, [contract]);
+
+  const isColor = React.useMemo(() => {
+    if (!contract?.items) return true;
+    return contract.items.some(
+      (i) =>
+        i.itemType === 'PRICING_RULE' &&
+        (i.description.includes('Color') || i.description.includes('Combined')),
+    );
+  }, [contract]);
+
+  // Price Estimation Logic
+  React.useEffect(() => {
+    if (!contract) return;
+
+    // Rent Type Check: CPC = 0 Rent base. Fixed = Monthly Rent base.
+    // If rentType is missing, assume Fixed/Rent.
+    const isCpc = contract.rentType?.includes('CPC');
+    let total = isCpc ? 0 : contract.monthlyRent || 0;
+
+    // Usage Cost
+    const bwA4 = Number(formData.bwA4Count) || 0;
+    const bwA3 = Number(formData.bwA3Count) || 0; // Usually A3 is 2x A4 or separate? Assuming separate count.
+
+    const clrA4 = Number(formData.colorA4Count) || 0;
+    const clrA3 = Number(formData.colorA3Count) || 0;
+
+    // Simplify: Just sum inputs for now. Real logic needs explicit mapping to Rules.
+    // Assuming Rule 1 = B&W, Rule 2 = Color.
+    // NOTE: This is an ESTIMATE. The backend does full calculation.
+
+    const bwRule = contract.items?.find(
+      (i) => i.itemType === 'PRICING_RULE' && i.description.includes('Black'),
+    );
+    const colorRule = contract.items?.find(
+      (i) => i.itemType === 'PRICING_RULE' && i.description.includes('Color'),
+    );
+
+    if (bwRule) {
+      // Logic: A3 usually counts as 2x A4 in copy cost calculations (Standard Industry Practice)
+      // If user complained about calculation, this is the most likely missing factor.
+      const totalCount = bwA4 + bwA3 * 2;
+      const limit = bwRule.bwIncludedLimit || 0;
+
+      const excess = Math.max(0, totalCount - limit);
+      total += excess * (bwRule.bwExcessRate || 0);
+    }
+
+    if (colorRule) {
+      const totalCount = clrA4 + clrA3 * 2;
+      const limit = colorRule.colorIncludedLimit || 0;
+
+      const excess = Math.max(0, totalCount - limit);
+      total += excess * (colorRule.colorExcessRate || 0);
+    }
+
+    // Fix floating point precision issues (e.g. 5600.000001)
+    setEstimatedCost(Math.round((total + Number.EPSILON) * 100) / 100);
+  }, [formData, contract]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -82,6 +164,11 @@ export default function UsageRecordingModal({
     }
   };
 
+  const handleNumberInput = (val: string) => {
+    if (val === '') return '';
+    return val;
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[600px]">
@@ -111,41 +198,131 @@ export default function UsageRecordingModal({
           </div>
 
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>BW A4 Count</Label>
-              <Input
-                type="number"
-                min="0"
-                value={formData.bwA4Count}
-                onChange={(e) => setFormData({ ...formData, bwA4Count: Number(e.target.value) })}
-              />
+            {isBw &&
+              contract?.items?.find(
+                (i) => i.itemType === 'PRICING_RULE' && i.description.includes('Black'),
+              ) && (
+                <>
+                  <div className="space-y-2">
+                    <div className="flex justify-between">
+                      <Label>BW A4 Count</Label>
+                      <span className="text-xs text-slate-500">
+                        Free Limit:{' '}
+                        {contract.items.find((i) => i.description.includes('Black'))
+                          ?.bwIncludedLimit || 0}
+                      </span>
+                    </div>
+                    <Input
+                      type="number"
+                      min="0"
+                      value={formData.bwA4Count}
+                      onChange={(e) =>
+                        setFormData({ ...formData, bwA4Count: handleNumberInput(e.target.value) })
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>BW A3 Count</Label>
+                    <Input
+                      type="number"
+                      min="0"
+                      value={formData.bwA3Count}
+                      onChange={(e) =>
+                        setFormData({ ...formData, bwA3Count: handleNumberInput(e.target.value) })
+                      }
+                    />
+                    <p className="text-[10px] text-slate-400 text-right">Counts as 2x copies</p>
+                  </div>
+                </>
+              )}
+
+            {isColor &&
+              contract?.items?.find(
+                (i) => i.itemType === 'PRICING_RULE' && i.description.includes('Color'),
+              ) && (
+                <>
+                  <div className="space-y-2">
+                    <div className="flex justify-between">
+                      <Label>Color A4 Count</Label>
+                      <span className="text-xs text-slate-500">
+                        Free Limit:{' '}
+                        {contract.items.find((i) => i.description.includes('Color'))
+                          ?.colorIncludedLimit || 0}
+                      </span>
+                    </div>
+                    <Input
+                      type="number"
+                      min="0"
+                      value={formData.colorA4Count}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          colorA4Count: handleNumberInput(e.target.value),
+                        })
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Color A3 Count</Label>
+                    <Input
+                      type="number"
+                      min="0"
+                      value={formData.colorA3Count}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          colorA3Count: handleNumberInput(e.target.value),
+                        })
+                      }
+                    />
+                    <p className="text-[10px] text-slate-400 text-right">Counts as 2x copies</p>
+                  </div>
+                </>
+              )}
+          </div>
+
+          <div className="bg-slate-50 rounded-lg border border-slate-200 overflow-hidden">
+            <div className="p-3 border-b border-slate-200 bg-slate-100/50 flex justify-between items-center">
+              <span className="text-xs font-bold text-slate-500 uppercase">Usage Summary</span>
             </div>
-            <div className="space-y-2">
-              <Label>BW A3 Count</Label>
-              <Input
-                type="number"
-                min="0"
-                value={formData.bwA3Count}
-                onChange={(e) => setFormData({ ...formData, bwA3Count: Number(e.target.value) })}
-              />
+            <div className="p-4 grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">
+                  Total A4 Copies
+                </p>
+                <p className="text-lg font-bold text-slate-700">
+                  {(Number(formData.bwA4Count) + Number(formData.colorA4Count)).toLocaleString()}
+                </p>
+              </div>
+              <div>
+                <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">
+                  Total A3 Copies
+                </p>
+                <p className="text-lg font-bold text-slate-700">
+                  {(Number(formData.bwA3Count) + Number(formData.colorA3Count)).toLocaleString()}
+                </p>
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label>Color A4 Count</Label>
-              <Input
-                type="number"
-                min="0"
-                value={formData.colorA4Count}
-                onChange={(e) => setFormData({ ...formData, colorA4Count: Number(e.target.value) })}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Color A3 Count</Label>
-              <Input
-                type="number"
-                min="0"
-                value={formData.colorA3Count}
-                onChange={(e) => setFormData({ ...formData, colorA3Count: Number(e.target.value) })}
-              />
+            <div className="p-4 bg-blue-50/50 border-t border-blue-100">
+              <div className="flex justify-between items-center">
+                <div>
+                  <Label className="text-xs font-bold text-blue-600 uppercase block">
+                    Grand Total Estimated
+                  </Label>
+                  <span className="text-[10px] text-blue-400 font-medium">
+                    {contract?.rentType?.includes('CPC')
+                      ? '(Usage Cost Only)'
+                      : '(Rent + Excess Usage)'}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1 text-2xl font-bold text-blue-700">
+                  <IndianRupee size={22} className="mt-1" />
+                  {estimatedCost.toLocaleString('en-IN', {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}
+                </div>
+              </div>
             </div>
           </div>
 

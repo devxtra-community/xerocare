@@ -169,7 +169,14 @@ const fetchCustomerDetails = async (
     customerCache.set(id, { name, phone, email, timestamp: Date.now() });
 
     return { name, phone, email };
-  } catch {
+  } catch (error: unknown) {
+    const err = error as { message?: string; response?: { status?: number; data?: unknown } };
+    logger.error(`Failed to fetch customer details for ID: ${id}`, {
+      message: err.message,
+      status: err.response?.status,
+      data: err.response?.data,
+      url: url,
+    });
     return defaultRes;
   }
 };
@@ -344,6 +351,11 @@ export class InvoiceAggregationService {
         },
       );
       const invoices = billingResponse.data.data;
+      if (invoices.length > 0) {
+        logger.info(
+          `Branch Invoices Sample: ID=${invoices[0].id}, CustomerID=${invoices[0].customerId}`,
+        );
+      }
 
       const aggregated = await Promise.all(
         invoices.map(async (inv) => {
@@ -793,11 +805,14 @@ export class InvoiceAggregationService {
       };
     } catch (error: unknown) {
       if (axios.isAxiosError(error)) {
-        logger.error('Axios error in generate final invoice', {
+        logger.error('[API Gateway] Axios error in generateFinalInvoice', {
+          url: error.config?.url,
           message: error.message,
           responseStatus: error.response?.status,
-          responseData: error.response?.data,
+          responseBody: error.response?.data,
         });
+
+        // Propagate the exact error message from Billing Service
         throw new AppError(
           error.response?.data?.message || 'Failed to generate final invoice',
           error.response?.status || 500,
@@ -828,6 +843,7 @@ export class InvoiceAggregationService {
           return {
             ...alert,
             customerName: customerDetails.name,
+            customerPhone: customerDetails.phone,
           };
         }),
       );

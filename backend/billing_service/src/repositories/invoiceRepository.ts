@@ -77,6 +77,15 @@ export class InvoiceRepository {
     });
   }
 
+  async countFinalInvoicesByContractId(contractId: string): Promise<number> {
+    return this.repo.count({
+      where: {
+        referenceContractId: contractId,
+        type: InvoiceType.FINAL,
+      },
+    });
+  }
+
   async getStats(
     filter: {
       createdBy?: string;

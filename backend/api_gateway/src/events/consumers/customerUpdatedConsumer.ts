@@ -15,8 +15,8 @@ export const startCustomerConsumer = async () => {
 
           if (id && name) {
             // Update Redis cache
-            // Key format: customer:{id} -> name
-            await redis.set(`customer:${id}`, name);
+            // Key format: customer:{id}:name -> name
+            await redis.set(`customer:${id}:name`, name);
             logger.info(`Updated customer cache via RabbitMQ: ${id} -> ${name}`);
           }
 
