@@ -319,7 +319,12 @@ export class BillingService {
       monthlyEmiAmount: payload.monthlyEmiAmount,
       monthlyLeaseAmount: payload.monthlyLeaseAmount,
 
-      totalAmount: calculatedTotal == 0 ? payload.advanceAmount || 0 : calculatedTotal,
+      totalAmount:
+        payload.saleType === SaleType.LEASE
+          ? payload.advanceAmount || 0
+          : calculatedTotal == 0
+            ? payload.advanceAmount || 0
+            : calculatedTotal,
       items: invoiceItems,
     });
 
@@ -537,6 +542,7 @@ export class BillingService {
       invoice.type = InvoiceType.PROFORMA; // Converts to Contract
       // Keep status as FINANCE_APPROVED (which implies Active Contract)
     } else if (invoice.saleType === SaleType.LEASE) {
+      invoice.type = InvoiceType.PROFORMA; // Converts to Contract
       invoice.status = InvoiceStatus.ACTIVE_LEASE; // Explicit requirement: "LEASE status = ACTIVE_LEASE"
     }
 

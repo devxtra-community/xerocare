@@ -2,6 +2,7 @@ import { Repository, Between } from 'typeorm';
 import { Invoice } from '../entities/invoiceEntity';
 import { InvoiceStatus } from '../entities/enums/invoiceStatus';
 import { InvoiceType } from '../entities/enums/invoiceType';
+import { SaleType } from '../entities/enums/saleType';
 import { Source } from '../config/dataSource';
 
 export class InvoiceRepository {
@@ -330,7 +331,11 @@ export class InvoiceRepository {
             WHEN invoice.type = 'FINAL' THEN COALESCE(invoice.totalAmount, 0)
             WHEN invoice.saleType = 'SALE' AND invoice.status = 'FINANCE_APPROVED' THEN COALESCE(invoice.totalAmount, 0)
             WHEN invoice.saleType = 'RENT' AND invoice.status = 'FINANCE_APPROVED' THEN COALESCE(invoice.monthlyRent, 0)
-            WHEN invoice.saleType = 'LEASE' AND invoice.status = 'ACTIVE_LEASE' THEN COALESCE(invoice.monthlyLeaseAmount, 0)
+            WHEN invoice.saleType = 'LEASE' AND (invoice.status = 'ACTIVE_LEASE' OR invoice.status = 'FINANCE_APPROVED') THEN 
+              CASE 
+                WHEN invoice.leaseType = 'EMI' THEN COALESCE(invoice.monthlyEmiAmount, 0)
+                ELSE COALESCE(invoice.monthlyLeaseAmount, 0)
+              END
             ELSE COALESCE(invoice.totalAmount, 0)
           END
         )`,
@@ -343,7 +348,11 @@ export class InvoiceRepository {
             WHEN invoice.type = 'FINAL' THEN COALESCE(invoice.grossAmount, 0)
             WHEN invoice.saleType = 'SALE' THEN COALESCE(invoice.totalAmount, 0)
             WHEN invoice.saleType = 'RENT' THEN COALESCE(invoice.monthlyRent, 0)
-            WHEN invoice.saleType = 'LEASE' THEN COALESCE(invoice.monthlyLeaseAmount, 0)
+            WHEN invoice.saleType = 'LEASE' THEN 
+              CASE 
+                WHEN invoice.leaseType = 'EMI' THEN COALESCE(invoice.monthlyEmiAmount, 0)
+                ELSE COALESCE(invoice.monthlyLeaseAmount, 0)
+              END
             ELSE COALESCE(invoice.totalAmount, 0)
           END
         )`,
@@ -358,9 +367,14 @@ export class InvoiceRepository {
           InvoiceStatus.PAID,
         ],
       })
-      .andWhere('invoice.type != :quotationType', {
-        quotationType: InvoiceType.QUOTATION,
-      });
+      .andWhere(
+        '(invoice.type != :quotationType OR (invoice.saleType = :leaseType AND invoice.status = :activeLease))',
+        {
+          quotationType: InvoiceType.QUOTATION,
+          leaseType: SaleType.LEASE,
+          activeLease: InvoiceStatus.ACTIVE_LEASE,
+        },
+      );
 
     if (filter.branchId && filter.branchId !== 'All') {
       qb.andWhere('invoice.branchId = :branchId', { branchId: filter.branchId });

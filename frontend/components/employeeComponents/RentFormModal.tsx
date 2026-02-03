@@ -157,6 +157,7 @@ export default function RentFormModal({
           effectiveFrom: form.effectiveFrom,
           effectiveTo: form.effectiveTo || undefined,
           discountPercent: cleanNumber(form.discountPercent),
+          advanceAmount: cleanNumber(form.advanceAmount),
 
           items: selectedProducts.map((p) => ({
             description: `${p.name} - ${p.serial_no}`,
@@ -791,6 +792,23 @@ export default function RentFormModal({
                       />
                     </div>
                   )}
+                  {/* Advance Amount for Lease */}
+                  <div className="space-y-2">
+                    <label className="text-[11px] font-bold text-slate-500 uppercase">
+                      Advance Amount
+                    </label>
+                    <Input
+                      type="number"
+                      value={form.advanceAmount}
+                      onChange={(e) =>
+                        setForm({
+                          ...form,
+                          advanceAmount: handleNumberInput(e.target.value),
+                        })
+                      }
+                      className="font-bold text-slate-800"
+                    />
+                  </div>
                 </div>
               )}
 
