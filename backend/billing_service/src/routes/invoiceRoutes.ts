@@ -51,7 +51,8 @@ router.post(
   financeReject,
 );
 
-router.put('/:id/approve', authMiddleware, approveQuotation); // Keeping old approve? Or Deprecating? Prompt says "Employee can mark quotations as EMPLOYEE_APPROVED". Old approve was "approveQuotation". Might key to "EMPLOYEE_APPROVED" or is it "Finalize"?
+router.put('/:id/approve', authMiddleware, approveQuotation);
+// Keeping old approve? Or Deprecating? Prompt says "Employee can mark quotations as EMPLOYEE_APPROVED". Old approve was "approveQuotation". Might key to "EMPLOYEE_APPROVED" or is it "Finalize"?
 // User prompt: "Employee Approval Endpoint: POST /b/invoices/:id/employee-approve".
 // Old method "approveQuotation" likely converted to PROFORMA directly previously.
 // We should probably keep it but ensure it's not used by employee for bypassing finance?

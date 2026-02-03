@@ -7,15 +7,15 @@ export interface Lead {
   phone?: string;
   source?: string;
   status: 'new' | 'contacted' | 'qualified' | 'converted' | 'lost';
-  metadata: Record<string, unknown>;
+  metadata?: Record<string, unknown>;
   customerId?: string;
   isCustomer?: boolean;
   assignedTo?: string;
-  createdBy: string;
+  createdBy?: string;
   convertedBy?: string;
-  createdAt: string;
-  updatedAt: string;
   isDeleted?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface CreateLeadData {

@@ -176,6 +176,7 @@ export class BillingService {
     discountPercent?: number;
     effectiveFrom: string; // From UI usually string
     effectiveTo?: string;
+    totalAmount?: number;
 
     // Lease Fields
     leaseType?: LeaseType;
@@ -303,7 +304,7 @@ export class BillingService {
       monthlyEmiAmount: payload.monthlyEmiAmount,
       monthlyLeaseAmount: payload.monthlyLeaseAmount,
 
-      totalAmount: calculatedTotal,
+      totalAmount: calculatedTotal == 0 ? payload.advanceAmount || 0 : calculatedTotal,
       items: invoiceItems,
     });
 

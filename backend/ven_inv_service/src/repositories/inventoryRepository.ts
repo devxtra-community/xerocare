@@ -8,49 +8,46 @@ export class InventoryRepository {
 
   // ADMIN — GLOBAL INVENTORY (Model-based with quantity)
   async getGlobalInventory() {
-    // Return all models with their quantities and breakdown by status
-    const models = await this.modelRepo
+    const rawData = await this.modelRepo
       .createQueryBuilder('model')
+      .leftJoin('model.products', 'product', 'product.spare_part_id IS NULL')
       .select([
         'model.id AS id',
         'model.model_no AS model_no',
         'model.model_name AS model_name',
         'model.brand AS brand',
         'model.description AS description',
-        'model.quantity AS total_quantity',
       ])
-      .where('model.quantity > 0') // Only show models with products
-      .orderBy('model.model_name', 'ASC')
+      .addSelect('COUNT(product.id)', 'total_quantity')
+      .addSelect(
+        "COUNT(CASE WHEN product.product_status = 'AVAILABLE' THEN 1 END)",
+        'available_qty',
+      )
+      .addSelect("COUNT(CASE WHEN product.product_status = 'RENTED' THEN 1 END)", 'rented_qty')
+      .addSelect("COUNT(CASE WHEN product.product_status = 'LEASE' THEN 1 END)", 'lease_qty')
+      .addSelect("COUNT(CASE WHEN product.product_status = 'SOLD' THEN 1 END)", 'sold_qty')
+      .addSelect("COUNT(CASE WHEN product.product_status = 'DAMAGED' THEN 1 END)", 'damaged_qty')
+      // Only include models that have at least one product if desired, OR include all.
+      // The previous code filtered 'quantity > 0'.
+      // If we want to show only models with inventory, we can use HAVING or INNER JOIN.
+      // Given "inventory" context, usually implies things in stock.
+      // But user complained about "didn't getting any data". Safe bet is LEFT JOIN to show models even if empty, or filter `total_quantity > 0` in having.
+      // Sticking to LEFT JOIN results in all models. I'll add a filter if needed, but showing 0s is better than showing nothing when debuging.
+      // However, previous code explicitly had `.where('model.quantity > 0')`.
+      // I will filter out models with 0 total products to keep it identical to "inventory with items" logic, but fixing the source of truth.
+      .groupBy('model.id')
+      .having('COUNT(product.id) > 0')
       .getRawMany();
 
-    // For each model, get status breakdown
-    const enrichedModels = await Promise.all(
-      models.map(async (model) => {
-        const statusBreakdown = await this.productRepo
-          .createQueryBuilder('product')
-          .select([
-            `SUM(CASE WHEN product.product_status = 'AVAILABLE' THEN 1 ELSE 0 END)::int AS available_qty`,
-            `SUM(CASE WHEN product.product_status = 'RENTED' THEN 1 ELSE 0 END)::int AS rented_qty`,
-            `SUM(CASE WHEN product.product_status = 'LEASE' THEN 1 ELSE 0 END)::int AS lease_qty`,
-            `SUM(CASE WHEN product.product_status = 'DAMAGED' THEN 1 ELSE 0 END)::int AS damaged_qty`,
-            `SUM(CASE WHEN product.product_status = 'SOLD' THEN 1 ELSE 0 END)::int AS sold_qty`,
-          ])
-          .where('product.model_id = :modelId', { modelId: model.id })
-          .andWhere('product.spare_part_id IS NULL')
-          .getRawOne();
-
-        return {
-          ...model,
-          available_qty: Number(statusBreakdown?.available_qty || 0),
-          rented_qty: Number(statusBreakdown?.rented_qty || 0),
-          lease_qty: Number(statusBreakdown?.lease_qty || 0),
-          damaged_qty: Number(statusBreakdown?.damaged_qty || 0),
-          sold_qty: Number(statusBreakdown?.sold_qty || 0),
-        };
-      }),
-    );
-
-    return enrichedModels;
+    return rawData.map((item) => ({
+      ...item,
+      total_quantity: Number(item.total_quantity),
+      available_qty: Number(item.available_qty),
+      rented_qty: Number(item.rented_qty),
+      lease_qty: Number(item.lease_qty),
+      sold_qty: Number(item.sold_qty),
+      damaged_qty: Number(item.damaged_qty),
+    }));
   }
 
   // MANAGER — BRANCH INVENTORY (Model-based with warehouse breakdown)

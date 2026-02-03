@@ -461,6 +461,7 @@ export class InvoiceAggregationService {
       effectiveFrom: string;
       effectiveTo?: string;
       pricingItems: unknown[];
+      totalAmount?: number;
     },
     token: string,
   ): Promise<AggregatedInvoice> {

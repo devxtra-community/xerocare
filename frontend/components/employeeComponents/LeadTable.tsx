@@ -104,11 +104,12 @@ export function LeadTable({ leads, onRefresh, onEdit }: LeadTableProps) {
                     </span>
                   </TableCell>
                   <TableCell className="text-slate-500 text-xs font-medium whitespace-nowrap">
-                    {new Date(lead.createdAt).toLocaleDateString(undefined, {
-                      day: '2-digit',
-                      month: 'short',
-                      year: 'numeric',
-                    })}
+                    {lead.createdAt &&
+                      new Date(lead.createdAt).toLocaleDateString(undefined, {
+                        day: '2-digit',
+                        month: 'short',
+                        year: 'numeric',
+                      })}
                   </TableCell>
                   <TableCell className="text-center">
                     <div className="flex items-center justify-center gap-2">
