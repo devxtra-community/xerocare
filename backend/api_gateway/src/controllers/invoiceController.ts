@@ -251,3 +251,29 @@ export const getCollectionAlerts = async (
     next(error);
   }
 };
+export const getGlobalSales = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const token = req.headers.authorization?.split(' ')[1] || '';
+    const period = (req.query.period as string) || '1M';
+    const result = await invoiceAggregationService.getGlobalSales(token, period);
+    return res.status(200).json({
+      success: true,
+      data: result,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getGlobalSalesTotals = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const token = req.headers.authorization?.split(' ')[1] || '';
+    const result = await invoiceAggregationService.getGlobalSalesTotals(token);
+    return res.status(200).json({
+      success: true,
+      data: result,
+    });
+  } catch (error) {
+    next(error);
+  }
+};

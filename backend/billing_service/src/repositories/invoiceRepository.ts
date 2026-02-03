@@ -135,7 +135,7 @@ export class InvoiceRepository {
       .where('invoice.branchId = :branchId', { branchId })
       .andWhere('invoice.createdAt >= :startDate', { startDate })
       .andWhere('invoice.status IN (:...statuses)', {
-        statuses: [InvoiceStatus.PAID, InvoiceStatus.ISSUED],
+        statuses: [InvoiceStatus.PAID, InvoiceStatus.ISSUED, InvoiceStatus.FINANCE_APPROVED],
       })
       .andWhere('invoice.type != :type', { type: InvoiceType.PROFORMA })
       .groupBy("TO_CHAR(invoice.createdAt, 'YYYY-MM-DD')")
@@ -146,6 +146,67 @@ export class InvoiceRepository {
       date: r.date,
       totalSales: parseFloat(r.totalSales) || 0,
     }));
+  }
+
+  async getGlobalSalesTrend(startDate: Date): Promise<{ date: string; totalSales: number }[]> {
+    const query = this.repo
+      .createQueryBuilder('invoice')
+      .select("TO_CHAR(invoice.createdAt, 'YYYY-MM-DD')", 'date')
+      .addSelect('SUM(invoice.totalAmount)', 'totalSales')
+      .where('invoice.createdAt >= :startDate', { startDate })
+      .andWhere('invoice.status IN (:...statuses)', {
+        statuses: [InvoiceStatus.PAID, InvoiceStatus.ISSUED, InvoiceStatus.FINANCE_APPROVED],
+      })
+      .andWhere('invoice.type != :type', { type: InvoiceType.PROFORMA })
+      .groupBy("TO_CHAR(invoice.createdAt, 'YYYY-MM-DD')")
+      .orderBy('date', 'ASC');
+
+    const results = await query.getRawMany();
+    return results.map((r) => ({
+      date: r.date,
+      totalSales: parseFloat(r.totalSales) || 0,
+    }));
+  }
+
+  async getGlobalSalesTotals(): Promise<{
+    totalSales: number;
+    salesByType: { saleType: string; total: number }[];
+    totalInvoices: number;
+  }> {
+    const totalResult = await this.repo
+      .createQueryBuilder('invoice')
+      .select('SUM(invoice.totalAmount)', 'totalSales')
+      .addSelect('COUNT(*)', 'totalInvoices')
+      .where('invoice.status IN (:...statuses)', {
+        statuses: [InvoiceStatus.PAID, InvoiceStatus.ISSUED, InvoiceStatus.FINANCE_APPROVED],
+      })
+      .andWhere('invoice.type != :type', { type: InvoiceType.PROFORMA })
+      .getRawOne();
+
+    const totalSales = parseFloat(totalResult?.totalSales) || 0;
+    const totalInvoices = parseInt(totalResult?.totalInvoices, 10) || 0;
+
+    const salesByTypeResults = await this.repo
+      .createQueryBuilder('invoice')
+      .select('invoice.saleType', 'saleType')
+      .addSelect('SUM(invoice.totalAmount)', 'total')
+      .where('invoice.status IN (:...statuses)', {
+        statuses: [InvoiceStatus.PAID, InvoiceStatus.ISSUED, InvoiceStatus.FINANCE_APPROVED],
+      })
+      .andWhere('invoice.type != :type', { type: InvoiceType.PROFORMA })
+      .groupBy('invoice.saleType')
+      .getRawMany();
+
+    const salesByType = salesByTypeResults.map((r) => ({
+      saleType: r.saleType,
+      total: parseFloat(r.total) || 0,
+    }));
+
+    return {
+      totalSales,
+      salesByType,
+      totalInvoices,
+    };
   }
 
   async getBranchSalesTotals(branchId: string): Promise<{
@@ -232,5 +293,90 @@ export class InvoiceRepository {
     // Also maybe SaleType check? PROFORMA implies Rent usually.
     // ACTIVE_LEASE implies Lease.
     return qb.getMany();
+  }
+
+  async getFinanceReport(
+    filter: {
+      branchId?: string;
+      saleType?: string;
+      month?: number;
+      year?: number;
+    } = {},
+  ) {
+    const qb = this.repo
+      .createQueryBuilder('invoice')
+      .select("TO_CHAR(invoice.createdAt, 'YYYY-MM')", 'month')
+      .addSelect('invoice.branchId', 'branchId')
+      .addSelect('invoice.saleType', 'saleType')
+      .addSelect(
+        `
+        SUM(
+          CASE 
+            WHEN invoice.type = 'FINAL' THEN COALESCE(invoice.totalAmount, 0)
+            WHEN invoice.saleType = 'SALE' AND invoice.status = 'FINANCE_APPROVED' THEN COALESCE(invoice.totalAmount, 0)
+            WHEN invoice.saleType = 'RENT' AND invoice.status = 'FINANCE_APPROVED' THEN COALESCE(invoice.monthlyRent, 0)
+            WHEN invoice.saleType = 'LEASE' AND invoice.status = 'ACTIVE_LEASE' THEN COALESCE(invoice.monthlyLeaseAmount, 0)
+            ELSE COALESCE(invoice.totalAmount, 0)
+          END
+        )`,
+        'income',
+      )
+      .addSelect(
+        `
+        SUM(
+          CASE 
+            WHEN invoice.type = 'FINAL' THEN COALESCE(invoice.grossAmount, 0)
+            WHEN invoice.saleType = 'SALE' THEN COALESCE(invoice.totalAmount, 0)
+            WHEN invoice.saleType = 'RENT' THEN COALESCE(invoice.monthlyRent, 0)
+            WHEN invoice.saleType = 'LEASE' THEN COALESCE(invoice.monthlyLeaseAmount, 0)
+            ELSE COALESCE(invoice.totalAmount, 0)
+          END
+        )`,
+        'grossIncome',
+      )
+      .addSelect('COUNT(invoice.id)', 'count')
+      .where('invoice.status IN (:...includedStatuses)', {
+        includedStatuses: [
+          InvoiceStatus.FINANCE_APPROVED,
+          InvoiceStatus.ACTIVE_LEASE,
+          InvoiceStatus.ISSUED,
+          InvoiceStatus.PAID,
+        ],
+      })
+      .andWhere('invoice.type != :quotationType', {
+        quotationType: InvoiceType.QUOTATION,
+      });
+
+    if (filter.branchId && filter.branchId !== 'All') {
+      qb.andWhere('invoice.branchId = :branchId', { branchId: filter.branchId });
+    }
+
+    if (filter.saleType && filter.saleType !== 'All') {
+      qb.andWhere('invoice.saleType = :saleType', { saleType: filter.saleType });
+    }
+
+    if (filter.year) {
+      qb.andWhere('EXTRACT(YEAR FROM invoice.createdAt) = :year', { year: filter.year });
+    }
+
+    if (filter.month) {
+      qb.andWhere('EXTRACT(MONTH FROM invoice.createdAt) = :month', { month: filter.month });
+    }
+
+    const results = await qb
+      .groupBy("TO_CHAR(invoice.createdAt, 'YYYY-MM')")
+      .addGroupBy('invoice.branchId')
+      .addGroupBy('invoice.saleType')
+      .orderBy('month', 'DESC')
+      .getRawMany();
+
+    return results.map((r) => ({
+      month: r.month,
+      branchId: r.branchId,
+      source: r.saleType || r.saletype,
+      income: parseFloat(r.income) || 0,
+      grossIncome: parseFloat(r.grossIncome) || 0,
+      count: parseInt(r.count, 10),
+    }));
   }
 }

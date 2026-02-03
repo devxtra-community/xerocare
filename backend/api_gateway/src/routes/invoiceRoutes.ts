@@ -14,6 +14,8 @@ import {
   getBranchInvoices,
   getPendingCounts,
   getCollectionAlerts,
+  getGlobalSales,
+  getGlobalSalesTotals,
 } from '../controllers/invoiceController';
 import { authMiddleware } from '../middleware/authMiddleware';
 import { requireRole } from '../middleware/roleMiddleware';
@@ -55,6 +57,14 @@ router.get(
   '/alerts',
   requireRole(UserRole.FINANCE),
   getCollectionAlerts, // Ensure import!
+);
+
+router.get('/sales/global-overview', requireRole(UserRole.ADMIN, UserRole.FINANCE), getGlobalSales);
+
+router.get(
+  '/sales/global-totals',
+  requireRole(UserRole.ADMIN, UserRole.FINANCE),
+  getGlobalSalesTotals,
 );
 
 router.put('/:id/approve', requireRole(UserRole.EMPLOYEE), approveQuotation);

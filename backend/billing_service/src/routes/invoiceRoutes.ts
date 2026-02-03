@@ -13,9 +13,12 @@ import {
   getStats,
   getBranchSales,
   getBranchSalesTotals,
+  getGlobalSales,
+  getGlobalSalesTotals,
   getBranchInvoices,
   getPendingCounts,
   getCollectionAlerts,
+  getFinanceReport,
 } from '../controllers/invoiceController';
 import { authMiddleware } from '../middlewares/authMiddleware';
 import { requireRole } from '../middlewares/roleMiddleware';
@@ -61,6 +64,8 @@ router.get('/', authMiddleware, getAllInvoices);
 router.get('/stats', authMiddleware, getStats);
 router.get('/sales/branch-overview', authMiddleware, getBranchSales);
 router.get('/sales/branch-totals', authMiddleware, getBranchSalesTotals);
+router.get('/sales/global-overview', authMiddleware, getGlobalSales);
+router.get('/sales/global-totals', authMiddleware, getGlobalSalesTotals);
 router.post(
   '/settlements/generate',
   authMiddleware,
@@ -70,6 +75,7 @@ router.post(
 router.get('/pending-counts', authMiddleware, getPendingCounts);
 router.get('/alerts', authMiddleware, requireRole(EmployeeRole.FINANCE), getCollectionAlerts);
 router.get('/branch-invoices', authMiddleware, getBranchInvoices);
+router.get('/finance/report', authMiddleware, requireRole(EmployeeRole.ADMIN), getFinanceReport);
 router.get('/:id', authMiddleware, getInvoiceById);
 
 export default router;

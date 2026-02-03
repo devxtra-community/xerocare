@@ -903,4 +903,39 @@ export class InvoiceAggregationService {
       throw new AppError('Internal Gateway Error during pending counts fetch', 500);
     }
   }
+
+  async getGlobalSales(token: string, period: string) {
+    try {
+      const response = await axios.get(`${BILLING_SERVICE_URL}/invoices/sales/global-overview`, {
+        headers: { Authorization: `Bearer ${token}` },
+        params: { period },
+      });
+      return response.data.data;
+    } catch (error: unknown) {
+      if (axios.isAxiosError(error)) {
+        throw new AppError(
+          error.response?.data?.message || 'Failed to fetch global sales',
+          error.response?.status || 500,
+        );
+      }
+      throw new AppError('Internal Gateway Error during global sales fetch', 500);
+    }
+  }
+
+  async getGlobalSalesTotals(token: string) {
+    try {
+      const response = await axios.get(`${BILLING_SERVICE_URL}/invoices/sales/global-totals`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      return response.data.data;
+    } catch (error: unknown) {
+      if (axios.isAxiosError(error)) {
+        throw new AppError(
+          error.response?.data?.message || 'Failed to fetch global sales totals',
+          error.response?.status || 500,
+        );
+      }
+      throw new AppError('Internal Gateway Error during global sales totals fetch', 500);
+    }
+  }
 }

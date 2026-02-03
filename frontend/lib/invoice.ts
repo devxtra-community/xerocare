@@ -212,3 +212,29 @@ export const generateMonthlyInvoice = async (payload: {
   // Returns Final Invoice
   return response.data.data;
 };
+
+export interface FinanceReportItem {
+  month: string;
+  income: number;
+  expense: number;
+  source: 'SALE' | 'LEASE' | 'RENT' | 'All';
+  branchId: string;
+  profit: number;
+  profitStatus: 'profit' | 'loss';
+}
+
+export const getFinanceReport = async (filters: {
+  branchId?: string;
+  saleType?: string;
+  month?: number;
+  year?: number;
+}): Promise<FinanceReportItem[]> => {
+  const params = new URLSearchParams();
+  if (filters.branchId && filters.branchId !== 'All') params.append('branchId', filters.branchId);
+  if (filters.saleType && filters.saleType !== 'All') params.append('saleType', filters.saleType);
+  if (filters.month) params.append('month', filters.month.toString());
+  if (filters.year) params.append('year', filters.year.toString());
+
+  const response = await api.get(`/b/invoices/finance/report?${params.toString()}`);
+  return response.data.data;
+};

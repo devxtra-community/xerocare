@@ -406,3 +406,50 @@ export const getCollectionAlerts = async (req: Request, res: Response, next: Nex
     next(error);
   }
 };
+export const getGlobalSales = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const period = (req.query.period as string) || '1M';
+    const result = await billingService.getGlobalSales(period);
+    return res.status(200).json({
+      success: true,
+      data: result,
+      message: 'Global sales overview fetched successfully',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getGlobalSalesTotals = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const result = await billingService.getGlobalSalesTotals();
+    return res.status(200).json({
+      success: true,
+      data: result,
+      message: 'Global sales totals fetched successfully',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getFinanceReport = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { branchId, saleType, month, year } = req.query;
+
+    const report = await billingService.getFinanceReport({
+      branchId: branchId as string,
+      saleType: saleType as string,
+      month: month ? parseInt(month as string, 10) : undefined,
+      year: year ? parseInt(year as string, 10) : undefined,
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: report,
+      message: 'Finance report fetched successfully',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
