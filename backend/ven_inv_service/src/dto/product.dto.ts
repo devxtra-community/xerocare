@@ -12,7 +12,8 @@ export interface AddProductDTO {
   sale_price: number;
   tax_rate: number;
   print_colour?: PrintColour;
-  max_discount_amount?: number;
+  max_discount_amount?: number | null;
+  imageUrl?: string | null;
 }
 
 export interface BulkProductRow {
@@ -27,5 +28,6 @@ export interface BulkProductRow {
   sale_price: number;
   tax_rate: number;
   print_colour?: PrintColour;
-  max_discount_amount?: number;
+  max_discount_amount?: number | null;
+  imageUrl?: string | null;
 }

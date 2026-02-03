@@ -46,6 +46,7 @@ export class ProductService {
         if (!warehouseDetails) {
           throw new AppError('warehouse not found ', 404);
         }
+        await this.model.updateModel(modelDetails.id, { quantity: modelDetails.quantity + 1 });
         await this.productRepo.addProduct({
           vendor_id: String(row.vendor_id),
           serial_no: row.serial_no,
@@ -94,6 +95,7 @@ export class ProductService {
       if (!warehouseDetails) {
         throw new AppError('warehouse not found ', 404);
       }
+      await this.model.updateModel(modelDetails.id, { quantity: modelDetails.quantity + 1 });
       return await this.productRepo.addProduct({
         vendor_id: String(data.vendor_id),
         serial_no: data.serial_no,
@@ -107,6 +109,7 @@ export class ProductService {
         product_status: data.product_status,
         print_colour: data.print_colour,
         max_discount_amount: maxDiscount,
+        imageUrl: data.imageUrl,
       });
     } catch (err: unknown) {
       if (err instanceof AppError) throw err;
@@ -118,6 +121,10 @@ export class ProductService {
     const product = await this.productRepo.findOne(id);
     if (!product) {
       throw new AppError('Product not found', 404);
+    }
+    const modelDetails = await this.model.findbyid(product.model_id);
+    if (modelDetails) {
+      await this.model.updateModel(modelDetails.id, { quantity: modelDetails.quantity - 1 });
     }
     return this.productRepo.deleteProduct(id);
   }

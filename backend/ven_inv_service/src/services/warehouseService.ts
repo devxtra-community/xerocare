@@ -40,4 +40,11 @@ export class WarehouseService {
     await this.repo.softDelete(id);
     return true;
   }
+
+  async getWarehousesByBranch(branchId: string) {
+    if (!branchId) {
+      throw new AppError('Branch ID is required', 400);
+    }
+    return this.repo.findByBranchId(branchId);
+  }
 }

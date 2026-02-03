@@ -32,7 +32,7 @@ import { SparePart } from './sparePartEntity';
   `("model_id" IS NOT NULL AND "spare_part_id" IS NULL) OR ("model_id" IS NULL AND "spare_part_id" IS NOT NULL)`,
 )
 @Check(`"max_discount_amount" >= 0`)
-@Check(`"max_discount_amount" <= "sale_price"`)
+// Removed: @Check(`"max_discount_amount" <= "sale_price"`) - validation moved to application layer
 export class Product {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
@@ -109,11 +109,12 @@ export class Product {
     precision: 12,
     scale: 2,
     default: 0,
+    nullable: true,
   })
-  max_discount_amount!: number;
+  max_discount_amount!: number | null;
 
   @Column({ type: 'varchar', length: 1000, nullable: true })
-  imageUrl?: string;
+  imageUrl?: string | null;
 
   @CreateDateColumn()
   created_at!: Date;

@@ -9,6 +9,7 @@ import {
   Key,
   ScrollText,
   LogOut,
+  Calendar,
 } from 'lucide-react';
 
 import {
@@ -34,6 +35,12 @@ const menuItems = [
     title: 'Dashboard',
     icon: LayoutDashboard,
     href: '/employee/dashboard',
+    modules: ['*'], // Always accessible
+  },
+  {
+    title: 'Leave',
+    icon: Calendar,
+    href: '/employee/leave',
     modules: ['*'], // Always accessible
   },
   {

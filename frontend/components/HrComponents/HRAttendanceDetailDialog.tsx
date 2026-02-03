@@ -32,7 +32,13 @@ export default function HRAttendanceDetailDialog({ open, onOpenChange, employee 
               <div className="h-20 w-20 rounded-2xl bg-slate-50 border-2 border-slate-100 p-1 overflow-hidden flex-shrink-0">
                 <div className="h-full w-full rounded-xl bg-white flex items-center justify-center relative overflow-hidden">
                   {employee.profile_image_url ? (
-                    <Image src={employee.profile_image_url} alt="" fill className="object-cover" />
+                    <Image
+                      src={employee.profile_image_url}
+                      alt=""
+                      fill
+                      className="object-cover"
+                      unoptimized={true}
+                    />
                   ) : (
                     <span className="text-2xl font-black text-primary/20">
                       {(employee.first_name?.[0] || employee.email?.[0] || '?').toUpperCase()}

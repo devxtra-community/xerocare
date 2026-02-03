@@ -72,7 +72,7 @@ export default function EditSparePartDialog({
       try {
         const [modelRes, whRes, vendorRes] = await Promise.all([
           modelService.getAllModels(),
-          warehouseService.getWarehouses(),
+          warehouseService.getWarehousesByBranch(),
           vendorService.getVendors(),
         ]);
 

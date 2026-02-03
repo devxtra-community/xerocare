@@ -28,4 +28,13 @@ export class WarehouseController {
     await this.service.deleteWarehouse(req.params.id as string);
     res.json({ success: true, message: 'Warehouse deleted successfully' });
   };
+
+  getMyBranchWarehouses = async (req: Request, res: Response) => {
+    const branchId = req.user?.branchId;
+    if (!branchId) {
+      return res.status(400).json({ success: false, message: 'Branch ID not found in token' });
+    }
+    const warehouses = await this.service.getWarehousesByBranch(branchId);
+    res.json({ success: true, data: warehouses });
+  };
 }

@@ -59,7 +59,7 @@ export default function BulkSparePartDialog({
     try {
       const [v, w, m] = await Promise.all([
         vendorService.getVendors(),
-        warehouseService.getWarehouses(),
+        warehouseService.getWarehousesByBranch(),
         modelService.getAllModels(),
       ]);
       setVendors(v || []);

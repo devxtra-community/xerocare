@@ -15,4 +15,9 @@ export const warehouseService = {
     const response = await api.get('/i/warehouses');
     return response.data.data;
   },
+
+  getWarehousesByBranch: async (): Promise<Warehouse[]> => {
+    const response = await api.get('/i/warehouses/my-branch');
+    return response.data.data;
+  },
 };
