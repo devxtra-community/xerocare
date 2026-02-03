@@ -80,21 +80,31 @@ export default function UsageRecordingModal({
   React.useEffect(() => {
     if (!contract) return;
 
+    // Helper for robust parsing
+    const safeParse = (val: unknown) => {
+      if (val === undefined || val === null) return 0;
+      if (typeof val === 'number') return isNaN(val) ? 0 : val;
+      if (typeof val === 'string') {
+        const cleaned = val.replace(/[^0-9.-]+/g, '');
+        const num = Number(cleaned);
+        return isNaN(num) ? 0 : num;
+      }
+      return 0;
+    };
+
     // Rent Type Check: CPC = 0 Rent base. Fixed = Monthly Rent base.
     // If rentType is missing, assume Fixed/Rent.
     const isCpc = contract.rentType?.includes('CPC');
-    let total = isCpc ? 0 : contract.monthlyRent || 0;
+    let total = isCpc ? 0 : safeParse(contract.monthlyRent);
+
+    // Advance Amount Deduction
+    const advance = safeParse(contract.advanceAmount);
 
     // Usage Cost
-    const bwA4 = Number(formData.bwA4Count) || 0;
-    const bwA3 = Number(formData.bwA3Count) || 0; // Usually A3 is 2x A4 or separate? Assuming separate count.
-
-    const clrA4 = Number(formData.colorA4Count) || 0;
-    const clrA3 = Number(formData.colorA3Count) || 0;
-
-    // Simplify: Just sum inputs for now. Real logic needs explicit mapping to Rules.
-    // Assuming Rule 1 = B&W, Rule 2 = Color.
-    // NOTE: This is an ESTIMATE. The backend does full calculation.
+    const bwA4 = safeParse(formData.bwA4Count);
+    const bwA3 = safeParse(formData.bwA3Count);
+    const clrA4 = safeParse(formData.colorA4Count);
+    const clrA3 = safeParse(formData.colorA3Count);
 
     const bwRule = contract.items?.find(
       (i) => i.itemType === 'PRICING_RULE' && i.description.includes('Black'),
@@ -105,24 +115,27 @@ export default function UsageRecordingModal({
 
     if (bwRule) {
       // Logic: A3 usually counts as 2x A4 in copy cost calculations (Standard Industry Practice)
-      // If user complained about calculation, this is the most likely missing factor.
       const totalCount = bwA4 + bwA3 * 2;
-      const limit = bwRule.bwIncludedLimit || 0;
+      const limit = safeParse(bwRule.bwIncludedLimit);
 
       const excess = Math.max(0, totalCount - limit);
-      total += excess * (bwRule.bwExcessRate || 0);
+      total += excess * safeParse(bwRule.bwExcessRate);
     }
 
     if (colorRule) {
       const totalCount = clrA4 + clrA3 * 2;
-      const limit = colorRule.colorIncludedLimit || 0;
+      const limit = safeParse(colorRule.colorIncludedLimit);
 
       const excess = Math.max(0, totalCount - limit);
-      total += excess * (colorRule.colorExcessRate || 0);
+      total += excess * safeParse(colorRule.colorExcessRate);
     }
 
+    // Deduct Advance Amount
+    total -= advance;
+
     // Fix floating point precision issues (e.g. 5600.000001)
-    setEstimatedCost(Math.round((total + Number.EPSILON) * 100) / 100);
+    const finalVal = Math.round((total + Number.EPSILON) * 100) / 100;
+    setEstimatedCost(isNaN(finalVal) ? 0 : finalVal);
   }, [formData, contract]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -311,8 +324,8 @@ export default function UsageRecordingModal({
                   </Label>
                   <span className="text-[10px] text-blue-400 font-medium">
                     {contract?.rentType?.includes('CPC')
-                      ? '(Usage Cost Only)'
-                      : '(Rent + Excess Usage)'}
+                      ? '(Usage Cost - Advance)'
+                      : '(Rent + Excess - Advance)'}
                   </span>
                 </div>
                 <div className="flex items-center gap-1 text-2xl font-bold text-blue-700">
