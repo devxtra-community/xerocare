@@ -186,6 +186,7 @@ export interface CollectionAlert {
   contractId: string;
   customerId: string;
   customerName: string;
+  customerPhone?: string; // Added for display
   invoiceNumber: string;
   type: 'USAGE_PENDING' | 'INVOICE_PENDING';
   dueDate: string;

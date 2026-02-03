@@ -10,8 +10,16 @@ const customerController = new CustomerController();
 router.use(authMiddleware);
 
 router.post('/', requireRole('ADMIN', 'EMPLOYEE'), customerController.createCustomer);
-router.get('/', requireRole('ADMIN', 'EMPLOYEE'), customerController.getAllCustomers);
-router.get('/:id', requireRole('ADMIN', 'EMPLOYEE'), customerController.getCustomerById);
+router.get(
+  '/',
+  requireRole('ADMIN', 'EMPLOYEE', 'FINANCE', 'MANAGER'),
+  customerController.getAllCustomers,
+);
+router.get(
+  '/:id',
+  requireRole('ADMIN', 'EMPLOYEE', 'FINANCE', 'MANAGER'),
+  customerController.getCustomerById,
+);
 router.put('/:id', requireRole('ADMIN', 'EMPLOYEE'), customerController.updateCustomer);
 router.delete('/:id', requireRole('ADMIN'), customerController.deleteCustomer); // Restrict delete to ADMIN? User didn't specify, but safer.
 // Actually user said "employees can edit things". "Edit softdelete okey everything".

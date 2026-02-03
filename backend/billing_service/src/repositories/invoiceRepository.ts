@@ -27,22 +27,25 @@ export class InvoiceRepository {
     });
   }
 
-  findAll(branchId?: string) {
-    const whereCondition: Record<string, string> = {};
+  // RE-IMPLEMENTING findAll and findByBranchId using QueryBuilder to properly exclude FINAL
+
+  async findAll(branchId?: string) {
+    const qb = this.repo
+      .createQueryBuilder('invoice')
+      .leftJoinAndSelect('invoice.items', 'items')
+      .orderBy('invoice.createdAt', 'DESC');
+
     if (branchId) {
-      whereCondition.branchId = branchId;
+      qb.andWhere('invoice.branchId = :branchId', { branchId });
     }
 
-    return this.repo.find({
-      where: whereCondition,
-      order: {
-        createdAt: 'DESC',
-      },
-      relations: ['items'],
-    });
+    // EXCLUDE FINAL Invoices (Monthly Settlements) from the main list
+    qb.andWhere('invoice.type != :finalType', { finalType: InvoiceType.FINAL });
+
+    return qb.getMany();
   }
 
-  findByCreatorId(createdBy: string) {
+  async findByCreatorId(createdBy: string) {
     return this.repo.find({
       where: { createdBy },
       order: {
@@ -52,14 +55,17 @@ export class InvoiceRepository {
     });
   }
 
-  findByBranchId(branchId: string) {
-    return this.repo.find({
-      where: { branchId },
-      order: {
-        createdAt: 'DESC',
-      },
-      relations: ['items'],
-    });
+  async findByBranchId(branchId: string) {
+    const qb = this.repo
+      .createQueryBuilder('invoice')
+      .leftJoinAndSelect('invoice.items', 'items')
+      .where('invoice.branchId = :branchId', { branchId })
+      .orderBy('invoice.createdAt', 'DESC');
+
+    // EXCLUDE FINAL Invoices
+    qb.andWhere('invoice.type != :finalType', { finalType: InvoiceType.FINAL });
+
+    return qb.getMany();
   }
 
   updateStatus(id: string, status: Invoice['status']) {
@@ -73,6 +79,15 @@ export class InvoiceRepository {
     return await this.repo.count({
       where: {
         createdAt: Between(startDate, endDate),
+      },
+    });
+  }
+
+  async countFinalInvoicesByContractId(contractId: string): Promise<number> {
+    return this.repo.count({
+      where: {
+        referenceContractId: contractId,
+        type: InvoiceType.FINAL,
       },
     });
   }

@@ -20,7 +20,7 @@ productRoute.post(
 productRoute.get(
   '/',
   authMiddleware,
-  roleMiddleware(['ADMIN', 'MANAGER', 'EMPLOYEE']),
+  roleMiddleware(['ADMIN', 'MANAGER', 'EMPLOYEE', 'FINANCE']),
   getallproducts,
 );
 productRoute.put(

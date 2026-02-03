@@ -29,7 +29,7 @@ export const addEmployee = async (req: Request, res: Response, next: NextFunctio
     const profileImageKey = files?.profile_image?.[0]?.key ?? null;
 
     const profileImageUrl = profileImageKey
-      ? `${process.env.R2_PUBLIC_URL}/${process.env.R2_BUCKET}/${profileImageKey}`
+      ? `${process.env.R2_PUBLIC_URL}/${profileImageKey}`
       : null;
 
     const idProofKey = files?.id_proof?.[0]?.key ?? null;
