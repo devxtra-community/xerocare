@@ -15,7 +15,7 @@ import { getCollectionAlerts, CollectionAlert, generateMonthlyInvoice } from '@/
 import { Loader2, Upload, FileText } from 'lucide-react';
 import { toast } from 'sonner';
 import UsageRecordingModal from './UsageRecordingModal';
-import { format } from 'date-fns';
+import { format, differenceInDays } from 'date-fns';
 
 export default function MonthlyCollectionTable() {
   const [alerts, setAlerts] = useState<CollectionAlert[]>([]);
@@ -94,6 +94,7 @@ export default function MonthlyCollectionTable() {
               <TableHead>Customer</TableHead>
               <TableHead>Contract / Invoice</TableHead>
               <TableHead>Status</TableHead>
+              <TableHead>Days Left</TableHead>
               <TableHead>Due Date</TableHead>
               <TableHead className="text-right">Action</TableHead>
             </TableRow>
@@ -103,7 +104,9 @@ export default function MonthlyCollectionTable() {
               <TableRow key={alert.contractId}>
                 <TableCell className="font-medium">
                   {alert.customerName || 'Unknown Customer'}
-                  <div className="text-xs text-muted-foreground">{alert.customerId}</div>
+                  <div className="text-xs text-muted-foreground">
+                    {alert.customerPhone || alert.customerId}
+                  </div>
                 </TableCell>
                 <TableCell>{alert.invoiceNumber}</TableCell>
                 <TableCell>
@@ -119,6 +122,20 @@ export default function MonthlyCollectionTable() {
                       Invoice Pending
                     </Badge>
                   )}
+                </TableCell>
+                <TableCell>
+                  {alert.dueDate
+                    ? (() => {
+                        const days = differenceInDays(new Date(alert.dueDate), new Date());
+                        return (
+                          <div
+                            className={`font-bold ${days < 0 ? 'text-red-500' : days <= 3 ? 'text-orange-500' : 'text-emerald-600'}`}
+                          >
+                            {days < 0 ? `${Math.abs(days)} Days Overdue` : `${days} Days Left`}
+                          </div>
+                        );
+                      })()
+                    : 'N/A'}
                 </TableCell>
                 <TableCell>
                   {alert.dueDate ? format(new Date(alert.dueDate), 'MMM dd, yyyy') : 'N/A'}

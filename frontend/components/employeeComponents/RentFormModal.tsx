@@ -10,6 +10,8 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Label } from '@/components/ui/label';
 import { CustomerSelect } from '@/components/invoice/CustomerSelect';
 import { CreateInvoicePayload, Invoice } from '@/lib/invoice';
 import { ProductSelect, SelectableItem } from '@/components/invoice/ProductSelect';
@@ -18,6 +20,13 @@ import { Product } from '@/lib/product';
 // Helper to strip empty/zero fields for API
 const cleanNumber = (val: string | number | undefined | null) =>
   val === '' || val === undefined || val === null ? undefined : Number(val);
+
+const handleNumberInput = (val: string) => {
+  // Allow empty string to clear the input
+  if (val === '') return '';
+  // Check if it's a valid number format (though input type="number" restricts this mostly)
+  return val;
+};
 
 // ... (imports)
 
@@ -35,6 +44,7 @@ export default function RentFormModal({
   lockSaleType?: boolean;
 }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [machineType, setMachineType] = useState<'BW' | 'COLOR' | 'BOTH'>('BOTH');
 
   // Initialize state. Use '' or undefined for numbers to avoid "0"
   const [form, setForm] = useState<{
@@ -42,33 +52,35 @@ export default function RentFormModal({
     saleType: string;
     rentType: string;
     rentPeriod: string;
-    monthlyRent: string | number;
-    advanceAmount: string | number;
-    discountPercent: string | number;
+    monthlyRent: string;
+    advanceAmount: string;
+    discountPercent: string;
     effectiveFrom: string;
     effectiveTo: string;
     leaseType: 'EMI' | 'FSM';
-    leaseTenureMonths: string | number;
-    totalLeaseAmount: string | number;
-    monthlyEmiAmount: string | number;
-    monthlyLeaseAmount: string | number;
+    leaseTenureMonths: string;
+    totalLeaseAmount: string;
+    monthlyEmiAmount: string;
+    monthlyLeaseAmount: string;
     pricingItems: {
       description: string;
-      bwIncludedLimit?: string | number;
-      colorIncludedLimit?: string | number;
-      combinedIncludedLimit?: string | number;
-      bwExcessRate?: string | number;
-      colorExcessRate?: string | number;
-      combinedExcessRate?: string | number;
+      bwIncludedLimit?: string;
+      colorIncludedLimit?: string;
+      combinedIncludedLimit?: string;
+      bwExcessRate?: string;
+      colorExcessRate?: string;
+      combinedExcessRate?: string;
     }[];
   }>({
     customerId: initialData?.customerId || '',
     saleType: initialData?.saleType || defaultSaleType,
     rentType: initialData?.rentType || 'FIXED_LIMIT',
     rentPeriod: initialData?.rentPeriod || 'MONTHLY',
-    monthlyRent: initialData?.monthlyRent || '',
-    advanceAmount: initialData?.advanceAmount || '',
-    discountPercent: initialData?.discountPercent || '',
+    monthlyRent: initialData?.monthlyRent !== undefined ? String(initialData.monthlyRent) : '',
+    advanceAmount:
+      initialData?.advanceAmount !== undefined ? String(initialData.advanceAmount) : '',
+    discountPercent:
+      initialData?.discountPercent !== undefined ? String(initialData.discountPercent) : '',
     effectiveFrom: initialData?.effectiveFrom
       ? new Date(initialData.effectiveFrom).toISOString().split('T')[0]
       : new Date().toISOString().split('T')[0],
@@ -76,20 +88,25 @@ export default function RentFormModal({
       ? new Date(initialData.effectiveTo).toISOString().split('T')[0]
       : '',
     leaseType: 'EMI' as 'EMI' | 'FSM',
-    leaseTenureMonths: initialData?.leaseTenureMonths || '',
-    totalLeaseAmount: initialData?.totalLeaseAmount || '',
-    monthlyEmiAmount: initialData?.monthlyEmiAmount || '',
-    monthlyLeaseAmount: initialData?.monthlyLeaseAmount || '',
+    leaseTenureMonths:
+      initialData?.leaseTenureMonths !== undefined ? String(initialData.leaseTenureMonths) : '',
+    totalLeaseAmount:
+      initialData?.totalLeaseAmount !== undefined ? String(initialData.totalLeaseAmount) : '',
+    monthlyEmiAmount:
+      initialData?.monthlyEmiAmount !== undefined ? String(initialData.monthlyEmiAmount) : '',
+    monthlyLeaseAmount:
+      initialData?.monthlyLeaseAmount !== undefined ? String(initialData.monthlyLeaseAmount) : '',
     pricingItems: initialData?.items
       ?.filter((i) => i.itemType === 'PRICING_RULE')
       ?.map((i) => ({
         description: i.description,
-        bwIncludedLimit: i.bwIncludedLimit ?? '',
-        colorIncludedLimit: i.colorIncludedLimit ?? '',
-        combinedIncludedLimit: i.combinedIncludedLimit ?? '',
-        bwExcessRate: i.bwExcessRate ?? '',
-        colorExcessRate: i.colorExcessRate ?? '',
-        combinedExcessRate: i.combinedExcessRate ?? '',
+        bwIncludedLimit: i.bwIncludedLimit !== undefined ? String(i.bwIncludedLimit) : '',
+        colorIncludedLimit: i.colorIncludedLimit !== undefined ? String(i.colorIncludedLimit) : '',
+        combinedIncludedLimit:
+          i.combinedIncludedLimit !== undefined ? String(i.combinedIncludedLimit) : '',
+        bwExcessRate: i.bwExcessRate !== undefined ? String(i.bwExcessRate) : '',
+        colorExcessRate: i.colorExcessRate !== undefined ? String(i.colorExcessRate) : '',
+        combinedExcessRate: i.combinedExcessRate !== undefined ? String(i.combinedExcessRate) : '',
       })) || [
       {
         description: 'Black & White',
@@ -519,7 +536,12 @@ export default function RentFormModal({
                   <Input
                     type="number"
                     value={form.leaseTenureMonths}
-                    onChange={(e) => setForm({ ...form, leaseTenureMonths: e.target.value })}
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        leaseTenureMonths: handleNumberInput(e.target.value),
+                      })
+                    }
                     placeholder="e.g 12, 24, 36"
                     className="font-bold"
                   />
@@ -640,6 +662,47 @@ export default function RentFormModal({
             <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-indigo-400" /> Pricing Model
             </h4>
+
+            {/* Machine Configuration Selector */}
+            <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+              <Label className="text-xs font-bold text-slate-500 uppercase block mb-3">
+                Machine Capabilities
+              </Label>
+              <RadioGroup
+                defaultValue="BOTH"
+                value={machineType}
+                onValueChange={(val: string) => setMachineType(val as 'BW' | 'COLOR' | 'BOTH')}
+                className="flex gap-6"
+              >
+                <div className="flex items-center space-x-2 bg-white px-3 py-2 rounded-lg border border-slate-100 shadow-sm">
+                  <RadioGroupItem value="BW" id="r-bw" />
+                  <Label
+                    htmlFor="r-bw"
+                    className="cursor-pointer text-sm font-semibold text-slate-700"
+                  >
+                    Black & White Only
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2 bg-white px-3 py-2 rounded-lg border border-slate-100 shadow-sm">
+                  <RadioGroupItem value="COLOR" id="r-color" />
+                  <Label
+                    htmlFor="r-color"
+                    className="cursor-pointer text-sm font-semibold text-slate-700"
+                  >
+                    Color Only
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2 bg-white px-3 py-2 rounded-lg border border-slate-100 shadow-sm">
+                  <RadioGroupItem value="BOTH" id="r-both" />
+                  <Label
+                    htmlFor="r-both"
+                    className="cursor-pointer text-sm font-semibold text-slate-700"
+                  >
+                    Both
+                  </Label>
+                </div>
+              </RadioGroup>
+            </div>
             <div className="p-5 rounded-xl bg-white border border-slate-100 shadow-sm space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
@@ -684,7 +747,12 @@ export default function RentFormModal({
                         <Input
                           type="number"
                           value={form.totalLeaseAmount}
-                          onChange={(e) => setForm({ ...form, totalLeaseAmount: e.target.value })}
+                          onChange={(e) =>
+                            setForm({
+                              ...form,
+                              totalLeaseAmount: handleNumberInput(e.target.value),
+                            })
+                          }
                           className="font-bold text-slate-800"
                         />
                       </div>
@@ -695,7 +763,12 @@ export default function RentFormModal({
                         <Input
                           type="number"
                           value={form.monthlyEmiAmount}
-                          onChange={(e) => setForm({ ...form, monthlyEmiAmount: e.target.value })}
+                          onChange={(e) =>
+                            setForm({
+                              ...form,
+                              monthlyEmiAmount: handleNumberInput(e.target.value),
+                            })
+                          }
                           className="font-bold text-slate-800"
                         />
                       </div>
@@ -708,7 +781,12 @@ export default function RentFormModal({
                       <Input
                         type="number"
                         value={form.monthlyLeaseAmount}
-                        onChange={(e) => setForm({ ...form, monthlyLeaseAmount: e.target.value })}
+                        onChange={(e) =>
+                          setForm({
+                            ...form,
+                            monthlyLeaseAmount: handleNumberInput(e.target.value),
+                          })
+                        }
                         className="font-bold text-slate-800"
                       />
                     </div>
@@ -726,7 +804,9 @@ export default function RentFormModal({
                       type="number"
                       placeholder="0"
                       value={form.monthlyRent}
-                      onChange={(e) => setForm({ ...form, monthlyRent: e.target.value })}
+                      onChange={(e) =>
+                        setForm({ ...form, monthlyRent: handleNumberInput(e.target.value) })
+                      }
                       className="font-bold text-slate-800 border-slate-200 focus:border-indigo-400"
                     />
                   </div>
@@ -738,7 +818,9 @@ export default function RentFormModal({
                       type="number"
                       placeholder="0"
                       value={form.advanceAmount}
-                      onChange={(e) => setForm({ ...form, advanceAmount: e.target.value })}
+                      onChange={(e) =>
+                        setForm({ ...form, advanceAmount: handleNumberInput(e.target.value) })
+                      }
                       className="font-bold text-slate-800"
                     />
                   </div>
@@ -779,34 +861,48 @@ export default function RentFormModal({
                     {/* Limit Fields */}
                     {isFixed && form.rentType !== 'FIXED_FLAT' && (
                       <div className="col-span-6 md:col-span-3 space-y-1">
-                        <label className="text-[9px] font-bold text-slate-400 uppercase">
-                          {item.description.startsWith('Combined')
-                            ? 'Combined Limit'
-                            : 'Free Limit'}
-                        </label>
-                        <Input
-                          type="number"
-                          placeholder="0"
-                          value={
-                            (item.description.startsWith('Combined')
-                              ? item.combinedIncludedLimit
-                              : item.description.startsWith('Black & White')
-                                ? item.bwIncludedLimit
-                                : item.colorIncludedLimit) ?? ''
-                          }
-                          onChange={(e) =>
-                            updatePricingItem(
-                              index,
-                              item.description.startsWith('Combined')
-                                ? 'combinedIncludedLimit'
-                                : item.description.startsWith('Black & White')
-                                  ? 'bwIncludedLimit'
-                                  : 'colorIncludedLimit',
-                              e.target.value,
-                            )
-                          }
-                          className="h-9 border-slate-200"
-                        />
+                        {/* Logic to Hide B&W fields if COLOR only, etc */}
+                        {(!item.description.toLowerCase().includes('color') ||
+                          machineType !== 'BW') &&
+                          (!item.description.toLowerCase().includes('black') ||
+                            machineType !== 'COLOR') && (
+                            <>
+                              <label className="text-[9px] font-bold text-slate-400 uppercase">
+                                {item.description.startsWith('Combined')
+                                  ? 'Combined Limit'
+                                  : 'Free Limit'}
+                              </label>
+                              <Input
+                                type="number"
+                                placeholder="0"
+                                disabled={
+                                  (item.description.toLowerCase().includes('color') &&
+                                    machineType === 'BW') ||
+                                  (item.description.toLowerCase().includes('black') &&
+                                    machineType === 'COLOR')
+                                }
+                                value={
+                                  (item.description.startsWith('Combined')
+                                    ? item.combinedIncludedLimit
+                                    : item.description.startsWith('Black & White')
+                                      ? item.bwIncludedLimit
+                                      : item.colorIncludedLimit) ?? ''
+                                }
+                                onChange={(e) =>
+                                  updatePricingItem(
+                                    index,
+                                    item.description.startsWith('Combined')
+                                      ? 'combinedIncludedLimit'
+                                      : item.description.startsWith('Black & White')
+                                        ? 'bwIncludedLimit'
+                                        : 'colorIncludedLimit',
+                                    handleNumberInput(e.target.value),
+                                  )
+                                }
+                                className={`h-9 border-slate-200 ${(item.description.toLowerCase().includes('color') && machineType === 'BW') || (item.description.toLowerCase().includes('black') && machineType === 'COLOR') ? 'opacity-50' : ''}`}
+                              />
+                            </>
+                          )}
                       </div>
                     )}
 
@@ -842,7 +938,7 @@ export default function RentFormModal({
                                   : item.description.startsWith('Black & White')
                                     ? 'bwExcessRate'
                                     : 'colorExcessRate',
-                                e.target.value,
+                                handleNumberInput(e.target.value),
                               )
                             }
                             className={`h-9 font-bold pl-6 ${isFixed ? 'text-red-600 bg-red-50/50 border-red-100' : 'text-emerald-700 bg-emerald-50/50 border-emerald-100'}`}

@@ -1,37 +1,38 @@
-import { LeadModel, ILead } from '../models/leadModel';
+import { LeadModel, ILead, LeadStatus } from '../models/leadModel';
 
 export class LeadRepository {
   async createLead(data: Partial<ILead>): Promise<ILead> {
-    const lead = new LeadModel(data);
-    return await lead.save();
+    return await LeadModel.create(data);
   }
 
-  async findLeadById(leadId: string): Promise<ILead | null> {
-    return await LeadModel.findOne({ _id: leadId });
-  }
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  async findAllLeads(filter: any = {}): Promise<ILead[]> {
+  async findAllLeads(includeDeleted = false): Promise<ILead[]> {
+    const filter = includeDeleted ? {} : { isDeleted: false };
     return await LeadModel.find(filter).sort({ createdAt: -1 });
   }
 
-  async updateLead(leadId: string, data: Partial<ILead>): Promise<ILead | null> {
-    return await LeadModel.findByIdAndUpdate(leadId, data, { new: true });
+  async findLeadById(id: string): Promise<ILead | null> {
+    return await LeadModel.findById(id);
   }
 
-  async deleteLead(leadId: string): Promise<ILead | null> {
-    return await LeadModel.findByIdAndUpdate(leadId, { isDeleted: true }, { new: true });
+  async updateLead(id: string, data: Partial<ILead>): Promise<ILead | null> {
+    return await LeadModel.findByIdAndUpdate(id, data, { new: true });
+  }
+
+  async deleteLead(id: string): Promise<ILead | null> {
+    // Soft delete
+    return await this.updateLead(id, { isDeleted: true });
   }
 
   async updateLeadStatus(
-    leadId: string,
-    status: ILead['status'],
+    id: string,
+    status: LeadStatus,
     customerId?: string,
   ): Promise<ILead | null> {
     const updateData: Partial<ILead> = { status };
     if (customerId) {
       updateData.customerId = customerId;
+      updateData.isCustomer = true;
     }
-    return await LeadModel.findByIdAndUpdate(leadId, updateData, { new: true });
+    return await this.updateLead(id, updateData);
   }
 }

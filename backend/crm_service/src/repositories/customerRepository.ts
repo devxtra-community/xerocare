@@ -1,12 +1,9 @@
-import { Repository } from 'typeorm';
 import { Customer } from '../entities/customerEntity';
 import { Source } from '../config/datasource';
 
 export class CustomerRepository {
-  private repo: Repository<Customer>;
-
-  constructor() {
-    this.repo = Source.getRepository(Customer);
+  private get repo() {
+    return Source.getRepository(Customer);
   }
 
   async createCustomer(data: Partial<Customer>): Promise<Customer> {

@@ -32,6 +32,7 @@ export const createQuotation = async (req: Request, res: Response, next: NextFun
       effectiveFrom,
       effectiveTo,
       items,
+      totalAmount,
     } = payload;
 
     if (!customerId || !saleType) {
@@ -74,6 +75,7 @@ export const createQuotation = async (req: Request, res: Response, next: NextFun
       effectiveFrom,
       effectiveTo,
       pricingItems,
+      totalAmount,
       items,
       leaseType: payload.leaseType,
       leaseTenureMonths: payload.leaseTenureMonths,

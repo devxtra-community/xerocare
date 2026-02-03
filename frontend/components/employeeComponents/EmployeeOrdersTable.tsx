@@ -55,6 +55,8 @@ export default function EmployeeOrdersTable({
         if (mode === 'FINANCE') {
           const { getBranchInvoices } = await import('@/lib/invoice');
           data = await getBranchInvoices();
+          // Filter out unapproved records for Finance View
+          data = data.filter((inv) => !['DRAFT', 'SENT'].includes(inv.status));
         } else {
           data = await getMyInvoices();
         }
