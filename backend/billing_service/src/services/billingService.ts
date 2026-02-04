@@ -162,6 +162,12 @@ export class BillingService {
       rentType: contract.rentType,
       billingPeriodStart: start,
       billingPeriodEnd: end,
+
+      // Usage Snapshot
+      bwA4Count: usage.bwA4Count,
+      bwA3Count: usage.bwA3Count,
+      colorA4Count: usage.colorA4Count,
+      colorA3Count: usage.colorA3Count,
     });
 
     // 7. Lock Usage
@@ -169,6 +175,96 @@ export class BillingService {
     await this.usageRepo.save(usage);
 
     return finalInvoice;
+  }
+
+  async updateInvoiceUsage(
+    invoiceId: string,
+    payload: {
+      bwA4Count: number;
+      bwA3Count: number;
+      colorA4Count: number;
+      colorA3Count: number;
+    },
+  ) {
+    // 1. Fetch Invoice
+    const invoice = await this.invoiceRepo.findById(invoiceId);
+    if (!invoice) throw new AppError('Invoice not found', 404);
+    if (invoice.type !== InvoiceType.FINAL) {
+      throw new AppError('Only FINAL invoices can have their usage updated', 400);
+    }
+    if (invoice.status === InvoiceStatus.PAID) {
+      throw new AppError('Cannot update usage for a PAID invoice', 400);
+    }
+
+    // 2. Fetch Contract
+    if (!invoice.referenceContractId) throw new AppError('Contract reference missing', 400);
+    const contract = await this.invoiceRepo.findById(invoice.referenceContractId);
+    if (!contract) throw new AppError('Reference contract not found', 404);
+
+    // 3. Recalculate
+    const calcResult = this.calculator.calculate({
+      rentType: contract.rentType,
+      monthlyRent:
+        contract.saleType === SaleType.LEASE && contract.leaseType === LeaseType.FSM
+          ? Number(contract.monthlyLeaseAmount || 0)
+          : Number(contract.monthlyRent || 0),
+      discountPercent: Number(contract.discountPercent || 0),
+      pricingItems: contract.items, // Items from contract
+      usage: {
+        bwA4: payload.bwA4Count,
+        bwA3: payload.bwA3Count,
+        colorA4: payload.colorA4Count,
+        colorA3: payload.colorA3Count,
+      },
+    });
+
+    let payableAmount = 0;
+    let advanceAdjusted = 0;
+
+    // Handle Advance Adjustment (mirrors generateFinalInvoice logic)
+    if (contract.rentType === RentType.FIXED_LIMIT || contract.rentType === RentType.FIXED_COMBO) {
+      const isFirstMonth = await this.invoiceRepo.isFirstFinalInvoice(contract.id);
+      if (isFirstMonth) {
+        const advance = Number(contract.advanceAmount || 0);
+        if (calcResult.netAmount >= advance) {
+          advanceAdjusted = advance;
+          payableAmount = calcResult.netAmount - advance;
+        } else {
+          advanceAdjusted = calcResult.netAmount;
+          payableAmount = 0;
+        }
+      } else {
+        advanceAdjusted = 0;
+        payableAmount = calcResult.netAmount;
+      }
+    } else {
+      advanceAdjusted = 0;
+      payableAmount = calcResult.netAmount;
+    }
+
+    // 4. Update Invoice
+    invoice.bwA4Count = payload.bwA4Count;
+    invoice.bwA3Count = payload.bwA3Count;
+    invoice.colorA4Count = payload.colorA4Count;
+    invoice.colorA3Count = payload.colorA3Count;
+    invoice.grossAmount = calcResult.grossAmount;
+    invoice.discountAmount = calcResult.discountAmount;
+    invoice.advanceAdjusted = advanceAdjusted;
+    invoice.totalAmount = payableAmount;
+
+    // 5. Update linked UsageRecord if it exists
+    if (invoice.usageRecordId) {
+      const usage = await this.usageRepo.findById(invoice.usageRecordId);
+      if (usage) {
+        usage.bwA4Count = payload.bwA4Count;
+        usage.bwA3Count = payload.bwA3Count;
+        usage.colorA4Count = payload.colorA4Count;
+        usage.colorA3Count = payload.colorA3Count;
+        await this.usageRepo.save(usage);
+      }
+    }
+
+    return this.invoiceRepo.saveInvoice(invoice);
   }
   private async generateInvoiceNumber(): Promise<string> {
     const year = new Date().getFullYear();
@@ -331,7 +427,7 @@ export class BillingService {
     // Publish event if needed (maybe quotation.created later)
     try {
       // Skipping usage-based event publishing for now
-    } catch (err) {
+    } catch (err: unknown) {
       logger.error('Failed to publish event', err);
     }
 
@@ -678,7 +774,7 @@ export class BillingService {
       // customerName is fetched by API Gateway
       customerId: string;
       invoiceNumber: string;
-      type: 'USAGE_PENDING' | 'INVOICE_PENDING';
+      type: 'USAGE_PENDING' | 'INVOICE_PENDING' | 'SEND_PENDING';
       saleType: string;
       dueDate: Date;
     }> = [];
@@ -737,6 +833,19 @@ export class BillingService {
             saleType: contract.saleType,
             dueDate: new Date(),
           });
+        } else {
+          // Invoice exists. Check if sent.
+          const finalInvoice = await this.invoiceRepo.findById(latestUsage.finalInvoiceId);
+          if (finalInvoice && !finalInvoice.emailSentAt && !finalInvoice.whatsappSentAt) {
+            alerts.push({
+              contractId: contract.id,
+              customerId: contract.customerId,
+              invoiceNumber: finalInvoice.invoiceNumber, // Use final invoice number
+              type: 'SEND_PENDING',
+              saleType: contract.saleType,
+              dueDate: finalInvoice.createdAt,
+            });
+          }
         }
       }
     }

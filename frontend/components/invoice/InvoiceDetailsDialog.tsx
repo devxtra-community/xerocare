@@ -69,12 +69,41 @@ export function InvoiceDetailsDialog({
       setIsLoading(false);
     }
   };
+  const getUsageBreakdownText = () => {
+    if (invoice.bwA4Count === undefined) return '';
+
+    let breakdown = '\nUsage Breakdown:';
+    const bwRule = invoice.items?.find(
+      (i) => i.itemType === 'PRICING_RULE' && i.description.includes('Black'),
+    );
+    const colorRule = invoice.items?.find(
+      (i) => i.itemType === 'PRICING_RULE' && i.description.includes('Color'),
+    );
+
+    if (bwRule) {
+      const bwTotal = (invoice.bwA4Count || 0) + (invoice.bwA3Count || 0) * 2;
+      const bwLimit = bwRule.bwIncludedLimit || 0;
+      const bwExcess = Math.max(0, bwTotal - bwLimit);
+      breakdown += `\n- B&W: ${bwTotal} units (Limit: ${bwLimit}, Excess: ${bwExcess})`;
+    }
+
+    if (colorRule) {
+      const colorTotal = (invoice.colorA4Count || 0) + (invoice.colorA3Count || 0) * 2;
+      const colorLimit = colorRule.colorIncludedLimit || 0;
+      const colorExcess = Math.max(0, colorTotal - colorLimit);
+      breakdown += `\n- Color: ${colorTotal} units (Limit: ${colorLimit}, Excess: ${colorExcess})`;
+    }
+
+    return breakdown;
+  };
+
   const handleShareWhatsApp = () => {
     if (!invoice.customerPhone) {
       alert('Customer phone number not available.');
       return;
     }
-    const message = `Hello ${invoice.customerName}, here is your invoice ${invoice.invoiceNumber} for ₹${(invoice.totalAmount || 0).toLocaleString('en-IN')}.`;
+    const usageText = getUsageBreakdownText();
+    const message = `Hello ${invoice.customerName}, here is your invoice ${invoice.invoiceNumber} for ₹${(invoice.totalAmount || 0).toLocaleString('en-IN')}.${usageText}\n\nThank you for using XeroCare.`;
     const url = `https://wa.me/${invoice.customerPhone.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`;
     window.open(url, '_blank');
   };
@@ -84,8 +113,9 @@ export function InvoiceDetailsDialog({
       alert('Customer email not available.');
       return;
     }
+    const usageText = getUsageBreakdownText();
     const subject = `Invoice ${invoice.invoiceNumber} from ${invoice.branchName || 'XeroCare'}`;
-    const body = `Hello ${invoice.customerName},\n\nPlease find attached the details for invoice ${invoice.invoiceNumber}.\n\nTotal Amount: ₹${(invoice.totalAmount || 0).toLocaleString('en-IN')}\n\nRegards,\nTeam XeroCare`;
+    const body = `Hello ${invoice.customerName},\n\nPlease find attached the details for invoice ${invoice.invoiceNumber}.\n\nTotal Amount: ₹${(invoice.totalAmount || 0).toLocaleString('en-IN')}\n${usageText}\n\nRegards,\nTeam XeroCare`;
     const url = `mailto:${invoice.customerEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
     window.location.href = url;
   };
@@ -292,15 +322,15 @@ export function InvoiceDetailsDialog({
                     <div className="flex items-center gap-2 text-gray-600">
                       <Calendar size={14} className="opacity-50" />
                       <p className="text-xs font-bold">
-                        {new Date(invoice.startDate || invoice.createdAt).toLocaleDateString(
+                        {new Date(invoice.effectiveFrom || invoice.createdAt).toLocaleDateString(
                           undefined,
                           {
                             dateStyle: 'medium',
                           },
                         )}{' '}
                         —{' '}
-                        {invoice.endDate
-                          ? new Date(invoice.endDate).toLocaleDateString(undefined, {
+                        {invoice.effectiveTo
+                          ? new Date(invoice.effectiveTo).toLocaleDateString(undefined, {
                               dateStyle: 'medium',
                             })
                           : 'N/A'}
@@ -319,6 +349,134 @@ export function InvoiceDetailsDialog({
                     </div>
                   </div>
                 </div>
+
+                {/* Usage Breakdown for FINAL Invoices */}
+                {invoice.bwA4Count !== undefined && (
+                  <div className="space-y-4">
+                    <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                      Usage Breakdown
+                    </h3>
+                    <div className="rounded-xl border border-blue-100 overflow-hidden">
+                      <Table>
+                        <TableHeader className="bg-blue-50/50">
+                          <TableRow className="hover:bg-transparent border-blue-100">
+                            <TableHead className="text-[10px] font-bold text-blue-600 h-10">
+                              METER CATEGORY
+                            </TableHead>
+                            <TableHead className="text-[10px] font-bold text-blue-600 text-center h-10">
+                              READING
+                            </TableHead>
+                            <TableHead className="text-[10px] font-bold text-blue-600 text-center h-10">
+                              ALLOWED
+                            </TableHead>
+                            <TableHead className="text-[10px] font-bold text-blue-600 text-right h-10">
+                              EXCESS
+                            </TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {/* BW Row */}
+                          {(() => {
+                            const bwRule = invoice.items?.find(
+                              (i) =>
+                                i.itemType === 'PRICING_RULE' && i.description.includes('Black'),
+                            );
+                            const bwTotal = (invoice.bwA4Count || 0) + (invoice.bwA3Count || 0) * 2;
+                            const bwLimit = bwRule?.bwIncludedLimit || 0;
+                            const bwExcess = Math.max(0, bwTotal - bwLimit);
+
+                            if (bwRule) {
+                              return (
+                                <TableRow className="border-blue-50">
+                                  <TableCell className="font-bold text-gray-700 py-3 text-sm">
+                                    B&W (A4 + 2x A3)
+                                  </TableCell>
+                                  <TableCell className="text-center font-bold text-gray-600 text-sm">
+                                    {bwTotal.toLocaleString()}
+                                  </TableCell>
+                                  <TableCell className="text-center font-bold text-gray-400 text-sm">
+                                    {bwLimit.toLocaleString()}
+                                  </TableCell>
+                                  <TableCell className="text-right font-bold text-blue-600 text-sm">
+                                    {bwExcess.toLocaleString()} units
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            }
+                            return null;
+                          })()}
+
+                          {/* Color Row */}
+                          {(() => {
+                            const colorRule = invoice.items?.find(
+                              (i) =>
+                                i.itemType === 'PRICING_RULE' && i.description.includes('Color'),
+                            );
+                            const colorTotal =
+                              (invoice.colorA4Count || 0) + (invoice.colorA3Count || 0) * 2;
+                            const colorLimit = colorRule?.colorIncludedLimit || 0;
+                            const colorExcess = Math.max(0, colorTotal - colorLimit);
+
+                            if (colorRule) {
+                              return (
+                                <TableRow className="border-blue-50">
+                                  <TableCell className="font-bold text-gray-700 py-3 text-sm">
+                                    Color (A4 + 2x A3)
+                                  </TableCell>
+                                  <TableCell className="text-center font-bold text-gray-600 text-sm">
+                                    {colorTotal.toLocaleString()}
+                                  </TableCell>
+                                  <TableCell className="text-center font-bold text-gray-400 text-sm">
+                                    {colorLimit.toLocaleString()}
+                                  </TableCell>
+                                  <TableCell className="text-right font-bold text-blue-600 text-sm">
+                                    {colorExcess.toLocaleString()} units
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            }
+                            return null;
+                          })()}
+
+                          {/* Combined Row (if any) */}
+                          {(() => {
+                            const comboRule = invoice.items?.find(
+                              (i) =>
+                                i.itemType === 'PRICING_RULE' && i.description.includes('Combined'),
+                            );
+                            if (comboRule) {
+                              const totalTotal =
+                                (invoice.bwA4Count || 0) +
+                                (invoice.bwA3Count || 0) * 2 +
+                                (invoice.colorA4Count || 0) +
+                                (invoice.colorA3Count || 0) * 2;
+                              const comboLimit = comboRule.combinedIncludedLimit || 0;
+                              const comboExcess = Math.max(0, totalTotal - comboLimit);
+
+                              return (
+                                <TableRow className="border-blue-50">
+                                  <TableCell className="font-bold text-gray-700 py-3 text-sm">
+                                    Combined Usage
+                                  </TableCell>
+                                  <TableCell className="text-center font-bold text-gray-600 text-sm">
+                                    {totalTotal.toLocaleString()}
+                                  </TableCell>
+                                  <TableCell className="text-center font-bold text-gray-400 text-sm">
+                                    {comboLimit.toLocaleString()}
+                                  </TableCell>
+                                  <TableCell className="text-right font-bold text-blue-600 text-sm">
+                                    {comboExcess.toLocaleString()} units
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            }
+                            return null;
+                          })()}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </div>
+                )}
               </>
             )}
 

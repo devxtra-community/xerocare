@@ -455,3 +455,25 @@ export const getFinanceReport = async (req: Request, res: Response, next: NextFu
     next(error);
   }
 };
+
+export const updateInvoiceUsage = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = req.params.id as string;
+    const { bwA4Count, bwA3Count, colorA4Count, colorA3Count } = req.body;
+
+    const invoice = await billingService.updateInvoiceUsage(id, {
+      bwA4Count: Number(bwA4Count || 0),
+      bwA3Count: Number(bwA3Count || 0),
+      colorA4Count: Number(colorA4Count || 0),
+      colorA3Count: Number(colorA3Count || 0),
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: invoice,
+      message: 'Invoice usage updated successfully',
+    });
+  } catch (error) {
+    next(error);
+  }
+};

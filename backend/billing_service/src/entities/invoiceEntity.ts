@@ -186,4 +186,17 @@ export class Invoice {
 
   @Column({ type: 'decimal', precision: 12, scale: 2, nullable: true })
   advanceAdjusted?: number;
+
+  // --- Usage Snapshots ---
+  @Column({ type: 'int', nullable: true })
+  bwA4Count?: number;
+
+  @Column({ type: 'int', nullable: true })
+  bwA3Count?: number;
+
+  @Column({ type: 'int', nullable: true })
+  colorA4Count?: number;
+
+  @Column({ type: 'int', nullable: true })
+  colorA3Count?: number;
 }

@@ -12,7 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { recordUsage, getInvoiceById, Invoice } from '@/lib/invoice';
+import { recordUsage, updateInvoiceUsage, getInvoiceById, Invoice } from '@/lib/invoice';
 import { toast } from 'sonner';
 import { Loader2, IndianRupee } from 'lucide-react';
 
@@ -22,6 +22,7 @@ interface UsageRecordingModalProps {
   contractId: string;
   customerName: string;
   onSuccess: () => void;
+  invoice?: Invoice | null; // Added for editing
 }
 
 export default function UsageRecordingModal({
@@ -30,6 +31,7 @@ export default function UsageRecordingModal({
   contractId,
   customerName,
   onSuccess,
+  invoice: editingInvoice,
 }: UsageRecordingModalProps) {
   const [loading, setLoading] = useState(false);
   const [contract, setContract] = useState<Invoice | null>(null);
@@ -47,15 +49,30 @@ export default function UsageRecordingModal({
   const [file, setFile] = useState<File | null>(null);
 
   React.useEffect(() => {
-    if (contractId) {
+    if (editingInvoice) {
+      setContract(editingInvoice);
+      setFormData({
+        billingPeriodStart: editingInvoice.billingPeriodStart?.split('T')[0] || '',
+        billingPeriodEnd: editingInvoice.billingPeriodEnd?.split('T')[0] || '',
+        bwA4Count: String(editingInvoice.bwA4Count || 0),
+        bwA3Count: String(editingInvoice.bwA3Count || 0),
+        colorA4Count: String(editingInvoice.colorA4Count || 0),
+        colorA3Count: String(editingInvoice.colorA3Count || 0),
+        remarks: editingInvoice.financeRemarks || '',
+      });
+    } else if (contractId) {
       getInvoiceById(contractId)
         .then((data) => {
           setContract(data);
-          // Auto-calculate estimate if data exists (e.g. editing)
+          setFormData((prev) => ({
+            ...prev,
+            billingPeriodStart: data.effectiveFrom?.split('T')[0] || '',
+            billingPeriodEnd: data.effectiveTo?.split('T')[0] || '',
+          }));
         })
         .catch((err) => console.error('Failed to fetch contract details:', err));
     }
-  }, [contractId]);
+  }, [contractId, editingInvoice]);
 
   // Determine Machine Capabilities from pricing items
   const isBw = React.useMemo(() => {
@@ -143,29 +160,39 @@ export default function UsageRecordingModal({
     setLoading(true);
 
     try {
-      const payload = new FormData();
-      payload.append('contractId', contractId);
-      payload.append('billingPeriodStart', formData.billingPeriodStart);
-      payload.append('billingPeriodEnd', formData.billingPeriodEnd);
-      payload.append('bwA4Count', String(formData.bwA4Count));
-      payload.append('bwA3Count', String(formData.bwA3Count));
-      payload.append('colorA4Count', String(formData.colorA4Count));
-      payload.append('colorA3Count', String(formData.colorA3Count));
-      payload.append('remarks', formData.remarks);
-      payload.append('reportedBy', 'EMPLOYEE'); // Or FINANCE if context allows
+      if (editingInvoice) {
+        await updateInvoiceUsage(editingInvoice.id, {
+          bwA4Count: Number(formData.bwA4Count),
+          bwA3Count: Number(formData.bwA3Count),
+          colorA4Count: Number(formData.colorA4Count),
+          colorA3Count: Number(formData.colorA3Count),
+        });
+        toast.success('Invoice usage updated successfully');
+      } else {
+        const payload = new FormData();
+        payload.append('contractId', contractId);
+        payload.append('billingPeriodStart', formData.billingPeriodStart);
+        payload.append('billingPeriodEnd', formData.billingPeriodEnd);
+        payload.append('bwA4Count', String(formData.bwA4Count));
+        payload.append('bwA3Count', String(formData.bwA3Count));
+        payload.append('colorA4Count', String(formData.colorA4Count));
+        payload.append('colorA3Count', String(formData.colorA3Count));
+        payload.append('remarks', formData.remarks);
+        payload.append('reportedBy', 'EMPLOYEE');
 
-      if (file) {
-        payload.append('file', file);
+        if (file) {
+          payload.append('file', file);
+        }
+
+        await recordUsage(payload);
+        toast.success('Usage recorded successfully');
       }
 
-      await recordUsage(payload);
-
-      toast.success('Usage recorded successfully');
       onSuccess();
       onClose();
     } catch (error: unknown) {
       const err = error as { message?: string };
-      toast.error(err.message || 'Failed to record usage');
+      toast.error(err.message || 'Failed to process request');
     } finally {
       setLoading(false);
     }
@@ -195,6 +222,7 @@ export default function UsageRecordingModal({
               <Input
                 type="date"
                 required
+                readOnly={!!editingInvoice}
                 value={formData.billingPeriodStart}
                 onChange={(e) => setFormData({ ...formData, billingPeriodStart: e.target.value })}
               />
@@ -204,6 +232,7 @@ export default function UsageRecordingModal({
               <Input
                 type="date"
                 required
+                readOnly={!!editingInvoice}
                 value={formData.billingPeriodEnd}
                 onChange={(e) => setFormData({ ...formData, billingPeriodEnd: e.target.value })}
               />
@@ -358,7 +387,7 @@ export default function UsageRecordingModal({
             </Button>
             <Button type="submit" disabled={loading}>
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Submit Record
+              {editingInvoice ? 'Update Invoice' : 'Submit Record'}
             </Button>
           </DialogFooter>
         </form>

@@ -19,6 +19,7 @@ import {
   getPendingCounts,
   getCollectionAlerts,
   getFinanceReport,
+  updateInvoiceUsage,
 } from '../controllers/invoiceController';
 import { authMiddleware } from '../middlewares/authMiddleware';
 import { requireRole } from '../middlewares/roleMiddleware';
@@ -77,6 +78,7 @@ router.get('/pending-counts', authMiddleware, getPendingCounts);
 router.get('/alerts', authMiddleware, requireRole(EmployeeRole.FINANCE), getCollectionAlerts);
 router.get('/branch-invoices', authMiddleware, getBranchInvoices);
 router.get('/finance/report', authMiddleware, requireRole(EmployeeRole.ADMIN), getFinanceReport);
+router.put('/:id/usage', authMiddleware, requireRole(EmployeeRole.FINANCE), updateInvoiceUsage);
 router.get('/:id', authMiddleware, getInvoiceById);
 
 export default router;

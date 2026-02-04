@@ -14,8 +14,10 @@ import { Badge } from '@/components/ui/badge';
 import { getCollectionAlerts, CollectionAlert, generateMonthlyInvoice } from '@/lib/invoice';
 import { Loader2, Upload, FileText } from 'lucide-react';
 import { toast } from 'sonner';
-import UsageRecordingModal from './UsageRecordingModal';
 import { format, differenceInDays } from 'date-fns';
+import { InvoiceDetailsDialog } from '../invoice/InvoiceDetailsDialog';
+import { getInvoiceById, Invoice } from '@/lib/invoice';
+import UsageRecordingModal from './UsageRecordingModal';
 
 export default function MonthlyCollectionTable({ mode }: { mode?: 'RENT' | 'LEASE' }) {
   const [alerts, setAlerts] = useState<CollectionAlert[]>([]);
@@ -23,6 +25,8 @@ export default function MonthlyCollectionTable({ mode }: { mode?: 'RENT' | 'LEAS
   const [selectedContract, setSelectedContract] = useState<CollectionAlert | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [generating, setGenerating] = useState<string | null>(null);
+  const [viewingInvoice, setViewingInvoice] = useState<Invoice | null>(null);
+  const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null);
 
   const fetchAlerts = async () => {
     setLoading(true);
@@ -68,6 +72,26 @@ export default function MonthlyCollectionTable({ mode }: { mode?: 'RENT' | 'LEAS
       toast.error(err.message || 'Failed to generate invoice');
     } finally {
       setGenerating(null);
+    }
+  };
+
+  const handleViewDetails = async (alert: CollectionAlert) => {
+    try {
+      const inv = await getInvoiceById(alert.contractId);
+      setViewingInvoice(inv);
+    } catch {
+      toast.error('Failed to load invoice details');
+    }
+  };
+
+  const handleUpdateUsage = async (alert: CollectionAlert) => {
+    try {
+      const inv = await getInvoiceById(alert.contractId);
+      setEditingInvoice(inv);
+      setSelectedContract(alert);
+      setIsModalOpen(true);
+    } catch {
+      toast.error('Failed to load invoice for update');
     }
   };
 
@@ -119,9 +143,16 @@ export default function MonthlyCollectionTable({ mode }: { mode?: 'RENT' | 'LEAS
                     >
                       Usage Pending
                     </Badge>
-                  ) : (
+                  ) : alert.type === 'INVOICE_PENDING' ? (
                     <Badge variant="outline" className="bg-blue-50 text-blue-600 border-blue-200">
                       Invoice Pending
+                    </Badge>
+                  ) : (
+                    <Badge
+                      variant="outline"
+                      className="bg-green-50 text-green-600 border-green-200"
+                    >
+                      Send Pending
                     </Badge>
                   )}
                 </TableCell>
@@ -153,21 +184,53 @@ export default function MonthlyCollectionTable({ mode }: { mode?: 'RENT' | 'LEAS
                       <Upload className="mr-2 h-4 w-4" />
                       Record Usage
                     </Button>
-                  ) : (
-                    <Button
-                      size="sm"
-                      variant="default"
-                      className="bg-blue-600 hover:bg-blue-700"
-                      onClick={() => handleGenerateInvoice(alert)}
-                      disabled={generating === alert.contractId}
-                    >
-                      {generating === alert.contractId ? (
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      ) : (
+                  ) : alert.type === 'INVOICE_PENDING' ? (
+                    <div className="flex gap-2 justify-end">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="bg-white border-blue-200 text-blue-600 hover:bg-blue-50"
+                        onClick={() => handleViewDetails(alert)}
+                      >
                         <FileText className="mr-2 h-4 w-4" />
-                      )}
-                      Generate Invoice
-                    </Button>
+                        View Details
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="default"
+                        className="bg-blue-600 hover:bg-blue-700"
+                        onClick={() => handleGenerateInvoice(alert)}
+                        disabled={generating === alert.contractId}
+                      >
+                        {generating === alert.contractId ? (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        ) : (
+                          <FileText className="mr-2 h-4 w-4" />
+                        )}
+                        Generate Invoice
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="flex gap-2 justify-end">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="bg-white border-green-200 text-green-600 hover:bg-green-50"
+                        onClick={() => handleUpdateUsage(alert)}
+                      >
+                        <Upload className="mr-2 h-4 w-4" />
+                        Update Reading
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="default"
+                        className="bg-green-600 hover:bg-green-700"
+                        onClick={() => handleViewDetails(alert)}
+                      >
+                        <FileText className="mr-2 h-4 w-4" />
+                        Send Invoice
+                      </Button>
+                    </div>
                   )}
                 </TableCell>
               </TableRow>
@@ -179,11 +242,19 @@ export default function MonthlyCollectionTable({ mode }: { mode?: 'RENT' | 'LEAS
       {selectedContract && (
         <UsageRecordingModal
           isOpen={isModalOpen}
-          onClose={() => setIsModalOpen(false)}
+          onClose={() => {
+            setIsModalOpen(false);
+            setEditingInvoice(null);
+          }}
           contractId={selectedContract.contractId}
           customerName={selectedContract.customerName}
           onSuccess={fetchAlerts}
+          invoice={editingInvoice}
         />
+      )}
+
+      {viewingInvoice && (
+        <InvoiceDetailsDialog invoice={viewingInvoice} onClose={() => setViewingInvoice(null)} />
       )}
     </>
   );

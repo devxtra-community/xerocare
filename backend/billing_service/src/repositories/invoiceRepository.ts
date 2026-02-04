@@ -21,6 +21,15 @@ export class InvoiceRepository {
     return this.repo.save(invoice);
   }
 
+  saveInvoice(invoice: Invoice) {
+    return this.repo.save(invoice);
+  }
+
+  async isFirstFinalInvoice(contractId: string): Promise<boolean> {
+    const count = await this.countFinalInvoicesByContractId(contractId);
+    return count === 0;
+  }
+
   findById(id: string) {
     return this.repo.findOne({
       where: { id },

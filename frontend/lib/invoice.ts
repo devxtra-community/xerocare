@@ -65,6 +65,14 @@ export interface Invoice {
   financeApprovedBy?: string;
   financeApprovedAt?: string;
   financeRemarks?: string;
+
+  // Usage Snapshot
+  bwA4Count?: number;
+  bwA3Count?: number;
+  colorA4Count?: number;
+  colorA3Count?: number;
+  billingPeriodStart?: string;
+  billingPeriodEnd?: string;
 }
 
 export interface CreateInvoicePayload {
@@ -188,7 +196,7 @@ export interface CollectionAlert {
   customerName: string;
   customerPhone?: string; // Added for display
   invoiceNumber: string;
-  type: 'USAGE_PENDING' | 'INVOICE_PENDING';
+  type: 'USAGE_PENDING' | 'INVOICE_PENDING' | 'SEND_PENDING';
   saleType: string;
   dueDate: string;
 }
@@ -239,4 +247,16 @@ export const getFinanceReport = async (filters: {
 
   const response = await api.get(`/b/invoices/finance/report?${params.toString()}`);
   return response.data.data;
+};
+export const updateInvoiceUsage = async (
+  invoiceId: string,
+  payload: {
+    bwA4Count: number;
+    bwA3Count: number;
+    colorA4Count: number;
+    colorA3Count: number;
+  },
+): Promise<unknown> => {
+  const response = await api.put(`/b/invoices/${invoiceId}/usage`, payload);
+  return response.data;
 };
