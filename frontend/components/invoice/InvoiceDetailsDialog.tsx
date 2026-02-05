@@ -228,12 +228,155 @@ export function InvoiceDetailsDialog({
                     {invoice.items
                       .filter((i) => i.itemType === 'PRICING_RULE')
                       .map((rule, idx) => (
-                        <div key={idx} className="flex flex-col gap-1">
-                          <span className="font-bold">{rule.description}</span>
-                          <div className="flex gap-4 opacity-80">
-                            <span>B/W Included: {rule.bwIncludedLimit || 0}</span>
-                            <span>Color Included: {rule.colorIncludedLimit || 0}</span>
-                          </div>
+                        <div
+                          key={idx}
+                          className="flex flex-col gap-1 pb-3 mb-3 border-b border-orange-200/30 last:border-0 last:pb-0 last:mb-0"
+                        >
+                          <span className="font-bold text-sm text-gray-800">
+                            {rule.description}
+                          </span>
+
+                          {/* Included Limits (Fixed Models) */}
+                          {rule.bwIncludedLimit || rule.colorIncludedLimit ? (
+                            <div className="flex gap-4 opacity-80 text-xs">
+                              {rule.bwIncludedLimit && (
+                                <span>B/W Included: {rule.bwIncludedLimit}</span>
+                              )}
+                              {rule.colorIncludedLimit && (
+                                <span>Color Included: {rule.colorIncludedLimit}</span>
+                              )}
+                            </div>
+                          ) : null}
+
+                          {/* SLAB RATES DISPLAY */}
+                          {/* 1. Black & White Slabs */}
+                          {rule.bwSlabRanges && rule.bwSlabRanges.length > 0 && (
+                            <div className="mt-1 p-2 bg-white/50 rounded-lg border border-orange-100">
+                              <p className="text-[10px] font-bold text-orange-400 uppercase mb-1">
+                                B&W Slabs
+                              </p>
+                              <div className="text-xs space-y-0.5 text-gray-600">
+                                {rule.bwSlabRanges.map((s, i) => (
+                                  <div
+                                    key={i}
+                                    className="flex justify-between w-full max-w-[200px]"
+                                  >
+                                    <span>
+                                      {s.from} - {s.to}
+                                    </span>
+                                    <span className="font-bold text-gray-800">₹{s.rate}</span>
+                                  </div>
+                                ))}
+                                {rule.bwExcessRate && (
+                                  <div className="flex justify-between w-full max-w-[200px] border-t border-orange-100 pt-0.5 mt-0.5">
+                                    <span>
+                                      &gt;{' '}
+                                      {Math.max(...rule.bwSlabRanges.map((s) => Number(s.to) || 0))}
+                                    </span>
+                                    <span className="font-bold text-gray-800">
+                                      ₹{rule.bwExcessRate}
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* 2. Color Slabs */}
+                          {rule.colorSlabRanges && rule.colorSlabRanges.length > 0 && (
+                            <div className="mt-1 p-2 bg-white/50 rounded-lg border border-orange-100">
+                              <p className="text-[10px] font-bold text-orange-400 uppercase mb-1">
+                                Color Slabs
+                              </p>
+                              <div className="text-xs space-y-0.5 text-gray-600">
+                                {rule.colorSlabRanges.map((s, i) => (
+                                  <div
+                                    key={i}
+                                    className="flex justify-between w-full max-w-[200px]"
+                                  >
+                                    <span>
+                                      {s.from} - {s.to}
+                                    </span>
+                                    <span className="font-bold text-gray-800">₹{s.rate}</span>
+                                  </div>
+                                ))}
+                                {rule.colorExcessRate && (
+                                  <div className="flex justify-between w-full max-w-[200px] border-t border-orange-100 pt-0.5 mt-0.5">
+                                    <span>
+                                      &gt;{' '}
+                                      {Math.max(
+                                        ...rule.colorSlabRanges.map((s) => Number(s.to) || 0),
+                                      )}
+                                    </span>
+                                    <span className="font-bold text-gray-800">
+                                      ₹{rule.colorExcessRate}
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* 3. Combined Slabs */}
+                          {rule.comboSlabRanges && rule.comboSlabRanges.length > 0 && (
+                            <div className="mt-1 p-2 bg-white/50 rounded-lg border border-orange-100">
+                              <p className="text-[10px] font-bold text-orange-400 uppercase mb-1">
+                                Combined Slabs
+                              </p>
+                              <div className="text-xs space-y-0.5 text-gray-600">
+                                {rule.comboSlabRanges.map((s, i) => (
+                                  <div
+                                    key={i}
+                                    className="flex justify-between w-full max-w-[200px]"
+                                  >
+                                    <span>
+                                      {s.from} - {s.to}
+                                    </span>
+                                    <span className="font-bold text-gray-800">₹{s.rate}</span>
+                                  </div>
+                                ))}
+                                {rule.combinedExcessRate && (
+                                  <div className="flex justify-between w-full max-w-[200px] border-t border-orange-100 pt-0.5 mt-0.5">
+                                    <span>
+                                      &gt;{' '}
+                                      {Math.max(
+                                        ...rule.comboSlabRanges.map((s) => Number(s.to) || 0),
+                                      )}
+                                    </span>
+                                    <span className="font-bold text-gray-800">
+                                      ₹{rule.combinedExcessRate}
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Fallback Base Rate if NO Slabs */}
+                          {!rule.bwSlabRanges?.length &&
+                            !rule.colorSlabRanges?.length &&
+                            !rule.comboSlabRanges?.length &&
+                            (rule.bwExcessRate ||
+                              rule.colorExcessRate ||
+                              rule.combinedExcessRate) && (
+                              <div className="mt-1 text-xs grid grid-cols-2 gap-2 opacity-80">
+                                {rule.bwExcessRate && (
+                                  <div>
+                                    B/W Rate: <strong>₹{rule.bwExcessRate}</strong>
+                                  </div>
+                                )}
+                                {rule.colorExcessRate && (
+                                  <div>
+                                    Color Rate: <strong>₹{rule.colorExcessRate}</strong>
+                                  </div>
+                                )}
+                                {rule.combinedExcessRate && (
+                                  <div>
+                                    Combined Rate: <strong>₹{rule.combinedExcessRate}</strong>
+                                  </div>
+                                )}
+                              </div>
+                            )}
                         </div>
                       ))}
                   </div>
