@@ -108,6 +108,18 @@ export class InvoiceRepository {
     });
   }
 
+  async findFinalInvoicesByContractId(contractId: string): Promise<Invoice[]> {
+    return this.repo.find({
+      where: {
+        referenceContractId: contractId,
+        type: InvoiceType.FINAL,
+      },
+      order: {
+        createdAt: 'DESC',
+      },
+    });
+  }
+
   async getStats(
     filter: {
       createdBy?: string;

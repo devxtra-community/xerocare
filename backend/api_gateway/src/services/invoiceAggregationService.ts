@@ -823,14 +823,21 @@ export class InvoiceAggregationService {
     }
   }
 
-  async getCollectionAlerts(user: { role: string; branchId?: string }, token: string) {
+  async getCollectionAlerts(
+    user: { role: string; branchId?: string },
+    token: string,
+    date?: string,
+  ) {
     try {
       if (!user.branchId) {
         throw new AppError('Branch ID not found in user context', 400);
       }
-      const response = await axios.get(`${BILLING_SERVICE_URL}/invoices/alerts`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const response = await axios.get(
+        `${BILLING_SERVICE_URL}/invoices/alerts${date ? `?date=${date}` : ''}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
       const alerts = response.data.data; // Array of { contractId, customerId, ... }
 
       // Aggregate Customer Names

@@ -6,7 +6,7 @@ import { SaleType } from '../entities/enums/saleType';
 import { AppError } from '../errors/appError';
 import { BillingCalculationService } from './billingCalculationService';
 import { UsageRepository } from '../repositories/usageRepository';
-import { SecurityDepositMode } from '../entities/invoiceEntity';
+import { SecurityDepositMode, Invoice } from '../entities/invoiceEntity';
 import { logger } from '../config/logger';
 import { RentType } from '../entities/enums/rentType';
 import { RentPeriod } from '../entities/enums/rentPeriod';
@@ -739,6 +739,63 @@ export class BillingService {
     if (!invoice) {
       throw new AppError('Invoice not found', 404);
     }
+
+    // Logic 1: If this is a Contract (PROFORMA / ACTIVE_LEASE),
+    // enrich with latest pending usage readings for display.
+    if (
+      (invoice.type === InvoiceType.PROFORMA || invoice.status === InvoiceStatus.ACTIVE_LEASE) &&
+      (invoice.bwA4Count === null || invoice.bwA4Count === undefined)
+    ) {
+      const history = await this.usageRepo.getUsageHistory(invoice.id);
+      const latestUsage = history[0];
+      if (latestUsage && !latestUsage.finalInvoiceId) {
+        invoice.bwA4Count = latestUsage.bwA4Count;
+        invoice.bwA3Count = latestUsage.bwA3Count;
+        invoice.colorA4Count = latestUsage.colorA4Count;
+        invoice.colorA3Count = latestUsage.colorA3Count;
+        invoice.billingPeriodStart = latestUsage.billingPeriodStart;
+        invoice.billingPeriodEnd = latestUsage.billingPeriodEnd;
+
+        // NEW: Determine if this is the first month for advance deduction simulation
+        const isFirstMonth = history.length === 1;
+        if (isFirstMonth && invoice.advanceAmount && invoice.advanceAmount > 0) {
+          // Simulation: Deduct advance from rent for the preview
+          invoice.advanceAdjusted = invoice.advanceAmount;
+        }
+
+        // Calculate a projected total for the UI
+        // We'll leave totalAmount as is but the UI will use these flags.
+      }
+    }
+
+    // Logic 2: If this is a FINAL invoice, it might not have the pricing rules (items)
+    // copied from the contract. Load them from the reference contract if missing
+    // so the Usage Breakdown and Pricing Rules sections display correctly.
+    if (
+      invoice.type === InvoiceType.FINAL &&
+      invoice.referenceContractId &&
+      (!invoice.items || !invoice.items.some((i) => i.itemType === ItemType.PRICING_RULE))
+    ) {
+      const contract = await this.invoiceRepo.findById(invoice.referenceContractId);
+      if (contract && contract.items) {
+        const rules = contract.items.filter((i) => i.itemType === ItemType.PRICING_RULE);
+        if (!invoice.items) invoice.items = [];
+        invoice.items.push(...rules);
+      }
+    }
+
+    // Logic 3: Fetch related final invoice history for contracts or final invoices
+    if (invoice.type === InvoiceType.FINAL && invoice.referenceContractId) {
+      (invoice as Invoice & { invoiceHistory?: Invoice[] }).invoiceHistory =
+        await this.invoiceRepo.findFinalInvoicesByContractId(invoice.referenceContractId);
+    } else if (
+      invoice.type === InvoiceType.PROFORMA ||
+      invoice.status === InvoiceStatus.ACTIVE_LEASE
+    ) {
+      (invoice as Invoice & { invoiceHistory?: Invoice[] }).invoiceHistory =
+        await this.invoiceRepo.findFinalInvoicesByContractId(invoice.id);
+    }
+
     return invoice;
   }
 
@@ -828,7 +885,7 @@ export class BillingService {
     return result;
   }
 
-  async getCollectionAlerts(branchId: string) {
+  async getCollectionAlerts(branchId: string, targetDateStr?: string) {
     const activeContracts = await this.invoiceRepo.findActiveContracts(branchId);
     const alerts: Array<{
       contractId: string;
@@ -838,9 +895,10 @@ export class BillingService {
       type: 'USAGE_PENDING' | 'INVOICE_PENDING' | 'SEND_PENDING';
       saleType: string;
       dueDate: Date;
+      finalInvoiceId?: string;
     }> = [];
 
-    const now = new Date();
+    const now = targetDateStr ? new Date(targetDateStr) : new Date();
     const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
     // Optimization: Bulk fetch usage/invoices? For now, Loop (N is small per branch usually).
@@ -905,6 +963,7 @@ export class BillingService {
               type: 'SEND_PENDING',
               saleType: contract.saleType,
               dueDate: finalInvoice.createdAt,
+              finalInvoiceId: finalInvoice.id, // Added for frontend to view correct details
             });
           }
         }

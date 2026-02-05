@@ -36,30 +36,27 @@ export class UsageRepository {
       where: { contractId },
     });
 
-    // Debug Logging
-    console.log('[DEBUG] findByContractAndPeriod Input:', {
-      contractId,
-      start: billingPeriodStart.toISOString(),
-      end: billingPeriodEnd.toISOString(),
-    });
+    // Find matching record using manual date part extraction to be timezone-safe
+    const toDateStr = (d: Date | string) => {
+      const date = typeof d === 'string' ? new Date(d) : d;
+      // If it's a date-only string or we want to treat it as UTC (TypeORM 'date' columns often do)
+      // we should be careful. toISOString is safe if the dates are at midnight UTC.
+      // But let's use a more robust way:
+      const y = date.getUTCFullYear();
+      const m = String(date.getUTCMonth() + 1).padStart(2, '0');
+      const d_ = String(date.getUTCDate()).padStart(2, '0');
+      return `${y}-${m}-${d_}`;
+    };
 
-    // Find matching record tolerating small time diffs or just checking ISO date string
-    const startStr = billingPeriodStart.toISOString().split('T')[0];
-    const endStr = billingPeriodEnd.toISOString().split('T')[0];
+    const startStr = toDateStr(billingPeriodStart);
+    const endStr = toDateStr(billingPeriodEnd);
 
     const found = records.find((r) => {
-      // Handle potential null/undefined db values safe-guard
       if (!r.billingPeriodStart || !r.billingPeriodEnd) return false;
 
-      const rStart = new Date(r.billingPeriodStart).toISOString().split('T')[0];
-      const rEnd = new Date(r.billingPeriodEnd).toISOString().split('T')[0];
+      const rStart = toDateStr(r.billingPeriodStart);
+      const rEnd = toDateStr(r.billingPeriodEnd);
 
-      console.log(
-        `[DEBUG] Comparing Record ${r.id}: DB(${rStart}, ${rEnd}) vs Target(${startStr}, ${endStr})`,
-      );
-
-      // Strict Match OR Subset Match (Usage is within the billing period)
-      // e.g. Usage (Feb 3 - Feb 8) is valid for Invoice (Feb 1 - Feb 28)
       const isExact = rStart === startStr && rEnd === endStr;
       const isSubset = rStart >= startStr && rEnd <= endStr;
 

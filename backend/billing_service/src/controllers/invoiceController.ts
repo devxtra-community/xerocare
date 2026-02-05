@@ -399,7 +399,8 @@ export const getCollectionAlerts = async (req: Request, res: Response, next: Nex
     if (!branchId) {
       throw new AppError('Branch ID not found in user context', 400);
     }
-    const alerts = await billingService.getCollectionAlerts(branchId);
+    const date = req.query.date as string;
+    const alerts = await billingService.getCollectionAlerts(branchId, date);
     return res.status(200).json({
       success: true,
       data: alerts,

@@ -71,14 +71,24 @@ router.get('/sales/global-totals', authMiddleware, getGlobalSalesTotals);
 router.post(
   '/settlements/generate',
   authMiddleware,
-  requireRole(EmployeeRole.FINANCE),
+  requireRole(EmployeeRole.ADMIN, EmployeeRole.FINANCE),
   generateFinalInvoice,
 );
 router.get('/pending-counts', authMiddleware, getPendingCounts);
-router.get('/alerts', authMiddleware, requireRole(EmployeeRole.FINANCE), getCollectionAlerts);
+router.get(
+  '/alerts',
+  authMiddleware,
+  requireRole(EmployeeRole.ADMIN, EmployeeRole.FINANCE),
+  getCollectionAlerts,
+);
 router.get('/branch-invoices', authMiddleware, getBranchInvoices);
 router.get('/finance/report', authMiddleware, requireRole(EmployeeRole.ADMIN), getFinanceReport);
-router.put('/:id/usage', authMiddleware, requireRole(EmployeeRole.FINANCE), updateInvoiceUsage);
+router.put(
+  '/:id/usage',
+  authMiddleware,
+  requireRole(EmployeeRole.ADMIN, EmployeeRole.FINANCE),
+  updateInvoiceUsage,
+);
 router.get('/:id', authMiddleware, getInvoiceById);
 
 export default router;

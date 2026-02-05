@@ -239,10 +239,11 @@ export const getCollectionAlerts = async (
     const user = req.user;
     if (!user) throw new Error('User not authenticated');
     const token = req.headers.authorization?.split(' ')[1] || '';
+    const date = req.query.date as string;
 
     // Authorization: Finance Only (Gateway Route checks this too, but good to have)
     // assuming service handles logic or passes through
-    const alerts = await invoiceAggregationService.getCollectionAlerts(user, token);
+    const alerts = await invoiceAggregationService.getCollectionAlerts(user, token, date);
     return res.status(200).json({
       success: true,
       data: alerts,
