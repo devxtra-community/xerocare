@@ -1,4 +1,3 @@
-import { Source } from '../config/db';
 import { AddProductDTO, BulkProductRow } from '../dto/product.dto';
 import { AppError } from '../errors/appError';
 import { ProductRepository } from '../repositories/productRepository';
@@ -9,7 +8,6 @@ import { logger } from '../config/logger';
 
 export class ProductService {
   private productRepo = new ProductRepository();
-  private source = Source;
   private model = new ModelRepository();
   private warehouse = new WarehouseRepository();
 

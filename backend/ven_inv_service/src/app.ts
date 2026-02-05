@@ -10,6 +10,7 @@ import productRoute from './routes/productRoute';
 import branchRouter from './routes/branchRoutes';
 import warehouseRouter from './routes/warehouseRoutes';
 import { startEmployeeConsumer } from './events/consumers/employeeConsumer';
+import { startProductStatusConsumer } from './worker/productStatusUpdateWorker';
 import { getRabbitChannel } from './config/rabbitmq';
 import modelRoute from './routes/modelRoute';
 import inventoryRouter from './routes/inventoryRoutes';
@@ -34,6 +35,7 @@ const startServer = async () => {
     await Source.initialize();
     await getRabbitChannel();
     await startEmployeeConsumer();
+    await startProductStatusConsumer();
     logger.info('Database connected');
 
     const PORT = process.env.PORT;
