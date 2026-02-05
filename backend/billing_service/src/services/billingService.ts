@@ -13,6 +13,7 @@ import { RentPeriod } from '../entities/enums/rentPeriod';
 import { LeaseType } from '../entities/enums/leaseType';
 import { ItemType } from '../entities/enums/itemType';
 import { InvoiceType } from '../entities/enums/invoiceType';
+import { emitProductStatusUpdate } from '../events/publisher/productStatusEvent';
 
 export class BillingService {
   private invoiceRepo = new InvoiceRepository();
@@ -302,6 +303,7 @@ export class BillingService {
       quantity: number;
       unitPrice: number;
       itemType?: ItemType;
+      productId?: string; // CRITICAL: Product ID for status updates
     }[];
     // Pricing Items (Rules)
     pricingItems?: {
@@ -344,12 +346,29 @@ export class BillingService {
 
     // 1. Handle Items (Product/Machines) - Available for both SALE and RENT
     if (payload.items) {
+      logger.info('Creating invoice items from payload', {
+        itemsCount: payload.items.length,
+        items: payload.items.map((i) => ({
+          description: i.description,
+          productId: i.productId,
+          hasProductId: !!i.productId,
+        })),
+      });
+
       const productItems = payload.items.map((item) => {
         const invItem = new InvoiceItem();
         invItem.itemType = item.itemType || ItemType.PRODUCT;
         invItem.description = item.description;
         invItem.quantity = item.quantity;
         invItem.unitPrice = item.unitPrice;
+        invItem.productId = item.productId; // CRITICAL FIX: Save productId
+
+        logger.info('Created invoice item', {
+          description: invItem.description,
+          productId: invItem.productId,
+          hasProductId: !!invItem.productId,
+        });
+
         return invItem;
       });
       invoiceItems.push(...productItems);
@@ -468,6 +487,7 @@ export class BillingService {
         quantity: number;
         unitPrice: number;
         itemType?: ItemType;
+        productId?: string; // CRITICAL: Product ID for status updates
       }[];
     },
   ) {
@@ -512,6 +532,7 @@ export class BillingService {
         invItem.description = item.description;
         invItem.quantity = item.quantity;
         invItem.unitPrice = item.unitPrice;
+        invItem.productId = item.productId; // CRITICAL FIX: Save productId
         return invItem;
       });
       newInvoiceItems.push(...machineItems);
@@ -624,25 +645,65 @@ export class BillingService {
 
     // Final Transition Logic
     if (invoice.saleType === SaleType.SALE) {
-      invoice.type = InvoiceType.FINAL; // Converts to Final Invoice
-      invoice.status = InvoiceStatus.ISSUED; // Or kept as FINANCE_APPROVED? Prompt says "Sale -> FINAL Invoice". Usually Final Invoices are ISSUED/UNPAID. Let's use ISSUED for consistency with Final Invoice flows.
-      // Wait, "Only FINANCE_APPROVED can trigger final transitions".
-      // "SALE type = FINAL (Invoice)"
-      // Let's set Status to FINANCE_APPROVED as the gate, but maybe immediately transition to ISSUED?
-      // Prompt says "Rules: Employee approval -> EMPLOYEE_APPROVED, Finance approval -> FINANCE_APPROVED".
-      // "Status flow: DRAFT -> EMPLOYEE_APPROVED -> FINANCE_APPROVED -> (Final State)"
-      // "Final State: SALE Invoice -> FINAL".
-      // So I will stick to setting it to FINANCE_APPROVED, but changing TYPE to FINAL.
-      // Actually, if I change type to FINAL, it IS a Final Invoice.
+      invoice.type = InvoiceType.FINAL;
+      invoice.status = InvoiceStatus.ISSUED;
     } else if (invoice.saleType === SaleType.RENT) {
-      invoice.type = InvoiceType.PROFORMA; // Converts to Contract
-      // Keep status as FINANCE_APPROVED (which implies Active Contract)
+      invoice.type = InvoiceType.PROFORMA;
     } else if (invoice.saleType === SaleType.LEASE) {
-      invoice.type = InvoiceType.PROFORMA; // Converts to Contract
-      invoice.status = InvoiceStatus.ACTIVE_LEASE; // Explicit requirement: "LEASE status = ACTIVE_LEASE"
+      invoice.type = InvoiceType.PROFORMA;
+      invoice.status = InvoiceStatus.ACTIVE_LEASE;
     }
 
-    return this.invoiceRepo.save(invoice);
+    // Save invoice first
+    const savedInvoice = await this.invoiceRepo.save(invoice);
+
+    logger.info('Finance approved invoice', {
+      invoiceId: savedInvoice.id,
+      saleType: savedInvoice.saleType,
+      itemsCount: savedInvoice.items?.length || 0,
+    });
+
+    // Emit product status update events
+    try {
+      if (!savedInvoice.items || savedInvoice.items.length === 0) {
+        logger.warn('No items found in invoice for product status update', {
+          invoiceId: savedInvoice.id,
+        });
+        return savedInvoice;
+      }
+
+      for (const item of savedInvoice.items) {
+        if (!item.productId) {
+          logger.debug('Skipping item without productId', {
+            itemId: item.id,
+            itemType: item.itemType,
+          });
+          continue;
+        }
+
+        logger.info('Emitting product status update', {
+          productId: item.productId,
+          billType: savedInvoice.saleType,
+          invoiceId: savedInvoice.id,
+        });
+
+        await emitProductStatusUpdate({
+          productId: item.productId,
+          billType: savedInvoice.saleType,
+          invoiceId: savedInvoice.id,
+          approvedBy: userId,
+          approvedAt: savedInvoice.financeApprovedAt || new Date(),
+        });
+      }
+    } catch (error) {
+      logger.error('Failed to emit product status update events', {
+        error,
+        invoiceId: savedInvoice.id,
+      });
+      // Don't fail the approval if event emission fails
+    }
+
+    return savedInvoice;
   }
 
   async financeReject(id: string, userId: string, reason: string) {

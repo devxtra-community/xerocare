@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { getAllProducts, Product } from '@/lib/product';
+import { getAllProducts, Product, ProductStatus } from '@/lib/product';
 import { getAllSpareParts, SparePart } from '@/lib/spare-part';
 import { SearchableSelect, SearchableSelectOption } from '@/components/ui/searchable-select';
 
@@ -24,7 +24,12 @@ export function ProductSelect({ onSelect }: ProductSelectProps) {
           getAllSpareParts(),
         ]);
 
-        setItems([...productsData, ...sparePartsData]);
+        // Filter products to show only AVAILABLE status
+        const availableProducts = productsData.filter(
+          (product) => product.product_status === ProductStatus.AVAILABLE,
+        );
+
+        setItems([...availableProducts, ...sparePartsData]);
       } catch (error) {
         console.error('Failed to fetch items', error);
       } finally {

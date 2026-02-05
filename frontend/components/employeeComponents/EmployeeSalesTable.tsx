@@ -353,6 +353,7 @@ function SaleFormModal({
     discount: number;
     maxDiscount: number;
     isManual: boolean;
+    productId?: string; // Product ID for status updates
   }
 
   const [form, setForm] = useState<{
@@ -372,17 +373,20 @@ function SaleFormModal({
     let description = '';
     let basePrice = 0;
     let maxDiscount = 0;
+    let productId: string | undefined;
 
     if ('part_name' in item) {
       // SparePart
       description = item.part_name;
       basePrice = Number(item.base_price) || 0;
       maxDiscount = 0;
+      productId = undefined; // Spare parts don't have productId
     } else {
       // Product
       description = item.name;
       basePrice = item.sale_price || 0;
       maxDiscount = item.max_discount_amount || 0;
+      productId = item.id; // CRITICAL: Store product ID
     }
 
     const newItem: ExtendedItem = {
@@ -393,6 +397,7 @@ function SaleFormModal({
       unitPrice: basePrice, // Initially same as base
       maxDiscount,
       isManual: false,
+      productId, // CRITICAL: Include productId
     };
 
     setForm({
@@ -699,6 +704,7 @@ function SaleFormModal({
                       // We send the NET unit price to backend as 'unitPrice' usually (unless backed expects discount field)
                       // Based on previous code, only unitPrice exists in payload.
                       unitPrice: it.unitPrice,
+                      productId: it.productId, // CRITICAL: Include productId
                     })),
                   };
 

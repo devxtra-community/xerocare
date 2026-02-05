@@ -54,6 +54,9 @@ export class InvoiceItem {
   @Column({ type: 'decimal', precision: 12, scale: 2, nullable: true, default: 0 })
   unitPrice?: number;
 
+  @Column({ type: 'uuid', nullable: true })
+  productId?: string;
+
   @ManyToOne(() => Invoice, (invoice) => invoice.items, {
     onDelete: 'CASCADE',
   })

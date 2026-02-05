@@ -161,6 +161,7 @@ export default function RentFormModal({
             quantity: p.quantity || 1,
             unitPrice: 0,
             itemType: 'PRODUCT' as const,
+            productId: p.id, // CRITICAL: Include productId for status updates
           })),
 
           pricingItems:
@@ -197,6 +198,7 @@ export default function RentFormModal({
             quantity: p.quantity || 1,
             unitPrice: 0,
             itemType: 'PRODUCT' as const,
+            productId: p.id, // CRITICAL: Include productId for status updates
           })),
           rentType: form.rentType as
             | 'FIXED_LIMIT'
