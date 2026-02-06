@@ -31,7 +31,7 @@ export interface Invoice {
   status: string;
   saleType: string;
   rentType?: 'FIXED_LIMIT' | 'FIXED_COMBO' | 'FIXED_FLAT' | 'CPC' | 'CPC_COMBO';
-  rentPeriod?: 'MONTHLY' | 'QUARTERLY' | 'HALF_YEARLY' | 'YEARLY';
+  rentPeriod?: 'MONTHLY' | 'QUARTERLY' | 'HALF_YEARLY' | 'YEARLY' | 'CUSTOM';
 
   // Lease Fields
   leaseType?: 'EMI' | 'FSM';
@@ -85,7 +85,7 @@ export interface CreateInvoicePayload {
 
   // Rent Fields
   rentType?: 'FIXED_LIMIT' | 'FIXED_COMBO' | 'FIXED_FLAT' | 'CPC' | 'CPC_COMBO';
-  rentPeriod?: 'MONTHLY' | 'QUARTERLY' | 'HALF_YEARLY' | 'YEARLY';
+  rentPeriod?: 'MONTHLY' | 'QUARTERLY' | 'HALF_YEARLY' | 'YEARLY' | 'CUSTOM';
 
   // Lease Fields
   leaseType?: 'EMI' | 'FSM';

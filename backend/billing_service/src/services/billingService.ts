@@ -382,6 +382,7 @@ export class BillingService {
     effectiveFrom: string; // From UI usually string
     effectiveTo?: string;
     totalAmount?: number;
+    billingCycleInDays?: number; // Added for CUSTOM period logic
 
     // Lease Fields
     leaseType?: LeaseType;
@@ -429,6 +430,16 @@ export class BillingService {
     } else if (payload.rentType === RentType.CPC || payload.rentType === RentType.CPC_COMBO) {
       if (payload.monthlyRent && payload.monthlyRent > 0) {
         throw new AppError('CPC models cannot have Monthly Rent', 400);
+      }
+    }
+
+    // Validation for Custom Billing Period
+    if (payload.rentPeriod === RentPeriod.CUSTOM) {
+      if (!payload.billingCycleInDays || payload.billingCycleInDays <= 0) {
+        throw new AppError(
+          'Billing Cycle (Days) is required and must be greater than 0 for CUSTOM rent period',
+          400,
+        );
       }
     }
 
@@ -520,6 +531,8 @@ export class BillingService {
       discountPercent: payload.discountPercent,
       effectiveFrom: payload.effectiveFrom ? new Date(payload.effectiveFrom) : new Date(),
       effectiveTo: payload.effectiveTo ? new Date(payload.effectiveTo) : undefined,
+      billingCycleInDays:
+        payload.rentPeriod === RentPeriod.CUSTOM ? payload.billingCycleInDays : undefined, // Only save if CUSTOM
 
       leaseType: payload.leaseType!, // ! if validated
       leaseTenureMonths: payload.leaseTenureMonths,
@@ -556,6 +569,7 @@ export class BillingService {
       discountPercent?: number;
       effectiveFrom?: string;
       effectiveTo?: string;
+      billingCycleInDays?: number; // Added for CUSTOM period
       // Lease Fields
       leaseType?: LeaseType;
       leaseTenureMonths?: number;
@@ -602,8 +616,22 @@ export class BillingService {
     if (payload.advanceAmount !== undefined) invoice.advanceAmount = payload.advanceAmount;
     if (payload.discountPercent !== undefined) invoice.discountPercent = payload.discountPercent;
     if (payload.effectiveFrom) invoice.effectiveFrom = new Date(payload.effectiveFrom);
-    if (payload.effectiveFrom) invoice.effectiveFrom = new Date(payload.effectiveFrom);
     if (payload.effectiveTo) invoice.effectiveTo = new Date(payload.effectiveTo);
+    if (payload.billingCycleInDays !== undefined) {
+      invoice.billingCycleInDays = payload.billingCycleInDays;
+    }
+
+    // Validation update: If switching to CUSTOM, check validity
+    if (
+      (payload.rentPeriod === RentPeriod.CUSTOM ||
+        (invoice.rentPeriod === RentPeriod.CUSTOM && !payload.rentPeriod)) &&
+      (!invoice.billingCycleInDays || invoice.billingCycleInDays <= 0)
+    ) {
+      throw new AppError(
+        'Billing Cycle (Days) is required and must be greater than 0 for CUSTOM rent period',
+        400,
+      );
+    }
 
     // Update Lease Fields
     if (payload.leaseType) invoice.leaseType = payload.leaseType;
@@ -742,9 +770,40 @@ export class BillingService {
       invoice.status = InvoiceStatus.ISSUED;
     } else if (invoice.saleType === SaleType.RENT) {
       invoice.type = InvoiceType.PROFORMA;
+
+      // --- DATE RESET LOGIC (User Request) ---
+      // Reset the current Billing Cycle / Contract Period to start upon Approval
+      const approvalDate = new Date();
+      invoice.effectiveFrom = approvalDate;
+
+      // Calculate Next Due Date (Effective To) based on Rent Period
+      const endDate = new Date(approvalDate);
+
+      // Add Duration
+      if (invoice.rentPeriod === RentPeriod.CUSTOM && invoice.billingCycleInDays) {
+        endDate.setDate(endDate.getDate() + invoice.billingCycleInDays);
+      } else if (invoice.rentPeriod === RentPeriod.QUARTERLY) {
+        endDate.setMonth(endDate.getMonth() + 3);
+      } else if (invoice.rentPeriod === RentPeriod.HALF_YEARLY) {
+        endDate.setMonth(endDate.getMonth() + 6);
+      } else if (invoice.rentPeriod === RentPeriod.YEARLY) {
+        endDate.setFullYear(endDate.getFullYear() + 1);
+      } else {
+        // Default: MONTHLY
+        endDate.setMonth(endDate.getMonth() + 1);
+      }
+      invoice.effectiveTo = endDate;
     } else if (invoice.saleType === SaleType.LEASE) {
       invoice.type = InvoiceType.PROFORMA;
       invoice.status = InvoiceStatus.ACTIVE_LEASE;
+      // Leases typically have fixed tenure (effectiveTo set at creation), so strictly preserve or reset start?
+      // Assuming Lease starts on Approval too:
+      if (invoice.leaseTenureMonths) {
+        invoice.effectiveFrom = new Date();
+        const leaseEnd = new Date();
+        leaseEnd.setMonth(leaseEnd.getMonth() + invoice.leaseTenureMonths);
+        invoice.effectiveTo = leaseEnd;
+      }
     }
 
     // Save invoice first

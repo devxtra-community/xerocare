@@ -12,7 +12,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { recordUsage, updateInvoiceUsage, getInvoiceById, Invoice } from '@/lib/invoice';
+import {
+  recordUsage,
+  getInvoiceById,
+  updateInvoiceUsage,
+  Invoice,
+  InvoiceItem,
+} from '@/lib/invoice';
 import { toast } from 'sonner';
 import { Loader2, IndianRupee } from 'lucide-react';
 import UsagePreviewDialog from './UsagePreviewDialog';
@@ -145,48 +151,113 @@ export default function UsageRecordingModal({
       return 0;
     };
 
-    // Rent Type Check: CPC = 0 Rent base. Fixed = Monthly Rent base.
-    // If rentType is missing, assume Fixed/Rent.
-    const isCpc = contract.rentType?.includes('CPC');
-    let total = isCpc ? 0 : safeParse(contract.monthlyRent);
+    // Helper: Calculate cost for a specific rule (BW/Color/Combo)
+    const calculateRuleCost = (
+      ruleItem: InvoiceItem | undefined,
+      countA4: number,
+      countA3: number,
+    ) => {
+      if (!ruleItem) return 0;
 
-    // Advance Amount Deduction
+      // 1. Total Copies (A3 = 2x A4)
+      const totalCopies = countA4 + countA3 * 2;
+
+      // 2. Deduct Included Limit
+      let includedLimit = 0;
+      let slabRanges: { from: number | string; to: number | string; rate: number | string }[] = [];
+      let excessRate = 0;
+
+      if (ruleItem.description.includes('Black')) {
+        includedLimit = safeParse(ruleItem.bwIncludedLimit);
+        slabRanges = ruleItem.bwSlabRanges || [];
+        excessRate = safeParse(ruleItem.bwExcessRate);
+      } else if (ruleItem.description.includes('Color')) {
+        includedLimit = safeParse(ruleItem.colorIncludedLimit);
+        slabRanges = ruleItem.colorSlabRanges || [];
+        excessRate = safeParse(ruleItem.colorExcessRate);
+      } else if (ruleItem.description.includes('Combined')) {
+        includedLimit = safeParse(ruleItem.combinedIncludedLimit);
+        slabRanges = ruleItem.comboSlabRanges || [];
+        excessRate = safeParse(ruleItem.combinedExcessRate);
+      }
+
+      let chargeable = Math.max(0, totalCopies - includedLimit);
+      let cost = 0;
+
+      // 3. Apply Slabs (Graduated)
+      if (slabRanges && slabRanges.length > 0) {
+        // Sort by 'from'
+        const sortedSlabs = [...slabRanges].sort((a, b) => safeParse(a.from) - safeParse(b.from));
+
+        for (const slab of sortedSlabs) {
+          if (chargeable <= 0) break;
+
+          const from = safeParse(slab.from);
+          const to = safeParse(slab.to);
+          const rate = safeParse(slab.rate);
+
+          // Slab Capacity
+          const capacity = to - from + 1;
+          const usageInSlab = Math.min(chargeable, capacity);
+
+          cost += usageInSlab * rate;
+          chargeable -= usageInSlab;
+        }
+      }
+
+      // 4. Apply Excess Rate to remaining
+      if (chargeable > 0) {
+        cost += chargeable * excessRate;
+      }
+
+      return cost;
+    };
+
+    // Main Calculation
+    // ----------------
+    // Rent Type Check
+    const isCpc = contract.rentType?.includes('CPC');
     const advance = safeParse(contract.advanceAmount);
 
-    // Usage Cost
+    let total = 0;
+
+    // 1. Establish Base & Advance Logic
+    if (isCpc) {
+      // CPC: Pay for Usage Only. Base Rent = 0.
+      // Advance is NOT deducted for CPC in this context (per backend rules).
+      total = 0;
+    } else {
+      // FIXED: Base is Monthly Rent. Deduct Advance.
+      total = safeParse(contract.monthlyRent);
+      total -= advance;
+    }
+
+    // Inputs
     const bwA4 = safeParse(formData.bwA4Count);
     const bwA3 = safeParse(formData.bwA3Count);
     const clrA4 = safeParse(formData.colorA4Count);
     const clrA3 = safeParse(formData.colorA3Count);
 
+    // Find Rules
     const bwRule = contract.items?.find(
       (i) => i.itemType === 'PRICING_RULE' && i.description.includes('Black'),
     );
     const colorRule = contract.items?.find(
       (i) => i.itemType === 'PRICING_RULE' && i.description.includes('Color'),
     );
+    const comboRule = contract.items?.find(
+      (i) => i.itemType === 'PRICING_RULE' && i.description.includes('Combined'),
+    );
 
-    if (bwRule) {
-      // Logic: A3 usually counts as 2x A4 in copy cost calculations (Standard Industry Practice)
-      const totalCount = bwA4 + bwA3 * 2;
-      const limit = safeParse(bwRule.bwIncludedLimit);
-
-      const excess = Math.max(0, totalCount - limit);
-      total += excess * safeParse(bwRule.bwExcessRate);
+    // Calculate Rule Costs
+    if (comboRule) {
+      total += calculateRuleCost(comboRule, bwA4 + clrA4, bwA3 + clrA3);
+    } else {
+      if (bwRule) total += calculateRuleCost(bwRule, bwA4, bwA3);
+      if (colorRule) total += calculateRuleCost(colorRule, clrA4, clrA3);
     }
 
-    if (colorRule) {
-      const totalCount = clrA4 + clrA3 * 2;
-      const limit = safeParse(colorRule.colorIncludedLimit);
-
-      const excess = Math.max(0, totalCount - limit);
-      total += excess * safeParse(colorRule.colorExcessRate);
-    }
-
-    // Deduct Advance Amount
-    total -= advance;
-
-    // Fix floating point precision issues (e.g. 5600.000001)
+    // Fix floating point precision
     const finalVal = Math.round((total + Number.EPSILON) * 100) / 100;
     setEstimatedCost(isNaN(finalVal) ? 0 : finalVal);
   }, [formData, contract]);
@@ -397,74 +468,6 @@ export default function UsageRecordingModal({
                   </p>
                 </div>
               </div>
-
-              {/* Pricing Details */}
-              <div className="p-4 border-t border-slate-200 space-y-2 bg-white">
-                {/* Monthly Rent */}
-                {!contract?.rentType?.includes('CPC') && contract?.monthlyRent && (
-                  <div className="flex justify-between items-center text-sm">
-                    <span className="text-slate-600">Monthly Rent</span>
-                    <span className="font-semibold text-slate-800 flex items-center gap-1">
-                      <IndianRupee size={14} />
-                      {Number(contract.monthlyRent).toLocaleString('en-IN', {
-                        minimumFractionDigits: 2,
-                      })}
-                    </span>
-                  </div>
-                )}
-
-                {/* Advance Amount */}
-                {contract?.advanceAmount && Number(contract.advanceAmount) > 0 && (
-                  <div className="flex justify-between items-center text-sm">
-                    <span className="text-slate-600">Advance Amount</span>
-                    <span className="font-semibold text-orange-600 flex items-center gap-1">
-                      <IndianRupee size={14} />
-                      {Number(contract.advanceAmount).toLocaleString('en-IN', {
-                        minimumFractionDigits: 2,
-                      })}
-                    </span>
-                  </div>
-                )}
-
-                {/* BW Excess Rate */}
-                {contract?.items?.find(
-                  (i) => i.itemType === 'PRICING_RULE' && i.description.includes('Black'),
-                ) && (
-                  <div className="flex justify-between items-center text-sm">
-                    <span className="text-slate-600">BW Excess Rate</span>
-                    <span className="font-semibold text-blue-600 flex items-center gap-1">
-                      <IndianRupee size={14} />
-                      {Number(
-                        contract.items.find((i) => i.description.includes('Black'))?.bwExcessRate ||
-                          0,
-                      ).toLocaleString('en-IN', {
-                        minimumFractionDigits: 2,
-                      })}
-                      <span className="text-xs text-slate-500">/copy</span>
-                    </span>
-                  </div>
-                )}
-
-                {/* Color Excess Rate */}
-                {contract?.items?.find(
-                  (i) => i.itemType === 'PRICING_RULE' && i.description.includes('Color'),
-                ) && (
-                  <div className="flex justify-between items-center text-sm">
-                    <span className="text-slate-600">Color Excess Rate</span>
-                    <span className="font-semibold text-purple-600 flex items-center gap-1">
-                      <IndianRupee size={14} />
-                      {Number(
-                        contract.items.find((i) => i.description.includes('Color'))
-                          ?.colorExcessRate || 0,
-                      ).toLocaleString('en-IN', {
-                        minimumFractionDigits: 2,
-                      })}
-                      <span className="text-xs text-slate-500">/copy</span>
-                    </span>
-                  </div>
-                )}
-              </div>
-
               <div className="p-4 bg-blue-50/50 border-t border-blue-100">
                 <div className="flex justify-between items-center">
                   <div>
@@ -473,8 +476,8 @@ export default function UsageRecordingModal({
                     </Label>
                     <span className="text-[10px] text-blue-400 font-medium">
                       {contract?.rentType?.includes('CPC')
-                        ? '(Usage Cost - Advance)'
-                        : '(Rent + Excess - Advance)'}
+                        ? '(Slab/Usage Cost)'
+                        : '(Rent - Advance + Excess)'}
                     </span>
                   </div>
                   <div className="flex items-center gap-1 text-2xl font-bold text-blue-700">

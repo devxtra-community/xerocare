@@ -3,4 +3,5 @@ export enum RentPeriod {
   QUARTERLY = 'QUARTERLY',
   HALF_YEARLY = 'HALF_YEARLY',
   YEARLY = 'YEARLY',
+  CUSTOM = 'CUSTOM',
 }

@@ -2,10 +2,11 @@ import api from './api';
 import { Model } from './model';
 
 export enum ProductStatus {
-  AVAILABLE = 'available',
-  RENTED = 'rented',
-  SOLD = 'sold',
-  DAMAGED = 'damaged',
+  AVAILABLE = 'AVAILABLE',
+  RENTED = 'RENTED',
+  SOLD = 'SOLD',
+  DAMAGED = 'DAMAGED',
+  LEASE = 'LEASE',
 }
 
 export interface Product {
