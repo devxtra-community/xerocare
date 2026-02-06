@@ -15,6 +15,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { recordUsage, updateInvoiceUsage, getInvoiceById, Invoice } from '@/lib/invoice';
 import { toast } from 'sonner';
 import { Loader2, IndianRupee } from 'lucide-react';
+import UsagePreviewDialog from './UsagePreviewDialog';
 
 interface UsageRecordingModalProps {
   isOpen: boolean;
@@ -23,6 +24,19 @@ interface UsageRecordingModalProps {
   customerName: string;
   onSuccess: () => void;
   invoice?: Invoice | null; // Added for editing
+  defaultMonth?: number;
+  defaultYear?: number;
+}
+
+interface RecordedUsageData {
+  bwA4Count: number;
+  bwA3Count: number;
+  colorA4Count: number;
+  colorA3Count: number;
+  billingPeriodStart: string;
+  billingPeriodEnd: string;
+  remarks: string;
+  meterImageUrl?: string;
 }
 
 export default function UsageRecordingModal({
@@ -32,10 +46,14 @@ export default function UsageRecordingModal({
   customerName,
   onSuccess,
   invoice: editingInvoice,
+  defaultMonth,
+  defaultYear,
 }: UsageRecordingModalProps) {
   const [loading, setLoading] = useState(false);
   const [contract, setContract] = useState<Invoice | null>(null);
   const [estimatedCost, setEstimatedCost] = useState<number>(0);
+  const [showPreview, setShowPreview] = useState(false);
+  const [recordedUsageData, setRecordedUsageData] = useState<RecordedUsageData | null>(null);
 
   const [formData, setFormData] = useState({
     billingPeriodStart: '',
@@ -64,15 +82,33 @@ export default function UsageRecordingModal({
       getInvoiceById(contractId)
         .then((data) => {
           setContract(data);
+          let startStr = data.effectiveFrom?.split('T')[0] || '';
+          let endStr = data.effectiveTo?.split('T')[0] || '';
+
+          // If default month/year provided, use that range
+          if (defaultMonth !== undefined && defaultYear !== undefined) {
+            const start = new Date(defaultYear, defaultMonth, 1);
+            const end = new Date(defaultYear, defaultMonth + 1, 0);
+            // Use local date components to avoid timezone shifts
+            const fmt = (d: Date) => {
+              const y = d.getFullYear();
+              const m = String(d.getMonth() + 1).padStart(2, '0');
+              const day = String(d.getDate()).padStart(2, '0');
+              return `${y}-${m}-${day}`;
+            };
+            startStr = fmt(start);
+            endStr = fmt(end);
+          }
+
           setFormData((prev) => ({
             ...prev,
-            billingPeriodStart: data.effectiveFrom?.split('T')[0] || '',
-            billingPeriodEnd: data.effectiveTo?.split('T')[0] || '',
+            billingPeriodStart: startStr,
+            billingPeriodEnd: endStr,
           }));
         })
         .catch((err) => console.error('Failed to fetch contract details:', err));
     }
-  }, [contractId, editingInvoice]);
+  }, [contractId, editingInvoice, defaultMonth, defaultYear]);
 
   // Determine Machine Capabilities from pricing items
   const isBw = React.useMemo(() => {
@@ -168,6 +204,8 @@ export default function UsageRecordingModal({
           colorA3Count: Number(formData.colorA3Count),
         });
         toast.success('Invoice usage updated successfully');
+        onSuccess();
+        onClose();
       } else {
         const payload = new FormData();
         payload.append('contractId', contractId);
@@ -184,12 +222,25 @@ export default function UsageRecordingModal({
           payload.append('file', file);
         }
 
-        await recordUsage(payload);
+        const response = await recordUsage(payload);
         toast.success('Usage recorded successfully');
-      }
 
-      onSuccess();
-      onClose();
+        // Store usage data for preview
+        setRecordedUsageData({
+          bwA4Count: Number(formData.bwA4Count),
+          bwA3Count: Number(formData.bwA3Count),
+          colorA4Count: Number(formData.colorA4Count),
+          colorA3Count: Number(formData.colorA3Count),
+          billingPeriodStart: formData.billingPeriodStart,
+          billingPeriodEnd: formData.billingPeriodEnd,
+          remarks: formData.remarks,
+          meterImageUrl: (response as { meterImageUrl?: string })?.meterImageUrl,
+        });
+
+        // Show preview
+        setShowPreview(true);
+        onSuccess();
+      }
     } catch (error: unknown) {
       const err = error as { message?: string };
       toast.error(err.message || 'Failed to process request');
@@ -210,188 +261,271 @@ export default function UsageRecordingModal({
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[600px]">
-        <DialogHeader>
-          <DialogTitle>Record Usage for {customerName}</DialogTitle>
-        </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Period Start</Label>
-              <Input
-                type="date"
-                required
-                readOnly={!!editingInvoice}
-                value={formData.billingPeriodStart}
-                onChange={(e) => setFormData({ ...formData, billingPeriodStart: e.target.value })}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Period End</Label>
-              <Input
-                type="date"
-                required
-                readOnly={!!editingInvoice}
-                value={formData.billingPeriodEnd}
-                onChange={(e) => setFormData({ ...formData, billingPeriodEnd: e.target.value })}
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            {isBw &&
-              contract?.items?.find(
-                (i) => i.itemType === 'PRICING_RULE' && i.description.includes('Black'),
-              ) && (
-                <>
-                  <div className="space-y-2">
-                    <div className="flex justify-between">
-                      <Label>BW A4 Count</Label>
-                      <span className="text-xs text-slate-500">
-                        Free Limit:{' '}
-                        {contract.items.find((i) => i.description.includes('Black'))
-                          ?.bwIncludedLimit || 0}
-                      </span>
-                    </div>
-                    <Input
-                      type="number"
-                      min="0"
-                      value={formData.bwA4Count}
-                      onChange={(e) =>
-                        setFormData({ ...formData, bwA4Count: handleNumberInput(e.target.value) })
-                      }
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>BW A3 Count</Label>
-                    <Input
-                      type="number"
-                      min="0"
-                      value={formData.bwA3Count}
-                      onChange={(e) =>
-                        setFormData({ ...formData, bwA3Count: handleNumberInput(e.target.value) })
-                      }
-                    />
-                    <p className="text-[10px] text-slate-400 text-right">Counts as 2x copies</p>
-                  </div>
-                </>
-              )}
-
-            {isColor &&
-              contract?.items?.find(
-                (i) => i.itemType === 'PRICING_RULE' && i.description.includes('Color'),
-              ) && (
-                <>
-                  <div className="space-y-2">
-                    <div className="flex justify-between">
-                      <Label>Color A4 Count</Label>
-                      <span className="text-xs text-slate-500">
-                        Free Limit:{' '}
-                        {contract.items.find((i) => i.description.includes('Color'))
-                          ?.colorIncludedLimit || 0}
-                      </span>
-                    </div>
-                    <Input
-                      type="number"
-                      min="0"
-                      value={formData.colorA4Count}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          colorA4Count: handleNumberInput(e.target.value),
-                        })
-                      }
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Color A3 Count</Label>
-                    <Input
-                      type="number"
-                      min="0"
-                      value={formData.colorA3Count}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          colorA3Count: handleNumberInput(e.target.value),
-                        })
-                      }
-                    />
-                    <p className="text-[10px] text-slate-400 text-right">Counts as 2x copies</p>
-                  </div>
-                </>
-              )}
-          </div>
-
-          <div className="bg-slate-50 rounded-lg border border-slate-200 overflow-hidden">
-            <div className="p-3 border-b border-slate-200 bg-slate-100/50 flex justify-between items-center">
-              <span className="text-xs font-bold text-slate-500 uppercase">Usage Summary</span>
-            </div>
-            <div className="p-4 grid grid-cols-2 gap-4">
-              <div>
-                <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">
-                  Total A4 Copies
-                </p>
-                <p className="text-lg font-bold text-slate-700">
-                  {(Number(formData.bwA4Count) + Number(formData.colorA4Count)).toLocaleString()}
-                </p>
+    <>
+      <Dialog open={isOpen} onOpenChange={onClose}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle>Record Usage for {customerName}</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Period Start</Label>
+                <Input
+                  type="date"
+                  required
+                  readOnly={!!editingInvoice}
+                  value={formData.billingPeriodStart}
+                  onChange={(e) => setFormData({ ...formData, billingPeriodStart: e.target.value })}
+                />
               </div>
-              <div>
-                <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">
-                  Total A3 Copies
-                </p>
-                <p className="text-lg font-bold text-slate-700">
-                  {(Number(formData.bwA3Count) + Number(formData.colorA3Count)).toLocaleString()}
-                </p>
+              <div className="space-y-2">
+                <Label>Period End</Label>
+                <Input
+                  type="date"
+                  required
+                  readOnly={!!editingInvoice}
+                  value={formData.billingPeriodEnd}
+                  onChange={(e) => setFormData({ ...formData, billingPeriodEnd: e.target.value })}
+                />
               </div>
             </div>
-            <div className="p-4 bg-blue-50/50 border-t border-blue-100">
-              <div className="flex justify-between items-center">
+
+            <div className="grid grid-cols-2 gap-4">
+              {isBw &&
+                contract?.items?.find(
+                  (i) => i.itemType === 'PRICING_RULE' && i.description.includes('Black'),
+                ) && (
+                  <>
+                    <div className="space-y-2">
+                      <div className="flex justify-between">
+                        <Label>BW A4 Count</Label>
+                        <span className="text-xs text-slate-500">
+                          Free Limit:{' '}
+                          {contract.items.find((i) => i.description.includes('Black'))
+                            ?.bwIncludedLimit || 0}
+                        </span>
+                      </div>
+                      <Input
+                        type="number"
+                        min="0"
+                        value={formData.bwA4Count}
+                        onChange={(e) =>
+                          setFormData({ ...formData, bwA4Count: handleNumberInput(e.target.value) })
+                        }
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>BW A3 Count</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        value={formData.bwA3Count}
+                        onChange={(e) =>
+                          setFormData({ ...formData, bwA3Count: handleNumberInput(e.target.value) })
+                        }
+                      />
+                      <p className="text-[10px] text-slate-400 text-right">Counts as 2x copies</p>
+                    </div>
+                  </>
+                )}
+
+              {isColor &&
+                contract?.items?.find(
+                  (i) => i.itemType === 'PRICING_RULE' && i.description.includes('Color'),
+                ) && (
+                  <>
+                    <div className="space-y-2">
+                      <div className="flex justify-between">
+                        <Label>Color A4 Count</Label>
+                        <span className="text-xs text-slate-500">
+                          Free Limit:{' '}
+                          {contract.items.find((i) => i.description.includes('Color'))
+                            ?.colorIncludedLimit || 0}
+                        </span>
+                      </div>
+                      <Input
+                        type="number"
+                        min="0"
+                        value={formData.colorA4Count}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            colorA4Count: handleNumberInput(e.target.value),
+                          })
+                        }
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Color A3 Count</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        value={formData.colorA3Count}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            colorA3Count: handleNumberInput(e.target.value),
+                          })
+                        }
+                      />
+                      <p className="text-[10px] text-slate-400 text-right">Counts as 2x copies</p>
+                    </div>
+                  </>
+                )}
+            </div>
+
+            <div className="bg-slate-50 rounded-lg border border-slate-200 overflow-hidden">
+              <div className="p-3 border-b border-slate-200 bg-slate-100/50 flex justify-between items-center">
+                <span className="text-xs font-bold text-slate-500 uppercase">Usage Summary</span>
+              </div>
+              <div className="p-4 grid grid-cols-2 gap-4">
                 <div>
-                  <Label className="text-xs font-bold text-blue-600 uppercase block">
-                    Grand Total Estimated
-                  </Label>
-                  <span className="text-[10px] text-blue-400 font-medium">
-                    {contract?.rentType?.includes('CPC')
-                      ? '(Usage Cost - Advance)'
-                      : '(Rent + Excess - Advance)'}
-                  </span>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">
+                    Total A4 Copies
+                  </p>
+                  <p className="text-lg font-bold text-slate-700">
+                    {(Number(formData.bwA4Count) + Number(formData.colorA4Count)).toLocaleString()}
+                  </p>
                 </div>
-                <div className="flex items-center gap-1 text-2xl font-bold text-blue-700">
-                  <IndianRupee size={22} className="mt-1" />
-                  {estimatedCost.toLocaleString('en-IN', {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}
+                <div>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">
+                    Total A3 Copies
+                  </p>
+                  <p className="text-lg font-bold text-slate-700">
+                    {(Number(formData.bwA3Count) + Number(formData.colorA3Count)).toLocaleString()}
+                  </p>
+                </div>
+              </div>
+
+              {/* Pricing Details */}
+              <div className="p-4 border-t border-slate-200 space-y-2 bg-white">
+                {/* Monthly Rent */}
+                {!contract?.rentType?.includes('CPC') && contract?.monthlyRent && (
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-slate-600">Monthly Rent</span>
+                    <span className="font-semibold text-slate-800 flex items-center gap-1">
+                      <IndianRupee size={14} />
+                      {Number(contract.monthlyRent).toLocaleString('en-IN', {
+                        minimumFractionDigits: 2,
+                      })}
+                    </span>
+                  </div>
+                )}
+
+                {/* Advance Amount */}
+                {contract?.advanceAmount && Number(contract.advanceAmount) > 0 && (
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-slate-600">Advance Amount</span>
+                    <span className="font-semibold text-orange-600 flex items-center gap-1">
+                      <IndianRupee size={14} />
+                      {Number(contract.advanceAmount).toLocaleString('en-IN', {
+                        minimumFractionDigits: 2,
+                      })}
+                    </span>
+                  </div>
+                )}
+
+                {/* BW Excess Rate */}
+                {contract?.items?.find(
+                  (i) => i.itemType === 'PRICING_RULE' && i.description.includes('Black'),
+                ) && (
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-slate-600">BW Excess Rate</span>
+                    <span className="font-semibold text-blue-600 flex items-center gap-1">
+                      <IndianRupee size={14} />
+                      {Number(
+                        contract.items.find((i) => i.description.includes('Black'))?.bwExcessRate ||
+                          0,
+                      ).toLocaleString('en-IN', {
+                        minimumFractionDigits: 2,
+                      })}
+                      <span className="text-xs text-slate-500">/copy</span>
+                    </span>
+                  </div>
+                )}
+
+                {/* Color Excess Rate */}
+                {contract?.items?.find(
+                  (i) => i.itemType === 'PRICING_RULE' && i.description.includes('Color'),
+                ) && (
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-slate-600">Color Excess Rate</span>
+                    <span className="font-semibold text-purple-600 flex items-center gap-1">
+                      <IndianRupee size={14} />
+                      {Number(
+                        contract.items.find((i) => i.description.includes('Color'))
+                          ?.colorExcessRate || 0,
+                      ).toLocaleString('en-IN', {
+                        minimumFractionDigits: 2,
+                      })}
+                      <span className="text-xs text-slate-500">/copy</span>
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              <div className="p-4 bg-blue-50/50 border-t border-blue-100">
+                <div className="flex justify-between items-center">
+                  <div>
+                    <Label className="text-xs font-bold text-blue-600 uppercase block">
+                      Grand Total Estimated
+                    </Label>
+                    <span className="text-[10px] text-blue-400 font-medium">
+                      {contract?.rentType?.includes('CPC')
+                        ? '(Usage Cost - Advance)'
+                        : '(Rent + Excess - Advance)'}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1 text-2xl font-bold text-blue-700">
+                    <IndianRupee size={22} className="mt-1" />
+                    {estimatedCost.toLocaleString('en-IN', {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
 
-          <div className="space-y-2">
-            <Label>Meter Image (Required for verification)</Label>
-            <Input type="file" accept="image/*" onChange={handleFileChange} />
-          </div>
+            <div className="space-y-2">
+              <Label>Meter Image (Required for verification)</Label>
+              <Input type="file" accept="image/*" onChange={handleFileChange} />
+            </div>
 
-          <div className="space-y-2">
-            <Label>Remarks</Label>
-            <Textarea
-              value={formData.remarks}
-              onChange={(e) => setFormData({ ...formData, remarks: e.target.value })}
-            />
-          </div>
+            <div className="space-y-2">
+              <Label>Remarks</Label>
+              <Textarea
+                value={formData.remarks}
+                onChange={(e) => setFormData({ ...formData, remarks: e.target.value })}
+              />
+            </div>
 
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={onClose}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={loading}>
-              {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {editingInvoice ? 'Update Invoice' : 'Submit Record'}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={onClose}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={loading}>
+                {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {editingInvoice ? 'Update Invoice' : 'Submit Record'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Preview Dialog */}
+      {showPreview && contract && recordedUsageData && (
+        <UsagePreviewDialog
+          isOpen={showPreview}
+          onClose={() => {
+            setShowPreview(false);
+            onClose();
+          }}
+          invoice={contract}
+          usageData={recordedUsageData}
+        />
+      )}
+    </>
   );
 }

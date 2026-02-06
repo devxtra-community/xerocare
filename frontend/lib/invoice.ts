@@ -73,6 +73,10 @@ export interface Invoice {
   colorA3Count?: number;
   billingPeriodStart?: string;
   billingPeriodEnd?: string;
+  referenceContractId?: string; // Link to PROFORMA contract
+  advanceAdjusted?: number;
+  grossAmount?: number;
+  invoiceHistory?: Invoice[];
 }
 
 export interface CreateInvoicePayload {
@@ -199,10 +203,12 @@ export interface CollectionAlert {
   type: 'USAGE_PENDING' | 'INVOICE_PENDING' | 'SEND_PENDING';
   saleType: string;
   dueDate: string;
+  finalInvoiceId?: string; // Point to final invoice if generated
 }
 
-export const getCollectionAlerts = async (): Promise<CollectionAlert[]> => {
-  const response = await api.get('/b/invoices/alerts');
+export const getCollectionAlerts = async (date?: string): Promise<CollectionAlert[]> => {
+  const url = date ? `/b/invoices/alerts?date=${date}` : '/b/invoices/alerts';
+  const response = await api.get(url);
   return response.data.data;
 };
 
@@ -220,6 +226,11 @@ export const generateMonthlyInvoice = async (payload: {
 }): Promise<Invoice> => {
   const response = await api.post('/b/invoices/settlements/generate', payload);
   // Returns Final Invoice
+  return response.data.data;
+};
+
+export const createNextMonthInvoice = async (contractId: string): Promise<Invoice> => {
+  const response = await api.post('/b/invoices/settlements/next-month', { contractId });
   return response.data.data;
 };
 

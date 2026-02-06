@@ -18,7 +18,7 @@ import {
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { FileText, Calendar, IndianRupee, Printer, Mail, Phone, X, Loader2 } from 'lucide-react';
-import { Invoice } from '@/lib/invoice';
+import { Invoice, getInvoiceById } from '@/lib/invoice';
 
 interface InvoiceDetailsDialogProps {
   invoice: Invoice;
@@ -28,6 +28,7 @@ interface InvoiceDetailsDialogProps {
   approveLabel?: string;
   mode?: 'EMPLOYEE' | 'FINANCE';
   onSuccess?: () => void; // Optional callback for internal dialog state if needed
+  onApproveNext?: () => Promise<void> | void;
 }
 
 export function InvoiceDetailsDialog({
@@ -37,10 +38,40 @@ export function InvoiceDetailsDialog({
   onReject,
   approveLabel = 'Approve',
   mode = 'EMPLOYEE',
+  onApproveNext,
 }: InvoiceDetailsDialogProps) {
+  const [currentInvoice, setCurrentInvoice] = React.useState<Invoice>(invoice);
   const [rejectReason, setRejectReason] = React.useState('');
   const [rejecting, setRejecting] = React.useState(false);
   const [isLoading, setIsLoading] = React.useState(false);
+
+  React.useEffect(() => {
+    setCurrentInvoice(invoice);
+  }, [invoice]);
+
+  const handleSelectInvoice = async (id: string) => {
+    try {
+      setIsLoading(true);
+      const data = await getInvoiceById(id);
+      setCurrentInvoice(data);
+    } catch {
+      toast.error('Failed to load invoice details');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleApproveNext = async () => {
+    if (!onApproveNext) return;
+    setIsLoading(true);
+    try {
+      await onApproveNext();
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleApprove = async () => {
     if (!onApprove) return;
@@ -69,26 +100,28 @@ export function InvoiceDetailsDialog({
       setIsLoading(false);
     }
   };
+
   const getUsageBreakdownText = () => {
-    if (invoice.bwA4Count === undefined) return '';
+    if (currentInvoice.bwA4Count === undefined) return '';
 
     let breakdown = '\nUsage Breakdown:';
-    const bwRule = invoice.items?.find(
+    const bwRule = currentInvoice.items?.find(
       (i) => i.itemType === 'PRICING_RULE' && i.description.includes('Black'),
     );
-    const colorRule = invoice.items?.find(
+    const colorRule = currentInvoice.items?.find(
       (i) => i.itemType === 'PRICING_RULE' && i.description.includes('Color'),
     );
 
     if (bwRule) {
-      const bwTotal = (invoice.bwA4Count || 0) + (invoice.bwA3Count || 0) * 2;
+      const bwTotal = (currentInvoice.bwA4Count || 0) + (currentInvoice.bwA3Count || 0) * 2;
       const bwLimit = bwRule.bwIncludedLimit || 0;
       const bwExcess = Math.max(0, bwTotal - bwLimit);
       breakdown += `\n- B&W: ${bwTotal} units (Limit: ${bwLimit}, Excess: ${bwExcess})`;
     }
 
     if (colorRule) {
-      const colorTotal = (invoice.colorA4Count || 0) + (invoice.colorA3Count || 0) * 2;
+      const colorTotal =
+        (currentInvoice.colorA4Count || 0) + (currentInvoice.colorA3Count || 0) * 2;
       const colorLimit = colorRule.colorIncludedLimit || 0;
       const colorExcess = Math.max(0, colorTotal - colorLimit);
       breakdown += `\n- Color: ${colorTotal} units (Limit: ${colorLimit}, Excess: ${colorExcess})`;
@@ -98,27 +131,88 @@ export function InvoiceDetailsDialog({
   };
 
   const handleShareWhatsApp = () => {
-    if (!invoice.customerPhone) {
+    if (!currentInvoice.customerPhone) {
       alert('Customer phone number not available.');
       return;
     }
     const usageText = getUsageBreakdownText();
-    const message = `Hello ${invoice.customerName}, here is your invoice ${invoice.invoiceNumber} for ₹${(invoice.totalAmount || 0).toLocaleString('en-IN')}.${usageText}\n\nThank you for using XeroCare.`;
-    const url = `https://wa.me/${invoice.customerPhone.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`;
+    const message = `Hello ${currentInvoice.customerName}, here is your invoice ${currentInvoice.invoiceNumber} for ₹${(currentInvoice.totalAmount || 0).toLocaleString('en-IN')}.${usageText}\n\nThank you for using XeroCare.`;
+    const url = `https://wa.me/${currentInvoice.customerPhone.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`;
     window.open(url, '_blank');
   };
 
   const handleSendEmail = () => {
-    if (!invoice.customerEmail) {
+    if (!currentInvoice.customerEmail) {
       alert('Customer email not available.');
       return;
     }
     const usageText = getUsageBreakdownText();
-    const subject = `Invoice ${invoice.invoiceNumber} from ${invoice.branchName || 'XeroCare'}`;
-    const body = `Hello ${invoice.customerName},\n\nPlease find attached the details for invoice ${invoice.invoiceNumber}.\n\nTotal Amount: ₹${(invoice.totalAmount || 0).toLocaleString('en-IN')}\n${usageText}\n\nRegards,\nTeam XeroCare`;
-    const url = `mailto:${invoice.customerEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    const subject = `Invoice ${currentInvoice.invoiceNumber} from ${currentInvoice.branchName || 'XeroCare'}`;
+    const body = `Hello ${currentInvoice.customerName},\n\nPlease find attached the details for invoice ${currentInvoice.invoiceNumber}.\n\nTotal Amount: ₹${(currentInvoice.totalAmount || 0).toLocaleString('en-IN')}\n${usageText}\n\nRegards,\nTeam XeroCare`;
+    const url = `mailto:${currentInvoice.customerEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
     window.location.href = url;
   };
+
+  // Calculate Excess Amount for Breakdown
+  const excessAmount = React.useMemo(() => {
+    let total = 0;
+    const items = currentInvoice.items || [];
+    const bwRule = items.find(
+      (i) => i.itemType === 'PRICING_RULE' && i.description.includes('Black'),
+    );
+    const colorRule = items.find(
+      (i) => i.itemType === 'PRICING_RULE' && i.description.includes('Color'),
+    );
+    const comboRule = items.find(
+      (i) => i.itemType === 'PRICING_RULE' && i.description.includes('Combined'),
+    );
+
+    if (bwRule) {
+      const bwTotal = (currentInvoice.bwA4Count || 0) + (currentInvoice.bwA3Count || 0) * 2;
+      const bwLimit = bwRule.bwIncludedLimit || 0;
+      const bwExcess = Math.max(0, bwTotal - bwLimit);
+      total += bwExcess * (bwRule.bwExcessRate || 0);
+    }
+    if (colorRule) {
+      const colorTotal =
+        (currentInvoice.colorA4Count || 0) + (currentInvoice.colorA3Count || 0) * 2;
+      const colorLimit = colorRule.colorIncludedLimit || 0;
+      const colorExcess = Math.max(0, colorTotal - colorLimit);
+      total += colorExcess * (colorRule.colorExcessRate || 0);
+    }
+    if (comboRule) {
+      const totalTotal =
+        (currentInvoice.bwA4Count || 0) +
+        (currentInvoice.bwA3Count || 0) * 2 +
+        (currentInvoice.colorA4Count || 0) +
+        (currentInvoice.colorA3Count || 0) * 2;
+      const comboLimit = comboRule.combinedIncludedLimit || 0;
+      const comboExcess = Math.max(0, totalTotal - comboLimit);
+      total += comboExcess * (comboRule.combinedExcessRate || 0);
+    }
+    return total;
+  }, [invoice]);
+
+  const grandTotal = React.useMemo(() => {
+    if (currentInvoice.saleType === 'RENT' || currentInvoice.saleType === 'LEASE') {
+      const rent = currentInvoice.monthlyRent || 0;
+      const advance = Number(currentInvoice.advanceAdjusted || 0);
+
+      // Include other order items if any
+      const orderItemsTotal = (currentInvoice.items || [])
+        .filter(
+          (item) =>
+            item.itemType !== 'PRICING_RULE' &&
+            !item.description.startsWith('Black & White') &&
+            !item.description.startsWith('Color') &&
+            !item.description.startsWith('Combined'),
+        )
+        .reduce((sum, item) => sum + (item.quantity || 0) * (item.unitPrice || 0), 0);
+
+      return Math.max(0, rent - advance + excessAmount + orderItemsTotal);
+    }
+    return currentInvoice.totalAmount || 0;
+  }, [currentInvoice, excessAmount]);
 
   return (
     <Dialog open={true} onOpenChange={(val) => !val && onClose()}>
@@ -130,7 +224,7 @@ export function InvoiceDetailsDialog({
             </div>
             <div className="space-y-1">
               <DialogTitle className="text-xl font-bold text-primary tracking-tight">
-                {invoice.invoiceNumber}
+                {currentInvoice.invoiceNumber}
               </DialogTitle>
               <DialogDescription className="text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-none">
                 Invoice Details & Summary
@@ -142,12 +236,12 @@ export function InvoiceDetailsDialog({
               variant="secondary"
               className={`rounded-full px-3 py-1 text-[10px] font-bold tracking-wider shadow-none
                 ${
-                  invoice.status === 'PAID'
+                  currentInvoice.status === 'PAID'
                     ? 'bg-green-50 text-green-600 border-green-100'
                     : 'bg-amber-50 text-amber-600 border-amber-100'
                 }`}
             >
-              {invoice.status}
+              {currentInvoice.status}
             </Badge>
             <button
               onClick={onClose}
@@ -166,7 +260,7 @@ export function InvoiceDetailsDialog({
                 <div className="flex items-center gap-2">
                   <Calendar size={14} className="text-gray-400" />
                   <p className="text-sm font-bold text-gray-800">
-                    {new Date(invoice.createdAt).toLocaleDateString(undefined, {
+                    {new Date(currentInvoice.createdAt).toLocaleDateString(undefined, {
                       dateStyle: 'medium',
                     })}
                   </p>
@@ -178,14 +272,14 @@ export function InvoiceDetailsDialog({
                   variant="outline"
                   className="mt-1 font-bold text-[10px] rounded-lg border-gray-100 text-gray-600"
                 >
-                  {invoice.saleType}
+                  {currentInvoice.saleType}
                 </Badge>
               </div>
             </div>
           </div>
 
           {/* RENT Details */}
-          {invoice.saleType === 'RENT' && (
+          {currentInvoice.saleType === 'RENT' && (
             <div className="grid grid-cols-2 gap-x-12 gap-y-6 p-6 bg-orange-50/50 rounded-xl border border-orange-100">
               <div className="space-y-1">
                 <p className="text-[10px] font-bold text-orange-400 uppercase tracking-wider">
@@ -193,7 +287,7 @@ export function InvoiceDetailsDialog({
                 </p>
                 <div className="flex items-center gap-2 text-gray-700">
                   <Printer size={14} className="opacity-50" />
-                  <p className="text-xs font-bold">{invoice.rentType?.replace('_', ' ')}</p>
+                  <p className="text-xs font-bold">{currentInvoice.rentType?.replace('_', ' ')}</p>
                 </div>
               </div>
               <div className="space-y-1">
@@ -203,15 +297,14 @@ export function InvoiceDetailsDialog({
                 <div className="flex items-center gap-2 text-gray-700">
                   <Calendar size={14} className="opacity-50" />
                   <p className="text-xs font-bold">
-                    {new Date(invoice.startDate || invoice.createdAt).toLocaleDateString(
-                      undefined,
-                      {
-                        dateStyle: 'medium',
-                      },
-                    )}{' '}
+                    {new Date(
+                      currentInvoice.startDate || currentInvoice.createdAt,
+                    ).toLocaleDateString(undefined, {
+                      dateStyle: 'medium',
+                    })}{' '}
                     -{' '}
-                    {invoice.endDate
-                      ? new Date(invoice.endDate).toLocaleDateString(undefined, {
+                    {currentInvoice.endDate
+                      ? new Date(currentInvoice.endDate).toLocaleDateString(undefined, {
                           dateStyle: 'medium',
                         })
                       : 'N/A'}
@@ -220,7 +313,7 @@ export function InvoiceDetailsDialog({
               </div>
 
               {/* Monthly Rent Display */}
-              {invoice.monthlyRent !== undefined && invoice.monthlyRent > 0 && (
+              {currentInvoice.monthlyRent !== undefined && currentInvoice.monthlyRent > 0 && (
                 <div className="space-y-1">
                   <p className="text-[10px] font-bold text-orange-400 uppercase tracking-wider">
                     Monthly Rent
@@ -228,14 +321,14 @@ export function InvoiceDetailsDialog({
                   <div className="flex items-center gap-2 text-gray-700">
                     <IndianRupee size={14} className="opacity-50" />
                     <p className="text-xs font-bold">
-                      ₹{invoice.monthlyRent.toLocaleString('en-IN')}
+                      ₹{currentInvoice.monthlyRent.toLocaleString('en-IN')}
                     </p>
                   </div>
                 </div>
               )}
 
               {/* Advance Amount Display */}
-              {invoice.advanceAmount !== undefined && invoice.advanceAmount > 0 && (
+              {currentInvoice.advanceAmount !== undefined && currentInvoice.advanceAmount > 0 && (
                 <div className="space-y-1">
                   <p className="text-[10px] font-bold text-orange-400 uppercase tracking-wider">
                     Advance Amount
@@ -243,23 +336,28 @@ export function InvoiceDetailsDialog({
                   <div className="flex items-center gap-2 text-gray-700">
                     <IndianRupee size={14} className="opacity-50" />
                     <p className="text-xs font-bold">
-                      ₹{invoice.advanceAmount.toLocaleString('en-IN')}
+                      ₹{currentInvoice.advanceAmount.toLocaleString('en-IN')}
                     </p>
                   </div>
                 </div>
               )}
               {/* Show Included Limits / Excess if relevant (simplified view) */}
-              {invoice.items?.some((i) => i.itemType === 'PRICING_RULE') && (
+              {currentInvoice.items?.some((i) => i.itemType === 'PRICING_RULE') && (
                 <div className="col-span-2 mt-2 pt-4 border-t border-orange-200/50">
                   <p className="text-[10px] font-bold text-orange-400 uppercase tracking-wider mb-2">
                     Pricing Rules
                   </p>
                   <div className="text-xs space-y-1 text-gray-600">
-                    {invoice.items
+                    {currentInvoice.items
                       .filter((i) => i.itemType === 'PRICING_RULE')
                       .map((rule, idx) => (
                         <div key={idx} className="flex flex-col gap-1">
-                          <span className="font-bold">{rule.description}</span>
+                          <div className="flex justify-between items-center">
+                            <span className="font-bold">{rule.description}</span>
+                            <span className="text-[10px] px-2 py-0.5 bg-orange-100 text-orange-700 rounded-full font-bold">
+                              ₹{rule.bwExcessRate || rule.colorExcessRate || 0}/copy
+                            </span>
+                          </div>
                           <div className="flex gap-4 opacity-80">
                             <span>B/W Included: {rule.bwIncludedLimit || 0}</span>
                             <span>Color Included: {rule.colorIncludedLimit || 0}</span>
@@ -273,29 +371,29 @@ export function InvoiceDetailsDialog({
           )}
 
           {/* LEASE Details */}
-          {invoice.saleType === 'LEASE' && (
+          {currentInvoice.saleType === 'LEASE' && (
             <div className="grid grid-cols-2 gap-x-12 gap-y-6 p-6 bg-purple-50/50 rounded-xl border border-purple-100">
               <div className="space-y-1">
                 <p className="text-[10px] font-bold text-purple-400 uppercase tracking-wider">
                   Lease Type
                 </p>
-                <p className="text-xs font-bold text-gray-700">{invoice.leaseType}</p>
+                <p className="text-xs font-bold text-gray-700">{currentInvoice.leaseType}</p>
               </div>
               <div className="space-y-1">
                 <p className="text-[10px] font-bold text-purple-400 uppercase tracking-wider">
                   Tenure
                 </p>
                 <p className="text-xs font-bold text-gray-700">
-                  {invoice.leaseTenureMonths} Months
+                  {currentInvoice.leaseTenureMonths} Months
                 </p>
               </div>
-              {invoice.monthlyEmiAmount && (
+              {currentInvoice.monthlyEmiAmount && (
                 <div className="space-y-1">
                   <p className="text-[10px] font-bold text-purple-400 uppercase tracking-wider">
                     Monthly EMI
                   </p>
                   <p className="text-xs font-bold text-gray-700">
-                    ₹{invoice.monthlyEmiAmount.toLocaleString()}
+                    ₹{currentInvoice.monthlyEmiAmount.toLocaleString()}
                   </p>
                 </div>
               )}
@@ -303,7 +401,7 @@ export function InvoiceDetailsDialog({
           )}
 
           {/* SALE Details - Warranty placeholder if needed */}
-          {invoice.saleType === 'SALE' && (
+          {currentInvoice.saleType === 'SALE' && (
             <div className="p-4 bg-blue-50/50 rounded-xl border border-blue-100">
               <p className="text-[10px] font-bold text-blue-400 uppercase tracking-wider">
                 Sale Order
@@ -311,8 +409,10 @@ export function InvoiceDetailsDialog({
               <p className="text-xs text-gray-500 mt-1">Standard product sale terms apply.</p>
             </div>
           )}
-          {(invoice.saleType === 'RENT' || invoice.saleType === 'LEASE') &&
-            (invoice.startDate || invoice.endDate || invoice.billingCycleInDays) && (
+          {(currentInvoice.saleType === 'RENT' || currentInvoice.saleType === 'LEASE') &&
+            (currentInvoice.startDate ||
+              currentInvoice.endDate ||
+              currentInvoice.billingCycleInDays) && (
               <>
                 <div className="grid grid-cols-2 gap-x-12 gap-y-6 p-6 bg-gray-50 rounded-xl">
                   <div className="space-y-1">
@@ -322,15 +422,14 @@ export function InvoiceDetailsDialog({
                     <div className="flex items-center gap-2 text-gray-600">
                       <Calendar size={14} className="opacity-50" />
                       <p className="text-xs font-bold">
-                        {new Date(invoice.effectiveFrom || invoice.createdAt).toLocaleDateString(
-                          undefined,
-                          {
-                            dateStyle: 'medium',
-                          },
-                        )}{' '}
+                        {new Date(
+                          currentInvoice.effectiveFrom || currentInvoice.createdAt,
+                        ).toLocaleDateString(undefined, {
+                          dateStyle: 'medium',
+                        })}{' '}
                         —{' '}
-                        {invoice.effectiveTo
-                          ? new Date(invoice.effectiveTo).toLocaleDateString(undefined, {
+                        {currentInvoice.effectiveTo
+                          ? new Date(currentInvoice.effectiveTo).toLocaleDateString(undefined, {
                               dateStyle: 'medium',
                             })
                           : 'N/A'}
@@ -344,14 +443,15 @@ export function InvoiceDetailsDialog({
                     <div className="flex items-center gap-2 text-gray-600">
                       <IndianRupee size={14} className="opacity-50" />
                       <p className="text-xs font-bold">
-                        Every {invoice.billingCycleInDays || 30} Days
+                        Every {currentInvoice.billingCycleInDays || 30} Days
                       </p>
                     </div>
                   </div>
                 </div>
 
                 {/* Usage Breakdown for FINAL Invoices */}
-                {invoice.bwA4Count !== undefined && (
+                {(currentInvoice.bwA4Count !== undefined ||
+                  currentInvoice.bwA3Count !== undefined) && (
                   <div className="space-y-4">
                     <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
                       Usage Breakdown
@@ -360,7 +460,7 @@ export function InvoiceDetailsDialog({
                       <Table>
                         <TableHeader className="bg-blue-50/50">
                           <TableRow className="hover:bg-transparent border-blue-100">
-                            <TableHead className="text-[10px] font-bold text-blue-600 h-10">
+                            <TableHead className="text-[10px] font-bold text-blue-600 h-10 w-[30%]">
                               METER CATEGORY
                             </TableHead>
                             <TableHead className="text-[10px] font-bold text-blue-600 text-center h-10">
@@ -369,36 +469,48 @@ export function InvoiceDetailsDialog({
                             <TableHead className="text-[10px] font-bold text-blue-600 text-center h-10">
                               ALLOWED
                             </TableHead>
-                            <TableHead className="text-[10px] font-bold text-blue-600 text-right h-10">
+                            <TableHead className="text-[10px] font-bold text-blue-600 text-center h-10">
                               EXCESS
+                            </TableHead>
+                            <TableHead className="text-[10px] font-bold text-blue-600 text-right h-10">
+                              AMOUNT
                             </TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
                           {/* BW Row */}
                           {(() => {
-                            const bwRule = invoice.items?.find(
+                            const bwRule = currentInvoice.items?.find(
                               (i) =>
                                 i.itemType === 'PRICING_RULE' && i.description.includes('Black'),
                             );
-                            const bwTotal = (invoice.bwA4Count || 0) + (invoice.bwA3Count || 0) * 2;
+                            const bwTotal =
+                              (currentInvoice.bwA4Count || 0) + (currentInvoice.bwA3Count || 0) * 2;
                             const bwLimit = bwRule?.bwIncludedLimit || 0;
                             const bwExcess = Math.max(0, bwTotal - bwLimit);
+                            const bwExcessRate = bwRule?.bwExcessRate || 0;
+                            const bwExcessAmount = bwExcess * bwExcessRate;
 
                             if (bwRule) {
                               return (
                                 <TableRow className="border-blue-50">
-                                  <TableCell className="font-bold text-gray-700 py-3 text-sm">
+                                  <TableCell className="font-bold text-gray-700 py-3 text-[10px] sm:text-xs">
                                     B&W (A4 + 2x A3)
                                   </TableCell>
-                                  <TableCell className="text-center font-bold text-gray-600 text-sm">
+                                  <TableCell className="text-center font-bold text-gray-600 text-xs">
                                     {bwTotal.toLocaleString()}
                                   </TableCell>
-                                  <TableCell className="text-center font-bold text-gray-400 text-sm">
+                                  <TableCell className="text-center font-bold text-gray-400 text-xs">
                                     {bwLimit.toLocaleString()}
                                   </TableCell>
-                                  <TableCell className="text-right font-bold text-blue-600 text-sm">
-                                    {bwExcess.toLocaleString()} units
+                                  <TableCell className="text-center font-bold text-blue-600 text-xs">
+                                    {bwExcess.toLocaleString()}
+                                  </TableCell>
+                                  <TableCell className="text-right font-bold text-primary text-xs">
+                                    ₹
+                                    {bwExcessAmount.toLocaleString(undefined, {
+                                      minimumFractionDigits: 2,
+                                    })}
                                   </TableCell>
                                 </TableRow>
                               );
@@ -408,29 +520,38 @@ export function InvoiceDetailsDialog({
 
                           {/* Color Row */}
                           {(() => {
-                            const colorRule = invoice.items?.find(
+                            const colorRule = currentInvoice.items?.find(
                               (i) =>
                                 i.itemType === 'PRICING_RULE' && i.description.includes('Color'),
                             );
                             const colorTotal =
-                              (invoice.colorA4Count || 0) + (invoice.colorA3Count || 0) * 2;
+                              (currentInvoice.colorA4Count || 0) +
+                              (currentInvoice.colorA3Count || 0) * 2;
                             const colorLimit = colorRule?.colorIncludedLimit || 0;
                             const colorExcess = Math.max(0, colorTotal - colorLimit);
+                            const colorExcessRate = colorRule?.colorExcessRate || 0;
+                            const colorExcessAmount = colorExcess * colorExcessRate;
 
                             if (colorRule) {
                               return (
                                 <TableRow className="border-blue-50">
-                                  <TableCell className="font-bold text-gray-700 py-3 text-sm">
+                                  <TableCell className="font-bold text-gray-700 py-3 text-[10px] sm:text-xs">
                                     Color (A4 + 2x A3)
                                   </TableCell>
-                                  <TableCell className="text-center font-bold text-gray-600 text-sm">
+                                  <TableCell className="text-center font-bold text-gray-600 text-xs">
                                     {colorTotal.toLocaleString()}
                                   </TableCell>
-                                  <TableCell className="text-center font-bold text-gray-400 text-sm">
+                                  <TableCell className="text-center font-bold text-gray-400 text-xs">
                                     {colorLimit.toLocaleString()}
                                   </TableCell>
-                                  <TableCell className="text-right font-bold text-blue-600 text-sm">
-                                    {colorExcess.toLocaleString()} units
+                                  <TableCell className="text-center font-bold text-blue-600 text-xs">
+                                    {colorExcess.toLocaleString()}
+                                  </TableCell>
+                                  <TableCell className="text-right font-bold text-primary text-xs">
+                                    ₹
+                                    {colorExcessAmount.toLocaleString(undefined, {
+                                      minimumFractionDigits: 2,
+                                    })}
                                   </TableCell>
                                 </TableRow>
                               );
@@ -440,32 +561,40 @@ export function InvoiceDetailsDialog({
 
                           {/* Combined Row (if any) */}
                           {(() => {
-                            const comboRule = invoice.items?.find(
+                            const comboRule = currentInvoice.items?.find(
                               (i) =>
                                 i.itemType === 'PRICING_RULE' && i.description.includes('Combined'),
                             );
                             if (comboRule) {
                               const totalTotal =
-                                (invoice.bwA4Count || 0) +
-                                (invoice.bwA3Count || 0) * 2 +
-                                (invoice.colorA4Count || 0) +
-                                (invoice.colorA3Count || 0) * 2;
+                                (currentInvoice.bwA4Count || 0) +
+                                (currentInvoice.bwA3Count || 0) * 2 +
+                                (currentInvoice.colorA4Count || 0) +
+                                (currentInvoice.colorA3Count || 0) * 2;
                               const comboLimit = comboRule.combinedIncludedLimit || 0;
                               const comboExcess = Math.max(0, totalTotal - comboLimit);
+                              const comboExcessRate = comboRule?.combinedExcessRate || 0;
+                              const comboExcessAmount = comboExcess * comboExcessRate;
 
                               return (
                                 <TableRow className="border-blue-50">
-                                  <TableCell className="font-bold text-gray-700 py-3 text-sm">
+                                  <TableCell className="font-bold text-gray-700 py-3 text-[10px] sm:text-xs">
                                     Combined Usage
                                   </TableCell>
-                                  <TableCell className="text-center font-bold text-gray-600 text-sm">
+                                  <TableCell className="text-center font-bold text-gray-600 text-xs">
                                     {totalTotal.toLocaleString()}
                                   </TableCell>
-                                  <TableCell className="text-center font-bold text-gray-400 text-sm">
+                                  <TableCell className="text-center font-bold text-gray-400 text-xs">
                                     {comboLimit.toLocaleString()}
                                   </TableCell>
-                                  <TableCell className="text-right font-bold text-blue-600 text-sm">
-                                    {comboExcess.toLocaleString()} units
+                                  <TableCell className="text-center font-bold text-blue-600 text-xs">
+                                    {comboExcess.toLocaleString()}
+                                  </TableCell>
+                                  <TableCell className="text-right font-bold text-primary text-xs">
+                                    ₹
+                                    {comboExcessAmount.toLocaleString(undefined, {
+                                      minimumFractionDigits: 2,
+                                    })}
                                   </TableCell>
                                 </TableRow>
                               );
@@ -500,7 +629,7 @@ export function InvoiceDetailsDialog({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {invoice.items
+                  {currentInvoice.items
                     ?.filter(
                       (item) =>
                         item.itemType !== 'PRICING_RULE' &&
@@ -525,15 +654,88 @@ export function InvoiceDetailsDialog({
               </Table>
             </div>
           </div>
+
+          {/* Invoice History Section */}
+          {currentInvoice.invoiceHistory && currentInvoice.invoiceHistory.length > 0 && (
+            <div className="space-y-4 pt-4 border-t border-gray-100">
+              <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                Invoice History
+              </h3>
+              <div className="rounded-xl border border-gray-100 overflow-hidden">
+                <Table>
+                  <TableHeader className="bg-gray-50/80">
+                    <TableRow className="hover:bg-transparent border-gray-100">
+                      <TableHead className="text-[10px] font-bold text-gray-400 h-10">
+                        DATE
+                      </TableHead>
+                      <TableHead className="text-[10px] font-bold text-gray-400 h-10">
+                        INVOICE #
+                      </TableHead>
+                      <TableHead className="text-[10px] font-bold text-gray-400 text-right h-10">
+                        AMOUNT
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {currentInvoice.invoiceHistory.map((hist) => (
+                      <TableRow
+                        key={hist.id}
+                        className="border-gray-50 hover:bg-blue-50/50 transition-colors cursor-pointer group"
+                        onClick={() => handleSelectInvoice(hist.id)}
+                      >
+                        <TableCell className="text-xs font-bold text-gray-600">
+                          {new Date(hist.createdAt).toLocaleDateString(undefined, {
+                            dateStyle: 'medium',
+                          })}
+                        </TableCell>
+                        <TableCell className="text-xs font-bold text-blue-600 group-hover:underline">
+                          {hist.invoiceNumber}
+                        </TableCell>
+                        <TableCell className="text-xs font-bold text-primary text-right">
+                          ₹
+                          {(hist.totalAmount || 0).toLocaleString(undefined, {
+                            minimumFractionDigits: 2,
+                          })}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="p-6 bg-gray-50/50 border-t border-gray-100 flex flex-col md:flex-row items-center justify-between gap-6">
-          <div className="flex flex-col items-center md:items-start">
+          <div className="flex flex-col items-center md:items-start flex-1">
+            {/* Pricing Breakdown Section */}
+            {(currentInvoice.saleType === 'RENT' || currentInvoice.saleType === 'LEASE') && (
+              <div className="mb-4 w-full max-w-xs space-y-1">
+                <div className="flex justify-between text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+                  <span>Rent Amount</span>
+                  <span>₹{(currentInvoice.monthlyRent || 0).toLocaleString()}</span>
+                </div>
+                {Number(currentInvoice.advanceAdjusted || 0) > 0 && (
+                  <div className="flex justify-between text-[10px] font-bold text-orange-600 uppercase tracking-wider">
+                    <span>Advance Deduction</span>
+                    <span>- ₹{Number(currentInvoice.advanceAdjusted || 0).toLocaleString()}</span>
+                  </div>
+                )}
+                {excessAmount > 0 && (
+                  <div className="flex justify-between text-[10px] font-bold text-blue-600 uppercase tracking-wider">
+                    <span>Excess Usage</span>
+                    <span>+ ₹{excessAmount.toLocaleString()}</span>
+                  </div>
+                )}
+                <div className="h-px bg-gray-200 my-1" />
+              </div>
+            )}
+
             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider leading-none mb-1">
               Grand Total
             </p>
             <p className="text-2xl font-bold text-primary">
-              ₹{(invoice.totalAmount || 0).toLocaleString()}
+              ₹{grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}
             </p>
           </div>
 
@@ -576,7 +778,7 @@ export function InvoiceDetailsDialog({
 
             {/* Main Decision Actions */}
             <div className="flex items-center gap-3 w-full sm:w-auto">
-              {mode === 'FINANCE' && invoice.status === 'EMPLOYEE_APPROVED' ? (
+              {mode === 'FINANCE' && currentInvoice.status === 'EMPLOYEE_APPROVED' ? (
                 rejecting ? (
                   <div className="flex-1 flex gap-2 items-center animate-in slide-in-from-right-4 w-full sm:w-auto">
                     <input
@@ -624,15 +826,28 @@ export function InvoiceDetailsDialog({
                     </Button>
                   </>
                 )
-              ) : onApprove && (invoice.status === 'DRAFT' || invoice.status === 'SENT') ? (
-                <Button
-                  className="flex-1 sm:flex-none rounded-xl h-10 px-8 font-bold bg-blue-600 text-white shadow-lg shadow-blue-100 hover:bg-blue-700 hover:shadow-blue-200 transition-all"
-                  onClick={handleApprove}
-                  disabled={isLoading}
-                >
-                  {isLoading ? <Loader2 className="animate-spin h-4 w-4 mr-2" /> : null}
-                  {approveLabel}
-                </Button>
+              ) : onApprove &&
+                (currentInvoice.status === 'DRAFT' || currentInvoice.status === 'SENT') ? (
+                <div className="flex items-center gap-3 w-full sm:w-auto">
+                  <Button
+                    className="flex-1 sm:flex-none rounded-xl h-10 px-8 font-bold bg-blue-600 text-white shadow-lg shadow-blue-100 hover:bg-blue-700 hover:shadow-blue-200 transition-all"
+                    onClick={handleApprove}
+                    disabled={isLoading}
+                  >
+                    {isLoading ? <Loader2 className="animate-spin h-4 w-4 mr-2" /> : null}
+                    {approveLabel}
+                  </Button>
+                  {onApproveNext && (
+                    <Button
+                      variant="outline"
+                      className="flex-1 sm:flex-none rounded-xl h-10 px-6 font-bold border-blue-600 text-blue-600 hover:bg-blue-50 transition-all"
+                      onClick={handleApproveNext}
+                      disabled={isLoading}
+                    >
+                      Generate & Record Next
+                    </Button>
+                  )}
+                </div>
               ) : (
                 <Button
                   variant="ghost"
