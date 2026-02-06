@@ -77,7 +77,7 @@ export default function HrSidebar() {
       {/* Header */}
       <SidebarHeader className="bg-sidebar">
         <div className="flex items-center gap-3 px-4 py-4">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/10">
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-card/10">
             <LayoutDashboard className="h-5 w-5 text-sidebar-accent-foreground" />
           </div>
           <span className="text-base font-semibold text-sidebar-accent-foreground group-data-[collapsible=icon]:hidden">
@@ -98,8 +98,8 @@ export default function HrSidebar() {
                     isActive={pathname === item.href}
                     className={`py-2.5 rounded-md ${
                       pathname === item.href
-                        ? 'bg-white text-sidebar'
-                        : 'hover:bg-white/10 text-sidebar-accent-foreground'
+                        ? 'bg-card text-sidebar'
+                        : 'hover:bg-card/10 text-sidebar-accent-foreground'
                     }`}
                   >
                     <a href={item.href} className="flex items-center gap-3 px-3">

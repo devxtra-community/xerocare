@@ -58,7 +58,7 @@ export default function HRBranchEmployeesGraph() {
   const CustomTooltip = ({ active, payload, label }: TooltipProps<number, string>) => {
     if (active && payload && payload.length) {
       return (
-        <div className="bg-white p-3 rounded-xl shadow-lg border border-blue-100">
+        <div className="bg-card p-3 rounded-xl shadow-lg border border-blue-100">
           <p className="font-bold text-[#2563eb] text-[10px] mb-2 uppercase tracking-widest border-b border-blue-50 pb-1">
             {label}
           </p>
@@ -75,15 +75,15 @@ export default function HRBranchEmployeesGraph() {
 
   if (isLoading) {
     return (
-      <div className="bg-white rounded-2xl shadow-sm border-0 p-6 h-[300px]">
+      <div className="bg-card rounded-2xl shadow-sm border-0 p-6 h-[300px]">
         <div className="h-4 w-32 bg-gray-100 animate-pulse rounded mb-8" />
-        <div className="flex-1 min-h-0 bg-gray-50 animate-pulse rounded-lg" />
+        <div className="flex-1 min-h-0 bg-muted/50 animate-pulse rounded-lg" />
       </div>
     );
   }
 
   return (
-    <div className="bg-white p-5 rounded-2xl shadow-sm border border-blue-100/50 flex flex-col h-[300px] w-full">
+    <div className="bg-card p-5 rounded-2xl shadow-sm border border-blue-100/50 flex flex-col h-[300px] w-full">
       <h4 className="text-[10px] font-bold text-primary uppercase tracking-[0.2em] mb-8">
         Branch wise Employees
       </h4>

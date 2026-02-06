@@ -21,7 +21,7 @@ export default function ProfitChart() {
   }, []);
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-blue-100 p-4 h-full min-h-[260px]">
+    <div className="bg-card rounded-2xl shadow-sm border border-blue-100 p-4 h-full min-h-[260px]">
       <h4 className="text-sm font-bold text-primary uppercase mb-6">Profit Trend</h4>
       <div className="h-[180px] w-full">
         {isClient && (

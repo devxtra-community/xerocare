@@ -64,7 +64,7 @@ export function SearchableSelect({
           role="combobox"
           aria-expanded={open}
           className={cn(
-            'w-full justify-between h-10 px-3 bg-white hover:bg-slate-50 border-input text-slate-900',
+            'w-full justify-between h-10 px-3 bg-card hover:bg-muted/50 border-input text-foreground',
             className,
           )}
         >
@@ -73,7 +73,7 @@ export function SearchableSelect({
               <span className="font-bold truncate text-sm">{selectedOption.label}</span>
             </div>
           ) : (
-            <span className="text-slate-500 font-normal text-sm">{placeholder}</span>
+            <span className="text-muted-foreground font-normal text-sm">{placeholder}</span>
           )}
           {loading ? (
             <Loader2 className="ml-2 h-4 w-4 shrink-0 opacity-50 animate-spin" />
@@ -83,10 +83,10 @@ export function SearchableSelect({
         </Button>
       </PopoverTrigger>
       <PopoverContent
-        className="w-[--radix-popover-trigger-width] p-0 bg-white z-[9999] pointer-events-auto"
+        className="w-[--radix-popover-trigger-width] p-0 bg-card z-[9999] pointer-events-auto"
         align="start"
       >
-        <div className="flex flex-col bg-white rounded-md">
+        <div className="flex flex-col bg-card rounded-md">
           {/* Native Search Input */}
           <div className="flex items-center border-b px-3 py-2">
             <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
@@ -105,7 +105,7 @@ export function SearchableSelect({
           {/* Custom List */}
           <div className="max-h-[300px] overflow-y-auto p-1">
             {filteredOptions.length === 0 ? (
-              <div className="py-6 text-center text-sm text-slate-500">{emptyText}</div>
+              <div className="py-6 text-center text-sm text-muted-foreground">{emptyText}</div>
             ) : (
               filteredOptions.map((option) => (
                 <div

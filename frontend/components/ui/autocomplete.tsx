@@ -74,7 +74,7 @@ export function Autocomplete({
     <Popover open={isOpen} onOpenChange={setIsOpen}>
       <Command shouldFilter={false} className={cn('overflow-visible bg-transparent', className)}>
         <PopoverAnchor>
-          <div className="group relative rounded-xl border border-slate-200 bg-white px-3 py-2 transition-all focus-within:ring-4 focus-within:ring-primary/10 focus-within:border-primary">
+          <div className="group relative rounded-xl border border-border bg-card px-3 py-2 transition-all focus-within:ring-4 focus-within:ring-primary/10 focus-within:border-primary">
             <div className="flex items-center gap-2">
               <Search className="h-4 w-4 text-slate-400" />
               <CommandPrimitive.Input
@@ -109,7 +109,7 @@ export function Autocomplete({
           align="start"
           onOpenAutoFocus={(e) => e.preventDefault()}
         >
-          <div className="rounded-xl border border-slate-100 bg-white p-1 shadow-2xl max-h-[300px] overflow-auto mt-1">
+          <div className="rounded-xl border border-slate-100 bg-card p-1 shadow-2xl max-h-[300px] overflow-auto mt-1">
             <CommandList>
               <CommandGroup>
                 {filteredOptions.length === 0 ? (
@@ -125,11 +125,11 @@ export function Autocomplete({
                         e.stopPropagation();
                         handleSelect(option);
                       }}
-                      className="flex flex-col items-start gap-0.5 rounded-lg px-3 py-2 aria-selected:bg-slate-50 aria-selected:text-slate-900 cursor-pointer"
+                      className="flex flex-col items-start gap-0.5 rounded-lg px-3 py-2 aria-selected:bg-muted/50 aria-selected:text-foreground cursor-pointer"
                     >
                       <span className="text-sm font-bold">{option.label}</span>
                       {option.description && (
-                        <span className="text-[10px] text-slate-500 font-medium leading-none">
+                        <span className="text-[10px] text-muted-foreground font-medium leading-none">
                           {option.description}
                         </span>
                       )}

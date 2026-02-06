@@ -132,8 +132,8 @@ export default function ProductDetailPage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
           {/* COLUMN 1: PRODUCT IMAGE & QUICK SPECS */}
           <div className="lg:col-span-1 flex flex-col gap-6">
-            <div className="bg-white rounded-xl shadow-sm overflow-hidden border border-blue-100/30">
-              <div className="aspect-square relative flex items-center justify-center bg-gray-50">
+            <div className="bg-card rounded-xl shadow-sm overflow-hidden border border-blue-100/30">
+              <div className="aspect-square relative flex items-center justify-center bg-muted/50">
                 <Image
                   src={product.imageUrl}
                   alt={product.name}
@@ -143,7 +143,7 @@ export default function ProductDetailPage() {
               </div>
             </div>
 
-            <div className="bg-white rounded-xl shadow-sm p-4 border border-blue-100/30">
+            <div className="bg-card rounded-xl shadow-sm p-4 border border-blue-100/30">
               <h3 className="text-xs font-bold text-primary uppercase flex items-center gap-2 border-b border-gray-50 pb-3 mb-4">
                 <ShieldCheck className="h-3.5 w-3.5 text-primary" /> Warranty & MFD
               </h3>
@@ -151,14 +151,16 @@ export default function ProductDetailPage() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Calendar className="h-4 w-4 text-blue-600" />
-                    <span className="text-xs text-gray-500 font-medium">Warranty Until</span>
+                    <span className="text-xs text-muted-foreground font-medium">
+                      Warranty Until
+                    </span>
                   </div>
                   <span className="text-xs font-bold text-primary">{product.warranty}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Package className="h-4 w-4 text-blue-600" />
-                    <span className="text-xs text-gray-500 font-medium">MFD</span>
+                    <span className="text-xs text-muted-foreground font-medium">MFD</span>
                   </div>
                   <span className="text-xs font-bold text-primary">{product.mfd}</span>
                 </div>
@@ -168,7 +170,7 @@ export default function ProductDetailPage() {
 
           {/* COLUMN 2 & 3: DETAILED INFO */}
           <div className="lg:col-span-2 flex flex-col gap-6">
-            <div className="bg-white rounded-xl shadow-sm p-6 border border-blue-100/30 flex-1">
+            <div className="bg-card rounded-xl shadow-sm p-6 border border-blue-100/30 flex-1">
               <h3 className="text-xs font-bold text-primary uppercase flex items-center gap-2 border-b border-gray-50 pb-3 mb-6">
                 <Info className="h-3.5 w-3.5 text-primary" /> General Information
               </h3>

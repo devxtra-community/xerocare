@@ -18,7 +18,7 @@ export default function ManagerInventoryPage() {
         {/* MAIN TABLE */}
         <div className="space-y-3">
           <h3 className="text-base sm:text-lg font-bold text-primary">Product Inventory</h3>
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100">
+          <div className="bg-card rounded-xl shadow-sm border border-gray-100">
             <InventoryTable mode="branch" />
           </div>
         </div>
@@ -27,14 +27,14 @@ export default function ManagerInventoryPage() {
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 sm:gap-6 items-stretch">
           <div className="flex flex-col space-y-3">
             <h4 className="text-base sm:text-lg font-bold text-primary">Most Moved Products</h4>
-            <div className="bg-white rounded-xl p-3 flex-1 flex flex-col min-h-[280px]">
+            <div className="bg-card rounded-xl p-3 flex-1 flex flex-col min-h-[280px]">
               <MostMovedProductsChart />
             </div>
           </div>
 
           <div className="flex flex-col space-y-3">
             <h4 className="text-base sm:text-lg font-bold text-primary">Stock by Category</h4>
-            <div className="bg-white rounded-xl p-3 flex-1 flex flex-col min-h-[280px]">
+            <div className="bg-card rounded-xl p-3 flex-1 flex flex-col min-h-[280px]">
               <StockByCategoryChart />
             </div>
           </div>

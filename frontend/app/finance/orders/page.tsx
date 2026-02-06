@@ -26,7 +26,7 @@ export default function FinanceOrdersPage() {
       <div className="flex flex-col space-y-6">
         <div>
           <h3 className="text-2xl font-bold text-slate-800 tracking-tight">Orders Management</h3>
-          <p className="text-slate-500">Overview of all branch orders</p>
+          <p className="text-muted-foreground">Overview of all branch orders</p>
         </div>
 
         <EmployeeOrderStats invoices={invoices} />
@@ -34,7 +34,7 @@ export default function FinanceOrdersPage() {
 
         <div className="space-y-4">
           <h3 className="text-xl font-bold text-slate-800 tracking-tight">All Orders</h3>
-          <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-1">
+          <div className="bg-card rounded-xl shadow-sm border border-slate-100 p-1">
             <EmployeeOrdersTable mode="FINANCE" invoices={invoices} />
           </div>
         </div>

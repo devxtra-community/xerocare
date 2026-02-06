@@ -43,7 +43,7 @@ export default function CategoryPieChart() {
   }, []);
 
   return (
-    <div className="rounded-2xl bg-white shadow-sm w-full p-4 h-[260px] flex flex-col">
+    <div className="rounded-2xl bg-card shadow-sm w-full p-4 h-[260px] flex flex-col">
       <h3 className="text-base font-semibold text-primary mb-3">Brands</h3>
 
       <div className="relative w-[120px] h-[120px] mx-auto mb-4">
@@ -81,9 +81,11 @@ export default function CategoryPieChart() {
           <div key={item.name} className="flex items-center justify-between text-xs">
             <div className="flex items-center gap-1.5">
               <span className="h-2 w-2 rounded-full" style={{ backgroundColor: item.color }} />
-              <span className="font-medium text-gray-900 truncate max-w-[100px]">{item.name}</span>
+              <span className="font-medium text-foreground truncate max-w-[100px]">
+                {item.name}
+              </span>
             </div>
-            <span className="font-semibold text-gray-900">{item.value}%</span>
+            <span className="font-semibold text-foreground">{item.value}%</span>
           </div>
         ))}
       </div>

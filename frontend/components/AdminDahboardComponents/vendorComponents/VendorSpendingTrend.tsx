@@ -27,12 +27,12 @@ export default function VendorSpendingTrend() {
     setIsClient(true);
   }, []);
 
-  if (!isClient) return <div className="h-full w-full animate-pulse bg-gray-50 rounded-lg" />;
+  if (!isClient) return <div className="h-full w-full animate-pulse bg-muted/50 rounded-lg" />;
 
   return (
     <div className="w-full h-full flex flex-col">
       <div className="flex flex-row items-center justify-between pb-4">
-        <p className="text-[10px] text-gray-500 font-medium uppercase tracking-wider">
+        <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">
           Purchase Value Trend
         </p>
       </div>

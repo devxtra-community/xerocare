@@ -158,13 +158,13 @@ export default function EmployeeOrdersTable({
               placeholder="Search orders..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="pl-9 h-10 bg-white border-blue-400/60 focus:border-blue-400 focus:ring-4 focus:ring-blue-100 outline-none shadow-sm transition-all w-full"
+              className="pl-9 h-10 bg-card border-blue-400/60 focus:border-blue-400 focus:ring-4 focus:ring-blue-100 outline-none shadow-sm transition-all w-full"
             />
           </div>
 
           <div className="w-full sm:w-[150px]">
             <Select value={filterType} onValueChange={setFilterType}>
-              <SelectTrigger className="h-10 bg-white border-blue-400/60 focus:ring-blue-100 rounded-lg w-full">
+              <SelectTrigger className="h-10 bg-card border-blue-400/60 focus:ring-blue-100 rounded-lg w-full">
                 <SelectValue placeholder="Filter by" />
               </SelectTrigger>
               <SelectContent>
@@ -178,11 +178,11 @@ export default function EmployeeOrdersTable({
         </div>
       </div>
 
-      <div className="rounded-2xl bg-white shadow-sm overflow-hidden border">
+      <div className="rounded-2xl bg-card shadow-sm overflow-hidden border">
         <div className="overflow-x-auto">
           <Table className="min-w-[1000px] sm:min-w-full">
             <TableHeader>
-              <TableRow className="bg-slate-50">
+              <TableRow className="bg-muted/50">
                 <TableHead className="text-primary font-bold whitespace-nowrap">Order ID</TableHead>
                 <TableHead className="text-primary font-bold whitespace-nowrap">
                   Customer Name
@@ -212,7 +212,7 @@ export default function EmployeeOrdersTable({
                 filteredInvoices.map((invoice, index) => (
                   <TableRow
                     key={invoice.id}
-                    className={index % 2 !== 0 ? 'bg-blue-50/20' : 'bg-white'}
+                    className={index % 2 !== 0 ? 'bg-blue-50/20' : 'bg-card'}
                   >
                     <TableCell className="text-blue-600 font-medium whitespace-nowrap">
                       {invoice.invoiceNumber}
@@ -220,10 +220,10 @@ export default function EmployeeOrdersTable({
                     <TableCell className="font-bold text-primary whitespace-nowrap">
                       {getCleanCustomerName(invoice.customerName)}
                     </TableCell>
-                    <TableCell className="text-slate-500 whitespace-nowrap text-xs">
+                    <TableCell className="text-muted-foreground whitespace-nowrap text-xs">
                       {invoice.customerPhone || 'N/A'}
                     </TableCell>
-                    <TableCell className="text-slate-500 whitespace-nowrap text-xs">
+                    <TableCell className="text-muted-foreground whitespace-nowrap text-xs">
                       {formatDate(invoice.createdAt)}
                     </TableCell>
                     <TableCell className="text-primary font-medium whitespace-nowrap">
@@ -283,7 +283,7 @@ export default function EmployeeOrdersTable({
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-8 w-8 text-slate-500 hover:text-blue-600 hover:bg-blue-50"
+                        className="h-8 w-8 text-muted-foreground hover:text-blue-600 hover:bg-blue-50"
                         onClick={() => handleViewDetails(invoice.id)}
                         title="View Details"
                       >

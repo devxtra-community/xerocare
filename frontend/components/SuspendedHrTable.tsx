@@ -93,7 +93,7 @@ export default function SuspendedHrTable() {
   const currentData = humanResourcedatas.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
   return (
-    <div className="rounded-2xl bg-white p-6 shadow-sm">
+    <div className="rounded-2xl bg-card p-6 shadow-sm">
       <Table>
         <TableHeader>
           <TableRow className="border-none">
@@ -109,7 +109,7 @@ export default function SuspendedHrTable() {
           {currentData.map((item, index) => (
             <TableRow
               key={index}
-              className={`border-none rounded-xl ${index % 2 === 1 ? 'bg-blue-50/20' : 'bg-white'}`}
+              className={`border-none rounded-xl ${index % 2 === 1 ? 'bg-blue-50/20' : 'bg-card'}`}
             >
               <TableCell className="font-medium rounded-l-xl">{item.Fullname}</TableCell>
               <TableCell>{item.Possition}</TableCell>

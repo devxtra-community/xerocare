@@ -26,7 +26,7 @@ export default function StockByCategoryChart() {
     return () => clearTimeout(timer);
   }, []);
 
-  if (!isClient) return <div className="h-full w-full bg-gray-50 rounded-lg animate-pulse" />;
+  if (!isClient) return <div className="h-full w-full bg-muted/50 rounded-lg animate-pulse" />;
 
   return (
     <div className="w-full h-full">

@@ -97,7 +97,7 @@ export default function ManagerPurchaseTable() {
         </Button>
       </div>
 
-      <div className="rounded-2xl bg-white shadow-sm overflow-hidden">
+      <div className="rounded-2xl bg-card shadow-sm overflow-hidden">
         <Table>
           <TableHeader>
             <TableRow>
@@ -127,7 +127,7 @@ export default function ManagerPurchaseTable() {
               </TableRow>
             ) : filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="text-center py-8 text-gray-500">
+                <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                   No purchases found.
                 </TableCell>
               </TableRow>

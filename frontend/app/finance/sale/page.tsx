@@ -26,7 +26,7 @@ export default function SalePage() {
       <div className="flex flex-col space-y-6">
         <div>
           <h3 className="text-2xl font-bold text-slate-800 tracking-tight">Sale Operations</h3>
-          <p className="text-slate-500">Manage and approve sales orders</p>
+          <p className="text-muted-foreground">Manage and approve sales orders</p>
         </div>
 
         <EmployeeSalesStats invoices={invoices} />
@@ -34,7 +34,7 @@ export default function SalePage() {
 
         <div className="space-y-4">
           <h3 className="text-xl font-bold text-slate-800 tracking-tight">All Sales</h3>
-          <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-1">
+          <div className="bg-card rounded-xl shadow-sm border border-slate-100 p-1">
             <EmployeeSalesTable mode="FINANCE" />
           </div>
         </div>

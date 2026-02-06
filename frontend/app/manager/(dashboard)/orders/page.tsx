@@ -13,7 +13,7 @@ export default function OrdersPage() {
           <h2 className="text-xl sm:text-2xl font-bold text-primary tracking-tight">
             Orders Management
           </h2>
-          <p className="text-sm text-slate-500 font-medium">
+          <p className="text-sm text-muted-foreground font-medium">
             Monitor and track sales, rentals, and lease orders across branches
           </p>
         </div>

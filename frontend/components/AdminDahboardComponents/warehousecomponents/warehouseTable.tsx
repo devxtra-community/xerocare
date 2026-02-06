@@ -155,10 +155,10 @@ export default function WarehouseReport() {
         </div>
 
         {/* TABLE */}
-        <div className="rounded-2xl bg-white shadow-sm overflow-x-auto">
+        <div className="rounded-2xl bg-card shadow-sm overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr className="border-b border-gray-200">
+              <tr className="border-b border-border">
                 {[
                   'WAREHOUSE NAME',
                   'CODE',
@@ -183,7 +183,7 @@ export default function WarehouseReport() {
               {filtered.map((w, i) => (
                 <tr
                   key={w.id}
-                  className={`border-b border-gray-100 ${i % 2 !== 0 ? 'bg-blue-50/20' : 'bg-white'}`}
+                  className={`border-b border-gray-100 ${i % 2 !== 0 ? 'bg-blue-50/20' : 'bg-card'}`}
                 >
                   <td className="px-4 py-3 text-sm font-medium">{w.warehouseName}</td>
                   <td className="px-4 py-3 text-sm text-primary font-medium">{w.warehouseCode}</td>
@@ -307,7 +307,7 @@ function WarehouseFormModal({
                 placeholder="Enter warehouse name"
                 value={form.warehouseName}
                 onChange={(e) => setForm({ ...form, warehouseName: e.target.value })}
-                className="h-12 rounded-xl bg-white border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
+                className="h-12 rounded-xl bg-card border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
               />
             </div>
 
@@ -319,7 +319,7 @@ function WarehouseFormModal({
                 placeholder="e.g., WH-001"
                 value={form.warehouseCode}
                 onChange={(e) => setForm({ ...form, warehouseCode: e.target.value })}
-                className="h-12 rounded-xl bg-white border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
+                className="h-12 rounded-xl bg-card border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
               />
             </div>
 
@@ -331,7 +331,7 @@ function WarehouseFormModal({
                 value={form.branchId || ''}
                 onValueChange={(value) => setForm({ ...form, branchId: value })}
               >
-                <SelectTrigger className="h-12 rounded-xl bg-white border-none shadow-sm focus:ring-2 focus:ring-blue-400">
+                <SelectTrigger className="h-12 rounded-xl bg-card border-none shadow-sm focus:ring-2 focus:ring-blue-400">
                   <SelectValue placeholder="Select branch" />
                 </SelectTrigger>
                 <SelectContent className="rounded-xl">
@@ -352,7 +352,7 @@ function WarehouseFormModal({
                 placeholder="Enter city"
                 value={form.location}
                 onChange={(e) => setForm({ ...form, location: e.target.value })}
-                className="h-12 rounded-xl bg-white border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
+                className="h-12 rounded-xl bg-card border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
               />
             </div>
 
@@ -364,7 +364,7 @@ function WarehouseFormModal({
                 placeholder="Enter complete address"
                 value={form.address}
                 onChange={(e) => setForm({ ...form, address: e.target.value })}
-                className="h-12 rounded-xl bg-white border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
+                className="h-12 rounded-xl bg-card border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
               />
             </div>
 
@@ -376,7 +376,7 @@ function WarehouseFormModal({
                 placeholder="e.g., 30000 sqft"
                 value={form.capacity}
                 onChange={(e) => setForm({ ...form, capacity: e.target.value })}
-                className="h-12 rounded-xl bg-white border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
+                className="h-12 rounded-xl bg-card border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
               />
             </div>
 
@@ -390,7 +390,7 @@ function WarehouseFormModal({
                   setForm({ ...form, status: value as 'ACTIVE' | 'INACTIVE' })
                 }
               >
-                <SelectTrigger className="h-12 rounded-xl bg-white border-none shadow-sm focus:ring-2 focus:ring-blue-400">
+                <SelectTrigger className="h-12 rounded-xl bg-card border-none shadow-sm focus:ring-2 focus:ring-blue-400">
                   <SelectValue placeholder="Select status" />
                 </SelectTrigger>
                 <SelectContent className="rounded-xl">
@@ -405,7 +405,7 @@ function WarehouseFormModal({
             <button
               type="button"
               onClick={onClose}
-              className="text-sm font-bold text-gray-900 hover:text-gray-600 transition-colors"
+              className="text-sm font-bold text-foreground hover:text-gray-600 transition-colors"
             >
               Cancel
             </button>
@@ -451,7 +451,7 @@ function ConfirmDeleteModal({
           <button
             type="button"
             onClick={onCancel}
-            className="text-sm font-bold text-gray-900 hover:text-gray-600 transition-colors"
+            className="text-sm font-bold text-foreground hover:text-gray-600 transition-colors"
           >
             Cancel
           </button>

@@ -58,9 +58,9 @@ export default function Home() {
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] bg-blue-600/20 blur-[80px] rounded-full pointer-events-none" />
 
             {/* Main Card: Sales Overview (Back) */}
-            <div className="relative z-10 bg-white dark:bg-slate-900 rounded-2xl p-5 shadow-2xl border border-slate-700/50 w-full max-w-[350px] mx-auto lg:ml-auto lg:mr-0 transform -rotate-2 lg:translate-x-4 hover:rotate-0 transition-transform duration-500">
+            <div className="relative z-10 bg-card dark:bg-slate-900 rounded-2xl p-5 shadow-2xl border border-slate-700/50 w-full max-w-[350px] mx-auto lg:ml-auto lg:mr-0 transform -rotate-2 lg:translate-x-4 hover:rotate-0 transition-transform duration-500">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="font-bold text-slate-900 dark:text-white text-base">
+                <h3 className="font-bold text-foreground dark:text-white text-base">
                   Sales Overview
                 </h3>
                 <div className="flex gap-2">
@@ -76,10 +76,10 @@ export default function Home() {
                   <span className="text-white font-bold text-base">9.2K</span>
                 </div>
                 <div className="bg-slate-100 dark:bg-slate-800 rounded-xl p-2.5 flex-1">
-                  <span className="text-[10px] text-slate-500 dark:text-slate-400 block mb-0.5">
+                  <span className="text-[10px] text-muted-foreground dark:text-slate-400 block mb-0.5">
                     Expense
                   </span>
-                  <span className="text-slate-900 dark:text-white font-bold text-base">2.6K</span>
+                  <span className="text-foreground dark:text-white font-bold text-base">2.6K</span>
                 </div>
               </div>
 
@@ -109,9 +109,9 @@ export default function Home() {
             </div>
 
             {/* Floating Card: Upcoming Schedule (Front) */}
-            <div className="absolute top-12 -left-2 lg:-left-6 z-20 bg-white dark:bg-white rounded-2xl p-4 shadow-[0_15px_40px_rgba(0,0,0,0.3)] w-60 transform rotate-3 hover:scale-105 transition-all duration-300">
+            <div className="absolute top-12 -left-2 lg:-left-6 z-20 bg-card dark:bg-card rounded-2xl p-4 shadow-[0_15px_40px_rgba(0,0,0,0.3)] w-60 transform rotate-3 hover:scale-105 transition-all duration-300">
               <div className="flex items-center justify-between mb-3">
-                <h4 className="font-bold text-slate-900 text-sm">Upcoming Schedule</h4>
+                <h4 className="font-bold text-foreground text-sm">Upcoming Schedule</h4>
                 <MoreHorizontal className="text-slate-400 w-4 h-4" />
               </div>
 
@@ -140,7 +140,7 @@ export default function Home() {
                     <div className="mt-0.5">{item.icon}</div>
                     <div>
                       <h5
-                        className={`text-xs font-semibold ${item.active ? 'text-slate-900' : 'text-slate-500'}`}
+                        className={`text-xs font-semibold ${item.active ? 'text-foreground' : 'text-muted-foreground'}`}
                       >
                         {item.title}
                       </h5>
@@ -155,7 +155,7 @@ export default function Home() {
 
         {/* LOGOS SECTION */}
         <div className="pt-6 border-t border-slate-800/50 flex-none pb-6">
-          <p className="text-center text-slate-500 text-xs font-medium mb-4">
+          <p className="text-center text-muted-foreground text-xs font-medium mb-4">
             Trusted by leading printing technology companies
           </p>
           <div className="flex flex-wrap justify-center items-center gap-6 md:gap-12 opacity-40 grayscale hover:grayscale-0 transition-all duration-500">

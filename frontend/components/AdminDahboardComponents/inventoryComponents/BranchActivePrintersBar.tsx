@@ -26,10 +26,10 @@ export default function BranchActivePrintersBar() {
     setIsClient(true);
   }, []);
 
-  if (!isClient) return <div className="h-[250px] w-full bg-white rounded-2xl animate-pulse" />;
+  if (!isClient) return <div className="h-[250px] w-full bg-card rounded-2xl animate-pulse" />;
 
   return (
-    <div className="rounded-2xl bg-white h-[320px] w-full shadow-sm flex flex-col p-4 border">
+    <div className="rounded-2xl bg-card h-[320px] w-full shadow-sm flex flex-col p-4 border">
       <div className="mb-2">
         <h3 className="font-semibold text-lg">Branch-wise Active</h3>
         <p className="text-xs text-muted-foreground">Distribution of active units</p>

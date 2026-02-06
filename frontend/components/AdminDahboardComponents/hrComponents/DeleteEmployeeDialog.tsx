@@ -61,7 +61,7 @@ export default function DeleteEmployeeDialog({
           <button
             type="button"
             onClick={() => onOpenChange(false)}
-            className="text-sm font-bold text-gray-900 hover:text-gray-600 transition-colors"
+            className="text-sm font-bold text-foreground hover:text-gray-600 transition-colors"
           >
             Cancel
           </button>

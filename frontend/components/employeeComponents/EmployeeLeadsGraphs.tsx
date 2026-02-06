@@ -38,7 +38,7 @@ const CustomTooltip = ({
   if (active && payload && payload.length) {
     const dataItem = payload[0].payload;
     return (
-      <div className="bg-white p-3 rounded-xl shadow-lg border border-blue-100">
+      <div className="bg-card p-3 rounded-xl shadow-lg border border-blue-100">
         <p className="font-bold text-[#2563eb] text-[10px] mb-2 uppercase tracking-widest border-b border-blue-50 pb-1">
           {label}
         </p>
@@ -68,7 +68,7 @@ const ChartContainer = ({
   isClient: boolean;
   gradientId: string;
 }) => (
-  <div className="bg-white p-5 rounded-2xl shadow-sm border border-blue-100/50 flex flex-col h-[300px] w-full">
+  <div className="bg-card p-5 rounded-2xl shadow-sm border border-blue-100/50 flex flex-col h-[300px] w-full">
     <h4 className="text-[10px] font-bold text-primary uppercase tracking-[0.2em] mb-8">{title}</h4>
     <div className="flex-1 w-full min-h-0">
       {isClient && (

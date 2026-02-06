@@ -11,7 +11,7 @@ const data = [
 
 export default function MostSoldProductChart() {
   return (
-    <div className="bg-white rounded-xl p-3 sm:p-4">
+    <div className="bg-card rounded-xl p-3 sm:p-4">
       <div className="h-[220px]">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart

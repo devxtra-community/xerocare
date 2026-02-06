@@ -37,9 +37,9 @@ export default function APInvoiceViewPage() {
   const balanceDue = (invoice.totalAmount ?? 0) - (invoice.paidAmount ?? 0);
 
   return (
-    <div className="max-w-6xl mx-auto p-4 md:p-8 space-y-6 bg-slate-50/50 min-h-screen">
+    <div className="max-w-6xl mx-auto p-4 md:p-8 space-y-6 bg-muted/50/50 min-h-screen">
       {/* 1. Sticky Action Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-4 rounded-xl border shadow-sm sticky top-0 z-10">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-card p-4 rounded-xl border shadow-sm sticky top-0 z-10">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="icon" onClick={() => router.back()}>
             <ArrowLeft className="w-4 h-4" />
@@ -80,7 +80,7 @@ export default function APInvoiceViewPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* 2. Primary Invoice Column */}
         <div className="lg:col-span-2 space-y-6">
-          <div className="bg-white border rounded-xl shadow-sm overflow-hidden">
+          <div className="bg-card border rounded-xl shadow-sm overflow-hidden">
             {/* Vendor & Header Branding */}
             <div className="p-8 border-b flex justify-between items-start">
               <div className="space-y-1">
@@ -113,7 +113,7 @@ export default function APInvoiceViewPage() {
             {/* Line Items Table */}
             <div className="p-0">
               <Table>
-                <TableHeader className="bg-slate-50/50">
+                <TableHeader className="bg-muted/50/50">
                   <TableRow>
                     <TableHead className="pl-8 py-4">Service Description</TableHead>
                     <TableHead className="text-right">Qty</TableHead>
@@ -123,7 +123,7 @@ export default function APInvoiceViewPage() {
                 </TableHeader>
                 <TableBody>
                   {invoice.lines.map((line) => (
-                    <TableRow key={line.id} className="hover:bg-slate-50/30">
+                    <TableRow key={line.id} className="hover:bg-muted/50/30">
                       <TableCell className="pl-8 py-4 font-medium">{line.description}</TableCell>
                       <TableCell className="text-right text-muted-foreground">
                         {line.quantity || 1}
@@ -131,7 +131,7 @@ export default function APInvoiceViewPage() {
                       <TableCell className="text-right text-muted-foreground">
                         {line.unitPrice.toLocaleString()}
                       </TableCell>
-                      <TableCell className="text-right pr-8 font-bold text-slate-900">
+                      <TableCell className="text-right pr-8 font-bold text-foreground">
                         {line.amount.toLocaleString()}
                       </TableCell>
                     </TableRow>
@@ -141,7 +141,7 @@ export default function APInvoiceViewPage() {
             </div>
 
             {/* Totals Summary Footer */}
-            <div className="p-8 border-t bg-slate-50/30 flex justify-end">
+            <div className="p-8 border-t bg-muted/50/30 flex justify-end">
               <div className="w-full max-w-[280px] space-y-3">
                 <SummaryRow label="Subtotal" value={invoice.totalAmount} />
                 <SummaryRow label="Tax (0%)" value={0} />
@@ -208,8 +208,8 @@ function SidebarCard({
   children: React.ReactNode;
 }) {
   return (
-    <div className="bg-white border rounded-xl shadow-sm overflow-hidden">
-      <div className="px-4 py-3 border-b bg-slate-50 flex items-center gap-2">
+    <div className="bg-card border rounded-xl shadow-sm overflow-hidden">
+      <div className="px-4 py-3 border-b bg-muted/50 flex items-center gap-2">
         {icon}
         <h2 className="text-sm font-bold uppercase tracking-wider text-slate-600">{title}</h2>
       </div>

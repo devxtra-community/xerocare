@@ -21,7 +21,7 @@ export default function TeamDistributionChart() {
   const total = data.reduce((acc, curr) => acc + curr.value, 0);
 
   return (
-    <div className="bg-white rounded-xl shadow-sm p-4 border border-blue-100/30 flex flex-col h-full min-h-[260px]">
+    <div className="bg-card rounded-xl shadow-sm p-4 border border-blue-100/30 flex flex-col h-full min-h-[260px]">
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-sm font-bold text-primary uppercase">Team Distribution</h3>
       </div>
@@ -49,7 +49,7 @@ export default function TeamDistributionChart() {
                   content={({ active, payload }) => {
                     if (active && payload && payload.length) {
                       return (
-                        <div className="bg-white p-2 border border-gray-100 shadow-lg rounded-lg text-xs font-bold text-primary">
+                        <div className="bg-card p-2 border border-gray-100 shadow-lg rounded-lg text-xs font-bold text-primary">
                           {payload[0].name}: {payload[0].value} Employees
                         </div>
                       );
@@ -62,7 +62,7 @@ export default function TeamDistributionChart() {
           )}
           <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
             <span className="text-2xl font-bold text-primary">{total}</span>
-            <span className="text-[10px] text-gray-500 font-bold uppercase">Total</span>
+            <span className="text-[10px] text-muted-foreground font-bold uppercase">Total</span>
           </div>
         </div>
 

@@ -19,7 +19,7 @@ const data = [
 
 export default function MonthlySalesBarChart() {
   return (
-    <div className="bg-white rounded-xl p-3 sm:p-4">
+    <div className="bg-card rounded-xl p-3 sm:p-4">
       <div className="h-[220px]">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={data} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>

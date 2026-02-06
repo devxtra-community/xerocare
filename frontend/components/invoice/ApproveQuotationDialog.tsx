@@ -77,8 +77,10 @@ export function ApproveQuotationDialog({
         </DialogHeader>
 
         <div className="grid gap-4 py-4">
-          <div className="space-y-2 border rounded-lg p-4 bg-slate-50/50">
-            <h4 className="font-medium text-sm text-slate-900 mb-2">Security Deposit (Optional)</h4>
+          <div className="space-y-2 border rounded-lg p-4 bg-muted/50/50">
+            <h4 className="font-medium text-sm text-foreground mb-2">
+              Security Deposit (Optional)
+            </h4>
 
             <div className="grid gap-2">
               <Label htmlFor="amount" className="text-xs">

@@ -83,7 +83,7 @@ export default function OrderUpdateDialog({
                 name="customerName"
                 value={formData.customerName}
                 onChange={handleChange}
-                className="h-10 rounded-lg bg-gray-50 border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
+                className="h-10 rounded-lg bg-muted/50 border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
               />
             </div>
 
@@ -95,7 +95,7 @@ export default function OrderUpdateDialog({
                 name="customerPhone"
                 value={formData.customerPhone}
                 onChange={handleChange}
-                className="h-10 rounded-lg bg-gray-50 border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
+                className="h-10 rounded-lg bg-muted/50 border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
               />
             </div>
 
@@ -108,7 +108,7 @@ export default function OrderUpdateDialog({
                   name="productName"
                   value={formData.productName}
                   onChange={handleChange}
-                  className="h-10 rounded-lg bg-gray-50 border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
+                  className="h-10 rounded-lg bg-muted/50 border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
                 />
               </div>
               <div className="space-y-1.5">
@@ -120,7 +120,7 @@ export default function OrderUpdateDialog({
                   type="number"
                   value={formData.quantity}
                   onChange={handleChange}
-                  className="h-10 rounded-lg bg-gray-50 border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
+                  className="h-10 rounded-lg bg-muted/50 border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
                 />
               </div>
             </div>
@@ -134,7 +134,7 @@ export default function OrderUpdateDialog({
                   name="totalAmount"
                   value={formData.totalAmount}
                   onChange={handleChange}
-                  className="h-10 rounded-lg bg-gray-50 border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
+                  className="h-10 rounded-lg bg-muted/50 border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
                 />
               </div>
               <div className="space-y-1.5">
@@ -145,7 +145,7 @@ export default function OrderUpdateDialog({
                   value={formData.deliveryType}
                   onValueChange={(val) => handleSelectChange('deliveryType', val)}
                 >
-                  <SelectTrigger className="h-10 rounded-lg bg-gray-50 border-none shadow-sm focus:ring-2 focus:ring-blue-400">
+                  <SelectTrigger className="h-10 rounded-lg bg-muted/50 border-none shadow-sm focus:ring-2 focus:ring-blue-400">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -166,7 +166,7 @@ export default function OrderUpdateDialog({
                   value={formData.paymentStatus}
                   onValueChange={(val) => handleSelectChange('paymentStatus', val)}
                 >
-                  <SelectTrigger className="h-10 rounded-lg bg-gray-50 border-none shadow-sm focus:ring-2 focus:ring-blue-400">
+                  <SelectTrigger className="h-10 rounded-lg bg-muted/50 border-none shadow-sm focus:ring-2 focus:ring-blue-400">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -190,7 +190,7 @@ export default function OrderUpdateDialog({
                   value={formData.orderStatus}
                   onValueChange={(val) => handleSelectChange('orderStatus', val)}
                 >
-                  <SelectTrigger className="h-10 rounded-lg bg-gray-50 border-none shadow-sm focus:ring-2 focus:ring-blue-400">
+                  <SelectTrigger className="h-10 rounded-lg bg-muted/50 border-none shadow-sm focus:ring-2 focus:ring-blue-400">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -220,7 +220,7 @@ export default function OrderUpdateDialog({
               type="button"
               variant="ghost"
               onClick={() => onOpenChange(false)}
-              className="font-bold text-gray-600 hover:text-gray-900"
+              className="font-bold text-gray-600 hover:text-foreground"
             >
               Cancel
             </Button>

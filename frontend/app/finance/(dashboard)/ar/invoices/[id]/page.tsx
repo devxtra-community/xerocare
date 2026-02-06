@@ -41,20 +41,20 @@ export default function InvoiceViewPage() {
   const customer = arCustomers.find((c) => c.id === invoice.customerId);
 
   return (
-    <div className="p-4 sm:p-8 max-w-5xl mx-auto space-y-6 bg-slate-50/30 min-h-screen">
+    <div className="p-4 sm:p-8 max-w-5xl mx-auto space-y-6 bg-muted/50/30 min-h-screen">
       {/* Action Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-4 bg-white/80 backdrop-blur sticky top-0 z-10 p-4 border rounded-xl shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-4 bg-card/80 backdrop-blur sticky top-0 z-10 p-4 border rounded-xl shadow-sm">
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-slate-900">
+          <h1 className="text-xl font-bold tracking-tight text-foreground">
             {invoice.invoiceNumber}
           </h1>
           <p className="text-xs text-muted-foreground">Issued: {invoice.issueDate}</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" className="hidden sm:flex border-slate-200">
+          <Button variant="outline" size="sm" className="hidden sm:flex border-border">
             <Printer className="w-4 h-4 mr-2" /> Print
           </Button>
-          <Button variant="outline" size="sm" className="border-slate-200">
+          <Button variant="outline" size="sm" className="border-border">
             <Download className="w-4 h-4 mr-2" /> PDF
           </Button>
 
@@ -79,9 +79,9 @@ export default function InvoiceViewPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main Document Section */}
         <div className="lg:col-span-2 space-y-6">
-          <div className="bg-white border shadow-sm rounded-2xl overflow-hidden">
+          <div className="bg-card border shadow-sm rounded-2xl overflow-hidden">
             {/* Header Branding */}
-            <div className="p-8 border-b bg-slate-50/50 flex justify-between items-start">
+            <div className="p-8 border-b bg-muted/50/50 flex justify-between items-start">
               <div className="space-y-1">
                 <div className="text-2xl font-black tracking-tighter text-blue-600">
                   Sales Invoice
@@ -108,15 +108,15 @@ export default function InvoiceViewPage() {
                     <User className="w-3 h-3" /> Bill To
                   </label>
                   <div className="mt-2 space-y-1">
-                    <p className="font-bold text-lg text-slate-900">{customer?.name}</p>
-                    <p className="text-sm text-slate-500">ID: {customer?.id}</p>
-                    <p className="text-sm text-slate-500 italic uppercase text-[10px]">
+                    <p className="font-bold text-lg text-foreground">{customer?.name}</p>
+                    <p className="text-sm text-muted-foreground">ID: {customer?.id}</p>
+                    <p className="text-sm text-muted-foreground italic uppercase text-[10px]">
                       Verified Customer
                     </p>
                   </div>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-100">
+              <div className="grid grid-cols-2 gap-4 bg-muted/50 p-4 rounded-xl border border-slate-100">
                 <DetailItem label="Currency" value={invoice.currency} />
                 <DetailItem label="Terms" value="Net 30" />
                 <DetailItem label="Due Date" value={invoice.dueDate} />
@@ -127,7 +127,7 @@ export default function InvoiceViewPage() {
             {/* Itemized Table */}
             <div className="px-1 border-t border-slate-100">
               <Table>
-                <TableHeader className="bg-slate-50/50">
+                <TableHeader className="bg-muted/50/50">
                   <TableRow>
                     <TableHead className="pl-8 text-[11px] uppercase font-bold">
                       Item & Mode
@@ -144,9 +144,9 @@ export default function InvoiceViewPage() {
                   {invoice.lines.map((line) => {
                     const product = products.find((p) => p.id === line.productId);
                     return (
-                      <TableRow key={line.id} className="hover:bg-slate-50/30 border-slate-100">
+                      <TableRow key={line.id} className="hover:bg-muted/50/30 border-slate-100">
                         <TableCell className="pl-8 py-4">
-                          <div className="font-bold text-slate-900">
+                          <div className="font-bold text-foreground">
                             {product?.name || line.description}
                           </div>
                           <div className="text-[10px] text-muted-foreground font-medium mt-0.5 tracking-wide uppercase">
@@ -165,7 +165,7 @@ export default function InvoiceViewPage() {
                             </div>
                           )}
                         </TableCell>
-                        <TableCell className="text-right pr-8 font-black text-slate-900 text-base">
+                        <TableCell className="text-right pr-8 font-black text-foreground text-base">
                           {line.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                         </TableCell>
                       </TableRow>
@@ -176,7 +176,7 @@ export default function InvoiceViewPage() {
             </div>
 
             {/* Financial Footer */}
-            <div className="p-8 border-t border-slate-100 bg-slate-50/30 flex justify-end">
+            <div className="p-8 border-t border-slate-100 bg-muted/50/30 flex justify-end">
               <div className="w-full max-w-[240px] space-y-3">
                 <SummaryRow
                   label="Subtotal"
@@ -184,7 +184,7 @@ export default function InvoiceViewPage() {
                   currency={invoice.currency}
                 />
                 <SummaryRow label="Tax (0%)" value={0} currency={invoice.currency} />
-                <div className="flex justify-between items-center pt-3 border-t-2 border-slate-200">
+                <div className="flex justify-between items-center pt-3 border-t-2 border-border">
                   <span className="text-sm font-black uppercase tracking-tighter">Total </span>
                   <span className="text-xl font-black text-blue-600">
                     {invoice.currency} {invoice.totalAmount.toLocaleString()}
@@ -218,7 +218,7 @@ export default function InvoiceViewPage() {
           </Card>
           {/* <Card className="border-none shadow-sm ring-1 ring-slate-200">
                         <CardContent className="p-6 space-y-4 text-center">
-                            <p className="text-xs text-slate-500 italic">Please quote {invoice.invoiceNumber} in all payment communications.</p>
+                            <p className="text-xs text-muted-foreground italic">Please quote {invoice.invoiceNumber} in all payment communications.</p>
                         </CardContent>
                     </Card> */}
         </div>
@@ -247,7 +247,7 @@ function DetailItem({
           {icon}
           {label}
         </span>
-        <span className="text-sm font-bold text-slate-900">{value}</span>
+        <span className="text-sm font-bold text-foreground">{value}</span>
       </div>
     );
   return (
@@ -256,7 +256,7 @@ function DetailItem({
         {icon}
         {label}
       </label>
-      <p className="text-sm font-bold text-slate-900">{value}</p>
+      <p className="text-sm font-bold text-foreground">{value}</p>
     </div>
   );
 }
@@ -271,7 +271,7 @@ function SummaryRow({
   currency: string;
 }) {
   return (
-    <div className="flex justify-between text-[11px] font-medium text-slate-500 uppercase tracking-wide">
+    <div className="flex justify-between text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
       <span>{label}</span>
       <span>
         {currency} {value.toLocaleString()}

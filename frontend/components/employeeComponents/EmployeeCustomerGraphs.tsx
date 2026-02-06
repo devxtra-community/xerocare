@@ -25,12 +25,15 @@ interface ChartDataItem {
 const CustomTooltip = ({ active, payload, label }: TooltipProps<ValueType, NameType>) => {
   if (active && payload && payload.length) {
     return (
-      <div className="bg-white p-3 rounded-xl shadow-lg border border-blue-100">
+      <div className="bg-card p-3 rounded-xl shadow-lg border border-blue-100">
         <p className="font-bold text-[#2563eb] text-[10px] mb-2 uppercase tracking-widest border-b border-blue-50 pb-1">
           {label}
         </p>
         {payload.map((entry, index) => (
-          <p key={index} className="text-[11px] font-bold text-gray-500 uppercase tracking-tighter">
+          <p
+            key={index}
+            className="text-[11px] font-bold text-muted-foreground uppercase tracking-tighter"
+          >
             {entry.name}: <span className="text-[#2563eb] ml-1">{entry.value}</span>
           </p>
         ))}
@@ -41,7 +44,7 @@ const CustomTooltip = ({ active, payload, label }: TooltipProps<ValueType, NameT
 };
 
 const ChartCard = ({ title, children }: { title: string; children: React.ReactNode }) => (
-  <div className="bg-white p-5 rounded-2xl shadow-sm border border-blue-100/50 flex flex-col h-[300px] w-full">
+  <div className="bg-card p-5 rounded-2xl shadow-sm border border-blue-100/50 flex flex-col h-[300px] w-full">
     <h4 className="text-[10px] font-bold text-primary uppercase tracking-[0.2em] mb-6">{title}</h4>
     <div className="flex-1 w-full min-h-0">{children}</div>
   </div>
@@ -122,7 +125,7 @@ export default function EmployeeCustomerGraphs() {
         {[1, 2].map((i) => (
           <div
             key={i}
-            className="bg-white p-5 rounded-2xl shadow-sm border border-blue-100/50 flex flex-col h-[300px] w-full items-center justify-center"
+            className="bg-card p-5 rounded-2xl shadow-sm border border-blue-100/50 flex flex-col h-[300px] w-full items-center justify-center"
           >
             <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
           </div>

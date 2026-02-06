@@ -59,10 +59,10 @@ const data = [
 
 export default function OutstandingReceivablesTable() {
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-blue-100 overflow-hidden">
+    <div className="bg-card rounded-2xl shadow-sm border border-blue-100 overflow-hidden">
       <div className="overflow-x-auto">
         <Table>
-          <TableHeader className="bg-slate-50/50">
+          <TableHeader className="bg-muted/50/50">
             <TableRow>
               <TableHead className="text-[11px] font-bold text-primary uppercase py-4 px-4 whitespace-nowrap">
                 Customer Name
@@ -97,21 +97,21 @@ export default function OutstandingReceivablesTable() {
             {data.map((row, i) => (
               <TableRow
                 key={i}
-                className={`hover:bg-blue-50/30 transition-colors ${i % 2 ? 'bg-blue-50/20' : 'bg-white'}`}
+                className={`hover:bg-blue-50/30 transition-colors ${i % 2 ? 'bg-blue-50/20' : 'bg-card'}`}
               >
-                <TableCell className="text-xs font-bold text-gray-900 px-4 whitespace-nowrap">
+                <TableCell className="text-xs font-bold text-foreground px-4 whitespace-nowrap">
                   {row.customer}
                 </TableCell>
                 <TableCell className="text-xs font-medium text-blue-600 whitespace-nowrap">
                   {row.invoice}
                 </TableCell>
-                <TableCell className="text-xs font-medium text-gray-500 whitespace-nowrap">
+                <TableCell className="text-xs font-medium text-muted-foreground whitespace-nowrap">
                   {row.date}
                 </TableCell>
-                <TableCell className="text-xs font-medium text-gray-500 whitespace-nowrap">
+                <TableCell className="text-xs font-medium text-muted-foreground whitespace-nowrap">
                   {row.due}
                 </TableCell>
-                <TableCell className="text-xs font-bold text-gray-900 whitespace-nowrap">
+                <TableCell className="text-xs font-bold text-foreground whitespace-nowrap">
                   {row.amount}
                 </TableCell>
                 <TableCell className="text-xs font-bold text-green-600 whitespace-nowrap">

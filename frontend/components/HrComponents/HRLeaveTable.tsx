@@ -165,14 +165,14 @@ export default function HRLeaveTable() {
   return (
     <>
       <div className="space-y-4">
-        <div className="flex items-center justify-between gap-4 bg-white p-4 rounded-xl shadow-sm border">
+        <div className="flex items-center justify-between gap-4 bg-card p-4 rounded-xl shadow-sm border">
           <div className="relative flex-1 max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Search by name, ID or email..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="pl-9 bg-gray-50 border-none shadow-sm"
+              className="pl-9 bg-muted/50 border-none shadow-sm"
             />
           </div>
           <Select value={statusFilter} onValueChange={setStatusFilter}>
@@ -189,9 +189,9 @@ export default function HRLeaveTable() {
           </Select>
         </div>
 
-        <div className="rounded-xl border bg-white shadow-sm overflow-hidden">
+        <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
           <Table>
-            <TableHeader className="bg-gray-50/50">
+            <TableHeader className="bg-muted/50/50">
               <TableRow>
                 <TableHead className="px-3 py-2 font-bold text-xs uppercase tracking-wider text-primary">
                   Employee ID
@@ -228,7 +228,7 @@ export default function HRLeaveTable() {
                 </TableRow>
               ) : filteredLeaves.length > 0 ? (
                 filteredLeaves.map((leave) => (
-                  <TableRow key={leave.id} className="hover:bg-gray-50/50 transition-colors">
+                  <TableRow key={leave.id} className="hover:bg-muted/50/50 transition-colors">
                     <TableCell className="px-3 py-1.5 font-medium text-primary">
                       {leave.employee.display_id || '---'}
                     </TableCell>

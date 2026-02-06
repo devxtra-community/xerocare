@@ -73,7 +73,7 @@ export default function EmployeeOrderStats({ invoices: propInvoices }: EmployeeO
         {[1, 2, 3].map((i) => (
           <div
             key={i}
-            className="bg-white p-4 rounded-xl shadow-sm h-32 flex items-center justify-center"
+            className="bg-card p-4 rounded-xl shadow-sm h-32 flex items-center justify-center"
           >
             <Loader2 className="h-6 w-6 animate-spin text-blue-500" />
           </div>

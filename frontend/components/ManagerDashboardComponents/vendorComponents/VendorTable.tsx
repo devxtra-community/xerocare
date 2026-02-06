@@ -148,13 +148,13 @@ export default function VendorTable({
             placeholder="Search vendors..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="pl-9 h-10 bg-white border-blue-400/60 focus:border-blue-400 focus:ring-4 focus:ring-blue-100 outline-none shadow-sm transition-all"
+            className="pl-9 h-10 bg-card border-blue-400/60 focus:border-blue-400 focus:ring-4 focus:ring-blue-100 outline-none shadow-sm transition-all"
           />
         </div>
         <div className="flex gap-2 w-full sm:w-auto">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" className="gap-2 bg-white border-blue-400/60">
+              <Button variant="outline" className="gap-2 bg-card border-blue-400/60">
                 <Filter className="h-4 w-4" />
                 Filter: {filterType}
               </Button>
@@ -182,10 +182,10 @@ export default function VendorTable({
         </div>
       </div>
 
-      <div className="rounded-2xl border border-blue-100 bg-white overflow-hidden shadow-sm m-4 mt-0">
+      <div className="rounded-2xl border border-blue-100 bg-card overflow-hidden shadow-sm m-4 mt-0">
         <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-gray-200">
           <Table className="min-w-[1050px]">
-            <TableHeader className="bg-slate-50/50">
+            <TableHeader className="bg-muted/50/50">
               <TableRow className="border-b border-blue-50/50 hover:bg-transparent">
                 <TableHead className="font-bold text-[10px] text-primary uppercase py-3 px-4">
                   Vendor Name
@@ -221,13 +221,13 @@ export default function VendorTable({
                   <TableRow
                     key={vendor.id}
                     className={`border-b border-blue-50/20 hover:bg-blue-50/30 transition-colors ${
-                      index % 2 !== 0 ? 'bg-blue-50/20' : 'bg-white'
+                      index % 2 !== 0 ? 'bg-blue-50/20' : 'bg-card'
                     }`}
                   >
                     <TableCell className="px-4 py-3 font-semibold text-primary">
                       {vendor.name}
                     </TableCell>
-                    <TableCell className="text-slate-500 font-medium text-[10px]">
+                    <TableCell className="text-muted-foreground font-medium text-[10px]">
                       VND-{vendor.id.substring(0, 4)}
                     </TableCell>
                     <TableCell>
@@ -249,7 +249,7 @@ export default function VendorTable({
                       </span>
                     </TableCell>
                     <TableCell>
-                      <div className="flex flex-col text-[10px] text-slate-500">
+                      <div className="flex flex-col text-[10px] text-muted-foreground">
                         <span className="font-medium">{vendor.phone}</span>
                         <span className="font-medium">{vendor.email}</span>
                       </div>
@@ -292,7 +292,7 @@ export default function VendorTable({
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-8 w-8 text-slate-500 hover:text-slate-700 hover:bg-slate-100"
+                          className="h-8 w-8 text-muted-foreground hover:text-slate-700 hover:bg-slate-100"
                           onClick={() => {
                             setEditingVendor(vendor);
                             setFormOpen(true);
@@ -314,7 +314,7 @@ export default function VendorTable({
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={10} className="text-center py-8 text-slate-500 italic">
+                  <TableCell colSpan={10} className="text-center py-8 text-muted-foreground italic">
                     No vendors found matching your criteria.
                   </TableCell>
                 </TableRow>
@@ -405,7 +405,7 @@ function VendorFormModal({
                 placeholder="Enter vendor name"
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
-                className="h-12 rounded-xl bg-white border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
+                className="h-12 rounded-xl bg-card border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
               />
             </div>
 
@@ -417,7 +417,7 @@ function VendorFormModal({
                 placeholder="Enter contact person"
                 value={form.contactPerson}
                 onChange={(e) => setForm({ ...form, contactPerson: e.target.value })}
-                className="h-12 rounded-xl bg-white border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
+                className="h-12 rounded-xl bg-card border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
               />
             </div>
 
@@ -431,7 +431,7 @@ function VendorFormModal({
                   setForm({ ...form, type: value as VendorFormData['type'] })
                 }
               >
-                <SelectTrigger className="h-12 rounded-xl bg-white border-none shadow-sm focus:ring-2 focus:ring-blue-400">
+                <SelectTrigger className="h-12 rounded-xl bg-card border-none shadow-sm focus:ring-2 focus:ring-blue-400">
                   <SelectValue placeholder="Select type" />
                 </SelectTrigger>
                 <SelectContent className="rounded-xl">
@@ -450,7 +450,7 @@ function VendorFormModal({
                 placeholder="Enter phone number"
                 value={form.phone}
                 onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                className="h-12 rounded-xl bg-white border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
+                className="h-12 rounded-xl bg-card border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
               />
             </div>
 
@@ -462,7 +462,7 @@ function VendorFormModal({
                 placeholder="Enter email address"
                 value={form.email}
                 onChange={(e) => setForm({ ...form, email: e.target.value })}
-                className="h-12 rounded-xl bg-white border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
+                className="h-12 rounded-xl bg-card border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
               />
             </div>
 
@@ -476,7 +476,7 @@ function VendorFormModal({
                   setForm({ ...form, status: value as VendorFormData['status'] })
                 }
               >
-                <SelectTrigger className="h-12 rounded-xl bg-white border-none shadow-sm focus:ring-2 focus:ring-blue-400">
+                <SelectTrigger className="h-12 rounded-xl bg-card border-none shadow-sm focus:ring-2 focus:ring-blue-400">
                   <SelectValue placeholder="Select status" />
                 </SelectTrigger>
                 <SelectContent className="rounded-xl">
@@ -491,7 +491,7 @@ function VendorFormModal({
             <button
               type="button"
               onClick={onClose}
-              className="text-sm font-bold text-gray-900 hover:text-gray-600 transition-colors"
+              className="text-sm font-bold text-foreground hover:text-gray-600 transition-colors"
             >
               Cancel
             </button>
@@ -537,7 +537,7 @@ function ConfirmDeleteModal({
           <button
             type="button"
             onClick={onCancel}
-            className="text-sm font-bold text-gray-900 hover:text-gray-600 transition-colors"
+            className="text-sm font-bold text-foreground hover:text-gray-600 transition-colors"
           >
             Cancel
           </button>

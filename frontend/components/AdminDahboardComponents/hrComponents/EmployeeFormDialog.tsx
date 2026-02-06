@@ -240,7 +240,7 @@ export default function EmployeeFormDialog({
                 value={formData.first_name}
                 onChange={handleChange}
                 required
-                className="h-12 rounded-xl bg-gray-50 border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
+                className="h-12 rounded-xl bg-muted/50 border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
               />
             </div>
             <div className="space-y-2">
@@ -253,7 +253,7 @@ export default function EmployeeFormDialog({
                 value={formData.last_name}
                 onChange={handleChange}
                 required
-                className="h-12 rounded-xl bg-gray-50 border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
+                className="h-12 rounded-xl bg-muted/50 border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
               />
             </div>
 
@@ -269,7 +269,7 @@ export default function EmployeeFormDialog({
                 onChange={handleChange}
                 required
                 disabled={!!initialData}
-                className="h-12 rounded-xl bg-gray-50 border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400 disabled:opacity-50"
+                className="h-12 rounded-xl bg-muted/50 border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400 disabled:opacity-50"
               />
             </div>
 
@@ -281,7 +281,7 @@ export default function EmployeeFormDialog({
                 value={formData.role}
                 onValueChange={(val) => handleSelectChange('role', val)}
               >
-                <SelectTrigger className="h-12 rounded-xl bg-gray-50 border-none shadow-sm focus:ring-2 focus:ring-blue-400">
+                <SelectTrigger className="h-12 rounded-xl bg-muted/50 border-none shadow-sm focus:ring-2 focus:ring-blue-400">
                   <SelectValue placeholder="Select role" />
                 </SelectTrigger>
                 <SelectContent className="rounded-xl">
@@ -304,7 +304,7 @@ export default function EmployeeFormDialog({
                   onValueChange={(val) => handleSelectChange('employee_job', val)}
                   required={formData.role === 'EMPLOYEE'}
                 >
-                  <SelectTrigger className="h-12 rounded-xl bg-gray-50 border-none shadow-sm focus:ring-2 focus:ring-blue-400">
+                  <SelectTrigger className="h-12 rounded-xl bg-muted/50 border-none shadow-sm focus:ring-2 focus:ring-blue-400">
                     <SelectValue placeholder="Select job type" />
                   </SelectTrigger>
                   <SelectContent className="rounded-xl">
@@ -329,7 +329,7 @@ export default function EmployeeFormDialog({
                   onValueChange={(val) => handleSelectChange('finance_job', val)}
                   required={formData.role === 'FINANCE'}
                 >
-                  <SelectTrigger className="h-12 rounded-xl bg-gray-50 border-none shadow-sm focus:ring-2 focus:ring-blue-400">
+                  <SelectTrigger className="h-12 rounded-xl bg-muted/50 border-none shadow-sm focus:ring-2 focus:ring-blue-400">
                     <SelectValue placeholder="Select finance job type" />
                   </SelectTrigger>
                   <SelectContent className="rounded-xl">
@@ -354,7 +354,7 @@ export default function EmployeeFormDialog({
                 value={formData.salary}
                 onChange={handleChange}
                 required
-                className="h-12 rounded-xl bg-gray-50 border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
+                className="h-12 rounded-xl bg-muted/50 border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
               />
             </div>
 
@@ -367,7 +367,7 @@ export default function EmployeeFormDialog({
                 type="date"
                 value={formData.expire_date}
                 onChange={handleChange}
-                className="h-12 rounded-xl bg-gray-50 border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
+                className="h-12 rounded-xl bg-muted/50 border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
               />
             </div>
 
@@ -379,7 +379,7 @@ export default function EmployeeFormDialog({
                 value={formData.status}
                 onValueChange={(val) => handleSelectChange('status', val)}
               >
-                <SelectTrigger className="h-12 rounded-xl bg-gray-50 border-none shadow-sm focus:ring-2 focus:ring-blue-400">
+                <SelectTrigger className="h-12 rounded-xl bg-muted/50 border-none shadow-sm focus:ring-2 focus:ring-blue-400">
                   <SelectValue placeholder="Select status" />
                 </SelectTrigger>
                 <SelectContent className="rounded-xl">
@@ -402,7 +402,7 @@ export default function EmployeeFormDialog({
                   value={formData.branchId}
                   onValueChange={(val) => handleSelectChange('branchId', val)}
                 >
-                  <SelectTrigger className="h-12 rounded-xl bg-gray-50 border-none shadow-sm focus:ring-2 focus:ring-blue-400">
+                  <SelectTrigger className="h-12 rounded-xl bg-muted/50 border-none shadow-sm focus:ring-2 focus:ring-blue-400">
                     <SelectValue placeholder="Select Branch" />
                   </SelectTrigger>
                   <SelectContent className="rounded-xl">
@@ -433,14 +433,14 @@ export default function EmployeeFormDialog({
               className={`h-20 rounded-xl border-2 border-dashed flex items-center justify-between px-6 cursor-pointer transition-colors ${
                 idProof
                   ? 'border-green-200 bg-green-50'
-                  : 'border-gray-200 bg-gray-50 hover:border-blue-200'
+                  : 'border-border bg-muted/50 hover:border-blue-200'
               }`}
               onClick={() => idProofInputRef.current?.click()}
             >
               <div className="flex items-center gap-3">
                 <FileText className={`h-5 w-5 ${idProof ? 'text-green-500' : 'text-gray-400'}`} />
                 <span
-                  className={`text-sm ${idProof ? 'text-green-700 font-medium' : 'text-gray-500'}`}
+                  className={`text-sm ${idProof ? 'text-green-700 font-medium' : 'text-muted-foreground'}`}
                 >
                   {idProof ? idProof.name : 'Click to upload ID proof'}
                 </span>
@@ -471,7 +471,7 @@ export default function EmployeeFormDialog({
             <button
               type="button"
               onClick={() => onOpenChange(false)}
-              className="text-sm font-bold text-gray-900 hover:text-gray-600 transition-colors"
+              className="text-sm font-bold text-foreground hover:text-gray-600 transition-colors"
             >
               Cancel
             </button>

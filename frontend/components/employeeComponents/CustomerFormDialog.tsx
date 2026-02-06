@@ -86,7 +86,7 @@ export default function CustomerFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-xl p-0 overflow-hidden rounded-xl border-none shadow-2xl bg-white">
+      <DialogContent className="sm:max-w-xl p-0 overflow-hidden rounded-xl border-none shadow-2xl bg-card">
         <form onSubmit={handleSubmit}>
           <DialogHeader className="p-8 pb-4">
             <div className="flex items-center gap-4">
@@ -117,7 +117,7 @@ export default function CustomerFormDialog({
                   value={formData.name || ''}
                   onChange={handleChange}
                   placeholder="Ex. John Doe"
-                  className="h-12 rounded-xl bg-gray-50 border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400 pl-11"
+                  className="h-12 rounded-xl bg-muted/50 border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400 pl-11"
                   required
                 />
                 <User className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -136,7 +136,7 @@ export default function CustomerFormDialog({
                     value={formData.email || ''}
                     onChange={handleChange}
                     placeholder="john@example.com"
-                    className="h-12 rounded-xl bg-gray-50 border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400 pl-11"
+                    className="h-12 rounded-xl bg-muted/50 border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400 pl-11"
                   />
                   <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                 </div>
@@ -151,7 +151,7 @@ export default function CustomerFormDialog({
                     value={formData.phone || ''}
                     onChange={handleChange}
                     placeholder="+1 234 567 890"
-                    className="h-12 rounded-xl bg-gray-50 border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400 pl-11"
+                    className="h-12 rounded-xl bg-muted/50 border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400 pl-11"
                   />
                   <Phone className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                 </div>
@@ -169,7 +169,7 @@ export default function CustomerFormDialog({
                     handleSelectChange('status', val as 'ACTIVE' | 'INACTIVE')
                   }
                 >
-                  <SelectTrigger className="h-12 rounded-xl bg-gray-50 border-none shadow-sm focus:ring-2 focus:ring-blue-400 pl-11 relative text-left">
+                  <SelectTrigger className="h-12 rounded-xl bg-muted/50 border-none shadow-sm focus:ring-2 focus:ring-blue-400 pl-11 relative text-left">
                     <div
                       className={`absolute left-4 top-1/2 -translate-y-1/2 h-2 w-2 rounded-full ${formData.status === 'ACTIVE' ? 'bg-green-500' : 'bg-red-500'}`}
                     />
@@ -188,11 +188,11 @@ export default function CustomerFormDialog({
             </div>
           </div>
 
-          <div className="p-8 bg-gray-50 flex items-center justify-between border-t border-gray-100">
+          <div className="p-8 bg-muted/50 flex items-center justify-between border-t border-gray-100">
             <button
               type="button"
               onClick={() => onOpenChange(false)}
-              className="text-sm font-bold text-gray-900 hover:text-gray-600 transition-colors"
+              className="text-sm font-bold text-foreground hover:text-gray-600 transition-colors"
             >
               Discard
             </button>

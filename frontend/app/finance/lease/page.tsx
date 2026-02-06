@@ -28,21 +28,21 @@ export default function LeasePage() {
       <div className="flex flex-col space-y-6">
         <div>
           <h3 className="text-2xl font-bold text-slate-800 tracking-tight">Lease Operations</h3>
-          <p className="text-slate-500">Manage and approve lease contracts</p>
+          <p className="text-muted-foreground">Manage and approve lease contracts</p>
         </div>
 
         <EmployeeLeaseStats invoices={invoices} />
         <EmployeeLeaseGraphs invoices={invoices} />
 
         <Tabs defaultValue="operations" className="w-full space-y-4">
-          <TabsList className="bg-white border text-slate-600">
+          <TabsList className="bg-card border text-slate-600">
             <TabsTrigger value="operations">Operations</TabsTrigger>
             <TabsTrigger value="collection">Monthly Collection</TabsTrigger>
           </TabsList>
 
           <TabsContent value="operations" className="space-y-4">
             <h3 className="text-xl font-bold text-slate-800 tracking-tight">All Leases</h3>
-            <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-1">
+            <div className="bg-card rounded-xl shadow-sm border border-slate-100 p-1">
               <EmployeeLeaseTable mode="FINANCE" />
             </div>
           </TabsContent>
@@ -51,7 +51,7 @@ export default function LeasePage() {
             <h3 className="text-xl font-bold text-slate-800 tracking-tight">
               Monthly Usage & Billing
             </h3>
-            <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-1">
+            <div className="bg-card rounded-xl shadow-sm border border-slate-100 p-1">
               <MonthlyCollectionTable mode="LEASE" />
             </div>
           </TabsContent>

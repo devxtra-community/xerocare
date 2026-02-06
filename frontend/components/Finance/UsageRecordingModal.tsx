@@ -181,33 +181,35 @@ export default function UsageRecordingModal({
         excessRate = safeParse(ruleItem.combinedExcessRate);
       }
 
-      let chargeable = Math.max(0, totalCopies - includedLimit);
+      const chargeable = Math.max(0, totalCopies - includedLimit);
       let cost = 0;
 
-      // 3. Apply Slabs (Graduated)
-      if (slabRanges && slabRanges.length > 0) {
-        // Sort by 'from'
-        const sortedSlabs = [...slabRanges].sort((a, b) => safeParse(a.from) - safeParse(b.from));
-
-        for (const slab of sortedSlabs) {
-          if (chargeable <= 0) break;
-
-          const from = safeParse(slab.from);
-          const to = safeParse(slab.to);
-          const rate = safeParse(slab.rate);
-
-          // Slab Capacity
-          const capacity = to - from + 1;
-          const usageInSlab = Math.min(chargeable, capacity);
-
-          cost += usageInSlab * rate;
-          chargeable -= usageInSlab;
-        }
-      }
-
-      // 4. Apply Excess Rate to remaining
+      // 3. Apply Slabs (Flat Volume based on Total Excess)
       if (chargeable > 0) {
-        cost += chargeable * excessRate;
+        if (slabRanges && slabRanges.length > 0) {
+          // Find the slab that matches the TOTAL chargeable count
+          const match = slabRanges.find(
+            (s) => chargeable >= safeParse(s.from) && chargeable <= safeParse(s.to),
+          );
+
+          if (match) {
+            cost = chargeable * safeParse(match.rate);
+          } else {
+            // Fallback if no slab matches? Using excessRate as default or 0?
+            // Backend logic falls back to 0 if findSlabRate fails
+            // BUT generally we might want to default to the highest slab or excessRate?
+            // Given user requirement "10000-100000 range price must be calculated for all",
+            // if it exceeds 100000 and no slab exists, what happens?
+            // Assuming strict range match for now to align with backend.
+            // If no match in slabs, check if we should fall back to linear excessRate?
+            // Backend code: if (slabs) use slab (and return 0 if no match).
+            // Let's stick to backend logic.
+            cost = 0;
+          }
+        } else {
+          // 4. No Slabs -> Use Linear Excess Rate
+          cost = chargeable * excessRate;
+        }
       }
 
       return cost;
@@ -371,7 +373,7 @@ export default function UsageRecordingModal({
                     <div className="space-y-2">
                       <div className="flex justify-between">
                         <Label>BW A4 Count</Label>
-                        <span className="text-xs text-slate-500">
+                        <span className="text-xs text-muted-foreground">
                           Free Limit:{' '}
                           {contract.items.find((i) => i.description.includes('Black'))
                             ?.bwIncludedLimit || 0}
@@ -409,7 +411,7 @@ export default function UsageRecordingModal({
                     <div className="space-y-2">
                       <div className="flex justify-between">
                         <Label>Color A4 Count</Label>
-                        <span className="text-xs text-slate-500">
+                        <span className="text-xs text-muted-foreground">
                           Free Limit:{' '}
                           {contract.items.find((i) => i.description.includes('Color'))
                             ?.colorIncludedLimit || 0}
@@ -446,9 +448,11 @@ export default function UsageRecordingModal({
                 )}
             </div>
 
-            <div className="bg-slate-50 rounded-lg border border-slate-200 overflow-hidden">
-              <div className="p-3 border-b border-slate-200 bg-slate-100/50 flex justify-between items-center">
-                <span className="text-xs font-bold text-slate-500 uppercase">Usage Summary</span>
+            <div className="bg-muted/50 rounded-lg border border-border overflow-hidden">
+              <div className="p-3 border-b border-border bg-slate-100/50 flex justify-between items-center">
+                <span className="text-xs font-bold text-muted-foreground uppercase">
+                  Usage Summary
+                </span>
               </div>
               <div className="p-4 grid grid-cols-2 gap-4">
                 <div>

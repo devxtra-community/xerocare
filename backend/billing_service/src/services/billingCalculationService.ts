@@ -87,14 +87,28 @@ export class BillingCalculationService {
     for (const rule of rules) {
       if (rule.itemType !== 'PRICING_RULE') continue;
 
-      if (rule.bwIncludedLimit !== undefined && rule.bwExcessRate !== undefined) {
+      if (rule.bwIncludedLimit !== undefined) {
         const excess = Math.max(0, bwUsage - rule.bwIncludedLimit);
-        excessAmount += excess * Number(rule.bwExcessRate);
+        if (excess > 0) {
+          if (rule.bwSlabRanges && rule.bwSlabRanges.length > 0) {
+            const rate = this.findSlabRate(excess, rule.bwSlabRanges);
+            excessAmount += excess * rate;
+          } else if (rule.bwExcessRate !== undefined) {
+            excessAmount += excess * Number(rule.bwExcessRate);
+          }
+        }
       }
 
-      if (rule.colorIncludedLimit !== undefined && rule.colorExcessRate !== undefined) {
+      if (rule.colorIncludedLimit !== undefined) {
         const excess = Math.max(0, colorUsage - rule.colorIncludedLimit);
-        excessAmount += excess * Number(rule.colorExcessRate);
+        if (excess > 0) {
+          if (rule.colorSlabRanges && rule.colorSlabRanges.length > 0) {
+            const rate = this.findSlabRate(excess, rule.colorSlabRanges);
+            excessAmount += excess * rate;
+          } else if (rule.colorExcessRate !== undefined) {
+            excessAmount += excess * Number(rule.colorExcessRate);
+          }
+        }
       }
     }
     return Number(baseRent) + excessAmount;
@@ -105,9 +119,16 @@ export class BillingCalculationService {
     for (const rule of rules) {
       if (rule.itemType !== 'PRICING_RULE') continue;
 
-      if (rule.combinedIncludedLimit !== undefined && rule.combinedExcessRate !== undefined) {
+      if (rule.combinedIncludedLimit !== undefined) {
         const excess = Math.max(0, totalUsage - rule.combinedIncludedLimit);
-        excessAmount += excess * Number(rule.combinedExcessRate);
+        if (excess > 0) {
+          if (rule.comboSlabRanges && rule.comboSlabRanges.length > 0) {
+            const rate = this.findSlabRate(excess, rule.comboSlabRanges);
+            excessAmount += excess * rate;
+          } else if (rule.combinedExcessRate !== undefined) {
+            excessAmount += excess * Number(rule.combinedExcessRate);
+          }
+        }
       }
     }
     return Number(baseRent) + excessAmount;

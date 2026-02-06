@@ -28,7 +28,7 @@ export default function DashbordTable() {
   }, []);
 
   return (
-    <div className="rounded-2xl bg-white shadow-sm overflow-hidden">
+    <div className="rounded-2xl bg-card shadow-sm overflow-hidden">
       <Table>
         <TableHeader>
           <TableRow>
@@ -56,7 +56,7 @@ export default function DashbordTable() {
             ))
           ) : (
             <TableRow>
-              <TableCell colSpan={4} className="text-center py-6 text-gray-500">
+              <TableCell colSpan={4} className="text-center py-6 text-muted-foreground">
                 No inventory found for this branch.
               </TableCell>
             </TableRow>

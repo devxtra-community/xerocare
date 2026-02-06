@@ -218,7 +218,7 @@ export default function MonthlyCollectionTable({ mode }: { mode?: 'RENT' | 'LEAS
 
       <div className="overflow-hidden rounded-lg border border-slate-200">
         <Table>
-          <TableHeader className="bg-slate-50">
+          <TableHeader className="bg-muted/50">
             <TableRow>
               <TableHead>Customer</TableHead>
               <TableHead>Contract / Invoice</TableHead>

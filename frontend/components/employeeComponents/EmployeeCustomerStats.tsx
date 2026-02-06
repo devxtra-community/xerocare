@@ -57,7 +57,7 @@ export default function EmployeeCustomerStats() {
         {[1, 2, 3].map((i) => (
           <div
             key={i}
-            className="bg-white p-4 rounded-xl shadow-sm border border-blue-100/50 flex items-center justify-center h-24"
+            className="bg-card p-4 rounded-xl shadow-sm border border-blue-100/50 flex items-center justify-center h-24"
           >
             <Loader2 className="h-6 w-6 animate-spin text-blue-500" />
           </div>

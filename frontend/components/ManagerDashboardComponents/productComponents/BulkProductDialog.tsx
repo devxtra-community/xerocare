@@ -193,7 +193,7 @@ export function BulkProductDialog({ open, onClose, onSuccess }: BulkProductDialo
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="bg-white rounded-xl w-full max-w-6xl h-[85vh] flex flex-col shadow-2xl">
+      <div className="bg-card rounded-xl w-full max-w-6xl h-[85vh] flex flex-col shadow-2xl">
         <div className="p-4 border-b flex justify-between items-center">
           <h2 className="text-xl font-bold flex items-center gap-2">
             <Upload size={20} /> Bulk Product Upload
@@ -203,7 +203,7 @@ export function BulkProductDialog({ open, onClose, onSuccess }: BulkProductDialo
           </button>
         </div>
 
-        <div className="p-4 bg-gray-50 border-b flex flex-col sm:flex-row gap-4 items-center justify-between">
+        <div className="p-4 bg-muted/50 border-b flex flex-col sm:flex-row gap-4 items-center justify-between">
           <div className="flex gap-4 items-center w-full sm:w-auto">
             <div className="relative">
               <input
@@ -222,7 +222,7 @@ export function BulkProductDialog({ open, onClose, onSuccess }: BulkProductDialo
               </label>
             </div>
           </div>
-          <div className="text-sm text-gray-500">
+          <div className="text-sm text-muted-foreground">
             {rows.length > 0 ? `${rows.length} rows loaded` : 'Upload an Excel file to get started'}
           </div>
         </div>
@@ -422,7 +422,7 @@ export function BulkProductDialog({ open, onClose, onSuccess }: BulkProductDialo
           )}
         </div>
 
-        <div className="p-4 border-t flex justify-between items-center bg-gray-50">
+        <div className="p-4 border-t flex justify-between items-center bg-muted/50">
           <Button variant="outline" onClick={handleAddRow} className="gap-2">
             <Plus size={16} /> Add Row
           </Button>

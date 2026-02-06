@@ -153,7 +153,7 @@ export default function EmployeeLeaseTable({ mode = 'EMPLOYEE' }: EmployeeLeaseT
             placeholder="Search by invoice # or customer..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="pl-9 h-10 bg-white border-blue-400/60 focus:border-blue-400 focus:ring-4 focus:ring-blue-100 outline-none shadow-sm transition-all w-full"
+            className="pl-9 h-10 bg-card border-blue-400/60 focus:border-blue-400 focus:ring-4 focus:ring-blue-100 outline-none shadow-sm transition-all w-full"
           />
         </div>
         {mode === 'EMPLOYEE' && (
@@ -166,11 +166,11 @@ export default function EmployeeLeaseTable({ mode = 'EMPLOYEE' }: EmployeeLeaseT
         )}
       </div>
 
-      <div className="rounded-2xl bg-white shadow-sm overflow-hidden border">
+      <div className="rounded-2xl bg-card shadow-sm overflow-hidden border">
         <div className="overflow-x-auto">
           <Table className="min-w-[800px] sm:min-w-full">
             <TableHeader>
-              <TableRow className="bg-slate-50">
+              <TableRow className="bg-muted/50">
                 <TableHead className="text-primary font-bold whitespace-nowrap uppercase text-[11px]">
                   INV NUMBER
                 </TableHead>
@@ -210,7 +210,7 @@ export default function EmployeeLeaseTable({ mode = 'EMPLOYEE' }: EmployeeLeaseT
                 </TableRow>
               ) : (
                 filteredInvoices.map((inv, index) => (
-                  <TableRow key={inv.id} className={index % 2 !== 0 ? 'bg-blue-50/20' : 'bg-white'}>
+                  <TableRow key={inv.id} className={index % 2 !== 0 ? 'bg-blue-50/20' : 'bg-card'}>
                     <TableCell className="text-blue-500 font-bold tracking-tight">
                       {inv.invoiceNumber}
                     </TableCell>
@@ -254,7 +254,7 @@ export default function EmployeeLeaseTable({ mode = 'EMPLOYEE' }: EmployeeLeaseT
                         {inv.status}
                       </span>
                     </TableCell>
-                    <TableCell className="text-slate-500 text-[11px] font-medium whitespace-nowrap">
+                    <TableCell className="text-muted-foreground text-[11px] font-medium whitespace-nowrap">
                       {new Date(inv.createdAt).toLocaleDateString(undefined, {
                         day: '2-digit',
                         month: 'short',

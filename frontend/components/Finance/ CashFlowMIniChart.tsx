@@ -22,9 +22,9 @@ export default function CashFlowMiniChart() {
       {/* Dynamic Header with Net Position */}
       <div className="flex justify-between items-end mb-8">
         <div>
-          <h3 className="text-sm font-medium text-slate-500">Net Cash Position</h3>
+          <h3 className="text-sm font-medium text-muted-foreground">Net Cash Position</h3>
           <div className="flex items-center gap-2 mt-1">
-            <span className="text-xl font-bold text-slate-900">
+            <span className="text-xl font-bold text-foreground">
               AED {netPosition.toLocaleString()}
             </span>
             <span className="flex items-center text-xs font-medium text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">
