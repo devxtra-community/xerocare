@@ -28,7 +28,7 @@ export default function RentPage() {
       <div className="flex flex-col space-y-6">
         <div>
           <h3 className="text-2xl font-bold text-slate-800 tracking-tight">Rent Operations</h3>
-          <p className="text-slate-500">Manage and approve rental agreements</p>
+          <p className="text-muted-foreground">Manage and approve rental agreements</p>
         </div>
 
         <EmployeeRentStats invoices={invoices} />
@@ -38,14 +38,14 @@ export default function RentPage() {
         <EmployeeRentGraphs />
 
         <Tabs defaultValue="operations" className="w-full space-y-4">
-          <TabsList className="bg-white border text-slate-600">
+          <TabsList className="bg-card border text-slate-600">
             <TabsTrigger value="operations">Operations</TabsTrigger>
             <TabsTrigger value="collection">Monthly Collection</TabsTrigger>
           </TabsList>
 
           <TabsContent value="operations" className="space-y-4">
             <h3 className="text-xl font-bold text-slate-800 tracking-tight">All Rentals</h3>
-            <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-1">
+            <div className="bg-card rounded-xl shadow-sm border border-slate-100 p-1">
               <EmployeeRentTable mode="FINANCE" />
             </div>
           </TabsContent>
@@ -54,7 +54,7 @@ export default function RentPage() {
             <h3 className="text-xl font-bold text-slate-800 tracking-tight">
               Monthly Usage & Billing
             </h3>
-            <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-1">
+            <div className="bg-card rounded-xl shadow-sm border border-slate-100 p-1">
               <MonthlyCollectionTable mode="RENT" />
             </div>
           </TabsContent>

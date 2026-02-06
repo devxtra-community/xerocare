@@ -92,7 +92,7 @@ export function InvoiceDetailsDialog({
 
   return (
     <Dialog open={true} onOpenChange={(val) => !val && onClose()}>
-      <DialogContent className="sm:max-w-xl p-0 overflow-hidden rounded-xl border border-gray-100 shadow-2xl bg-white flex flex-col max-h-[90vh]">
+      <DialogContent className="sm:max-w-xl p-0 overflow-hidden rounded-xl border border-gray-100 shadow-2xl bg-card flex flex-col max-h-[90vh]">
         <DialogHeader className="p-8 pb-4">
           <div className="flex items-center gap-4">
             <div className="h-12 w-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shadow-sm">
@@ -121,7 +121,7 @@ export function InvoiceDetailsDialog({
             </Badge>
             <button
               onClick={onClose}
-              className="p-2 rounded-full bg-gray-50 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
+              className="p-2 rounded-full bg-muted/50 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
             >
               <X size={18} />
             </button>
@@ -251,7 +251,7 @@ export function InvoiceDetailsDialog({
                           {/* SLAB RATES DISPLAY */}
                           {/* 1. Black & White Slabs */}
                           {rule.bwSlabRanges && rule.bwSlabRanges.length > 0 && (
-                            <div className="mt-1 p-2 bg-white/50 rounded-lg border border-orange-100">
+                            <div className="mt-1 p-2 bg-card/50 rounded-lg border border-orange-100">
                               <p className="text-[10px] font-bold text-orange-400 uppercase mb-1">
                                 B&W Slabs
                               </p>
@@ -284,7 +284,7 @@ export function InvoiceDetailsDialog({
 
                           {/* 2. Color Slabs */}
                           {rule.colorSlabRanges && rule.colorSlabRanges.length > 0 && (
-                            <div className="mt-1 p-2 bg-white/50 rounded-lg border border-orange-100">
+                            <div className="mt-1 p-2 bg-card/50 rounded-lg border border-orange-100">
                               <p className="text-[10px] font-bold text-orange-400 uppercase mb-1">
                                 Color Slabs
                               </p>
@@ -319,7 +319,7 @@ export function InvoiceDetailsDialog({
 
                           {/* 3. Combined Slabs */}
                           {rule.comboSlabRanges && rule.comboSlabRanges.length > 0 && (
-                            <div className="mt-1 p-2 bg-white/50 rounded-lg border border-orange-100">
+                            <div className="mt-1 p-2 bg-card/50 rounded-lg border border-orange-100">
                               <p className="text-[10px] font-bold text-orange-400 uppercase mb-1">
                                 Combined Slabs
                               </p>
@@ -415,19 +415,58 @@ export function InvoiceDetailsDialog({
             </div>
           )}
 
+          {/* Security Deposit Display */}
+          {invoice.securityDepositAmount !== undefined && invoice.securityDepositAmount > 0 && (
+            <div className="p-6 bg-emerald-50/50 rounded-xl border border-emerald-100 grid grid-cols-2 md:grid-cols-4 gap-6">
+              <div className="col-span-full border-b border-emerald-100 pb-2 mb-2">
+                <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider flex items-center gap-2">
+                  <IndianRupee size={12} /> Security Deposit Collected
+                </p>
+              </div>
+              <div>
+                <p className="text-[10px] font-bold text-emerald-400 uppercase">Amount</p>
+                <p className="text-sm font-bold text-gray-800">
+                  ₹{invoice.securityDepositAmount.toLocaleString()}
+                </p>
+              </div>
+              <div>
+                <p className="text-[10px] font-bold text-emerald-400 uppercase">Mode</p>
+                <p className="text-sm font-bold text-gray-800">
+                  {invoice.securityDepositMode || '-'}
+                </p>
+              </div>
+              <div>
+                <p className="text-[10px] font-bold text-emerald-400 uppercase">Reference</p>
+                <p className="text-sm font-bold text-gray-800">
+                  {invoice.securityDepositReference || '-'}
+                </p>
+              </div>
+              <div>
+                <p className="text-[10px] font-bold text-emerald-400 uppercase">Date</p>
+                <p className="text-sm font-bold text-gray-800">
+                  {invoice.securityDepositReceivedDate
+                    ? new Date(invoice.securityDepositReceivedDate).toLocaleDateString()
+                    : '-'}
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* SALE Details - Warranty placeholder if needed */}
           {invoice.saleType === 'SALE' && (
             <div className="p-4 bg-blue-50/50 rounded-xl border border-blue-100">
               <p className="text-[10px] font-bold text-blue-400 uppercase tracking-wider">
                 Sale Order
               </p>
-              <p className="text-xs text-gray-500 mt-1">Standard product sale terms apply.</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Standard product sale terms apply.
+              </p>
             </div>
           )}
           {(invoice.saleType === 'RENT' || invoice.saleType === 'LEASE') &&
             (invoice.startDate || invoice.endDate || invoice.billingCycleInDays) && (
               <>
-                <div className="grid grid-cols-2 gap-x-12 gap-y-6 p-6 bg-gray-50 rounded-xl">
+                <div className="grid grid-cols-2 gap-x-12 gap-y-6 p-6 bg-muted/50 rounded-xl">
                   <div className="space-y-1">
                     <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
                       Contract Period
@@ -471,7 +510,7 @@ export function InvoiceDetailsDialog({
             </h3>
             <div className="rounded-xl border border-gray-100 overflow-hidden">
               <Table>
-                <TableHeader className="bg-gray-50/80">
+                <TableHeader className="bg-muted/50/80">
                   <TableRow className="hover:bg-transparent border-gray-100">
                     <TableHead className="text-[10px] font-bold text-gray-400 h-10">
                       DESCRIPTION
@@ -498,10 +537,10 @@ export function InvoiceDetailsDialog({
                         <TableCell className="font-bold text-gray-700 py-3 text-sm">
                           {item.description}
                         </TableCell>
-                        <TableCell className="text-center font-bold text-gray-500 text-sm">
+                        <TableCell className="text-center font-bold text-muted-foreground text-sm">
                           {item.quantity}
                         </TableCell>
-                        <TableCell className="text-right font-bold text-gray-900 text-sm">
+                        <TableCell className="text-right font-bold text-foreground text-sm">
                           ₹{((item.quantity || 0) * (item.unitPrice || 0)).toLocaleString()}
                         </TableCell>
                       </TableRow>
@@ -512,7 +551,7 @@ export function InvoiceDetailsDialog({
           </div>
         </div>
 
-        <div className="p-6 bg-gray-50/50 border-t border-gray-100 flex flex-col md:flex-row items-center justify-between gap-6">
+        <div className="p-6 bg-muted/50/50 border-t border-gray-100 flex flex-col md:flex-row items-center justify-between gap-6">
           <div className="flex flex-col items-center md:items-start">
             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider leading-none mb-1">
               Grand Total
@@ -524,11 +563,11 @@ export function InvoiceDetailsDialog({
 
           <div className="flex flex-col sm:flex-row items-center gap-4 w-full md:w-auto">
             {/* Utility Actions */}
-            <div className="flex items-center gap-2 p-1 bg-white rounded-xl border border-gray-100 shadow-sm">
+            <div className="flex items-center gap-2 p-1 bg-card rounded-xl border border-gray-100 shadow-sm">
               <Button
                 variant="ghost"
                 size="icon"
-                className="rounded-lg h-9 w-9 text-gray-500 hover:text-green-600 hover:bg-green-50"
+                className="rounded-lg h-9 w-9 text-muted-foreground hover:text-green-600 hover:bg-green-50"
                 onClick={handleShareWhatsApp}
                 title="Share on WhatsApp"
               >
@@ -538,7 +577,7 @@ export function InvoiceDetailsDialog({
               <Button
                 variant="ghost"
                 size="icon"
-                className="rounded-lg h-9 w-9 text-gray-500 hover:text-blue-600 hover:bg-blue-50"
+                className="rounded-lg h-9 w-9 text-muted-foreground hover:text-blue-600 hover:bg-blue-50"
                 onClick={handleSendEmail}
                 title="Send Email"
               >
@@ -548,7 +587,7 @@ export function InvoiceDetailsDialog({
               <Button
                 variant="ghost"
                 size="icon"
-                className="rounded-lg h-9 w-9 text-gray-500 hover:text-indigo-600 hover:bg-indigo-50"
+                className="rounded-lg h-9 w-9 text-muted-foreground hover:text-indigo-600 hover:bg-indigo-50"
                 onClick={() => window.print()}
                 title="Print Invoice"
               >
@@ -565,7 +604,7 @@ export function InvoiceDetailsDialog({
                 rejecting ? (
                   <div className="flex-1 flex gap-2 items-center animate-in slide-in-from-right-4 w-full sm:w-auto">
                     <input
-                      className="flex-1 min-w-[140px] text-xs p-2 h-10 border border-red-200 rounded-lg bg-red-50 focus:bg-white focus:border-red-400 outline-none transition-all placeholder:text-red-300"
+                      className="flex-1 min-w-[140px] text-xs p-2 h-10 border border-red-200 rounded-lg bg-red-50 focus:bg-card focus:border-red-400 outline-none transition-all placeholder:text-red-300"
                       placeholder="Reason..."
                       value={rejectReason}
                       onChange={(e) => setRejectReason(e.target.value)}
@@ -575,7 +614,7 @@ export function InvoiceDetailsDialog({
                       variant="ghost"
                       size="sm"
                       onClick={() => setRejecting(false)}
-                      className="h-10 text-slate-500 hover:text-slate-800"
+                      className="h-10 text-muted-foreground hover:text-slate-800"
                     >
                       Cancel
                     </Button>
@@ -621,7 +660,7 @@ export function InvoiceDetailsDialog({
               ) : (
                 <Button
                   variant="ghost"
-                  className="flex-1 sm:flex-none rounded-xl h-10 px-6 font-bold text-gray-500 hover:bg-gray-100"
+                  className="flex-1 sm:flex-none rounded-xl h-10 px-6 font-bold text-muted-foreground hover:bg-gray-100"
                   onClick={onClose}
                 >
                   Close

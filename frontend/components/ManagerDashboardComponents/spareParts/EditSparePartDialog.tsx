@@ -148,7 +148,7 @@ export default function EditSparePartDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto bg-white text-black">
+      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto bg-card text-black">
         <DialogHeader>
           <DialogTitle>Edit Spare Part</DialogTitle>
         </DialogHeader>

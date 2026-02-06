@@ -52,11 +52,11 @@ export default function InventoryTable({ mode = 'global', warehouseId }: Invento
   const currentData = data.slice(startIndex, startIndex + itemsPerPage);
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+    <div className="bg-card rounded-xl shadow-sm border border-gray-100 overflow-hidden">
       <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-gray-200">
         <Table className="min-w-[900px]">
           <TableHeader>
-            <TableRow className="bg-gray-50/50 hover:bg-transparent">
+            <TableRow className="bg-muted/50/50 hover:bg-transparent">
               {mode !== 'warehouse' && (
                 <TableHead className="text-[10px] font-bold text-primary uppercase py-2 px-3">
                   Warehouse
@@ -96,10 +96,10 @@ export default function InventoryTable({ mode = 'global', warehouseId }: Invento
               currentData.map((item, idx) => (
                 <TableRow
                   key={idx}
-                  className={`transition-colors h-11 ${idx % 2 === 0 ? 'bg-white' : 'bg-blue-50/20'}`}
+                  className={`transition-colors h-11 ${idx % 2 === 0 ? 'bg-card' : 'bg-blue-50/20'}`}
                 >
                   {mode !== 'warehouse' && (
-                    <TableCell className="px-3 py-1.5 font-medium text-gray-900 text-[12px]">
+                    <TableCell className="px-3 py-1.5 font-medium text-foreground text-[12px]">
                       {item.warehouse_name || 'N/A'}
                     </TableCell>
                   )}
@@ -140,7 +140,7 @@ export default function InventoryTable({ mode = 'global', warehouseId }: Invento
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={8} className="text-center py-12 text-gray-500">
+                <TableCell colSpan={8} className="text-center py-12 text-muted-foreground">
                   <div className="flex flex-col items-center justify-center gap-2">
                     <div className="bg-gray-100 p-3 rounded-full">
                       <span className="text-2xl">📦</span>
@@ -155,7 +155,7 @@ export default function InventoryTable({ mode = 'global', warehouseId }: Invento
         </Table>
       </div>
 
-      <div className="p-4 border-t border-gray-50 flex items-center justify-between bg-white text-xs">
+      <div className="p-4 border-t border-gray-50 flex items-center justify-between bg-card text-xs">
         Showing {(page - 1) * itemsPerPage + 1} to {Math.min(page * itemsPerPage, total)} of {total}{' '}
         items
         <div className="flex items-center gap-1">
@@ -164,7 +164,7 @@ export default function InventoryTable({ mode = 'global', warehouseId }: Invento
             size="sm"
             onClick={() => setPage((p) => Math.max(1, p - 1))}
             disabled={page === 1}
-            className="h-8 rounded-lg border-gray-100 text-gray-600 hover:bg-gray-50 text-[11px]"
+            className="h-8 rounded-lg border-gray-100 text-gray-600 hover:bg-muted/50 text-[11px]"
           >
             Prev
           </Button>
@@ -175,7 +175,7 @@ export default function InventoryTable({ mode = 'global', warehouseId }: Invento
               className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${
                 page === i + 1
                   ? 'bg-primary text-white font-bold'
-                  : 'text-gray-500 hover:bg-gray-50'
+                  : 'text-muted-foreground hover:bg-muted/50'
               }`}
             >
               {i + 1}
@@ -186,7 +186,7 @@ export default function InventoryTable({ mode = 'global', warehouseId }: Invento
             size="sm"
             onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
             disabled={page === totalPages}
-            className="h-8 rounded-lg border-gray-100 text-gray-600 hover:bg-gray-50 text-[11px]"
+            className="h-8 rounded-lg border-gray-100 text-gray-600 hover:bg-muted/50 text-[11px]"
           >
             Next
           </Button>

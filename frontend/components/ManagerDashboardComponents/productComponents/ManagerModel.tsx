@@ -115,7 +115,7 @@ export default function ManagerModel() {
         </div>
       </div>
 
-      <div className="rounded-2xl bg-white shadow-sm overflow-hidden">
+      <div className="rounded-2xl bg-card shadow-sm overflow-hidden">
         <Table>
           <TableHeader>
             <TableRow>
@@ -160,7 +160,7 @@ export default function ManagerModel() {
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={5} className="text-center py-6 text-gray-500">
+                <TableCell colSpan={5} className="text-center py-6 text-muted-foreground">
                   No models found
                 </TableCell>
               </TableRow>
@@ -276,7 +276,7 @@ function Modal({
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="bg-white rounded-2xl w-full max-w-2xl p-6">
+      <div className="bg-card rounded-2xl w-full max-w-2xl p-6">
         <div className="flex justify-between mb-4">
           <h2 className="font-semibold">{title}</h2>
           <button onClick={onClose}>
@@ -300,7 +300,7 @@ function ConfirmDeleteModal({
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="bg-white rounded-2xl p-6 text-center">
+      <div className="bg-card rounded-2xl p-6 text-center">
         <Trash2 className="mx-auto text-red-600 mb-2" />
         <p>
           Delete <b>{name}</b>?

@@ -26,11 +26,11 @@ export default function HRAttendanceDetailDialog({ open, onOpenChange, employee 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl rounded-2xl p-0 overflow-hidden border-0 shadow-2xl">
-        <div className="bg-white p-6 border-b border-slate-100">
+        <div className="bg-card p-6 border-b border-slate-100">
           <DialogHeader>
             <div className="flex items-center gap-4 mb-6">
-              <div className="h-20 w-20 rounded-2xl bg-slate-50 border-2 border-slate-100 p-1 overflow-hidden flex-shrink-0">
-                <div className="h-full w-full rounded-xl bg-white flex items-center justify-center relative overflow-hidden">
+              <div className="h-20 w-20 rounded-2xl bg-muted/50 border-2 border-slate-100 p-1 overflow-hidden flex-shrink-0">
+                <div className="h-full w-full rounded-xl bg-card flex items-center justify-center relative overflow-hidden">
                   {employee.profile_image_url ? (
                     <Image
                       src={employee.profile_image_url}
@@ -47,7 +47,7 @@ export default function HRAttendanceDetailDialog({ open, onOpenChange, employee 
                 </div>
               </div>
               <div>
-                <DialogTitle className="text-2xl font-black flex items-center gap-2 text-slate-900">
+                <DialogTitle className="text-2xl font-black flex items-center gap-2 text-foreground">
                   {employee.first_name} {employee.last_name}
                 </DialogTitle>
                 <div className="flex flex-col gap-1 mt-1">
@@ -90,7 +90,7 @@ export default function HRAttendanceDetailDialog({ open, onOpenChange, employee 
           </div>
         </div>
 
-        <div className="p-6 space-y-6 bg-white">
+        <div className="p-6 space-y-6 bg-card">
           {/* Summary Grid */}
           <div className="grid grid-cols-3 gap-4">
             <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 flex flex-col">

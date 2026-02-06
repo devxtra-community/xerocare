@@ -152,12 +152,12 @@ export default function EmployeeSalesTable({ mode = 'EMPLOYEE' }: EmployeeSalesT
               placeholder="Search by invoice #, customer or items..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="pl-9 h-10 bg-white border-blue-400/60 focus:border-blue-400 focus:ring-4 focus:ring-blue-100 outline-none shadow-sm transition-all w-full"
+              className="pl-9 h-10 bg-card border-blue-400/60 focus:border-blue-400 focus:ring-4 focus:ring-blue-100 outline-none shadow-sm transition-all w-full"
             />
           </div>
           <div className="w-full sm:w-[150px]">
             <Select value={filterType} onValueChange={setFilterType}>
-              <SelectTrigger className="h-10 bg-white border-blue-400/60 focus:ring-blue-100 rounded-lg w-full">
+              <SelectTrigger className="h-10 bg-card border-blue-400/60 focus:ring-blue-100 rounded-lg w-full">
                 <SelectValue placeholder="Filter by" />
               </SelectTrigger>
               <SelectContent>
@@ -179,10 +179,10 @@ export default function EmployeeSalesTable({ mode = 'EMPLOYEE' }: EmployeeSalesT
         )}
       </div>
 
-      <div className="rounded-2xl bg-white shadow-sm overflow-hidden border border-slate-100">
+      <div className="rounded-2xl bg-card shadow-sm overflow-hidden border border-slate-100">
         <div className="overflow-x-auto">
           <Table className="min-w-[800px] sm:min-w-full">
-            <TableHeader className="bg-slate-50/50">
+            <TableHeader className="bg-muted/50/50">
               <TableRow>
                 <TableHead className="text-primary font-bold">INV NUMBER</TableHead>
                 <TableHead className="text-primary font-bold">CUSTOMER</TableHead>
@@ -206,7 +206,7 @@ export default function EmployeeSalesTable({ mode = 'EMPLOYEE' }: EmployeeSalesT
                 filteredInvoices.map((inv, index) => (
                   <TableRow
                     key={inv.id}
-                    className={`${index % 2 ? 'bg-blue-50/10' : 'bg-white'} hover:bg-slate-50 transition-colors`}
+                    className={`${index % 2 ? 'bg-blue-50/10' : 'bg-card'} hover:bg-muted/50 transition-colors`}
                   >
                     <TableCell className="text-blue-500 font-bold tracking-tight">
                       {inv.invoiceNumber}
@@ -224,7 +224,7 @@ export default function EmployeeSalesTable({ mode = 'EMPLOYEE' }: EmployeeSalesT
                         </span>
                       )}
                     </TableCell>
-                    <TableCell className="font-semibold text-slate-900">
+                    <TableCell className="font-semibold text-foreground">
                       ₹{inv.totalAmount.toLocaleString()}
                     </TableCell>
                     <TableCell>
@@ -257,7 +257,7 @@ export default function EmployeeSalesTable({ mode = 'EMPLOYEE' }: EmployeeSalesT
                         {inv.status}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-slate-500 text-sm font-medium">
+                    <TableCell className="text-muted-foreground text-sm font-medium">
                       {new Date(inv.createdAt).toLocaleDateString(undefined, {
                         day: '2-digit',
                         month: 'short',
@@ -471,8 +471,8 @@ function SaleFormModal({
 
   return (
     <Dialog open={true} onOpenChange={(val) => !val && onClose()}>
-      <DialogContent className="sm:max-w-3xl p-0 overflow-hidden rounded-2xl border-none shadow-2xl bg-slate-50/50 backdrop-blur-sm h-[90vh] flex flex-col">
-        <DialogHeader className="p-6 pb-4 bg-white border-b border-slate-100 shrink-0">
+      <DialogContent className="sm:max-w-3xl p-0 overflow-hidden rounded-2xl border-none shadow-2xl bg-muted/50/50 backdrop-blur-sm h-[90vh] flex flex-col">
+        <DialogHeader className="p-6 pb-4 bg-card border-b border-slate-100 shrink-0">
           <div className="flex items-center gap-4">
             <div className="h-12 w-12 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-lg shadow-blue-200">
               <IndianRupee size={24} />
@@ -488,10 +488,10 @@ function SaleFormModal({
           </div>
         </DialogHeader>
 
-        <div className="p-6 space-y-8 overflow-y-auto grow scrollbar-hide bg-white/50">
+        <div className="p-6 space-y-8 overflow-y-auto grow scrollbar-hide bg-card/50">
           {/* Customer Section */}
-          <div className="space-y-2 bg-white p-5 rounded-xl border border-slate-100 shadow-sm">
-            <label className="text-[11px] font-bold text-slate-500 uppercase flex items-center gap-2">
+          <div className="space-y-2 bg-card p-5 rounded-xl border border-slate-100 shadow-sm">
+            <label className="text-[11px] font-bold text-muted-foreground uppercase flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-blue-400" /> Customer Details
             </label>
             <div className="w-full">
@@ -521,7 +521,7 @@ function SaleFormModal({
             </div>
 
             {/* Search Logic */}
-            <div className="bg-white p-2 rounded-xl border border-slate-200 shadow-sm focus-within:ring-2 focus-within:ring-primary/20 transition-all">
+            <div className="bg-card p-2 rounded-xl border border-border shadow-sm focus-within:ring-2 focus-within:ring-primary/20 transition-all">
               <ProductSelect onSelect={addItem} />
             </div>
             {/* Secondary Manual Add */}
@@ -541,7 +541,7 @@ function SaleFormModal({
             {/* List of Added Items */}
             <div className="space-y-3 mt-4">
               {form.items.length === 0 && (
-                <div className="text-center py-12 border-2 border-dashed border-slate-200 rounded-xl">
+                <div className="text-center py-12 border-2 border-dashed border-border rounded-xl">
                   <p className="text-sm font-bold text-slate-400">No items added.</p>
                   <p className="text-xs text-slate-300 mt-1">Search above to add products.</p>
                 </div>
@@ -550,7 +550,7 @@ function SaleFormModal({
               {form.items.map((item, index) => (
                 <div
                   key={index}
-                  className="group relative bg-white border border-slate-200 rounded-xl p-4 shadow-sm hover:shadow-md hover:border-blue-300 transition-all"
+                  className="group relative bg-card border border-border rounded-xl p-4 shadow-sm hover:shadow-md hover:border-blue-300 transition-all"
                 >
                   <div className="absolute top-2 right-2">
                     <button
@@ -571,7 +571,7 @@ function SaleFormModal({
                         value={item.description}
                         onChange={(e) => updateItem(index, 'description', e.target.value)}
                         readOnly={!item.isManual}
-                        className={`h-9 font-bold text-sm ${!item.isManual ? 'bg-slate-50 border-transparent' : 'bg-white'}`}
+                        className={`h-9 font-bold text-sm ${!item.isManual ? 'bg-muted/50 border-transparent' : 'bg-card'}`}
                       />
                     </div>
 
@@ -600,7 +600,7 @@ function SaleFormModal({
                           value={item.basePrice}
                           readOnly={!item.isManual}
                           onChange={(e) => updateItem(index, 'basePrice', e.target.value)}
-                          className={`h-9 text-right font-bold pr-1 ${!item.isManual ? 'bg-slate-50 text-slate-500' : ''}`}
+                          className={`h-9 text-right font-bold pr-1 ${!item.isManual ? 'bg-muted/50 text-muted-foreground' : ''}`}
                         />
                         <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-300">
                           ₹
@@ -642,7 +642,7 @@ function SaleFormModal({
                     {/* Total Row */}
                     <div className="md:col-span-2 flex flex-col items-end justify-center h-9 mt-auto">
                       <p className="text-[9px] font-bold text-slate-400 uppercase">Net</p>
-                      <p className="font-extrabold text-slate-900">
+                      <p className="font-extrabold text-foreground">
                         ₹{(item.quantity * item.unitPrice).toLocaleString()}
                       </p>
                     </div>
@@ -654,7 +654,7 @@ function SaleFormModal({
         </div>
 
         {/* Footer */}
-        <div className="p-6 bg-white border-t border-slate-100 flex items-center justify-between shrink-0">
+        <div className="p-6 bg-card border-t border-slate-100 flex items-center justify-between shrink-0">
           <div>
             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider leading-none mb-1">
               Grand Total

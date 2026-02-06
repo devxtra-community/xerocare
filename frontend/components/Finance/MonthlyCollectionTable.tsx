@@ -81,7 +81,7 @@ export default function MonthlyCollectionTable({ mode }: { mode?: 'RENT' | 'LEAS
 
   if (alerts.length === 0) {
     return (
-      <div className="p-8 text-center text-gray-500">
+      <div className="p-8 text-center text-muted-foreground">
         <p>No pending collections for this month.</p>
       </div>
     );
@@ -89,9 +89,9 @@ export default function MonthlyCollectionTable({ mode }: { mode?: 'RENT' | 'LEAS
 
   return (
     <>
-      <div className="overflow-hidden rounded-lg border border-slate-200">
+      <div className="overflow-hidden rounded-lg border border-border">
         <Table>
-          <TableHeader className="bg-slate-50">
+          <TableHeader className="bg-muted/50">
             <TableRow>
               <TableHead>Customer</TableHead>
               <TableHead>Contract / Invoice</TableHead>

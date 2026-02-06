@@ -60,7 +60,7 @@ export default function LeadsPage() {
             <div className="flex items-center gap-4">
               <div>
                 <h3 className="text-xl sm:text-2xl font-bold text-primary">Lead Management</h3>
-                <p className="text-sm text-slate-500 font-medium">
+                <p className="text-sm text-muted-foreground font-medium">
                   Manage your prospects and track their status.
                 </p>
               </div>
@@ -71,7 +71,7 @@ export default function LeadsPage() {
                 size="icon"
                 onClick={fetchLeads}
                 disabled={loading}
-                className="h-11 w-11 rounded-xl bg-white shadow-sm border-slate-200 hover:bg-slate-50"
+                className="h-11 w-11 rounded-xl bg-card shadow-sm border-border hover:bg-muted/50"
               >
                 <RefreshCw className={`h-4 w-4 text-slate-600 ${loading ? 'animate-spin' : ''}`} />
               </Button>
@@ -101,7 +101,7 @@ export default function LeadsPage() {
                   placeholder="Search by name, email or phone..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  className="pl-10 h-11 bg-white border-slate-200 focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all rounded-xl"
+                  className="pl-10 h-11 bg-card border-border focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all rounded-xl"
                 />
               </div>
             </div>
@@ -109,7 +109,7 @@ export default function LeadsPage() {
             {loading ? (
               <div className="flex flex-col items-center justify-center py-20 space-y-4">
                 <div className="h-10 w-10 border-4 border-primary/20 border-t-primary rounded-full animate-spin"></div>
-                <p className="text-sm text-slate-500 font-medium animate-pulse">
+                <p className="text-sm text-muted-foreground font-medium animate-pulse">
                   Syncing leads data...
                 </p>
               </div>

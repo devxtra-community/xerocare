@@ -559,8 +559,8 @@ export default function RentFormModal({
 
   return (
     <Dialog open={true} onOpenChange={(val) => !val && onClose()}>
-      <DialogContent className="sm:max-w-4xl p-0 overflow-hidden rounded-2xl border-none shadow-2xl bg-slate-50/50 backdrop-blur-sm h-[90vh] flex flex-col">
-        <DialogHeader className="p-6 pb-4 bg-white border-b border-slate-100 shrink-0">
+      <DialogContent className="sm:max-w-4xl p-0 overflow-hidden rounded-2xl border-none shadow-2xl bg-muted/50/50 backdrop-blur-sm h-[90vh] flex flex-col">
+        <DialogHeader className="p-6 pb-4 bg-card border-b border-slate-100 shrink-0">
           <div className="flex items-center gap-4">
             <div className="h-12 w-12 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-md shadow-blue-200">
               <Calendar size={24} />
@@ -576,29 +576,29 @@ export default function RentFormModal({
           </div>
         </DialogHeader>
 
-        <div className="p-6 space-y-8 overflow-y-auto grow scrollbar-hide bg-white/50">
+        <div className="p-6 space-y-8 overflow-y-auto grow scrollbar-hide bg-card/50">
           {/* Section 1: Contract Terms */}
           <section className="space-y-4">
             <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-blue-400" /> Contract Terms
             </h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-5 rounded-xl bg-white border border-slate-100 shadow-sm">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-5 rounded-xl bg-card border border-slate-100 shadow-sm">
               {/* Contract Type Toggle */}
               <div className="md:col-span-2 flex gap-4 p-1 bg-slate-100 rounded-lg w-fit">
                 {lockSaleType ? (
-                  <button className="px-4 py-1.5 text-xs font-bold rounded-md bg-white text-blue-600 shadow-sm cursor-default">
+                  <button className="px-4 py-1.5 text-xs font-bold rounded-md bg-card text-blue-600 shadow-sm cursor-default">
                     {form.saleType === 'RENT' ? 'Rental Contract' : 'Lease Contract'}
                   </button>
                 ) : (
                   <>
                     <button
-                      className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all ${form.saleType === 'RENT' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                      className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all ${form.saleType === 'RENT' ? 'bg-card text-blue-600 shadow-sm' : 'text-muted-foreground hover:text-slate-700'}`}
                       onClick={() => setForm({ ...form, saleType: 'RENT' })}
                     >
                       Rental Contract
                     </button>
                     <button
-                      className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all ${form.saleType === 'LEASE' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                      className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all ${form.saleType === 'LEASE' ? 'bg-card text-blue-600 shadow-sm' : 'text-muted-foreground hover:text-slate-700'}`}
                       onClick={() => setForm({ ...form, saleType: 'LEASE' })}
                     >
                       Lease Contract
@@ -608,12 +608,14 @@ export default function RentFormModal({
               </div>
 
               <div className="space-y-2">
-                <label className="text-[11px] font-bold text-slate-500 uppercase">Customer</label>
+                <label className="text-[11px] font-bold text-muted-foreground uppercase">
+                  Customer
+                </label>
                 {initialData ? (
                   <Input
                     value={initialData.customerName}
                     disabled
-                    className="bg-slate-50 font-bold text-slate-700"
+                    className="bg-muted/50 font-bold text-slate-700"
                   />
                 ) : (
                   <CustomerSelect
@@ -623,7 +625,7 @@ export default function RentFormModal({
                 )}
               </div>
               <div className="space-y-2">
-                <label className="text-[11px] font-bold text-slate-500 uppercase">
+                <label className="text-[11px] font-bold text-muted-foreground uppercase">
                   {form.saleType === 'LEASE' ? 'Tenure (Months)' : 'Billing Period'}
                 </label>
                 {form.saleType === 'LEASE' ? (
@@ -641,7 +643,7 @@ export default function RentFormModal({
                   />
                 ) : (
                   <select
-                    className="w-full h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 focus:ring-2 focus:ring-blue-100 outline-none"
+                    className="w-full h-10 rounded-lg border border-border bg-card px-3 text-sm font-semibold text-slate-700 focus:ring-2 focus:ring-blue-100 outline-none"
                     value={form.rentPeriod}
                     onChange={(e) => setForm({ ...form, rentPeriod: e.target.value })}
                   >
@@ -655,7 +657,7 @@ export default function RentFormModal({
               </div>
               {form.rentPeriod === 'CUSTOM' && form.saleType === 'RENT' && (
                 <div className="space-y-2">
-                  <label className="text-[11px] font-bold text-slate-500 uppercase">
+                  <label className="text-[11px] font-bold text-muted-foreground uppercase">
                     Billing Cycle (Days)
                   </label>
                   <Input
@@ -674,7 +676,7 @@ export default function RentFormModal({
                 </div>
               )}
               <div className="space-y-2">
-                <label className="text-[11px] font-bold text-slate-500 uppercase">
+                <label className="text-[11px] font-bold text-muted-foreground uppercase">
                   Effective From
                 </label>
                 <Input
@@ -685,7 +687,7 @@ export default function RentFormModal({
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-[11px] font-bold text-slate-500 uppercase">
+                <label className="text-[11px] font-bold text-muted-foreground uppercase">
                   Effective To
                 </label>
                 <Input
@@ -704,9 +706,9 @@ export default function RentFormModal({
             <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-purple-400" /> Identify Machine
             </h4>
-            <div className="p-5 rounded-xl bg-white border border-slate-100 shadow-sm space-y-4">
+            <div className="p-5 rounded-xl bg-card border border-slate-100 shadow-sm space-y-4">
               <div className="space-y-2">
-                <label className="text-[11px] font-bold text-slate-500 uppercase">
+                <label className="text-[11px] font-bold text-muted-foreground uppercase">
                   Select Product
                 </label>
                 <div className="mb-4">
@@ -727,7 +729,7 @@ export default function RentFormModal({
                           <div className="text-sm font-bold text-slate-800 truncate">
                             {product.name}
                           </div>
-                          <div className="text-[10px] text-slate-500 font-medium uppercase tracking-wide truncate">
+                          <div className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide truncate">
                             {product.brand} • {product.serial_no}
                           </div>
                         </div>
@@ -739,7 +741,7 @@ export default function RentFormModal({
                           <Input
                             type="number"
                             min="1"
-                            className="h-8 text-xs font-bold text-center px-1 bg-white border-purple-200 focus:border-purple-400"
+                            className="h-8 text-xs font-bold text-center px-1 bg-card border-purple-200 focus:border-purple-400"
                             placeholder="Qty"
                             value={product.quantity ?? ''}
                             onChange={(e) => {
@@ -763,7 +765,7 @@ export default function RentFormModal({
                     </div>
                   ))}
                   {selectedProducts.length === 0 && (
-                    <div className="text-xs text-slate-400 font-medium text-center py-4 border border-dashed border-slate-200 rounded-lg">
+                    <div className="text-xs text-slate-400 font-medium text-center py-4 border border-dashed border-border rounded-lg">
                       No products selected
                     </div>
                   )}
@@ -778,15 +780,15 @@ export default function RentFormModal({
               <span className="w-2 h-2 rounded-full bg-indigo-400" /> Pricing Model
             </h4>
 
-            <div className="p-5 rounded-xl bg-white border border-slate-100 shadow-sm space-y-6">
+            <div className="p-5 rounded-xl bg-card border border-slate-100 shadow-sm space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
-                  <label className="text-[11px] font-bold text-slate-500 uppercase">
+                  <label className="text-[11px] font-bold text-muted-foreground uppercase">
                     Model Type
                   </label>
                   {form.saleType === 'LEASE' ? (
                     <select
-                      className="w-full h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-indigo-600 focus:ring-2 focus:ring-indigo-100 outline-none"
+                      className="w-full h-10 rounded-lg border border-border bg-card px-3 text-sm font-semibold text-indigo-600 focus:ring-2 focus:ring-indigo-100 outline-none"
                       value={form.leaseType}
                       onChange={(e) =>
                         setForm({ ...form, leaseType: e.target.value as 'EMI' | 'FSM' })
@@ -797,7 +799,7 @@ export default function RentFormModal({
                     </select>
                   ) : (
                     <select
-                      className="w-full h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-indigo-600 focus:ring-2 focus:ring-indigo-100 outline-none"
+                      className="w-full h-10 rounded-lg border border-border bg-card px-3 text-sm font-semibold text-indigo-600 focus:ring-2 focus:ring-indigo-100 outline-none"
                       value={form.rentType}
                       onChange={(e) => handleRentTypeChange(e.target.value)}
                     >
@@ -816,7 +818,7 @@ export default function RentFormModal({
                   {form.leaseType === 'EMI' ? (
                     <>
                       <div className="space-y-2">
-                        <label className="text-[11px] font-bold text-slate-500 uppercase">
+                        <label className="text-[11px] font-bold text-muted-foreground uppercase">
                           Total Lease Amount
                         </label>
                         <Input
@@ -832,7 +834,7 @@ export default function RentFormModal({
                         />
                       </div>
                       <div className="space-y-2">
-                        <label className="text-[11px] font-bold text-slate-500 uppercase">
+                        <label className="text-[11px] font-bold text-muted-foreground uppercase">
                           Monthly EMI
                         </label>
                         <Input
@@ -850,7 +852,7 @@ export default function RentFormModal({
                     </>
                   ) : (
                     <div className="space-y-2">
-                      <label className="text-[11px] font-bold text-slate-500 uppercase">
+                      <label className="text-[11px] font-bold text-muted-foreground uppercase">
                         Monthly Lease Amount
                       </label>
                       <Input
@@ -868,7 +870,7 @@ export default function RentFormModal({
                   )}
                   {/* Advance Amount for Lease */}
                   <div className="space-y-2">
-                    <label className="text-[11px] font-bold text-slate-500 uppercase">
+                    <label className="text-[11px] font-bold text-muted-foreground uppercase">
                       Advance Amount
                     </label>
                     <Input
@@ -889,7 +891,7 @@ export default function RentFormModal({
               {form.saleType === 'RENT' && isFixed && (
                 <div className="grid grid-cols-2 gap-6 pt-4 border-t border-slate-50">
                   <div className="space-y-2">
-                    <label className="text-[11px] font-bold text-slate-500 uppercase">
+                    <label className="text-[11px] font-bold text-muted-foreground uppercase">
                       Monthly Rent (₹)
                     </label>
                     <Input
@@ -899,11 +901,11 @@ export default function RentFormModal({
                       onChange={(e) =>
                         setForm({ ...form, monthlyRent: handleNumberInput(e.target.value) })
                       }
-                      className="font-bold text-slate-800 border-slate-200 focus:border-indigo-400"
+                      className="font-bold text-slate-800 border-border focus:border-indigo-400"
                     />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[11px] font-bold text-slate-500 uppercase">
+                    <label className="text-[11px] font-bold text-muted-foreground uppercase">
                       Advance (₹)
                     </label>
                     <Input
@@ -936,7 +938,7 @@ export default function RentFormModal({
                 {form.pricingItems.map((item, index) => (
                   <div
                     key={index}
-                    className="grid grid-cols-12 gap-4 p-4 rounded-xl border border-dotted border-slate-200 bg-white hover:border-emerald-300 transition-all items-end relative group"
+                    className="grid grid-cols-12 gap-4 p-4 rounded-xl border border-dotted border-border bg-card hover:border-emerald-300 transition-all items-end relative group"
                   >
                     <div className="col-span-12 md:col-span-3 space-y-1">
                       <label className="text-[9px] font-bold text-slate-400 uppercase">
@@ -978,7 +980,7 @@ export default function RentFormModal({
                                 handleNumberInput(e.target.value),
                               )
                             }
-                            className={`h-9 border-slate-200`}
+                            className={`h-9 border-border`}
                           />
                         </>
                       </div>
@@ -1151,8 +1153,8 @@ export default function RentFormModal({
                               : 'colorExcessRate';
 
                           return (
-                            <div className="flex gap-2 items-center mt-2 p-2 bg-slate-50/50 rounded border border-slate-100">
-                              <div className="flex-1 text-[10px] font-bold text-slate-500 uppercase tracking-wide">
+                            <div className="flex gap-2 items-center mt-2 p-2 bg-muted/50/50 rounded border border-slate-100">
+                              <div className="flex-1 text-[10px] font-bold text-muted-foreground uppercase tracking-wide">
                                 {maxTo > 0
                                   ? `Rate for usage > ${maxTo}`
                                   : 'Base Rate (Example: > 0)'}
@@ -1194,7 +1196,7 @@ export default function RentFormModal({
           )}
 
           <section className="pt-4 border-t border-slate-100 flex justify-end gap-3">
-            <Button variant="ghost" onClick={onClose} className="font-bold text-slate-500">
+            <Button variant="ghost" onClick={onClose} className="font-bold text-muted-foreground">
               Cancel
             </Button>
             <Button

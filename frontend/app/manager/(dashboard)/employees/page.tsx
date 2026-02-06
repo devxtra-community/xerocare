@@ -13,7 +13,7 @@ export default function EmployeesPage() {
       <div className="flex justify-between items-center">
         <div className="space-y-1">
           <h2 className="text-xl sm:text-2xl font-bold text-primary">Employee Management</h2>
-          <p className="text-sm text-slate-500 font-medium">
+          <p className="text-sm text-muted-foreground font-medium">
             Monitor attendance, department distribution, and visa statuses
           </p>
         </div>

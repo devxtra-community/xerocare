@@ -12,7 +12,7 @@ const data = [
 
 export default function MostSoldProductChart() {
   return (
-    <div className="bg-white rounded-xl p-3 sm:p-4">
+    <div className="bg-card rounded-xl p-3 sm:p-4">
       <div className="h-[250px]">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart
@@ -36,22 +36,17 @@ export default function MostSoldProductChart() {
               tickLine={false}
               tickMargin={8}
             />
-            <Tooltip 
-              contentStyle={{ 
-                fontSize: 12, 
-                borderRadius: '12px', 
-                border: 'none', 
-                boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
-              }} 
+            <Tooltip
+              contentStyle={{
+                fontSize: 12,
+                borderRadius: '12px',
+                border: 'none',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+              }}
               labelStyle={{ color: '#1e3a8a', fontWeight: 'bold' }}
               cursor={{ fill: '#f8fafc' }}
             />
-            <Bar 
-              dataKey="qty" 
-              fill="#0D47A1" 
-              radius={[0, 4, 4, 0]} 
-              barSize={20}
-            />
+            <Bar dataKey="qty" fill="#0D47A1" radius={[0, 4, 4, 0]} barSize={20} />
           </BarChart>
         </ResponsiveContainer>
       </div>

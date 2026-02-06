@@ -114,11 +114,11 @@ export default function InvoiceForm() {
         <div className="space-y-1">
           <button
             onClick={() => router.back()}
-            className="flex items-center gap-2 text-xs font-bold text-slate-400 hover:text-primary transition-colors mb-2 uppercase tracking-widest"
+            className="flex items-center gap-2 text-xs font-bold text-muted-foreground hover:text-primary transition-colors mb-2 uppercase tracking-widest"
           >
             <ArrowLeft size={14} /> Back
           </button>
-          <h1 className="text-3xl font-black text-slate-900 tracking-tight flex items-center gap-3">
+          <h1 className="text-3xl font-black text-foreground tracking-tight flex items-center gap-3">
             <div className="h-10 w-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
               <Receipt size={24} />
             </div>
@@ -153,7 +153,7 @@ export default function InvoiceForm() {
         {/* Left Side: Selection & Info */}
         <div className="lg:col-span-1 space-y-8">
           <Card className="border-none shadow-xl shadow-slate-200/50 rounded-2xl overflow-hidden">
-            <CardHeader className="bg-slate-50/50 border-b border-slate-100">
+            <CardHeader className="bg-muted/50/50 border-b border-slate-100">
               <CardTitle className="text-sm font-black uppercase tracking-widest text-slate-400 flex items-center gap-2">
                 <Users size={14} /> Customer Selection
               </CardTitle>
@@ -168,8 +168,8 @@ export default function InvoiceForm() {
               />
               {customer && (
                 <div className="mt-4 p-4 rounded-xl bg-primary/5 border border-primary/10">
-                  <div className="text-sm font-bold text-slate-900">{customer.name}</div>
-                  <div className="text-xs font-medium text-slate-500">{customer.phone}</div>
+                  <div className="text-sm font-bold text-foreground">{customer.name}</div>
+                  <div className="text-xs font-medium text-muted-foreground">{customer.phone}</div>
                   <div className="text-xs font-medium text-slate-400 mt-1 uppercase tracking-tight">
                     VIP Status: Active
                   </div>
@@ -179,7 +179,7 @@ export default function InvoiceForm() {
           </Card>
 
           <Card className="border-none shadow-xl shadow-slate-200/50 rounded-2xl overflow-hidden">
-            <CardHeader className="bg-slate-50/50 border-b border-slate-100">
+            <CardHeader className="bg-muted/50/50 border-b border-slate-100">
               <CardTitle className="text-sm font-black uppercase tracking-widest text-slate-400 flex items-center gap-2">
                 <Package size={14} /> Add Inventory
               </CardTitle>
@@ -197,12 +197,12 @@ export default function InvoiceForm() {
         {/* Right Side: Items Table */}
         <div className="lg:col-span-2">
           <Card className="border-none shadow-xl shadow-slate-200/50 rounded-2xl overflow-hidden h-full flex flex-col">
-            <CardHeader className="bg-slate-50/50 border-b border-slate-100 py-4">
+            <CardHeader className="bg-muted/50/50 border-b border-slate-100 py-4">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-sm font-black uppercase tracking-widest text-slate-400">
                   Invoice Items
                 </CardTitle>
-                <div className="px-3 py-1 bg-white border border-slate-200 rounded-full text-[10px] font-bold text-slate-500">
+                <div className="px-3 py-1 bg-card border border-border rounded-full text-[10px] font-bold text-muted-foreground">
                   {items.length} Items Total
                 </div>
               </div>
@@ -211,7 +211,7 @@ export default function InvoiceForm() {
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
-                    <TableRow className="bg-slate-50/30 border-none hover:bg-slate-50/30">
+                    <TableRow className="bg-muted/50/30 border-none hover:bg-muted/50/30">
                       <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-400 h-12 pl-6">
                         Description
                       </TableHead>
@@ -241,13 +241,13 @@ export default function InvoiceForm() {
                       items.map((item) => (
                         <TableRow
                           key={item.id}
-                          className="group border-slate-50 hover:bg-slate-50/50 transition-colors"
+                          className="group border-slate-50 hover:bg-muted/50/50 transition-colors"
                         >
                           <TableCell className="pl-6">
                             <Input
                               value={item.description}
                               onChange={(e) => updateItem(item.id, 'description', e.target.value)}
-                              className="h-10 border-none bg-transparent font-bold text-slate-900 focus-visible:ring-0 p-0 shadow-none"
+                              className="h-10 border-none bg-transparent font-bold text-foreground focus-visible:ring-0 p-0 shadow-none"
                             />
                           </TableCell>
                           <TableCell>
@@ -272,7 +272,7 @@ export default function InvoiceForm() {
                               />
                             </div>
                           </TableCell>
-                          <TableCell className="text-right pr-6 font-black text-slate-900">
+                          <TableCell className="text-right pr-6 font-black text-foreground">
                             ₹{(item.quantity * item.unitPrice).toLocaleString()}
                           </TableCell>
                           <TableCell>
@@ -294,18 +294,18 @@ export default function InvoiceForm() {
 
               {/* Totals Section */}
               {items.length > 0 && (
-                <div className="mt-auto p-8 bg-slate-50/50 border-t border-slate-100">
+                <div className="mt-auto p-8 bg-muted/50/50 border-t border-slate-100">
                   <div className="flex justify-between items-center">
                     <div className="space-y-1">
                       <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">
                         Net Payable
                       </div>
-                      <div className="text-xs text-slate-500 font-medium italic">
+                      <div className="text-xs text-muted-foreground font-medium italic">
                         Inclusive of all local taxes
                       </div>
                     </div>
                     <div className="text-right">
-                      <div className="text-4xl font-black text-slate-900 tracking-tighter flex items-center gap-2">
+                      <div className="text-4xl font-black text-foreground tracking-tighter flex items-center gap-2">
                         <span className="text-xl text-primary font-bold">₹</span>
                         {calculateTotal().toLocaleString()}
                       </div>

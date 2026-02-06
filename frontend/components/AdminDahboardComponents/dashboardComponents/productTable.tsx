@@ -30,7 +30,7 @@ export default function ProductsTable() {
   const currentData = data.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
   return (
-    <div className="rounded-2xl bg-white p-2 sm:p-3 shadow-sm w-full h-[260px] flex flex-col">
+    <div className="rounded-2xl bg-card p-2 sm:p-3 shadow-sm w-full h-[260px] flex flex-col">
       <div className="flex-1 overflow-x-auto">
         <table className="w-full">
           <thead>
@@ -53,7 +53,7 @@ export default function ProductsTable() {
             {currentData.length > 0 ? (
               currentData.map((item, index) => (
                 <tr key={item.id} className={index % 2 === 1 ? 'bg-sky-100/60' : ''}>
-                  <td className="py-1.5 sm:py-2 px-1 sm:px-2 text-[10px] sm:text-xs font-medium text-gray-900">
+                  <td className="py-1.5 sm:py-2 px-1 sm:px-2 text-[10px] sm:text-xs font-medium text-foreground">
                     {item.name}
                   </td>
                   <td className="py-1.5 sm:py-2 px-1 sm:px-2 text-[10px] sm:text-xs text-gray-700">
@@ -69,7 +69,7 @@ export default function ProductsTable() {
               ))
             ) : (
               <tr>
-                <td colSpan={4} className="text-center py-6 text-xs text-gray-500">
+                <td colSpan={4} className="text-center py-6 text-xs text-muted-foreground">
                   No products found
                 </td>
               </tr>
@@ -82,7 +82,7 @@ export default function ProductsTable() {
         <button
           onClick={() => setPage((p) => Math.max(1, p - 1))}
           disabled={page === 1}
-          className="rounded-md border px-1.5 sm:px-2 py-0.5 disabled:opacity-40 hover:bg-gray-50 transition"
+          className="rounded-md border px-1.5 sm:px-2 py-0.5 disabled:opacity-40 hover:bg-muted/50 transition"
         >
           &lt;
         </button>
@@ -101,7 +101,7 @@ export default function ProductsTable() {
               key={pageNum}
               onClick={() => setPage(pageNum)}
               className={`px-1.5 sm:px-2 py-0.5 rounded-md transition ${
-                page === pageNum ? 'bg-primary text-white' : 'border hover:bg-gray-50'
+                page === pageNum ? 'bg-primary text-white' : 'border hover:bg-muted/50'
               }`}
             >
               {pageNum}
@@ -114,7 +114,7 @@ export default function ProductsTable() {
         <button
           onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
           disabled={page === totalPages}
-          className="rounded-md border px-1.5 sm:px-2 py-0.5 disabled:opacity-40 hover:bg-gray-50 transition"
+          className="rounded-md border px-1.5 sm:px-2 py-0.5 disabled:opacity-40 hover:bg-muted/50 transition"
         >
           &gt;
         </button>

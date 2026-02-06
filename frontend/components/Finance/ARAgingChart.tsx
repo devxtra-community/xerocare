@@ -18,11 +18,11 @@ export default function ARAgingChart() {
 
   return (
     <div className="flex flex-col h-full">
-      <Card className="h-full border-slate-200 shadow-sm">
+      <Card className="h-full border-border shadow-sm">
         <CardHeader className="pb-0">
           <div className="flex justify-between items-start mb-3">
             <div>
-              <CardTitle className="text-sm font-medium text-slate-500 uppercase">
+              <CardTitle className="text-sm font-medium text-muted-foreground uppercase">
                 Receivables Risk
               </CardTitle>
               <p className="text-2xl font-bold">AED {totalAR.toLocaleString()}</p>
@@ -58,7 +58,7 @@ export default function ARAgingChart() {
                     <span className="text-sm font-medium text-slate-600">{item.bucket}</span>
                   </div>
                   <div className="flex items-center gap-4">
-                    <span className="text-sm font-bold text-slate-900 tabular-nums">
+                    <span className="text-sm font-bold text-foreground tabular-nums">
                       AED {item.amount.toLocaleString()}
                     </span>
                     <span className="text-xs text-slate-400 w-8 text-right">
@@ -70,8 +70,8 @@ export default function ARAgingChart() {
             </div>
 
             {/* 2026 ERP Action Point */}
-            <div className="mt-3 p-2 bg-slate-50 rounded-lg border border-slate-100 flex items-center justify-between">
-              <span className="text-xs text-slate-500 font-medium">
+            <div className="mt-3 p-2 bg-muted/50 rounded-lg border border-slate-100 flex items-center justify-between">
+              <span className="text-xs text-muted-foreground font-medium">
                 9 accounts are over 60 days.
               </span>
               <Link href="/finance/ar/invoices">

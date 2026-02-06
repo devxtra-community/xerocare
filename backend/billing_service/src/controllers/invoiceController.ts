@@ -183,8 +183,10 @@ export const financeApprove = async (req: Request, res: Response, next: NextFunc
       throw new AppError('User context missing', 401);
     }
 
+    const { deposit } = req.body;
+
     // Trigger final state transitions based on SaleType
-    const invoice = await billingService.financeApprove(id, req.user.userId);
+    const invoice = await billingService.financeApprove(id, req.user.userId, deposit);
 
     return res.status(200).json({
       success: true,

@@ -64,7 +64,7 @@ export default function SalesChart() {
   }, []);
 
   return (
-    <div className="rounded-2xl bg-white h-[260px] w-full shadow-sm flex flex-col p-3">
+    <div className="rounded-2xl bg-card h-[260px] w-full shadow-sm flex flex-col p-3">
       <div className="flex flex-row items-center justify-between pb-2">
         <p className="text-xs text-gray-600">Monthly Sales ({new Date().getFullYear()})</p>
 

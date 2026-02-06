@@ -44,7 +44,7 @@ export default function BranchSalesChart() {
   }, [selectedPeriod]);
 
   return (
-    <div className="rounded-2xl bg-white h-[260px] w-full shadow-sm flex flex-col p-3">
+    <div className="rounded-2xl bg-card h-[260px] w-full shadow-sm flex flex-col p-3">
       {/* Header */}
       <div className="flex items-center justify-between pb-2">
         <p className="text-xs text-gray-600">Branch sales ({selectedPeriod})</p>
@@ -134,7 +134,7 @@ function CustomTooltip({
   if (!active || !payload?.length) return null;
 
   return (
-    <div className="bg-white px-2 py-1 rounded-md shadow-sm text-[10px] leading-tight">
+    <div className="bg-card px-2 py-1 rounded-md shadow-sm text-[10px] leading-tight">
       <p className="text-gray-700 font-medium">{label}</p>
       <p className="text-blue-600">Sales: ₹{payload[0].value.toLocaleString()}</p>
     </div>

@@ -33,7 +33,7 @@ export default function SalesSummaryTable() {
 
   if (loading) {
     return (
-      <div className="rounded-2xl bg-white p-4 shadow-sm w-full h-64 flex items-center justify-center">
+      <div className="rounded-2xl bg-card p-4 shadow-sm w-full h-64 flex items-center justify-center">
         <p className="text-primary/60">Loading sales data...</p>
       </div>
     );
@@ -41,14 +41,14 @@ export default function SalesSummaryTable() {
 
   if (invoices.length === 0) {
     return (
-      <div className="rounded-2xl bg-white p-4 shadow-sm w-full h-64 flex items-center justify-center">
+      <div className="rounded-2xl bg-card p-4 shadow-sm w-full h-64 flex items-center justify-center">
         <p className="text-primary/60">No sales data available</p>
       </div>
     );
   }
 
   return (
-    <div className="rounded-2xl bg-white p-2 sm:p-4 shadow-sm w-full h-full flex flex-col border border-primary/10 overflow-hidden">
+    <div className="rounded-2xl bg-card p-2 sm:p-4 shadow-sm w-full h-full flex flex-col border border-primary/10 overflow-hidden">
       {/* Scrollable Container with Custom Slider Styling */}
       <div className="flex-1 overflow-x-auto custom-scrollbar pb-2">
         <Table className="min-w-[900px] border-collapse relative">
@@ -110,7 +110,7 @@ export default function SalesSummaryTable() {
                         : invoice.status === 'PENDING'
                           ? 'bg-yellow-100 text-yellow-700 hover:bg-yellow-100 border-yellow-200'
                           : invoice.status === 'DRAFT'
-                            ? 'bg-gray-100 text-gray-700 hover:bg-gray-100 border-gray-200'
+                            ? 'bg-gray-100 text-gray-700 hover:bg-gray-100 border-border'
                             : 'bg-primary/10 text-primary hover:bg-primary/15 border-primary/20'
                     }`}
                   >

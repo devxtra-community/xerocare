@@ -15,7 +15,7 @@ export default function StatusBadge({ status, isOverdue }: Props) {
         'px-2 py-1 text-sm rounded-md font-medium',
 
         status === 'Active' && 'bg-emerald-100 text-emerald-800 border border-emerald-200',
-        status === 'Inactive' && 'bg-slate-100 text-slate-600 border border-slate-200',
+        status === 'Inactive' && 'bg-slate-100 text-slate-600 border border-border',
         status === 'Paid' && 'bg-green-100 text-green-800',
         status === 'Posted' && !isOverdue && 'bg-blue-100 text-blue-800',
         status === 'Draft' && 'bg-gray-100 text-gray-800',

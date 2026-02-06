@@ -2,16 +2,7 @@
 
 import React from 'react';
 
-import {
-  LucideIcon,
-  LayoutDashboard,
-  CreditCard,
-  Receipt,
-  ShoppingCart,
-  Key,
-  Home,
-  Tag,
-} from 'lucide-react';
+import { LucideIcon, LayoutDashboard, ShoppingCart, Key, Home, Tag } from 'lucide-react';
 
 import {
   Sidebar,
@@ -77,21 +68,6 @@ const financeMenu: FinanceMenuGroup[] = [
       },
     ],
   },
-  {
-    group: 'Ledgers',
-    items: [
-      {
-        title: 'Accounts Receivable',
-        icon: Receipt,
-        href: '/finance/ar/invoices',
-      },
-      {
-        title: 'Accounts Payable',
-        icon: CreditCard,
-        href: '/finance/ap/invoices',
-      },
-    ],
-  },
 ];
 
 /**
@@ -145,7 +121,7 @@ export default function FinanceSidebar() {
     <Sidebar collapsible="icon" className="border-r-0">
       <SidebarHeader className="bg-sidebar border-b border-white/10">
         <div className="flex items-center gap-3 px-4 py-4">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/10">
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-card/10">
             <LayoutDashboard className="h-5 w-5 text-sidebar-accent-foreground" />
           </div>
           <span className="text-base font-semibold text-sidebar-accent-foreground group-data-[collapsible=icon]:hidden">
@@ -177,8 +153,8 @@ export default function FinanceSidebar() {
                     py-2.5 rounded-md
                     ${
                       isActive
-                        ? 'bg-white text-sidebar'
-                        : 'hover:bg-white/10 text-sidebar-accent-foreground'
+                        ? 'bg-card text-sidebar'
+                        : 'hover:bg-card/10 text-sidebar-accent-foreground'
                     }
                     ${item.disabled ? 'opacity-60 cursor-not-allowed' : ''}
                   `}

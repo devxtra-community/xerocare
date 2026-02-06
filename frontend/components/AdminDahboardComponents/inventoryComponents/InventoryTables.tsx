@@ -8,10 +8,10 @@ import LowStockTable from './LowStockTable';
 
 export default function InventoryTables() {
   return (
-    <div className="w-full bg-white rounded-2xl shadow-sm border p-4 sm:p-6">
+    <div className="w-full bg-card rounded-2xl shadow-sm border p-4 sm:p-6">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h2 className="text-xl font-bold text-gray-900">Inventory Details</h2>
+          <h2 className="text-xl font-bold text-foreground">Inventory Details</h2>
           <p className="text-sm text-muted-foreground">
             Manage and track your entire inventory system
           </p>
@@ -22,25 +22,25 @@ export default function InventoryTables() {
         <TabsList className="mb-4 w-full h-auto flex flex-wrap justify-start gap-2 bg-transparent p-0">
           <TabsTrigger
             value="master"
-            className="data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-md border border-gray-200 bg-white"
+            className="data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-md border border-border bg-card"
           >
             Inventory Master
           </TabsTrigger>
           <TabsTrigger
             value="audit"
-            className="data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-md border border-gray-200 bg-white"
+            className="data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-md border border-border bg-card"
           >
             Stock Movement Log
           </TabsTrigger>
           <TabsTrigger
             value="warehouse"
-            className="data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-md border border-gray-200 bg-white"
+            className="data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-md border border-border bg-card"
           >
             Warehouse Summary
           </TabsTrigger>
           <TabsTrigger
             value="lowstock"
-            className="data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-md border border-gray-200 bg-white"
+            className="data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-md border border-border bg-card"
           >
             Critical Alerts
           </TabsTrigger>

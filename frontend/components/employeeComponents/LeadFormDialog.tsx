@@ -84,7 +84,7 @@ export function LeadFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-xl p-0 overflow-hidden rounded-xl border-none shadow-2xl bg-white">
+      <DialogContent className="sm:max-w-xl p-0 overflow-hidden rounded-xl border-none shadow-2xl bg-card">
         <form onSubmit={handleSubmit}>
           <DialogHeader className="p-8 pb-4">
             <div className="flex items-center gap-4">
@@ -116,7 +116,7 @@ export function LeadFormDialog({
                     id="name"
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    className="h-12 rounded-xl border-none bg-gray-50 focus-visible:ring-2 focus-visible:ring-blue-400 pl-10"
+                    className="h-12 rounded-xl border-none bg-muted/50 focus-visible:ring-2 focus-visible:ring-blue-400 pl-10"
                     placeholder="John Doe"
                     required
                   />
@@ -136,7 +136,7 @@ export function LeadFormDialog({
                     type="email"
                     value={formData.email}
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    className="h-12 rounded-xl border-none bg-gray-50 focus-visible:ring-2 focus-visible:ring-blue-400 pl-10"
+                    className="h-12 rounded-xl border-none bg-muted/50 focus-visible:ring-2 focus-visible:ring-blue-400 pl-10"
                     placeholder="john@example.com"
                   />
                   <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 h-4 w-4" />
@@ -157,7 +157,7 @@ export function LeadFormDialog({
                     id="phone"
                     value={formData.phone}
                     onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                    className="h-12 rounded-xl border-none bg-gray-50 focus-visible:ring-2 focus-visible:ring-blue-400 pl-10"
+                    className="h-12 rounded-xl border-none bg-muted/50 focus-visible:ring-2 focus-visible:ring-blue-400 pl-10"
                     placeholder="+1 234 567 890"
                   />
                   <Phone className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 h-4 w-4" />
@@ -175,7 +175,7 @@ export function LeadFormDialog({
                     id="source"
                     value={formData.source}
                     onChange={(e) => setFormData({ ...formData, source: e.target.value })}
-                    className="h-12 rounded-xl border-none bg-gray-50 focus-visible:ring-2 focus-visible:ring-blue-400 pl-10"
+                    className="h-12 rounded-xl border-none bg-muted/50 focus-visible:ring-2 focus-visible:ring-blue-400 pl-10"
                     placeholder="e.g. Website, Referral"
                   />
                   <Globe className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 h-4 w-4" />
@@ -197,7 +197,7 @@ export function LeadFormDialog({
                   onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) =>
                     setFormData({ ...formData, notes: e.target.value })
                   }
-                  className="min-h-[100px] rounded-xl border-none bg-gray-50 focus-visible:ring-2 focus-visible:ring-blue-400 pl-10 pt-3"
+                  className="min-h-[100px] rounded-xl border-none bg-muted/50 focus-visible:ring-2 focus-visible:ring-blue-400 pl-10 pt-3"
                   placeholder="Interest, budget, potential for sale..."
                 />
                 <FileText className="absolute left-3 top-3 text-gray-400 h-4 w-4" />
@@ -205,11 +205,11 @@ export function LeadFormDialog({
             </div>
           </div>
 
-          <div className="p-8 bg-gray-50 flex items-center justify-between border-t border-gray-100">
+          <div className="p-8 bg-muted/50 flex items-center justify-between border-t border-gray-100">
             <button
               type="button"
               onClick={() => onOpenChange(false)}
-              className="text-sm font-bold text-gray-900 hover:text-gray-600 transition-colors"
+              className="text-sm font-bold text-foreground hover:text-gray-600 transition-colors"
             >
               Discard
             </button>

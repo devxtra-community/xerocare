@@ -128,9 +128,9 @@ export default function EmployeeLeaveApplicationsTable() {
 
   return (
     <>
-      <div className="rounded-xl border bg-white shadow-sm overflow-hidden">
+      <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
         <Table>
-          <TableHeader className="bg-gray-50/50">
+          <TableHeader className="bg-muted/50/50">
             <TableRow>
               <TableHead className="px-3 py-2 font-bold text-xs uppercase tracking-wider text-primary">
                 Date Range
@@ -167,7 +167,7 @@ export default function EmployeeLeaveApplicationsTable() {
               </TableRow>
             ) : (
               leaveApplications.map((leave) => (
-                <TableRow key={leave.id} className="hover:bg-gray-50/50 transition-colors">
+                <TableRow key={leave.id} className="hover:bg-muted/50/50 transition-colors">
                   <TableCell className="px-3 py-2 font-medium">
                     {formatDate(leave.start_date)} - {formatDate(leave.end_date)}
                   </TableCell>

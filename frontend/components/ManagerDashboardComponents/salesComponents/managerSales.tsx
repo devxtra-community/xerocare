@@ -79,14 +79,14 @@ export default function ManagerSalesPage() {
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 sm:gap-6">
           <div className="space-y-4">
             <h4 className="text-lg sm:text-xl font-bold text-primary">Sales per Month</h4>
-            <div className="bg-white rounded-xl p-3">
+            <div className="bg-card rounded-xl p-3">
               <MonthlySalesBarChart />
             </div>
           </div>
 
           <div className="space-y-4">
             <h4 className="text-lg sm:text-xl font-bold text-primary">Sold Products by Quantity</h4>
-            <div className="bg-white rounded-xl p-3">
+            <div className="bg-card rounded-xl p-3">
               <MostSoldProductChart />
             </div>
           </div>

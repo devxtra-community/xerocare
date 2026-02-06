@@ -224,7 +224,7 @@ export default function BranchReport() {
         </div>
 
         {/* TABLE */}
-        <div className="rounded-2xl bg-white shadow-sm overflow-hidden">
+        <div className="rounded-2xl bg-card shadow-sm overflow-hidden">
           <Table>
             <TableHeader>
               <TableRow>
@@ -243,13 +243,13 @@ export default function BranchReport() {
 
             <TableBody>
               {filtered.map((b, i) => (
-                <TableRow key={b.id} className={i % 2 ? 'bg-blue-50/20' : 'bg-white'}>
+                <TableRow key={b.id} className={i % 2 ? 'bg-blue-50/20' : 'bg-card'}>
                   <TableCell className="px-4 font-medium">{b.name}</TableCell>
                   <TableCell className="px-4">{b.address}</TableCell>
                   <TableCell className="px-4">{b.location}</TableCell>
                   <TableCell className="px-4">
                     <span
-                      className={`${getManagerName(b.manager_id) === 'Unassigned' ? 'text-slate-400' : 'text-gray-900'}`}
+                      className={`${getManagerName(b.manager_id) === 'Unassigned' ? 'text-slate-400' : 'text-foreground'}`}
                     >
                       {getManagerName(b.manager_id)}
                     </span>
@@ -355,7 +355,7 @@ function BranchFormModal({
           </DialogTitle>
           <button
             onClick={onClose}
-            className="h-7 w-7 flex items-center justify-center rounded-full border text-gray-500 hover:text-gray-800"
+            className="h-7 w-7 flex items-center justify-center rounded-full border text-muted-foreground hover:text-gray-800"
           >
             <X size={14} />
           </button>
@@ -378,7 +378,7 @@ function BranchFormModal({
               placeholder="Address"
               value={form.address}
               onChange={(e) => setForm({ ...form, address: e.target.value })}
-              className="h-12 rounded-xl bg-white border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
+              className="h-12 rounded-xl bg-card border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
             />
           </div>
 
@@ -487,7 +487,7 @@ function ConfirmDeleteModal({
           <button
             type="button"
             onClick={onCancel}
-            className="text-sm font-bold text-gray-900 hover:text-gray-600 transition-colors"
+            className="text-sm font-bold text-foreground hover:text-gray-600 transition-colors"
           >
             Cancel
           </button>

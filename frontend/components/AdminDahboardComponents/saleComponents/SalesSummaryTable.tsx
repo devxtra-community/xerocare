@@ -60,10 +60,10 @@ const SalesSummaryTable = () => {
   );
 
   return (
-    <div className="rounded-2xl bg-white p-2 sm:p-3 shadow-sm w-full h-full flex flex-col space-y-4">
+    <div className="rounded-2xl bg-card p-2 sm:p-3 shadow-sm w-full h-full flex flex-col space-y-4">
       {/* Search Bar */}
       <div className="relative w-full max-w-sm">
-        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
+        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
         <Input
           placeholder="Search by Product, ID, or Model..."
           className="pl-9"
@@ -75,7 +75,7 @@ const SalesSummaryTable = () => {
       <div className="flex-1 overflow-x-auto">
         {loading ? (
           <div className="flex justify-center items-center h-40">
-            <span className="text-sm text-gray-500">Loading sales data...</span>
+            <span className="text-sm text-muted-foreground">Loading sales data...</span>
           </div>
         ) : (
           <table className="w-full border-collapse">
@@ -108,11 +108,11 @@ const SalesSummaryTable = () => {
             <tbody>
               {filteredData.length > 0 ? (
                 filteredData.map((row, index) => (
-                  <tr key={index} className={index % 2 === 1 ? 'bg-blue-50/20' : 'bg-white'}>
-                    <td className="py-1.5 sm:py-2 px-1 sm:px-2 text-[10px] sm:text-xs font-medium text-gray-900">
+                  <tr key={index} className={index % 2 === 1 ? 'bg-blue-50/20' : 'bg-card'}>
+                    <td className="py-1.5 sm:py-2 px-1 sm:px-2 text-[10px] sm:text-xs font-medium text-foreground">
                       {row.productId}
                     </td>
-                    <td className="py-1.5 sm:py-2 px-1 sm:px-2 text-[10px] sm:text-xs font-medium text-gray-900">
+                    <td className="py-1.5 sm:py-2 px-1 sm:px-2 text-[10px] sm:text-xs font-medium text-foreground">
                       {row.product}
                     </td>
                     <td className="py-1.5 sm:py-2 px-1 sm:px-2 text-[10px] sm:text-xs text-gray-700">
@@ -134,7 +134,7 @@ const SalesSummaryTable = () => {
                 ))
               ) : (
                 <tr>
-                  <td colSpan={7} className="text-center py-8 text-xs text-gray-500">
+                  <td colSpan={7} className="text-center py-8 text-xs text-muted-foreground">
                     No sales records found.
                   </td>
                 </tr>

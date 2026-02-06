@@ -125,7 +125,7 @@ export default function ManagerProduct() {
         </div>
       </div>
 
-      <div className="rounded-2xl bg-white shadow-sm overflow-hidden">
+      <div className="rounded-2xl bg-card shadow-sm overflow-hidden">
         <Table>
           <TableHeader>
             <TableRow>
@@ -155,7 +155,7 @@ export default function ManagerProduct() {
               </TableRow>
             ) : filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="text-center py-8 text-gray-500">
+                <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                   No products found.
                 </TableCell>
               </TableRow>
@@ -548,7 +548,7 @@ function Modal({
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="bg-white rounded-2xl w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto">
+      <div className="bg-card rounded-2xl w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto">
         <div className="flex justify-between mb-4">
           <h2 className="font-semibold text-lg">{title}</h2>
           <button onClick={onClose}>
@@ -572,12 +572,12 @@ function ConfirmDeleteModal({
 }) {
   return (
     <div className="fixed inset-0 flex items-center justify-center bg-black/40 z-[60]">
-      <div className="bg-white rounded-2xl p-6 text-center shadow-xl">
+      <div className="bg-card rounded-2xl p-6 text-center shadow-xl">
         <Trash2 className="mx-auto text-red-600 mb-2 h-10 w-10" />
         <p className="text-lg">
           Delete <b>{name}</b>?
         </p>
-        <p className="text-sm text-gray-500 mb-4">This action cannot be undone.</p>
+        <p className="text-sm text-muted-foreground mb-4">This action cannot be undone.</p>
         <div className="flex justify-center gap-4">
           <Button variant="outline" onClick={onCancel}>
             Cancel

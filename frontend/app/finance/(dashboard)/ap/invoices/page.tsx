@@ -66,10 +66,10 @@ export default function APInvoiceListPage() {
   const pendingApproval = filteredInvoices.filter((i) => i.status === 'Pending_Approval').length;
 
   return (
-    <div className="p-4 sm:p-8 space-y-8 bg-slate-50/50 min-h-screen">
+    <div className="p-4 sm:p-8 space-y-8 bg-muted/50/50 min-h-screen">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-black tracking-tight text-slate-900">Vendor Invoices</h1>
+          <h1 className="text-2xl font-black tracking-tight text-foreground">Vendor Invoices</h1>
           <p className="text-sm text-muted-foreground">
             Manage accounts payable and vendor obligations.
           </p>
@@ -100,24 +100,24 @@ export default function APInvoiceListPage() {
       </div>
 
       {/* 2. Advanced Toolbar */}
-      <div className="bg-white border rounded-xl shadow-sm p-4 space-y-4">
+      <div className="bg-card border rounded-xl shadow-sm p-4 space-y-4">
         <div className="flex flex-col md:flex-row gap-4">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
               placeholder="Search by vendor or invoice #..."
-              className="pl-10 bg-slate-50/50 border-none"
+              className="pl-10 bg-muted/50/50 border-none"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <Select value={dateRange} onValueChange={(v) => setDateRange(v as DateRange)}>
-              <SelectTrigger className="w-[180px] bg-white">
+              <SelectTrigger className="w-[180px] bg-card">
                 <Calendar className="w-4 h-4 mr-2 text-muted-foreground" />
                 <SelectValue placeholder="Date Range" />
               </SelectTrigger>
-              <SelectContent className="bg-white">
+              <SelectContent className="bg-card">
                 <SelectItem value="all">All Time</SelectItem>
                 <SelectItem value="today">Today</SelectItem>
                 <SelectItem value="this_month">This Month</SelectItem>
@@ -146,9 +146,9 @@ export default function APInvoiceListPage() {
       </div>
 
       {/* 3. Invoice Table */}
-      <div className="bg-white border rounded-xl shadow-sm overflow-hidden">
+      <div className="bg-card border rounded-xl shadow-sm overflow-hidden">
         <Table>
-          <TableHeader className="bg-slate-50/50">
+          <TableHeader className="bg-muted/50/50">
             <TableRow>
               <TableHead className="pl-6">Invoice & Vendor</TableHead>
               <TableHead>Dates</TableHead>
@@ -169,11 +169,11 @@ export default function APInvoiceListPage() {
                 return (
                   <TableRow
                     key={inv.id}
-                    className="group cursor-pointer hover:bg-slate-50/50 transition-colors"
+                    className="group cursor-pointer hover:bg-muted/50/50 transition-colors"
                   >
                     <TableCell className="pl-6 py-4">
                       <Link href={`/finance/ap/invoices/${inv.id}`} className="block">
-                        <div className="font-bold text-slate-900 group-hover:text-blue-600 transition-colors flex items-center gap-2">
+                        <div className="font-bold text-foreground group-hover:text-blue-600 transition-colors flex items-center gap-2">
                           {inv.invoiceNumber}
                           <ChevronRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
                         </div>
@@ -192,7 +192,7 @@ export default function APInvoiceListPage() {
                       <StatusBadge status={inv.status} />
                     </TableCell>
                     <TableCell className="text-right pr-6">
-                      <div className="font-black text-slate-900">
+                      <div className="font-black text-foreground">
                         {inv.currency} {inv.totalAmount.toLocaleString()}
                       </div>
                       <div className="text-[10px] text-muted-foreground font-bold uppercase">
@@ -229,12 +229,12 @@ function StatsCard({ title, value, icon, currency, isText }: StatsCardProps) {
           <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
             {title}
           </p>
-          <p className="text-2xl font-black text-slate-900">
+          <p className="text-2xl font-black text-foreground">
             {currency && <span className="text-sm font-medium mr-1">{currency}</span>}
             {isText ? value : value.toLocaleString()}
           </p>
         </div>
-        <div className="h-12 w-12 bg-slate-50 rounded-2xl flex items-center justify-center border border-slate-100">
+        <div className="h-12 w-12 bg-muted/50 rounded-2xl flex items-center justify-center border border-slate-100">
           {icon}
         </div>
       </CardContent>

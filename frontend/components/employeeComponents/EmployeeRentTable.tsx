@@ -154,10 +154,10 @@ export default function EmployeeRentTable({ mode = 'EMPLOYEE' }: EmployeeRentTab
         )}
       </div>
 
-      <div className="rounded-2xl bg-white shadow-sm overflow-hidden border border-slate-100">
+      <div className="rounded-2xl bg-card shadow-sm overflow-hidden border border-slate-100">
         <div className="overflow-x-auto">
           <Table className="min-w-[800px] sm:min-w-full">
-            <TableHeader className="bg-slate-50/50">
+            <TableHeader className="bg-muted/50/50">
               <TableRow>
                 <TableHead className="text-primary font-bold">INV NUMBER</TableHead>
                 <TableHead className="text-primary font-bold">CUSTOMER</TableHead>
@@ -193,7 +193,7 @@ export default function EmployeeRentTable({ mode = 'EMPLOYEE' }: EmployeeRentTab
                       : true,
                   )
                   .map((inv) => (
-                    <TableRow key={inv.id} className="hover:bg-slate-50/50">
+                    <TableRow key={inv.id} className="hover:bg-muted/50/50">
                       <TableCell className="font-medium text-slate-700">
                         {inv.invoiceNumber}
                       </TableCell>
@@ -207,7 +207,7 @@ export default function EmployeeRentTable({ mode = 'EMPLOYEE' }: EmployeeRentTab
                                 ? 'border-blue-200 text-blue-600 bg-blue-50'
                                 : inv.rentType?.startsWith('CPC')
                                   ? 'border-purple-200 text-purple-600 bg-purple-50'
-                                  : 'border-slate-200 text-slate-600 bg-slate-50'
+                                  : 'border-border text-slate-600 bg-muted/50'
                             }
                           `}
                         >

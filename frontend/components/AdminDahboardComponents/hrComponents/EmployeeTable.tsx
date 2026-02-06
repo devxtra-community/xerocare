@@ -147,7 +147,7 @@ export default function EmployeeTable() {
   };
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border-0 overflow-hidden text-left">
+    <div className="bg-card rounded-2xl shadow-sm border-0 overflow-hidden text-left">
       <div className="p-6 border-b border-gray-100">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
@@ -159,14 +159,14 @@ export default function EmployeeTable() {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
               <Input
                 placeholder="Search employees..."
-                className="pl-10 h-10 w-full md:w-[250px] bg-gray-50 border-none rounded-xl"
+                className="pl-10 h-10 w-full md:w-[250px] bg-muted/50 border-none rounded-xl"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="h-10 rounded-xl border-gray-200 gap-2">
+                <Button variant="outline" className="h-10 rounded-xl border-border gap-2">
                   <Filter className="h-4 w-4" />
                   Role: {roleFilter}
                 </Button>
@@ -185,7 +185,7 @@ export default function EmployeeTable() {
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-            <Button variant="outline" className="h-10 rounded-xl border-gray-200">
+            <Button variant="outline" className="h-10 rounded-xl border-border">
               <Download className="h-4 w-4 mr-2" />
               Export
             </Button>
@@ -202,7 +202,7 @@ export default function EmployeeTable() {
 
       <div className="overflow-x-auto min-h-[400px]">
         <Table className="w-full">
-          <TableHeader className="bg-gray-50/50">
+          <TableHeader className="bg-muted/50/50">
             <TableRow className="border-b border-gray-100 hover:bg-transparent">
               <TableHead className="px-3 py-4 text-xs font-semibold text-primary uppercase tracking-wider">
                 ID
@@ -236,7 +236,10 @@ export default function EmployeeTable() {
           <TableBody className="">
             {!isLoading && filteredEmployees.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={9} className="px-3 py-20 text-center text-gray-500 italic">
+                <TableCell
+                  colSpan={9}
+                  className="px-3 py-20 text-center text-muted-foreground italic"
+                >
                   No employees found
                 </TableCell>
               </TableRow>
@@ -245,7 +248,7 @@ export default function EmployeeTable() {
                 <TableRow
                   key={emp.id}
                   className={`transition-colors h-11 border-b border-gray-50 hover:bg-primary/5 ${
-                    index % 2 === 0 ? 'bg-white' : 'bg-blue-50/20'
+                    index % 2 === 0 ? 'bg-card' : 'bg-blue-50/20'
                   }`}
                 >
                   <TableCell className="px-3 py-4 text-xs font-bold text-blue-600">
@@ -275,10 +278,10 @@ export default function EmployeeTable() {
                         )}
                       </div>
                       <div className="flex flex-col">
-                        <span className="text-sm font-medium text-gray-900 truncate">
+                        <span className="text-sm font-medium text-foreground truncate">
                           {emp.first_name} {emp.last_name}
                         </span>
-                        <span className="text-[11px] text-gray-500">{emp.email}</span>
+                        <span className="text-[11px] text-muted-foreground">{emp.email}</span>
                       </div>
                     </div>
                   </TableCell>
@@ -310,12 +313,12 @@ export default function EmployeeTable() {
                       {emp.status}
                     </Badge>
                   </TableCell>
-                  <TableCell className="px-3 py-4 text-xs text-gray-500">
+                  <TableCell className="px-3 py-4 text-xs text-muted-foreground">
                     {emp.expire_date
                       ? new Date(emp.expire_date).toLocaleDateString('en-GB')
                       : '---'}
                   </TableCell>
-                  <TableCell className="px-3 py-4 text-xs text-gray-500">
+                  <TableCell className="px-3 py-4 text-xs text-muted-foreground">
                     {new Date(emp.createdAt).toLocaleDateString('en-GB')}
                   </TableCell>
                   <TableCell className="px-3 py-4 text-right pr-4">
@@ -388,7 +391,7 @@ export default function EmployeeTable() {
       />
 
       <div className="p-6 border-t border-gray-100 flex items-center justify-between">
-        <p className="text-sm text-gray-500">
+        <p className="text-sm text-muted-foreground">
           Showing {filteredEmployees.length} of {pagination.total} employees
         </p>
         <div className="flex gap-2">

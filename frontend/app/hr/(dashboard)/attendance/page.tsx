@@ -11,7 +11,7 @@ export default function HRAttendancePage() {
     <div className="p-3 sm:p-4 md:p-6 space-y-6 bg-blue-50/50 min-h-screen font-sans">
       <div className="flex flex-col gap-1">
         <h2 className="text-2xl font-bold text-primary">Attendance Management</h2>
-        <p className="text-sm text-gray-500 font-medium">
+        <p className="text-sm text-muted-foreground font-medium">
           Monitor daily attendance, track leaves, and manage punctuality records.
         </p>
       </div>
@@ -36,7 +36,7 @@ export default function HRAttendancePage() {
       </div>
 
       {/* Attendance Log Table */}
-      <div className="bg-white rounded-2xl p-6 shadow-sm border border-blue-100/50">
+      <div className="bg-card rounded-2xl p-6 shadow-sm border border-blue-100/50">
         <div className="mb-6">
           <h3 className="text-lg font-semibold text-primary">Daily Attendance Log</h3>
           <p className="text-xs text-gray-400 font-bold uppercase tracking-wider">

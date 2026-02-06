@@ -69,10 +69,10 @@ const data = [
 
 export default function PrinterAssetTable() {
   return (
-    <div className="rounded-xl border bg-white shadow-sm overflow-hidden">
+    <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
       <Table>
         <TableHeader>
-          <TableRow className="bg-gray-50/50 hover:bg-gray-50/50">
+          <TableRow className="bg-muted/50/50 hover:bg-muted/50/50">
             <TableHead className="font-semibold text-gray-700">Printer Model</TableHead>
             <TableHead className="font-semibold text-gray-700">Category</TableHead>
             <TableHead className="font-semibold text-gray-700">Owning Branch</TableHead>
@@ -96,9 +96,9 @@ export default function PrinterAssetTable() {
           {data.map((item, idx) => (
             <TableRow
               key={idx}
-              className={`hover:bg-gray-50/50 ${idx % 2 !== 0 ? 'bg-blue-50/20' : 'bg-white'}`}
+              className={`hover:bg-muted/50/50 ${idx % 2 !== 0 ? 'bg-blue-50/20' : 'bg-card'}`}
             >
-              <TableCell className="font-medium text-gray-900">{item.model}</TableCell>
+              <TableCell className="font-medium text-foreground">{item.model}</TableCell>
               <TableCell className="text-gray-600">
                 <span
                   className={`px-2 py-0.5 rounded-full text-xs font-medium ${
@@ -114,7 +114,7 @@ export default function PrinterAssetTable() {
               </TableCell>
               <TableCell className="text-gray-600">{item.branch}</TableCell>
               <TableCell className="text-gray-600">{item.vendor}</TableCell>
-              <TableCell className="text-center font-bold text-gray-900">{item.total}</TableCell>
+              <TableCell className="text-center font-bold text-foreground">{item.total}</TableCell>
               <TableCell className="text-center font-medium text-blue-600">{item.active}</TableCell>
               <TableCell className="text-center font-medium text-green-600">
                 {item.available}

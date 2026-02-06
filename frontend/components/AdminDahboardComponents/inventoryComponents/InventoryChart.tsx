@@ -29,12 +29,12 @@ export default function InventoryChart() {
     setIsClient(true);
   }, []);
 
-  if (!isClient) return <div className="h-full w-full animate-pulse bg-gray-50 rounded-lg" />;
+  if (!isClient) return <div className="h-full w-full animate-pulse bg-muted/50 rounded-lg" />;
 
   return (
     <div className="w-full h-full flex flex-col">
       <div className="flex flex-row items-center justify-between pb-4">
-        <p className="text-xs text-gray-500 font-medium uppercase">Last 7 Days</p>
+        <p className="text-xs text-muted-foreground font-medium uppercase">Last 7 Days</p>
 
         <div className="flex gap-1.5 text-[10px] bg-blue-50/50 p-1 rounded-lg border border-blue-100/50">
           {['Weekly', 'Monthly'].map((period) => (

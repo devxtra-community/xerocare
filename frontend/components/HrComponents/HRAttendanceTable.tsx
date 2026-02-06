@@ -94,7 +94,7 @@ export default function HRAttendanceTable() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
             <Input
               placeholder="Search by ID or name..."
-              className="pl-10 h-10 bg-white border-blue-400/60 focus:ring-blue-100 rounded-xl transition-all"
+              className="pl-10 h-10 bg-card border-blue-400/60 focus:ring-blue-100 rounded-xl transition-all"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -104,7 +104,7 @@ export default function HRAttendanceTable() {
               <DropdownMenuTrigger asChild>
                 <Button
                   variant="outline"
-                  className="h-10 bg-white border-blue-400/60 focus:ring-blue-100 rounded-xl justify-between px-3 min-w-[120px]"
+                  className="h-10 bg-card border-blue-400/60 focus:ring-blue-100 rounded-xl justify-between px-3 min-w-[120px]"
                 >
                   <Filter className="h-4 w-4 mr-2" />
                   <span className="truncate">{roleFilter}</span>
@@ -129,7 +129,7 @@ export default function HRAttendanceTable() {
               <DropdownMenuTrigger asChild>
                 <Button
                   variant="outline"
-                  className="h-10 bg-white border-blue-400/60 focus:ring-blue-100 rounded-xl justify-between px-3 min-w-[120px]"
+                  className="h-10 bg-card border-blue-400/60 focus:ring-blue-100 rounded-xl justify-between px-3 min-w-[120px]"
                 >
                   <Filter className="h-4 w-4 mr-2" />
                   <span className="truncate">
@@ -154,7 +154,7 @@ export default function HRAttendanceTable() {
         <div className="flex items-center gap-2">
           <Button
             variant="outline"
-            className="h-10 bg-white border-blue-400/60 focus:ring-blue-100 rounded-xl"
+            className="h-10 bg-card border-blue-400/60 focus:ring-blue-100 rounded-xl"
           >
             <Download className="h-4 w-4 mr-2" />
             Export
@@ -163,10 +163,10 @@ export default function HRAttendanceTable() {
         </div>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+      <div className="bg-card rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="overflow-x-auto min-h-[400px]">
           <Table className="w-full text-left">
-            <TableHeader className="bg-gray-50/50">
+            <TableHeader className="bg-muted/50/50">
               <TableRow className="border-b border-gray-100 hover:bg-transparent">
                 <TableHead className="px-3 py-2 text-xs font-bold text-primary uppercase tracking-wider whitespace-nowrap">
                   Employee ID
@@ -202,7 +202,7 @@ export default function HRAttendanceTable() {
                 <TableRow>
                   <TableCell
                     colSpan={9}
-                    className="px-3 py-20 text-center text-gray-500 text-sm italic"
+                    className="px-3 py-20 text-center text-muted-foreground text-sm italic"
                   >
                     Loading attendance records...
                   </TableCell>
@@ -211,7 +211,7 @@ export default function HRAttendanceTable() {
                 <TableRow>
                   <TableCell
                     colSpan={9}
-                    className="px-3 py-20 text-center text-gray-500 text-sm italic"
+                    className="px-3 py-20 text-center text-muted-foreground text-sm italic"
                   >
                     No attendance records found
                   </TableCell>
@@ -221,7 +221,7 @@ export default function HRAttendanceTable() {
                   <TableRow
                     key={emp.id}
                     className={`transition-colors h-11 border-b border-gray-50 hover:bg-primary/5 ${
-                      index % 2 === 0 ? 'bg-white' : 'bg-blue-50/20'
+                      index % 2 === 0 ? 'bg-card' : 'bg-blue-50/20'
                     }`}
                   >
                     <TableCell className="px-3 py-1.5 font-medium text-primary whitespace-nowrap">

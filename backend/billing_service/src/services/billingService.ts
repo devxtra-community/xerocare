@@ -563,7 +563,16 @@ export class BillingService {
     return this.invoiceRepo.save(invoice);
   }
 
-  async financeApprove(id: string, userId: string) {
+  async financeApprove(
+    id: string,
+    userId: string,
+    deposit?: {
+      amount: number;
+      mode: SecurityDepositMode;
+      reference?: string;
+      receivedDate?: string;
+    },
+  ) {
     const invoice = await this.invoiceRepo.findById(id);
     if (!invoice) throw new AppError('Quotation not found', 404);
 
@@ -617,6 +626,16 @@ export class BillingService {
       }
     }
 
+    // Security Deposit Logic (mirrored from approveQuotation)
+    if (deposit) {
+      invoice.securityDepositAmount = deposit.amount;
+      invoice.securityDepositMode = deposit.mode;
+      invoice.securityDepositReference = deposit.reference;
+      if (deposit.receivedDate) {
+        invoice.securityDepositReceivedDate = new Date(deposit.receivedDate);
+      }
+    }
+
     // Save invoice first
     const savedInvoice = await this.invoiceRepo.save(invoice);
 
@@ -624,6 +643,7 @@ export class BillingService {
       invoiceId: savedInvoice.id,
       saleType: savedInvoice.saleType,
       itemsCount: savedInvoice.items?.length || 0,
+      hasDeposit: !!deposit,
     });
 
     // Emit product status update events

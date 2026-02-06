@@ -87,17 +87,17 @@ export default function OrderTable() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
           <Input
             placeholder="Search Order ID, Customer, or Assigned..."
-            className="pl-10 h-10 bg-white border-blue-400/60 focus:border-blue-400 focus:ring-4 focus:ring-blue-100 outline-none shadow-sm rounded-xl transition-all"
+            className="pl-10 h-10 bg-card border-blue-400/60 focus:border-blue-400 focus:ring-4 focus:ring-blue-100 outline-none shadow-sm rounded-xl transition-all"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
       </div>
 
-      <div className="rounded-2xl border border-blue-100 bg-white shadow-sm overflow-hidden">
+      <div className="rounded-2xl border border-blue-100 bg-card shadow-sm overflow-hidden">
         <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-gray-200">
           <Table className="min-w-[900px]">
-            <TableHeader className="bg-slate-50/50">
+            <TableHeader className="bg-muted/50/50">
               <TableRow className="border-b border-blue-50/50 hover:bg-transparent">
                 <TableHead className="text-[10px] font-bold text-primary uppercase py-3 px-4">
                   Order Details
@@ -124,12 +124,14 @@ export default function OrderTable() {
               {filteredOrders.map((order, index) => (
                 <TableRow
                   key={order.id}
-                  className={`hover:bg-blue-50/30 transition-colors border-b border-blue-50/20 ${index % 2 ? 'bg-blue-50/20' : 'bg-white'}`}
+                  className={`hover:bg-blue-50/30 transition-colors border-b border-blue-50/20 ${index % 2 ? 'bg-blue-50/20' : 'bg-card'}`}
                 >
                   <TableCell className="px-4 py-2">
                     <div className="flex flex-col">
                       <span className="text-xs font-bold text-primary">{order.id}</span>
-                      <span className="text-[9px] text-gray-500 font-semibold">{order.date}</span>
+                      <span className="text-[9px] text-muted-foreground font-semibold">
+                        {order.date}
+                      </span>
                     </div>
                   </TableCell>
                   <TableCell className="py-2">

@@ -158,8 +158,16 @@ export const employeeApproveInvoice = async (id: string): Promise<Invoice> => {
   return response.data.data;
 };
 
-export const financeApproveInvoice = async (id: string): Promise<Invoice> => {
-  const response = await api.post(`/b/invoices/${id}/finance-approve`);
+export const financeApproveInvoice = async (
+  id: string,
+  deposit?: {
+    amount: number;
+    mode: 'CASH' | 'CHEQUE';
+    reference?: string;
+    receivedDate?: string;
+  },
+): Promise<Invoice> => {
+  const response = await api.post(`/b/invoices/${id}/finance-approve`, { deposit });
   return response.data.data;
 };
 

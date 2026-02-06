@@ -29,6 +29,9 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 
 export default function FinanceApprovalTable() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
@@ -37,6 +40,13 @@ export default function FinanceApprovalTable() {
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [rejectOpen, setRejectOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
+
+  // Security Deposit State
+  const [depositOpen, setDepositOpen] = useState(false);
+  const [depositAmount, setDepositAmount] = useState('');
+  const [depositMode, setDepositMode] = useState<'CASH' | 'CHEQUE'>('CASH');
+  const [depositReference, setDepositReference] = useState('');
+  const [depositDate, setDepositDate] = useState('');
 
   const fetchInvoices = async () => {
     try {
@@ -59,10 +69,98 @@ export default function FinanceApprovalTable() {
     fetchInvoices();
   }, []);
 
-  const handleApprove = async (id: string) => {
+  const handleApproveClick = (invoice: Invoice) => {
+    setSelectedInvoice(invoice);
+
+    // Skip deposit for SALE
+    if (invoice.saleType === 'SALE') {
+      // Direct approve or maybe a small confirmation?
+      // For now, let's just trigger the approval with 0 deposit directly
+      // But we need to be careful about state. confirmApprove uses selectedInvoice.
+      // We set selectedInvoice above, but state updates are async.
+      // Better to use a separate confirmation dialog OR just reuse confirmApprove logic logic carefully.
+      // Actually, simplest is to open a DIFFERENT dialog or just reuse the deposit dialog but hide fields?
+      // No, user specifically said they don't want it.
+      // Let's use a "Simple Approve" confirmation dialog instead of the deposit one, or just confirm immediately?
+      // Immediate approval might be risky if clicked by accident.
+      // Let's modify confirmApprove to take parameters or better yet:
+      // We can allow the user to just click "Approve" on the main table actions.
+      // If we want to skip the dialog, we need to handle the async state of `selectedInvoice`.
+      // The `useEffect` or passing invoice directly to confirm function is better.
+      // Let's refactor confirmApprove to accept an invoice and payload optional.
+      // But confirmApprove relies on state variables for input.
+
+      // Let's try this:
+      // If SALE, we still need to confirm? "Are you sure you want to approve?"
+      // Ideally yes.
+      // For this user request "I don't want security deposit in sale", implies just skipping that input.
+      // I will open the dialog BUT modification: I will add a check in the dialog opening.
+
+      // Actually, I can just call approval directly if I refactor confirmApprove.
+      // But to be safe with React state, I will store the invoice and open a "SimpleConfirm" dialog if it's SALE.
+      // Or easier: Just use `window.confirm` for SALE? No, that's ugly.
+
+      // Let's stick to: If SALE -> Simple Confirmation (maybe reuse reject dialog structure or a new small one? or just `confirmApprove` with 0s if I can pass args).
+      // Refactoring `confirmApprove` to take args is best.
+
+      setDepositAmount('0');
+      setDepositMode('CASH');
+      setDepositReference('');
+      setDepositDate(new Date().toISOString().split('T')[0]);
+
+      // If SALE, we open a "confirm sale approval" dialog?
+      // The user previously had a "InvoiceDetailsDialog" which has "Approve" button.
+      // That calls `handleApproveClick`.
+
+      if (invoice.saleType === 'SALE') {
+        // Just approve it immediately? Or ask "Are you sure?"
+        if (confirm('Approve Sale Invoice ' + invoice.invoiceNumber + '?')) {
+          // We need to call approval API.
+          financeApproveInvoice(invoice.id, {
+            amount: 0,
+            mode: 'CASH',
+            reference: '',
+            receivedDate: new Date().toISOString().split('T')[0],
+          })
+            .then(() => {
+              toast.success('Invoice Approved successfully');
+              setDetailsOpen(false);
+              fetchInvoices();
+            })
+            .catch(() => toast.error('Failed to approve'));
+        }
+        return;
+      }
+
+      // For RENT/LEASE, open the deposit dialog
+      setDepositOpen(true);
+    } else {
+      // RENT / LEASE
+      setDepositAmount('0');
+      setDepositMode('CASH');
+      setDepositReference('');
+      setDepositDate(new Date().toISOString().split('T')[0]);
+      setDepositOpen(true);
+    }
+  };
+
+  const confirmApprove = async () => {
+    if (!selectedInvoice) return;
+
     try {
-      await financeApproveInvoice(id);
+      // Validate if amount > 0? User might want 0 deposit?
+      // Assuming valid request if they click confirm.
+
+      const payload = {
+        amount: parseFloat(depositAmount) || 0,
+        mode: depositMode,
+        reference: depositReference,
+        receivedDate: depositDate,
+      };
+
+      await financeApproveInvoice(selectedInvoice.id, payload);
       toast.success('Invoice Approved successfully');
+      setDepositOpen(false);
       setDetailsOpen(false);
       fetchInvoices();
     } catch (error) {
@@ -105,7 +203,7 @@ export default function FinanceApprovalTable() {
 
   if (invoices.length === 0) {
     return (
-      <div className="text-center p-8 border-2 border-dashed border-slate-200 rounded-xl bg-slate-50/50">
+      <div className="text-center p-8 border-2 border-dashed border-border rounded-xl bg-muted/30">
         <p className="text-muted-foreground font-medium">No pending approvals.</p>
       </div>
     );
@@ -114,15 +212,15 @@ export default function FinanceApprovalTable() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-lg font-bold text-slate-800">Waiting for Finance Confirmation</h3>
-        <Badge variant="secondary" className="bg-blue-100 text-blue-700">
+        <h3 className="text-lg font-bold text-foreground">Waiting for Finance Confirmation</h3>
+        <Badge variant="secondary" className="bg-primary/10 text-primary">
           {invoices.length} Pending
         </Badge>
       </div>
 
-      <div className="rounded-xl border border-slate-200 overflow-hidden bg-white shadow-sm">
+      <div className="rounded-xl border border-border overflow-hidden bg-card shadow-sm">
         <Table>
-          <TableHeader className="bg-slate-50">
+          <TableHeader className="bg-muted/50">
             <TableRow>
               <TableHead>Invoice #</TableHead>
               <TableHead>Customer</TableHead>
@@ -154,12 +252,12 @@ export default function FinanceApprovalTable() {
                         setDetailsOpen(true);
                       }}
                     >
-                      <Eye className="h-4 w-4 text-slate-500" />
+                      <Eye className="h-4 w-4 text-muted-foreground" />
                     </Button>
                     <Button
                       size="sm"
                       className="bg-green-600 hover:bg-green-700 text-white h-8 w-8 p-0 rounded-full"
-                      onClick={() => handleApprove(inv.id)}
+                      onClick={() => handleApproveClick(inv)}
                       title="Approve"
                     >
                       <CheckCircle className="h-4 w-4" />
@@ -185,7 +283,7 @@ export default function FinanceApprovalTable() {
         <InvoiceDetailsDialog
           invoice={selectedInvoice}
           onClose={() => setDetailsOpen(false)}
-          onApprove={() => handleApprove(selectedInvoice.id)}
+          onApprove={() => handleApproveClick(selectedInvoice)}
           approveLabel="Approve Now"
         />
       )}
@@ -212,6 +310,86 @@ export default function FinanceApprovalTable() {
               </Button>
               <Button variant="destructive" onClick={handleReject}>
                 Confirm Rejection
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+      {depositOpen && (
+        <Dialog open={depositOpen} onOpenChange={setDepositOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Security Deposit Collection</DialogTitle>
+              <DialogDescription>
+                Please enter the security deposit details collected from the customer.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="amount" className="text-right">
+                  Amount
+                </Label>
+                <div className="col-span-3">
+                  <Input
+                    id="amount"
+                    type="number"
+                    value={depositAmount}
+                    onChange={(e) => setDepositAmount(e.target.value)}
+                    placeholder="0.00"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label className="text-right">Mode</Label>
+                <RadioGroup
+                  value={depositMode}
+                  onValueChange={(val) => setDepositMode(val as 'CASH' | 'CHEQUE')}
+                  className="flex gap-4 col-span-3"
+                >
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="CASH" id="mode-cash" />
+                    <Label htmlFor="mode-cash">Cash</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="CHEQUE" id="mode-cheque" />
+                    <Label htmlFor="mode-cheque">Cheque</Label>
+                  </div>
+                </RadioGroup>
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="reference" className="text-right">
+                  Reference
+                </Label>
+                <Input
+                  id="reference"
+                  value={depositReference}
+                  onChange={(e) => setDepositReference(e.target.value)}
+                  placeholder="Cheque No. / Transaction ID"
+                  className="col-span-3"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="date" className="text-right">
+                  Date
+                </Label>
+                <Input
+                  id="date"
+                  type="date"
+                  value={depositDate}
+                  onChange={(e) => setDepositDate(e.target.value)}
+                  className="col-span-3"
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setDepositOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                onClick={confirmApprove}
+                className="bg-green-600 hover:bg-green-700 text-white"
+              >
+                Confirm Approval
               </Button>
             </DialogFooter>
           </DialogContent>

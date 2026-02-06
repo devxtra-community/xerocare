@@ -27,7 +27,7 @@ export default function InventoryPage() {
 
           <div className="flex flex-col space-y-4">
             <h3 className="text-lg sm:text-xl font-bold text-primary">Stock Activity</h3>
-            <div className="bg-white rounded-xl p-3 flex-1">
+            <div className="bg-card rounded-xl p-3 flex-1">
               <InventoryChart />
             </div>
           </div>
@@ -37,14 +37,14 @@ export default function InventoryPage() {
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 sm:gap-6">
           <div className="space-y-4">
             <h4 className="text-lg sm:text-xl font-bold text-primary">Stock Status Overview</h4>
-            <div className="bg-white rounded-xl p-3 h-[280px]">
+            <div className="bg-card rounded-xl p-3 h-[280px]">
               <StockStatusDonut />
             </div>
           </div>
 
           <div className="space-y-4">
             <h4 className="text-lg sm:text-xl font-bold text-primary">Movement Trend</h4>
-            <div className="bg-white rounded-xl p-3 h-[280px]">
+            <div className="bg-card rounded-xl p-3 h-[280px]">
               <StockMovementTrend />
             </div>
           </div>

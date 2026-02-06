@@ -53,7 +53,7 @@ export default function LowStockTable() {
   const currentData = lowStockData;
 
   return (
-    <div className="rounded-2xl bg-white p-2 sm:p-3 shadow-sm w-full min-h-[200px] flex flex-col">
+    <div className="rounded-2xl bg-card p-2 sm:p-3 shadow-sm w-full min-h-[200px] flex flex-col">
       <div className="flex-1 overflow-x-auto">
         <Table>
           <TableHeader>
@@ -79,15 +79,15 @@ export default function LowStockTable() {
             {currentData.map((item, index) => (
               <TableRow
                 key={item.id}
-                className={`border-none ${index % 2 === 1 ? 'bg-blue-50/20' : 'bg-white'}`}
+                className={`border-none ${index % 2 === 1 ? 'bg-blue-50/20' : 'bg-card'}`}
               >
-                <TableCell className="py-1.5 sm:py-2 px-1 sm:px-2 text-[10px] sm:text-xs font-medium text-gray-900">
+                <TableCell className="py-1.5 sm:py-2 px-1 sm:px-2 text-[10px] sm:text-xs font-medium text-foreground">
                   {item.name}
                 </TableCell>
                 <TableCell className="py-1.5 sm:py-2 px-1 sm:px-2 text-[10px] sm:text-xs text-center font-bold">
                   {item.currentStock}
                 </TableCell>
-                <TableCell className="py-1.5 sm:py-2 px-1 sm:px-2 text-[10px] sm:text-xs text-center text-gray-500">
+                <TableCell className="py-1.5 sm:py-2 px-1 sm:px-2 text-[10px] sm:text-xs text-center text-muted-foreground">
                   {item.reorderLevel}
                 </TableCell>
                 <TableCell className="py-1.5 sm:py-2 px-1 sm:px-2 text-[10px] sm:text-xs text-center font-bold text-red-600">

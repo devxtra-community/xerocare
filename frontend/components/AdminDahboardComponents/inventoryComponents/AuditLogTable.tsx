@@ -65,7 +65,7 @@ export default function AuditLogTable() {
   const currentData = auditData.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
   return (
-    <div className="rounded-2xl bg-white p-2 sm:p-3 shadow-sm w-full min-h-[260px] flex flex-col">
+    <div className="rounded-2xl bg-card p-2 sm:p-3 shadow-sm w-full min-h-[260px] flex flex-col">
       <div className="flex-1 overflow-x-auto">
         <Table>
           <TableHeader>
@@ -91,12 +91,12 @@ export default function AuditLogTable() {
             {currentData.map((item, index) => (
               <TableRow
                 key={item.id}
-                className={`border-none ${index % 2 === 1 ? 'bg-blue-50/20' : 'bg-white'}`}
+                className={`border-none ${index % 2 === 1 ? 'bg-blue-50/20' : 'bg-card'}`}
               >
-                <TableCell className="py-1.5 sm:py-2 px-1 sm:px-2 text-[10px] sm:text-xs text-gray-500">
+                <TableCell className="py-1.5 sm:py-2 px-1 sm:px-2 text-[10px] sm:text-xs text-muted-foreground">
                   {item.date}
                 </TableCell>
-                <TableCell className="py-1.5 sm:py-2 px-1 sm:px-2 text-[10px] sm:text-xs font-medium text-gray-900">
+                <TableCell className="py-1.5 sm:py-2 px-1 sm:px-2 text-[10px] sm:text-xs font-medium text-foreground">
                   {item.product}
                 </TableCell>
                 <TableCell
@@ -129,17 +129,17 @@ export default function AuditLogTable() {
         <button
           onClick={() => setPage((p) => Math.max(1, p - 1))}
           disabled={page === 1}
-          className="rounded-md border px-1.5 sm:px-2 py-0.5 disabled:opacity-40 hover:bg-gray-50 transition"
+          className="rounded-md border px-1.5 sm:px-2 py-0.5 disabled:opacity-40 hover:bg-muted/50 transition"
         >
           &lt;
         </button>
-        <span className="text-gray-500">
+        <span className="text-muted-foreground">
           Page {page} of {totalPages}
         </span>
         <button
           onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
           disabled={page === totalPages}
-          className="rounded-md border px-1.5 sm:px-2 py-0.5 disabled:opacity-40 hover:bg-gray-50 transition"
+          className="rounded-md border px-1.5 sm:px-2 py-0.5 disabled:opacity-40 hover:bg-muted/50 transition"
         >
           &gt;
         </button>

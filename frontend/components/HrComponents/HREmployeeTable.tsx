@@ -142,7 +142,7 @@ export default function HREmployeeTable() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
             <Input
               placeholder="Search employees..."
-              className="pl-10 h-10 bg-white border-blue-400/60 focus:border-blue-400 focus:ring-4 focus:ring-blue-100 outline-none shadow-sm rounded-xl transition-all w-full"
+              className="pl-10 h-10 bg-card border-blue-400/60 focus:border-blue-400 focus:ring-4 focus:ring-blue-100 outline-none shadow-sm rounded-xl transition-all w-full"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -152,7 +152,7 @@ export default function HREmployeeTable() {
               <DropdownMenuTrigger asChild>
                 <Button
                   variant="outline"
-                  className="w-full h-10 bg-white border-blue-400/60 focus:ring-blue-100 rounded-xl justify-between px-3"
+                  className="w-full h-10 bg-card border-blue-400/60 focus:ring-blue-100 rounded-xl justify-between px-3"
                 >
                   <div className="flex items-center gap-2 truncate">
                     <Filter className="h-4 w-4" />
@@ -180,7 +180,7 @@ export default function HREmployeeTable() {
               <DropdownMenuTrigger asChild>
                 <Button
                   variant="outline"
-                  className="w-full h-10 bg-white border-blue-400/60 focus:ring-blue-100 rounded-xl justify-between px-3"
+                  className="w-full h-10 bg-card border-blue-400/60 focus:ring-blue-100 rounded-xl justify-between px-3"
                 >
                   <div className="flex items-center gap-2 truncate">
                     <Filter className="h-4 w-4" />
@@ -207,7 +207,7 @@ export default function HREmployeeTable() {
         <div className="flex items-center gap-2 w-full sm:w-auto">
           <Button
             variant="outline"
-            className="h-10 bg-white border-blue-400/60 focus:ring-blue-100 rounded-xl flex-1 sm:flex-none"
+            className="h-10 bg-card border-blue-400/60 focus:ring-blue-100 rounded-xl flex-1 sm:flex-none"
           >
             <Download className="h-4 w-4 mr-2" />
             Export
@@ -216,10 +216,10 @@ export default function HREmployeeTable() {
         </div>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+      <div className="bg-card rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="overflow-x-auto min-h-[400px]">
           <Table className="w-full text-left">
-            <TableHeader className="bg-gray-50/50">
+            <TableHeader className="bg-muted/50/50">
               <TableRow className="border-b border-gray-100 hover:bg-transparent">
                 <TableHead className="px-3 py-2 text-xs font-bold text-primary uppercase tracking-wider whitespace-nowrap">
                   Employee ID
@@ -255,7 +255,7 @@ export default function HREmployeeTable() {
                 <TableRow>
                   <TableCell
                     colSpan={9}
-                    className="px-3 py-20 text-center text-gray-500 text-sm italic"
+                    className="px-3 py-20 text-center text-muted-foreground text-sm italic"
                   >
                     No employees found
                   </TableCell>
@@ -265,7 +265,7 @@ export default function HREmployeeTable() {
                   <TableRow
                     key={emp.id}
                     className={`transition-colors h-11 border-b border-gray-50 hover:bg-primary/5 ${
-                      index % 2 === 0 ? 'bg-white' : 'bg-blue-50/20'
+                      index % 2 === 0 ? 'bg-card' : 'bg-blue-50/20'
                     }`}
                   >
                     <TableCell className="px-3 py-1.5 font-medium text-primary whitespace-nowrap">
@@ -376,7 +376,7 @@ export default function HREmployeeTable() {
           </Table>
         </div>
         <div className="p-6 border-t border-gray-100 flex items-center justify-between">
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-muted-foreground">
             Showing {filteredEmployees.length} of {pagination.total} employees
           </p>
           <div className="flex gap-2">

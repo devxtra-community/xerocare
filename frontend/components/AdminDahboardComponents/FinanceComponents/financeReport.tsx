@@ -192,7 +192,7 @@ export default function FinanceReport() {
       {/* Monthly Performance Charts */}
       <div className="flex flex-col lg:flex-row gap-6">
         {/* Income vs Expense Chart */}
-        <div className="flex-1 bg-white p-4 rounded-2xl shadow-sm space-y-4 border border-blue-50">
+        <div className="flex-1 bg-card p-4 rounded-2xl shadow-sm space-y-4 border border-blue-50">
           <h4 className="text-lg sm:text-xl font-bold text-primary">Income vs Expense (Monthly)</h4>
           <div className="h-[300px] w-full">
             <ResponsiveContainer width="100%" height="100%">
@@ -251,7 +251,7 @@ export default function FinanceReport() {
         </div>
 
         {/* Profit Margin Chart */}
-        <div className="flex-1 bg-white p-4 rounded-2xl shadow-sm space-y-4 border border-blue-50">
+        <div className="flex-1 bg-card p-4 rounded-2xl shadow-sm space-y-4 border border-blue-50">
           <h4 className="text-lg sm:text-xl font-bold text-primary">Profit Margin % (Monthly)</h4>
           <div className="h-[300px] w-full">
             <ResponsiveContainer width="100%" height="100%">
@@ -312,13 +312,13 @@ export default function FinanceReport() {
             placeholder="Search report..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="pl-9 h-11 rounded-xl border-blue-400/60 focus:border-blue-400 focus:ring-4 focus:ring-blue-100 bg-white shadow-sm transition-all"
+            className="pl-9 h-11 rounded-xl border-blue-400/60 focus:border-blue-400 focus:ring-4 focus:ring-blue-100 bg-card shadow-sm transition-all"
           />
         </div>
 
         <div className="w-[180px]">
           <Select value={monthFilter} onValueChange={setMonthFilter}>
-            <SelectTrigger className="h-11 bg-white border-blue-400/60 focus:ring-blue-100 rounded-xl shadow-sm">
+            <SelectTrigger className="h-11 bg-card border-blue-400/60 focus:ring-blue-100 rounded-xl shadow-sm">
               <SelectValue placeholder="All Months" />
             </SelectTrigger>
             <SelectContent>
@@ -334,7 +334,7 @@ export default function FinanceReport() {
 
         <div className="w-[200px]">
           <Select value={branchFilter} onValueChange={setBranchFilter}>
-            <SelectTrigger className="h-11 bg-white border-blue-400/60 focus:ring-blue-100 rounded-xl shadow-sm">
+            <SelectTrigger className="h-11 bg-card border-blue-400/60 focus:ring-blue-100 rounded-xl shadow-sm">
               <SelectValue placeholder="All Branches" />
             </SelectTrigger>
             <SelectContent>
@@ -353,7 +353,7 @@ export default function FinanceReport() {
             value={sourceFilter}
             onValueChange={(val) => setSourceFilter(val as 'All' | 'SALE' | 'LEASE' | 'RENT')}
           >
-            <SelectTrigger className="h-11 bg-white border-blue-400/60 focus:ring-blue-100 rounded-xl shadow-sm">
+            <SelectTrigger className="h-11 bg-card border-blue-400/60 focus:ring-blue-100 rounded-xl shadow-sm">
               <SelectValue placeholder="All Sources" />
             </SelectTrigger>
             <SelectContent>
@@ -367,9 +367,9 @@ export default function FinanceReport() {
       </div>
 
       {/* Table */}
-      <div className="rounded-2xl bg-white shadow-sm overflow-hidden border border-blue-50">
+      <div className="rounded-2xl bg-card shadow-sm overflow-hidden border border-blue-50">
         <Table>
-          <TableHeader className="bg-slate-50">
+          <TableHeader className="bg-muted/50">
             <TableRow>
               {['MONTH', 'BRANCH', 'SOURCE', 'INCOME', 'EXPENSE', 'PROFIT', 'STATUS'].map((h) => (
                 <TableHead
@@ -391,7 +391,7 @@ export default function FinanceReport() {
               </TableRow>
             ) : (
               filteredFinance.map((f, i) => (
-                <TableRow key={f.id} className={i % 2 ? 'bg-blue-50/10' : 'bg-white'}>
+                <TableRow key={f.id} className={i % 2 ? 'bg-blue-50/10' : 'bg-card'}>
                   <TableCell className="px-6 py-4 font-medium text-slate-800">{f.month}</TableCell>
                   <TableCell className="px-6 py-4">
                     <span className="text-xs font-semibold px-2 py-1 bg-slate-100 rounded-lg text-slate-600">
@@ -402,7 +402,7 @@ export default function FinanceReport() {
                   <TableCell className="px-6 py-4 font-medium text-blue-600">
                     ₹ {f.income.toLocaleString()}
                   </TableCell>
-                  <TableCell className="px-6 py-4 text-slate-500">
+                  <TableCell className="px-6 py-4 text-muted-foreground">
                     ₹ {f.expense.toLocaleString()}
                   </TableCell>
                   <TableCell className="px-6 py-4 font-bold text-primary">

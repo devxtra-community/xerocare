@@ -67,14 +67,14 @@ export default function HrTable() {
 
   if (loading) {
     return (
-      <div className="rounded-2xl bg-white p-2 sm:p-3 shadow-sm w-full h-[280px] flex items-center justify-center">
-        <p className="text-sm text-gray-500">Loading employees...</p>
+      <div className="rounded-2xl bg-card p-2 sm:p-3 shadow-sm w-full h-[280px] flex items-center justify-center">
+        <p className="text-sm text-muted-foreground">Loading employees...</p>
       </div>
     );
   }
 
   return (
-    <div className="rounded-2xl bg-white p-2 sm:p-3 shadow-sm w-full h-[280px] flex flex-col">
+    <div className="rounded-2xl bg-card p-2 sm:p-3 shadow-sm w-full h-[280px] flex flex-col">
       {/* TABLE */}
       <div className="flex-1 overflow-x-auto">
         <table className="w-full">
@@ -98,13 +98,13 @@ export default function HrTable() {
           <tbody>
             {currentData.length > 0 ? (
               currentData.map((item, index) => (
-                <tr key={index} className={index % 2 !== 0 ? 'bg-blue-50/20' : 'bg-white'}>
+                <tr key={index} className={index % 2 !== 0 ? 'bg-blue-50/20' : 'bg-card'}>
                   <td className="py-1.5 sm:py-2 px-1 sm:px-2 text-[10px] sm:text-xs font-medium">
                     <div className="flex items-center gap-1 sm:gap-2">
                       <div className="h-5 w-5 sm:h-6 sm:w-6 rounded-full bg-gray-300 flex items-center justify-center text-[10px] sm:text-xs font-medium text-gray-700">
                         {item.avatar}
                       </div>
-                      <span className="text-gray-900 truncate">{item.Fullname}</span>
+                      <span className="text-foreground truncate">{item.Fullname}</span>
                     </div>
                   </td>
                   <td className="py-1.5 sm:py-2 px-1 sm:px-2 text-[10px] sm:text-xs text-gray-700">
@@ -120,7 +120,7 @@ export default function HrTable() {
               ))
             ) : (
               <tr>
-                <td colSpan={4} className="text-center py-10 text-xs text-gray-500">
+                <td colSpan={4} className="text-center py-10 text-xs text-muted-foreground">
                   No employee records found
                 </td>
               </tr>
@@ -134,7 +134,7 @@ export default function HrTable() {
         <button
           onClick={() => setPage((p) => Math.max(1, p - 1))}
           disabled={page === 1}
-          className="rounded-md border px-1.5 sm:px-2 py-0.5 disabled:opacity-40 hover:bg-gray-50 transition"
+          className="rounded-md border px-1.5 sm:px-2 py-0.5 disabled:opacity-40 hover:bg-muted/50 transition"
         >
           &lt;
         </button>
@@ -146,7 +146,7 @@ export default function HrTable() {
               key={num}
               onClick={() => setPage(num)}
               className={`px-1.5 sm:px-2 py-0.5 rounded-md transition ${
-                page === num ? 'bg-primary text-white' : 'border hover:bg-gray-50'
+                page === num ? 'bg-primary text-white' : 'border hover:bg-muted/50'
               }`}
             >
               {num}
@@ -158,7 +158,7 @@ export default function HrTable() {
         <button
           onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
           disabled={page === totalPages}
-          className="rounded-md border px-1.5 sm:px-2 py-0.5 disabled:opacity-40 hover:bg-gray-50 transition"
+          className="rounded-md border px-1.5 sm:px-2 py-0.5 disabled:opacity-40 hover:bg-muted/50 transition"
         >
           &gt;
         </button>

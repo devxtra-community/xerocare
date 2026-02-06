@@ -48,9 +48,9 @@ const data = [
 
 export default function RevenueSummaryTable() {
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-blue-100 overflow-hidden">
+    <div className="bg-card rounded-2xl shadow-sm border border-blue-100 overflow-hidden">
       <Table>
-        <TableHeader className="bg-slate-50/50">
+        <TableHeader className="bg-muted/50/50">
           <TableRow>
             <TableHead className="text-[11px] font-bold text-primary uppercase py-4 px-4">
               Date
@@ -72,7 +72,7 @@ export default function RevenueSummaryTable() {
           {data.map((row, i) => (
             <TableRow
               key={i}
-              className={`hover:bg-blue-50/30 transition-colors ${i % 2 ? 'bg-blue-50/20' : 'bg-white'}`}
+              className={`hover:bg-blue-50/30 transition-colors ${i % 2 ? 'bg-blue-50/20' : 'bg-card'}`}
             >
               <TableCell className="text-xs font-medium text-gray-600 px-4">{row.date}</TableCell>
               <TableCell>
@@ -94,7 +94,7 @@ export default function RevenueSummaryTable() {
               <TableCell className="text-xs font-bold text-primary text-center">
                 {row.count}
               </TableCell>
-              <TableCell className="text-xs font-bold text-gray-900">{row.total}</TableCell>
+              <TableCell className="text-xs font-bold text-foreground">{row.total}</TableCell>
               <TableCell className="text-xs font-bold text-green-600">{row.paid}</TableCell>
               <TableCell
                 className={`text-xs font-bold ${row.pending !== '₹0' ? 'text-red-600' : 'text-gray-400'}`}

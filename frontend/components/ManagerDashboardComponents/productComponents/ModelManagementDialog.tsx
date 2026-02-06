@@ -64,7 +64,7 @@ export function ModelManagementDialog({ open, onClose }: ModelManagementDialogPr
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="bg-white rounded-xl w-full max-w-5xl h-[80vh] flex flex-col shadow-2xl">
+      <div className="bg-card rounded-xl w-full max-w-5xl h-[80vh] flex flex-col shadow-2xl">
         <div className="p-4 border-b flex justify-between items-center">
           <h2 className="text-xl font-bold">Model Management</h2>
           <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded-full">
@@ -98,14 +98,14 @@ export function ModelManagementDialog({ open, onClose }: ModelManagementDialogPr
                     <TableCell className="font-medium">{model.model_no}</TableCell>
                     <TableCell>
                       <div>{model.model_name}</div>
-                      <div className="text-xs text-gray-500 truncate max-w-[200px]">
+                      <div className="text-xs text-muted-foreground truncate max-w-[200px]">
                         {model.description}
                       </div>
                     </TableCell>
                     <TableCell>{model.brand || '-'}</TableCell>
                     <TableCell>
                       <span className="font-semibold text-blue-600">{model.quantity}</span>
-                      <span className="text-xs text-gray-500 ml-1">units</span>
+                      <span className="text-xs text-muted-foreground ml-1">units</span>
                     </TableCell>
                     <TableCell>
                       <div className="flex gap-2">
@@ -130,7 +130,7 @@ export function ModelManagementDialog({ open, onClose }: ModelManagementDialogPr
                 ))}
                 {models.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center py-8 text-gray-500">
+                    <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
                       No models found. Add one to get started.
                     </TableCell>
                   </TableRow>
@@ -193,7 +193,7 @@ function ModelForm({
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
-      <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+      <div className="bg-card rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
         <h3 className="text-lg font-bold mb-4">{initialData ? 'Edit Model' : 'Add New Model'}</h3>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">

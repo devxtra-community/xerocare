@@ -11,7 +11,7 @@ export default function AdminHR() {
       <div className="space-y-4 sm:space-y-6">
         <div className="flex flex-col gap-1">
           <h3 className="text-xl sm:text-2xl font-bold text-primary">Human Resources</h3>
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-muted-foreground">
             Manage your employees, departments, and recruitment.
           </p>
         </div>

@@ -73,7 +73,7 @@ export default function UpdatePayrollDialog({
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4 pt-4">
           {/* Read-only Employee Info */}
-          <div className="grid grid-cols-2 gap-4 opacity-70 pointer-events-none bg-gray-50/50 p-2 rounded-lg">
+          <div className="grid grid-cols-2 gap-4 opacity-70 pointer-events-none bg-muted/50/50 p-2 rounded-lg">
             <div className="space-y-1.5">
               <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
                 Employee Name
@@ -97,7 +97,7 @@ export default function UpdatePayrollDialog({
                 name="salaryPerMonth"
                 value={formData.salaryPerMonth}
                 onChange={handleChange}
-                className="h-10 rounded-lg bg-gray-50 border-none shadow-sm"
+                className="h-10 rounded-lg bg-muted/50 border-none shadow-sm"
                 required
               />
             </div>
@@ -109,7 +109,7 @@ export default function UpdatePayrollDialog({
                 name="grossSalary"
                 value={formData.grossSalary}
                 onChange={handleChange}
-                className="h-10 rounded-lg bg-gray-50 border-none shadow-sm"
+                className="h-10 rounded-lg bg-muted/50 border-none shadow-sm"
                 required
               />
             </div>
@@ -125,7 +125,7 @@ export default function UpdatePayrollDialog({
                 type="number"
                 value={formData.workingDays}
                 onChange={handleChange}
-                className="h-10 rounded-lg bg-gray-50 border-none shadow-sm"
+                className="h-10 rounded-lg bg-muted/50 border-none shadow-sm"
                 required
               />
             </div>
@@ -138,7 +138,7 @@ export default function UpdatePayrollDialog({
                 type="number"
                 value={formData.leaveDays}
                 onChange={handleChange}
-                className="h-10 rounded-lg bg-gray-50 border-none shadow-sm"
+                className="h-10 rounded-lg bg-muted/50 border-none shadow-sm"
                 required
               />
             </div>
@@ -153,7 +153,7 @@ export default function UpdatePayrollDialog({
                 value={formData.status}
                 onValueChange={(value: 'PAID' | 'PENDING') => handleStatusChange(value)}
               >
-                <SelectTrigger className="h-10 rounded-lg bg-gray-50 border-none shadow-sm">
+                <SelectTrigger className="h-10 rounded-lg bg-muted/50 border-none shadow-sm">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -171,7 +171,7 @@ export default function UpdatePayrollDialog({
                 type="date"
                 value={formData.paidDate}
                 onChange={handleChange}
-                className="h-10 rounded-lg bg-gray-50 border-none shadow-sm"
+                className="h-10 rounded-lg bg-muted/50 border-none shadow-sm"
               />
             </div>
           </div>
