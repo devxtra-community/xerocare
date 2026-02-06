@@ -354,6 +354,7 @@ function SaleFormModal({
     maxDiscount: number;
     isManual: boolean;
     productId?: string; // Product ID for status updates
+    isEditable: boolean; // Allow editing price (e.g. for Spare Parts or 0-price items)
   }
 
   const [form, setForm] = useState<{
@@ -398,6 +399,7 @@ function SaleFormModal({
       maxDiscount,
       isManual: false,
       productId, // CRITICAL: Include productId
+      isEditable: !productId || basePrice === 0, // Editable if No Product ID (Spare Part) OR Price is 0
     };
 
     setForm({
@@ -420,6 +422,7 @@ function SaleFormModal({
           unitPrice: 0,
           maxDiscount: 999999,
           isManual: true,
+          isEditable: true,
         },
       ],
     });
@@ -455,7 +458,7 @@ function SaleFormModal({
         discount: discountVal,
         unitPrice: prevItem.basePrice - discountVal,
       };
-    } else if (field === 'basePrice' && prevItem.isManual) {
+    } else if (field === 'basePrice' && prevItem.isEditable) {
       const base = Number(safeValue);
       newItems[index] = {
         ...prevItem,
@@ -598,7 +601,7 @@ function SaleFormModal({
                         <Input
                           type="number"
                           value={item.basePrice}
-                          readOnly={!item.isManual}
+                          readOnly={!item.isEditable}
                           onChange={(e) => updateItem(index, 'basePrice', e.target.value)}
                           className={`h-9 text-right font-bold pr-1 ${!item.isManual ? 'bg-muted/50 text-muted-foreground' : ''}`}
                         />
@@ -614,23 +617,31 @@ function SaleFormModal({
                         Discount
                       </label>
                       <div className="relative">
-                        <Input
-                          type="number"
-                          min="0"
-                          // Remove max attribute to allow typing higher values
-                          value={item.discount === 0 ? '' : item.discount}
-                          placeholder="0"
-                          onChange={(e) => updateItem(index, 'discount', e.target.value)}
-                          className={`h-9 text-center font-bold border-2 focus:ring-2 transition-all ${
-                            !item.isManual &&
-                            item.maxDiscount > 0 &&
-                            item.discount > item.maxDiscount
-                              ? 'text-red-600 border-red-200 bg-red-50 focus:border-red-500 focus:ring-red-200'
-                              : 'text-emerald-600 border-emerald-100 bg-emerald-50/30 focus:border-emerald-400 focus:ring-emerald-200'
-                          }`}
-                        />
+                        {!item.productId && !item.isManual ? (
+                          <div className="h-9 flex items-center justify-center text-slate-300 font-bold text-xs bg-slate-50 rounded-md border border-transparent cursor-not-allowed">
+                            N/A
+                          </div>
+                        ) : (
+                          <Input
+                            type="number"
+                            min="0"
+                            // Remove max attribute to allow typing higher values
+                            value={item.discount === 0 ? '' : item.discount}
+                            placeholder="0"
+                            onChange={(e) => updateItem(index, 'discount', e.target.value)}
+                            className={`h-9 text-center font-bold border-2 focus:ring-2 transition-all ${
+                              !item.isManual &&
+                              item.maxDiscount > 0 &&
+                              item.discount > item.maxDiscount
+                                ? 'text-red-600 border-red-200 bg-red-50 focus:border-red-500 focus:ring-red-200'
+                                : 'text-emerald-600 border-emerald-100 bg-emerald-50/30 focus:border-emerald-400 focus:ring-emerald-200'
+                            }`}
+                          />
+                        )}
                       </div>
-                      {!item.isManual &&
+                      {/* Warning Text only for non-spare-parts */}
+                      {item.productId &&
+                        !item.isManual &&
                         item.maxDiscount > 0 &&
                         item.discount > item.maxDiscount && (
                           <p className="text-[9px] font-bold text-red-500 text-center animate-pulse mt-1">

@@ -2,7 +2,7 @@ import api from '@/lib/api';
 
 export interface SparePartInventoryItem {
   id: string; // Added ID
-  item_code: string;
+  lot_number: string;
   part_name: string;
   brand: string;
   compatible_model: string;

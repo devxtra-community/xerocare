@@ -20,7 +20,7 @@ export class SparePart {
 
   @Column()
   @Index()
-  item_code!: string; // Normalized global code
+  lot_number!: string; // Replaces Item Code, Not Unique
 
   @Column()
   part_name!: string;

@@ -2,7 +2,7 @@ import api from './api';
 
 export interface SparePart {
   id: string;
-  item_code: string;
+  lot_number: string; // Replaces item_code
   part_name: string;
   brand: string;
   description?: string;

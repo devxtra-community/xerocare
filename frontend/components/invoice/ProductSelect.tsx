@@ -53,7 +53,7 @@ export function ProductSelect({ onSelect }: ProductSelectProps) {
 
     if ('part_name' in item) {
       // SparePart
-      label = item.part_name;
+      label = `${item.part_name} (Lot: ${item.lot_number})`;
       price = Number(item.base_price) || 0;
       type = 'Spare Part';
     } else {
