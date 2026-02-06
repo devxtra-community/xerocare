@@ -250,6 +250,26 @@ export const generateFinalInvoice = async (req: Request, res: Response, next: Ne
   }
 };
 
+export const createNextMonthInvoice = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { contractId } = req.body;
+
+    if (!contractId) {
+      throw new AppError('contractId is required', 400);
+    }
+
+    const invoice = await billingService.createNextMonthInvoice(contractId);
+
+    return res.status(201).json({
+      success: true,
+      data: invoice,
+      message: 'Next month invoice created successfully',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const getAllInvoices = async (req: Request, res: Response, next: NextFunction) => {
   try {
     // Branch filtering: Admin sees all invoices, others see only their branch

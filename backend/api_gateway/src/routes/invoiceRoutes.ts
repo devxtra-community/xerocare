@@ -16,6 +16,7 @@ import {
   getCollectionAlerts,
   getGlobalSales,
   getGlobalSalesTotals,
+  createNextMonthInvoice,
 } from '../controllers/invoiceController';
 import { authMiddleware } from '../middleware/authMiddleware';
 import { requireRole } from '../middleware/roleMiddleware';
@@ -79,6 +80,11 @@ router.post(
   '/settlements/generate',
   requireRole(UserRole.ADMIN, UserRole.FINANCE),
   generateFinalInvoice,
+);
+router.post(
+  '/settlements/next-month',
+  requireRole(UserRole.ADMIN, UserRole.FINANCE),
+  createNextMonthInvoice,
 );
 router.post('/', requireRole(UserRole.EMPLOYEE), createInvoice);
 router.put('/:id', requireRole(UserRole.EMPLOYEE), updateQuotation);

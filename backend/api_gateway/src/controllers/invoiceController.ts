@@ -185,6 +185,21 @@ export const generateFinalInvoice = async (req: Request, res: Response, next: Ne
   }
 };
 
+export const createNextMonthInvoice = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const token = req.headers.authorization?.split(' ')[1] || '';
+    const { contractId } = req.body;
+    const invoice = await invoiceAggregationService.createNextMonthInvoice(contractId, token);
+    return res.status(201).json({
+      success: true,
+      data: invoice,
+      message: 'Next month invoice created successfully',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const getStats = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     const user = req.user;

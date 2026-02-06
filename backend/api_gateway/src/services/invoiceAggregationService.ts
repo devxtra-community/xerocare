@@ -810,16 +810,40 @@ export class InvoiceAggregationService {
           url: error.config?.url,
           message: error.message,
           responseStatus: error.response?.status,
-          responseBody: error.response?.data,
+          responseData: error.response?.data,
         });
-
-        // Propagate the exact error message from Billing Service
         throw new AppError(
           error.response?.data?.message || 'Failed to generate final invoice',
           error.response?.status || 500,
         );
       }
       throw new AppError('Internal Gateway Error during final invoice generation', 500);
+    }
+  }
+
+  async createNextMonthInvoice(contractId: string, token: string): Promise<Invoice> {
+    try {
+      const response = await axios.post<{ data: Invoice }>(
+        `${BILLING_SERVICE_URL}/invoices/settlements/next-month`,
+        { contractId },
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
+      return response.data.data;
+    } catch (error: unknown) {
+      if (axios.isAxiosError(error)) {
+        logger.error('Axios error in create next month invoice', {
+          message: error.message,
+          responseStatus: error.response?.status,
+          responseData: error.response?.data,
+        });
+        throw new AppError(
+          error.response?.data?.message || 'Failed to create next month invoice',
+          error.response?.status || 500,
+        );
+      }
+      throw new AppError('Internal Gateway Error during next month invoice creation', 500);
     }
   }
 

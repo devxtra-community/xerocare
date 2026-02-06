@@ -20,6 +20,7 @@ import {
   getCollectionAlerts,
   getFinanceReport,
   updateInvoiceUsage,
+  createNextMonthInvoice,
 } from '../controllers/invoiceController';
 import { authMiddleware } from '../middlewares/authMiddleware';
 import { requireRole } from '../middlewares/roleMiddleware';
@@ -73,6 +74,12 @@ router.post(
   authMiddleware,
   requireRole(EmployeeRole.ADMIN, EmployeeRole.FINANCE),
   generateFinalInvoice,
+);
+router.post(
+  '/settlements/next-month',
+  authMiddleware,
+  requireRole(EmployeeRole.ADMIN, EmployeeRole.FINANCE),
+  createNextMonthInvoice,
 );
 router.get('/pending-counts', authMiddleware, getPendingCounts);
 router.get(

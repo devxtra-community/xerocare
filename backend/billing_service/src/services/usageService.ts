@@ -38,26 +38,39 @@ export class UsageService {
     const start = new Date(payload.billingPeriodStart);
     const end = new Date(payload.billingPeriodEnd);
 
-    // 3. Check for Duplicates
-    const existing = await this.usageRepo.findByContractAndPeriod(payload.contractId, start, end);
-    if (existing) {
-      throw new AppError('Usage record already exists for this contract and billing period.', 409);
-    }
+    // 3. Check for Duplicates / Upsert
+    let usage = await this.usageRepo.findByContractAndPeriod(payload.contractId, start, end);
 
-    // 4. Create Record (Raw Data Only)
-    const usage = this.usageRepo.create({
-      contractId: payload.contractId,
-      billingPeriodStart: start,
-      billingPeriodEnd: end,
-      bwA4Count: payload.bwA4Count,
-      bwA3Count: payload.bwA3Count,
-      colorA4Count: payload.colorA4Count,
-      colorA3Count: payload.colorA3Count,
-      reportedBy: payload.reportedBy,
-      recordedByEmployeeId: payload.recordedByEmployeeId,
-      remarks: payload.remarks,
-      meterImageUrl: payload.meterImageUrl,
-    });
+    if (usage) {
+      // If usage exists, we update it instead of throwing error (Upsert)
+      // This supports the flow where "Next Month Invoice" initialization created an empty record.
+      if (usage.finalInvoiceId) {
+        throw new AppError('Usage record is already locked/settled', 409);
+      }
+      usage.bwA4Count = payload.bwA4Count;
+      usage.bwA3Count = payload.bwA3Count;
+      usage.colorA4Count = payload.colorA4Count;
+      usage.colorA3Count = payload.colorA3Count;
+      usage.reportedBy = payload.reportedBy;
+      usage.recordedByEmployeeId = payload.recordedByEmployeeId;
+      usage.remarks = payload.remarks;
+      usage.meterImageUrl = payload.meterImageUrl;
+    } else {
+      // 4. Create New Record
+      usage = this.usageRepo.create({
+        contractId: payload.contractId,
+        billingPeriodStart: start,
+        billingPeriodEnd: end,
+        bwA4Count: payload.bwA4Count,
+        bwA3Count: payload.bwA3Count,
+        colorA4Count: payload.colorA4Count,
+        colorA3Count: payload.colorA3Count,
+        reportedBy: payload.reportedBy,
+        recordedByEmployeeId: payload.recordedByEmployeeId,
+        remarks: payload.remarks,
+        meterImageUrl: payload.meterImageUrl,
+      });
+    }
 
     return this.usageRepo.save(usage);
   }
