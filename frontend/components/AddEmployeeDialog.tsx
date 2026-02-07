@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/input';
 import RoleSelect from './RoleSelect';
 import { createEmployee } from '@/lib/employee';
 import { getBranches, Branch } from '@/lib/branch';
+import { toast } from 'sonner';
 
 export default function AddEmployeeDialog() {
   const [open, setOpen] = useState(false);
@@ -74,12 +75,13 @@ export default function AddEmployeeDialog() {
       if (files.id_proof) data.append('id_proof', files.id_proof);
 
       await createEmployee(data);
+      toast.success('Employee created successfully');
       setOpen(false);
       // Optional: trigger refresh of list here or require page reload
       window.location.reload();
-    } catch (error) {
-      console.error('Failed to create employee', error);
-      alert('Failed to create employee');
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { message?: string } } };
+      toast.error(err.response?.data?.message || 'Failed to create employee');
     } finally {
       setLoading(false);
     }
@@ -109,7 +111,7 @@ export default function AddEmployeeDialog() {
                 placeholder="John"
                 value={formData.firstName}
                 onChange={handleInputChange}
-                className="h-12 rounded-xl bg-white border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
+                className="h-12 rounded-xl bg-card border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
               />
             </div>
             <div className="space-y-2">
@@ -121,7 +123,7 @@ export default function AddEmployeeDialog() {
                 placeholder="Doe"
                 value={formData.lastName}
                 onChange={handleInputChange}
-                className="h-12 rounded-xl bg-white border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
+                className="h-12 rounded-xl bg-card border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
               />
             </div>
 
@@ -145,7 +147,7 @@ export default function AddEmployeeDialog() {
                 placeholder="john.doe@example.com"
                 value={formData.email}
                 onChange={handleInputChange}
-                className="h-12 rounded-xl bg-white border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
+                className="h-12 rounded-xl bg-card border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
               />
             </div>
 
@@ -158,7 +160,7 @@ export default function AddEmployeeDialog() {
                 name="expireDate"
                 value={formData.expireDate}
                 onChange={handleInputChange}
-                className="h-12 rounded-xl bg-white border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
+                className="h-12 rounded-xl bg-card border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
               />
             </div>
             <div className="space-y-2">
@@ -171,7 +173,7 @@ export default function AddEmployeeDialog() {
                 type="number"
                 value={formData.salary}
                 onChange={handleInputChange}
-                className="h-12 rounded-xl bg-white border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
+                className="h-12 rounded-xl bg-card border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
               />
             </div>
 
@@ -183,7 +185,7 @@ export default function AddEmployeeDialog() {
                 name="branchId"
                 value={formData.branchId}
                 onChange={handleInputChange}
-                className="w-full h-12 px-3 rounded-xl bg-white border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400 text-sm"
+                className="w-full h-12 px-3 rounded-xl bg-card border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400 text-sm"
               >
                 <option value="">Select Branch</option>
                 {branches.map((branch) => (
@@ -202,7 +204,7 @@ export default function AddEmployeeDialog() {
                 type="file"
                 accept="image/*"
                 onChange={(e) => handleFileChange(e, 'profile_image')}
-                className="h-12 rounded-xl bg-white border-none shadow-sm text-xs file:bg-blue-50 file:text-blue-600 file:border-none file:rounded-lg file:px-2 file:py-1 file:mr-2 flex items-center"
+                className="h-12 rounded-xl bg-card border-none shadow-sm text-xs file:bg-blue-50 file:text-blue-600 file:border-none file:rounded-lg file:px-2 file:py-1 file:mr-2 flex items-center"
               />
             </div>
             <div className="space-y-2">
@@ -213,7 +215,7 @@ export default function AddEmployeeDialog() {
                 type="file"
                 accept="application/pdf,image/*"
                 onChange={(e) => handleFileChange(e, 'id_proof')}
-                className="h-12 rounded-xl bg-white border-none shadow-sm text-xs file:bg-blue-50 file:text-blue-600 file:border-none file:rounded-lg file:px-2 file:py-1 file:mr-2 flex items-center"
+                className="h-12 rounded-xl bg-card border-none shadow-sm text-xs file:bg-blue-50 file:text-blue-600 file:border-none file:rounded-lg file:px-2 file:py-1 file:mr-2 flex items-center"
               />
             </div>
           </div>
@@ -222,7 +224,7 @@ export default function AddEmployeeDialog() {
             <button
               type="button"
               onClick={() => setOpen(false)}
-              className="text-sm font-bold text-gray-900 hover:text-gray-600 transition-colors"
+              className="text-sm font-bold text-foreground hover:text-gray-600 transition-colors"
             >
               Cancel
             </button>

@@ -21,7 +21,7 @@ export default function StockStatusDonut() {
     setIsClient(true);
   }, []);
 
-  if (!isClient) return <div className="h-full w-full bg-gray-50 rounded-lg animate-pulse" />;
+  if (!isClient) return <div className="h-full w-full bg-muted/50 rounded-lg animate-pulse" />;
 
   return (
     <div className="w-full h-full flex flex-col">
@@ -59,7 +59,7 @@ export default function StockStatusDonut() {
         </ResponsiveContainer>
         <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-[calc(50%+18px)] text-center pointer-events-none">
           <span className="text-xl font-bold text-primary">140</span>
-          <p className="text-[9px] text-gray-500 uppercase font-medium">Items</p>
+          <p className="text-[9px] text-muted-foreground uppercase font-medium">Items</p>
         </div>
       </div>
     </div>

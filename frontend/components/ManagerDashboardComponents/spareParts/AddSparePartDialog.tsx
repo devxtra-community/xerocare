@@ -51,7 +51,7 @@ export default function AddSparePartDialog({
   const [vendors, setVendors] = useState<Vendor[]>([]);
 
   const [formData, setFormData] = useState({
-    item_code: '',
+    lot_number: '',
     part_name: '',
     brand: '',
     model_id: '',
@@ -70,7 +70,7 @@ export default function AddSparePartDialog({
   const loadDependencies = async () => {
     try {
       const [whRes, modelRes, vendorRes] = await Promise.all([
-        warehouseService.getWarehouses(),
+        warehouseService.getWarehousesByBranch(),
         modelService.getAllModels(),
         vendorService.getVendors(),
       ]);
@@ -88,25 +88,26 @@ export default function AddSparePartDialog({
     try {
       const respo = await sparePartService.addSparePart({
         ...formData,
+        lot_number: formData.lot_number.toUpperCase(), // Apply uppercase to lot_number
         model_id: formData.model_id === 'null' ? undefined : formData.model_id,
         warehouse_id: formData.warehouse_id || undefined,
         vendor_id: formData.vendor_id || undefined,
         base_price: Number(formData.base_price),
-        quantity: Number(formData.quantity) || 0,
+        quantity: Number(formData.quantity)!,
       });
       console.log(respo);
       toast.success('Spare part added successfully');
       onSuccess();
       onOpenChange(false);
       setFormData({
-        item_code: '',
+        lot_number: '',
         part_name: '',
         brand: '',
         model_id: '',
         base_price: '',
         warehouse_id: '',
         vendor_id: '',
-        quantity: '0',
+        quantity: '',
       });
     } catch (error: unknown) {
       console.log(error);
@@ -127,11 +128,11 @@ export default function AddSparePartDialog({
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Item Code</Label>
+              <Label>Lot / Order Number</Label>
               <Input
                 required
-                value={formData.item_code}
-                onChange={(e) => setFormData({ ...formData, item_code: e.target.value })}
+                value={formData.lot_number}
+                onChange={(e) => setFormData({ ...formData, lot_number: e.target.value })}
               />
             </div>
             <div className="space-y-2">
@@ -157,6 +158,7 @@ export default function AddSparePartDialog({
                 min="0"
                 value={formData.quantity}
                 onChange={(e) => setFormData({ ...formData, quantity: e.target.value })}
+                placeholder="0"
               />
             </div>
             <div className="space-y-2">

@@ -96,17 +96,17 @@ export default function EmployeeTable() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
           <Input
             placeholder="Search employees..."
-            className="pl-10 h-10 bg-white border-blue-400/60 focus:border-blue-400 focus:ring-4 focus:ring-blue-100 outline-none shadow-sm rounded-xl transition-all"
+            className="pl-10 h-10 bg-card border-blue-400/60 focus:border-blue-400 focus:ring-4 focus:ring-blue-100 outline-none shadow-sm rounded-xl transition-all"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+      <div className="bg-card rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-gray-200">
           <Table className="w-full text-left">
-            <TableHeader className="bg-gray-50/50">
+            <TableHeader className="bg-muted/50/50">
               <TableRow className="border-b border-gray-100 hover:bg-transparent">
                 <TableHead className="px-3 py-2 text-[10px] font-bold text-primary uppercase">
                   Employee ID
@@ -139,10 +139,10 @@ export default function EmployeeTable() {
                 <TableRow
                   key={emp.id}
                   className={`transition-colors h-11 border-b border-gray-50 hover:bg-primary/5 ${
-                    index % 2 === 0 ? 'bg-white' : 'bg-blue-50/20'
+                    index % 2 === 0 ? 'bg-card' : 'bg-blue-50/20'
                   }`}
                 >
-                  <TableCell className="px-3 py-1.5 text-[11px] font-mono text-gray-500 whitespace-nowrap">
+                  <TableCell className="px-3 py-1.5 text-[11px] font-mono text-muted-foreground whitespace-nowrap">
                     EMP-{emp.id.toString().padStart(4, '0')}
                   </TableCell>
                   <TableCell className="px-3 py-1.5 whitespace-nowrap">
@@ -150,7 +150,7 @@ export default function EmployeeTable() {
                       <div className="h-7 w-7 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-bold text-[10px] flex-shrink-0">
                         {emp.name.charAt(0)}
                       </div>
-                      <span className="text-[12px] font-bold text-gray-900">{emp.name}</span>
+                      <span className="text-[12px] font-bold text-foreground">{emp.name}</span>
                     </div>
                   </TableCell>
                   <TableCell className="px-3 py-1.5 text-[11px] text-gray-600 whitespace-nowrap">
@@ -172,10 +172,10 @@ export default function EmployeeTable() {
                       {emp.department}
                     </span>
                   </TableCell>
-                  <TableCell className="px-3 py-1.5 text-[11px] text-gray-500 whitespace-nowrap">
+                  <TableCell className="px-3 py-1.5 text-[11px] text-muted-foreground whitespace-nowrap">
                     Main Branch
                   </TableCell>
-                  <TableCell className="px-3 py-1.5 text-[11px] text-gray-500 whitespace-nowrap">
+                  <TableCell className="px-3 py-1.5 text-[11px] text-muted-foreground whitespace-nowrap">
                     Reporting Manager
                   </TableCell>
                   <TableCell className="px-3 py-1.5 whitespace-nowrap">

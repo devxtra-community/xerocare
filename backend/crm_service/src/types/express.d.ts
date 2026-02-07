@@ -4,6 +4,7 @@ export interface JWTPayload {
   email: string;
   role: string;
   branchId?: string;
+  employeeJob?: string | null;
 }
 
 declare global {

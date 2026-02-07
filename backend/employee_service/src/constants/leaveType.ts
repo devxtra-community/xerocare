@@ -1,0 +1,7 @@
+export enum LeaveType {
+  SICK = 'SICK',
+  CASUAL = 'CASUAL',
+  VACATION = 'VACATION',
+  PERSONAL = 'PERSONAL',
+  EMERGENCY = 'EMERGENCY',
+}

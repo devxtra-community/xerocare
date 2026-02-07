@@ -9,6 +9,8 @@ import {
   JoinColumn,
 } from 'typeorm';
 import { EmployeeRole } from '../constants/employeeRole';
+import { EmployeeJob } from '../constants/employeeJob';
+import { FinanceJob } from '../constants/financeJob';
 import { Branch } from './branchEntity';
 
 export enum EmployeeStatus {
@@ -41,6 +43,14 @@ export class Employee {
 
   @Column({ type: 'enum', enum: EmployeeRole, default: EmployeeRole.EMPLOYEE })
   role!: EmployeeRole;
+
+  @Index()
+  @Column({ type: 'enum', enum: EmployeeJob, nullable: true })
+  employee_job!: EmployeeJob | null;
+
+  @Index()
+  @Column({ type: 'enum', enum: FinanceJob, nullable: true })
+  finance_job!: FinanceJob | null;
 
   @Column({ type: 'numeric', precision: 12, scale: 2, nullable: true })
   salary!: number | null;

@@ -28,12 +28,12 @@ export default function StockMovementTrend() {
     setIsClient(true);
   }, []);
 
-  if (!isClient) return <div className="h-full w-full bg-gray-50 rounded-lg animate-pulse" />;
+  if (!isClient) return <div className="h-full w-full bg-muted/50 rounded-lg animate-pulse" />;
 
   return (
     <div className="w-full h-full flex flex-col">
       <div className="flex flex-row items-center justify-between pb-4">
-        <p className="text-xs text-gray-500 font-medium uppercase">Last 12 Months</p>
+        <p className="text-xs text-muted-foreground font-medium uppercase">Last 12 Months</p>
         <div className="flex gap-1.5 text-[10px]">
           {['1M', '3M', '6M', '1Y'].map((period) => (
             <button

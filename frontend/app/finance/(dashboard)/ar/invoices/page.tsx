@@ -107,7 +107,7 @@ export default function SalesInvoiceListPage() {
   );
 
   return (
-    <div className="p-4 sm:p-8 space-y-8 bg-slate-50/50 min-h-screen">
+    <div className="p-4 sm:p-8 space-y-8 bg-muted/50/50 min-h-screen">
       <PageHeader
         title="Sales Invoices"
         description="Accounts Receivable – Customer Invoices & Collections"
@@ -135,12 +135,12 @@ export default function SalesInvoiceListPage() {
       </div>
 
       {/* 2. Search & Filters */}
-      <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-white p-4 rounded-xl border shadow-sm">
+      <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-card p-4 rounded-xl border shadow-sm">
         <div className="relative w-full md:w-96">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
             placeholder="Search invoice or customer..."
-            className="pl-10 bg-slate-50/50 border-none h-10"
+            className="pl-10 bg-muted/50/50 border-none h-10"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
@@ -148,10 +148,10 @@ export default function SalesInvoiceListPage() {
         <div className="flex items-center gap-3 w-full md:w-auto">
           <Filter className="w-4 h-4 text-muted-foreground hidden sm:block" />
           <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-full md:w-48 bg-white border-slate-200">
+            <SelectTrigger className="w-full md:w-48 bg-card border-border">
               <SelectValue placeholder="Filter by status" />
             </SelectTrigger>
-            <SelectContent className="bg-white">
+            <SelectContent className="bg-card">
               <SelectItem value="All">All Invoices</SelectItem>
               <SelectItem value="Draft">Drafts</SelectItem>
               <SelectItem value="Posted">Posted</SelectItem>
@@ -164,16 +164,16 @@ export default function SalesInvoiceListPage() {
       </div>
 
       {/* 3. Data Table */}
-      <div className="bg-white border rounded-xl shadow-sm overflow-hidden">
+      <div className="bg-card border rounded-xl shadow-sm overflow-hidden">
         <Table>
-          <TableHeader className="bg-slate-50/50">
+          <TableHeader className="bg-muted/50/50">
             <TableRow>
               <TableHead className="w-[140px] pl-6">Invoice No</TableHead>
               <TableHead>Customer</TableHead>
               <TableHead>Issue Date</TableHead>
               <TableHead>Due Date</TableHead>
               <TableHead className="text-right">Total</TableHead>
-              <TableHead className="text-right font-bold text-slate-900 pr-6">Balance</TableHead>
+              <TableHead className="text-right font-bold text-foreground pr-6">Balance</TableHead>
               <TableHead className="pl-8">Status</TableHead>
             </TableRow>
           </TableHeader>
@@ -186,7 +186,7 @@ export default function SalesInvoiceListPage() {
               </TableRow>
             ) : (
               filteredInvoices.map((inv) => (
-                <TableRow key={inv.id} className="group hover:bg-slate-50/30 transition-colors">
+                <TableRow key={inv.id} className="group hover:bg-muted/50/30 transition-colors">
                   <TableCell className="font-bold text-blue-600 pl-6">
                     <Link href={`/finance/ar/invoices/${inv.id}`}>{inv.invoiceNumber}</Link>
                   </TableCell>
@@ -203,7 +203,7 @@ export default function SalesInvoiceListPage() {
                   <TableCell className="text-right text-muted-foreground">
                     {inv.totalAmount.toLocaleString()}
                   </TableCell>
-                  <TableCell className="text-right font-black text-slate-900 pr-6">
+                  <TableCell className="text-right font-black text-foreground pr-6">
                     {inv.balance.toLocaleString()}
                   </TableCell>
                   <TableCell className="pl-8">
@@ -235,20 +235,20 @@ function StatsCard({
   isCount?: boolean;
 }) {
   return (
-    <Card className="shadow-sm border-none bg-white ring-1 ring-slate-200">
+    <Card className="shadow-sm border-none bg-card ring-1 ring-slate-200">
       <CardContent className="p-6 flex items-center justify-between">
         <div className="space-y-1">
           <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
             {title}
           </p>
           <h3
-            className={`text-2xl font-black ${isRisk && value > 0 ? 'text-destructive' : 'text-slate-900'}`}
+            className={`text-2xl font-black ${isRisk && value > 0 ? 'text-destructive' : 'text-foreground'}`}
           >
             {!isCount && 'AED '}
             {value.toLocaleString()}
           </h3>
         </div>
-        <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">{icon}</div>
+        <div className="p-3 bg-muted/50 rounded-xl border border-slate-100">{icon}</div>
       </CardContent>
     </Card>
   );

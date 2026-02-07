@@ -62,7 +62,7 @@ export default function VendorTransactionsTable() {
   const currentData = transactionData.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
   return (
-    <div className="bg-white rounded-xl shadow-sm overflow-hidden h-full flex flex-col">
+    <div className="bg-card rounded-xl shadow-sm overflow-hidden h-full flex flex-col">
       <div className="overflow-x-auto flex-1">
         <Table>
           <TableHeader>
@@ -91,9 +91,9 @@ export default function VendorTransactionsTable() {
             {currentData.map((item, index) => (
               <TableRow
                 key={item.id}
-                className={`hover:bg-gray-50/30 transition-colors ${index % 2 ? 'bg-blue-50/20' : 'bg-white'}`}
+                className={`hover:bg-muted/50/30 transition-colors ${index % 2 ? 'bg-blue-50/20' : 'bg-card'}`}
               >
-                <TableCell className="px-4 py-3 text-xs font-medium text-gray-900">
+                <TableCell className="px-4 py-3 text-xs font-medium text-foreground">
                   {item.id}
                 </TableCell>
                 <TableCell className="px-4 py-3 text-xs text-gray-600">{item.date}</TableCell>
@@ -108,7 +108,7 @@ export default function VendorTransactionsTable() {
                     {item.type}
                   </span>
                 </TableCell>
-                <TableCell className="px-4 py-3 text-xs text-right font-bold text-gray-900">
+                <TableCell className="px-4 py-3 text-xs text-right font-bold text-foreground">
                   ₹{item.amount.toLocaleString()}
                 </TableCell>
                 <TableCell className="px-4 py-3 text-center">
@@ -141,7 +141,7 @@ export default function VendorTransactionsTable() {
         </Table>
       </div>
 
-      <div className="p-3 border-t border-gray-50 flex items-center justify-between bg-white mt-auto">
+      <div className="p-3 border-t border-gray-50 flex items-center justify-between bg-card mt-auto">
         <div className="flex items-center gap-1">
           <Button
             variant="outline"
@@ -162,7 +162,7 @@ export default function VendorTransactionsTable() {
             Next
           </Button>
         </div>
-        <span className="text-[10px] text-gray-500">
+        <span className="text-[10px] text-muted-foreground">
           Page {page} of {totalPages}
         </span>
       </div>

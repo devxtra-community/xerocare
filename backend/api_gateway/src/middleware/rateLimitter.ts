@@ -40,7 +40,7 @@ export const otpVerifyLimiter = rateLimit({
     prefix: 'rl:otp-verify:',
   }),
   windowMs: 10 * 60 * 1000, // 10 minutes
-  max: 3,
+  max: 10,
   message: { message: 'Too many verification attempts, please try again after 10 minutes' },
 });
 

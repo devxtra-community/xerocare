@@ -33,7 +33,6 @@ interface BulkSparePartDialogProps {
 }
 
 interface BulkSparePartRow {
-  item_code: string;
   part_name: string;
   brand: string;
   model_id: string;
@@ -41,6 +40,7 @@ interface BulkSparePartRow {
   quantity: number;
   vendor_id: string;
   warehouse_id: string;
+  // lot_number come from Global State
 }
 
 export default function BulkSparePartDialog({
@@ -54,12 +54,13 @@ export default function BulkSparePartDialog({
   const [models, setModels] = useState<{ id: string; model_name: string }[]>([]);
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [file, setFile] = useState<File | null>(null);
+  const [lotNumber, setLotNumber] = useState('');
 
   const loadDependencies = async () => {
     try {
       const [v, w, m] = await Promise.all([
         vendorService.getVendors(),
-        warehouseService.getWarehouses(),
+        warehouseService.getWarehousesByBranch(),
         modelService.getAllModels(),
       ]);
       setVendors(v || []);
@@ -74,12 +75,12 @@ export default function BulkSparePartDialog({
     if (open) {
       setRows([]);
       setFile(null);
+      setLotNumber('');
       loadDependencies();
     }
   }, [open]);
 
   const createEmptyRow = (): Partial<BulkSparePartRow> => ({
-    item_code: '',
     part_name: '',
     brand: '',
     model_id: '',
@@ -138,12 +139,12 @@ export default function BulkSparePartDialog({
       const rawWarehouse = getVal(['warehouse_id', 'Warehouse ID', 'Warehouse']);
 
       return {
-        item_code: getVal(['item_code', 'Item Code', 'ItemCode']),
+        // item_code removed
         part_name: getVal(['part_name', 'Item Name', 'Name']),
         brand: getVal(['brand', 'Brand']),
         model_id: findIdByName(rawModel, models),
-        base_price: Number(getVal(['base_price', 'Price'])) || 0,
-        quantity: Number(getVal(['quantity', 'Quantity', 'Qty'])) || 0,
+        base_price: Number(getVal(['base_price', 'Price']))!,
+        quantity: Number(getVal(['quantity', 'Quantity', 'Qty']))!,
         vendor_id: findIdByName(rawVendor, vendors),
         warehouse_id: findIdByName(rawWarehouse, warehouses),
       };
@@ -173,11 +174,16 @@ export default function BulkSparePartDialog({
   };
 
   const handleSubmit = async () => {
-    // Validate rows - require item_code
-    const validRows = rows.filter((r) => r.item_code);
+    // Validate rows - require part_name
+    const validRows = rows.filter((r) => r.part_name);
+
+    if (!lotNumber) {
+      toast.error('Please enter a Batch Lot/Order Number');
+      return;
+    }
 
     if (validRows.length === 0) {
-      toast.error('Please add at least one valid spare part with Item Code');
+      toast.error('Please add at least one valid spare part');
       return;
     }
 
@@ -189,6 +195,7 @@ export default function BulkSparePartDialog({
         model_id: !r.model_id || r.model_id === 'universal' ? undefined : r.model_id,
         base_price: Number(r.base_price),
         quantity: Number(r.quantity),
+        lot_number: lotNumber || undefined, // Pass the Lot Number (global for batch)
       }));
 
       // sparePartService.bulkUpload type definition matches payload
@@ -214,7 +221,7 @@ export default function BulkSparePartDialog({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="bg-white rounded-xl w-full max-w-6xl h-[85vh] flex flex-col shadow-2xl">
+      <div className="bg-card rounded-xl w-full max-w-6xl h-[85vh] flex flex-col shadow-2xl">
         <div className="p-4 border-b flex justify-between items-center">
           <h2 className="text-xl font-bold flex items-center gap-2">
             <Upload size={20} /> Bulk Spare Part Upload
@@ -227,7 +234,7 @@ export default function BulkSparePartDialog({
           </button>
         </div>
 
-        <div className="p-4 bg-gray-50 border-b flex flex-col sm:flex-row gap-4 items-center justify-between">
+        <div className="p-4 bg-muted/50 border-b flex flex-col sm:flex-row gap-4 items-center justify-between">
           <div className="flex gap-4 items-center w-full sm:w-auto">
             <div className="relative">
               <input
@@ -246,8 +253,26 @@ export default function BulkSparePartDialog({
               </label>
             </div>
           </div>
-          <div className="text-sm text-gray-500">
+          <div className="text-sm text-muted-foreground">
             {rows.length > 0 ? `${rows.length} rows loaded` : 'Upload an Excel file to get started'}
+          </div>
+        </div>
+
+        {/* Global Batch Fields */}
+        <div className="px-4 py-2 bg-white border-b flex gap-4 items-center">
+          <div className="w-64">
+            <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">
+              Batch Lot / Order Number
+            </label>
+            <Input
+              placeholder="e.g. ORD-2024-001"
+              value={lotNumber}
+              onChange={(e) => setLotNumber(e.target.value)}
+              className="h-9"
+            />
+          </div>
+          <div className="text-xs text-blue-500 mt-5 font-medium">
+            * This Lot Number will be applied to all items in this batch.
           </div>
         </div>
 
@@ -256,9 +281,6 @@ export default function BulkSparePartDialog({
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[120px]">
-                    Item Code <span className="text-red-500">*</span>
-                  </TableHead>
                   <TableHead className="w-[150px]">
                     Part Name <span className="text-red-500">*</span>
                   </TableHead>
@@ -278,13 +300,6 @@ export default function BulkSparePartDialog({
                   <TableRow key={i}>
                     <TableCell>
                       <Input
-                        value={row.item_code}
-                        onChange={(e) => updateRow(i, 'item_code', e.target.value)}
-                        placeholder="SP-001"
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Input
                         value={row.part_name}
                         onChange={(e) => updateRow(i, 'part_name', e.target.value)}
                         placeholder="Name"
@@ -302,6 +317,7 @@ export default function BulkSparePartDialog({
                         type="number"
                         value={row.base_price}
                         onChange={(e) => updateRow(i, 'base_price', Number(e.target.value))}
+                        placeholder="Base Price"
                       />
                     </TableCell>
                     <TableCell>
@@ -309,6 +325,7 @@ export default function BulkSparePartDialog({
                         type="number"
                         value={row.quantity}
                         onChange={(e) => updateRow(i, 'quantity', Number(e.target.value))}
+                        placeholder="0"
                       />
                     </TableCell>
                     <TableCell>
@@ -384,7 +401,7 @@ export default function BulkSparePartDialog({
           )}
         </div>
 
-        <div className="p-4 border-t flex justify-between items-center bg-gray-50">
+        <div className="p-4 border-t flex justify-between items-center bg-muted/50">
           <Button variant="outline" onClick={handleAddRow} className="gap-2">
             <Plus size={16} /> Add Row
           </Button>

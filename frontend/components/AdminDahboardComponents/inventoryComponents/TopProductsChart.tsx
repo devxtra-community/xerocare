@@ -39,13 +39,13 @@ const CustomTooltip = ({
   if (active && payload && payload.length) {
     const data = payload[0].payload;
     return (
-      <div className="bg-white p-3 border rounded-lg shadow-lg">
+      <div className="bg-card p-3 border rounded-lg shadow-lg">
         <p className="font-semibold text-sm">{data.productName}</p>
         <p className="text-xs text-gray-600">
           Stock: <span className="font-bold text-primary">{data.stock}</span>
         </p>
-        <p className="text-xs text-gray-500 mt-1">Vendor: {data.vendor}</p>
-        <p className="text-xs text-gray-500">Warehouse: {data.warehouse}</p>
+        <p className="text-xs text-muted-foreground mt-1">Vendor: {data.vendor}</p>
+        <p className="text-xs text-muted-foreground">Warehouse: {data.warehouse}</p>
       </div>
     );
   }
@@ -59,10 +59,10 @@ export default function TopProductsChart() {
     setIsClient(true);
   }, []);
 
-  if (!isClient) return <div className="h-[250px] w-full bg-white rounded-2xl animate-pulse" />;
+  if (!isClient) return <div className="h-[250px] w-full bg-card rounded-2xl animate-pulse" />;
 
   return (
-    <div className="rounded-2xl bg-white h-[260px] w-full shadow-sm flex flex-col p-3">
+    <div className="rounded-2xl bg-card h-[260px] w-full shadow-sm flex flex-col p-3">
       <div className="flex-1 w-full">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart

@@ -15,7 +15,7 @@ interface Props {
 export default function RoleSelect({ value, onChange }: Props) {
   return (
     <Select value={value} onValueChange={onChange}>
-      <SelectTrigger className="rounded-xl bg-gray-50 border-none">
+      <SelectTrigger className="rounded-xl bg-muted/50 border-none">
         <SelectValue placeholder="Select Employee Role"></SelectValue>
       </SelectTrigger>
       <SelectContent>

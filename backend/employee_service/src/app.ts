@@ -1,10 +1,11 @@
 import 'reflect-metadata';
 import express, { urlencoded } from 'express';
 import { Source } from './config/dataSource';
-import './config/env';
+import './config/env'; // Trigger restart
 import adminRouter from './routes/adminRouter';
 import employeeRouter from './routes/employeeRouter';
 import authRouter from './routes/authRouter';
+import leaveApplicationRouter from './routes/leaveApplicationRouter';
 import cookieParser from 'cookie-parser';
 import { getRabbitChannel } from './config/rabbitmq';
 import { startWorker } from './workers/emailWorker';
@@ -43,6 +44,7 @@ app.use('/', healthRouter);
 app.use('/auth', authRouter);
 app.use('/employee', employeeRouter);
 app.use('/admin', adminRouter);
+app.use('/leave-applications', leaveApplicationRouter);
 
 app.use(errorHandler);
 

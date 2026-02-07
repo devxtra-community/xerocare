@@ -11,24 +11,40 @@ import {
   Tooltip,
 } from 'recharts';
 
-const data = [
-  { branch: 'Kochi', sales: 120000 },
-  { branch: 'Ernakulam', sales: 95000 },
-  { branch: 'Trivandrum', sales: 70000 },
-  { branch: 'Kozhikode', sales: 85000 },
-  { branch: 'Thrissur', sales: 60000 },
-];
+import { salesService } from '@/services/salesService';
+
+// Remove hardcoded data
 
 export default function BranchSalesChart() {
   const [selectedPeriod, setSelectedPeriod] = useState('1M');
   const [isClient, setIsClient] = useState(false);
+  const [chartData, setChartData] = useState<{ date: string; sales: number }[]>([]);
 
   useEffect(() => {
     setIsClient(true);
-  }, []);
+
+    const fetchData = async () => {
+      try {
+        const sales = await salesService.getBranchSalesOverview(selectedPeriod);
+
+        // Map sales to chart data
+        // Backend returns dates, let's map them directly
+        const data = sales.map((s) => ({
+          date: s.date, // Format if needed, e.g. new Date(s.date).toLocaleDateString()
+          sales: s.totalSales,
+        }));
+
+        setChartData(data);
+      } catch (error) {
+        console.error('Failed to fetch chart data:', error);
+      }
+    };
+
+    fetchData();
+  }, [selectedPeriod]);
 
   return (
-    <div className="rounded-2xl bg-white h-[260px] w-full shadow-sm flex flex-col p-3">
+    <div className="rounded-2xl bg-card h-[260px] w-full shadow-sm flex flex-col p-3">
       {/* Header */}
       <div className="flex items-center justify-between pb-2">
         <p className="text-xs text-gray-600">Branch sales ({selectedPeriod})</p>
@@ -54,7 +70,7 @@ export default function BranchSalesChart() {
       <div className="flex-1 w-full">
         {isClient && (
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={data} margin={{ top: 5, left: 0, right: 5, bottom: 0 }}>
+            <AreaChart data={chartData} margin={{ top: 5, left: 0, right: 5, bottom: 0 }}>
               <defs>
                 <linearGradient id="branchSalesGradient" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="0%" stopColor="#1d4ed8" stopOpacity={0.7} />
@@ -65,11 +81,15 @@ export default function BranchSalesChart() {
               <CartesianGrid vertical={false} strokeDasharray="3 3" strokeOpacity={0.3} />
 
               <XAxis
-                dataKey="branch"
+                dataKey="date"
                 axisLine={false}
                 tickLine={false}
                 tickMargin={6}
                 tick={{ fill: '#6b7280', fontSize: 10 }}
+                tickFormatter={(val) => {
+                  const d = new Date(val);
+                  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                }}
               />
 
               <YAxis
@@ -114,8 +134,8 @@ function CustomTooltip({
   if (!active || !payload?.length) return null;
 
   return (
-    <div className="bg-white px-2 py-1 rounded-md shadow-sm text-[10px] leading-tight">
-      <p className="text-gray-700 font-medium">Branch: {label}</p>
+    <div className="bg-card px-2 py-1 rounded-md shadow-sm text-[10px] leading-tight">
+      <p className="text-gray-700 font-medium">{label}</p>
       <p className="text-blue-600">Sales: ₹{payload[0].value.toLocaleString()}</p>
     </div>
   );

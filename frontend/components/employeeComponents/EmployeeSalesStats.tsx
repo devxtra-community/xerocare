@@ -2,57 +2,96 @@
 
 import React, { useEffect, useState } from 'react';
 import StatCard from '@/components/StatCard';
-import { getInvoiceStats } from '@/lib/invoice';
+import { getMyInvoices, Invoice } from '@/lib/invoice';
+import { Loader2 } from 'lucide-react';
 
-export default function EmployeeSalesStats() {
-  const [stats, setStats] = useState<Record<string, number>>({
-    SALE: 0,
-    RENT: 0,
-    LEASE: 0,
+interface EmployeeSalesStatsProps {
+  invoices?: Invoice[];
+}
+
+export default function EmployeeSalesStats({ invoices: propInvoices }: EmployeeSalesStatsProps) {
+  const [stats, setStats] = useState({
+    totalOrders: 0,
+    salesCount: 0,
+    salesMonth: 0,
+    totalAmount: 0,
   });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const data = await getInvoiceStats();
-        setStats(data);
+        let invoices = propInvoices;
+        if (!invoices) {
+          invoices = await getMyInvoices();
+        }
+
+        const now = new Date();
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+        const totalOrders = invoices.length;
+        const salesInvoices = invoices.filter((inv) => inv.saleType === 'SALE');
+        const salesCount = salesInvoices.length;
+        const salesMonth = salesInvoices.filter(
+          (inv) => new Date(inv.createdAt) >= startOfMonth,
+        ).length;
+
+        // Parse float to avoid string concatenation if API returns strings
+        const totalAmount = salesInvoices.reduce(
+          (sum, inv) => sum + (parseFloat(String(inv.totalAmount)) || 0),
+          0,
+        );
+
+        setStats({
+          totalOrders,
+          salesCount,
+          salesMonth,
+          totalAmount,
+        });
       } catch (error) {
-        console.error('Failed to fetch invoice stats:', error);
+        console.error('Failed to fetch sales stats:', error);
       } finally {
         setLoading(false);
       }
     };
     fetchStats();
-  }, []);
-
-  const totalSales = stats.SALE + stats.RENT + stats.LEASE;
+  }, [propInvoices]);
 
   const cards = [
     {
       title: 'Total Sales',
-      value: loading ? '...' : totalSales.toLocaleString(),
-      subtitle: 'Across all types',
+      value: loading ? '...' : stats.salesCount.toLocaleString(),
+      subtitle: 'All time sales count',
     },
     {
-      title: 'Rent',
-      value: loading ? '...' : stats.RENT.toLocaleString(),
-      subtitle: 'Active rentals',
+      title: 'Sales This Month',
+      value: loading ? '...' : stats.salesMonth.toLocaleString(),
+      subtitle: 'Current month count',
     },
     {
-      title: 'Lease',
-      value: loading ? '...' : stats.LEASE.toLocaleString(),
-      subtitle: 'Active leases',
-    },
-    {
-      title: 'Sale',
-      value: loading ? '...' : stats.SALE.toLocaleString(),
-      subtitle: 'Direct sales',
+      title: 'Total Sales Amount',
+      value: loading ? '...' : `₹${stats.totalAmount.toLocaleString()}`,
+      subtitle: 'Total revenue generated',
     },
   ];
 
+  if (loading) {
+    return (
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3 md:gap-4">
+        {[1, 2, 3].map((i) => (
+          <div
+            key={i}
+            className="bg-card p-4 rounded-xl shadow-sm h-32 flex items-center justify-center"
+          >
+            <Loader2 className="h-6 w-6 animate-spin text-blue-500" />
+          </div>
+        ))}
+      </div>
+    );
+  }
+
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 md:gap-4">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3 md:gap-4">
       {cards.map((c) => (
         <StatCard key={c.title} title={c.title} value={c.value} subtitle={c.subtitle} />
       ))}

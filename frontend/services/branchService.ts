@@ -11,6 +11,11 @@ export interface Branch {
 }
 
 export const branchService = {
+  getAllBranches: async (): Promise<Branch[]> => {
+    const response = await api.get('/i/branch');
+    return response.data.data;
+  },
+
   getMyBranch: async (): Promise<Branch> => {
     const response = await api.get('/i/branch/my-branch');
     return response.data.data;

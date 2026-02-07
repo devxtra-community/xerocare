@@ -90,7 +90,6 @@ export default function EmployeeLeadsTable() {
         await createLead(leadData);
         toast.success('Lead created successfully');
       }
-      setDialogOpen(false);
       fetchLeads();
     } catch (error) {
       console.error(error);
@@ -139,12 +138,12 @@ export default function EmployeeLeadsTable() {
               placeholder="Search leads..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="pl-9 h-10 bg-white border-blue-400/60 focus:border-blue-400 focus:ring-4 focus:ring-blue-100 outline-none shadow-sm transition-all w-full"
+              className="pl-9 h-10 bg-card border-blue-400/60 focus:border-blue-400 focus:ring-4 focus:ring-blue-100 outline-none shadow-sm transition-all w-full"
             />
           </div>
           <div className="w-full sm:w-[150px]">
             <Select value={filterType} onValueChange={setFilterType}>
-              <SelectTrigger className="h-10 bg-white border-blue-400/60 focus:ring-blue-100 rounded-lg w-full">
+              <SelectTrigger className="h-10 bg-card border-blue-400/60 focus:ring-blue-100 rounded-lg w-full">
                 <SelectValue placeholder="Filter by" />
               </SelectTrigger>
               <SelectContent>
@@ -172,11 +171,11 @@ export default function EmployeeLeadsTable() {
         </Button>
       </div>
 
-      <div className="rounded-2xl bg-white shadow-sm overflow-hidden border">
+      <div className="rounded-2xl bg-card shadow-sm overflow-hidden border">
         <div className="overflow-x-auto">
           <Table className="min-w-[800px] sm:min-w-full">
             <TableHeader>
-              <TableRow className="bg-slate-50">
+              <TableRow className="bg-muted/50">
                 <TableHead className="text-primary font-bold">NAME</TableHead>
                 <TableHead className="text-primary font-bold">CONTACT</TableHead>
                 <TableHead className="text-primary font-bold">SOURCE</TableHead>
@@ -201,7 +200,7 @@ export default function EmployeeLeadsTable() {
                 </TableRow>
               ) : (
                 filteredLeads.map((lead, index) => (
-                  <TableRow key={lead._id} className={index % 2 ? 'bg-blue-50/20' : 'bg-white'}>
+                  <TableRow key={lead._id} className={index % 2 ? 'bg-blue-50/20' : 'bg-card'}>
                     <TableCell className="font-bold text-primary">
                       <div className="flex flex-col">
                         <span>{lead.name}</span>
@@ -222,12 +221,12 @@ export default function EmployeeLeadsTable() {
                     </TableCell>
                     <TableCell>
                       <div className="flex flex-col">
-                        <span className="text-xs text-slate-500">{lead.email}</span>
-                        <span className="text-xs text-slate-500">{lead.phone}</span>
+                        <span className="text-xs text-muted-foreground">{lead.email}</span>
+                        <span className="text-xs text-muted-foreground">{lead.phone}</span>
                       </div>
                     </TableCell>
-                    <TableCell className="text-gray-500">{lead.source}</TableCell>
-                    <TableCell className="text-gray-500">
+                    <TableCell className="text-muted-foreground">{lead.source}</TableCell>
+                    <TableCell className="text-muted-foreground">
                       {(lead.metadata as { product?: string })?.product || '-'}
                     </TableCell>
                     <TableCell>
@@ -247,7 +246,7 @@ export default function EmployeeLeadsTable() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-8 w-8 text-slate-500 hover:text-blue-600 hover:bg-blue-50"
+                          className="h-8 w-8 text-muted-foreground hover:text-blue-600 hover:bg-blue-50"
                           onClick={() => handleEditClick(lead)}
                           title="Edit Lead"
                         >
@@ -257,7 +256,7 @@ export default function EmployeeLeadsTable() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-8 w-8 text-slate-500 hover:text-blue-600 hover:bg-blue-50"
+                            className="h-8 w-8 text-muted-foreground hover:text-blue-600 hover:bg-blue-50"
                           >
                             <Phone className="h-4 w-4" />
                           </Button>
@@ -266,7 +265,7 @@ export default function EmployeeLeadsTable() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-8 w-8 text-slate-500 hover:text-blue-600 hover:bg-blue-50"
+                            className="h-8 w-8 text-muted-foreground hover:text-blue-600 hover:bg-blue-50"
                           >
                             <Mail className="h-4 w-4" />
                           </Button>
@@ -275,7 +274,7 @@ export default function EmployeeLeadsTable() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-8 w-8 text-slate-500 hover:text-red-600 hover:bg-red-50"
+                            className="h-8 w-8 text-muted-foreground hover:text-red-600 hover:bg-red-50"
                             onClick={() => handleDelete(lead._id, !!lead.isDeleted)}
                             title="Delete Lead"
                           >

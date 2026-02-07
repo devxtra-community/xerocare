@@ -98,7 +98,8 @@ export default function EmployeeCustomerTable() {
         await createCustomer(payload);
         toast.success('Customer created successfully');
       }
-      setDialogOpen(false);
+      // fetchCustomers(); // Moved outside to let dialog close first if desired, or keep here.
+      // Dialog closes in FormDialog after await. State update happens here.
       fetchCustomers();
     } catch (error) {
       console.error(error);
@@ -121,7 +122,7 @@ export default function EmployeeCustomerTable() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
             <Input
               placeholder="Search customers..."
-              className="pl-9 h-10 bg-white border-blue-400/60 focus:border-blue-400 focus:ring-4 focus:ring-blue-100 outline-none shadow-sm transition-all w-full md:w-[250px]"
+              className="pl-9 h-10 bg-card border-blue-400/60 focus:border-blue-400 focus:ring-4 focus:ring-blue-100 outline-none shadow-sm transition-all w-full md:w-[250px]"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -144,11 +145,11 @@ export default function EmployeeCustomerTable() {
       </div>
 
       {/* Table Container */}
-      <div className="rounded-2xl bg-white shadow-sm overflow-hidden border">
+      <div className="rounded-2xl bg-card shadow-sm overflow-hidden border">
         <div className="overflow-x-auto">
           <Table>
             <TableHeader>
-              <TableRow className="bg-slate-50">
+              <TableRow className="bg-muted/50">
                 <TableHead className="text-primary font-bold whitespace-nowrap">Name</TableHead>
                 <TableHead className="text-primary font-bold whitespace-nowrap">Email</TableHead>
                 <TableHead className="text-primary font-bold whitespace-nowrap">Phone</TableHead>
@@ -176,17 +177,23 @@ export default function EmployeeCustomerTable() {
                 </TableRow>
               ) : (
                 filteredCustomers.map((customer, index) => (
-                  <TableRow key={customer.id} className={index % 2 ? 'bg-blue-50/20' : 'bg-white'}>
+                  <TableRow key={customer.id} className={index % 2 ? 'bg-blue-50/20' : 'bg-card'}>
                     <TableCell>
                       <div className="flex items-center gap-3">
                         <div className="h-9 w-9 rounded-full bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center text-blue-600 font-bold text-xs border border-blue-200">
                           {customer.name.charAt(0)}
                         </div>
-                        <span className="text-sm font-semibold text-gray-900">{customer.name}</span>
+                        <span className="text-sm font-semibold text-foreground">
+                          {customer.name}
+                        </span>
                       </div>
                     </TableCell>
-                    <TableCell className="text-sm text-gray-500">{customer.email || '-'}</TableCell>
-                    <TableCell className="text-sm text-gray-500">{customer.phone || '-'}</TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {customer.email || '-'}
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {customer.phone || '-'}
+                    </TableCell>
                     <TableCell>
                       <Badge
                         variant="secondary"
@@ -199,7 +206,7 @@ export default function EmployeeCustomerTable() {
                         {customer.isActive ? 'ACTIVE' : 'INACTIVE'}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-slate-500 font-medium text-sm whitespace-nowrap">
+                    <TableCell className="text-muted-foreground font-medium text-sm whitespace-nowrap">
                       {new Date(customer.createdAt).toLocaleDateString('en-GB', {
                         day: '2-digit',
                         month: 'short',
@@ -211,7 +218,7 @@ export default function EmployeeCustomerTable() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-8 w-8 text-slate-500 hover:text-blue-600 hover:bg-blue-50"
+                          className="h-8 w-8 text-muted-foreground hover:text-blue-600 hover:bg-blue-50"
                           onClick={() => handleEditCustomer(customer)}
                           title="Edit Customer"
                         >
@@ -220,7 +227,7 @@ export default function EmployeeCustomerTable() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-8 w-8 text-slate-500 hover:text-red-600 hover:bg-red-50"
+                          className="h-8 w-8 text-muted-foreground hover:text-red-600 hover:bg-red-50"
                           onClick={() => handleDeleteCustomer(customer.id)}
                           title="Delete Customer"
                         >
@@ -236,8 +243,8 @@ export default function EmployeeCustomerTable() {
         </div>
 
         {/* Pagination Footer - Static for now - Matched with Container style */}
-        <div className="p-4 border-t border-gray-100 bg-gray-50/50 flex items-center justify-between">
-          <p className="text-xs text-gray-500">
+        <div className="p-4 border-t border-gray-100 bg-muted/50/50 flex items-center justify-between">
+          <p className="text-xs text-muted-foreground">
             Showing 1-{filteredCustomers.length} of {customers.length}
           </p>
           <div className="flex gap-2">
@@ -245,14 +252,14 @@ export default function EmployeeCustomerTable() {
               variant="outline"
               size="sm"
               disabled
-              className="h-8 text-xs border-blue-200 hover:bg-white hover:text-primary"
+              className="h-8 text-xs border-blue-200 hover:bg-card hover:text-primary"
             >
               Previous
             </Button>
             <Button
               variant="outline"
               size="sm"
-              className="h-8 text-xs border-blue-200 hover:bg-white hover:text-primary"
+              className="h-8 text-xs border-blue-200 hover:bg-card hover:text-primary"
             >
               Next
             </Button>

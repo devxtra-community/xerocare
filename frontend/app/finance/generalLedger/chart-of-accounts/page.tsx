@@ -204,15 +204,14 @@ export default function ChartOfAccountsPage() {
           selectedAccount
             ? {
                 ...selectedAccount,
-                description: '',
-                isControlAccount: false,
-                currency: '',
+
                 parentId: selectedAccount.parentId ?? null,
               }
             : undefined
         }
         accounts={accounts}
-        onSave={(updatedAccount) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        onSave={(updatedAccount: any) => {
           if (!updatedAccount.id) return;
 
           if (mode === 'edit') {

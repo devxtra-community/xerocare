@@ -20,7 +20,7 @@ interface AttendanceData {
 const CustomTooltip = ({ active, payload, label }: TooltipProps<number, string>) => {
   if (active && payload && payload.length) {
     return (
-      <div className="bg-white p-3 rounded-xl shadow-lg border border-blue-100">
+      <div className="bg-card p-3 rounded-xl shadow-lg border border-blue-100">
         <p className="font-bold text-[#2563eb] text-[10px] mb-2 uppercase tracking-widest border-b border-blue-50 pb-1">
           Day {label}
         </p>
@@ -64,7 +64,7 @@ export default function HRAttendanceGraph() {
   }, []);
 
   return (
-    <div className="bg-white p-5 rounded-2xl shadow-sm border border-blue-100/50 flex flex-col h-[300px] w-full">
+    <div className="bg-card p-5 rounded-2xl shadow-sm border border-blue-100/50 flex flex-col h-[300px] w-full">
       <div className="flex-1 w-full min-h-0 pt-4">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={data} margin={{ top: 5, right: 20, left: -20, bottom: 5 }}>

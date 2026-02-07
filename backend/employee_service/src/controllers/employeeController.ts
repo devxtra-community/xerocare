@@ -9,7 +9,17 @@ const service = new EmployeeService();
 
 export const addEmployee = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { first_name, last_name, email, role, expireDate, salary, branchId } = req.body;
+    const {
+      first_name,
+      last_name,
+      email,
+      role,
+      employee_job,
+      finance_job,
+      expireDate,
+      salary,
+      branchId,
+    } = req.body;
 
     const files = req.files as {
       profile_image?: MulterS3File[];
@@ -19,7 +29,7 @@ export const addEmployee = async (req: Request, res: Response, next: NextFunctio
     const profileImageKey = files?.profile_image?.[0]?.key ?? null;
 
     const profileImageUrl = profileImageKey
-      ? `${process.env.R2_PUBLIC_URL}/${process.env.R2_BUCKET}/${profileImageKey}`
+      ? `${process.env.R2_PUBLIC_URL}/${profileImageKey}`
       : null;
 
     const idProofKey = files?.id_proof?.[0]?.key ?? null;
@@ -32,6 +42,8 @@ export const addEmployee = async (req: Request, res: Response, next: NextFunctio
       last_name,
       email,
       role,
+      employee_job,
+      finance_job,
       expireDate,
       salary: salary ? Number(salary) : null,
       profile_image_url: profileImageUrl,
@@ -69,8 +81,17 @@ export const getAllEmployees = async (req: Request, res: Response, next: NextFun
     const limit = Number(req.query.limit) || 20;
     const role = req.query.role as EmployeeRole | undefined;
 
-    const result = await service.getAllEmployees(page, limit, role);
-    logger.debug('Fetched employees', { count: result.employees.length, page, limit, role });
+    // Branch filtering: Admin sees all employees, others see only their branch
+    const branchId = req.user?.role === EmployeeRole.ADMIN ? undefined : req.user?.branchId;
+
+    const result = await service.getAllEmployees(page, limit, role, branchId);
+    logger.debug('Fetched employees', {
+      count: result.employees.length,
+      page,
+      limit,
+      role,
+      branchId,
+    });
     return res.json({
       success: true,
       data: result,
@@ -163,7 +184,10 @@ export const deleteEmployee = async (req: Request, res: Response, next: NextFunc
 
 export const getHRStats = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const stats = await service.getHRStats();
+    // Branch filtering: Admin sees all stats, others see only their branch
+    const branchId = req.user?.role === EmployeeRole.ADMIN ? undefined : req.user?.branchId;
+
+    const stats = await service.getHRStats(branchId);
     return res.json({
       success: true,
       data: stats,

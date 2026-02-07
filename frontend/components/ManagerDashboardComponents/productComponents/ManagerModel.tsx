@@ -115,19 +115,11 @@ export default function ManagerModel() {
         </div>
       </div>
 
-      <div className="rounded-2xl bg-white shadow-sm overflow-hidden">
+      <div className="rounded-2xl bg-card shadow-sm overflow-hidden">
         <Table>
           <TableHeader>
             <TableRow>
-              {[
-                'MODEL NAME',
-                'MODEL NO',
-                'WHOLESALE PRICE',
-                'SALE PRICE',
-                'RENT PRICE (M/Y)',
-                'LEASE PRICE (M/Y)',
-                'ACTION',
-              ].map((h) => (
+              {['MODEL NAME', 'MODEL NO', 'BRAND', 'QUANTITY', 'ACTION'].map((h) => (
                 <TableHead key={h} className="text-[11px] font-semibold text-primary px-4">
                   {h}
                 </TableHead>
@@ -141,13 +133,9 @@ export default function ManagerModel() {
                 <TableRow key={m.id} className={i % 2 ? 'bg-sky-100/60' : ''}>
                   <TableCell className="px-4 font-medium">{m.model_name}</TableCell>
                   <TableCell className="px-4">{m.model_no}</TableCell>
-                  <TableCell className="px-4">₹{m.wholesale_price}</TableCell>
-                  <TableCell className="px-4">₹{m.sale_price}</TableCell>
-                  <TableCell className="px-4">
-                    ₹{m.rent_price_monthly} / ₹{m.rent_price_yearly}
-                  </TableCell>
-                  <TableCell className="px-4">
-                    ₹{m.lease_price_monthly} / ₹{m.lease_price_yearly}
+                  <TableCell className="px-4">{m.brand || '-'}</TableCell>
+                  <TableCell className="px-4 font-semibold text-blue-600">
+                    {m.quantity} units
                   </TableCell>
                   <TableCell className="px-4">
                     <div className="flex gap-3 text-sm">
@@ -172,7 +160,7 @@ export default function ManagerModel() {
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={4} className="text-center py-6 text-gray-500">
+                <TableCell colSpan={5} className="text-center py-6 text-muted-foreground">
                   No models found
                 </TableCell>
               </TableRow>
@@ -214,12 +202,6 @@ function ModelFormModal({
     model_no: initialData?.model_no || '',
     brand: initialData?.brand || '',
     description: initialData?.description || '',
-    rent_price_monthly: initialData?.rent_price_monthly || 0,
-    rent_price_yearly: initialData?.rent_price_yearly || 0,
-    lease_price_monthly: initialData?.lease_price_monthly || 0,
-    lease_price_yearly: initialData?.lease_price_yearly || 0,
-    sale_price: initialData?.sale_price || 0,
-    wholesale_price: initialData?.wholesale_price || 0,
   });
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -232,7 +214,9 @@ function ModelFormModal({
       <form onSubmit={handleSubmit} className="space-y-4 max-h-[70vh] overflow-y-auto px-1">
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium mb-1">Model Name</label>
+            <label className="block text-sm font-medium mb-1">
+              Model Name <span className="text-red-500">*</span>
+            </label>
             <Input
               value={formData.model_name}
               onChange={(e) => setFormData({ ...formData, model_name: e.target.value })}
@@ -241,7 +225,9 @@ function ModelFormModal({
             />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1">Model No</label>
+            <label className="block text-sm font-medium mb-1">
+              Model No <span className="text-red-500">*</span>
+            </label>
             <Input
               value={formData.model_no}
               onChange={(e) => setFormData({ ...formData, model_no: e.target.value })}
@@ -249,7 +235,7 @@ function ModelFormModal({
               required
             />
           </div>
-          <div>
+          <div className="col-span-2">
             <label className="block text-sm font-medium mb-1">Brand</label>
             <Input
               value={formData.brand}
@@ -257,81 +243,13 @@ function ModelFormModal({
               placeholder="e.g. HP"
             />
           </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">Scale Price (₹)</label>
-            <Input
-              type="number"
-              value={formData.sale_price}
-              onChange={(e) => setFormData({ ...formData, sale_price: Number(e.target.value) })}
-              min={0}
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">Wholesale Price (₹)</label>
-            <Input
-              type="number"
-              value={formData.wholesale_price}
-              onChange={(e) =>
-                setFormData({ ...formData, wholesale_price: Number(e.target.value) })
-              }
-              min={0}
-              required
-            />
-          </div>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium mb-1">Description</label>
-          <textarea
-            className="flex min-h-[60px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-            value={formData.description}
-            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-          />
-        </div>
-
-        <div className="grid grid-cols-2 gap-4 border-t pt-4">
-          <div>
-            <label className="block text-sm font-medium mb-1">Rent (Monthly)</label>
-            <Input
-              type="number"
-              value={formData.rent_price_monthly}
-              onChange={(e) =>
-                setFormData({ ...formData, rent_price_monthly: Number(e.target.value) })
-              }
-              min={0}
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">Rent (Yearly)</label>
-            <Input
-              type="number"
-              value={formData.rent_price_yearly}
-              onChange={(e) =>
-                setFormData({ ...formData, rent_price_yearly: Number(e.target.value) })
-              }
-              min={0}
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">Lease (Monthly)</label>
-            <Input
-              type="number"
-              value={formData.lease_price_monthly}
-              onChange={(e) =>
-                setFormData({ ...formData, lease_price_monthly: Number(e.target.value) })
-              }
-              min={0}
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">Lease (Yearly)</label>
-            <Input
-              type="number"
-              value={formData.lease_price_yearly}
-              onChange={(e) =>
-                setFormData({ ...formData, lease_price_yearly: Number(e.target.value) })
-              }
-              min={0}
+          <div className="col-span-2">
+            <label className="block text-sm font-medium mb-1">Description</label>
+            <textarea
+              className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              value={formData.description}
+              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              placeholder="A reliable laser printer suitable for small offices."
             />
           </div>
         </div>
@@ -358,7 +276,7 @@ function Modal({
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="bg-white rounded-2xl w-full max-w-2xl p-6">
+      <div className="bg-card rounded-2xl w-full max-w-2xl p-6">
         <div className="flex justify-between mb-4">
           <h2 className="font-semibold">{title}</h2>
           <button onClick={onClose}>
@@ -382,7 +300,7 @@ function ConfirmDeleteModal({
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="bg-white rounded-2xl p-6 text-center">
+      <div className="bg-card rounded-2xl p-6 text-center">
         <Trash2 className="mx-auto text-red-600 mb-2" />
         <p>
           Delete <b>{name}</b>?

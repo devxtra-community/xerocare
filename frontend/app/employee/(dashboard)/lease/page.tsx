@@ -2,8 +2,10 @@
 
 import React, { useEffect, useState } from 'react';
 import EmployeeLeaseStats from '@/components/employeeComponents/EmployeeLeaseStats';
+import EmployeeLeaseGraphs from '@/components/employeeComponents/EmployeeLeaseGraphs';
 import EmployeeLeaseTable from '@/components/employeeComponents/EmployeeLeaseTable';
 import { getMyInvoices, Invoice } from '@/lib/invoice';
+import ProtectedRoute from '@/components/ProtectedRoute';
 
 export default function EmployeeLeasePage() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
@@ -21,16 +23,19 @@ export default function EmployeeLeasePage() {
   }, []);
 
   return (
-    <div className="bg-blue-100 min-h-full p-3 sm:p-4 md:p-6 space-y-6 sm:space-y-8">
-      <div className="flex flex-col space-y-4 sm:space-y-6">
-        <h3 className="text-xl sm:text-2xl font-bold text-primary">Lease Management</h3>
-        <EmployeeLeaseStats invoices={invoices} />
+    <ProtectedRoute requiredModules={['lease']}>
+      <div className="bg-blue-100 min-h-full p-3 sm:p-4 md:p-6 space-y-6 sm:space-y-8">
+        <div className="flex flex-col space-y-4 sm:space-y-6">
+          <h3 className="text-xl sm:text-2xl font-bold text-primary">Lease Management</h3>
+          <EmployeeLeaseStats invoices={invoices} />
+          <EmployeeLeaseGraphs />
 
-        <div className="space-y-3">
-          <h3 className="text-lg sm:text-xl font-bold text-primary">All Leases</h3>
-          <EmployeeLeaseTable />
+          <div className="space-y-3">
+            <h3 className="text-lg sm:text-xl font-bold text-primary">All Leases</h3>
+            <EmployeeLeaseTable />
+          </div>
         </div>
       </div>
-    </div>
+    </ProtectedRoute>
   );
 }

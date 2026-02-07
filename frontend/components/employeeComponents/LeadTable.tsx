@@ -39,11 +39,11 @@ export function LeadTable({ leads, onRefresh, onEdit }: LeadTableProps) {
   };
 
   return (
-    <div className="rounded-2xl bg-white shadow-sm overflow-hidden border">
+    <div className="rounded-2xl bg-card shadow-sm overflow-hidden border">
       <div className="overflow-x-auto">
         <Table className="min-w-[800px] sm:min-w-full">
           <TableHeader>
-            <TableRow className="bg-slate-50">
+            <TableRow className="bg-muted/50">
               <TableHead className="text-primary font-bold whitespace-nowrap">CONTACT</TableHead>
               <TableHead className="text-primary font-bold whitespace-nowrap">SOURCE</TableHead>
               <TableHead className="text-primary font-bold whitespace-nowrap">STATUS</TableHead>
@@ -63,7 +63,7 @@ export function LeadTable({ leads, onRefresh, onEdit }: LeadTableProps) {
               </TableRow>
             ) : (
               leads.map((lead, index) => (
-                <TableRow key={lead._id} className={index % 2 !== 0 ? 'bg-blue-50/20' : 'bg-white'}>
+                <TableRow key={lead._id} className={index % 2 !== 0 ? 'bg-blue-50/20' : 'bg-card'}>
                   <TableCell>
                     <div className="flex flex-col space-y-1">
                       <span className="font-bold text-primary flex items-center gap-2">
@@ -71,13 +71,13 @@ export function LeadTable({ leads, onRefresh, onEdit }: LeadTableProps) {
                         {lead.name || 'No Name'}
                       </span>
                       {lead.email && (
-                        <span className="text-[10px] text-slate-500 flex items-center gap-2">
+                        <span className="text-[10px] text-muted-foreground flex items-center gap-2">
                           <Mail size={12} />
                           {lead.email}
                         </span>
                       )}
                       {lead.phone && (
-                        <span className="text-[10px] text-slate-500 flex items-center gap-2">
+                        <span className="text-[10px] text-muted-foreground flex items-center gap-2">
                           <Phone size={12} />
                           {lead.phone}
                         </span>
@@ -103,12 +103,13 @@ export function LeadTable({ leads, onRefresh, onEdit }: LeadTableProps) {
                       {lead.status}
                     </span>
                   </TableCell>
-                  <TableCell className="text-slate-500 text-xs font-medium whitespace-nowrap">
-                    {new Date(lead.createdAt).toLocaleDateString(undefined, {
-                      day: '2-digit',
-                      month: 'short',
-                      year: 'numeric',
-                    })}
+                  <TableCell className="text-muted-foreground text-xs font-medium whitespace-nowrap">
+                    {lead.createdAt &&
+                      new Date(lead.createdAt).toLocaleDateString(undefined, {
+                        day: '2-digit',
+                        month: 'short',
+                        year: 'numeric',
+                      })}
                   </TableCell>
                   <TableCell className="text-center">
                     <div className="flex items-center justify-center gap-2">

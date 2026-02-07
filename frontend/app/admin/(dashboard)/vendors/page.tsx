@@ -69,7 +69,7 @@ export default function VendorsPage() {
       <div className="flex justify-between items-center">
         <div className="space-y-1">
           <h2 className="text-xl sm:text-2xl font-bold text-primary">Vendor Management</h2>
-          <p className="text-sm text-slate-500">
+          <p className="text-sm text-muted-foreground">
             Manage suppliers, distributors, and service providers
           </p>
         </div>

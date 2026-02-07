@@ -43,14 +43,14 @@ export default function EmployeeProfilePage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50/50 p-6 space-y-8">
+    <div className="min-h-screen bg-muted/50/50 p-6 space-y-8">
       {/* HEADER */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-4">
           <Button
             variant="outline"
             size="icon"
-            className="h-9 w-9 bg-white"
+            className="h-9 w-9 bg-card"
             onClick={() => router.back()}
           >
             <ArrowLeft className="h-4 w-4" />
@@ -66,14 +66,14 @@ export default function EmployeeProfilePage() {
                   {employee.status}
                 </span>
               </h3>
-              <p className="text-sm text-gray-500">
+              <p className="text-sm text-muted-foreground">
                 {employee.role} &middot; {employee.department}
               </p>
             </div>
           </div>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" className="bg-white gap-2 h-9 font-medium px-4">
+          <Button variant="outline" className="bg-card gap-2 h-9 font-medium px-4">
             <Mail className="h-4 w-4" /> Message
           </Button>
           <Button className="gap-2 h-9 font-medium px-4">Edit Profile</Button>
@@ -84,9 +84,9 @@ export default function EmployeeProfilePage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* PERSONAL INFO */}
         <div className="lg:col-span-1 space-y-6">
-          <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
-            <h4 className="text-sm font-semibold text-gray-900 flex items-center gap-2 mb-6 pb-3 border-b border-gray-100">
-              <User className="h-4 w-4 text-gray-500" /> Personal Information
+          <div className="bg-card rounded-xl border border-border p-6 shadow-sm">
+            <h4 className="text-sm font-semibold text-foreground flex items-center gap-2 mb-6 pb-3 border-b border-gray-100">
+              <User className="h-4 w-4 text-muted-foreground" /> Personal Information
             </h4>
             <div className="space-y-5">
               <InfoRow icon={<Mail />} label="Email" value={employee.email} isCritical />
@@ -96,9 +96,9 @@ export default function EmployeeProfilePage() {
             </div>
           </div>
 
-          <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
-            <h4 className="text-sm font-semibold text-gray-900 flex items-center gap-2 mb-6 pb-3 border-b border-gray-100">
-              <ShieldCheck className="h-4 w-4 text-gray-500" /> Documents
+          <div className="bg-card rounded-xl border border-border p-6 shadow-sm">
+            <h4 className="text-sm font-semibold text-foreground flex items-center gap-2 mb-6 pb-3 border-b border-gray-100">
+              <ShieldCheck className="h-4 w-4 text-muted-foreground" /> Documents
             </h4>
             <div className="space-y-3">
               <DocumentRow name="VisaCopy_2025.pdf" size="2.4 MB" />
@@ -110,9 +110,9 @@ export default function EmployeeProfilePage() {
 
         {/* WORK INFO */}
         <div className="lg:col-span-2 space-y-6">
-          <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
-            <h4 className="text-sm font-semibold text-gray-900 flex items-center gap-2 mb-6 pb-3 border-b border-gray-100">
-              <Briefcase className="h-4 w-4 text-gray-500" /> Employment Details
+          <div className="bg-card rounded-xl border border-border p-6 shadow-sm">
+            <h4 className="text-sm font-semibold text-foreground flex items-center gap-2 mb-6 pb-3 border-b border-gray-100">
+              <Briefcase className="h-4 w-4 text-muted-foreground" /> Employment Details
             </h4>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-8">
               <div className="space-y-6">
@@ -164,8 +164,8 @@ function InfoRow({
     <div className="flex items-start gap-4">
       <div className="mt-0.5 text-gray-400 *:h-4 *:w-4">{icon}</div>
       <div className="space-y-1">
-        <p className="text-xs font-medium text-gray-500">{label}</p>
-        <p className={`text-sm font-medium ${isCritical ? 'text-primary' : 'text-gray-900'}`}>
+        <p className="text-xs font-medium text-muted-foreground">{label}</p>
+        <p className={`text-sm font-medium ${isCritical ? 'text-primary' : 'text-foreground'}`}>
           {value}
         </p>
       </div>
@@ -175,14 +175,14 @@ function InfoRow({
 
 function DocumentRow({ name, size }: { name: string; size: string }) {
   return (
-    <div className="flex items-center justify-between p-3 rounded-lg border border-gray-100 hover:bg-gray-50 transition-colors">
+    <div className="flex items-center justify-between p-3 rounded-lg border border-gray-100 hover:bg-muted/50 transition-colors">
       <div className="flex items-center gap-3">
-        <div className="h-8 w-8 bg-gray-100 text-gray-500 rounded flex items-center justify-center">
+        <div className="h-8 w-8 bg-gray-100 text-muted-foreground rounded flex items-center justify-center">
           <FileText className="h-4 w-4" />
         </div>
         <div className="flex flex-col">
-          <p className="text-sm font-medium text-gray-900 truncate max-w-[150px]">{name}</p>
-          <p className="text-xs text-gray-500">{size}</p>
+          <p className="text-sm font-medium text-foreground truncate max-w-[150px]">{name}</p>
+          <p className="text-xs text-muted-foreground">{size}</p>
         </div>
       </div>
       <Button

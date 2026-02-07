@@ -1,3 +1,7 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { getInvoices } from '@/lib/invoice';
 import StatCard from '@/components/StatCard';
 import ProductsTable from '@/components/AdminDahboardComponents/dashboardComponents/productTable';
 import HrTable from '@/components/AdminDahboardComponents/dashboardComponents/HrTable';
@@ -7,6 +11,60 @@ import WarehouseTable from '@/components/AdminDahboardComponents/dashboardCompon
 import CategoryPieChart from '@/components/AdminDahboardComponents/dashboardComponents/CategoryPieChart';
 
 export default function Dashboard() {
+  const [stats, setStats] = useState({
+    earnings: '0.00',
+    totalSold: '0',
+    bestSellingModel: 'N/A',
+    bestSellingProduct: 'N/A',
+  });
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const invoices = await getInvoices();
+        const sales = invoices.filter((inv) => inv.saleType === 'SALE');
+
+        // Total Earnings (Assuming totalAmount is the final price)
+        const totalEarnings = sales.reduce((sum, inv) => sum + (Number(inv.totalAmount) || 0), 0);
+
+        // Total Items Sold & Best Sellers
+        let totalItems = 0;
+        const productCounts: Record<string, number> = {};
+
+        sales.forEach((inv) => {
+          if (inv.items) {
+            inv.items.forEach((item) => {
+              const qty = item.quantity || 0;
+              totalItems += qty;
+              const name = item.description || 'Unknown';
+              productCounts[name] = (productCounts[name] || 0) + qty;
+            });
+          }
+        });
+
+        // Find best selling
+        let bestProduct = 'N/A';
+        let maxCount = 0;
+        Object.entries(productCounts).forEach(([name, count]) => {
+          if (count > maxCount) {
+            maxCount = count;
+            bestProduct = name;
+          }
+        });
+
+        setStats({
+          earnings: totalEarnings.toLocaleString('en-US', { minimumFractionDigits: 2 }),
+          totalSold: totalItems.toString(),
+          bestSellingModel: 'N/A', // Placeholder as model is not in invoice items directly
+          bestSellingProduct: bestProduct,
+        });
+      } catch (error) {
+        console.error('Failed to fetch dashboard stats', error);
+      }
+    };
+    fetchStats();
+  }, []);
+
   return (
     <div className="bg-blue-100 min-h-screen p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6">
       {/* <h3 className="text-xl sm:text-2xl md:text-2xl font-bold text-primary">
@@ -17,16 +75,20 @@ export default function Dashboard() {
         <h3 className="text-lg sm:text-m font-bold text-primary">Sales</h3>
 
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 md:gap-4">
-          <StatCard title="Total Earnings" value="100.000" subtitle="1 month indicator" />
+          <StatCard title="Total Earnings" value={stats.earnings} subtitle="1 month indicator" />
           <StatCard
             title="Total Number Of Products Sold"
-            value="3400"
+            value={stats.totalSold}
             subtitle="1 month indicator"
           />
-          <StatCard title="Best Selling Model" value="Electronics" subtitle="1 month indicator" />
+          <StatCard
+            title="Best Selling Model"
+            value={stats.bestSellingModel}
+            subtitle="1 month indicator"
+          />
           <StatCard
             title="Best Selling Product"
-            value="Iphone 15 Pro"
+            value={stats.bestSellingProduct}
             subtitle="1 month indicator"
           />
         </div>

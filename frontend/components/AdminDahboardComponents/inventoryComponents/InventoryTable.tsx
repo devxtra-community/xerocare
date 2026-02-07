@@ -58,8 +58,8 @@ export default function InventoryTable() {
   }, []);
 
   return (
-    <div className="rounded-2xl border bg-white shadow-sm overflow-hidden">
-      <div className="p-4 border-b bg-gray-50/50">
+    <div className="rounded-2xl border bg-card shadow-sm overflow-hidden">
+      <div className="p-4 border-b bg-muted/50/50">
         <h3 className="font-semibold text-lg">Critical Stock Alerts</h3>
         <p className="text-xs text-muted-foreground">
           Items requiring immediate attention (Stock &lt; 20)
@@ -67,18 +67,22 @@ export default function InventoryTable() {
       </div>
       <Table>
         <TableHeader>
-          <TableRow className="bg-gray-50/50 hover:bg-gray-50/50">
-            <TableHead className="font-medium text-gray-500">Product Name</TableHead>
-            <TableHead className="font-medium text-gray-500">Warehouse ID</TableHead>
-            <TableHead className="font-medium text-gray-500 text-center">Current Stock</TableHead>
-            <TableHead className="font-medium text-gray-500 text-center">Reorder Level</TableHead>
-            <TableHead className="font-medium text-gray-500">Status</TableHead>
+          <TableRow className="bg-muted/50/50 hover:bg-muted/50/50">
+            <TableHead className="font-medium text-muted-foreground">Product Name</TableHead>
+            <TableHead className="font-medium text-muted-foreground">Warehouse ID</TableHead>
+            <TableHead className="font-medium text-muted-foreground text-center">
+              Current Stock
+            </TableHead>
+            <TableHead className="font-medium text-muted-foreground text-center">
+              Reorder Level
+            </TableHead>
+            <TableHead className="font-medium text-muted-foreground">Status</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {data.map((item) => (
-            <TableRow key={item.id} className="hover:bg-gray-50/50">
-              <TableCell className="font-medium text-gray-900">{item.product.name}</TableCell>
+            <TableRow key={item.id} className="hover:bg-muted/50/50">
+              <TableCell className="font-medium text-foreground">{item.product.name}</TableCell>
               <TableCell className="text-gray-600 truncate max-w-[150px]" title={item.warehouseId}>
                 {item.warehouseId}
               </TableCell>
@@ -106,7 +110,7 @@ export default function InventoryTable() {
           ))}
           {data.length === 0 && (
             <TableRow>
-              <TableCell colSpan={5} className="text-center py-4 text-gray-500">
+              <TableCell colSpan={5} className="text-center py-4 text-muted-foreground">
                 No inventory items found
               </TableCell>
             </TableRow>

@@ -6,12 +6,7 @@ export interface Model {
   model_name: string;
   brand: string;
   description: string;
-  rent_price_monthly: number;
-  rent_price_yearly: number;
-  lease_price_monthly: number;
-  lease_price_yearly: number;
-  sale_price: number;
-  wholesale_price: number;
+  quantity: number;
 }
 
 export interface CreateModelDTO {
@@ -19,12 +14,6 @@ export interface CreateModelDTO {
   model_name: string;
   brand: string;
   description: string;
-  rent_price_monthly: number;
-  rent_price_yearly: number;
-  lease_price_monthly: number;
-  lease_price_yearly: number;
-  sale_price: number;
-  wholesale_price: number;
 }
 
 export const modelService = {

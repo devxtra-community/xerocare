@@ -29,10 +29,10 @@ export default function WarehouseTable() {
   const currentData = warehouses.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
   return (
-    <div className="rounded-2xl bg-white p-2 sm:p-3 shadow-sm w-full h-[260px] flex flex-col">
+    <div className="rounded-2xl bg-card p-2 sm:p-3 shadow-sm w-full h-[260px] flex flex-col">
       <div className="flex-1 overflow-x-auto">
         {loading ? (
-          <div className="flex items-center justify-center h-full text-xs text-gray-500">
+          <div className="flex items-center justify-center h-full text-xs text-muted-foreground">
             Loading...
           </div>
         ) : (
@@ -56,8 +56,8 @@ export default function WarehouseTable() {
 
             <tbody>
               {currentData.map((item, index) => (
-                <tr key={item.id} className={index % 2 === 1 ? 'bg-blue-50/20' : 'bg-white'}>
-                  <td className="py-2 px-2 text-[10px] sm:text-xs font-medium text-gray-900">
+                <tr key={item.id} className={index % 2 === 1 ? 'bg-blue-50/20' : 'bg-card'}>
+                  <td className="py-2 px-2 text-[10px] sm:text-xs font-medium text-foreground">
                     {item.warehouseName}
                   </td>
                   <td className="py-2 px-2 text-[10px] sm:text-xs text-gray-700">
@@ -91,7 +91,7 @@ export default function WarehouseTable() {
             key={num}
             onClick={() => setPage(num)}
             className={`px-2 py-0.5 rounded-md ${
-              page === num ? 'bg-primary text-white' : 'border hover:bg-gray-50'
+              page === num ? 'bg-primary text-white' : 'border hover:bg-muted/50'
             }`}
           >
             {num}

@@ -7,7 +7,6 @@ import {
   Package,
   Wallet,
   Truck,
-
   Boxes,
 } from 'lucide-react';
 
@@ -96,7 +95,7 @@ export default function AppSidebar() {
     <Sidebar collapsible="icon" className="border-r-0 border-none !border-r-0">
       <SidebarHeader className="bg-sidebar">
         <div className="flex items-center gap-3 px-4 py-4">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/10">
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-card/10">
             <LayoutDashboard className="h-5 w-5 text-sidebar-accent-foreground" />
           </div>
           <span className="text-base font-semibold text-sidebar-accent-foreground group-data-[collapsible=icon]:hidden">
@@ -120,12 +119,14 @@ export default function AppSidebar() {
                       !text-sidebar-accent-foreground
                       [&_svg]:!text-sidebar-accent-foreground
 
-                      ${pathname === item.href
-                        ? 'bg-white text-sidebar [&_svg]:text-sidebar'
-                        : 'hover:bg-white/10'
+                      ${
+                        pathname === item.href
+                          ? 'bg-card text-sidebar [&_svg]:text-sidebar'
+                          : 'hover:bg-card/10'
                       }
 
-                      ${item.disabled ? '!text-sidebar-accent-foreground/70 cursor-not-allowed' : ''
+                      ${
+                        item.disabled ? '!text-sidebar-accent-foreground/70 cursor-not-allowed' : ''
                       }
                     `}
                   >

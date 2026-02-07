@@ -24,19 +24,19 @@ export default function ViewPurchaseDialog({
         <div className="space-y-6">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <p className="text-sm font-medium text-gray-500">Purchase Number</p>
+              <p className="text-sm font-medium text-muted-foreground">Purchase Number</p>
               <p className="font-semibold">{purchase.purchase_number}</p>
             </div>
             <div>
-              <p className="text-sm font-medium text-gray-500">Lot Number</p>
+              <p className="text-sm font-medium text-muted-foreground">Lot Number</p>
               <p className="font-semibold">{purchase.lot_number}</p>
             </div>
             <div>
-              <p className="text-sm font-medium text-gray-500">Vendor</p>
+              <p className="text-sm font-medium text-muted-foreground">Vendor</p>
               <p className="font-semibold">{purchase.vendor_name}</p>
             </div>
             <div>
-              <p className="text-sm font-medium text-gray-500">Status</p>
+              <p className="text-sm font-medium text-muted-foreground">Status</p>
               <Badge
                 variant={
                   purchase.status === 'COMPLETED'
@@ -51,11 +51,11 @@ export default function ViewPurchaseDialog({
               </Badge>
             </div>
             <div>
-              <p className="text-sm font-medium text-gray-500">Created At</p>
+              <p className="text-sm font-medium text-muted-foreground">Created At</p>
               <p className="font-medium">{new Date(purchase.created_at).toLocaleDateString()}</p>
             </div>
             <div>
-              <p className="text-sm font-medium text-gray-500">Total Amount</p>
+              <p className="text-sm font-medium text-muted-foreground">Total Amount</p>
               <p className="font-bold text-lg text-primary">
                 ₹{purchase.total_amount.toLocaleString()}
               </p>
@@ -64,7 +64,7 @@ export default function ViewPurchaseDialog({
 
           <div className="border-t pt-4">
             <h4 className="font-semibold mb-2">Products</h4>
-            <div className="bg-gray-50 p-3 rounded-md">
+            <div className="bg-muted/50 p-3 rounded-md">
               <ul className="list-disc list-inside space-y-1">
                 {purchase.product_names.map((name, i) => (
                   <li key={i}>{name}</li>
@@ -75,7 +75,7 @@ export default function ViewPurchaseDialog({
 
           <div className="border-t pt-4">
             <h4 className="font-semibold mb-2">Models</h4>
-            <div className="bg-gray-50 p-3 rounded-md">
+            <div className="bg-muted/50 p-3 rounded-md">
               <ul className="list-disc list-inside space-y-1">
                 {purchase.model_names.map((name, i) => (
                   <li key={i}>{name}</li>

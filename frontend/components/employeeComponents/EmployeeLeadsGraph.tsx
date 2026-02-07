@@ -23,7 +23,7 @@ const data = [
 
 export default function EmployeeLeadsGraph() {
   return (
-    <div className="bg-white p-4 rounded-2xl shadow-sm border-none flex flex-col h-[350px] w-full">
+    <div className="bg-card p-4 rounded-2xl shadow-sm border-none flex flex-col h-[350px] w-full">
       <div className="flex-1 w-full min-h-0">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart

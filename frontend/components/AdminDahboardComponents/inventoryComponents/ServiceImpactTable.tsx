@@ -35,10 +35,10 @@ const data = [
 
 export default function ServiceImpactTable() {
   return (
-    <div className="rounded-xl border bg-white shadow-sm overflow-hidden">
+    <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
       <Table>
         <TableHeader>
-          <TableRow className="bg-gray-50/50 hover:bg-gray-50/50">
+          <TableRow className="bg-muted/50/50 hover:bg-muted/50/50">
             <TableHead className="font-semibold text-gray-700">Printer Model</TableHead>
             <TableHead className="font-semibold text-gray-700">Vendor</TableHead>
             <TableHead className="font-semibold text-gray-700 text-center">Service Count</TableHead>
@@ -54,9 +54,9 @@ export default function ServiceImpactTable() {
           {data.map((item, idx) => (
             <TableRow
               key={idx}
-              className={`hover:bg-gray-50/50 ${idx % 2 !== 0 ? 'bg-blue-50/20' : 'bg-white'}`}
+              className={`hover:bg-muted/50/50 ${idx % 2 !== 0 ? 'bg-blue-50/20' : 'bg-card'}`}
             >
-              <TableCell className="font-medium text-gray-900">{item.model}</TableCell>
+              <TableCell className="font-medium text-foreground">{item.model}</TableCell>
               <TableCell className="text-gray-600">{item.vendor}</TableCell>
               <TableCell className="text-center">{item.count}</TableCell>
               <TableCell className="text-center text-red-600 font-medium">

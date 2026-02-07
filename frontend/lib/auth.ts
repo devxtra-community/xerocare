@@ -1,17 +1,23 @@
 import api from './api';
-
 import { jwtDecode } from 'jwt-decode';
+import { EmployeeJob } from './employeeJob';
+import { FinanceJob } from './financeJob';
 
-export type UserRole = 'HR' | 'EMPLOYEE' | 'FINANCE' | 'MANAGER';
+export type UserRole = 'HR' | 'EMPLOYEE' | 'FINANCE' | 'MANAGER' | 'ADMIN';
 
 export interface JwtPayload {
-  id: string;
+  userId: string;
   role: UserRole;
-  exp: number;
   branchId?: string;
+  employeeJob?: EmployeeJob | null;
+  financeJob?: FinanceJob | null;
+  exp: number;
 }
 
 export function getUserFromToken(): JwtPayload | null {
+  // Check if we're in the browser (not SSR)
+  if (typeof window === 'undefined') return null;
+
   const token = localStorage.getItem('accessToken');
   if (!token) return null;
 
@@ -84,6 +90,29 @@ export async function adminLogin(email: string, password: string) {
     password,
   });
   localStorage.setItem('accessToken', res.data.accessToken);
+  return res.data;
+}
+
+export async function changePassword(currentPassword: string, newPassword: string) {
+  const res = await api.post('/e/auth/change-password', {
+    currentPassword,
+    newPassword,
+  });
+  return res.data;
+}
+
+export async function getSessions() {
+  const res = await api.get('/e/auth/sessions');
+  return res.data;
+}
+
+export async function logoutOtherDevices() {
+  const res = await api.post('/e/auth/logout-other-devices');
+  return res.data;
+}
+
+export async function logoutSession(sessionId: string) {
+  const res = await api.post('/e/auth/sessions/logout', { sessionId });
   return res.data;
 }
 

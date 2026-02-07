@@ -17,7 +17,7 @@ export default function ManagerFinancePage() {
           <h2 className="text-xl sm:text-2xl font-bold text-primary tracking-tight">
             Financial Overview
           </h2>
-          <p className="text-sm text-slate-500 font-medium">
+          <p className="text-sm text-muted-foreground font-medium">
             Analyze revenue streams, track expenses, and manage receivables
           </p>
         </div>

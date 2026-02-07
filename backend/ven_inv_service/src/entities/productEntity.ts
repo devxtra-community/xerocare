@@ -20,6 +20,12 @@ export enum ProductStatus {
   DAMAGED = 'DAMAGED',
 }
 
+export enum PrintColour {
+  BLACK_WHITE = 'BLACK_WHITE',
+  COLOUR = 'COLOUR',
+  BOTH = 'BOTH',
+}
+
 import { Vendor } from './vendorEntity';
 import { SparePart } from './sparePartEntity';
 
@@ -27,13 +33,23 @@ import { SparePart } from './sparePartEntity';
 @Check(
   `("model_id" IS NOT NULL AND "spare_part_id" IS NULL) OR ("model_id" IS NULL AND "spare_part_id" IS NOT NULL)`,
 )
+@Check(`"max_discount_amount" >= 0`)
+// Removed: @Check(`"max_discount_amount" <= "sale_price"`) - validation moved to application layer
 export class Product {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
 
+  @Column({ type: 'uuid' })
+  @Index()
+  model_id!: string;
+
   @ManyToOne(() => Model, (model) => model.products)
   @JoinColumn({ name: 'model_id' })
   model!: Model;
+
+  @Column({ type: 'uuid' })
+  @Index()
+  warehouse_id!: string;
 
   @ManyToOne(() => Warehouse, { nullable: true })
   @JoinColumn({ name: 'warehouse_id' })
@@ -81,8 +97,26 @@ export class Product {
   @Index() // Optimizes getInventoryStats filtering
   product_status!: ProductStatus;
 
+  @Column({
+    type: 'enum',
+    enum: PrintColour,
+    default: PrintColour.BLACK_WHITE,
+    enumName: 'print_colour_enum',
+    nullable: true,
+  })
+  print_colour!: PrintColour;
+
+  @Column({
+    type: 'numeric',
+    precision: 12,
+    scale: 2,
+    default: 0,
+    nullable: true,
+  })
+  max_discount_amount!: number | null;
+
   @Column({ type: 'varchar', length: 1000, nullable: true })
-  imageUrl?: string;
+  imageUrl?: string | null;
 
   @CreateDateColumn()
   created_at!: Date;

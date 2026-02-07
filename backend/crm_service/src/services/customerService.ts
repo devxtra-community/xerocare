@@ -21,6 +21,8 @@ export class CustomerService {
   }
 
   async getAllCustomers(): Promise<Customer[]> {
+    // Note: Customer entity currently doesn't have branchId field
+    // Branch filtering for customers would require database schema migration
     return this.customerRepository.findAll();
   }
 

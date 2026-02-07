@@ -1,14 +1,8 @@
 'use client';
 
-import {
-  LucideIcon,
-  LayoutDashboard,
-  BookOpen,
-  FileText,
-  CreditCard,
-  Receipt,
-  BarChart3,
-} from 'lucide-react';
+import React from 'react';
+
+import { LucideIcon, LayoutDashboard, ShoppingCart, Key, Home, Tag } from 'lucide-react';
 
 import {
   Sidebar,
@@ -40,7 +34,7 @@ type FinanceMenuGroup = {
 
 const financeMenu: FinanceMenuGroup[] = [
   {
-    group: 'Overview',
+    group: 'Main',
     items: [
       {
         title: 'Dashboard',
@@ -50,61 +44,42 @@ const financeMenu: FinanceMenuGroup[] = [
     ],
   },
   {
-    group: 'General Ledger',
+    group: 'Operations',
     items: [
       {
-        title: 'Chart of Accounts',
-        icon: BookOpen,
-        href: '/finance/generalLedger/chart-of-accounts',
-        // disabled: true, // account-specific pages only
+        title: 'Rent',
+        icon: Key,
+        href: '/finance/rent',
       },
       {
-        title: 'Journal Entries',
-        icon: FileText,
-        href: '/finance/generalLedger/journals',
-        // disabled: true, // account-specific pages only
+        title: 'Lease',
+        icon: Home,
+        href: '/finance/lease',
       },
-      // {
-      //   title: "Ledger",
-      //   icon: BookOpen,
-      //   href: "/finance/generalLedger/ledger",
-      //   disabled: true, // account-specific pages only
-      // },
       {
-        title: 'Trial Balance',
-        icon: BarChart3,
-        href: '/finance/generalLedger/trial-balance',
-        // disabled: true, // account-specific pages only
+        title: 'Sale',
+        icon: Tag,
+        href: '/finance/sale',
+      },
+      {
+        title: 'Orders',
+        icon: ShoppingCart,
+        href: '/finance/orders',
       },
     ],
   },
-  {
-    group: 'Sub Ledgers',
-    items: [
-      {
-        title: 'Accounts Receivable',
-        icon: Receipt,
-        href: '/finance/ar/invoices',
-      },
-      {
-        title: 'Accounts Payable',
-        icon: CreditCard,
-        href: '/finance/ap/invoices',
-      },
-    ],
-  },
-  // {
-  //   group: "Reports",
-  //   items: [
-  //     {
-  //       title: "Profit & Loss",
-  //       icon: BarChart3,
-  //       href: "/finance/reports/profit-loss",
-  //       disabled: true,
-  //     },
-  //   ],
-  // },
 ];
+
+/**
+ * Helper to get badge count for a specific title from the counts object
+ * 'Rent' -> counts.RENT
+ * 'Lease' -> counts.LEASE
+ * 'Sale' -> counts.SALE
+ */
+const getBadgeCount = (title: string, counts: Record<string, number>) => {
+  const key = title.toUpperCase();
+  return counts[key] || 0;
+};
 
 export default function FinanceSidebar() {
   const router = useRouter();
@@ -124,11 +99,29 @@ export default function FinanceSidebar() {
     }
   };
 
+  // State to store pending counts
+  const [counts, setCounts] = React.useState<Record<string, number>>({});
+
+  React.useEffect(() => {
+    const fetchCounts = async () => {
+      try {
+        const { getPendingCounts } = await import('@/lib/invoice');
+        const data = await getPendingCounts();
+        setCounts(data);
+      } catch (err) {
+        console.error('Failed to fetch sidebar counts', err);
+      }
+    };
+    fetchCounts();
+    // Poll every 30s? Or just once on mount. Assuming once on mount is enough for now.
+    // Or maybe refresh when pathname changes?
+  }, [pathname]); // Refresh counts on navigation too, ensuring updates after approvals
+
   return (
     <Sidebar collapsible="icon" className="border-r-0">
       <SidebarHeader className="bg-sidebar border-b border-white/10">
         <div className="flex items-center gap-3 px-4 py-4">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/10">
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-card/10">
             <LayoutDashboard className="h-5 w-5 text-sidebar-accent-foreground" />
           </div>
           <span className="text-base font-semibold text-sidebar-accent-foreground group-data-[collapsible=icon]:hidden">
@@ -148,6 +141,7 @@ export default function FinanceSidebar() {
               <SidebarMenu className="space-y-1 px-2">
                 {section.items.map((item) => {
                   const isActive = pathname === item.href;
+                  const count = getBadgeCount(item.title, counts);
 
                   return (
                     <SidebarMenuItem key={item.title}>
@@ -159,15 +153,21 @@ export default function FinanceSidebar() {
                     py-2.5 rounded-md
                     ${
                       isActive
-                        ? 'bg-white text-sidebar'
-                        : 'hover:bg-white/10 text-sidebar-accent-foreground'
+                        ? 'bg-card text-sidebar'
+                        : 'hover:bg-card/10 text-sidebar-accent-foreground'
                     }
                     ${item.disabled ? 'opacity-60 cursor-not-allowed' : ''}
                   `}
                       >
-                        <a href={item.href} className="flex items-center gap-3 px-3">
+                        <a
+                          href={item.href}
+                          className="flex items-center gap-3 px-3 relative w-full"
+                        >
                           <item.icon className="h-4 w-4" />
-                          <span className="font-medium">{item.title}</span>
+                          <span className="font-medium flex-1">{item.title}</span>
+                          {count > 0 && (
+                            <span className="flex h-2 w-2 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.6)] animate-pulse" />
+                          )}
                         </a>
                       </SidebarMenuButton>
                     </SidebarMenuItem>

@@ -34,7 +34,7 @@ export default function APDueTable() {
     .slice(0, 5); // Show top 5 priority invoices
 
   return (
-    <Card className="shadow-sm border-slate-200">
+    <Card className="shadow-sm border-border">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-lg font-semibold">Upcoming Payables</CardTitle>
         <Link href="/finance/ap/invoices">
@@ -46,7 +46,7 @@ export default function APDueTable() {
 
       <CardContent className="p-0">
         <Table>
-          <TableHeader className="bg-slate-50">
+          <TableHeader className="bg-muted/50">
             <TableRow>
               <TableHead className="w-[180px]">Vendor</TableHead>
               <TableHead>Invoice #</TableHead>
@@ -66,7 +66,7 @@ export default function APDueTable() {
                 <TableRow key={inv.id} className="hover:bg-blue-50/50 transition-colors">
                   <TableCell className="font-semibold text-slate-800">{vendor?.name}</TableCell>
 
-                  <TableCell className="text-slate-500 hover:text-blue-600 cursor-pointer">
+                  <TableCell className="text-muted-foreground hover:text-blue-600 cursor-pointer">
                     <Link
                       href={`/finance/ap/invoices/${inv.id}`}
                       className="underline-offset-2 hover:underline"

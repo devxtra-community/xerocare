@@ -13,50 +13,45 @@ import { Eye, Edit2 } from 'lucide-react';
 
 import { useEffect } from 'react';
 import api from '@/lib/api';
-// Using any for stock calculation for now as quick fix, better to import types properly
-// import { InventoryItem } from ... (defined locally or imported)
 
 interface InventoryItem {
   id: string;
-  warehouseId: string;
-  quantity: number;
-  unitPrice: number;
-  sku: string | null;
-  description: string | null;
-  createdAt: string;
-  updatedAt: string;
-  product: {
-    id: string;
-    name: string;
-    model: { model_name: string };
-    vendor_id: string;
-  };
+  model_no: string;
+  model_name: string;
+  brand: string;
+  description: string;
+  total_quantity: number;
+  available_qty: number;
+  rented_qty: number;
+  lease_qty: number;
+  damaged_qty: number;
+  sold_qty: number;
 }
 
 interface InventoryResponse {
   success: boolean;
   data: InventoryItem[];
-  total: number;
 }
 
 export default function InventoryProductsTable() {
   const [page, setPage] = useState(1);
   const [data, setData] = useState<InventoryItem[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const ITEMS_PER_PAGE = 5;
-  // Use data.length or total from API for pagination. For now using client-side slice on fetched data
-  // but better to implement server side pagination.
-  // Let's stick to client side pagination on "all" data or page size limit for consistency with previous pattern
+  const ITEMS_PER_PAGE = 10;
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const res = await api.get<InventoryResponse>('/i/inventory?limit=50');
+        setLoading(true);
+        const res = await api.get<InventoryResponse>('/i/inventory');
         if (res.data.success) {
           setData(res.data.data);
         }
       } catch (e) {
-        console.error(e);
+        console.error('Failed to fetch inventory:', e);
+      } finally {
+        setLoading(false);
       }
     };
     fetchData();
@@ -67,28 +62,31 @@ export default function InventoryProductsTable() {
   const currentData = data.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
   return (
-    <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+    <div className="bg-card rounded-xl shadow-sm overflow-hidden">
       <div className="overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow className="hover:bg-transparent">
               <TableHead className="text-xs font-semibold text-primary uppercase px-6">
-                Product Name
+                Model No
               </TableHead>
               <TableHead className="text-xs font-semibold text-primary uppercase px-6">
-                Model
+                Model Name
+              </TableHead>
+              <TableHead className="text-xs font-semibold text-primary uppercase px-6">
+                Brand
               </TableHead>
               <TableHead className="text-xs font-semibold text-primary uppercase px-6 text-center">
-                Active Stock
+                Total Qty
+              </TableHead>
+              <TableHead className="text-xs font-semibold text-primary uppercase px-6 text-center">
+                Available
+              </TableHead>
+              <TableHead className="text-xs font-semibold text-primary uppercase px-6 text-center">
+                Rented
               </TableHead>
               <TableHead className="text-xs font-semibold text-primary uppercase px-6 text-center">
                 Damaged
-              </TableHead>
-              <TableHead className="text-xs font-semibold text-primary uppercase px-6">
-                Vendor
-              </TableHead>
-              <TableHead className="text-xs font-semibold text-primary uppercase px-6">
-                Warehouse
               </TableHead>
               <TableHead className="text-xs font-semibold text-primary uppercase px-6 text-right pr-6">
                 Actions
@@ -96,38 +94,53 @@ export default function InventoryProductsTable() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {currentData.length > 0 ? (
+            {loading ? (
+              <TableRow>
+                <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                  Loading inventory...
+                </TableCell>
+              </TableRow>
+            ) : currentData.length > 0 ? (
               currentData.map((item, index) => (
                 <TableRow
-                  key={item.id}
-                  className={`hover:bg-gray-50/30 transition-colors ${index % 2 ? 'bg-sky-100/60' : ''}`}
+                  key={item.id || `inventory-${index}`}
+                  className={`hover:bg-muted/50/30 transition-colors ${index % 2 ? 'bg-sky-100/60' : ''}`}
                 >
-                  <TableCell className="px-6 py-4 font-medium text-gray-900">
-                    {item.product.name}
+                  <TableCell className="px-6 py-4 font-medium text-foreground">
+                    {item.model_no}
                   </TableCell>
-                  <TableCell className="px-6 py-4 text-gray-600">
-                    {item.product.model?.model_name || '-'}
+                  <TableCell className="px-6 py-4 text-foreground">
+                    <div className="font-medium">{item.model_name}</div>
+                    {item.description && (
+                      <div className="text-xs text-muted-foreground truncate max-w-[200px]">
+                        {item.description}
+                      </div>
+                    )}
                   </TableCell>
-                  <TableCell className="px-6 py-4 text-center font-bold text-gray-900">
-                    {item.quantity}
+                  <TableCell className="px-6 py-4 text-gray-600">{item.brand || '-'}</TableCell>
+                  <TableCell className="px-6 py-4 text-center font-bold text-blue-600">
+                    {item.total_quantity}
+                  </TableCell>
+                  <TableCell className="px-6 py-4 text-center">
+                    <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
+                      {item.available_qty}
+                    </span>
+                  </TableCell>
+                  <TableCell className="px-6 py-4 text-center">
+                    <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-700">
+                      {item.rented_qty + item.lease_qty}
+                    </span>
                   </TableCell>
                   <TableCell className="px-6 py-4 text-center">
                     <span
-                      className={`px-2.5 py-1 rounded-full text-xs font-medium ${'bg-green-100 text-green-700'}`}
+                      className={`px-2.5 py-1 rounded-full text-xs font-medium ${
+                        item.damaged_qty > 0
+                          ? 'bg-red-100 text-red-700'
+                          : 'bg-gray-100 text-muted-foreground'
+                      }`}
                     >
-                      0
+                      {item.damaged_qty}
                     </span>
-                  </TableCell>
-                  <TableCell className="px-6 py-4 text-gray-600">
-                    {item.product.vendor_id}
-                  </TableCell>
-                  <TableCell className="px-6 py-4 text-gray-600">
-                    <div className="flex items-center gap-2">
-                      <div className="w-1.5 h-1.5 rounded-full bg-blue-500"></div>
-                      <span className="truncate max-w-[100px]" title={item.warehouseId}>
-                        {item.warehouseId}
-                      </span>
-                    </div>
                   </TableCell>
                   <TableCell className="px-6 py-4 text-right pr-6">
                     <div className="flex justify-end gap-1">
@@ -151,7 +164,7 @@ export default function InventoryProductsTable() {
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-6 text-gray-500">
+                <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                   No inventory items found
                 </TableCell>
               </TableRow>
@@ -160,10 +173,10 @@ export default function InventoryProductsTable() {
         </Table>
       </div>
 
-      <div className="p-4 border-t border-gray-50 flex items-center justify-between bg-white">
-        <p className="text-xs text-gray-500">
+      <div className="p-4 border-t border-gray-50 flex items-center justify-between bg-card">
+        <p className="text-xs text-muted-foreground">
           Showing {startIndex + 1} to {Math.min(startIndex + ITEMS_PER_PAGE, data.length)} of{' '}
-          {data.length} products
+          {data.length} models
         </p>
         <div className="flex items-center gap-2">
           <Button
@@ -192,7 +205,7 @@ export default function InventoryProductsTable() {
             variant="outline"
             size="sm"
             onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-            disabled={page === totalPages}
+            disabled={page === totalPages || totalPages === 0}
             className="h-8 text-[11px] rounded-lg border-blue-100 text-blue-700 hover:bg-blue-50"
           >
             Next

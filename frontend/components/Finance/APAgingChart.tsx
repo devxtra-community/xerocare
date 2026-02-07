@@ -20,7 +20,7 @@ export default function APDueAgingChart() {
       <CardHeader className=" p-0">
         <div className="flex justify-between items-center">
           <div className="flex items-center gap-2">
-            <div className="p-2 bg-white rounded-lg  border-slate-200 shadow-sm">
+            <div className="p-2 bg-card rounded-lg  border-border shadow-sm">
               <Wallet className="w-4 h-4 text-indigo-600" />
             </div>
             <div>
@@ -31,7 +31,7 @@ export default function APDueAgingChart() {
             </div>
           </div>
           <div className="text-right">
-            <p className="text-2xl font-black text-slate-900 tracking-tight">
+            <p className="text-2xl font-black text-foreground tracking-tight">
               AED {totalAP.toLocaleString()}
             </p>
           </div>
@@ -45,7 +45,7 @@ export default function APDueAgingChart() {
             <div key={item.bucket} className="space-y-2 group">
               <div className="flex justify-between items-end">
                 <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold text-slate-500 uppercase tracking-tight">
+                  <span className="text-xs font-bold text-muted-foreground uppercase tracking-tight">
                     {item.bucket}
                   </span>
                   {item.bucket === '90+ Days' && (
@@ -55,7 +55,7 @@ export default function APDueAgingChart() {
                   )}
                 </div>
                 <div className="text-right">
-                  <span className="text-sm font-bold text-slate-900 tabular-nums">
+                  <span className="text-sm font-bold text-foreground tabular-nums">
                     AED {item.amount.toLocaleString()}
                   </span>
                   <span className="text-xs text-slate-400 ml-2">({item.percentage}%)</span>
@@ -78,12 +78,14 @@ export default function APDueAgingChart() {
           <div className="flex items-center gap-2">
             <Clock className="w-4 h-4 text-slate-400" />
             <div>
-              <p className="text-[10px] text-slate-500 uppercase font-bold">Avg. Pay Cycle</p>
+              <p className="text-[10px] text-muted-foreground uppercase font-bold">
+                Avg. Pay Cycle
+              </p>
               <p className="text-sm font-bold text-slate-800">22 Days</p>
             </div>
           </div>
           <div className="text-right">
-            <p className="text-[10px] text-slate-500 uppercase font-bold">Priority to Pay</p>
+            <p className="text-[10px] text-muted-foreground uppercase font-bold">Priority to Pay</p>
             <Link href="/finance/ap/invoices">
               <p className="text-sm font-bold text-indigo-600 underline cursor-pointer">
                 3 Vendors

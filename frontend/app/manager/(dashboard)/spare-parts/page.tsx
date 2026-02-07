@@ -62,7 +62,7 @@ export default function SparePartsPage() {
 
   const filtered = parts.filter(
     (p) =>
-      p.item_code.toLowerCase().includes(search.toLowerCase()) ||
+      p.lot_number.toLowerCase().includes(search.toLowerCase()) ||
       p.part_name.toLowerCase().includes(search.toLowerCase()) ||
       p.brand.toLowerCase().includes(search.toLowerCase()),
   );
@@ -76,7 +76,7 @@ export default function SparePartsPage() {
             + Add Item
           </Button>
           <Button
-            className="bg-white text-primary border border-primary gap-2 hover:bg-slate-50"
+            className="bg-card text-primary border border-primary gap-2 hover:bg-muted/50"
             onClick={() => setBulkOpen(true)}
           >
             <Upload size={16} /> Bulk Upload
@@ -96,11 +96,11 @@ export default function SparePartsPage() {
         </div>
       </div>
 
-      <div className="rounded-2xl bg-white shadow-sm overflow-hidden">
+      <div className="rounded-2xl bg-card shadow-sm overflow-hidden">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="font-bold text-primary">Item Code</TableHead>
+              <TableHead className="font-bold text-primary">Lot / Order Number</TableHead>
               <TableHead className="font-bold text-primary">Part Name</TableHead>
               <TableHead className="font-bold text-primary">Brand</TableHead>
               <TableHead className="font-bold text-primary">Compatible Model</TableHead>
@@ -114,8 +114,8 @@ export default function SparePartsPage() {
           <TableBody>
             {filtered.length > 0 ? (
               filtered.map((item, i) => (
-                <TableRow key={`${item.item_code}-${i}`} className={i % 2 ? 'bg-sky-100/60' : ''}>
-                  <TableCell className="font-medium">{item.item_code}</TableCell>
+                <TableRow key={`${item.lot_number}-${i}`} className={i % 2 ? 'bg-sky-100/60' : ''}>
+                  <TableCell className="font-medium">{item.lot_number}</TableCell>
                   <TableCell>{item.part_name}</TableCell>
                   <TableCell>{item.brand}</TableCell>
                   <TableCell>{item.compatible_model || 'Universal'}</TableCell>
@@ -137,7 +137,7 @@ export default function SparePartsPage() {
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={9} className="text-center py-8 text-gray-500">
+                <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                   No spare parts found. Try adding some.
                 </TableCell>
               </TableRow>

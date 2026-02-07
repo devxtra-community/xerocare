@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { Loader2 } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -24,7 +25,7 @@ type LeadDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   initialData?: Lead | null;
-  onSave: (lead: CreateLeadData & { id?: string }) => void;
+  onSave: (lead: CreateLeadData & { id?: string }) => Promise<void>;
 };
 
 const emptyLead: CreateLeadData = {
@@ -40,6 +41,7 @@ const emptyLead: CreateLeadData = {
 
 export default function LeadDialog({ open, onOpenChange, initialData, onSave }: LeadDialogProps) {
   const [formData, setFormData] = useState<CreateLeadData>(emptyLead);
+  const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState<Lead['status']>('new');
 
   useEffect(() => {
@@ -74,21 +76,21 @@ export default function LeadDialog({ open, onOpenChange, initialData, onSave }: 
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    onSave({
-      ...formData,
-      id: initialData?._id,
-
-      // Actually CreateLeadData doesn't have status in my lib definition?
-      // Let's check lib/lead.ts.
-      // It accepts `status` in CreateLeadData? No.
-      // But backend `createLead` service sets default status 'new'.
-      // `updateLead` can update status.
-      // I will pass status separately or extend CreateLeadData in the handler.
-      status: status,
-    } as unknown as CreateLeadData & { id?: string });
-    onOpenChange(false);
+    setLoading(true);
+    try {
+      await onSave({
+        ...formData,
+        id: initialData?._id,
+        status: status,
+      } as unknown as CreateLeadData & { id?: string });
+      onOpenChange(false);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -194,7 +196,12 @@ export default function LeadDialog({ open, onOpenChange, initialData, onSave }: 
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit" className="bg-primary text-white">
+            <Button
+              type="submit"
+              className="bg-primary text-white flex items-center gap-2"
+              disabled={loading}
+            >
+              {loading && <Loader2 className="h-4 w-4 animate-spin" />}
               {initialData ? 'Update Lead' : 'Add Lead'}
             </Button>
           </DialogFooter>

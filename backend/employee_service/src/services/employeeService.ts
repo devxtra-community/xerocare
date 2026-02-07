@@ -6,6 +6,8 @@ import { getSignedIdProofUrl } from '../utlis/r2SignedUrl';
 import { publishEmailJob } from '../queues/emailProducer';
 import { AppError } from '../errors/appError';
 import { EmployeeStatus } from '../entities/employeeEntities';
+import { EmployeeJob } from '../constants/employeeJob';
+import { FinanceJob } from '../constants/financeJob';
 import { publishEmployeeEvent } from '../events/publishers/eventPublisher';
 import { EmployeeEventType } from '../events/employeeEvents';
 import { logger } from '../config/logger';
@@ -20,6 +22,8 @@ export class EmployeeService {
     last_name: string;
     email: string;
     role?: string;
+    employee_job?: EmployeeJob;
+    finance_job?: FinanceJob;
     expireDate?: Date;
     salary?: number | null;
     profile_image_url?: string | null;
@@ -31,6 +35,8 @@ export class EmployeeService {
       last_name,
       email,
       role,
+      employee_job,
+      finance_job,
       expireDate,
       salary,
       profile_image_url,
@@ -51,6 +57,28 @@ export class EmployeeService {
       throw new AppError('Invalid role', 400);
     }
 
+    const roleEnum = (role ?? EmployeeRole.EMPLOYEE) as EmployeeRole;
+
+    // Validate employee_job if provided
+    if (employee_job && !Object.values(EmployeeJob).includes(employee_job)) {
+      throw new AppError('Invalid employee job', 400);
+    }
+
+    // Require employee_job for EMPLOYEE role
+    if (roleEnum === EmployeeRole.EMPLOYEE && !employee_job) {
+      throw new AppError('Employee job is required for EMPLOYEE role', 400);
+    }
+
+    // Validate finance_job if provided
+    if (finance_job && !Object.values(FinanceJob).includes(finance_job)) {
+      throw new AppError('Invalid finance job', 400);
+    }
+
+    // Require finance_job for FINANCE role
+    if (roleEnum === EmployeeRole.FINANCE && !finance_job) {
+      throw new AppError('Finance job is required for FINANCE role', 400);
+    }
+
     if (branchId) {
       const branchRepo = Source.getRepository(Branch);
       const branch = await branchRepo.findOne({ where: { branch_id: branchId } });
@@ -58,8 +86,6 @@ export class EmployeeService {
         throw new AppError('Invalid Branch ID', 400);
       }
     }
-
-    const roleEnum = (role ?? EmployeeRole.EMPLOYEE) as EmployeeRole;
 
     const count = await this.employeeRepo.countByRole(roleEnum);
     const prefix =
@@ -85,6 +111,8 @@ export class EmployeeService {
       display_id,
       password_hash: passwordHash,
       role: roleEnum,
+      employee_job: employee_job ?? null,
+      finance_job: finance_job ?? null,
       salary: salary ?? null,
       profile_image_url: profile_image_url ?? null,
       id_proof_key: id_proof_key ?? null,
@@ -127,10 +155,10 @@ export class EmployeeService {
     };
   }
 
-  async getAllEmployees(page = 1, limit = 20, role?: EmployeeRole) {
+  async getAllEmployees(page = 1, limit = 20, role?: EmployeeRole, branchId?: string) {
     const skip = (page - 1) * limit;
 
-    const { data, total } = await this.employeeRepo.findAll(skip, limit, role);
+    const { data, total } = await this.employeeRepo.findAll(skip, limit, role, branchId);
 
     return {
       employees: data,
@@ -175,6 +203,8 @@ export class EmployeeService {
       first_name?: string;
       last_name?: string;
       role?: EmployeeRole;
+      employee_job?: EmployeeJob | null;
+      finance_job?: FinanceJob | null;
       salary?: number | null;
       profile_image_url?: string | null;
       id_proof_key?: string | null;
@@ -195,6 +225,18 @@ export class EmployeeService {
 
     if (payload.role && !Object.values(EmployeeRole).includes(payload.role)) {
       throw new AppError('Invalid role', 400);
+    }
+
+    if (payload.employee_job !== undefined && payload.employee_job !== null) {
+      if (!Object.values(EmployeeJob).includes(payload.employee_job)) {
+        throw new AppError('Invalid employee job', 400);
+      }
+    }
+
+    if (payload.finance_job !== undefined && payload.finance_job !== null) {
+      if (!Object.values(FinanceJob).includes(payload.finance_job)) {
+        throw new AppError('Invalid finance job', 400);
+      }
     }
 
     if (payload.branchId) {
@@ -242,17 +284,28 @@ export class EmployeeService {
     return !!updated;
   }
 
-  async getHRStats() {
-    const total = await this.employeeRepo.count();
-    const active = await this.employeeRepo.countByStatus(EmployeeStatus.ACTIVE);
-    const inactive = await this.employeeRepo.countByStatus(EmployeeStatus.INACTIVE);
+  async getHRStats(branchId?: string) {
+    // If branchId is provided, get stats for that branch only
+    const total = branchId
+      ? await this.employeeRepo.countByBranch(branchId)
+      : await this.employeeRepo.count();
+
+    const active = branchId
+      ? await this.employeeRepo.countByStatusAndBranch(EmployeeStatus.ACTIVE, branchId)
+      : await this.employeeRepo.countByStatus(EmployeeStatus.ACTIVE);
+
+    const inactive = branchId
+      ? await this.employeeRepo.countByStatusAndBranch(EmployeeStatus.INACTIVE, branchId)
+      : await this.employeeRepo.countByStatus(EmployeeStatus.INACTIVE);
 
     // Get counts by role
     const roles = Object.values(EmployeeRole);
     const byRole: Record<string, number> = {};
 
     for (const role of roles) {
-      byRole[role] = await this.employeeRepo.countByRole(role as EmployeeRole);
+      byRole[role] = branchId
+        ? await this.employeeRepo.countByRoleAndBranch(role as EmployeeRole, branchId)
+        : await this.employeeRepo.countByRole(role as EmployeeRole);
     }
 
     return {

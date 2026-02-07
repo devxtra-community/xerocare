@@ -25,10 +25,10 @@ export default function PrinterStatusDonut() {
     setIsClient(true);
   }, []);
 
-  if (!isClient) return <div className="h-[250px] w-full bg-white rounded-2xl animate-pulse" />;
+  if (!isClient) return <div className="h-[250px] w-full bg-card rounded-2xl animate-pulse" />;
 
   return (
-    <div className="rounded-2xl bg-white h-[320px] w-full shadow-sm flex flex-col p-4 border">
+    <div className="rounded-2xl bg-card h-[320px] w-full shadow-sm flex flex-col p-4 border">
       <div className="mb-2">
         <h3 className="font-semibold text-lg">Printer Status Distribution</h3>
         <p className="text-xs text-muted-foreground">Current fleet breakdown</p>
@@ -65,8 +65,8 @@ export default function PrinterStatusDonut() {
           </PieChart>
         </ResponsiveContainer>
         <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-center pointer-events-none mt-[-10px]">
-          <span className="text-2xl font-bold text-gray-900">120</span>
-          <p className="text-[10px] text-gray-500 uppercase font-medium">Total</p>
+          <span className="text-2xl font-bold text-foreground">120</span>
+          <p className="text-[10px] text-muted-foreground uppercase font-medium">Total</p>
         </div>
       </div>
     </div>

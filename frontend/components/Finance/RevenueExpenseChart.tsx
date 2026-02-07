@@ -33,17 +33,17 @@ const CustomTooltip = ({
   if (active && payload && payload.length) {
     const net = payload[0].value - payload[1].value;
     return (
-      <div className="bg-white p-2 border border-slate-200 shadow-xl rounded-lg text-sm">
-        <p className="font-bold text-slate-900 mb-2 border-b pb-1">{label} Summary</p>
+      <div className="bg-card p-2 border border-border shadow-xl rounded-lg text-sm">
+        <p className="font-bold text-foreground mb-2 border-b pb-1">{label} Summary</p>
         <div className="space-y-1">
           <div className="flex justify-between gap-8">
-            <span className="text-slate-500">Revenue:</span>
+            <span className="text-muted-foreground">Revenue:</span>
             <span className="font-mono font-semibold text-blue-600">
               AED {payload[0].value.toLocaleString()}
             </span>
           </div>
           <div className="flex justify-between gap-8">
-            <span className="text-slate-500">Expenses:</span>
+            <span className="text-muted-foreground">Expenses:</span>
             <span className="font-mono font-semibold text-rose-500">
               AED {payload[1].value.toLocaleString()}
             </span>

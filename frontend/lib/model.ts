@@ -6,12 +6,7 @@ export interface Model {
   model_name: string;
   brand: string;
   description: string;
-  rent_price_monthly: number;
-  rent_price_yearly: number;
-  lease_price_monthly: number;
-  lease_price_yearly: number;
-  sale_price: number;
-  wholesale_price: number;
+  quantity: number; // Auto-managed by backend
 }
 
 export interface CreateModelData {
@@ -19,12 +14,6 @@ export interface CreateModelData {
   model_name: string;
   brand: string;
   description: string;
-  rent_price_monthly: number;
-  rent_price_yearly: number;
-  lease_price_monthly: number;
-  lease_price_yearly: number;
-  sale_price: number;
-  wholesale_price: number;
 }
 
 export interface UpdateModelData {
@@ -32,12 +21,6 @@ export interface UpdateModelData {
   model_name?: string;
   brand?: string;
   description?: string;
-  rent_price_monthly?: number;
-  rent_price_yearly?: number;
-  lease_price_monthly?: number;
-  lease_price_yearly?: number;
-  sale_price?: number;
-  wholesale_price?: number;
 }
 
 interface ApiResponse<T> {

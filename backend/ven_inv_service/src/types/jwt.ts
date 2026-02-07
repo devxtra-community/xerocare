@@ -3,4 +3,6 @@ export interface AccessTokenPayload {
   role: string;
   email?: string;
   branchId?: string;
+  employeeJob?: string | null;
+  financeJob?: string | null;
 }

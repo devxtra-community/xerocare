@@ -74,7 +74,7 @@ export default function EmployeePieChart() {
   }, []);
 
   return (
-    <div className="rounded-2xl bg-white shadow-sm w-full p-4 h-[280px] flex flex-col">
+    <div className="rounded-2xl bg-card shadow-sm w-full p-4 h-[280px] flex flex-col">
       <div className="relative w-[100px] h-[100px] mx-auto mb-2">
         {isClient && (
           <PieChart width={100} height={100}>
@@ -101,13 +101,13 @@ export default function EmployeePieChart() {
         )}
 
         <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-          <p className="text-xl font-bold text-gray-900 leading-none mt-2 ml-2">{total}</p>
-          <p className="text-[8px] text-gray-900 leading-tight font-medium ml-2">Total</p>
+          <p className="text-xl font-bold text-foreground leading-none mt-2 ml-2">{total}</p>
+          <p className="text-[8px] text-foreground leading-tight font-medium ml-2">Total</p>
         </div>
       </div>
 
       <div className="w-full flex-1 overflow-hidden">
-        <div className="grid grid-cols-3 text-[10px] font-semibold text-primary border-b border-gray-200 pb-1.5 mb-1.5">
+        <div className="grid grid-cols-3 text-[10px] font-semibold text-primary border-b border-border pb-1.5 mb-1.5">
           <span>Department</span>
           <span className="text-center">
             Number Of
@@ -123,10 +123,10 @@ export default function EmployeePieChart() {
               <div key={item.name} className="grid grid-cols-3 items-center py-1.5 text-xs">
                 <div className="flex items-center gap-1.5">
                   <span className="h-2 w-2 rounded-full" style={{ backgroundColor: item.color }} />
-                  <span className="font-medium text-gray-900">{item.name}</span>
+                  <span className="font-medium text-foreground">{item.name}</span>
                 </div>
-                <span className="text-center font-semibold text-gray-900">{item.value}</span>
-                <span className="text-right font-semibold text-gray-900">{item.percentage}%</span>
+                <span className="text-center font-semibold text-foreground">{item.value}</span>
+                <span className="text-right font-semibold text-foreground">{item.percentage}%</span>
               </div>
             ),
         )}

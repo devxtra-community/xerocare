@@ -1,0 +1,369 @@
+'use client';
+
+import React from 'react';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Invoice } from '@/lib/invoice';
+import { IndianRupee, Calendar, User, Phone, FileText, Image as ImageIcon } from 'lucide-react';
+import { format } from 'date-fns';
+
+interface UsagePreviewDialogProps {
+  isOpen: boolean;
+  onClose: () => void;
+  invoice: Invoice;
+  usageData: {
+    bwA4Count: number;
+    bwA3Count: number;
+    colorA4Count: number;
+    colorA3Count: number;
+    billingPeriodStart: string;
+    billingPeriodEnd: string;
+    meterImageUrl?: string;
+    remarks?: string;
+  };
+}
+
+export default function UsagePreviewDialog({
+  isOpen,
+  onClose,
+  invoice,
+  usageData,
+}: UsagePreviewDialogProps) {
+  // Helper to safely parse numbers
+  const safeParse = (val: unknown) => {
+    if (val === undefined || val === null) return 0;
+    if (typeof val === 'number') return isNaN(val) ? 0 : val;
+    if (typeof val === 'string') {
+      const cleaned = val.replace(/[^0-9.-]+/g, '');
+      const num = Number(cleaned);
+      return isNaN(num) ? 0 : num;
+    }
+    return 0;
+  };
+
+  // Calculate pricing breakdown
+  const calculatePricing = () => {
+    const isCpc = invoice.rentType?.includes('CPC');
+    const monthlyRent = isCpc ? 0 : safeParse(invoice.monthlyRent);
+    const advance = safeParse(invoice.advanceAmount);
+
+    let bwExcessCost = 0;
+    let colorExcessCost = 0;
+    let bwExcessUnits = 0;
+    let colorExcessUnits = 0;
+    let bwRate = 0;
+    let colorRate = 0;
+    let bwLimit = 0;
+    let colorLimit = 0;
+
+    // BW Excess Calculation
+    const bwRule = invoice.items?.find(
+      (i) => i.itemType === 'PRICING_RULE' && i.description.includes('Black'),
+    );
+    if (bwRule) {
+      const totalCount = usageData.bwA4Count + usageData.bwA3Count * 2;
+      bwLimit = safeParse(bwRule.bwIncludedLimit);
+      bwRate = safeParse(bwRule.bwExcessRate);
+      bwExcessUnits = Math.max(0, totalCount - bwLimit);
+      bwExcessCost = bwExcessUnits * bwRate;
+    }
+
+    // Color Excess Calculation
+    const colorRule = invoice.items?.find(
+      (i) => i.itemType === 'PRICING_RULE' && i.description.includes('Color'),
+    );
+    if (colorRule) {
+      const totalCount = usageData.colorA4Count + usageData.colorA3Count * 2;
+      colorLimit = safeParse(colorRule.colorIncludedLimit);
+      colorRate = safeParse(colorRule.colorExcessRate);
+      colorExcessUnits = Math.max(0, totalCount - colorLimit);
+      colorExcessCost = colorExcessUnits * colorRate;
+    }
+
+    const totalExcess = bwExcessCost + colorExcessCost;
+    const total = monthlyRent + totalExcess - advance;
+
+    return {
+      monthlyRent,
+      advance,
+      bwExcessCost,
+      colorExcessCost,
+      bwExcessUnits,
+      colorExcessUnits,
+      bwRate,
+      colorRate,
+      bwLimit,
+      colorLimit,
+      totalExcess,
+      total: Math.round((total + Number.EPSILON) * 100) / 100,
+      isCpc,
+    };
+  };
+
+  const pricing = calculatePricing();
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="text-2xl font-bold text-blue-700">
+            Usage Record Preview
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          {/* Customer Information */}
+          <div className="bg-slate-50 rounded-lg border border-slate-200 p-4">
+            <h3 className="text-sm font-bold text-slate-600 uppercase mb-3 flex items-center gap-2">
+              <User size={16} />
+              Customer Details
+            </h3>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <p className="text-xs text-slate-500">Name</p>
+                <p className="font-semibold">{invoice.customerName}</p>
+              </div>
+              <div>
+                <p className="text-xs text-slate-500">Phone</p>
+                <p className="font-semibold flex items-center gap-1">
+                  <Phone size={14} />
+                  {invoice.customerPhone || 'N/A'}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-slate-500">Invoice Number</p>
+                <p className="font-semibold">{invoice.invoiceNumber}</p>
+              </div>
+              <div>
+                <p className="text-xs text-slate-500">Contract Type</p>
+                <p className="font-semibold">{invoice.rentType}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Billing Period */}
+          <div className="bg-blue-50 rounded-lg border border-blue-200 p-4">
+            <h3 className="text-sm font-bold text-blue-600 uppercase mb-3 flex items-center gap-2">
+              <Calendar size={16} />
+              Billing Period
+            </h3>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <p className="text-xs text-blue-500">Period Start</p>
+                <p className="font-semibold text-blue-700">
+                  {format(new Date(usageData.billingPeriodStart), 'MMM dd, yyyy')}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-blue-500">Period End</p>
+                <p className="font-semibold text-blue-700">
+                  {format(new Date(usageData.billingPeriodEnd), 'MMM dd, yyyy')}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Usage Summary */}
+          <div className="bg-orange-50 rounded-lg border border-orange-200 p-4">
+            <h3 className="text-sm font-bold text-orange-600 uppercase mb-3 flex items-center gap-2">
+              <FileText size={16} />
+              Usage Summary
+            </h3>
+            <div className="grid grid-cols-2 gap-4">
+              {/* BW Usage */}
+              {usageData.bwA4Count + usageData.bwA3Count > 0 && (
+                <div className="bg-white rounded p-3 border border-orange-100">
+                  <p className="text-xs font-semibold text-orange-600 mb-2">Black & White</p>
+                  <div className="space-y-1 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-slate-600">A4 Copies:</span>
+                      <span className="font-semibold">{usageData.bwA4Count.toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-600">A3 Copies:</span>
+                      <span className="font-semibold">{usageData.bwA3Count.toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between pt-1 border-t border-orange-100">
+                      <span className="text-slate-600">Total (A4 equiv):</span>
+                      <span className="font-bold text-orange-600">
+                        {(usageData.bwA4Count + usageData.bwA3Count * 2).toLocaleString()}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-xs text-slate-500">
+                      <span>Free Limit:</span>
+                      <span>{pricing.bwLimit.toLocaleString()}</span>
+                    </div>
+                    {pricing.bwExcessUnits > 0 && (
+                      <div className="flex justify-between pt-1 border-t border-orange-100">
+                        <span className="text-red-600 font-semibold">Excess Units:</span>
+                        <span className="font-bold text-red-600">
+                          {pricing.bwExcessUnits.toLocaleString()}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Color Usage */}
+              {usageData.colorA4Count + usageData.colorA3Count > 0 && (
+                <div className="bg-white rounded p-3 border border-orange-100">
+                  <p className="text-xs font-semibold text-orange-600 mb-2">Color</p>
+                  <div className="space-y-1 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-slate-600">A4 Copies:</span>
+                      <span className="font-semibold">
+                        {usageData.colorA4Count.toLocaleString()}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-600">A3 Copies:</span>
+                      <span className="font-semibold">
+                        {usageData.colorA3Count.toLocaleString()}
+                      </span>
+                    </div>
+                    <div className="flex justify-between pt-1 border-t border-orange-100">
+                      <span className="text-slate-600">Total (A4 equiv):</span>
+                      <span className="font-bold text-orange-600">
+                        {(usageData.colorA4Count + usageData.colorA3Count * 2).toLocaleString()}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-xs text-slate-500">
+                      <span>Free Limit:</span>
+                      <span>{pricing.colorLimit.toLocaleString()}</span>
+                    </div>
+                    {pricing.colorExcessUnits > 0 && (
+                      <div className="flex justify-between pt-1 border-t border-orange-100">
+                        <span className="text-red-600 font-semibold">Excess Units:</span>
+                        <span className="font-bold text-red-600">
+                          {pricing.colorExcessUnits.toLocaleString()}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Pricing Breakdown */}
+          <div className="bg-green-50 rounded-lg border border-green-200 p-4">
+            <h3 className="text-sm font-bold text-green-700 uppercase mb-3 flex items-center gap-2">
+              <IndianRupee size={16} />
+              Pricing Breakdown
+            </h3>
+            <div className="space-y-2">
+              {!pricing.isCpc && (
+                <div className="flex justify-between items-center py-2 border-b border-green-100">
+                  <span className="text-slate-700">Monthly Rent</span>
+                  <span className="font-semibold text-green-700 flex items-center gap-1">
+                    <IndianRupee size={16} />
+                    {pricing.monthlyRent.toLocaleString('en-IN', {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
+                  </span>
+                </div>
+              )}
+
+              {pricing.bwExcessUnits > 0 && (
+                <div className="flex justify-between items-center py-2 border-b border-green-100">
+                  <div>
+                    <span className="text-slate-700">BW Excess Charges</span>
+                    <p className="text-xs text-slate-500">
+                      {pricing.bwExcessUnits} units × ₹{pricing.bwRate}
+                    </p>
+                  </div>
+                  <span className="font-semibold text-orange-600 flex items-center gap-1">
+                    <IndianRupee size={16} />
+                    {pricing.bwExcessCost.toLocaleString('en-IN', {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
+                  </span>
+                </div>
+              )}
+
+              {pricing.colorExcessUnits > 0 && (
+                <div className="flex justify-between items-center py-2 border-b border-green-100">
+                  <div>
+                    <span className="text-slate-700">Color Excess Charges</span>
+                    <p className="text-xs text-slate-500">
+                      {pricing.colorExcessUnits} units × ₹{pricing.colorRate}
+                    </p>
+                  </div>
+                  <span className="font-semibold text-orange-600 flex items-center gap-1">
+                    <IndianRupee size={16} />
+                    {pricing.colorExcessCost.toLocaleString('en-IN', {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
+                  </span>
+                </div>
+              )}
+
+              {pricing.advance > 0 && (
+                <div className="flex justify-between items-center py-2 border-b border-green-100">
+                  <span className="text-slate-700">Advance (Deduction)</span>
+                  <span className="font-semibold text-red-600 flex items-center gap-1">
+                    - <IndianRupee size={16} />
+                    {pricing.advance.toLocaleString('en-IN', {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
+                  </span>
+                </div>
+              )}
+
+              <div className="flex justify-between items-center py-3 bg-green-100 rounded px-3 mt-2">
+                <span className="text-lg font-bold text-green-800">Total Amount</span>
+                <span className="text-2xl font-bold text-green-700 flex items-center gap-1">
+                  <IndianRupee size={24} />
+                  {pricing.total.toLocaleString('en-IN', {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Meter Image */}
+          {usageData.meterImageUrl && (
+            <div className="bg-slate-50 rounded-lg border border-slate-200 p-4">
+              <h3 className="text-sm font-bold text-slate-600 uppercase mb-3 flex items-center gap-2">
+                <ImageIcon size={16} />
+                Meter Image
+              </h3>
+              <img
+                src={usageData.meterImageUrl}
+                alt="Meter reading"
+                className="w-full rounded border border-slate-300"
+              />
+            </div>
+          )}
+
+          {/* Remarks */}
+          {usageData.remarks && (
+            <div className="bg-slate-50 rounded-lg border border-slate-200 p-4">
+              <h3 className="text-sm font-bold text-slate-600 uppercase mb-2">Remarks</h3>
+              <p className="text-sm text-slate-700">{usageData.remarks}</p>
+            </div>
+          )}
+        </div>
+
+        <DialogFooter>
+          <Button onClick={onClose} className="bg-blue-600 hover:bg-blue-700">
+            Close
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}

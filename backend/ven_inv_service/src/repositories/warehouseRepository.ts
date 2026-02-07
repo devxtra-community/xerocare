@@ -33,4 +33,14 @@ export class WarehouseRepository {
   async softDelete(id: string) {
     return this.repo.update(id, { status: WarehouseStatus.DELETED });
   }
+
+  async findByBranchId(branchId: string) {
+    return this.repo.find({
+      where: [
+        { branchId, status: WarehouseStatus.ACTIVE },
+        { branchId, status: WarehouseStatus.INACTIVE },
+      ],
+      relations: ['branch'],
+    });
+  }
 }

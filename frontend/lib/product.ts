@@ -2,10 +2,11 @@ import api from './api';
 import { Model } from './model';
 
 export enum ProductStatus {
-  AVAILABLE = 'available',
-  RENTED = 'rented',
-  SOLD = 'sold',
-  DAMAGED = 'damaged',
+  AVAILABLE = 'AVAILABLE',
+  RENTED = 'RENTED',
+  SOLD = 'SOLD',
+  DAMAGED = 'DAMAGED',
+  LEASE = 'LEASE',
 }
 
 export interface Product {
@@ -23,6 +24,8 @@ export interface Product {
   sale_price: number;
   tax_rate: number;
   product_status: ProductStatus;
+  print_colour?: 'BLACK_WHITE' | 'COLOUR' | 'BOTH';
+  max_discount_amount?: number;
   imageUrl?: string;
   created_at: string;
   inventory?: {

@@ -146,7 +146,7 @@ export default function Page({ params }: { params: { id: string } }) {
           {/* COLUMN 1: VENDOR INFO */}
           <div className="lg:col-span-1 flex flex-col gap-6">
             {/* General Info Card */}
-            <div className="bg-white rounded-xl shadow-sm p-4 border border-blue-100/30 flex-1 flex flex-col">
+            <div className="bg-card rounded-xl shadow-sm p-4 border border-blue-100/30 flex-1 flex flex-col">
               <h3 className="text-xs font-bold text-primary uppercase flex items-center gap-2 border-b border-gray-50 pb-3 mb-4">
                 <User className="h-3.5 w-3.5 text-primary" /> Contact Profile
               </h3>
@@ -159,7 +159,7 @@ export default function Page({ params }: { params: { id: string } }) {
                     <p className="text-[10px] text-gray-400 uppercase font-bold tracking-wider">
                       Contact Person
                     </p>
-                    <p className="text-xs font-semibold text-gray-900">{vendor.contactPerson}</p>
+                    <p className="text-xs font-semibold text-foreground">{vendor.contactPerson}</p>
                   </div>
                 </div>
                 <div className="flex items-start gap-3">
@@ -170,7 +170,7 @@ export default function Page({ params }: { params: { id: string } }) {
                     <p className="text-[10px] text-gray-400 uppercase font-bold tracking-wider">
                       Phone
                     </p>
-                    <p className="text-xs font-semibold text-gray-900">{vendor.phone}</p>
+                    <p className="text-xs font-semibold text-foreground">{vendor.phone}</p>
                   </div>
                 </div>
                 <div className="flex items-start gap-3">
@@ -181,7 +181,7 @@ export default function Page({ params }: { params: { id: string } }) {
                     <p className="text-[10px] text-gray-400 uppercase font-bold tracking-wider">
                       Email
                     </p>
-                    <p className="text-xs font-semibold text-gray-900">{vendor.email}</p>
+                    <p className="text-xs font-semibold text-foreground">{vendor.email}</p>
                   </div>
                 </div>
                 <div className="flex items-start gap-3">
@@ -192,7 +192,7 @@ export default function Page({ params }: { params: { id: string } }) {
                     <p className="text-[10px] text-gray-400 uppercase font-bold tracking-wider">
                       Location
                     </p>
-                    <p className="text-xs font-semibold text-gray-900 leading-relaxed">
+                    <p className="text-xs font-semibold text-foreground leading-relaxed">
                       {vendor.address}
                     </p>
                   </div>
@@ -201,7 +201,7 @@ export default function Page({ params }: { params: { id: string } }) {
             </div>
 
             {/* Business Details Card */}
-            <div className="bg-white rounded-xl shadow-sm p-4 border border-blue-100/30 flex-1 flex flex-col">
+            <div className="bg-card rounded-xl shadow-sm p-4 border border-blue-100/30 flex-1 flex flex-col">
               <h3 className="text-xs font-bold text-primary uppercase flex items-center gap-2 border-b border-gray-50 pb-3 mb-4">
                 <Building2 className="h-3.5 w-3.5 text-primary" /> Business & Tax
               </h3>
@@ -217,13 +217,13 @@ export default function Page({ params }: { params: { id: string } }) {
                     <p className="text-[10px] text-gray-400 uppercase font-bold tracking-wider">
                       Bank Name
                     </p>
-                    <p className="text-xs font-semibold text-gray-900">{bankDetails.bankName}</p>
+                    <p className="text-xs font-semibold text-foreground">{bankDetails.bankName}</p>
                   </div>
                   <div>
                     <p className="text-[10px] text-gray-400 uppercase font-bold tracking-wider">
                       Account / IFSC
                     </p>
-                    <p className="text-xs font-mono font-semibold text-gray-900 break-all">
+                    <p className="text-xs font-mono font-semibold text-foreground break-all">
                       {bankDetails.accountNumber} / {bankDetails.ifsc}
                     </p>
                   </div>
@@ -234,8 +234,8 @@ export default function Page({ params }: { params: { id: string } }) {
 
           {/* COLUMN 2 & 3: TRANSACTION HISTORY */}
           <div className="lg:col-span-2">
-            <div className="bg-white rounded-xl shadow-sm border border-blue-100/30 h-full flex flex-col overflow-hidden text-primary uppercase">
-              <h3 className="text-xs font-bold text-primary uppercase flex items-center gap-2 p-4 border-b border-gray-50 flex-none bg-white">
+            <div className="bg-card rounded-xl shadow-sm border border-blue-100/30 h-full flex flex-col overflow-hidden text-primary uppercase">
+              <h3 className="text-xs font-bold text-primary uppercase flex items-center gap-2 p-4 border-b border-gray-50 flex-none bg-card">
                 <Clock className="h-3.5 w-3.5 text-primary" /> Transaction History
               </h3>
               <div className="flex-1 overflow-auto">
@@ -250,7 +250,7 @@ export default function Page({ params }: { params: { id: string } }) {
           <h3 className="text-sm font-bold text-primary uppercase flex items-center gap-2">
             <TrendingUp className="h-3.5 w-3.5 text-primary" /> Purchasing Analytics
           </h3>
-          <div className="bg-white rounded-xl p-6 shadow-sm border border-blue-100/30">
+          <div className="bg-card rounded-xl p-6 shadow-sm border border-blue-100/30">
             <div className="h-[320px]">
               <VendorSpendingTrend />
             </div>
