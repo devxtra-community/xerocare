@@ -285,6 +285,7 @@ export default function FinanceApprovalTable() {
           onClose={() => setDetailsOpen(false)}
           onApprove={() => handleApproveClick(selectedInvoice)}
           approveLabel="Approve Now"
+          mode="FINANCE"
         />
       )}
 

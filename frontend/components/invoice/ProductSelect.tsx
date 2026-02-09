@@ -24,12 +24,7 @@ export function ProductSelect({ onSelect }: ProductSelectProps) {
           getAllSpareParts(),
         ]);
 
-        // Filter products to show only AVAILABLE status
-        const availableProducts = productsData.filter(
-          (product) => product.product_status === ProductStatus.AVAILABLE,
-        );
-
-        setItems([...availableProducts, ...sparePartsData]);
+        setItems([...productsData, ...sparePartsData]);
       } catch (error) {
         console.error('Failed to fetch items', error);
       } finally {
@@ -42,6 +37,10 @@ export function ProductSelect({ onSelect }: ProductSelectProps) {
   const handleValueChange = (val: string) => {
     const selected = items.find((item) => item.id === val);
     if (selected) {
+      if ('product_status' in selected && selected.product_status !== ProductStatus.AVAILABLE) {
+        // Double check, though UI should prevent this
+        return;
+      }
       onSelect(selected);
     }
   };
@@ -50,6 +49,7 @@ export function ProductSelect({ onSelect }: ProductSelectProps) {
     let label = '';
     let price = 0;
     let type = '';
+    let disabled = false;
 
     if ('part_name' in item) {
       // SparePart
@@ -61,12 +61,17 @@ export function ProductSelect({ onSelect }: ProductSelectProps) {
       label = item.name;
       price = item.sale_price || 0;
       type = 'Product';
+      if (item.product_status !== ProductStatus.AVAILABLE) {
+        label += ` (${item.product_status})`;
+        disabled = true;
+      }
     }
 
     return {
       value: item.id,
       label: label,
       description: `${type} • ₹${price.toLocaleString()}`,
+      disabled,
     };
   });
 

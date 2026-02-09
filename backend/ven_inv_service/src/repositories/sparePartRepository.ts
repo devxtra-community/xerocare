@@ -102,6 +102,7 @@ export class SparePartRepository {
         .addGroupBy('wh.id')
         .addGroupBy('v.id')
         .addGroupBy('model.id')
+        .addGroupBy('sp.created_at')
         .orderBy('sp.created_at', 'DESC')
         .getRawMany()
     );

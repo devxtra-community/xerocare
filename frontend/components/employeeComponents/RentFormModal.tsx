@@ -189,7 +189,7 @@ export default function RentFormModal({
             quantity: p.quantity || 1,
             unitPrice: 0,
             itemType: 'PRODUCT' as const,
-            productId: p.id, // CRITICAL: Include productId for status updates
+            productId: p.id?.startsWith('restored_') ? undefined : p.id, // CRITICAL: Only send real UUIDs
           })),
 
           pricingItems:
@@ -226,7 +226,7 @@ export default function RentFormModal({
             quantity: p.quantity || 1,
             unitPrice: 0,
             itemType: 'PRODUCT' as const,
-            productId: p.id, // CRITICAL: Include productId for status updates
+            productId: p.id?.startsWith('restored_') ? undefined : p.id, // CRITICAL: Only send real UUIDs
           })),
           rentType: form.rentType as
             | 'FIXED_LIMIT'
@@ -339,9 +339,10 @@ export default function RentFormModal({
         serial: string,
         qty: number,
         capability: 'BLACK_WHITE' | 'COLOUR' | 'BOTH',
+        realId?: string,
       ) =>
         ({
-          id: `restored_${Math.random()}`,
+          id: realId || `restored_${Math.random()}`,
           name: name,
           serial_no: serial,
           print_colour: capability,
@@ -387,7 +388,9 @@ export default function RentFormModal({
         );
         const capability = hasColor ? 'BOTH' : 'BLACK_WHITE';
 
-        reconstructedProducts.push(createMockProduct(name, serial, item.quantity || 1, capability));
+        reconstructedProducts.push(
+          createMockProduct(name, serial, item.quantity || 1, capability, item.productId),
+        );
       });
 
       // B. Process Orphan Rules (Virtual Machines)

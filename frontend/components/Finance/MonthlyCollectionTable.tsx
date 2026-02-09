@@ -17,12 +17,20 @@ import {
   generateMonthlyInvoice,
   createNextMonthInvoice,
 } from '@/lib/invoice';
-import { Loader2, Upload, FileText } from 'lucide-react';
+import {
+  Loader2,
+  FileText,
+  History as HistoryIcon,
+  Eye,
+  RefreshCw,
+  PlusCircle,
+} from 'lucide-react';
 import { toast } from 'sonner';
 import { format, differenceInDays } from 'date-fns';
 import { InvoiceDetailsDialog } from '../invoice/InvoiceDetailsDialog';
 import { getInvoiceById, Invoice } from '@/lib/invoice';
 import UsageRecordingModal from './UsageRecordingModal';
+import RentHistoryView from '@/components/employeeComponents/RentHistoryView';
 import {
   Select,
   SelectContent,
@@ -36,10 +44,12 @@ export default function MonthlyCollectionTable({ mode }: { mode?: 'RENT' | 'LEAS
   const [loading, setLoading] = useState(true);
   const [selectedContract, setSelectedContract] = useState<CollectionAlert | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [generating, setGenerating] = useState<string | null>(null);
+
   const [viewingInvoice, setViewingInvoice] = useState<Invoice | null>(null);
   const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null);
   const [viewingAlert, setViewingAlert] = useState<CollectionAlert | null>(null);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [historyContractId, setHistoryContractId] = useState<string>('');
 
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
@@ -59,6 +69,11 @@ export default function MonthlyCollectionTable({ mode }: { mode?: 'RENT' | 'LEAS
     'December',
   ];
   const years = Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 1 + i);
+
+  const handleShowHistory = (alert: CollectionAlert) => {
+    setHistoryContractId(alert.contractId);
+    setIsHistoryOpen(true);
+  };
 
   const fetchAlerts = async () => {
     setLoading(true);
@@ -86,15 +101,18 @@ export default function MonthlyCollectionTable({ mode }: { mode?: 'RENT' | 'LEAS
   };
 
   const handleGenerateInvoice = async (alert: CollectionAlert) => {
-    setGenerating(alert.contractId);
     try {
-      const start = new Date(selectedYear, selectedMonth, 1);
-      const end = new Date(selectedYear, selectedMonth + 1, 0);
+      const start =
+        alert.usageData?.billingPeriodStart ||
+        format(new Date(selectedYear, selectedMonth, 1), 'yyyy-MM-dd');
+      const end =
+        alert.usageData?.billingPeriodEnd ||
+        format(new Date(selectedYear, selectedMonth + 1, 0), 'yyyy-MM-dd');
 
       await generateMonthlyInvoice({
         contractId: alert.contractId,
-        billingPeriodStart: format(start, 'yyyy-MM-dd'),
-        billingPeriodEnd: format(end, 'yyyy-MM-dd'),
+        billingPeriodStart: start,
+        billingPeriodEnd: end,
       });
 
       toast.success('Monthly Invoice Generated');
@@ -102,22 +120,23 @@ export default function MonthlyCollectionTable({ mode }: { mode?: 'RENT' | 'LEAS
     } catch (error: unknown) {
       const err = error as { message?: string };
       toast.error(err.message || 'Failed to generate invoice');
-    } finally {
-      setGenerating(null);
     }
   };
 
   const handleRecordNextUsage = async (alert: CollectionAlert) => {
-    setGenerating(alert.contractId);
     try {
       // 1. Generate current month invoice
-      const start = new Date(selectedYear, selectedMonth, 1);
-      const end = new Date(selectedYear, selectedMonth + 1, 0);
+      const start =
+        alert.usageData?.billingPeriodStart ||
+        format(new Date(selectedYear, selectedMonth, 1), 'yyyy-MM-dd');
+      const end =
+        alert.usageData?.billingPeriodEnd ||
+        format(new Date(selectedYear, selectedMonth + 1, 0), 'yyyy-MM-dd');
 
       await generateMonthlyInvoice({
         contractId: alert.contractId,
-        billingPeriodStart: format(start, 'yyyy-MM-dd'),
-        billingPeriodEnd: format(end, 'yyyy-MM-dd'),
+        billingPeriodStart: start,
+        billingPeriodEnd: end,
       });
 
       // 2. Create Next Month Invoice (Usage Record)
@@ -142,8 +161,6 @@ export default function MonthlyCollectionTable({ mode }: { mode?: 'RENT' | 'LEAS
     } catch (error: unknown) {
       const err = error as { message?: string };
       toast.error(err.message || 'Failed to process next month');
-    } finally {
-      setGenerating(null);
     }
   };
 
@@ -160,8 +177,17 @@ export default function MonthlyCollectionTable({ mode }: { mode?: 'RENT' | 'LEAS
 
   const handleUpdateUsage = async (alert: CollectionAlert) => {
     try {
-      const inv = await getInvoiceById(alert.contractId);
-      setEditingInvoice(inv);
+      // If we have usageData in alert, pre-fill it
+      if (alert.usageData) {
+        setEditingInvoice({
+          id: '', // Not used for usage update if logic handles it
+          invoiceNumber: alert.invoiceNumber,
+          ...alert.usageData,
+        } as Invoice);
+      } else {
+        const inv = await getInvoiceById(alert.contractId);
+        setEditingInvoice(inv);
+      }
       setSelectedContract(alert);
       setIsModalOpen(true);
     } catch {
@@ -220,18 +246,21 @@ export default function MonthlyCollectionTable({ mode }: { mode?: 'RENT' | 'LEAS
         <Table>
           <TableHeader className="bg-muted/50">
             <TableRow>
-              <TableHead>Customer</TableHead>
-              <TableHead>Contract / Invoice</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Days Left</TableHead>
-              <TableHead>Due Date</TableHead>
-              <TableHead className="text-right">Action</TableHead>
+              <TableHead>INV NUMBER</TableHead>
+              <TableHead>CUSTOMER</TableHead>
+              <TableHead>ITEMS</TableHead>
+              <TableHead className="uppercase">Contract Period</TableHead>
+              <TableHead>DURATION</TableHead>
+              <TableHead>AMOUNT</TableHead>
+              <TableHead>STATUS</TableHead>
+              <TableHead>DATE</TableHead>
+              <TableHead className="text-right">ACTION</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {alerts.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="h-32 text-center text-slate-500 bg-slate-50/30">
+                <TableCell colSpan={9} className="h-32 text-center text-slate-500 bg-slate-50/30">
                   <div className="flex flex-col items-center gap-2">
                     <FileText className="h-8 w-8 opacity-20" />
                     <p className="font-medium text-slate-400">
@@ -243,13 +272,40 @@ export default function MonthlyCollectionTable({ mode }: { mode?: 'RENT' | 'LEAS
             ) : (
               alerts.map((alert) => (
                 <TableRow key={alert.contractId}>
+                  <TableCell className="font-medium">{alert.invoiceNumber}</TableCell>
                   <TableCell className="font-medium">
-                    {alert.customerName || 'Unknown Customer'}
-                    <div className="text-xs text-muted-foreground">
-                      {alert.customerPhone || alert.customerId}
+                    <div className="flex flex-col">
+                      {alert.customerName || 'Unknown Customer'}
+                      <div className="text-xs text-muted-foreground">
+                        {alert.customerPhone || alert.customerId}
+                      </div>
                     </div>
                   </TableCell>
-                  <TableCell>{alert.invoiceNumber}</TableCell>
+                  <TableCell className="max-w-[200px]">
+                    <div className="text-xs font-medium text-slate-700 truncate">
+                      {alert.saleType === 'RENT' ? 'Rent Agreement' : 'Lease Agreement'}
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-xs text-muted-foreground font-medium">
+                    {alert.usageData?.billingPeriodStart && alert.usageData?.billingPeriodEnd
+                      ? `${format(new Date(alert.usageData.billingPeriodStart), 'MMM dd, yyyy')} - ${format(new Date(alert.usageData.billingPeriodEnd), 'MMM dd, yyyy')}`
+                      : 'N/A'}
+                  </TableCell>
+                  <TableCell>
+                    {alert.dueDate
+                      ? (() => {
+                          const days = differenceInDays(new Date(alert.dueDate), new Date());
+                          return (
+                            <div
+                              className={`font-bold ${days < 0 ? 'text-red-500' : days <= 3 ? 'text-orange-500' : 'text-emerald-600'}`}
+                            >
+                              {days < 0 ? `${Math.abs(days)} Days Overdue` : `${days} Days Left`}
+                            </div>
+                          );
+                        })()
+                      : 'N/A'}
+                  </TableCell>
+                  <TableCell className="font-bold text-slate-700">N/A</TableCell>
                   <TableCell>
                     {alert.type === 'USAGE_PENDING' ? (
                       <Badge
@@ -271,82 +327,51 @@ export default function MonthlyCollectionTable({ mode }: { mode?: 'RENT' | 'LEAS
                       </Badge>
                     )}
                   </TableCell>
-                  <TableCell>
-                    {alert.dueDate
-                      ? (() => {
-                          const days = differenceInDays(new Date(alert.dueDate), new Date());
-                          return (
-                            <div
-                              className={`font-bold ${days < 0 ? 'text-red-500' : days <= 3 ? 'text-orange-500' : 'text-emerald-600'}`}
-                            >
-                              {days < 0 ? `${Math.abs(days)} Days Overdue` : `${days} Days Left`}
-                            </div>
-                          );
-                        })()
-                      : 'N/A'}
-                  </TableCell>
-                  <TableCell>
+                  <TableCell className="text-xs text-muted-foreground font-medium whitespace-nowrap">
                     {alert.dueDate ? format(new Date(alert.dueDate), 'MMM dd, yyyy') : 'N/A'}
                   </TableCell>
                   <TableCell className="text-right">
-                    {alert.type === 'USAGE_PENDING' ? (
+                    <div className="flex gap-1 justify-end items-center">
                       <Button
                         size="sm"
-                        variant="default"
-                        className="bg-orange-500 hover:bg-orange-600"
-                        onClick={() => handleRecordUsage(alert)}
+                        variant="ghost"
+                        className="h-7 w-7 p-0 text-primary hover:text-blue-600 hover:bg-blue-50"
+                        onClick={() => handleViewDetails(alert)}
+                        title="View Collection"
                       >
-                        <Upload className="mr-2 h-4 w-4" />
-                        Record Usage
+                        <Eye className="h-3.5 w-3.5" />
                       </Button>
-                    ) : alert.type === 'INVOICE_PENDING' ? (
-                      <div className="flex gap-2 justify-end">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="bg-white border-blue-200 text-blue-600 hover:bg-blue-50"
-                          onClick={() => handleViewDetails(alert)}
-                        >
-                          <FileText className="mr-2 h-4 w-4" />
-                          View Details
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="default"
-                          className="bg-orange-500 hover:bg-orange-600"
-                          onClick={() => handleRecordNextUsage(alert)}
-                          disabled={generating === alert.contractId}
-                        >
-                          {generating === alert.contractId ? (
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          ) : (
-                            <Upload className="mr-2 h-4 w-4" />
-                          )}
-                          Record Usage
-                        </Button>
-                      </div>
-                    ) : (
-                      <div className="flex gap-2 justify-end">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="bg-white border-green-200 text-green-600 hover:bg-green-50"
-                          onClick={() => handleUpdateUsage(alert)}
-                        >
-                          <Upload className="mr-2 h-4 w-4" />
-                          Update Reading
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="default"
-                          className="bg-green-600 hover:bg-green-700"
-                          onClick={() => handleViewDetails(alert)}
-                        >
-                          <FileText className="mr-2 h-4 w-4" />
-                          Send Invoice
-                        </Button>
-                      </div>
-                    )}
+
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 w-7 p-0 text-blue-600 hover:bg-blue-50"
+                        onClick={() => handleShowHistory(alert)}
+                        title="Usage History"
+                      >
+                        <HistoryIcon className="h-3.5 w-3.5" />
+                      </Button>
+
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 w-7 p-0 text-slate-600 hover:bg-slate-50"
+                        onClick={() => handleUpdateUsage(alert)}
+                        title="Update Collection"
+                      >
+                        <RefreshCw className="h-3.5 w-3.5" />
+                      </Button>
+
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 w-7 p-0 text-orange-600 hover:bg-orange-50"
+                        onClick={() => handleRecordUsage(alert)}
+                        title="Create Collection"
+                      >
+                        <PlusCircle className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))
@@ -397,8 +422,15 @@ export default function MonthlyCollectionTable({ mode }: { mode?: 'RENT' | 'LEAS
               : undefined
           }
           approveLabel="Record Usage"
+          mode="FINANCE"
         />
       )}
+
+      <RentHistoryView
+        isOpen={isHistoryOpen}
+        onClose={() => setIsHistoryOpen(false)}
+        contractId={historyContractId}
+      />
     </>
   );
 }

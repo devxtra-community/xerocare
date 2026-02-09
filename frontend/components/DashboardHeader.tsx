@@ -103,14 +103,14 @@ export default function DashboardHeader({ title = 'Dashboard' }: { title?: strin
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <div className="flex items-center gap-2 sm:gap-3 pl-2 sm:pl-4 border-l border-white/20 cursor-pointer hover:bg-card/5 py-2 px-1 rounded transition-colors">
-                <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-full bg-card/20 flex items-center justify-center text-xs sm:text-sm font-medium shrink-0">
+                <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-full bg-white/20 flex items-center justify-center text-xs sm:text-sm font-medium shrink-0">
                   {user.initial}
                 </div>
                 <div className="hidden sm:flex flex-col min-w-0">
                   <span className="text-sm font-medium truncate">{user.name}</span>
-                  <span className="text-xs text-gray-300 truncate">{user.email}</span>
+                  <span className="text-xs text-sidebar-foreground/70 truncate">{user.email}</span>
                 </div>
-                <ChevronDown className="hidden sm:block h-4 w-4 text-gray-300" />
+                <ChevronDown className="hidden sm:block h-4 w-4 text-sidebar-foreground/70" />
               </div>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56 bg-card text-black">
@@ -127,7 +127,7 @@ export default function DashboardHeader({ title = 'Dashboard' }: { title?: strin
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 onClick={handleLogout}
-                className="text-red-600 focus:text-red-600 focus:bg-red-50"
+                className="text-danger focus:text-danger focus:bg-danger/10"
               >
                 <LogOut className="mr-2 h-4 w-4" />
                 <span>Log out</span>
