@@ -15,9 +15,10 @@ export class InventoryRepository {
         'model.id AS id',
         'model.model_no AS model_no',
         'model.model_name AS model_name',
-        'model.brand AS brand',
+        'brandRelation.name AS brand',
         'model.description AS description',
       ])
+      .leftJoin('model.brandRelation', 'brandRelation')
       .addSelect('COUNT(product.id)', 'total_quantity')
       .addSelect(
         "COUNT(CASE WHEN product.product_status = 'AVAILABLE' THEN 1 END)",
@@ -36,6 +37,8 @@ export class InventoryRepository {
       // However, previous code explicitly had `.where('model.quantity > 0')`.
       // I will filter out models with 0 total products to keep it identical to "inventory with items" logic, but fixing the source of truth.
       .groupBy('model.id')
+      .addGroupBy('brandRelation.id')
+      .addGroupBy('brandRelation.name')
       .having('COUNT(product.id) > 0')
       .getRawMany();
 
@@ -55,13 +58,14 @@ export class InventoryRepository {
     const result = await this.productRepo
       .createQueryBuilder('product')
       .leftJoin('product.model', 'model')
+      .leftJoin('model.brandRelation', 'brandRelation')
       .innerJoin('product.warehouse', 'warehouse')
       .innerJoin('warehouse.branch', 'branch')
       .select([
         'model.id AS model_id',
         'model.model_no AS model_no',
         'model.model_name AS model_name',
-        'model.brand AS brand',
+        'brandRelation.name AS brand',
         'warehouse.id AS warehouse_id',
         'warehouse.warehouseName AS warehouse_name',
         'COUNT(product.id)::int AS total_qty',
@@ -76,7 +80,8 @@ export class InventoryRepository {
       .groupBy('model.id')
       .addGroupBy('model.model_no')
       .addGroupBy('model.model_name')
-      .addGroupBy('model.brand')
+      .addGroupBy('brandRelation.name')
+      .addGroupBy('brandRelation.id')
       .addGroupBy('warehouse.id')
       .addGroupBy('warehouse.warehouseName')
       .orderBy('model.model_name', 'ASC')
@@ -103,11 +108,12 @@ export class InventoryRepository {
     const result = await this.productRepo
       .createQueryBuilder('product')
       .leftJoin('product.model', 'model')
+      .leftJoin('model.brandRelation', 'brandRelation')
       .select([
         'model.id AS model_id',
         'model.model_no AS model_no',
         'model.model_name AS model_name',
-        'model.brand AS brand',
+        'brandRelation.name AS brand',
         'COUNT(product.id)::int AS total_qty',
         `SUM(CASE WHEN product.product_status = 'AVAILABLE' THEN 1 ELSE 0 END)::int AS available_qty`,
         `SUM(CASE WHEN product.product_status = 'RENTED' THEN 1 ELSE 0 END)::int AS rented_qty`,
@@ -120,7 +126,8 @@ export class InventoryRepository {
       .groupBy('model.id')
       .addGroupBy('model.model_no')
       .addGroupBy('model.model_name')
-      .addGroupBy('model.brand')
+      .addGroupBy('brandRelation.name')
+      .addGroupBy('brandRelation.id')
       .orderBy('model.model_name', 'ASC')
       .getRawMany();
 

@@ -397,7 +397,17 @@ function ProductFormModal({
         {/* Right Column */}
         <div className="space-y-4">
           <Field label="Model">
-            <Select value={form.model_id} onValueChange={(v) => setForm({ ...form, model_id: v })}>
+            <Select
+              value={form.model_id}
+              onValueChange={(v) => {
+                const selectedModel = models.find((m) => m.id === v);
+                setForm({
+                  ...form,
+                  model_id: v,
+                  brand: selectedModel?.brandRelation?.name || form.brand,
+                });
+              }}
+            >
               <SelectTrigger>
                 <SelectValue placeholder="Select Model" />
               </SelectTrigger>

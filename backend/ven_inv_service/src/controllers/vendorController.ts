@@ -68,4 +68,41 @@ export class VendorController {
       next(error);
     }
   };
+
+  requestProducts = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { products, message } = req.body;
+      const { userId, branchId } = req.user!; // Auth middleware ensures user exists
+
+      if (!products) {
+        return res.status(400).json({ success: false, message: 'Product list is required' });
+      }
+
+      await this.vendorService.requestProducts(
+        req.params.id as string,
+        { products, message },
+        userId,
+        branchId,
+      );
+
+      return res.json({
+        success: true,
+        message: 'Product request email sent successfully',
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  getVendorRequests = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const requests = await this.vendorService.getVendorRequests(req.params.id as string);
+      return res.json({
+        success: true,
+        data: requests,
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
 }
