@@ -54,25 +54,23 @@ app.post(['/e/auth/forgot-password', '/e/auth/magic-link'], otpSendLimiter);
 const empProxyOptions: Options = {
   target: EMPLOYEE_SERVICE_URL,
   changeOrigin: true,
-  pathRewrite: { '^/e': '' },
 };
 
 const invProxyOptions: Options = {
   target: VENDOR_INVENTORY_SERVICE_URL,
   changeOrigin: true,
-  pathRewrite: { '^/i': '' },
 };
 
 const billProxyOptions: Options = {
   target: BILLING_SERVICE_URL,
   changeOrigin: true,
-  pathRewrite: { '^/b': '' },
 };
 
 const crmProxyOptions: Options = {
   target: CRM_SERVICE_URL,
   changeOrigin: true,
-  pathRewrite: { '^/c': '' },
+  // pathRewrite removed because Express app.use('/c', ...) already strips the prefix
+  // and ^/c matches /customers causing /ustomers
 };
 
 app.use(httpLogger);

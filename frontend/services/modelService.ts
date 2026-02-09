@@ -4,7 +4,7 @@ export interface Model {
   id: string;
   model_no: string;
   model_name: string;
-  brand: string;
+  brandRelation?: { id: string; name: string };
   description: string;
   quantity: number;
 }
@@ -12,7 +12,7 @@ export interface Model {
 export interface CreateModelDTO {
   model_no: string;
   model_name: string;
-  brand: string;
+  brand_id: string;
   description: string;
 }
 

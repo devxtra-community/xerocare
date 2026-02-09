@@ -110,3 +110,41 @@ export async function sendLoginAlertMail(
     `,
   });
 }
+
+export async function sendProductRequestMail(
+  to: string,
+  vendorName: string,
+  productList: string,
+  message: string,
+) {
+  await mailer.sendMail({
+    from: process.env.MAIL_USER,
+    to,
+    subject: 'New Product Request from XeroCare',
+    html: `
+      <h2>Product Request</h2>
+      <p>Hello ${vendorName},</p>
+      <p>We have a new product request for you.</p>
+
+      <h3>Requested Products:</h3>
+      <div style="background-color: #f4f4f4; padding: 15px; border-radius: 5px; white-space: pre-wrap;">
+        ${productList}
+      </div>
+
+      ${
+        message
+          ? `
+        <h3>Message:</h3>
+        <p style="background-color: #fff3cd; padding: 10px; border-radius: 5px;">
+          ${message}
+        </p>
+      `
+          : ''
+      }
+
+      <br/>
+      <p>Please review and confirm availability.</p>
+      <p>— Team XeroCare</p>
+    `,
+  });
+}

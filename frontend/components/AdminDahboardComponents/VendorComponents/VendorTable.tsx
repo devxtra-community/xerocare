@@ -26,7 +26,12 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import { useRouter } from 'next/navigation';
-import { createVendor, updateVendor, deleteVendor as apiDeleteVendor } from '@/lib/vendor';
+import {
+  createVendor,
+  updateVendor,
+  deleteVendor as apiDeleteVendor,
+  requestProducts,
+} from '@/lib/vendor';
 import { toast } from 'sonner';
 import { AxiosError } from 'axios';
 import {
@@ -36,6 +41,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Send } from 'lucide-react';
+import RequestProductDialog from '@/components/ManagerDashboardComponents/VendorComponents/RequestProductDialog';
 
 // Extend frontend Vendor type to match API + UI needs
 // We keep the UI structure but populate from API where possible
@@ -83,6 +90,7 @@ export default function VendorTable({
   const [formOpen, setFormOpen] = useState(false);
   const [editingVendor, setEditingVendor] = useState<Vendor | null>(null);
   const [deleteVendor, setDeleteVendorTarget] = useState<Vendor | null>(null);
+  const [requestVendor, setRequestVendor] = useState<Vendor | null>(null);
 
   /* Fetched in parent */
 
@@ -141,6 +149,18 @@ export default function VendorTable({
       } else {
         toast.error('Failed to delete vendor');
       }
+    }
+  };
+
+  const handleRequestProducts = async (data: { products: string; message: string }) => {
+    if (!requestVendor) return;
+    try {
+      await requestProducts(requestVendor.id, data);
+      toast.success(`Request sent to ${requestVendor.name}`);
+      setRequestVendor(null);
+    } catch (err: unknown) {
+      console.error(err);
+      toast.error('Failed to send request');
     }
   };
 
@@ -308,6 +328,15 @@ export default function VendorTable({
                       <Button
                         variant="ghost"
                         size="icon"
+                        className="h-8 w-8 text-indigo-500 hover:text-indigo-700 hover:bg-indigo-50"
+                        title="Request Products"
+                        onClick={() => setRequestVendor(vendor)}
+                      >
+                        <Send className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
                         className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50"
                         onClick={() => setDeleteVendorTarget(vendor)}
                       >
@@ -342,6 +371,15 @@ export default function VendorTable({
         onCancel={() => setDeleteVendorTarget(null)}
         onConfirm={confirmDelete}
       />
+
+      {requestVendor && (
+        <RequestProductDialog
+          open={!!requestVendor}
+          onOpenChange={(open) => !open && setRequestVendor(null)}
+          vendor={requestVendor}
+          onConfirm={handleRequestProducts}
+        />
+      )}
     </div>
   );
 }

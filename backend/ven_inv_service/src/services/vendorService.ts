@@ -2,6 +2,7 @@ import { VendorRepository } from '../repositories/vendorRepository';
 import { Vendor, VendorStatus } from '../entities/vendorEntity';
 import { AppError } from '../errors/appError';
 import { publishEmailJob } from '../queues/emailPublisher';
+import { VendorRequestRepository } from '../repositories/vendorRequestRepository';
 
 interface CreateVendorDTO {
   name: string;
@@ -12,8 +13,16 @@ interface CreateVendorDTO {
   status?: VendorStatus;
 }
 
+interface RequestProductsDTO {
+  products: string;
+  message: string;
+}
+
 export class VendorService {
-  constructor(private readonly vendorRepo: VendorRepository) {}
+  constructor(
+    private readonly vendorRepo: VendorRepository,
+    private readonly requestRepo: VendorRequestRepository,
+  ) {}
 
   async createVendor(data: CreateVendorDTO): Promise<Vendor> {
     const existingByEmail = await this.vendorRepo.findByEmail(data.email);
@@ -83,5 +92,39 @@ export class VendorService {
     await this.vendorRepo.save(vendor);
 
     return true;
+  }
+  async requestProducts(
+    vendorId: string,
+    data: RequestProductsDTO,
+    userId: string,
+    branchId?: string,
+  ) {
+    const vendor = await this.getVendorById(vendorId);
+
+    // Save history
+    await this.requestRepo.createRequest({
+      vendor_id: vendorId,
+      requested_by: userId,
+      branch_id: branchId,
+      products: data.products,
+      message: data.message,
+    });
+
+    await publishEmailJob({
+      type: 'REQUEST_PRODUCTS',
+      email: vendor.email,
+      vendorName: vendor.name,
+      productList: data.products,
+      message: data.message,
+    });
+
+    return { success: true, message: 'Product request email sent' };
+  }
+
+  async getVendorRequests(vendorId: string) {
+    return this.requestRepo.find({
+      where: { vendor_id: vendorId },
+      order: { created_at: 'DESC' },
+    });
   }
 }

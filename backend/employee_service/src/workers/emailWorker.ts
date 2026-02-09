@@ -6,6 +6,7 @@ import {
   sendEmployeeWelcomeMail,
   sendVendorWelcomeMail,
   sendLoginAlertMail,
+  sendProductRequestMail,
 } from '../utlis/mailer';
 
 import { logger } from '../config/logger';
@@ -49,6 +50,10 @@ export const startWorker = async () => {
           ip: job.ip,
           time: job.time,
         });
+      }
+
+      if (job.type === 'REQUEST_PRODUCTS') {
+        await sendProductRequestMail(job.email, job.vendorName, job.productList, job.message);
       }
 
       channel.ack(msg);
