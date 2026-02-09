@@ -13,7 +13,7 @@ import { Warehouse } from './warehouseEntity';
 import { Vendor } from './vendorEntity';
 
 @Entity('spare_part_inventories')
-@Index(['spare_part_id', 'warehouse_id'], { unique: true }) // Unique constraint for Part+Warehouse
+@Index(['spare_part_id', 'warehouse_id'], { unique: true }) // Unique constraint per Part+Warehouse
 export class SparePartInventory {
   @PrimaryGeneratedColumn('uuid')
   id!: string;

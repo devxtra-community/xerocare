@@ -18,7 +18,7 @@ export class SparePartRepository {
   // --- Master Data Operations ---
 
   async findMasterByItemCode(itemCode: string) {
-    return this.masterRepo.findOne({ where: { item_code: itemCode } });
+    return this.masterRepo.find({ where: { item_code: itemCode } });
   }
 
   async createMaster(data: Partial<SparePart>) {
@@ -81,7 +81,8 @@ export class SparePartRepository {
         .leftJoin('inv.vendor', 'v')
         .select([
           'sp.id AS id',
-          'sp.item_code AS item_code',
+          'sp.item_code AS item_code', // Alias as item_code for frontend compatibility or rename frontend
+          'sp.item_code AS lot_number',
           'sp.part_name AS part_name',
           'sp.brand AS brand',
           'model.model_name AS compatible_model',

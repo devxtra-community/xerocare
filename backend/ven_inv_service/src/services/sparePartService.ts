@@ -64,6 +64,7 @@ export class SparePartService {
     const quantity = (data as BulkUploadRow & { quantity?: number }).quantity;
     const warehouseId = (data as BulkUploadRow & { warehouse_id?: string }).warehouse_id;
     const vendorId = (data as BulkUploadRow & { vendor_id?: string }).vendor_id;
+    // itemCode already extracted above
 
     if (quantity && quantity > 0) {
       if (!warehouseId) {

@@ -33,7 +33,6 @@ interface BulkSparePartDialogProps {
 }
 
 interface BulkSparePartRow {
-  item_code: string;
   part_name: string;
   brand: string;
   model_id: string;
@@ -41,6 +40,7 @@ interface BulkSparePartRow {
   quantity: number;
   vendor_id: string;
   warehouse_id: string;
+  // lot_number come from Global State
 }
 
 export default function BulkSparePartDialog({
@@ -54,6 +54,7 @@ export default function BulkSparePartDialog({
   const [models, setModels] = useState<{ id: string; model_name: string }[]>([]);
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [file, setFile] = useState<File | null>(null);
+  const [lotNumber, setLotNumber] = useState('');
 
   const loadDependencies = async () => {
     try {
@@ -74,12 +75,12 @@ export default function BulkSparePartDialog({
     if (open) {
       setRows([]);
       setFile(null);
+      setLotNumber('');
       loadDependencies();
     }
   }, [open]);
 
   const createEmptyRow = (): Partial<BulkSparePartRow> => ({
-    item_code: '',
     part_name: '',
     brand: '',
     model_id: '',
@@ -138,7 +139,7 @@ export default function BulkSparePartDialog({
       const rawWarehouse = getVal(['warehouse_id', 'Warehouse ID', 'Warehouse']);
 
       return {
-        item_code: getVal(['item_code', 'Item Code', 'ItemCode']),
+        // item_code removed
         part_name: getVal(['part_name', 'Item Name', 'Name']),
         brand: getVal(['brand', 'Brand']),
         model_id: findIdByName(rawModel, models),
@@ -173,11 +174,16 @@ export default function BulkSparePartDialog({
   };
 
   const handleSubmit = async () => {
-    // Validate rows - require item_code
-    const validRows = rows.filter((r) => r.item_code);
+    // Validate rows - require part_name
+    const validRows = rows.filter((r) => r.part_name);
+
+    if (!lotNumber) {
+      toast.error('Please enter a Batch Lot/Order Number');
+      return;
+    }
 
     if (validRows.length === 0) {
-      toast.error('Please add at least one valid spare part with Item Code');
+      toast.error('Please add at least one valid spare part');
       return;
     }
 
@@ -189,6 +195,7 @@ export default function BulkSparePartDialog({
         model_id: !r.model_id || r.model_id === 'universal' ? undefined : r.model_id,
         base_price: Number(r.base_price),
         quantity: Number(r.quantity),
+        lot_number: lotNumber || undefined, // Pass the Lot Number (global for batch)
       }));
 
       // sparePartService.bulkUpload type definition matches payload
@@ -251,14 +258,29 @@ export default function BulkSparePartDialog({
           </div>
         </div>
 
+        {/* Global Batch Fields */}
+        <div className="px-4 py-2 bg-white border-b flex gap-4 items-center">
+          <div className="w-64">
+            <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">
+              Batch Lot / Order Number
+            </label>
+            <Input
+              placeholder="e.g. ORD-2024-001"
+              value={lotNumber}
+              onChange={(e) => setLotNumber(e.target.value)}
+              className="h-9"
+            />
+          </div>
+          <div className="text-xs text-blue-500 mt-5 font-medium">
+            * This Lot Number will be applied to all items in this batch.
+          </div>
+        </div>
+
         <div className="flex-1 overflow-auto p-4">
           {rows.length > 0 ? (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[120px]">
-                    Item Code <span className="text-red-500">*</span>
-                  </TableHead>
                   <TableHead className="w-[150px]">
                     Part Name <span className="text-red-500">*</span>
                   </TableHead>
@@ -276,13 +298,6 @@ export default function BulkSparePartDialog({
               <TableBody>
                 {rows.map((row, i) => (
                   <TableRow key={i}>
-                    <TableCell>
-                      <Input
-                        value={row.item_code}
-                        onChange={(e) => updateRow(i, 'item_code', e.target.value)}
-                        placeholder="Item Code"
-                      />
-                    </TableCell>
                     <TableCell>
                       <Input
                         value={row.part_name}

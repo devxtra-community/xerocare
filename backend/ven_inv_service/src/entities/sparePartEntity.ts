@@ -20,7 +20,7 @@ export class SparePart {
 
   @Column({ name: 'item_code' })
   @Index()
-  item_code!: string; // Normalized global code
+  item_code!: string; // Matches DB column
 
   @Column({ name: 'part_name' })
   part_name!: string;
