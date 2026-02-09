@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Clock, CheckCircle, XCircle, Calendar } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import StatCard from '@/components/StatCard';
+import { Loader2 } from 'lucide-react';
 import { getLeaveStats } from '@/lib/leaveApplicationService';
 import { toast } from 'sonner';
 
@@ -36,48 +36,45 @@ export default function HRLeaveStats() {
   const statCards = [
     {
       title: 'Pending Applications',
-      value: stats.totalPending,
-      icon: Clock,
-      color: 'text-yellow-600',
-      bgColor: 'bg-yellow-100',
+      value: stats.totalPending.toString(),
+      subtitle: 'Waiting for action',
     },
     {
       title: 'Approved',
-      value: stats.totalApproved,
-      icon: CheckCircle,
-      color: 'text-green-600',
-      bgColor: 'bg-green-100',
+      value: stats.totalApproved.toString(),
+      subtitle: 'Total approved',
     },
     {
       title: 'Rejected',
-      value: stats.totalRejected,
-      icon: XCircle,
-      color: 'text-red-600',
-      bgColor: 'bg-red-100',
+      value: stats.totalRejected.toString(),
+      subtitle: 'Total rejected',
     },
     {
       title: 'Total Applications',
-      value: stats.totalApplications,
-      icon: Calendar,
-      color: 'text-blue-600',
-      bgColor: 'bg-blue-100',
+      value: stats.totalApplications.toString(),
+      subtitle: 'All records',
     },
   ];
 
+  if (isLoading) {
+    return (
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 md:gap-4">
+        {[...Array(4)].map((_, i) => (
+          <div
+            key={i}
+            className="h-[80px] bg-card/50 animate-pulse rounded-2xl flex items-center justify-center"
+          >
+            <Loader2 className="h-4 w-4 animate-spin text-primary/30" />
+          </div>
+        ))}
+      </div>
+    );
+  }
+
   return (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 md:gap-4">
       {statCards.map((stat) => (
-        <Card key={stat.title} className="shadow-sm">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">{stat.title}</CardTitle>
-            <div className={`p-2 rounded-lg ${stat.bgColor}`}>
-              <stat.icon className={`h-4 w-4 ${stat.color}`} />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{isLoading ? '...' : stat.value}</div>
-          </CardContent>
-        </Card>
+        <StatCard key={stat.title} title={stat.title} value={stat.value} subtitle={stat.subtitle} />
       ))}
     </div>
   );

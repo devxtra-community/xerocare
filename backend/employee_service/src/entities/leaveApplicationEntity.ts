@@ -20,11 +20,11 @@ export class LeaveApplication {
   id!: string;
 
   @Index()
-  @Column({ type: 'varchar', length: 255 })
+  @Column({ type: 'varchar' })
   employee_id!: string;
 
   @Index()
-  @Column({ type: 'varchar', length: 255 })
+  @Column({ type: 'varchar' })
   branch_id!: string;
 
   @Column({ type: 'date' })
@@ -43,7 +43,7 @@ export class LeaveApplication {
   @Column({ type: 'enum', enum: LeaveStatus, default: LeaveStatus.PENDING })
   status!: LeaveStatus;
 
-  @Column({ type: 'varchar', length: 255, nullable: true })
+  @Column({ type: 'varchar', nullable: true })
   reviewed_by!: string | null;
 
   @Column({ type: 'timestamp with time zone', nullable: true })

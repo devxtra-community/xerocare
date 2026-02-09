@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Invoice } from '@/lib/invoice';
 import { IndianRupee, Calendar, User, Phone, FileText, Image as ImageIcon } from 'lucide-react';
 import { format } from 'date-fns';
+import Image from 'next/image';
 
 interface UsagePreviewDialogProps {
   isOpen: boolean;
@@ -341,10 +342,13 @@ export default function UsagePreviewDialog({
                 <ImageIcon size={16} />
                 Meter Image
               </h3>
-              <img
+              <Image
                 src={usageData.meterImageUrl}
                 alt="Meter reading"
-                className="w-full rounded border border-slate-300"
+                width={800}
+                height={600}
+                className="w-full rounded border border-slate-300 h-auto"
+                unoptimized
               />
             </div>
           )}

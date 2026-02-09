@@ -35,6 +35,7 @@ const startServer = async () => {
       logger.info(`Server running on port ${PORT}`);
     });
   } catch (error) {
+    console.error('CRITICAL ERROR DURING STARTUP:', error);
     logger.error('DB connection failed', error);
     process.exit(1);
   }

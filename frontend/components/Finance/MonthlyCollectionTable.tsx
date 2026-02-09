@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   Table,
   TableBody,
@@ -75,7 +75,7 @@ export default function MonthlyCollectionTable({ mode }: { mode?: 'RENT' | 'LEAS
     setIsHistoryOpen(true);
   };
 
-  const fetchAlerts = async () => {
+  const fetchAlerts = useCallback(async () => {
     setLoading(true);
     try {
       const dateStr = format(new Date(selectedYear, selectedMonth, 1), 'yyyy-MM-dd');
@@ -89,11 +89,11 @@ export default function MonthlyCollectionTable({ mode }: { mode?: 'RENT' | 'LEAS
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedMonth, selectedYear, mode]);
 
   useEffect(() => {
     fetchAlerts();
-  }, [selectedMonth, selectedYear]);
+  }, [fetchAlerts]);
 
   const handleRecordUsage = (alert: CollectionAlert) => {
     setSelectedContract(alert);

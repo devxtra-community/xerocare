@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Table,
   TableBody,
@@ -12,7 +12,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Search, CheckCircle, XCircle, Loader2 } from 'lucide-react';
+import { Search, CheckCircle, XCircle, Loader2, FileText, Printer } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -39,6 +39,8 @@ import {
   LeaveStatus,
   LeaveType,
 } from '@/lib/leaveApplicationService';
+import { EMPLOYEE_JOB_LABELS, EmployeeJob } from '@/lib/employeeJob';
+import { FINANCE_JOB_LABELS, FinanceJob } from '@/lib/financeJob';
 
 const leaveTypeLabels: Record<LeaveType, string> = {
   [LeaveType.SICK]: 'Sick Leave',
@@ -57,8 +59,25 @@ export default function HRLeaveTable() {
   const [isRejectDialogOpen, setIsRejectDialogOpen] = useState(false);
   const [rejectionReason, setRejectionReason] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isLetterOpen, setIsLetterOpen] = useState(false);
 
-  const fetchLeaveApplications = async () => {
+  const calculateDays = (start: string, end: string) => {
+    const s = new Date(start);
+    const e = new Date(end);
+    const diffTime = Math.abs(e.getTime() - s.getTime());
+    return Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+  };
+
+  const getDepartment = (emp: LeaveApplication['employee'] | undefined) => {
+    if (!emp) return 'General';
+    if (emp.employee_job)
+      return EMPLOYEE_JOB_LABELS[emp.employee_job as EmployeeJob] || emp.employee_job;
+    if (emp.finance_job)
+      return FINANCE_JOB_LABELS[emp.finance_job as FinanceJob] || emp.finance_job;
+    return 'General';
+  };
+
+  const fetchLeaveApplications = useCallback(async () => {
     setIsLoading(true);
     try {
       const status = statusFilter === 'ALL' ? undefined : (statusFilter as LeaveStatus);
@@ -71,11 +90,11 @@ export default function HRLeaveTable() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [statusFilter]);
 
   useEffect(() => {
     fetchLeaveApplications();
-  }, [statusFilter]);
+  }, [fetchLeaveApplications]);
 
   const filteredLeaves = leaves.filter(
     (leave) =>
@@ -200,19 +219,22 @@ export default function HRLeaveTable() {
                   Name
                 </TableHead>
                 <TableHead className="px-3 py-2 font-bold text-xs uppercase tracking-wider text-primary">
-                  Date Range
+                  Department
                 </TableHead>
                 <TableHead className="px-3 py-2 font-bold text-xs uppercase tracking-wider text-primary">
-                  Leave Type
+                  From
+                </TableHead>
+                <TableHead className="px-3 py-2 font-bold text-xs uppercase tracking-wider text-primary">
+                  To
+                </TableHead>
+                <TableHead className="px-3 py-2 font-bold text-xs uppercase tracking-wider text-primary text-center">
+                  Days
                 </TableHead>
                 <TableHead className="px-3 py-2 font-bold text-xs uppercase tracking-wider text-primary">
                   Reason
                 </TableHead>
                 <TableHead className="px-3 py-2 font-bold text-xs uppercase tracking-wider text-primary text-center">
                   Status
-                </TableHead>
-                <TableHead className="px-3 py-2 font-bold text-xs uppercase tracking-wider text-primary">
-                  Applied On
                 </TableHead>
                 <TableHead className="px-3 py-2 text-right font-bold text-xs uppercase tracking-wider text-primary">
                   Actions
@@ -233,51 +255,75 @@ export default function HRLeaveTable() {
                       {leave.employee.display_id || '---'}
                     </TableCell>
                     <TableCell className="px-3 py-1.5">
-                      <div className="font-medium text-primary">
+                      <div className="font-medium text-primary line-clamp-1">
                         {leave.employee.first_name} {leave.employee.last_name}
                       </div>
-                      <div className="text-xs text-muted-foreground">{leave.employee.email}</div>
+                      <div className="text-[10px] text-muted-foreground line-clamp-1">
+                        {leave.employee.email}
+                      </div>
                     </TableCell>
                     <TableCell className="px-3 py-1.5 text-sm">
-                      {formatDate(leave.start_date)} - {formatDate(leave.end_date)}
+                      <Badge variant="secondary" className="font-normal text-[11px]">
+                        {getDepartment(leave.employee)}
+                      </Badge>
                     </TableCell>
-                    <TableCell className="px-3 py-1.5 text-sm">
-                      {leaveTypeLabels[leave.leave_type]}
+                    <TableCell className="px-3 py-1.5 text-sm whitespace-nowrap">
+                      {formatDate(leave.start_date)}
                     </TableCell>
-                    <TableCell className="px-3 py-1.5 max-w-[200px] truncate" title={leave.reason}>
+                    <TableCell className="px-3 py-1.5 text-sm whitespace-nowrap">
+                      {formatDate(leave.end_date)}
+                    </TableCell>
+                    <TableCell className="px-3 py-1.5 text-center font-bold text-primary">
+                      {calculateDays(leave.start_date, leave.end_date)}
+                    </TableCell>
+                    <TableCell
+                      className="px-3 py-1.5 max-w-[150px] truncate text-sm"
+                      title={leave.reason}
+                    >
                       {leave.reason}
                     </TableCell>
                     <TableCell className="px-3 py-1.5 text-center">
                       {getStatusBadge(leave.status)}
                     </TableCell>
-                    <TableCell className="px-3 py-1.5 text-sm text-muted-foreground">
-                      {formatDate(leave.createdAt)}
-                    </TableCell>
-                    <TableCell className="px-3 py-1.5 text-right">
-                      {leave.status === LeaveStatus.PENDING && (
-                        <div className="flex items-center justify-end gap-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-green-600 hover:text-green-700 hover:bg-green-50"
-                            onClick={() => handleApprove(leave)}
-                            disabled={isProcessing}
-                          >
-                            <CheckCircle className="h-4 w-4 mr-1" />
-                            Approve
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                            onClick={() => handleRejectClick(leave)}
-                            disabled={isProcessing}
-                          >
-                            <XCircle className="h-4 w-4 mr-1" />
-                            Reject
-                          </Button>
-                        </div>
-                      )}
+                    <TableCell className="px-3 py-1.5">
+                      <div className="flex items-center justify-end gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                          title="View Letter"
+                          onClick={() => {
+                            setSelectedLeave(leave);
+                            setIsLetterOpen(true);
+                          }}
+                        >
+                          <FileText className="h-4 w-4" />
+                        </Button>
+                        {leave.status === LeaveStatus.PENDING && (
+                          <>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-green-600 hover:text-green-700 hover:bg-green-50"
+                              title="Approve"
+                              onClick={() => handleApprove(leave)}
+                              disabled={isProcessing}
+                            >
+                              <CheckCircle className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50"
+                              title="Reject"
+                              onClick={() => handleRejectClick(leave)}
+                              disabled={isProcessing}
+                            >
+                              <XCircle className="h-4 w-4" />
+                            </Button>
+                          </>
+                        )}
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))
@@ -330,6 +376,129 @@ export default function HRLeaveTable() {
               {isProcessing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Reject Application
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={isLetterOpen} onOpenChange={setIsLetterOpen}>
+        <DialogContent className="sm:max-w-[600px] p-0 overflow-hidden">
+          <DialogHeader className="bg-primary p-6 text-primary-foreground space-y-0">
+            <div className="flex justify-between items-center">
+              <div>
+                <DialogTitle className="text-2xl font-bold">Leave Application</DialogTitle>
+                <DialogDescription className="text-primary-foreground/80 text-[13px] mt-1 font-medium">
+                  Reference: {selectedLeave?.id?.slice(0, 8).toUpperCase()}
+                </DialogDescription>
+              </div>
+              <Button
+                variant="secondary"
+                size="sm"
+                className="gap-2"
+                onClick={() => window.print()}
+              >
+                <Printer className="h-4 w-4" />
+                Print
+              </Button>
+            </div>
+          </DialogHeader>
+          <div className="p-8 space-y-6 bg-white dark:bg-slate-950">
+            <div className="flex justify-between text-sm">
+              <div className="space-y-1">
+                <p className="font-semibold text-muted-foreground uppercase text-[10px] tracking-wider">
+                  From
+                </p>
+                <p className="font-bold text-lg">
+                  {selectedLeave?.employee?.first_name} {selectedLeave?.employee?.last_name}
+                </p>
+                <p>{selectedLeave?.employee?.email}</p>
+                <p className="text-muted-foreground italic">
+                  {getDepartment(selectedLeave?.employee)} Department
+                </p>
+              </div>
+              <div className="text-right space-y-1">
+                <p className="font-semibold text-muted-foreground uppercase text-[10px] tracking-wider">
+                  Date Applied
+                </p>
+                <p className="font-bold">{selectedLeave && formatDate(selectedLeave.createdAt)}</p>
+                <Badge variant="outline" className="mt-2">
+                  {selectedLeave?.leave_type && leaveTypeLabels[selectedLeave.leave_type]}
+                </Badge>
+              </div>
+            </div>
+
+            <div className="border-t pt-6">
+              <p className="text-sm font-semibold text-muted-foreground mb-4">
+                Subject: Application for Leave
+              </p>
+              <div className="space-y-4 text-sm leading-relaxed">
+                <p>Dear Management,</p>
+                <p>
+                  I am writing to formally request leave from{' '}
+                  <strong>{selectedLeave && formatDate(selectedLeave.start_date)}</strong> to
+                  <strong> {selectedLeave && formatDate(selectedLeave.end_date)}</strong>, totaling
+                  <strong>
+                    {' '}
+                    {selectedLeave &&
+                      calculateDays(selectedLeave.start_date, selectedLeave.end_date)}{' '}
+                    days
+                  </strong>
+                  .
+                </p>
+                <div>
+                  <p className="font-semibold mb-1">Reason for Leave:</p>
+                  <div className="bg-muted/30 p-4 rounded-lg italic">
+                    &quot;{selectedLeave?.reason}&quot;
+                  </div>
+                </div>
+                <p>
+                  I will ensure that all my current tasks are up to date before my leave starts.
+                  Thank you for considering my application.
+                </p>
+                <div className="pt-4">
+                  <p>Sincerely,</p>
+                  <p className="font-bold mt-1">
+                    {selectedLeave?.employee?.first_name} {selectedLeave?.employee?.last_name}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {selectedLeave?.status === LeaveStatus.REJECTED && (
+              <div className="mt-6 p-4 bg-red-50 border border-red-100 rounded-lg">
+                <p className="text-xs font-bold text-red-600 uppercase mb-1">Rejection Reason:</p>
+                <p className="text-sm text-red-700">{selectedLeave.rejection_reason}</p>
+              </div>
+            )}
+          </div>
+          <DialogFooter className="p-4 bg-muted/20 border-t flex flex-row justify-end gap-2">
+            <Button variant="ghost" onClick={() => setIsLetterOpen(false)} className="h-10">
+              Close
+            </Button>
+            {selectedLeave?.status === LeaveStatus.PENDING && (
+              <>
+                <Button
+                  variant="outline"
+                  className="border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 h-10 px-6 font-semibold"
+                  onClick={() => {
+                    setIsLetterOpen(false);
+                    handleRejectClick(selectedLeave);
+                  }}
+                  disabled={isProcessing}
+                >
+                  Reject
+                </Button>
+                <Button
+                  className="bg-green-600 hover:bg-green-700 text-white h-10 px-6 font-semibold shadow-sm"
+                  onClick={() => {
+                    handleApprove(selectedLeave);
+                    setIsLetterOpen(false);
+                  }}
+                  disabled={isProcessing}
+                >
+                  {isProcessing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Approve Application
+                </Button>
+              </>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

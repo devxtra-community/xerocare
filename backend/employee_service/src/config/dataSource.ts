@@ -7,6 +7,7 @@ import { Employee } from '../entities/employeeEntities';
 import { Auth } from '../entities/authEntities';
 
 import { Branch } from '../entities/branchEntity';
+import { LeaveApplication } from '../entities/leaveApplicationEntity';
 
 export const Source = new DataSource({
   type: 'postgres',
@@ -15,5 +16,5 @@ export const Source = new DataSource({
     rejectUnauthorized: false,
   },
   synchronize: true,
-  entities: [Admin, Employee, Auth, Branch],
+  entities: [Admin, Employee, Auth, Branch, LeaveApplication],
 });
