@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Search, Loader2, Eye, FileText, Plus } from 'lucide-react';
@@ -58,7 +58,7 @@ export default function EmployeeRentTable({ mode = 'EMPLOYEE' }: EmployeeRentTab
   const [editingUsage] = useState<Invoice | null>(null);
   const [search, setSearch] = useState('');
 
-  const fetchInvoices = async () => {
+  const fetchInvoices = useCallback(async () => {
     try {
       setLoading(true);
       let data: Invoice[] = [];
@@ -78,11 +78,11 @@ export default function EmployeeRentTable({ mode = 'EMPLOYEE' }: EmployeeRentTab
     } finally {
       setLoading(false);
     }
-  };
+  }, [mode]);
 
   useEffect(() => {
     fetchInvoices();
-  }, []);
+  }, [fetchInvoices]);
 
   const handleViewDetails = (id: string) => {
     const invoice = invoices.find((i) => i.id === id);

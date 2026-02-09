@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -44,13 +44,7 @@ export default function RentHistoryView({ contractId, isOpen, onClose }: RentHis
   // State for recording new usage
   const [isUsageModalOpen, setIsUsageModalOpen] = useState(false);
 
-  useEffect(() => {
-    if (isOpen && contractId) {
-      fetchData();
-    }
-  }, [isOpen, contractId]);
-
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       setLoading(true);
       const data = await getInvoiceById(contractId);
@@ -63,7 +57,13 @@ export default function RentHistoryView({ contractId, isOpen, onClose }: RentHis
     } finally {
       setLoading(false);
     }
-  };
+  }, [contractId]);
+
+  useEffect(() => {
+    if (isOpen && contractId) {
+      fetchData();
+    }
+  }, [isOpen, contractId, fetchData]);
 
   const handleViewInvoice = (inv: Invoice) => {
     setSelectedInvoice(inv);

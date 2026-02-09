@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Table,
   TableBody,
@@ -46,7 +46,7 @@ export default function EmployeeLeaveApplicationsTable() {
   const [selectedLeaveId, setSelectedLeaveId] = useState<string | null>(null);
   const [isCancelling, setIsCancelling] = useState(false);
 
-  const fetchLeaveApplications = async () => {
+  const fetchLeaveApplications = useCallback(async () => {
     setIsLoading(true);
     try {
       const response = await getMyLeaveApplications(1, 20);
@@ -58,11 +58,11 @@ export default function EmployeeLeaveApplicationsTable() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchLeaveApplications();
-  }, []);
+  }, [fetchLeaveApplications]);
 
   const handleCancelClick = (leaveId: string) => {
     setSelectedLeaveId(leaveId);
