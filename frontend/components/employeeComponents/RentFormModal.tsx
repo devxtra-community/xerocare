@@ -192,28 +192,66 @@ export default function RentFormModal({
             productId: p.id, // CRITICAL: Include productId for status updates
           })),
 
-          pricingItems:
-            form.leaseType === 'FSM'
-              ? form.pricingItems.map((item) => {
-                  // Reuse CPC logic for FSM
-                  const isCombinedItem = item.description.startsWith('Combined');
-                  const isBwItem = item.description.startsWith('Black & White');
-                  const isColorItem = item.description.startsWith('Color');
-                  return {
-                    description: item.description,
-                    bwIncludedLimit: undefined, // FSM usually pure CPC or fixed base. Assuming no free limit for FSM unless prompted? Prompt says "monthly lease + CPC". CPC implies pay per copy, usually from 0.
-                    colorIncludedLimit: undefined,
-                    combinedIncludedLimit: undefined,
-                    // FSM Pricing (Excess Rate = CPC Rate)
-                    bwExcessRate: isBwItem ? cleanNumber(item.bwExcessRate) : undefined,
-                    colorExcessRate: isColorItem ? cleanNumber(item.colorExcessRate) : undefined,
-                    combinedExcessRate: isCombinedItem
-                      ? cleanNumber(item.combinedExcessRate)
-                      : undefined,
-                  };
-                })
-              : undefined,
+          pricingItems: undefined,
         };
+
+        if (form.leaseType === 'FSM') {
+          const isFixed = form.rentType.startsWith('FIXED');
+          cleanPayload = {
+            ...cleanPayload,
+            rentType: form.rentType as
+              | 'FIXED_LIMIT'
+              | 'FIXED_COMBO'
+              | 'FIXED_FLAT'
+              | 'CPC'
+              | 'CPC_COMBO',
+            pricingItems: form.pricingItems.map((item) => {
+              const isCombinedItem = item.description.startsWith('Combined');
+              const isBwItem = item.description.startsWith('Black & White');
+              const isColorItem = item.description.startsWith('Color');
+
+              return {
+                description: item.description,
+                bwIncludedLimit:
+                  isBwItem && isFixed ? cleanNumber(item.bwIncludedLimit) : undefined,
+                colorIncludedLimit:
+                  isColorItem && isFixed ? cleanNumber(item.colorIncludedLimit) : undefined,
+                combinedIncludedLimit:
+                  isCombinedItem && isFixed ? cleanNumber(item.combinedIncludedLimit) : undefined,
+
+                bwExcessRate: isBwItem ? cleanNumber(item.bwExcessRate) : undefined,
+                colorExcessRate: isColorItem ? cleanNumber(item.colorExcessRate) : undefined,
+                combinedExcessRate: isCombinedItem
+                  ? cleanNumber(item.combinedExcessRate)
+                  : undefined,
+                bwSlabRanges:
+                  isBwItem && !isFixed
+                    ? item.bwSlabRanges?.map((r) => ({
+                        from: Number(r.from),
+                        to: Number(r.to),
+                        rate: Number(r.rate),
+                      }))
+                    : undefined,
+                colorSlabRanges:
+                  isColorItem && !isFixed
+                    ? item.colorSlabRanges?.map((r) => ({
+                        from: Number(r.from),
+                        to: Number(r.to),
+                        rate: Number(r.rate),
+                      }))
+                    : undefined,
+                comboSlabRanges:
+                  isCombinedItem && !isFixed
+                    ? item.comboSlabRanges?.map((r) => ({
+                        from: Number(r.from),
+                        to: Number(r.to),
+                        rate: Number(r.rate),
+                      }))
+                    : undefined,
+              };
+            }),
+          };
+        }
       } else {
         const isFixed = form.rentType.startsWith('FIXED');
 
@@ -790,14 +828,27 @@ export default function RentFormModal({
                     <select
                       className="w-full h-10 rounded-lg border border-border bg-card px-3 text-sm font-semibold text-indigo-600 focus:ring-2 focus:ring-indigo-100 outline-none"
                       value={form.leaseType}
-                      onChange={(e) =>
-                        setForm({ ...form, leaseType: e.target.value as 'EMI' | 'FSM' })
-                      }
+                      onChange={(e) => {
+                        const newLeaseType = e.target.value as 'EMI' | 'FSM';
+                        setForm({ ...form, leaseType: newLeaseType });
+                        // If switching to FSM, ensure rules are populated based on current Rent Type
+                        if (newLeaseType === 'FSM') {
+                          // Allow state update to settle? No, use current products
+                          // But we need to pass the *new* lease type context or just force update
+                          console.log('Switching to FSM, updating rules...');
+                          updateUsageRules(selectedProducts, form.rentType);
+                        }
+                      }}
                     >
                       <option value="EMI">EMI Based Lease</option>
                       <option value="FSM">Lease + Full Service Maintenance (FSM)</option>
                     </select>
                   ) : (
+                    <div className="hidden" />
+                  )}
+
+                  {(form.saleType === 'RENT' ||
+                    (form.saleType === 'LEASE' && form.leaseType === 'FSM')) && (
                     <select
                       className="w-full h-10 rounded-lg border border-border bg-card px-3 text-sm font-semibold text-indigo-600 focus:ring-2 focus:ring-indigo-100 outline-none"
                       value={form.rentType}

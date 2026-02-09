@@ -4,7 +4,7 @@ import { WarehouseRepository } from '../repositories/warehouseRepository';
 import { SparePart } from '../entities/sparePartEntity';
 
 interface BulkUploadRow {
-  lot_number: string;
+  item_code: string;
   part_name: string;
   brand: string;
   model_id?: string; // Optional if universal
@@ -29,7 +29,7 @@ export class SparePartService {
       } catch (error: unknown) {
         results.failed++;
         const message = error instanceof Error ? error.message : 'Unknown error';
-        results.errors.push({ item_code: row.lot_number, error: message });
+        results.errors.push({ item_code: row.item_code, error: message });
       }
     }
 
@@ -38,8 +38,8 @@ export class SparePartService {
 
   async addSingleSparePart(data: BulkUploadRow, branchId: string) {
     // 1. Validate Inputs
-    const lotNumber = data.lot_number?.trim().toUpperCase();
-    if (!lotNumber) throw new Error('Lot Number is required');
+    const itemCode = data.item_code?.trim().toUpperCase();
+    if (!itemCode) throw new Error('Item Code is required');
 
     // 2. Validate/Fetch Model (Optional)
     const modelId = data.model_id;
@@ -52,7 +52,7 @@ export class SparePartService {
     // User Requirement change: "i dont want to merge the spare parts having the same item code"
     // Always create a new entry for every upload.
     const master = await this.repo.createMaster({
-      lot_number: lotNumber,
+      item_code: itemCode,
       part_name: data.part_name,
       brand: data.brand,
       model_id: modelId || undefined,
@@ -64,7 +64,7 @@ export class SparePartService {
     const quantity = (data as BulkUploadRow & { quantity?: number }).quantity;
     const warehouseId = (data as BulkUploadRow & { warehouse_id?: string }).warehouse_id;
     const vendorId = (data as BulkUploadRow & { vendor_id?: string }).vendor_id;
-    // lotNumber already extracted above
+    // itemCode already extracted above
 
     if (quantity && quantity > 0) {
       if (!warehouseId) {

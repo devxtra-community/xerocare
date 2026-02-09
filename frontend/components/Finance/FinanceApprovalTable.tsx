@@ -319,9 +319,9 @@ export default function FinanceApprovalTable() {
         <Dialog open={depositOpen} onOpenChange={setDepositOpen}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Security Deposit Collection</DialogTitle>
+              <DialogTitle>Security Deposit Collection (Optional)</DialogTitle>
               <DialogDescription>
-                Please enter the security deposit details collected from the customer.
+                Enter security deposit details if collected. Leave 0 or empty to skip.
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
@@ -389,7 +389,9 @@ export default function FinanceApprovalTable() {
                 onClick={confirmApprove}
                 className="bg-green-600 hover:bg-green-700 text-white"
               >
-                Confirm Approval
+                {parseFloat(depositAmount) > 0
+                  ? 'Confirm with Deposit'
+                  : 'Confirm Approval (No Deposit)'}
               </Button>
             </DialogFooter>
           </DialogContent>

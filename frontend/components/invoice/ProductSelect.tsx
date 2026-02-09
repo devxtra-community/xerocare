@@ -58,7 +58,7 @@ export function ProductSelect({ onSelect }: ProductSelectProps) {
       type = 'Spare Part';
     } else {
       // Product
-      label = item.name;
+      label = `${item.name} (SN: ${item.serial_no})`;
       price = item.sale_price || 0;
       type = 'Product';
     }

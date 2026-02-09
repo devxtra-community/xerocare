@@ -17,8 +17,8 @@ export class SparePartRepository {
 
   // --- Master Data Operations ---
 
-  async findMasterByLotNumber(lotNumber: string) {
-    return this.masterRepo.find({ where: { lot_number: lotNumber } });
+  async findMasterByItemCode(itemCode: string) {
+    return this.masterRepo.find({ where: { item_code: itemCode } });
   }
 
   async createMaster(data: Partial<SparePart>) {
@@ -81,8 +81,8 @@ export class SparePartRepository {
         .leftJoin('inv.vendor', 'v')
         .select([
           'sp.id AS id',
-          'sp.lot_number AS item_code', // Alias as item_code for frontend compatibility or rename frontend
-          'sp.lot_number AS lot_number',
+          'sp.item_code AS item_code', // Alias as item_code for frontend compatibility or rename frontend
+          'sp.item_code AS lot_number',
           'sp.part_name AS part_name',
           'sp.brand AS brand',
           'model.model_name AS compatible_model',
@@ -93,7 +93,7 @@ export class SparePartRepository {
         ])
         .where('sp.branch_id = :branchId', { branchId })
         .groupBy('sp.id')
-        .addGroupBy('sp.lot_number')
+        .addGroupBy('sp.item_code')
         .addGroupBy('sp.part_name')
         .addGroupBy('sp.brand')
         .addGroupBy('sp.base_price')

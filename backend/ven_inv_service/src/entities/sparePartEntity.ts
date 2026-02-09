@@ -20,7 +20,7 @@ export class SparePart {
 
   @Column()
   @Index()
-  lot_number!: string; // Replaces Item Code, Not Unique
+  item_code!: string; // Matches DB column
 
   @Column()
   part_name!: string;
