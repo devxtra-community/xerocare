@@ -2,6 +2,13 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
   Table,
   TableBody,
   TableCell,
@@ -11,6 +18,7 @@ import {
 } from '@/components/ui/table';
 import { X, Trash2, Edit2, Plus } from 'lucide-react';
 import { Model, CreateModelDTO, modelService } from '@/services/modelService';
+import { getBrands, Brand } from '@/lib/brand';
 import { toast } from 'sonner';
 
 interface ModelManagementDialogProps {
@@ -102,7 +110,7 @@ export function ModelManagementDialog({ open, onClose }: ModelManagementDialogPr
                         {model.description}
                       </div>
                     </TableCell>
-                    <TableCell>{model.brand || '-'}</TableCell>
+                    <TableCell>{model.brandRelation?.name || '-'}</TableCell>
                     <TableCell>
                       <span className="font-semibold text-blue-600">{model.quantity}</span>
                       <span className="text-xs text-muted-foreground ml-1">units</span>
@@ -171,12 +179,27 @@ function ModelForm({
   const [form, setForm] = useState<CreateModelDTO>({
     model_no: initialData?.model_no || '',
     model_name: initialData?.model_name || '',
-    brand: initialData?.brand || '',
+    brand_id: initialData?.brandRelation?.id || '',
     description: initialData?.description || '',
   });
+  const [brands, setBrands] = useState<Brand[]>([]);
+
+  useEffect(() => {
+    const fetchBrands = async () => {
+      const res = await getBrands();
+      if (res.success) {
+        setBrands(res.data);
+      }
+    };
+    fetchBrands();
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!form.brand_id) {
+      toast.error('Select a brand to add a model');
+      return;
+    }
     try {
       if (initialData) {
         await modelService.updateModel(initialData.id, form);
@@ -218,11 +241,25 @@ function ModelForm({
               />
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1">Brand</label>
-              <Input
-                value={form.brand}
-                onChange={(e) => setForm({ ...form, brand: e.target.value })}
-              />
+              <label className="block text-sm font-medium mb-1">
+                Brand <span className="text-red-500">*</span>
+              </label>
+              <Select
+                required
+                value={form.brand_id}
+                onValueChange={(value) => setForm({ ...form, brand_id: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a brand" />
+                </SelectTrigger>
+                <SelectContent>
+                  {brands.map((brand) => (
+                    <SelectItem key={brand.id} value={brand.id}>
+                      {brand.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="col-span-2">
               <label className="block text-sm font-medium mb-1">Description</label>

@@ -98,7 +98,7 @@ export class ProductService {
         vendor_id: String(data.vendor_id),
         serial_no: data.serial_no,
         name: data.name,
-        brand: data.brand,
+        brand: modelDetails.brandRelation?.name || data.brand,
         MFD: new Date(data.MFD),
         sale_price: data.sale_price,
         tax_rate: data.tax_rate,

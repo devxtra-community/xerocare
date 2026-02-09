@@ -1,6 +1,5 @@
 import { SparePartRepository } from '../repositories/sparePartRepository';
 import { ModelRepository } from '../repositories/modelRepository';
-import { WarehouseRepository } from '../repositories/warehouseRepository';
 import { SparePart } from '../entities/sparePartEntity';
 
 interface BulkUploadRow {
@@ -9,14 +8,12 @@ interface BulkUploadRow {
   brand: string;
   model_id?: string; // Optional if universal
   base_price: number;
-  vendor_id?: string;
-  // Removed warehouse_id and quantity - Master Data Only
+  quantity?: number;
 }
 
 export class SparePartService {
   private repo = new SparePartRepository();
   private modelRepo = new ModelRepository();
-  private warehouseRepo = new WarehouseRepository();
 
   async bulkUpload(rows: BulkUploadRow[], branchId: string) {
     // Partial Success Strategy: Each row is isolated.
@@ -48,33 +45,22 @@ export class SparePartService {
       if (!model) throw new Error(`Model not found: ${modelId}`);
     }
 
-    // 3. Create Master Record (SparePart)
+    // 3. Create Master Record (SparePart) with Quantity
     // User Requirement change: "i dont want to merge the spare parts having the same item code"
     // Always create a new entry for every upload.
-    const master = await this.repo.createMaster({
+    const quantity = data.quantity || 0;
+
+    await this.repo.createMaster({
       item_code: itemCode,
       part_name: data.part_name,
       brand: data.brand,
       model_id: modelId || undefined,
       base_price: data.base_price,
       branch_id: branchId,
+      quantity: quantity,
     });
 
-    // 4. Create Stock (Spare Part Inventory)
-    const quantity = (data as BulkUploadRow & { quantity?: number }).quantity;
-    const warehouseId = (data as BulkUploadRow & { warehouse_id?: string }).warehouse_id;
-    const vendorId = (data as BulkUploadRow & { vendor_id?: string }).vendor_id;
-    // itemCode already extracted above
-
-    if (quantity && quantity > 0) {
-      if (!warehouseId) {
-        throw new Error('Warehouse is required when adding stock.');
-      }
-      // Vendor optional but good if provided
-      await this.repo.updateStock(master.id, warehouseId, quantity, vendorId);
-    }
-
-    return { success: true, message: 'Spare part master data and stock processed' };
+    return { success: true, message: 'Spare part and stock processed' };
   }
 
   async updateSparePart(id: string, data: Partial<SparePart>) {
@@ -99,7 +85,7 @@ export class SparePartService {
   async deleteSparePart(id: string) {
     const hasInventory = await this.repo.hasInventory(id);
     if (hasInventory) {
-      throw new Error('Cannot delete spare part with existing inventory.');
+      throw new Error('Cannot delete spare part with existing quantity > 0.');
     }
     await this.repo.deleteMaster(id);
     return { success: true, message: 'Spare part deleted' };

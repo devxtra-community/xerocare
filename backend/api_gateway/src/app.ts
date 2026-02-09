@@ -14,7 +14,7 @@ import {
   // globalRateLimiter,
   otpSendLimiter,
   otpVerifyLimiter,
-  loginLimiter,
+  // loginLimiter,
 } from './middleware/rateLimitter';
 
 const app: Express = express();
@@ -44,7 +44,7 @@ app.use(
 );
 
 // Specific Rate Limits
-app.post('/e/auth/login', loginLimiter);
+// app.post('/e/auth/login', loginLimiter);
 app.post(
   ['/e/auth/login/verify', '/e/auth/forgot-password/verify', '/e/auth/magic-link/verify'],
   otpVerifyLimiter,

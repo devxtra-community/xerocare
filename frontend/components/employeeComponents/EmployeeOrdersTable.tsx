@@ -89,9 +89,16 @@ export default function EmployeeOrdersTable({
 
   const getCleanProductName = (name: string) => {
     // Remove "Black & White - " or "Color - " prefixes
-    let clean = name.replace(/^(Black & White - |Color - )/i, '');
-    // Remove serial number patterns like (SN-...) or - SN-...
-    clean = clean.replace(/(\s*-\s*SN-[^,]+|\s*\(SN-[^)]+\))/gi, '');
+    let clean = name.replace(/^(Black & White - |Color - |Combined - )/i, '');
+    // Remove serial number patterns like (SN-...) or - SN-... or (Serial...)
+    clean = clean.replace(/(\s*-\s*SN-[^,]+|\s*\(SN-[^)]+\)|\s*\(Serial[^)]+\))/gi, '');
+
+    // Also remove everything after the last dash if it looks like a serial number (legacy format)
+    const lastDashIndex = clean.lastIndexOf(' - ');
+    if (lastDashIndex !== -1 && clean.length - lastDashIndex < 25) {
+      // Heuristic: if there's a dash and the suffix is short, it's likely a serial number
+      clean = clean.substring(0, lastDashIndex).trim();
+    }
     return clean.trim();
   };
 
@@ -319,7 +326,7 @@ export default function EmployeeOrdersTable({
               // FINANCE Appprove
               try {
                 const { financeApproveInvoice } = await import('@/lib/invoice');
-                await financeApproveInvoice(selectedInvoice.id);
+                await financeApproveInvoice(selectedInvoice.id, {});
                 toast.success('Order Approved');
                 setDetailsOpen(false);
                 // Refresh? If propInvoices, parent needs refresh.

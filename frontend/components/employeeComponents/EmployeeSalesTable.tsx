@@ -133,6 +133,21 @@ export default function EmployeeSalesTable({ mode = 'EMPLOYEE' }: EmployeeSalesT
     }
   };
 
+  const getCleanProductName = (name: string) => {
+    // Remove "Black & White - " or "Color - " prefixes
+    let clean = name.replace(/^(Black & White - |Color - |Combined - )/i, '');
+    // Remove serial number patterns like (SN-...) or - SN-... or (Serial...)
+    clean = clean.replace(/(\s*-\s*SN-[^,]+|\s*\(SN-[^)]+\)|\s*\(Serial[^)]+\))/gi, '');
+
+    // Also remove everything after the last dash if it looks like a serial number (legacy format)
+    const lastDashIndex = clean.lastIndexOf(' - ');
+    if (lastDashIndex !== -1 && clean.length - lastDashIndex < 25) {
+      // Heuristic: if there's a dash and the suffix is short, it's likely a serial number
+      clean = clean.substring(0, lastDashIndex).trim();
+    }
+    return clean.trim();
+  };
+
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center h-64 space-y-4">
@@ -216,7 +231,9 @@ export default function EmployeeSalesTable({ mode = 'EMPLOYEE' }: EmployeeSalesT
                     </TableCell>
                     <TableCell className="max-w-[250px]">
                       <div className="text-sm font-medium text-slate-700 truncate">
-                        {inv.items?.map((item) => item.description).join(', ') || 'No items'}
+                        {inv.items
+                          ?.map((item) => getCleanProductName(item.description))
+                          .join(', ') || 'No items'}
                       </div>
                       {inv.items && inv.items.length > 1 && (
                         <span className="text-[10px] text-slate-400 font-semibold uppercase">
@@ -296,7 +313,7 @@ export default function EmployeeSalesTable({ mode = 'EMPLOYEE' }: EmployeeSalesT
                   // FINANCE Mode Approve
                   try {
                     const { financeApproveInvoice } = await import('@/lib/invoice');
-                    await financeApproveInvoice(selectedInvoice.id);
+                    await financeApproveInvoice(selectedInvoice.id, {});
                     toast.success('Invoice Approved Successfully');
                     setDetailsOpen(false);
                     fetchInvoices();

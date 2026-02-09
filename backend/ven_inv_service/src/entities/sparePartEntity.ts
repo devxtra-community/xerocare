@@ -3,7 +3,6 @@ import {
   PrimaryGeneratedColumn,
   Column,
   ManyToOne,
-  OneToMany,
   JoinColumn,
   CreateDateColumn,
   UpdateDateColumn,
@@ -11,7 +10,6 @@ import {
 } from 'typeorm';
 import { Model } from './modelEntity';
 import { Branch } from './branchEntity';
-import { SparePartInventory } from './sparePartInventoryEntity';
 
 @Entity('spare_parts')
 export class SparePart {
@@ -49,6 +47,9 @@ export class SparePart {
   @Column({ name: 'base_price', type: 'decimal', precision: 12, scale: 2, default: 0 })
   base_price!: number;
 
+  @Column({ type: 'int', default: 0 })
+  quantity!: number;
+
   @Column({ nullable: true })
   image_url?: string;
 
@@ -57,7 +58,4 @@ export class SparePart {
 
   @UpdateDateColumn({ name: 'updated_at' })
   updated_at!: Date;
-
-  @OneToMany(() => SparePartInventory, (inv) => inv.spare_part)
-  inventory!: SparePartInventory[];
 }

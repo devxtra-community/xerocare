@@ -443,7 +443,8 @@ export class BillingService {
         })),
       });
 
-      const productItems = payload.items.map((item) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const productItems = payload.items.map((item: any) => {
         const invItem = new InvoiceItem();
         invItem.itemType = item.itemType || ItemType.PRODUCT;
         invItem.description = item.description;
@@ -451,10 +452,21 @@ export class BillingService {
         invItem.unitPrice = item.unitPrice;
         invItem.productId = item.productId; // CRITICAL FIX: Save productId
 
-        logger.info('Created invoice item', {
+        // Map pricing fields if present on the product item
+        invItem.bwIncludedLimit = item.bwIncludedLimit;
+        invItem.colorIncludedLimit = item.colorIncludedLimit;
+        invItem.combinedIncludedLimit = item.combinedIncludedLimit;
+        invItem.bwExcessRate = item.bwExcessRate;
+        invItem.colorExcessRate = item.colorExcessRate;
+        invItem.combinedExcessRate = item.combinedExcessRate;
+        invItem.bwSlabRanges = item.bwSlabRanges;
+        invItem.colorSlabRanges = item.colorSlabRanges;
+        invItem.comboSlabRanges = item.comboSlabRanges;
+
+        logger.info('Created invoice item (cons)', {
           description: invItem.description,
           productId: invItem.productId,
-          hasProductId: !!invItem.productId,
+          hasPricing: !!(invItem.bwIncludedLimit || invItem.bwSlabRanges),
         });
 
         return invItem;
@@ -635,13 +647,26 @@ export class BillingService {
 
     // 1. Handle Machine Items
     if (payload.items) {
-      const machineItems = payload.items.map((item) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const machineItems = payload.items.map((item: any) => {
         const invItem = new InvoiceItem();
         invItem.itemType = item.itemType || ItemType.PRODUCT;
         invItem.description = item.description;
         invItem.quantity = item.quantity;
         invItem.unitPrice = item.unitPrice;
-        invItem.productId = item.productId; // CRITICAL FIX: Save productId
+        invItem.productId = item.productId;
+
+        // Map pricing fields if present on the product item
+        invItem.bwIncludedLimit = item.bwIncludedLimit;
+        invItem.colorIncludedLimit = item.colorIncludedLimit;
+        invItem.combinedIncludedLimit = item.combinedIncludedLimit;
+        invItem.bwExcessRate = item.bwExcessRate;
+        invItem.colorExcessRate = item.colorExcessRate;
+        invItem.combinedExcessRate = item.combinedExcessRate;
+        invItem.bwSlabRanges = item.bwSlabRanges;
+        invItem.colorSlabRanges = item.colorSlabRanges;
+        invItem.comboSlabRanges = item.comboSlabRanges;
+
         return invItem;
       });
       newInvoiceItems.push(...machineItems);
@@ -770,12 +795,31 @@ export class BillingService {
       reference?: string;
       receivedDate?: string;
     },
+    itemUpdates?: {
+      id: string;
+      productId: string;
+      initialBwCount?: number;
+      initialColorCount?: number;
+    }[],
   ) {
     const invoice = await this.invoiceRepo.findById(id);
     if (!invoice) throw new AppError('Quotation not found', 404);
 
     if (invoice.status !== InvoiceStatus.EMPLOYEE_APPROVED) {
       throw new AppError('Only Employee Approved quotations can be finalized by Finance', 400);
+    }
+
+    // Apply item updates (productId + readings)
+    if (itemUpdates && itemUpdates.length > 0) {
+      for (const update of itemUpdates) {
+        const item = invoice.items.find((i) => i.id === update.id);
+        if (item) {
+          item.productId = update.productId;
+          if (update.initialBwCount !== undefined) item.initialBwCount = update.initialBwCount;
+          if (update.initialColorCount !== undefined)
+            item.initialColorCount = update.initialColorCount;
+        }
+      }
     }
 
     invoice.status = InvoiceStatus.FINANCE_APPROVED;

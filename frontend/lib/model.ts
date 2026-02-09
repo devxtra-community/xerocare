@@ -4,7 +4,10 @@ export interface Model {
   id: string;
   model_no: string;
   model_name: string;
-  brand: string;
+  brandRelation?: {
+    id: string;
+    name: string;
+  };
   description: string;
   quantity: number; // Auto-managed by backend
 }
@@ -12,14 +15,14 @@ export interface Model {
 export interface CreateModelData {
   model_no: string;
   model_name: string;
-  brand: string;
+  brand_id: string;
   description: string;
 }
 
 export interface UpdateModelData {
   model_no?: string;
   model_name?: string;
-  brand?: string;
+  brand_id?: string;
   description?: string;
 }
 

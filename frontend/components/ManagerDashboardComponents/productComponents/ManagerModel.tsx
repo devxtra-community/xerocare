@@ -22,7 +22,15 @@ import {
   CreateModelData,
   UpdateModelData,
 } from '@/lib/model';
+import { getBrands, Brand } from '@/lib/brand';
 import { toast } from 'sonner';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 export default function ManagerModel() {
   const [models, setModels] = useState<Model[]>([]);
@@ -133,7 +141,7 @@ export default function ManagerModel() {
                 <TableRow key={m.id} className={i % 2 ? 'bg-sky-100/60' : ''}>
                   <TableCell className="px-4 font-medium">{m.model_name}</TableCell>
                   <TableCell className="px-4">{m.model_no}</TableCell>
-                  <TableCell className="px-4">{m.brand || '-'}</TableCell>
+                  <TableCell className="px-4">{m.brandRelation?.name || '-'}</TableCell>
                   <TableCell className="px-4 font-semibold text-blue-600">
                     {m.quantity} units
                   </TableCell>
@@ -200,12 +208,27 @@ function ModelFormModal({
   const [formData, setFormData] = useState<CreateModelData>({
     model_name: initialData?.model_name || '',
     model_no: initialData?.model_no || '',
-    brand: initialData?.brand || '',
+    brand_id: initialData?.brandRelation?.id || '',
     description: initialData?.description || '',
   });
+  const [brands, setBrands] = useState<Brand[]>([]);
+
+  useEffect(() => {
+    const fetchBrands = async () => {
+      const res = await getBrands();
+      if (res.success) {
+        setBrands(res.data);
+      }
+    };
+    fetchBrands();
+  }, []);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!formData.brand_id) {
+      toast.error('Select a brand to add a model');
+      return;
+    }
     onConfirm(formData);
   };
 
@@ -236,12 +259,25 @@ function ModelFormModal({
             />
           </div>
           <div className="col-span-2">
-            <label className="block text-sm font-medium mb-1">Brand</label>
-            <Input
-              value={formData.brand}
-              onChange={(e) => setFormData({ ...formData, brand: e.target.value })}
-              placeholder="e.g. HP"
-            />
+            <label className="block text-sm font-medium mb-1">
+              Brand <span className="text-red-500">*</span>
+            </label>
+            <Select
+              required
+              value={formData.brand_id}
+              onValueChange={(value) => setFormData({ ...formData, brand_id: value })}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select a brand" />
+              </SelectTrigger>
+              <SelectContent>
+                {brands.map((brand) => (
+                  <SelectItem key={brand.id} value={brand.id}>
+                    {brand.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <div className="col-span-2">
             <label className="block text-sm font-medium mb-1">Description</label>

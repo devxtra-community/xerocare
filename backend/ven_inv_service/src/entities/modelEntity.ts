@@ -1,5 +1,14 @@
-import { Entity, PrimaryGeneratedColumn, Column, OneToMany, Index } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  OneToMany,
+  Index,
+  ManyToOne,
+  JoinColumn,
+} from 'typeorm';
 import { Product } from './productEntity';
+import { Brand } from './brandEntity';
 
 @Entity('model')
 @Index(['model_no'], { unique: true })
@@ -13,8 +22,12 @@ export class Model {
   @Column({ type: 'varchar', length: 255 })
   model_name!: string;
 
-  // @Column({ type: 'varchar', length: 100, nullable: true })
-  // brand!: string;
+  @Column({ type: 'uuid', nullable: true })
+  brand_id!: string;
+
+  @ManyToOne(() => Brand, (brand) => brand.models)
+  @JoinColumn({ name: 'brand_id' })
+  brandRelation?: Brand;
 
   @Column({ type: 'text', nullable: true })
   description!: string;

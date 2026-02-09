@@ -20,6 +20,8 @@ export interface InvoiceItem {
   quantity?: number;
   unitPrice?: number;
   productId?: string;
+  initialBwCount?: number;
+  initialColorCount?: number;
 }
 
 export interface Invoice {
@@ -192,14 +194,22 @@ export const employeeApproveInvoice = async (id: string): Promise<Invoice> => {
 
 export const financeApproveInvoice = async (
   id: string,
-  deposit?: {
-    amount: number;
-    mode: 'CASH' | 'CHEQUE';
-    reference?: string;
-    receivedDate?: string;
+  payload: {
+    deposit?: {
+      amount: number;
+      mode: 'CASH' | 'CHEQUE';
+      reference?: string;
+      receivedDate?: string;
+    };
+    itemUpdates?: {
+      id: string;
+      productId: string;
+      initialBwCount?: number;
+      initialColorCount?: number;
+    }[];
   },
 ): Promise<Invoice> => {
-  const response = await api.post(`/b/invoices/${id}/finance-approve`, { deposit });
+  const response = await api.post(`/b/invoices/${id}/finance-approve`, payload);
   return response.data.data;
 };
 
