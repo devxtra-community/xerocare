@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Search, Loader2, Eye, FileText, Plus } from 'lucide-react';
@@ -20,6 +20,8 @@ import {
   employeeApproveInvoice,
 } from '@/lib/invoice';
 import RentFormModal from './RentFormModal';
+import RentHistoryView from './RentHistoryView';
+import UsageRecordingModal from '../Finance/UsageRecordingModal';
 
 import { Badge } from '@/components/ui/badge';
 import { Clock } from 'lucide-react';
@@ -44,13 +46,16 @@ export default function EmployeeLeaseTable({ mode = 'EMPLOYEE' }: EmployeeLeaseT
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [formOpen, setFormOpen] = useState(false);
-  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useState(false); // Changed from useState(false) to useState(false) to allow state change
   const [approveOpen, setApproveOpen] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [editInvoice, setEditInvoice] = useState<Invoice | undefined>(undefined);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [isUsageModalOpen, setIsUsageModalOpen] = useState(false);
+  const [editingUsage] = useState<Invoice | null>(null);
   const [search, setSearch] = useState('');
 
-  const fetchInvoices = React.useCallback(async () => {
+  const fetchInvoices = useCallback(async () => {
     try {
       setLoading(true);
       let data: Invoice[] = [];
@@ -262,24 +267,33 @@ export default function EmployeeLeaseTable({ mode = 'EMPLOYEE' }: EmployeeLeaseT
                       })}
                     </TableCell>
                     <TableCell className="text-center">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-primary hover:text-primary/80 hover:bg-blue-50"
-                        onClick={() => handleViewDetails(inv.id)}
-                      >
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                      {(inv.status === 'DRAFT' || inv.status === 'SENT') && (
+                      <div className="flex items-center justify-center gap-1">
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-8 w-8 text-slate-400 hover:text-orange-600 hover:bg-orange-50"
-                          onClick={() => openEditModal(inv)}
+                          className="h-8 w-8 text-primary hover:text-primary/80 hover:bg-blue-50"
+                          onClick={() => handleViewDetails(inv.id)}
+                          title="View Details"
                         >
-                          <FileText className="h-4 w-4" />
+                          <Eye className="h-4 w-4" />
                         </Button>
-                      )}
+
+                        {mode === 'EMPLOYEE' && (
+                          <>
+                            {(inv.status === 'DRAFT' || inv.status === 'SENT') && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-slate-400 hover:text-orange-600 hover:bg-orange-50"
+                                onClick={() => openEditModal(inv)}
+                                title="Edit"
+                              >
+                                <FileText className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </>
+                        )}
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))
@@ -311,7 +325,7 @@ export default function EmployeeLeaseTable({ mode = 'EMPLOYEE' }: EmployeeLeaseT
                   // FINANCE Mode Approve
                   try {
                     const { financeApproveInvoice } = await import('@/lib/invoice');
-                    await financeApproveInvoice(selectedInvoice.id);
+                    await financeApproveInvoice(selectedInvoice.id, {});
                     toast.success('Lease Agreement Approved');
                     setDetailsOpen(false);
                     fetchInvoices();
@@ -357,6 +371,26 @@ export default function EmployeeLeaseTable({ mode = 'EMPLOYEE' }: EmployeeLeaseT
             setApproveOpen(false);
             fetchInvoices();
           }}
+        />
+      )}
+
+      {/* History View Dialog */}
+      {historyOpen && selectedInvoice && (
+        <RentHistoryView
+          contractId={selectedInvoice.id}
+          isOpen={historyOpen}
+          onClose={() => setHistoryOpen(false)}
+        />
+      )}
+
+      {isUsageModalOpen && selectedInvoice && (
+        <UsageRecordingModal
+          isOpen={isUsageModalOpen}
+          onClose={() => setIsUsageModalOpen(false)}
+          contractId={selectedInvoice.id}
+          customerName={selectedInvoice.customerName}
+          invoice={editingUsage}
+          onSuccess={fetchInvoices}
         />
       )}
     </div>

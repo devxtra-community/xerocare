@@ -3,7 +3,6 @@ import {
   PrimaryGeneratedColumn,
   Column,
   ManyToOne,
-  OneToMany,
   JoinColumn,
   CreateDateColumn,
   UpdateDateColumn,
@@ -11,21 +10,20 @@ import {
 } from 'typeorm';
 import { Model } from './modelEntity';
 import { Branch } from './branchEntity';
-import { SparePartInventory } from './sparePartInventoryEntity';
 
 @Entity('spare_parts')
 export class SparePart {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
 
-  @Column()
+  @Column({ name: 'item_code' })
   @Index()
-  lot_number!: string; // Replaces Item Code, Not Unique
+  item_code!: string; // Matches DB column
 
-  @Column()
+  @Column({ name: 'part_name' })
   part_name!: string;
 
-  @Column()
+  @Column({ name: 'brand' })
   brand!: string;
 
   @Column({ type: 'text', nullable: true })
@@ -46,18 +44,18 @@ export class SparePart {
   @JoinColumn({ name: 'branch_id' })
   branch!: Branch;
 
-  @Column({ type: 'decimal', precision: 12, scale: 2, default: 0 })
+  @Column({ name: 'base_price', type: 'decimal', precision: 12, scale: 2, default: 0 })
   base_price!: number;
+
+  @Column({ type: 'int', default: 0 })
+  quantity!: number;
 
   @Column({ nullable: true })
   image_url?: string;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ name: 'created_at' })
   created_at!: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ name: 'updated_at' })
   updated_at!: Date;
-
-  @OneToMany(() => SparePartInventory, (inv) => inv.spare_part)
-  inventory!: SparePartInventory[];
 }

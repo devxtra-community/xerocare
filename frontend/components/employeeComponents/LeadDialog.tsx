@@ -136,7 +136,20 @@ export default function LeadDialog({ open, onOpenChange, initialData, onSave }: 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="source">Source</Label>
-              <Select value={formData.source} onValueChange={(val) => handleChange('source', val)}>
+              <Select
+                value={
+                  ['Website', 'Instagram', 'Whatsapp'].includes(formData.source || '')
+                    ? formData.source
+                    : 'Other'
+                }
+                onValueChange={(val) => {
+                  if (val === 'Other') {
+                    handleChange('source', '');
+                  } else {
+                    handleChange('source', val);
+                  }
+                }}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Select Source" />
                 </SelectTrigger>
@@ -144,8 +157,17 @@ export default function LeadDialog({ open, onOpenChange, initialData, onSave }: 
                   <SelectItem value="Website">Website</SelectItem>
                   <SelectItem value="Instagram">Instagram</SelectItem>
                   <SelectItem value="Whatsapp">Whatsapp</SelectItem>
+                  <SelectItem value="Other">Other</SelectItem>
                 </SelectContent>
               </Select>
+              {!['Website', 'Instagram', 'Whatsapp'].includes(formData.source || 'Website') && (
+                <Input
+                  className="mt-2"
+                  placeholder="Enter source"
+                  value={formData.source || ''}
+                  onChange={(e) => handleChange('source', e.target.value)}
+                />
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="product">Product Interested</Label>

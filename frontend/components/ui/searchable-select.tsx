@@ -11,6 +11,7 @@ export interface SearchableSelectOption {
   value: string;
   label: string;
   description?: string;
+  disabled?: boolean;
   [key: string]: unknown;
 }
 
@@ -114,9 +115,16 @@ export function SearchableSelect({
                   onMouseDown={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    handleSelect(option);
+                    if (!option.disabled) {
+                      handleSelect(option);
+                    }
                   }}
-                  className="relative flex cursor-pointer select-none items-center rounded-sm px-3 py-2 text-sm outline-none hover:bg-blue-100 transition-colors group"
+                  className={cn(
+                    'relative flex select-none items-center rounded-sm px-3 py-2 text-sm outline-none transition-colors group',
+                    option.disabled
+                      ? 'cursor-not-allowed opacity-50 bg-muted/50'
+                      : 'cursor-pointer hover:bg-blue-100',
+                  )}
                 >
                   <div className="flex w-full items-center justify-between">
                     <span className="font-bold text-sm text-slate-700">{option.label}</span>

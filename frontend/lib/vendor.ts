@@ -48,3 +48,13 @@ export async function deleteVendor(id: string) {
   const res = await api.delete(`/i/vendors/${id}`);
   return res.data;
 }
+
+export async function requestProducts(id: string, data: { products: string; message: string }) {
+  const res = await api.post(`/i/vendors/${id}/request-products`, data);
+  return res.data;
+}
+
+export async function getVendorRequests(id: string) {
+  const res = await api.get(`/i/vendors/${id}/requests`);
+  return res.data;
+}

@@ -17,8 +17,9 @@ type InvoiceStatus = 'DRAFT' | 'SENT' | 'APPROVED' | 'REJECTED' | 'ISSUED' | 'PA
 
 interface InvoiceItem {
   id?: string;
-  itemType: 'PRICING_RULE';
+  itemType: 'PRICING_RULE' | 'PRODUCT';
   description: string;
+  productId?: string;
 
   // Fixed
   bwIncludedLimit?: number;
@@ -71,6 +72,15 @@ interface Invoice {
   leaseTenureMonths?: number;
   totalLeaseAmount?: number;
   monthlyEmiAmount?: number;
+
+  // Usage Snapshot Fields (Enriched)
+  bwA4Count?: number;
+  bwA3Count?: number;
+  colorA4Count?: number;
+  colorA3Count?: number;
+  billingPeriodStart?: string;
+  billingPeriodEnd?: string;
+  advanceAdjusted?: number;
 }
 
 interface AggregatedInvoice extends Invoice {

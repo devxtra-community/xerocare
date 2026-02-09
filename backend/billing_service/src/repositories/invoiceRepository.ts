@@ -3,6 +3,7 @@ import { Invoice } from '../entities/invoiceEntity';
 import { InvoiceStatus } from '../entities/enums/invoiceStatus';
 import { InvoiceType } from '../entities/enums/invoiceType';
 import { SaleType } from '../entities/enums/saleType';
+import { InvoiceItem } from '../entities/invoiceItemEntity';
 import { Source } from '../config/dataSource';
 
 export class InvoiceRepository {
@@ -15,6 +16,12 @@ export class InvoiceRepository {
   createInvoice(data: Partial<Invoice>) {
     const invoice = this.repo.create(data);
     return this.repo.save(invoice);
+  }
+
+  async clearItems(invoiceId: string) {
+    await Source.getRepository(InvoiceItem).delete({
+      invoice: { id: invoiceId },
+    } as { invoice: { id: string } });
   }
 
   save(invoice: Invoice) {

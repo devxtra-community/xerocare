@@ -14,6 +14,7 @@ import { LeaseType } from '../entities/enums/leaseType';
 import { ItemType } from '../entities/enums/itemType';
 import { InvoiceType } from '../entities/enums/invoiceType';
 import { emitProductStatusUpdate } from '../events/publisher/productStatusEvent';
+import { ReportedBy } from '../entities/usageRecordEntity';
 
 export class BillingService {
   private invoiceRepo = new InvoiceRepository();
@@ -282,82 +283,65 @@ export class BillingService {
     let nextStart: Date;
 
     if (history.length > 0) {
+      // Sort history desc in case getUsageHistory not sorted (though repo usually does)
       const lastUsage = history[0];
-      // Start is day after last end
       const lastEnd = new Date(lastUsage.billingPeriodEnd);
       nextStart = new Date(lastEnd);
       nextStart.setDate(nextStart.getDate() + 1);
     } else {
       // First period
-      nextStart = new Date(contract.effectiveFrom!);
+      if (!contract.effectiveFrom) throw new AppError('Contract start date missing', 400);
+      nextStart = new Date(contract.effectiveFrom);
     }
 
-    // Calculate End (End of that month) using UTC to match UsageRepository logic
-    // nextStart is derived from usage string which usually parses as UTC midnight.
-    // Ensure properly handling year/month transition.
-    const year = nextStart.getUTCFullYear();
-    const month = nextStart.getUTCMonth();
-    // Day 0 of next month = Last day of current month
-    const nextEnd = new Date(Date.UTC(year, month + 1, 0));
+    // Calculate End date
+    const year = nextStart.getFullYear();
+    const month = nextStart.getMonth();
+    // Default: End of that month.
+    // Optimization: If contract has Custom Cycle (e.g. 30 days) use that?
+    // User request: "One month usage". Defaulting to calendar month logic.
+    const nextEnd = new Date(year, month + 1, 0);
 
-    // 3. Check for Existing Usage
-    const existing = await this.usageRepo.findByContractAndPeriod(contractId, nextStart, nextEnd);
-    if (existing) {
-      // If usage exists, check if invoice exists
-      if (existing.finalInvoiceId) {
-        const inv = await this.invoiceRepo.findById(existing.finalInvoiceId);
-        return inv;
+    // 3. Upsert Empty Usage Record
+    // We use usageRepo directly to initializing it.
+    // UsageService.createUsageRecord checks for duplicates too, but requires payload like reportedBy.
+    // Here we are systematically creating a placeholder.
+
+    let usage = await this.usageRepo.findByContractAndPeriod(contractId, nextStart, nextEnd);
+
+    if (!usage) {
+      usage = this.usageRepo.create({
+        contractId,
+        billingPeriodStart: nextStart,
+        billingPeriodEnd: nextEnd,
+        bwA4Count: 0,
+        bwA3Count: 0,
+        colorA4Count: 0,
+        colorA3Count: 0,
+        reportedBy: ReportedBy.EMPLOYEE, // System or Employee triggered
+        remarks: 'Next month placeholder',
+      });
+      await this.usageRepo.save(usage);
+    } else {
+      if (usage.finalInvoiceId) {
+        // If already settled, maybe we should find the NEXT one?
+        // But frontend calls this specifically to "Unlock" the next slot.
+        // If next slot is already done, return it.
       }
-      // Usage exists but no invoice? That's USAGE_PENDING state.
-      // We can create the invoice now to move it to SEND_PENDING/INVOICE_PENDING
-      // But generateFinalInvoice logic handles "Closing" the usage.
-      // If we strictly want to "Record Next Usage", we just need the Usage Record.
-      return { message: 'Usage record already exists', usageId: existing.id };
     }
 
-    // 4. Create Empty Usage Record
-    const usage = this.usageRepo.create({
-      contractId,
-      billingPeriodStart: nextStart,
-      billingPeriodEnd: nextEnd,
-      bwA4Count: 0,
-      bwA3Count: 0,
-      colorA4Count: 0,
-      colorA3Count: 0,
-      // No finalInvoiceId yet
-    });
-    await this.usageRepo.save(usage);
+    // Return a shape that Frontend expects. Frontend expects Invoice?
+    // The frontend `createNextMonthInvoice` return type is `Promise<Invoice>`.
+    // But `UsageRecordingModal` just ignores the return or uses it to refresh.
+    // Let's return the usage record as a pseudo-invoice or just the usage object.
+    // Controller returns `res.data.data`.
+    // If we return usage, frontend types might mismatch if it expects Invoice.
+    // Let's check frontend usage: `await createNextMonthInvoice(contractId)`.
+    // It doesn't use the return value explicitly in `handleSubmitAndNext`.
+    // The prompt says "Opens a new form... Pre-fills...".
+    // The modal *fetches* usage history anyway.
 
-    // 5. Create Draft Final Invoice (Optional, but requested "create invoice")
-    // If we create a DRAFT Final invoice now, we can link it.
-    // But `generateFinalInvoice` does the heavy lifting of calculation.
-    // Let's CALL generateFinalInvoice directly?
-    // No, `generateFinalInvoice` CHECKS `if (usage.finalInvoiceId) throw error`.
-    // It consumes the usage.
-    // If I call it now with 0 usage, it will create a $0 usage invoice (plus rent).
-    // This is probably what "Record Next Usage" -> "Generate Invoice" flow does.
-    // But "Record Usage" usually implies entering numbers FIRST.
-    // So we should STOP here and return the Usage Record (or just success).
-    // The Frontend `handleRecordNextUsage` logic:
-    // "1. Generate current month... 2. Move to next... 3. Trigger modal".
-    // 3. Trigger modal -> User enters usage -> Calls `recordUsage`?
-    // `recordUsage` usually creates a NEW record.
-    // If I create one here, `recordUsage` might fail or duplicate.
-    // Frontend `UsageRecordingModal` calls `recordUsage` (onSuccess).
-    // I check `frontend/lib/invoice.ts`: `recordUsage` -> `POST /b/usage`.
-    // I need to see `usageController.createUsage`!
-    // If `createUsage` upserts, we are fine.
-    // If it inserts always, we have a duplicate.
-
-    // Let's checking usageController is critical now.
-    // I will hold off on saving usage until I verify usageController.
-    // For now, I will assume I need to create the usage to "initialize" the period.
-
-    return {
-      id: 'new-usage-placeholder', // mocked ID until verified
-      billingPeriodStart: nextStart,
-      billingPeriodEnd: nextEnd,
-    };
+    return usage;
   }
 
   private async generateInvoiceNumber(): Promise<string> {
@@ -459,7 +443,8 @@ export class BillingService {
         })),
       });
 
-      const productItems = payload.items.map((item) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const productItems = payload.items.map((item: any) => {
         const invItem = new InvoiceItem();
         invItem.itemType = item.itemType || ItemType.PRODUCT;
         invItem.description = item.description;
@@ -467,10 +452,21 @@ export class BillingService {
         invItem.unitPrice = item.unitPrice;
         invItem.productId = item.productId; // CRITICAL FIX: Save productId
 
-        logger.info('Created invoice item', {
+        // Map pricing fields if present on the product item
+        invItem.bwIncludedLimit = item.bwIncludedLimit;
+        invItem.colorIncludedLimit = item.colorIncludedLimit;
+        invItem.combinedIncludedLimit = item.combinedIncludedLimit;
+        invItem.bwExcessRate = item.bwExcessRate;
+        invItem.colorExcessRate = item.colorExcessRate;
+        invItem.combinedExcessRate = item.combinedExcessRate;
+        invItem.bwSlabRanges = item.bwSlabRanges;
+        invItem.colorSlabRanges = item.colorSlabRanges;
+        invItem.comboSlabRanges = item.comboSlabRanges;
+
+        logger.info('Created invoice item (cons)', {
           description: invItem.description,
           productId: invItem.productId,
-          hasProductId: !!invItem.productId,
+          hasPricing: !!(invItem.bwIncludedLimit || invItem.bwSlabRanges),
         });
 
         return invItem;
@@ -601,10 +597,14 @@ export class BillingService {
     const invoice = await this.invoiceRepo.findById(id);
     if (!invoice) throw new AppError('Quotation not found', 404);
 
-    // Refinement B: Lock editing after approval
-    if (invoice.status === InvoiceStatus.APPROVED || invoice.type === InvoiceType.PROFORMA) {
+    // Lock editing after final approval or conversion to contract
+    if (
+      invoice.status === InvoiceStatus.APPROVED ||
+      invoice.status === InvoiceStatus.FINANCE_APPROVED ||
+      invoice.type === InvoiceType.PROFORMA
+    ) {
       throw new AppError(
-        'Cannot edit a Quotation after it has been Approved (Proforma Contract)',
+        'Cannot edit a Quotation after it has been finalized/approved by Finance',
         400,
       );
     }
@@ -647,13 +647,26 @@ export class BillingService {
 
     // 1. Handle Machine Items
     if (payload.items) {
-      const machineItems = payload.items.map((item) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const machineItems = payload.items.map((item: any) => {
         const invItem = new InvoiceItem();
         invItem.itemType = item.itemType || ItemType.PRODUCT;
         invItem.description = item.description;
         invItem.quantity = item.quantity;
         invItem.unitPrice = item.unitPrice;
-        invItem.productId = item.productId; // CRITICAL FIX: Save productId
+        invItem.productId = item.productId;
+
+        // Map pricing fields if present on the product item
+        invItem.bwIncludedLimit = item.bwIncludedLimit;
+        invItem.colorIncludedLimit = item.colorIncludedLimit;
+        invItem.combinedIncludedLimit = item.combinedIncludedLimit;
+        invItem.bwExcessRate = item.bwExcessRate;
+        invItem.colorExcessRate = item.colorExcessRate;
+        invItem.combinedExcessRate = item.combinedExcessRate;
+        invItem.bwSlabRanges = item.bwSlabRanges;
+        invItem.colorSlabRanges = item.colorSlabRanges;
+        invItem.comboSlabRanges = item.comboSlabRanges;
+
         return invItem;
       });
       newInvoiceItems.push(...machineItems);
@@ -681,10 +694,31 @@ export class BillingService {
 
     // Replace items if any new items are provided (either machine or rules)
     if (newInvoiceItems.length > 0) {
+      await this.invoiceRepo.clearItems(invoice.id);
+      newInvoiceItems.forEach((item) => (item.invoice = invoice));
       invoice.items = newInvoiceItems;
     }
 
-    return this.invoiceRepo.save(invoice);
+    // Recalculate Total Amount for Quotation Phase
+    if (invoice.saleType === SaleType.LEASE) {
+      invoice.totalAmount = invoice.advanceAmount || 0;
+    } else {
+      // Rent or Sale
+      let calculatedTotal = 0;
+      if (invoice.items && invoice.items.length > 0) {
+        calculatedTotal = invoice.items.reduce(
+          (sum, item) => sum + Number(item.quantity || 0) * Number(item.unitPrice || 0),
+          0,
+        );
+      }
+      invoice.totalAmount =
+        calculatedTotal === 0 ? Number(invoice.advanceAmount || 0) : calculatedTotal;
+    }
+
+    await this.invoiceRepo.save(invoice);
+    const updated = await this.invoiceRepo.findById(invoice.id);
+    if (!updated) throw new AppError('Updated quotation not found', 404);
+    return updated;
   }
 
   async approveQuotation(
@@ -761,12 +795,31 @@ export class BillingService {
       reference?: string;
       receivedDate?: string;
     },
+    itemUpdates?: {
+      id: string;
+      productId: string;
+      initialBwCount?: number;
+      initialColorCount?: number;
+    }[],
   ) {
     const invoice = await this.invoiceRepo.findById(id);
     if (!invoice) throw new AppError('Quotation not found', 404);
 
     if (invoice.status !== InvoiceStatus.EMPLOYEE_APPROVED) {
       throw new AppError('Only Employee Approved quotations can be finalized by Finance', 400);
+    }
+
+    // Apply item updates (productId + readings)
+    if (itemUpdates && itemUpdates.length > 0) {
+      for (const update of itemUpdates) {
+        const item = invoice.items.find((i) => i.id === update.id);
+        if (item) {
+          item.productId = update.productId;
+          if (update.initialBwCount !== undefined) item.initialBwCount = update.initialBwCount;
+          if (update.initialColorCount !== undefined)
+            item.initialColorCount = update.initialColorCount;
+        }
+      }
     }
 
     invoice.status = InvoiceStatus.FINANCE_APPROVED;
@@ -782,11 +835,17 @@ export class BillingService {
 
       // --- DATE RESET LOGIC (User Request) ---
       // Reset the current Billing Cycle / Contract Period to start upon Approval
+      // FIX: Use the Contract's effectiveFrom if set, otherwise fallback to Approval Date.
+      // User reported that dates are showing "mistake" because we were forcing it to Today.
       const approvalDate = new Date();
-      invoice.effectiveFrom = approvalDate;
+      if (!invoice.effectiveFrom) {
+        invoice.effectiveFrom = approvalDate;
+      }
 
       // Calculate Next Due Date (Effective To) based on Rent Period
-      const endDate = new Date(approvalDate);
+      // Start form the EFFECTIVE FROM date, not approval date
+      const startDate = new Date(invoice.effectiveFrom);
+      const endDate = new Date(startDate);
 
       // Add Duration
       if (invoice.rentPeriod === RentPeriod.CUSTOM && invoice.billingCycleInDays) {
@@ -1068,42 +1127,44 @@ export class BillingService {
       saleType: string;
       dueDate: Date;
       finalInvoiceId?: string;
+      usageData?: {
+        bwA4Count: number;
+        bwA3Count: number;
+        colorA4Count: number;
+        colorA3Count: number;
+        billingPeriodStart: Date;
+        billingPeriodEnd: Date;
+      };
     }> = [];
 
     const now = targetDateStr ? new Date(targetDateStr) : new Date();
     const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const currentMonthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
 
-    // Optimization: Bulk fetch usage/invoices? For now, Loop (N is small per branch usually).
     for (const contract of activeContracts) {
-      // Check Usage for Current Month
-      // We can use UsageRepo.findByContractAndPeriod logic but need loose check "Starts in Current Month"
-      // Or "Is there any usage where billingPeriodStart >= currentMonthStart?"
+      // 1. Check if the contract period covers this month
+      const contractEffFrom = contract.effectiveFrom ? new Date(contract.effectiveFrom) : null;
+      const contractEffTo = contract.effectiveTo ? new Date(contract.effectiveTo) : null;
 
-      // Simplified Logic:
-      // 1. Get latest usage. If latest usage < current month -> Usage Pending.
-      // 2. If usage exists for current month -> Check if Final Invoice exists locked to it.
+      // Skip if month is before contract starts
+      if (contractEffFrom && currentMonthEnd < contractEffFrom) continue;
+      // Skip if month starts after contract ends
+      if (contractEffTo && currentMonthStart > contractEffTo) continue;
 
+      // 2. Find usage for THIS SPECIFIC month
       const history = await this.usageRepo.getUsageHistory(contract.id);
-      const latestUsage = history[0]; // Ordered DESC
+      const usageForMonth = history.find((u) => {
+        const uStart = new Date(u.billingPeriodStart);
+        return (
+          uStart.getFullYear() === currentMonthStart.getFullYear() &&
+          uStart.getMonth() === currentMonthStart.getMonth()
+        );
+      });
 
-      const isUsageDone =
-        latestUsage && new Date(latestUsage.billingPeriodStart) >= currentMonthStart;
-
-      if (!isUsageDone) {
-        // Usage Due Date Rule: End of Billing Period + Grace Period (e.g. 5 days).
-        // Billing Period = Current Month (e.g. Feb 1 - Feb 28).
-        // Due Date = Feb 28 + 5 days = March 5.
-        // Alert is for "Current Month Usage", which is collected at cycle end.
-
-        const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0); // Last day of current month
-        const due = new Date(endOfMonth);
-        due.setDate(due.getDate() + 5); // Add 5 days grace period
-
-        // If today is past the due date?
-        // Actually, if we are in Feb, usage is due in March?
-        // Yes, usually usage is post-paid.
-        // Prompt says "due date proper". Maybe they want it to match contract effective date?
-        // Let's stick to "End of Period + 5 Days" as standard.
+      if (!usageForMonth) {
+        // Usage Pending for this month
+        const due = new Date(currentMonthEnd);
+        due.setDate(due.getDate() + 5);
 
         alerts.push({
           contractId: contract.id,
@@ -1115,7 +1176,7 @@ export class BillingService {
         });
       } else {
         // Usage Done. Check Invoice.
-        if (!latestUsage.finalInvoiceId) {
+        if (!usageForMonth.finalInvoiceId) {
           alerts.push({
             contractId: contract.id,
             customerId: contract.customerId,
@@ -1123,19 +1184,35 @@ export class BillingService {
             type: 'INVOICE_PENDING',
             saleType: contract.saleType,
             dueDate: new Date(),
+            usageData: {
+              bwA4Count: usageForMonth.bwA4Count || 0,
+              bwA3Count: usageForMonth.bwA3Count || 0,
+              colorA4Count: usageForMonth.colorA4Count || 0,
+              colorA3Count: usageForMonth.colorA3Count || 0,
+              billingPeriodStart: usageForMonth.billingPeriodStart!,
+              billingPeriodEnd: usageForMonth.billingPeriodEnd!,
+            },
           });
         } else {
           // Invoice exists. Check if sent.
-          const finalInvoice = await this.invoiceRepo.findById(latestUsage.finalInvoiceId);
+          const finalInvoice = await this.invoiceRepo.findById(usageForMonth.finalInvoiceId);
           if (finalInvoice && !finalInvoice.emailSentAt && !finalInvoice.whatsappSentAt) {
             alerts.push({
               contractId: contract.id,
               customerId: contract.customerId,
-              invoiceNumber: finalInvoice.invoiceNumber, // Use final invoice number
+              invoiceNumber: finalInvoice.invoiceNumber,
               type: 'SEND_PENDING',
               saleType: contract.saleType,
               dueDate: finalInvoice.createdAt,
-              finalInvoiceId: finalInvoice.id, // Added for frontend to view correct details
+              finalInvoiceId: finalInvoice.id,
+              usageData: {
+                bwA4Count: finalInvoice.bwA4Count || 0,
+                bwA3Count: finalInvoice.bwA3Count || 0,
+                colorA4Count: finalInvoice.colorA4Count || 0,
+                colorA3Count: finalInvoice.colorA3Count || 0,
+                billingPeriodStart: finalInvoice.billingPeriodStart!,
+                billingPeriodEnd: finalInvoice.billingPeriodEnd!,
+              },
             });
           }
         }

@@ -11,6 +11,7 @@ import {
   Tags,
   Printer,
   Settings,
+  Award,
 } from 'lucide-react';
 
 import {
@@ -44,6 +45,11 @@ const menuItems = [
     title: 'Models',
     icon: Printer,
     href: '/manager/models',
+  },
+  {
+    title: 'Brands',
+    icon: Award,
+    href: '/manager/brands',
   },
   {
     title: 'Spare Parts',

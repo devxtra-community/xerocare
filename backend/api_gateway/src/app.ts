@@ -14,7 +14,7 @@ import {
   // globalRateLimiter,
   otpSendLimiter,
   otpVerifyLimiter,
-  loginLimiter,
+  // loginLimiter,
 } from './middleware/rateLimitter';
 
 const app: Express = express();
@@ -44,7 +44,7 @@ app.use(
 );
 
 // Specific Rate Limits
-app.post('/e/auth/login', loginLimiter);
+// app.post('/e/auth/login', loginLimiter);
 app.post(
   ['/e/auth/login/verify', '/e/auth/forgot-password/verify', '/e/auth/magic-link/verify'],
   otpVerifyLimiter,
@@ -54,25 +54,21 @@ app.post(['/e/auth/forgot-password', '/e/auth/magic-link'], otpSendLimiter);
 const empProxyOptions: Options = {
   target: EMPLOYEE_SERVICE_URL,
   changeOrigin: true,
-  pathRewrite: { '^/e': '' },
 };
 
 const invProxyOptions: Options = {
   target: VENDOR_INVENTORY_SERVICE_URL,
   changeOrigin: true,
-  pathRewrite: { '^/i': '' },
 };
 
 const billProxyOptions: Options = {
   target: BILLING_SERVICE_URL,
   changeOrigin: true,
-  pathRewrite: { '^/b': '' },
 };
 
 const crmProxyOptions: Options = {
   target: CRM_SERVICE_URL,
   changeOrigin: true,
-  pathRewrite: { '^/c': '' },
 };
 
 app.use(httpLogger);

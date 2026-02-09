@@ -55,7 +55,9 @@ export default function ManagerProduct() {
   }, []);
 
   const filtered = products.filter((p) =>
-    `${p.name} ${p.brand} ${p.serial_no}`.toLowerCase().includes(search.toLowerCase()),
+    `${p.name} ${p.brand} ${p.serial_no} ${p.model?.model_name || ''}`
+      .toLowerCase()
+      .includes(search.toLowerCase()),
   );
 
   const total = products.length;
@@ -185,7 +187,9 @@ export default function ManagerProduct() {
                       </div>
                     )}
                   </TableCell>
-                  <TableCell className="px-4 font-medium">{p.name}</TableCell>
+                  <TableCell className="px-4 font-medium">
+                    {p.name} {p.model?.model_name ? ` - ${p.model.model_name}` : ''}
+                  </TableCell>
                   <TableCell className="px-4">{p.brand}</TableCell>
                   <TableCell className="px-4">{p.serial_no}</TableCell>
                   <TableCell className="px-4">₹{p.sale_price}</TableCell>
@@ -397,7 +401,17 @@ function ProductFormModal({
         {/* Right Column */}
         <div className="space-y-4">
           <Field label="Model">
-            <Select value={form.model_id} onValueChange={(v) => setForm({ ...form, model_id: v })}>
+            <Select
+              value={form.model_id}
+              onValueChange={(v) => {
+                const selectedModel = models.find((m) => m.id === v);
+                setForm({
+                  ...form,
+                  model_id: v,
+                  brand: selectedModel?.brandRelation?.name || form.brand,
+                });
+              }}
+            >
               <SelectTrigger>
                 <SelectValue placeholder="Select Model" />
               </SelectTrigger>

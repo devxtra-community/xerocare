@@ -20,6 +20,7 @@ import {
   financeRejectInvoice,
 } from '@/lib/invoice';
 import { InvoiceDetailsDialog } from '@/components/invoice/InvoiceDetailsDialog';
+import { ProductSelect } from '@/components/invoice/ProductSelect';
 import {
   Dialog,
   DialogContent,
@@ -28,10 +29,10 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog';
-import { Textarea } from '@/components/ui/textarea';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Textarea } from '@/components/ui/textarea';
 
 export default function FinanceApprovalTable() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
@@ -48,14 +49,21 @@ export default function FinanceApprovalTable() {
   const [depositReference, setDepositReference] = useState('');
   const [depositDate, setDepositDate] = useState('');
 
+  // Item Updates State (Product association + Readings)
+  const [itemUpdates, setItemUpdates] = useState<
+    {
+      id: string;
+      description: string;
+      productId: string;
+      productName?: string;
+      initialBwCount: string;
+      initialColorCount: string;
+    }[]
+  >([]);
+
   const fetchInvoices = async () => {
     try {
       setLoading(true);
-      // Finance users should use an endpoint that returns all relevant invoices.
-      // Assuming getBranchInvoices or similar returns all for Finance role based on backend logic
-      // But actually getAllInvoices via API Gateway (for Finance role) is better.
-      // However currently available exports in lib/invoice.ts are getInvoices, getMyInvoices, getBranchInvoices.
-      // Let's assume getBranchInvoices or getInvoices works for Finance.
       const data = await getBranchInvoices();
       setInvoices(data.filter((inv) => inv.status === 'EMPLOYEE_APPROVED'));
     } catch (error) {
@@ -71,91 +79,51 @@ export default function FinanceApprovalTable() {
 
   const handleApproveClick = (invoice: Invoice) => {
     setSelectedInvoice(invoice);
+    setDetailsOpen(false); // Close details modal if open
+    setDepositAmount('0');
+    setDepositMode('CASH');
+    setDepositReference('');
+    setDepositDate(new Date().toISOString().split('T')[0]);
 
-    // Skip deposit for SALE
-    if (invoice.saleType === 'SALE') {
-      // Direct approve or maybe a small confirmation?
-      // For now, let's just trigger the approval with 0 deposit directly
-      // But we need to be careful about state. confirmApprove uses selectedInvoice.
-      // We set selectedInvoice above, but state updates are async.
-      // Better to use a separate confirmation dialog OR just reuse confirmApprove logic logic carefully.
-      // Actually, simplest is to open a DIFFERENT dialog or just reuse the deposit dialog but hide fields?
-      // No, user specifically said they don't want it.
-      // Let's use a "Simple Approve" confirmation dialog instead of the deposit one, or just confirm immediately?
-      // Immediate approval might be risky if clicked by accident.
-      // Let's modify confirmApprove to take parameters or better yet:
-      // We can allow the user to just click "Approve" on the main table actions.
-      // If we want to skip the dialog, we need to handle the async state of `selectedInvoice`.
-      // The `useEffect` or passing invoice directly to confirm function is better.
-      // Let's refactor confirmApprove to accept an invoice and payload optional.
-      // But confirmApprove relies on state variables for input.
+    // Initialize item updates for PRODUCT items or items with productId
+    const productItems =
+      invoice.items?.filter((item) => item.itemType === 'PRODUCT' || !!item.productId) || [];
+    setItemUpdates(
+      productItems.map((item) => ({
+        id: item.id!,
+        description: item.description,
+        productId: item.productId || '',
+        initialBwCount: '0',
+        initialColorCount: '0',
+      })),
+    );
 
-      // Let's try this:
-      // If SALE, we still need to confirm? "Are you sure you want to approve?"
-      // Ideally yes.
-      // For this user request "I don't want security deposit in sale", implies just skipping that input.
-      // I will open the dialog BUT modification: I will add a check in the dialog opening.
-
-      // Actually, I can just call approval directly if I refactor confirmApprove.
-      // But to be safe with React state, I will store the invoice and open a "SimpleConfirm" dialog if it's SALE.
-      // Or easier: Just use `window.confirm` for SALE? No, that's ugly.
-
-      // Let's stick to: If SALE -> Simple Confirmation (maybe reuse reject dialog structure or a new small one? or just `confirmApprove` with 0s if I can pass args).
-      // Refactoring `confirmApprove` to take args is best.
-
-      setDepositAmount('0');
-      setDepositMode('CASH');
-      setDepositReference('');
-      setDepositDate(new Date().toISOString().split('T')[0]);
-
-      // If SALE, we open a "confirm sale approval" dialog?
-      // The user previously had a "InvoiceDetailsDialog" which has "Approve" button.
-      // That calls `handleApproveClick`.
-
-      if (invoice.saleType === 'SALE') {
-        // Just approve it immediately? Or ask "Are you sure?"
-        if (confirm('Approve Sale Invoice ' + invoice.invoiceNumber + '?')) {
-          // We need to call approval API.
-          financeApproveInvoice(invoice.id, {
-            amount: 0,
-            mode: 'CASH',
-            reference: '',
-            receivedDate: new Date().toISOString().split('T')[0],
-          })
-            .then(() => {
-              toast.success('Invoice Approved successfully');
-              setDetailsOpen(false);
-              fetchInvoices();
-            })
-            .catch(() => toast.error('Failed to approve'));
-        }
-        return;
-      }
-
-      // For RENT/LEASE, open the deposit dialog
-      setDepositOpen(true);
-    } else {
-      // RENT / LEASE
-      setDepositAmount('0');
-      setDepositMode('CASH');
-      setDepositReference('');
-      setDepositDate(new Date().toISOString().split('T')[0]);
-      setDepositOpen(true);
-    }
+    setDepositOpen(true);
   };
 
   const confirmApprove = async () => {
     if (!selectedInvoice) return;
 
-    try {
-      // Validate if amount > 0? User might want 0 deposit?
-      // Assuming valid request if they click confirm.
+    // Validation: All product items must have a productId selected
+    if (itemUpdates.some((item) => !item.productId)) {
+      toast.error('Please select a serial number for all product items');
+      return;
+    }
 
+    try {
       const payload = {
-        amount: parseFloat(depositAmount) || 0,
-        mode: depositMode,
-        reference: depositReference,
-        receivedDate: depositDate,
+        deposit: {
+          amount: parseFloat(depositAmount) || 0,
+          mode: depositMode,
+          reference: depositReference,
+          receivedDate: depositDate,
+        },
+        itemUpdates: itemUpdates.map((item) => ({
+          id: item.id,
+          productId: item.productId,
+          initialBwCount: parseInt(item.initialBwCount) || 0,
+          initialColorCount: parseInt(item.initialColorCount) || 0,
+        })),
       };
 
       await financeApproveInvoice(selectedInvoice.id, payload);
@@ -285,6 +253,7 @@ export default function FinanceApprovalTable() {
           onClose={() => setDetailsOpen(false)}
           onApprove={() => handleApproveClick(selectedInvoice)}
           approveLabel="Approve Now"
+          mode="FINANCE"
         />
       )}
 
@@ -301,7 +270,9 @@ export default function FinanceApprovalTable() {
               <Textarea
                 placeholder="Reason for rejection..."
                 value={rejectReason}
-                onChange={(e) => setRejectReason(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) =>
+                  setRejectReason(e.target.value)
+                }
               />
             </div>
             <DialogFooter>
@@ -317,79 +288,165 @@ export default function FinanceApprovalTable() {
       )}
       {depositOpen && (
         <Dialog open={depositOpen} onOpenChange={setDepositOpen}>
-          <DialogContent>
+          <DialogContent className="max-w-2xl">
             <DialogHeader>
-              <DialogTitle>Security Deposit Collection</DialogTitle>
+              <DialogTitle>Finance Approval & Product Link</DialogTitle>
               <DialogDescription>
-                Please enter the security deposit details collected from the customer.
+                Link actual units and record initial readings before final approval.
               </DialogDescription>
             </DialogHeader>
-            <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="amount" className="text-right">
-                  Amount
-                </Label>
-                <div className="col-span-3">
-                  <Input
-                    id="amount"
-                    type="number"
-                    value={depositAmount}
-                    onChange={(e) => setDepositAmount(e.target.value)}
-                    placeholder="0.00"
-                  />
+
+            <div className="max-h-[60vh] overflow-y-auto px-1 py-4 space-y-6">
+              {/* Product Association & Readings */}
+              {itemUpdates.length > 0 && (
+                <div className="space-y-4">
+                  <h4 className="text-sm font-bold text-slate-700 border-b pb-2">
+                    Product Association
+                  </h4>
+                  {itemUpdates.map((item, idx) => (
+                    <div key={item.id} className="p-4 border rounded-lg bg-muted/20 space-y-4">
+                      <div className="flex justify-between items-center">
+                        <Label className="font-bold text-blue-600">Item: {item.description}</Label>
+                      </div>
+
+                      <div className="grid grid-cols-1 gap-4">
+                        <div className="space-y-1.5">
+                          <Label className="text-[11px] uppercase font-bold text-muted-foreground">
+                            Assign Unit (Serial Number)
+                          </Label>
+                          <ProductSelect
+                            onSelect={(selected) => {
+                              const newUpdates = [...itemUpdates];
+                              newUpdates[idx].productId = selected.id;
+                              // @ts-expect-error - name exists on Product
+                              newUpdates[idx].productName = selected.name;
+                              setItemUpdates(newUpdates);
+                            }}
+                          />
+                          {item.productId && (
+                            <p className="text-[10px] text-green-600 font-medium">
+                              Selected: {item.productName || 'Unit Assigned'}
+                            </p>
+                          )}
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-1.5">
+                            <Label className="text-[11px] uppercase font-bold text-muted-foreground">
+                              Initial B&W Reading
+                            </Label>
+                            <Input
+                              type="number"
+                              value={item.initialBwCount}
+                              onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                                const newUpdates = [...itemUpdates];
+                                newUpdates[idx].initialBwCount = e.target.value;
+                                setItemUpdates(newUpdates);
+                              }}
+                              placeholder="0"
+                            />
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label className="text-[11px] uppercase font-bold text-muted-foreground">
+                              Initial Color Reading
+                            </Label>
+                            <Input
+                              type="number"
+                              value={item.initialColorCount}
+                              onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                                const newUpdates = [...itemUpdates];
+                                newUpdates[idx].initialColorCount = e.target.value;
+                                setItemUpdates(newUpdates);
+                              }}
+                              placeholder="0"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Security Deposit (Optional) */}
+              <div className="space-y-4 pt-2">
+                <h4 className="text-sm font-bold text-slate-700 border-b pb-2">
+                  Security Deposit (Optional)
+                </h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <Label className="text-[11px] uppercase font-bold text-muted-foreground">
+                      Amount
+                    </Label>
+                    <Input
+                      type="number"
+                      value={depositAmount}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                        setDepositAmount(e.target.value)
+                      }
+                      placeholder="0.00"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-[11px] uppercase font-bold text-muted-foreground">
+                      Mode
+                    </Label>
+                    <RadioGroup
+                      value={depositMode}
+                      onValueChange={(val) => setDepositMode(val as 'CASH' | 'CHEQUE')}
+                      className="flex gap-4 pt-1"
+                    >
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="CASH" id="mode-cash" />
+                        <Label htmlFor="mode-cash" className="text-xs">
+                          Cash
+                        </Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="CHEQUE" id="mode-cheque" />
+                        <Label htmlFor="mode-cheque" className="text-xs">
+                          Cheque
+                        </Label>
+                      </div>
+                    </RadioGroup>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-[11px] uppercase font-bold text-muted-foreground">
+                      Reference
+                    </Label>
+                    <Input
+                      value={depositReference}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                        setDepositReference(e.target.value)
+                      }
+                      placeholder="Cheque # / TXN ID"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-[11px] uppercase font-bold text-muted-foreground">
+                      Date
+                    </Label>
+                    <Input
+                      type="date"
+                      value={depositDate}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                        setDepositDate(e.target.value)
+                      }
+                    />
+                  </div>
                 </div>
               </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label className="text-right">Mode</Label>
-                <RadioGroup
-                  value={depositMode}
-                  onValueChange={(val) => setDepositMode(val as 'CASH' | 'CHEQUE')}
-                  className="flex gap-4 col-span-3"
-                >
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="CASH" id="mode-cash" />
-                    <Label htmlFor="mode-cash">Cash</Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="CHEQUE" id="mode-cheque" />
-                    <Label htmlFor="mode-cheque">Cheque</Label>
-                  </div>
-                </RadioGroup>
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="reference" className="text-right">
-                  Reference
-                </Label>
-                <Input
-                  id="reference"
-                  value={depositReference}
-                  onChange={(e) => setDepositReference(e.target.value)}
-                  placeholder="Cheque No. / Transaction ID"
-                  className="col-span-3"
-                />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="date" className="text-right">
-                  Date
-                </Label>
-                <Input
-                  id="date"
-                  type="date"
-                  value={depositDate}
-                  onChange={(e) => setDepositDate(e.target.value)}
-                  className="col-span-3"
-                />
-              </div>
             </div>
-            <DialogFooter>
+
+            <DialogFooter className="border-t pt-4">
               <Button variant="outline" onClick={() => setDepositOpen(false)}>
                 Cancel
               </Button>
               <Button
                 onClick={confirmApprove}
-                className="bg-green-600 hover:bg-green-700 text-white"
+                className="bg-green-600 hover:bg-green-700 text-white font-bold"
               >
-                Confirm Approval
+                Confirm Approval & Finalize Contract
               </Button>
             </DialogFooter>
           </DialogContent>

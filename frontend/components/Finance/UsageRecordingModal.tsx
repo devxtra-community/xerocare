@@ -16,11 +16,15 @@ import {
   recordUsage,
   getInvoiceById,
   updateInvoiceUsage,
+  createNextMonthInvoice,
+  getUsageHistory,
   Invoice,
   InvoiceItem,
+  UsageRecord,
 } from '@/lib/invoice';
 import { toast } from 'sonner';
-import { Loader2, IndianRupee } from 'lucide-react';
+import { Loader2, IndianRupee, History } from 'lucide-react';
+import { format } from 'date-fns';
 import UsagePreviewDialog from './UsagePreviewDialog';
 
 interface UsageRecordingModalProps {
@@ -60,6 +64,8 @@ export default function UsageRecordingModal({
   const [estimatedCost, setEstimatedCost] = useState<number>(0);
   const [showPreview, setShowPreview] = useState(false);
   const [recordedUsageData, setRecordedUsageData] = useState<RecordedUsageData | null>(null);
+  const [history, setHistory] = useState<UsageRecord[]>([]);
+  const [showHistory, setShowHistory] = useState(false);
 
   const [formData, setFormData] = useState({
     billingPeriodStart: '',
@@ -113,8 +119,48 @@ export default function UsageRecordingModal({
           }));
         })
         .catch((err) => console.error('Failed to fetch contract details:', err));
+
+      getUsageHistory(contractId)
+        .then((data) => setHistory(data))
+        .catch((err) => console.error('Failed to fetch usage history:', err));
     }
   }, [contractId, editingInvoice, defaultMonth, defaultYear]);
+
+  // Pre-fill existing usage if found for the current period (for Editing pending usage)
+  React.useEffect(() => {
+    if (!editingInvoice && history.length > 0 && formData.billingPeriodStart) {
+      const currentStart = formData.billingPeriodStart;
+      const existing = history.find((h) => {
+        const hStart = new Date(h.billingPeriodStart).toISOString().split('T')[0];
+        return hStart === currentStart;
+      });
+
+      if (existing) {
+        setFormData((prev) => ({
+          ...prev,
+          bwA4Count: String(existing.bwA4Count),
+          bwA3Count: String(existing.bwA3Count),
+          colorA4Count: String(existing.colorA4Count),
+          colorA3Count: String(existing.colorA3Count),
+          remarks: existing.remarks || '',
+        }));
+      }
+    }
+  }, [history, formData.billingPeriodStart, editingInvoice]);
+
+  // Find previous reading based on current billingPeriodStart
+  const prevUsage = React.useMemo(() => {
+    if (!history.length || !formData.billingPeriodStart) return null;
+    const currentStart = new Date(formData.billingPeriodStart);
+    // Filter history to find items strictly before the current start date
+    // Also exclude the editing invoice itself if we are in EDIT mode
+    return history
+      .filter((h) => new Date(h.billingPeriodStart) < currentStart && h.id !== editingInvoice?.id)
+      .sort(
+        (a, b) =>
+          new Date(b.billingPeriodStart).getTime() - new Date(a.billingPeriodStart).getTime(),
+      )[0];
+  }, [history, formData.billingPeriodStart, editingInvoice]);
 
   // Determine Machine Capabilities from pricing items
   const isBw = React.useMemo(() => {
@@ -264,8 +310,41 @@ export default function UsageRecordingModal({
     setEstimatedCost(isNaN(finalVal) ? 0 : finalVal);
   }, [formData, contract]);
 
+  const validateReadings = () => {
+    if (!prevUsage) return true;
+
+    const errors: string[] = [];
+    if (Number(formData.bwA4Count) < prevUsage.bwA4Count) {
+      errors.push(
+        `BW A4 reading (${formData.bwA4Count}) cannot be lower than previous (${prevUsage.bwA4Count})`,
+      );
+    }
+    if (Number(formData.bwA3Count) < prevUsage.bwA3Count) {
+      errors.push(
+        `BW A3 reading (${formData.bwA3Count}) cannot be lower than previous (${prevUsage.bwA3Count})`,
+      );
+    }
+    if (Number(formData.colorA4Count) < prevUsage.colorA4Count) {
+      errors.push(
+        `Color A4 reading (${formData.colorA4Count}) cannot be lower than previous (${prevUsage.colorA4Count})`,
+      );
+    }
+    if (Number(formData.colorA3Count) < prevUsage.colorA3Count) {
+      errors.push(
+        `Color A3 reading (${formData.colorA3Count}) cannot be lower than previous (${prevUsage.colorA3Count})`,
+      );
+    }
+
+    if (errors.length > 0) {
+      errors.forEach((err) => toast.error(err));
+      return false;
+    }
+    return true;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!validateReadings()) return;
     setLoading(true);
 
     try {
@@ -322,6 +401,71 @@ export default function UsageRecordingModal({
     }
   };
 
+  const handleSubmitAndNext = async () => {
+    if (!validateReadings()) return;
+    setLoading(true);
+    try {
+      const payload = new FormData();
+      payload.append('contractId', contractId);
+      payload.append('billingPeriodStart', formData.billingPeriodStart);
+      payload.append('billingPeriodEnd', formData.billingPeriodEnd);
+      payload.append('bwA4Count', String(formData.bwA4Count));
+      payload.append('bwA3Count', String(formData.bwA3Count));
+      payload.append('colorA4Count', String(formData.colorA4Count));
+      payload.append('colorA3Count', String(formData.colorA3Count));
+      payload.append('remarks', formData.remarks);
+      payload.append('reportedBy', 'EMPLOYEE');
+
+      if (file) {
+        payload.append('file', file);
+      }
+
+      await recordUsage(payload);
+      await createNextMonthInvoice(contractId);
+
+      toast.success('Usage recorded. Switching to next month.');
+
+      // Refresh contract and history to get next period dates and updated references
+      const [updatedContract, updatedHistory] = await Promise.all([
+        getInvoiceById(contractId),
+        getUsageHistory(contractId),
+      ]);
+      setContract(updatedContract);
+      setHistory(updatedHistory);
+
+      // Shift dates manually to be safe or use updatedContract
+      const currentEnd = new Date(formData.billingPeriodEnd);
+      const nextStart = new Date(currentEnd);
+      nextStart.setDate(nextStart.getDate() + 1);
+
+      const nextEnd = new Date(nextStart.getFullYear(), nextStart.getMonth() + 1, 0);
+
+      const fmt = (d: Date) => {
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${y}-${m}-${day}`;
+      };
+
+      setFormData({
+        billingPeriodStart: fmt(nextStart),
+        billingPeriodEnd: fmt(nextEnd),
+        bwA4Count: '',
+        bwA3Count: '',
+        colorA4Count: '',
+        colorA3Count: '',
+        remarks: '',
+      });
+      setFile(null);
+      onSuccess();
+    } catch (error: unknown) {
+      const err = error as { message?: string };
+      toast.error(err.message || 'Failed to process request');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       setFile(e.target.files[0]);
@@ -338,8 +482,60 @@ export default function UsageRecordingModal({
       <Dialog open={isOpen} onOpenChange={onClose}>
         <DialogContent className="sm:max-w-[600px]">
           <DialogHeader>
-            <DialogTitle>Record Usage for {customerName}</DialogTitle>
+            <div className="flex justify-between items-center pr-8">
+              <DialogTitle>Record Usage for {customerName}</DialogTitle>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setShowHistory(!showHistory)}
+                className="text-xs"
+              >
+                <History className="mr-2 h-3 w-3" />
+                {showHistory ? 'Hide History' : 'Show History'}
+              </Button>
+            </div>
           </DialogHeader>
+
+          {showHistory && (
+            <div className="border border-border rounded-lg overflow-hidden mb-4 max-h-[200px] overflow-y-auto">
+              <table className="w-full text-[10px] text-left">
+                <thead className="bg-muted text-muted-foreground uppercase font-bold sticky top-0">
+                  <tr>
+                    <th className="p-2">Period</th>
+                    <th className="p-2">BW A4</th>
+                    <th className="p-2">BW A3</th>
+                    <th className="p-2">Col A4</th>
+                    <th className="p-2">Col A3</th>
+                    <th className="p-2">Remarks</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {history.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="p-4 text-center text-muted-foreground">
+                        No previous records found
+                      </td>
+                    </tr>
+                  ) : (
+                    history.map((h) => (
+                      <tr key={h.id} className="hover:bg-muted/50">
+                        <td className="p-2">
+                          {format(new Date(h.billingPeriodStart), 'MMM yyyy')}
+                        </td>
+                        <td className="p-2">{h.bwA4Count}</td>
+                        <td className="p-2">{h.bwA3Count}</td>
+                        <td className="p-2">{h.colorA4Count}</td>
+                        <td className="p-2">{h.colorA3Count}</td>
+                        <td className="p-2 truncate max-w-[100px]">{h.remarks || '-'}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -371,29 +567,45 @@ export default function UsageRecordingModal({
                 ) && (
                   <>
                     <div className="space-y-2">
-                      <div className="flex justify-between">
+                      <div className="flex justify-between items-center">
                         <Label>BW A4 Count</Label>
-                        <span className="text-xs text-muted-foreground">
-                          Free Limit:{' '}
-                          {contract.items.find((i) => i.description.includes('Black'))
-                            ?.bwIncludedLimit || 0}
-                        </span>
+                        <div className="text-[10px] space-x-2">
+                          {prevUsage && (
+                            <span className="text-orange-600 font-bold">
+                              Prev: {prevUsage.bwA4Count}
+                            </span>
+                          )}
+                          <span className="text-muted-foreground">
+                            Free:{' '}
+                            {contract.items.find((i) => i.description.includes('Black'))
+                              ?.bwIncludedLimit || 0}
+                          </span>
+                        </div>
                       </div>
                       <Input
                         type="number"
-                        min="0"
+                        min={prevUsage ? String(prevUsage.bwA4Count) : '0'}
                         value={formData.bwA4Count}
+                        placeholder={prevUsage ? `Must be >= ${prevUsage.bwA4Count}` : '0'}
                         onChange={(e) =>
                           setFormData({ ...formData, bwA4Count: handleNumberInput(e.target.value) })
                         }
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label>BW A3 Count</Label>
+                      <div className="flex justify-between items-center">
+                        <Label>BW A3 Count</Label>
+                        {prevUsage && (
+                          <span className="text-[10px] text-orange-600 font-bold">
+                            Prev: {prevUsage.bwA3Count}
+                          </span>
+                        )}
+                      </div>
                       <Input
                         type="number"
-                        min="0"
+                        min={prevUsage ? String(prevUsage.bwA3Count) : '0'}
                         value={formData.bwA3Count}
+                        placeholder={prevUsage ? `Must be >= ${prevUsage.bwA3Count}` : '0'}
                         onChange={(e) =>
                           setFormData({ ...formData, bwA3Count: handleNumberInput(e.target.value) })
                         }
@@ -409,18 +621,26 @@ export default function UsageRecordingModal({
                 ) && (
                   <>
                     <div className="space-y-2">
-                      <div className="flex justify-between">
+                      <div className="flex justify-between items-center">
                         <Label>Color A4 Count</Label>
-                        <span className="text-xs text-muted-foreground">
-                          Free Limit:{' '}
-                          {contract.items.find((i) => i.description.includes('Color'))
-                            ?.colorIncludedLimit || 0}
-                        </span>
+                        <div className="text-[10px] space-x-2">
+                          {prevUsage && (
+                            <span className="text-orange-600 font-bold">
+                              Prev: {prevUsage.colorA4Count}
+                            </span>
+                          )}
+                          <span className="text-muted-foreground">
+                            Free:{' '}
+                            {contract.items.find((i) => i.description.includes('Color'))
+                              ?.colorIncludedLimit || 0}
+                          </span>
+                        </div>
                       </div>
                       <Input
                         type="number"
-                        min="0"
+                        min={prevUsage ? String(prevUsage.colorA4Count) : '0'}
                         value={formData.colorA4Count}
+                        placeholder={prevUsage ? `Must be >= ${prevUsage.colorA4Count}` : '0'}
                         onChange={(e) =>
                           setFormData({
                             ...formData,
@@ -430,11 +650,19 @@ export default function UsageRecordingModal({
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label>Color A3 Count</Label>
+                      <div className="flex justify-between items-center">
+                        <Label>Color A3 Count</Label>
+                        {prevUsage && (
+                          <span className="text-[10px] text-orange-600 font-bold">
+                            Prev: {prevUsage.colorA3Count}
+                          </span>
+                        )}
+                      </div>
                       <Input
                         type="number"
-                        min="0"
+                        min={prevUsage ? String(prevUsage.colorA3Count) : '0'}
                         value={formData.colorA3Count}
+                        placeholder={prevUsage ? `Must be >= ${prevUsage.colorA3Count}` : '0'}
                         onChange={(e) =>
                           setFormData({
                             ...formData,
@@ -508,10 +736,21 @@ export default function UsageRecordingModal({
               />
             </div>
 
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={onClose}>
+            <DialogFooter className="gap-2 sm:gap-0">
+              <Button type="button" variant="outline" onClick={onClose} disabled={loading}>
                 Cancel
               </Button>
+              {!editingInvoice && (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={handleSubmitAndNext}
+                  disabled={loading}
+                >
+                  {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Submit & Next Month
+                </Button>
+              )}
               <Button type="submit" disabled={loading}>
                 {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 {editingInvoice ? 'Update Invoice' : 'Submit Record'}

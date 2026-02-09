@@ -19,6 +19,9 @@ export interface InvoiceItem {
   // Legacy
   quantity?: number;
   unitPrice?: number;
+  productId?: string;
+  initialBwCount?: number;
+  initialColorCount?: number;
 }
 
 export interface Invoice {
@@ -77,6 +80,25 @@ export interface Invoice {
   advanceAdjusted?: number;
   grossAmount?: number;
   invoiceHistory?: Invoice[];
+}
+
+export interface UsageRecord {
+  id: string;
+  contractId: string;
+  billingPeriodStart: string;
+  billingPeriodEnd: string;
+  bwA4Count: number;
+  bwA3Count: number;
+  colorA4Count: number;
+  colorA3Count: number;
+  reportedBy: 'CUSTOMER' | 'EMPLOYEE';
+  remarks?: string;
+  meterImageUrl?: string;
+  approvedByFinance: boolean;
+  approvedAt?: string;
+  financeRemarks?: string;
+  finalInvoiceId?: string;
+  createdAt: string;
 }
 
 export interface CreateInvoicePayload {
@@ -172,14 +194,22 @@ export const employeeApproveInvoice = async (id: string): Promise<Invoice> => {
 
 export const financeApproveInvoice = async (
   id: string,
-  deposit?: {
-    amount: number;
-    mode: 'CASH' | 'CHEQUE';
-    reference?: string;
-    receivedDate?: string;
+  payload: {
+    deposit?: {
+      amount: number;
+      mode: 'CASH' | 'CHEQUE';
+      reference?: string;
+      receivedDate?: string;
+    };
+    itemUpdates?: {
+      id: string;
+      productId: string;
+      initialBwCount?: number;
+      initialColorCount?: number;
+    }[];
   },
 ): Promise<Invoice> => {
-  const response = await api.post(`/b/invoices/${id}/finance-approve`, { deposit });
+  const response = await api.post(`/b/invoices/${id}/finance-approve`, payload);
   return response.data.data;
 };
 
@@ -211,7 +241,15 @@ export interface CollectionAlert {
   type: 'USAGE_PENDING' | 'INVOICE_PENDING' | 'SEND_PENDING';
   saleType: string;
   dueDate: string;
-  finalInvoiceId?: string; // Point to final invoice if generated
+  finalInvoiceId?: string;
+  usageData?: {
+    bwA4Count: number;
+    bwA3Count: number;
+    colorA4Count: number;
+    colorA3Count: number;
+    billingPeriodStart: string;
+    billingPeriodEnd: string;
+  };
 }
 
 export const getCollectionAlerts = async (date?: string): Promise<CollectionAlert[]> => {
@@ -224,6 +262,11 @@ export const recordUsage = async (payload: FormData): Promise<unknown> => {
   const response = await api.post('/b/usage', payload, {
     headers: { 'Content-Type': 'multipart/form-data' },
   });
+  return response.data.data;
+};
+
+export const getUsageHistory = async (contractId: string): Promise<UsageRecord[]> => {
+  const response = await api.get(`/b/usage/contract/${contractId}`);
   return response.data.data;
 };
 

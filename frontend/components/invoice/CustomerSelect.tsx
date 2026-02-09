@@ -117,15 +117,23 @@ export function CustomerSelect({ value, onChange }: CustomerSelectProps) {
         lead={selectedLead}
         onConverted={(customerId) => {
           if (selectedLead) {
-            // After conversion, update parent immediately
-            onChange(customerId, {
+            const newCustomer: SelectableCustomer = {
               ...selectedLead,
               id: customerId,
               type: 'CUSTOMER',
               name: selectedLead.name,
               phone: selectedLead.phone,
               email: selectedLead.email,
-            } as SelectableCustomer);
+              isCustomer: true,
+              customerId: customerId,
+            } as SelectableCustomer;
+
+            setItems((prev) =>
+              prev.map((item) => (item.id === selectedLead._id ? newCustomer : item)),
+            );
+
+            // Update parent immediately with the new customer
+            onChange(customerId, newCustomer);
           }
         }}
       />

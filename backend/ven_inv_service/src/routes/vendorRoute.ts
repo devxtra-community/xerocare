@@ -8,8 +8,11 @@ import { roleMiddleware } from '../middlewares/roleMiddleware';
 
 const router = Router();
 
+import { VendorRequestRepository } from '../repositories/vendorRequestRepository';
+
 const vendorRepo = new VendorRepository(Source);
-const vendorService = new VendorService(vendorRepo);
+const requestRepo = new VendorRequestRepository(Source);
+const vendorService = new VendorService(vendorRepo, requestRepo);
 const vendorController = new VendorController(vendorService);
 
 router.post(
@@ -41,6 +44,20 @@ router.delete(
   authMiddleware,
   roleMiddleware(['ADMIN', 'MANAGER']),
   vendorController.deleteVendor,
+);
+
+router.post(
+  '/:id/request-products',
+  authMiddleware,
+  roleMiddleware(['ADMIN', 'MANAGER']),
+  vendorController.requestProducts,
+);
+
+router.get(
+  '/:id/requests',
+  authMiddleware,
+  roleMiddleware(['ADMIN', 'MANAGER']),
+  vendorController.getVendorRequests,
 );
 
 export default router;

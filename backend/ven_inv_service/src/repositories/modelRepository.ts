@@ -21,9 +21,12 @@ export class ModelRepository {
           'model.id',
           'model.model_no',
           'model.model_name',
-          'model.brand',
+          'model.model_name',
           'model.description',
+          'brand.name', // Select brand name
+          'brand.id',
         ])
+        .leftJoin('model.brandRelation', 'brand') // Join with brand relation
         // If the user wants the quantity to be available in the entity result, `loadRelationCountAndMap` is the cleanest way.
         // It maps the count to the `quantity` property of the entity.
         .getMany()

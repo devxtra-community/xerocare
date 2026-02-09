@@ -15,6 +15,7 @@ import { getRabbitChannel } from './config/rabbitmq';
 import modelRoute from './routes/modelRoute';
 import inventoryRouter from './routes/inventoryRoutes';
 import sparePartRouter from './routes/sparePartRoutes';
+import brandRouter from './routes/brandRoute';
 
 const app = express();
 
@@ -28,6 +29,7 @@ app.use('/models', modelRoute);
 app.use('/products', productRoute);
 app.use('/inventory', inventoryRouter);
 app.use('/spare-parts', sparePartRouter);
+app.use('/brands', brandRouter);
 app.use(errorHandler);
 
 const startServer = async () => {

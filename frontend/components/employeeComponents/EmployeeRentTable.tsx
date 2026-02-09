@@ -1,8 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Search, Loader2, Eye, FileText, Plus } from 'lucide-react';
 import { toast } from 'sonner';
+import { format } from 'date-fns';
 import {
   Table,
   TableBody,
@@ -25,6 +26,9 @@ import { ApproveQuotationDialog } from '@/components/invoice/ApproveQuotationDia
 import { InvoiceDetailsDialog } from '@/components/invoice/InvoiceDetailsDialog';
 
 import { updateQuotation } from '@/lib/invoice'; // Ensure import
+import RentHistoryView from './RentHistoryView';
+import { History as HistoryIcon } from 'lucide-react';
+import UsageRecordingModal from '../Finance/UsageRecordingModal';
 
 const calculateRemainingDays = (end: string | Date | undefined) => {
   if (!end) return null;
@@ -47,11 +51,14 @@ export default function EmployeeRentTable({ mode = 'EMPLOYEE' }: EmployeeRentTab
   const [formOpen, setFormOpen] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [approveOpen, setApproveOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const [editInvoice, setEditInvoice] = useState<Invoice | undefined>(undefined); // For Edit Mode
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
+  const [isUsageModalOpen, setIsUsageModalOpen] = useState(false);
+  const [editingUsage] = useState<Invoice | null>(null);
   const [search, setSearch] = useState('');
 
-  const fetchInvoices = React.useCallback(async () => {
+  const fetchInvoices = useCallback(async () => {
     try {
       setLoading(true);
       let data: Invoice[] = [];
@@ -130,6 +137,11 @@ export default function EmployeeRentTable({ mode = 'EMPLOYEE' }: EmployeeRentTab
     }
   };
 
+  const handleShowHistory = (inv: Invoice) => {
+    setSelectedInvoice(inv);
+    setHistoryOpen(true);
+  };
+
   // ...
 
   return (
@@ -161,18 +173,19 @@ export default function EmployeeRentTable({ mode = 'EMPLOYEE' }: EmployeeRentTab
               <TableRow>
                 <TableHead className="text-primary font-bold">INV NUMBER</TableHead>
                 <TableHead className="text-primary font-bold">CUSTOMER</TableHead>
-                <TableHead className="text-primary font-bold">RENT TYPE</TableHead>
-                <TableHead className="text-primary font-bold">BILLING</TableHead>
+                <TableHead className="text-primary font-bold">ITEMS</TableHead>
+                <TableHead className="text-primary font-bold uppercase">Contract Period</TableHead>
                 <TableHead className="text-primary font-bold">DURATION</TableHead>
                 <TableHead className="text-primary font-bold">AMOUNT</TableHead>
                 <TableHead className="text-primary font-bold">STATUS</TableHead>
+                <TableHead className="text-primary font-bold">DATE</TableHead>
                 <TableHead className="text-primary font-bold text-center">ACTION</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="h-32 text-center">
+                  <TableCell colSpan={9} className="h-32 text-center">
                     <div className="flex justify-center items-center h-full">
                       <Loader2 className="h-6 w-6 animate-spin text-primary" />
                     </div>
@@ -180,7 +193,7 @@ export default function EmployeeRentTable({ mode = 'EMPLOYEE' }: EmployeeRentTab
                 </TableRow>
               ) : invoices.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">
+                  <TableCell colSpan={9} className="h-32 text-center text-muted-foreground">
                     No rent agreements found. Create one to get started.
                   </TableCell>
                 </TableRow>
@@ -198,24 +211,14 @@ export default function EmployeeRentTable({ mode = 'EMPLOYEE' }: EmployeeRentTab
                         {inv.invoiceNumber}
                       </TableCell>
                       <TableCell className="font-medium">{inv.customerName}</TableCell>
-                      <TableCell>
-                        <Badge
-                          variant="outline"
-                          className={`rounded-full px-3 py-0.5 text-[10px] font-bold tracking-wider
-                            ${
-                              inv.rentType?.startsWith('FIXED')
-                                ? 'border-blue-200 text-blue-600 bg-blue-50'
-                                : inv.rentType?.startsWith('CPC')
-                                  ? 'border-purple-200 text-purple-600 bg-purple-50'
-                                  : 'border-border text-slate-600 bg-muted/50'
-                            }
-                          `}
-                        >
-                          {inv.rentType?.replace('_', ' ')}
-                        </Badge>
+                      <TableCell className="max-w-[200px]">
+                        <div className="text-xs font-medium text-slate-700 truncate">
+                          {inv.rentType?.replace('_', ' ') || 'Rent agreement'}
+                        </div>
                       </TableCell>
                       <TableCell className="text-xs text-muted-foreground font-medium">
-                        {inv.rentPeriod}
+                        {inv.startDate ? format(new Date(inv.startDate), 'MMM dd, yyyy') : 'N/A'} -{' '}
+                        {inv.endDate ? format(new Date(inv.endDate), 'MMM dd, yyyy') : 'N/A'}
                       </TableCell>
                       <TableCell>
                         {(() => {
@@ -261,25 +264,44 @@ export default function EmployeeRentTable({ mode = 'EMPLOYEE' }: EmployeeRentTab
                           {inv.status}
                         </Badge>
                       </TableCell>
+                      <TableCell className="text-xs text-muted-foreground font-medium whitespace-nowrap">
+                        {inv.createdAt ? format(new Date(inv.createdAt), 'MMM dd, yyyy') : 'N/A'}
+                      </TableCell>
                       <TableCell className="text-center">
                         <div className="flex items-center justify-center gap-1">
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-8 w-8 text-slate-400 hover:text-blue-600 hover:bg-blue-50"
+                            className="h-8 w-8 text-primary hover:text-blue-600 hover:bg-blue-50"
                             onClick={() => handleViewDetails(inv.id)}
+                            title="View Details"
                           >
                             <Eye className="h-4 w-4" />
                           </Button>
-                          {(inv.status === 'DRAFT' || inv.status === 'SENT') && (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-slate-400 hover:text-orange-600 hover:bg-orange-50"
-                              onClick={() => openEditModal(inv)}
-                            >
-                              <FileText className="h-4 w-4" /> {/* Edit Icon replacement */}
-                            </Button>
+
+                          {mode === 'EMPLOYEE' && (
+                            <>
+                              {(inv.status === 'DRAFT' || inv.status === 'SENT') && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 text-slate-400 hover:text-orange-600 hover:bg-orange-50"
+                                  onClick={() => openEditModal(inv)}
+                                  title="Edit"
+                                >
+                                  <FileText className="h-4 w-4" />
+                                </Button>
+                              )}
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-slate-400 hover:text-purple-600 hover:bg-purple-50"
+                                onClick={() => handleShowHistory(inv)}
+                                title="History"
+                              >
+                                <HistoryIcon className="h-4 w-4" />
+                              </Button>
+                            </>
                           )}
                         </div>
                       </TableCell>
@@ -300,6 +322,15 @@ export default function EmployeeRentTable({ mode = 'EMPLOYEE' }: EmployeeRentTab
           />
         )}
 
+        {/* History View Dialog */}
+        {historyOpen && selectedInvoice && (
+          <RentHistoryView
+            contractId={selectedInvoice.id}
+            isOpen={historyOpen}
+            onClose={() => setHistoryOpen(false)}
+          />
+        )}
+
         {detailsOpen && selectedInvoice && (
           <InvoiceDetailsDialog
             invoice={selectedInvoice}
@@ -312,7 +343,7 @@ export default function EmployeeRentTable({ mode = 'EMPLOYEE' }: EmployeeRentTab
                     // FINANCE Mode Approve
                     try {
                       const { financeApproveInvoice } = await import('@/lib/invoice');
-                      await financeApproveInvoice(selectedInvoice.id);
+                      await financeApproveInvoice(selectedInvoice.id, {});
                       toast.success('Rent Agreement Approved');
                       setDetailsOpen(false);
                       fetchInvoices();
@@ -358,6 +389,17 @@ export default function EmployeeRentTable({ mode = 'EMPLOYEE' }: EmployeeRentTab
               setApproveOpen(false);
               fetchInvoices();
             }}
+          />
+        )}
+
+        {isUsageModalOpen && selectedInvoice && (
+          <UsageRecordingModal
+            isOpen={isUsageModalOpen}
+            onClose={() => setIsUsageModalOpen(false)}
+            contractId={selectedInvoice.id}
+            customerName={selectedInvoice.customerName}
+            invoice={editingUsage}
+            onSuccess={fetchInvoices}
           />
         )}
       </div>

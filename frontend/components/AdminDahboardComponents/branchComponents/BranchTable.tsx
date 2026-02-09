@@ -168,14 +168,14 @@ export default function BranchReport() {
 
   if (loading) {
     return (
-      <div className="bg-blue-100 min-h-screen p-3 sm:p-4 md:p-6 flex items-center justify-center">
+      <div className="bg-bg-muted min-h-screen p-3 sm:p-4 md:p-6 flex items-center justify-center">
         <div className="text-primary text-lg">Loading...</div>
       </div>
     );
   }
 
   return (
-    <div className="bg-blue-100 min-h-screen p-3 sm:p-4 md:p-6 space-y-8 sm:space-y-10">
+    <div className="bg-bg-muted min-h-screen p-3 sm:p-4 md:p-6 space-y-8 sm:space-y-10">
       {/* BRANCHES */}
       <div className="space-y-4 sm:space-y-6">
         <h3 className="text-xl sm:text-2xl font-bold text-primary">Branches</h3>
@@ -259,8 +259,8 @@ export default function BranchReport() {
                     <span
                       className={`px-2.5 py-1 rounded-full text-xs font-medium ${
                         b.status === 'ACTIVE'
-                          ? 'bg-green-100 text-green-700'
-                          : 'bg-red-100 text-red-700'
+                          ? 'bg-success/10 text-success'
+                          : 'bg-danger/10 text-danger'
                       }`}
                     >
                       {b.status}
@@ -473,8 +473,8 @@ function ConfirmDeleteModal({
     <Dialog open={open} onOpenChange={(val) => !val && onCancel()}>
       <DialogContent className="sm:max-w-[450px]">
         <DialogHeader>
-          <div className="flex items-center gap-4 text-red-600 mb-4">
-            <div className="h-12 w-12 rounded-2xl bg-red-50 flex items-center justify-center text-red-600 shadow-sm">
+          <div className="flex items-center gap-4 text-danger mb-4">
+            <div className="h-12 w-12 rounded-2xl bg-danger/10 flex items-center justify-center text-danger shadow-sm">
               <Trash2 className="h-6 w-6" />
             </div>
             <DialogTitle className="text-xl font-bold text-primary">Delete Branch</DialogTitle>
@@ -492,7 +492,7 @@ function ConfirmDeleteModal({
             Cancel
           </button>
           <Button
-            className="h-12 px-8 rounded-xl bg-red-600 text-white hover:bg-red-700 font-bold shadow-lg"
+            className="h-12 px-8 rounded-xl bg-danger text-white hover:bg-danger/90 font-bold shadow-lg"
             onClick={onConfirm}
           >
             Delete

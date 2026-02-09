@@ -42,9 +42,9 @@ export class SparePartInventory {
   @Column({ type: 'int', default: 0 })
   quantity!: number;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ name: 'created_at' })
   created_at!: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ name: 'updated_at' })
   updated_at!: Date;
 }

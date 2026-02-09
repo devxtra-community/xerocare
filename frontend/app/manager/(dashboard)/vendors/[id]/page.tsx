@@ -16,8 +16,9 @@ import {
   Clock,
 } from 'lucide-react';
 import StatCard from '@/components/StatCard';
-import VendorTransactionsTable from '@/components/AdminDahboardComponents/vendorComponents/VendorTransactionsTable';
+
 import VendorSpendingTrend from '@/components/AdminDahboardComponents/vendorComponents/VendorSpendingTrend';
+import VendorRequestHistory from '@/components/ManagerDashboardComponents/VendorComponents/VendorRequestHistory';
 import { getVendorById, Vendor as ApiVendor } from '@/lib/vendor';
 import { toast } from 'sonner';
 
@@ -97,7 +98,7 @@ export default function VendorProfilePage() {
                 </span>
               </h3>
               <p className="text-xs text-blue-600 font-medium uppercase tracking-wider">
-                ID: #{vendor.id} • {vendor.name}
+                {vendor.name}
               </p>
             </div>
           </div>
@@ -239,10 +240,10 @@ export default function VendorProfilePage() {
           <div className="lg:col-span-2">
             <div className="bg-card rounded-xl shadow-sm border border-blue-100/30 h-full flex flex-col overflow-hidden text-primary uppercase">
               <h3 className="text-xs font-bold text-primary uppercase flex items-center gap-2 p-4 border-b border-gray-50 flex-none bg-card">
-                <Clock className="h-3.5 w-3.5 text-primary" /> Transaction History
+                <Clock className="h-3.5 w-3.5 text-primary" /> Request History
               </h3>
               <div className="flex-1 overflow-auto">
-                <VendorTransactionsTable />
+                <VendorRequestHistory />
               </div>
             </div>
           </div>
