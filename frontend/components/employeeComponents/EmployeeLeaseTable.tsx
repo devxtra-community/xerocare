@@ -325,7 +325,7 @@ export default function EmployeeLeaseTable({ mode = 'EMPLOYEE' }: EmployeeLeaseT
                   // FINANCE Mode Approve
                   try {
                     const { financeApproveInvoice } = await import('@/lib/invoice');
-                    await financeApproveInvoice(selectedInvoice.id);
+                    await financeApproveInvoice(selectedInvoice.id, {});
                     toast.success('Lease Agreement Approved');
                     setDetailsOpen(false);
                     fetchInvoices();

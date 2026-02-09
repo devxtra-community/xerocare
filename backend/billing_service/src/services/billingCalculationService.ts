@@ -85,7 +85,7 @@ export class BillingCalculationService {
     // Based on user prompt "invoice_items represent pricing configuration".
     // We iterate but usually expect one definition set.
     for (const rule of rules) {
-      if (rule.itemType !== 'PRICING_RULE') continue;
+      // if (rule.itemType !== 'PRICING_RULE') continue;
 
       if (rule.bwIncludedLimit !== undefined) {
         const excess = Math.max(0, bwUsage - rule.bwIncludedLimit);
@@ -117,7 +117,7 @@ export class BillingCalculationService {
   private calculateFixedCombo(baseRent: number, totalUsage: number, rules: InvoiceItem[]): number {
     let excessAmount = 0;
     for (const rule of rules) {
-      if (rule.itemType !== 'PRICING_RULE') continue;
+      // if (rule.itemType !== 'PRICING_RULE') continue;
 
       if (rule.combinedIncludedLimit !== undefined) {
         const excess = Math.max(0, totalUsage - rule.combinedIncludedLimit);
@@ -139,7 +139,7 @@ export class BillingCalculationService {
     // Rule: Slab rate applies to ENTIRE usage (Non-incremental)
     // Find the slab that matches the usage count.
     for (const rule of rules) {
-      if (rule.itemType !== 'PRICING_RULE') continue;
+      // if (rule.itemType !== 'PRICING_RULE') continue;
 
       // B&W Slabs
       if (rule.bwSlabRanges) {
@@ -162,7 +162,7 @@ export class BillingCalculationService {
   private calculateCPCCombo(totalUsage: number, rules: InvoiceItem[]): number {
     let amount = 0;
     for (const rule of rules) {
-      if (rule.itemType !== 'PRICING_RULE') continue;
+      // if (rule.itemType !== 'PRICING_RULE') continue;
 
       if (rule.comboSlabRanges) {
         const rate = this.findSlabRate(totalUsage, rule.comboSlabRanges);

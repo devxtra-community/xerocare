@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Trash2, Calendar, Loader2 } from 'lucide-react';
+import { format } from 'date-fns';
 import { toast } from 'sonner';
 import {
   Dialog,
@@ -142,6 +143,32 @@ export default function RentFormModal({
     ],
   });
 
+  // Effect to calculate Effective To date based on Tenure
+  React.useEffect(() => {
+    if (
+      (form.saleType === 'LEASE' || form.saleType === 'RENT') &&
+      form.leaseTenureMonths &&
+      !isNaN(Number(form.leaseTenureMonths)) &&
+      form.effectiveFrom
+    ) {
+      const tenureMonths = Number(form.leaseTenureMonths);
+      if (tenureMonths > 0) {
+        const startDate = new Date(form.effectiveFrom);
+        // Calculate End Date: Start Date + Tenure Months - 1 Day
+        const endDate = new Date(startDate);
+        endDate.setMonth(endDate.getMonth() + tenureMonths);
+        endDate.setDate(endDate.getDate() - 1);
+
+        const formattedEndDate = endDate.toISOString().split('T')[0];
+
+        // Only update if different to avoid infinite loops
+        if (form.effectiveTo !== formattedEndDate) {
+          setForm((prev) => ({ ...prev, effectiveTo: formattedEndDate }));
+        }
+      }
+    }
+  }, [form.saleType, form.leaseTenureMonths, form.effectiveFrom, form.effectiveTo]);
+
   // ... (handler methods)
 
   const handleConfirm = async () => {
@@ -184,88 +211,67 @@ export default function RentFormModal({
           discountPercent: cleanNumber(form.discountPercent),
           advanceAmount: cleanNumber(form.advanceAmount),
 
-          items: selectedProducts.map((p) => ({
-            description: `${p.name} - ${p.serial_no}`,
-            quantity: p.quantity || 1,
-            unitPrice: 0,
-            itemType: 'PRODUCT' as const,
-            productId: p.id?.startsWith('restored_') ? undefined : p.id, // CRITICAL: Only send real UUIDs
-          })),
+          items: selectedProducts.map((p) => {
+            const baseDesc = `${p.name}${p.model?.model_name ? ` - ${p.model.model_name}` : ''}`;
+            const myRules = form.pricingItems.filter((i) => i.description.includes(baseDesc));
+
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const mergedItem: any = {
+              description: baseDesc,
+              quantity: p.quantity || 1,
+              unitPrice: 0,
+              itemType: 'PRODUCT' as const,
+              productId: p.id?.startsWith('restored_') ? undefined : p.id,
+            };
+
+            myRules.forEach((rule) => {
+              if (rule.bwIncludedLimit !== '')
+                mergedItem.bwIncludedLimit = cleanNumber(rule.bwIncludedLimit);
+              if (rule.colorIncludedLimit !== '')
+                mergedItem.colorIncludedLimit = cleanNumber(rule.colorIncludedLimit);
+              if (rule.combinedIncludedLimit !== '')
+                mergedItem.combinedIncludedLimit = cleanNumber(rule.combinedIncludedLimit);
+              if (rule.bwExcessRate !== '')
+                mergedItem.bwExcessRate = cleanNumber(rule.bwExcessRate);
+              if (rule.colorExcessRate !== '')
+                mergedItem.colorExcessRate = cleanNumber(rule.colorExcessRate);
+              if (rule.combinedExcessRate !== '')
+                mergedItem.combinedExcessRate = cleanNumber(rule.combinedExcessRate);
+
+              if (rule.bwSlabRanges?.length) {
+                mergedItem.bwSlabRanges = rule.bwSlabRanges.map((r) => ({
+                  from: Number(r.from),
+                  to: Number(r.to),
+                  rate: Number(r.rate),
+                }));
+              }
+              if (rule.colorSlabRanges?.length) {
+                mergedItem.colorSlabRanges = rule.colorSlabRanges.map((r) => ({
+                  from: Number(r.from),
+                  to: Number(r.to),
+                  rate: Number(r.rate),
+                }));
+              }
+              if (rule.comboSlabRanges?.length) {
+                mergedItem.comboSlabRanges = rule.comboSlabRanges.map((r) => ({
+                  from: Number(r.from),
+                  to: Number(r.to),
+                  rate: Number(r.rate),
+                }));
+              }
+            });
+
+            return mergedItem;
+          }),
 
           pricingItems: undefined,
         };
-
-        if (form.leaseType === 'FSM') {
-          const isFixed = form.rentType.startsWith('FIXED');
-          cleanPayload = {
-            ...cleanPayload,
-            rentType: form.rentType as
-              | 'FIXED_LIMIT'
-              | 'FIXED_COMBO'
-              | 'FIXED_FLAT'
-              | 'CPC'
-              | 'CPC_COMBO',
-            pricingItems: form.pricingItems.map((item) => {
-              const isCombinedItem = item.description.startsWith('Combined');
-              const isBwItem = item.description.startsWith('Black & White');
-              const isColorItem = item.description.startsWith('Color');
-
-              return {
-                description: item.description,
-                bwIncludedLimit:
-                  isBwItem && isFixed ? cleanNumber(item.bwIncludedLimit) : undefined,
-                colorIncludedLimit:
-                  isColorItem && isFixed ? cleanNumber(item.colorIncludedLimit) : undefined,
-                combinedIncludedLimit:
-                  isCombinedItem && isFixed ? cleanNumber(item.combinedIncludedLimit) : undefined,
-
-                bwExcessRate: isBwItem ? cleanNumber(item.bwExcessRate) : undefined,
-                colorExcessRate: isColorItem ? cleanNumber(item.colorExcessRate) : undefined,
-                combinedExcessRate: isCombinedItem
-                  ? cleanNumber(item.combinedExcessRate)
-                  : undefined,
-                bwSlabRanges:
-                  isBwItem && !isFixed
-                    ? item.bwSlabRanges?.map((r) => ({
-                        from: Number(r.from),
-                        to: Number(r.to),
-                        rate: Number(r.rate),
-                      }))
-                    : undefined,
-                colorSlabRanges:
-                  isColorItem && !isFixed
-                    ? item.colorSlabRanges?.map((r) => ({
-                        from: Number(r.from),
-                        to: Number(r.to),
-                        rate: Number(r.rate),
-                      }))
-                    : undefined,
-                comboSlabRanges:
-                  isCombinedItem && !isFixed
-                    ? item.comboSlabRanges?.map((r) => ({
-                        from: Number(r.from),
-                        to: Number(r.to),
-                        rate: Number(r.rate),
-                      }))
-                    : undefined,
-              };
-            }),
-          };
-        }
       } else {
         const isFixed = form.rentType.startsWith('FIXED');
 
         cleanPayload = {
           customerId: form.customerId,
           saleType: 'RENT',
-          // Include selected products as items in invoice
-          items: selectedProducts.map((p) => ({
-            description: `${p.name} - ${p.serial_no}`,
-            quantity: p.quantity || 1,
-            unitPrice: 0,
-            itemType: 'PRODUCT' as const,
-            productId: p.id?.startsWith('restored_') ? undefined : p.id, // CRITICAL: Only send real UUIDs
-          })),
           rentType: form.rentType as
             | 'FIXED_LIMIT'
             | 'FIXED_COMBO'
@@ -285,49 +291,59 @@ export default function RentFormModal({
           monthlyRent: isFixed ? cleanNumber(form.monthlyRent) : undefined,
           advanceAmount: isFixed ? cleanNumber(form.advanceAmount) : undefined,
           discountPercent: cleanNumber(form.discountPercent),
-          pricingItems: form.pricingItems.map((item) => {
-            const isCombinedItem = item.description.startsWith('Combined');
-            const isBwItem = item.description.startsWith('Black & White');
-            const isColorItem = item.description.startsWith('Color');
+          items: selectedProducts.map((p) => {
+            const baseDesc = `${p.name}${p.model?.model_name ? ` - ${p.model.model_name}` : ''}`;
+            const myRules = form.pricingItems.filter((i) => i.description.includes(baseDesc));
 
-            return {
-              description: item.description,
-
-              bwIncludedLimit: isBwItem && isFixed ? cleanNumber(item.bwIncludedLimit) : undefined,
-              colorIncludedLimit:
-                isColorItem && isFixed ? cleanNumber(item.colorIncludedLimit) : undefined,
-              combinedIncludedLimit:
-                isCombinedItem && isFixed ? cleanNumber(item.combinedIncludedLimit) : undefined,
-
-              bwExcessRate: isBwItem ? cleanNumber(item.bwExcessRate) : undefined,
-              colorExcessRate: isColorItem ? cleanNumber(item.colorExcessRate) : undefined,
-              combinedExcessRate: isCombinedItem ? cleanNumber(item.combinedExcessRate) : undefined,
-              bwSlabRanges:
-                isBwItem && !isFixed
-                  ? item.bwSlabRanges?.map((r) => ({
-                      from: Number(r.from),
-                      to: Number(r.to),
-                      rate: Number(r.rate),
-                    }))
-                  : undefined,
-              colorSlabRanges:
-                isColorItem && !isFixed
-                  ? item.colorSlabRanges?.map((r) => ({
-                      from: Number(r.from),
-                      to: Number(r.to),
-                      rate: Number(r.rate),
-                    }))
-                  : undefined,
-              comboSlabRanges:
-                isCombinedItem && !isFixed
-                  ? item.comboSlabRanges?.map((r) => ({
-                      from: Number(r.from),
-                      to: Number(r.to),
-                      rate: Number(r.rate),
-                    }))
-                  : undefined,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const mergedItem: any = {
+              description: baseDesc,
+              quantity: p.quantity || 1,
+              unitPrice: 0,
+              itemType: 'PRODUCT' as const,
+              productId: p.id?.startsWith('restored_') ? undefined : p.id,
             };
+
+            myRules.forEach((rule) => {
+              if (rule.bwIncludedLimit !== '')
+                mergedItem.bwIncludedLimit = cleanNumber(rule.bwIncludedLimit);
+              if (rule.colorIncludedLimit !== '')
+                mergedItem.colorIncludedLimit = cleanNumber(rule.colorIncludedLimit);
+              if (rule.combinedIncludedLimit !== '')
+                mergedItem.combinedIncludedLimit = cleanNumber(rule.combinedIncludedLimit);
+              if (rule.bwExcessRate !== '')
+                mergedItem.bwExcessRate = cleanNumber(rule.bwExcessRate);
+              if (rule.colorExcessRate !== '')
+                mergedItem.colorExcessRate = cleanNumber(rule.colorExcessRate);
+              if (rule.combinedExcessRate !== '')
+                mergedItem.combinedExcessRate = cleanNumber(rule.combinedExcessRate);
+
+              if (rule.bwSlabRanges?.length) {
+                mergedItem.bwSlabRanges = rule.bwSlabRanges.map((r) => ({
+                  from: Number(r.from),
+                  to: Number(r.to),
+                  rate: Number(r.rate),
+                }));
+              }
+              if (rule.colorSlabRanges?.length) {
+                mergedItem.colorSlabRanges = rule.colorSlabRanges.map((r) => ({
+                  from: Number(r.from),
+                  to: Number(r.to),
+                  rate: Number(r.rate),
+                }));
+              }
+              if (rule.comboSlabRanges?.length) {
+                mergedItem.comboSlabRanges = rule.comboSlabRanges.map((r) => ({
+                  from: Number(r.from),
+                  to: Number(r.to),
+                  rate: Number(r.rate),
+                }));
+              }
+            });
+
+            return mergedItem;
           }),
+          pricingItems: undefined,
         };
       }
 
@@ -386,7 +402,6 @@ export default function RentFormModal({
           print_colour: capability,
           quantity: qty,
           brand: 'Existing',
-          model: '',
           status: 'AVAILABLE',
           category: 'COPIER',
           procurement_price: 0,
@@ -401,6 +416,7 @@ export default function RentFormModal({
           MFD: new Date().toISOString(),
           rent_price_monthly: 0,
           rent_price_yearly: 0,
+          model: { model_name: 'Generic Model' },
           image: '',
           features: [],
           total_stock: 0,
@@ -414,9 +430,16 @@ export default function RentFormModal({
         let name = item.description;
         let serial = 'Unknown';
 
+        // NOTE: Serial number removal change:
+        // Previously we expected "Name - Serial"
+        // Now we just have "Name". If there's no dash, it's just the name.
         if (lastDashIndex !== -1) {
           name = item.description.substring(0, lastDashIndex).trim();
           serial = item.description.substring(lastDashIndex + 3).trim();
+        } else {
+          name = item.description;
+          // In case of restored items without SN in desc, we might lack the specific serial
+          // but reconstruction is primarily for UI display/pricing rule binding.
         }
 
         // Infer Capability
@@ -495,7 +518,7 @@ export default function RentFormModal({
       const isBlackWhite = p.print_colour === 'BLACK_WHITE';
       const isColorOnly = p.print_colour === 'COLOUR';
       const isBoth = p.print_colour === 'BOTH';
-      const baseDesc = `${p.name} (${p.serial_no})`;
+      const baseDesc = `${p.name}${p.model?.model_name ? ` - ${p.model.model_name}` : ''}`;
 
       const createItem = (prefix: string, type: 'BW' | 'COLOR' | 'COMBO') => {
         const desc = `${prefix} - ${baseDesc}`;
@@ -667,22 +690,27 @@ export default function RentFormModal({
               </div>
               <div className="space-y-2">
                 <label className="text-[11px] font-bold text-muted-foreground uppercase">
-                  {form.saleType === 'LEASE' ? 'Tenure (Months)' : 'Billing Period'}
+                  Tenure (Months)
                 </label>
-                {form.saleType === 'LEASE' ? (
-                  <Input
-                    type="number"
-                    value={form.leaseTenureMonths}
-                    onChange={(e) =>
-                      setForm({
-                        ...form,
-                        leaseTenureMonths: handleNumberInput(e.target.value),
-                      })
-                    }
-                    placeholder="e.g 12, 24, 36"
-                    className="font-bold"
-                  />
-                ) : (
+                <Input
+                  type="number"
+                  value={form.leaseTenureMonths}
+                  onChange={(e) =>
+                    setForm({
+                      ...form,
+                      leaseTenureMonths: handleNumberInput(e.target.value),
+                    })
+                  }
+                  placeholder="e.g 12, 24, 36"
+                  className="font-bold"
+                />
+              </div>
+
+              {form.saleType === 'RENT' && (
+                <div className="space-y-2">
+                  <label className="text-[11px] font-bold text-muted-foreground uppercase">
+                    Billing Period
+                  </label>
                   <select
                     className="w-full h-10 rounded-lg border border-border bg-card px-3 text-sm font-semibold text-slate-700 focus:ring-2 focus:ring-blue-100 outline-none"
                     value={form.rentPeriod}
@@ -694,8 +722,8 @@ export default function RentFormModal({
                     <option value="YEARLY">Yearly</option>
                     <option value="CUSTOM">Custom</option>
                   </select>
-                )}
-              </div>
+                </div>
+              )}
               {form.rentPeriod === 'CUSTOM' && form.saleType === 'RENT' && (
                 <div className="space-y-2">
                   <label className="text-[11px] font-bold text-muted-foreground uppercase">
@@ -720,24 +748,43 @@ export default function RentFormModal({
                 <label className="text-[11px] font-bold text-muted-foreground uppercase">
                   Effective From
                 </label>
-                <Input
-                  type="date"
-                  value={form.effectiveFrom}
-                  onChange={(e) => setForm({ ...form, effectiveFrom: e.target.value })}
-                  className="font-semibold"
-                />
+                <div className="relative">
+                  <Input
+                    readOnly
+                    value={
+                      form.effectiveFrom ? format(new Date(form.effectiveFrom), 'dd/MM/yyyy') : ''
+                    }
+                    placeholder="DD/MM/YYYY"
+                    className="font-semibold"
+                  />
+                  <Calendar className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                  <input
+                    type="date"
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                    value={form.effectiveFrom}
+                    onChange={(e) => setForm({ ...form, effectiveFrom: e.target.value })}
+                  />
+                </div>
               </div>
               <div className="space-y-2">
                 <label className="text-[11px] font-bold text-muted-foreground uppercase">
                   Effective To
                 </label>
-                <Input
-                  type="date"
-                  value={form.effectiveTo}
-                  onChange={(e) => setForm({ ...form, effectiveTo: e.target.value })}
-                  className="font-semibold"
-                  placeholder="Optional"
-                />
+                <div className="relative">
+                  <Input
+                    readOnly
+                    value={form.effectiveTo ? format(new Date(form.effectiveTo), 'dd/MM/yyyy') : ''}
+                    placeholder="DD/MM/YYYY (Optional)"
+                    className="font-semibold"
+                  />
+                  <Calendar className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                  <input
+                    type="date"
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                    value={form.effectiveTo}
+                    onChange={(e) => setForm({ ...form, effectiveTo: e.target.value })}
+                  />
+                </div>
               </div>
             </div>
           </section>
@@ -771,7 +818,8 @@ export default function RentFormModal({
                             {product.name}
                           </div>
                           <div className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide truncate">
-                            {product.brand} • {product.serial_no}
+                            {product.brand} • {product.model?.model_name || 'Generic Model'} •{' '}
+                            {product.serial_no}
                           </div>
                         </div>
                       </div>
@@ -858,10 +906,16 @@ export default function RentFormModal({
                       onChange={(e) => handleRentTypeChange(e.target.value)}
                     >
                       <option value="FIXED_LIMIT">Fixed Rent + Individual Limit</option>
-                      <option value="FIXED_COMBO">Fixed Rent + Combined Limit</option>
+                      {selectedProducts.length > 0 &&
+                        selectedProducts.every((p) => p.print_colour === 'BOTH') && (
+                          <option value="FIXED_COMBO">Fixed Rent + Combined Limit</option>
+                        )}
                       <option value="FIXED_FLAT">Fixed Flat Rent (No Limits)</option>
                       <option value="CPC">CPC (Individual)</option>
-                      <option value="CPC_COMBO">CPC (Combined)</option>
+                      {selectedProducts.length > 0 &&
+                        selectedProducts.every((p) => p.print_colour === 'BOTH') && (
+                          <option value="CPC_COMBO">CPC (Combined)</option>
+                        )}
                     </select>
                   )}
                 </div>

@@ -33,6 +33,21 @@ interface InvoiceDetailsDialogProps {
   onApproveNext?: () => Promise<void> | void;
 }
 
+const getCleanProductName = (name: string) => {
+  // Remove "Black & White - " or "Color - " prefixes
+  let clean = name.replace(/^(Black & White - |Color - |Combined - )/i, '');
+  // Remove serial number patterns like (SN-...) or - SN-... or (Serial...)
+  clean = clean.replace(/(\s*-\s*SN-[^,]+|\s*\(SN-[^)]+\)|\s*\(Serial[^)]+\))/gi, '');
+
+  // Also remove everything after the last dash if it looks like a serial number (legacy format)
+  const lastDashIndex = clean.lastIndexOf(' - ');
+  if (lastDashIndex !== -1 && clean.length - lastDashIndex < 25) {
+    // Heuristic: if there's a dash and the suffix is short, it's likely a serial number
+    clean = clean.substring(0, lastDashIndex).trim();
+  }
+  return clean.trim();
+};
+
 export function InvoiceDetailsDialog({
   invoice,
   onClose,
@@ -790,8 +805,42 @@ export function InvoiceDetailsDialog({
                     )
                     .map((item, idx) => (
                       <TableRow key={item.id || idx} className="border-gray-50">
-                        <TableCell className="font-bold text-gray-700 py-3 text-sm">
-                          {item.description}
+                        <TableCell className="py-3">
+                          <div className="space-y-1">
+                            <p className="font-bold text-gray-700 text-sm">
+                              {getCleanProductName(item.description)}
+                            </p>
+                            {(item.productId ||
+                              item.initialBwCount !== undefined ||
+                              item.initialColorCount !== undefined) && (
+                              <div className="flex flex-wrap gap-2 mt-1">
+                                {item.productId && (
+                                  <Badge
+                                    variant="outline"
+                                    className="text-[9px] font-bold bg-green-50 text-green-700 border-green-100 px-1.5 py-0"
+                                  >
+                                    SN: {item.productId}
+                                  </Badge>
+                                )}
+                                {item.initialBwCount !== undefined && (
+                                  <Badge
+                                    variant="outline"
+                                    className="text-[9px] font-bold bg-blue-50 text-blue-700 border-blue-100 px-1.5 py-0"
+                                  >
+                                    B&W: {item.initialBwCount}
+                                  </Badge>
+                                )}
+                                {item.initialColorCount !== undefined && (
+                                  <Badge
+                                    variant="outline"
+                                    className="text-[9px] font-bold bg-purple-50 text-purple-700 border-purple-100 px-1.5 py-0"
+                                  >
+                                    CLR: {item.initialColorCount}
+                                  </Badge>
+                                )}
+                              </div>
+                            )}
+                          </div>
                         </TableCell>
                         <TableCell className="text-center font-bold text-muted-foreground text-sm">
                           {item.quantity}

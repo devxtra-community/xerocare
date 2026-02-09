@@ -343,7 +343,7 @@ export default function EmployeeRentTable({ mode = 'EMPLOYEE' }: EmployeeRentTab
                     // FINANCE Mode Approve
                     try {
                       const { financeApproveInvoice } = await import('@/lib/invoice');
-                      await financeApproveInvoice(selectedInvoice.id);
+                      await financeApproveInvoice(selectedInvoice.id, {});
                       toast.success('Rent Agreement Approved');
                       setDetailsOpen(false);
                       fetchInvoices();
