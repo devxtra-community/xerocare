@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Search, Loader2, Eye, FileText, Plus } from 'lucide-react';
+import { Search, Loader2, Eye, FileText, Plus, Clock } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   Table,
@@ -20,11 +20,9 @@ import {
   employeeApproveInvoice,
 } from '@/lib/invoice';
 import RentFormModal from './RentFormModal';
-import RentHistoryView from './RentHistoryView';
 import UsageRecordingModal from '../Finance/UsageRecordingModal';
 
 import { Badge } from '@/components/ui/badge';
-import { Clock } from 'lucide-react';
 
 import { InvoiceDetailsDialog } from '@/components/invoice/InvoiceDetailsDialog';
 import { ApproveQuotationDialog } from '@/components/invoice/ApproveQuotationDialog';
@@ -50,7 +48,6 @@ export default function EmployeeLeaseTable({ mode = 'EMPLOYEE' }: EmployeeLeaseT
   const [approveOpen, setApproveOpen] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [editInvoice, setEditInvoice] = useState<Invoice | undefined>(undefined);
-  const [historyOpen, setHistoryOpen] = useState(false);
   const [isUsageModalOpen, setIsUsageModalOpen] = useState(false);
   const [editingUsage] = useState<Invoice | null>(null);
   const [search, setSearch] = useState('');
@@ -140,6 +137,21 @@ export default function EmployeeLeaseTable({ mode = 'EMPLOYEE' }: EmployeeLeaseT
     );
   });
 
+  const getCleanProductName = (name: string) => {
+    // Remove "Black & White - " or "Color - " prefixes
+    let clean = name.replace(/^(Black & White - |Color - |Combined - )/i, '');
+    // Remove serial number patterns like (SN-...) or - SN-... or (Serial...)
+    clean = clean.replace(/(\s*-\s*SN-[^,]+|\s*\(SN-[^)]+\)|\s*\(Serial[^)]+\))/gi, '');
+
+    // Also remove everything after the last dash if it looks like a serial number (legacy format)
+    const lastDashIndex = clean.lastIndexOf(' - ');
+    if (lastDashIndex !== -1 && clean.length - lastDashIndex < 25) {
+      // Heuristic: if there's a dash and the suffix is short, it's likely a serial number
+      clean = clean.substring(0, lastDashIndex).trim();
+    }
+    return clean.trim();
+  };
+
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center h-64 space-y-4">
@@ -224,7 +236,9 @@ export default function EmployeeLeaseTable({ mode = 'EMPLOYEE' }: EmployeeLeaseT
                     </TableCell>
                     <TableCell className="max-w-[250px]">
                       <div className="text-xs font-medium text-slate-700 truncate">
-                        {inv.items?.map((item) => item.description).join(', ') || 'No items'}
+                        {inv.items
+                          ?.map((item) => getCleanProductName(item.description))
+                          .join(', ') || 'No items'}
                       </div>
                     </TableCell>
                     <TableCell className="whitespace-nowrap">
@@ -371,15 +385,6 @@ export default function EmployeeLeaseTable({ mode = 'EMPLOYEE' }: EmployeeLeaseT
             setApproveOpen(false);
             fetchInvoices();
           }}
-        />
-      )}
-
-      {/* History View Dialog */}
-      {historyOpen && selectedInvoice && (
-        <RentHistoryView
-          contractId={selectedInvoice.id}
-          isOpen={historyOpen}
-          onClose={() => setHistoryOpen(false)}
         />
       )}
 
