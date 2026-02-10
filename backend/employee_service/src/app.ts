@@ -6,6 +6,8 @@ import adminRouter from './routes/adminRouter';
 import employeeRouter from './routes/employeeRouter';
 import authRouter from './routes/authRouter';
 import leaveApplicationRouter from './routes/leaveApplicationRouter';
+import payrollRouter from './routes/payrollRouter';
+import notificationRouter from './routes/notificationRouter';
 import cookieParser from 'cookie-parser';
 import { getRabbitChannel } from './config/rabbitmq';
 import { startWorker } from './workers/emailWorker';
@@ -46,6 +48,8 @@ app.use('/auth', authRouter);
 app.use('/employee', employeeRouter);
 app.use('/admin', adminRouter);
 app.use('/leave-applications', leaveApplicationRouter);
+app.use('/payroll', payrollRouter);
+app.use('/notifications', notificationRouter);
 
 app.use(errorHandler);
 
