@@ -72,11 +72,6 @@ const menuItems = [
     href: '/manager/employees',
   },
   {
-    title: 'Orders',
-    icon: Package,
-    href: '/manager/orders',
-  },
-  {
     title: 'Purchases',
     icon: ShoppingCart, // Reusing ShoppingCart or a different icon if preferred, but user asked for sidebar update.
     href: '/manager/purchases',
@@ -91,6 +86,11 @@ const menuItems = [
     title: 'Inventory',
     icon: Boxes,
     href: '/manager/inventory',
+  },
+  {
+    title: 'Lots',
+    icon: Package, // Using Package icon for Lots/Orders
+    href: '/manager/lots',
   },
 ];
 

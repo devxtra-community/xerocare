@@ -59,6 +59,9 @@ const empProxyOptions: Options = {
 const invProxyOptions: Options = {
   target: VENDOR_INVENTORY_SERVICE_URL,
   changeOrigin: true,
+  pathRewrite: {
+    '^/i': '', // Strip /i prefix
+  },
 };
 
 const billProxyOptions: Options = {

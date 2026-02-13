@@ -65,3 +65,13 @@ export const deleteModel = async (req: Request, res: Response) => {
     throw new AppError('Failed to delete model', 500);
   }
 };
+
+export const syncQuantities = async (req: Request, res: Response) => {
+  try {
+    await service.syncQuantities();
+    res.status(200).json({ message: 'Model quantities synced successfully', success: true });
+  } catch (error) {
+    logger.error('Error syncing quantities:', error);
+    throw new AppError('Failed to sync quantities', 500);
+  }
+};

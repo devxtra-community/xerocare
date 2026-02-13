@@ -52,3 +52,7 @@ export const updateModel = async (id: string, data: UpdateModelData): Promise<vo
 export const deleteModel = async (id: string): Promise<void> => {
   await api.delete<ApiResponse<void>>(`/i/models/${id}`);
 };
+
+export const syncQuantities = async (): Promise<void> => {
+  await api.post<ApiResponse<void>>('/i/models/sync-quantities', {});
+};

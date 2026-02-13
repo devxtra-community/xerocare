@@ -12,6 +12,8 @@ import { SparePart } from '../entities/sparePartEntity';
 
 import { VendorRequest } from '../entities/vendorRequestEntity';
 import { Brand } from '../entities/brandEntity';
+import { Lot } from '../entities/lotEntity';
+import { LotItem } from '../entities/lotItemEntity';
 
 export const Source = new DataSource({
   type: 'postgres',
@@ -30,5 +32,7 @@ export const Source = new DataSource({
     SparePart,
     VendorRequest,
     Brand,
+    Lot,
+    LotItem,
   ],
 });

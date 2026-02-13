@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Search, Plus, X, Trash2 } from 'lucide-react';
+import { Search, Plus, X } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -21,6 +21,7 @@ import {
   deleteModel,
   CreateModelData,
   UpdateModelData,
+  syncQuantities,
 } from '@/lib/model';
 import { getBrands, Brand } from '@/lib/brand';
 import { toast } from 'sonner';
@@ -31,6 +32,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 export default function ManagerModel() {
   const [models, setModels] = useState<Model[]>([]);
@@ -38,6 +49,7 @@ export default function ManagerModel() {
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Model | null>(null);
   const [deleting, setDeleting] = useState<Model | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const loadModels = async () => {
     try {
@@ -83,11 +95,24 @@ export default function ManagerModel() {
       await deleteModel(deleting.id);
       toast.success('Model deleted successfully');
       await loadModels();
-    } catch (e) {
-      console.error(e);
-      toast.error('Failed to delete model');
+      setDeleting(null);
+    } catch (e: unknown) {
+      // Check for 409 status code in error response
+      const error = e as { response?: { status?: number; data?: { statusCode?: number } } };
+      if (
+        error.response &&
+        (error.response.status === 409 || error.response.data?.statusCode === 409)
+      ) {
+        setDeleting(null); // Close confirmation dialog
+        // Show error dialog
+        setDeleteError(
+          'This model cannot be deleted because it is associated with existing products. Please delete or reassign the products first.',
+        );
+      } else {
+        toast.error('Failed to delete model');
+        setDeleting(null);
+      }
     }
-    setDeleting(null);
   };
 
   return (
@@ -111,6 +136,21 @@ export default function ManagerModel() {
         </div>
 
         <div className="flex gap-2">
+          <Button
+            className="bg-green-600 text-white gap-2 hover:bg-green-700"
+            onClick={async () => {
+              try {
+                await syncQuantities();
+                toast.success('Quantities synced successfully');
+                loadModels();
+              } catch (e) {
+                console.error(e);
+                toast.error('Failed to sync quantities');
+              }
+            }}
+          >
+            Sync Quantities
+          </Button>
           <Button
             className="bg-primary text-white gap-2"
             onClick={() => {
@@ -186,12 +226,45 @@ export default function ManagerModel() {
       )}
 
       {deleting && (
-        <ConfirmDeleteModal
-          name={deleting.model_name}
-          onCancel={() => setDeleting(null)}
-          onConfirm={confirmDelete}
-        />
+        <AlertDialog open={!!deleting} onOpenChange={(open) => !open && setDeleting(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This action cannot be undone. This will permanently delete the model
+                <span className="font-semibold text-foreground"> {deleting.model_name} </span>
+                and remove it from our servers.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-red-600 hover:bg-red-700"
+                onClick={(e) => {
+                  e.preventDefault();
+                  confirmDelete();
+                }}
+              >
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       )}
+
+      <AlertDialog open={!!deleteError} onOpenChange={(open) => !open && setDeleteError(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-red-600">Cannot Delete Model</AlertDialogTitle>
+            <AlertDialogDescription className="text-foreground">
+              {deleteError}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={() => setDeleteError(null)}>Okay</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
@@ -320,35 +393,6 @@ function Modal({
           </button>
         </div>
         <div className="space-y-4">{children}</div>
-      </div>
-    </div>
-  );
-}
-
-function ConfirmDeleteModal({
-  name,
-  onCancel,
-  onConfirm,
-}: {
-  name: string;
-  onCancel: () => void;
-  onConfirm: () => void;
-}) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="bg-card rounded-2xl p-6 text-center">
-        <Trash2 className="mx-auto text-red-600 mb-2" />
-        <p>
-          Delete <b>{name}</b>?
-        </p>
-        <div className="flex justify-center gap-4 mt-4">
-          <Button variant="outline" onClick={onCancel}>
-            Cancel
-          </Button>
-          <Button className="bg-red-600 text-white" onClick={onConfirm}>
-            Delete
-          </Button>
-        </div>
       </div>
     </div>
   );

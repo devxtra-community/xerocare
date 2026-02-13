@@ -1,6 +1,8 @@
 import { SparePartRepository } from '../repositories/sparePartRepository';
 import { ModelRepository } from '../repositories/modelRepository';
 import { SparePart } from '../entities/sparePartEntity';
+import { LotService } from './lotService';
+import { LotItemType } from '../entities/lotItemEntity';
 
 interface BulkUploadRow {
   item_code: string;
@@ -9,11 +11,13 @@ interface BulkUploadRow {
   model_id?: string; // Optional if universal
   base_price: number;
   quantity?: number;
+  lot_id?: string;
 }
 
 export class SparePartService {
   private repo = new SparePartRepository();
   private modelRepo = new ModelRepository();
+  private lotService = new LotService();
 
   async bulkUpload(rows: BulkUploadRow[], branchId: string) {
     // Partial Success Strategy: Each row is isolated.
@@ -50,6 +54,16 @@ export class SparePartService {
     // Always create a new entry for every upload.
     const quantity = data.quantity || 0;
 
+    // Check Lot Usage if lot_id provided
+    if (data.lot_id) {
+      await this.lotService.validateAndTrackUsage(
+        data.lot_id,
+        LotItemType.SPARE_PART,
+        itemCode, // Passing itemCode for validation
+        quantity,
+      );
+    }
+
     await this.repo.createMaster({
       item_code: itemCode,
       part_name: data.part_name,
@@ -58,6 +72,7 @@ export class SparePartService {
       base_price: data.base_price,
       branch_id: branchId,
       quantity: quantity,
+      lot_id: data.lot_id,
     });
 
     return { success: true, message: 'Spare part and stock processed' };
