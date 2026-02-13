@@ -1,12 +1,13 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import EmployeeLeaseTable from '@/components/employeeComponents/EmployeeLeaseTable';
 import EmployeeLeaseStats from '@/components/employeeComponents/EmployeeLeaseStats';
 import EmployeeLeaseGraphs from '@/components/employeeComponents/EmployeeLeaseGraphs';
 import { getBranchInvoices, Invoice } from '@/lib/invoice';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import MonthlyCollectionTable from '@/components/Finance/MonthlyCollectionTable';
+import EmployeeLeaseTable from '@/components/employeeComponents/EmployeeLeaseTable';
+import CompletedCollectionsTable from '@/components/Finance/CompletedCollectionsTable';
 
 export default function LeasePage() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
@@ -34,14 +35,17 @@ export default function LeasePage() {
         <EmployeeLeaseStats invoices={invoices} />
         <EmployeeLeaseGraphs invoices={invoices} />
 
-        <Tabs defaultValue="operations" className="w-full space-y-4">
+        <Tabs defaultValue="pending" className="w-full space-y-4">
           <TabsList className="bg-card border text-slate-600">
-            <TabsTrigger value="operations">Operations</TabsTrigger>
+            <TabsTrigger value="pending">Pending Approvals</TabsTrigger>
             <TabsTrigger value="collection">Monthly Collection</TabsTrigger>
+            <TabsTrigger value="completed">Completed Collections</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="operations" className="space-y-4">
-            <h3 className="text-xl font-bold text-slate-800 tracking-tight">All Leases</h3>
+          <TabsContent value="pending" className="space-y-4">
+            <h3 className="text-xl font-bold text-slate-800 tracking-tight">
+              Pending Finance Approval
+            </h3>
             <div className="bg-card rounded-xl shadow-sm border border-slate-100 p-1">
               <EmployeeLeaseTable mode="FINANCE" />
             </div>
@@ -53,6 +57,15 @@ export default function LeasePage() {
             </h3>
             <div className="bg-card rounded-xl shadow-sm border border-slate-100 p-1">
               <MonthlyCollectionTable mode="LEASE" />
+            </div>
+          </TabsContent>
+
+          <TabsContent value="completed" className="space-y-4">
+            <h3 className="text-xl font-bold text-slate-800 tracking-tight">
+              Completed Collections
+            </h3>
+            <div className="bg-card rounded-xl shadow-sm border border-slate-100 p-1">
+              <CompletedCollectionsTable mode="LEASE" />
             </div>
           </TabsContent>
         </Tabs>

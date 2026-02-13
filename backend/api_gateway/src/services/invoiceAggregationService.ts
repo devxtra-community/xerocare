@@ -996,4 +996,128 @@ export class InvoiceAggregationService {
       throw new AppError('Internal Gateway Error during global sales totals fetch', 500);
     }
   }
+
+  async getInvoiceHistory(
+    user: { role: string; branchId?: string },
+    token: string,
+    saleType?: string,
+  ) {
+    try {
+      if (!user.branchId) {
+        throw new AppError('Branch ID not found in user context', 400);
+      }
+
+      const url = `${BILLING_SERVICE_URL}/invoices/history${saleType ? `?saleType=${saleType}` : ''}`;
+      const response = await axios.get(url, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      const invoices = response.data.data;
+
+      // Aggregate Customer Names
+      const enrichedInvoices = await Promise.all(
+        invoices.map(async (invoice: Invoice) => {
+          const customerDetails = await fetchCustomerDetails(
+            invoice.customerId,
+            `${CRM_SERVICE_URL}/customers/${invoice.customerId}`,
+            token,
+          );
+          return {
+            ...invoice,
+            customerName: customerDetails.name,
+            customerPhone: customerDetails.phone,
+            customerEmail: customerDetails.email,
+          };
+        }),
+      );
+
+      return enrichedInvoices;
+    } catch (error: unknown) {
+      if (axios.isAxiosError(error)) {
+        logger.error('Axios error in get invoice history', {
+          message: error.message,
+          responseStatus: error.response?.status,
+        });
+        throw new AppError(
+          error.response?.data?.message || 'Failed to fetch invoice history',
+          error.response?.status || 500,
+        );
+      }
+      throw new AppError('Internal Gateway Error during invoice history fetch', 500);
+    }
+  }
+
+  async getCompletedCollections(user: { role: string; branchId?: string }, token: string) {
+    try {
+      if (!user.branchId) {
+        throw new AppError('Branch ID not found in user context', 400);
+      }
+
+      const response = await axios.get(`${BILLING_SERVICE_URL}/invoices/completed-collections`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      const collections = response.data.data;
+
+      const enrichedCollections = await Promise.all(
+        collections.map(async (collection: { customerId: string } & Record<string, unknown>) => {
+          const customerDetails = await fetchCustomerDetails(
+            collection.customerId,
+            `${CRM_SERVICE_URL}/customers/${collection.customerId}`,
+            token,
+          );
+          return {
+            ...collection,
+            customerName: customerDetails.name,
+            customerPhone: customerDetails.phone,
+          };
+        }),
+      );
+
+      return enrichedCollections;
+    } catch (error: unknown) {
+      if (axios.isAxiosError(error)) {
+        logger.error('Axios error in get completed collections', {
+          message: error.message,
+          responseStatus: error.response?.status,
+        });
+        throw new AppError(
+          error.response?.data?.message || 'Failed to fetch completed collections',
+          error.response?.status || 500,
+        );
+      }
+      throw new AppError('Internal Gateway Error during completed collections fetch', 500);
+    }
+  }
+
+  async downloadInvoice(contractId: string, token: string) {
+    try {
+      const response = await axios.get(
+        `${BILLING_SERVICE_URL}/invoices/completed-collections/${contractId}/download`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+          responseType: 'stream',
+        },
+      );
+      return response.data;
+    } catch {
+      // Handle error properly, maybe log it
+      throw new AppError('Failed to download invoice', 500);
+    }
+  }
+
+  async sendInvoice(contractId: string, token: string) {
+    try {
+      const response = await axios.post(
+        `${BILLING_SERVICE_URL}/invoices/completed-collections/${contractId}/send`,
+        {},
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
+      return response.data;
+    } catch {
+      throw new AppError('Failed to send invoice', 500);
+    }
+  }
 }

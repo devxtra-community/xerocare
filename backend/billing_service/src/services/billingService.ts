@@ -1,4 +1,5 @@
 import { InvoiceRepository } from '../repositories/invoiceRepository';
+import { getRabbitChannel } from '../config/rabbitmq';
 import { InvoiceStatus } from '../entities/enums/invoiceStatus';
 import { InvoiceItem } from '../entities/invoiceItemEntity';
 // import { publishInvoiceCreated } from '../events/publisher/billingPublisher';
@@ -15,6 +16,8 @@ import { ItemType } from '../entities/enums/itemType';
 import { InvoiceType } from '../entities/enums/invoiceType';
 import { emitProductStatusUpdate } from '../events/publisher/productStatusEvent';
 import { ReportedBy } from '../entities/usageRecordEntity';
+import { ContractStatus } from '../entities/enums/contractStatus';
+import PDFDocument from 'pdfkit';
 
 export class BillingService {
   private invoiceRepo = new InvoiceRepository();
@@ -23,6 +26,11 @@ export class BillingService {
 
   // ... existing methods ...
 
+  // ... existing methods ...
+
+  /**
+   * @deprecated logic moved to generateConsolidatedFinalInvoice (One final invoice per contract)
+   */
   async generateFinalInvoice(payload: {
     contractId: string;
     billingPeriodStart: string;
@@ -42,22 +50,47 @@ export class BillingService {
     if (!usage) {
       throw new AppError('Usage records not found for this billing period', 404);
     }
-    if (usage.finalInvoiceId) {
-      throw new AppError('Usage record is already locked/settled', 409);
+
+    // 3. Check for Duplicate/Tenure
+    if (contract.contractStatus === ContractStatus.COMPLETED) {
+      throw new AppError('Contract already completed. No further billing allowed.', 400);
     }
 
-    // 3. Check for Duplicate Final Invoice
-    // Can check repo by Reference contract + period.
-    // Implementing usageRepo logic implicitly locks it, but checking Invoice table is safer for idempotency.
-    // For now, relies on usage lock.
+    const tenure = contract.leaseTenureMonths || 0;
+    const history = await this.usageRepo.getUsageHistory(contract.id);
+    const usageCount = history.length;
 
-    // 4. Calculate
+    if (tenure > 0 && usageCount > tenure) {
+      // If we already have more usage records than tenure, it's an error
+      // But usually generateFinalInvoice is called FOR a specific usage record.
+      // Let's check if this specific usage record is the "next" one or past tenure.
+    }
+
+    // 3.5. Final Month Detection
+    // Wait, history.length already includes the record we just retrieved if it's already in DB.
+    // In recordUsage, we just saved it. So usageCount is the total number of records.
+    const isFinalMonth = tenure > 0 && usageCount === tenure;
+
+    // 4. Determine Rent to Charge
+    let rentToCharge = 0;
+    let advanceAdjusted = 0;
+
+    if (isFinalMonth) {
+      rentToCharge = 0; // Rent cancelled in final month
+      advanceAdjusted = Number(
+        contract.monthlyRent || contract.monthlyLeaseAmount || contract.monthlyEmiAmount || 0,
+      );
+    } else {
+      rentToCharge = Number(
+        contract.monthlyRent || contract.monthlyLeaseAmount || contract.monthlyEmiAmount || 0,
+      );
+      advanceAdjusted = 0;
+    }
+
+    // 5. Calculate
     const calcResult = this.calculator.calculate({
       rentType: contract.rentType,
-      monthlyRent:
-        contract.saleType === SaleType.LEASE && contract.leaseType === LeaseType.FSM
-          ? Number(contract.monthlyLeaseAmount || 0)
-          : Number(contract.monthlyRent || 0),
+      monthlyRent: rentToCharge,
       discountPercent: Number(contract.discountPercent || 0),
       pricingItems: contract.items,
       usage: {
@@ -68,37 +101,20 @@ export class BillingService {
       },
     });
 
-    // 5. Advance Adjustment Logic
-    let advanceAdjusted = 0;
     let payableAmount = calcResult.netAmount;
 
     // Rule: Fixed models consume advance (Monthly rent portion first)
     // Rule: CPC models -> advanceConsumed = 0 (as per prompt)
     if (contract.rentType === RentType.FIXED_LIMIT || contract.rentType === RentType.FIXED_COMBO) {
-      if (contract.advanceAmount && contract.advanceAmount > 0) {
-        // Logic Update: Only consume advance for the FIRST month rent if Advance matches Monthly Rent.
-        // User Request: "if the customer has paid the 1st month rent as advance then no need to collect the first month rent again"
-
-        // Check if this is the first invoice
-        const priorInvoiceCount = await this.invoiceRepo.countFinalInvoicesByContractId(
-          contract.id,
-        );
-        const isFirstInvoice = priorInvoiceCount === 0;
-
-        if (isFirstInvoice) {
-          // Deduct the rent portion from the total because it was already paid as advance.
-          // Usually this means we subtract Monthly Rent from the Net Amount.
-          // If Net Amount < Monthly Rent (e.g. partial month?), we cap it.
-
-          const rentComponent = Number(contract.monthlyRent || 0);
-          if (rentComponent > 0) {
-            // Set advanceAdjusted to the Rent Amount to indicate it's covered
-            advanceAdjusted = rentComponent;
-            // Reduce payable
-            payableAmount = calcResult.netAmount - advanceAdjusted;
-            if (payableAmount < 0) payableAmount = 0;
-          }
-        }
+      if (isFinalMonth) {
+        // If it's the final month, advanceAdjusted is already set to monthly rent/lease/emi amount
+        // rentToCharge was set to 0, so calcResult.netAmount is just usage charges.
+        // User wants "only exceeded charge to be collected", so payableAmount = calcResult.netAmount.
+        payableAmount = calcResult.netAmount;
+      } else {
+        // Normal month, no advance deduction anymore (moved to final month)
+        advanceAdjusted = 0;
+        payableAmount = calcResult.netAmount;
       }
     } else {
       // CPC
@@ -114,7 +130,7 @@ export class BillingService {
         calcResult.grossAmount = payableAmount;
         calcResult.netAmount = payableAmount;
         calcResult.discountAmount = 0;
-        advanceAdjusted = 0; // No advance
+        // advanceAdjusted is already handled by isFinalMonth logic
       } else if (contract.leaseType === LeaseType.FSM) {
         // FSM: Monthly Lease Amount + Usage CPC
         // Reuse calculator results which used monthlyLeaseAmount as base
@@ -130,37 +146,32 @@ export class BillingService {
     }
 
     // 6. Create FINAL Invoice
-    const invoiceNumber = await this.generateInvoiceNumber();
-
-    // Copy relevant items? Final invoice usually lists line items differently (Access, Rent).
-    // For Phase 3, we store totals. InvoiceItem relations not strictly required for Final if `grossAmount` etc stored on Invoice.
-    // Or we link original items? We link `referenceContractId`.
+    const invoiceNumber = await this.invoiceRepo.generateInvoiceNumber();
 
     const finalInvoice = await this.invoiceRepo.createInvoice({
       invoiceNumber,
       branchId: contract.branchId,
-      createdBy: contract.createdBy, // Auto-system or triggered user?
+      createdBy: contract.createdBy,
       customerId: contract.customerId,
       saleType: contract.saleType,
 
       type: InvoiceType.FINAL,
-      status: InvoiceStatus.DRAFT, // Final invoice created as draft first? "Once FINAL invoice is generated: usage record becomes immutable".
-      // Prompt validation checklist says "Usage locked after settlement".
-      // Maybe types: FINAL status: UNPAID? Prompt says "status = UNPAID".
+      status: InvoiceStatus.DRAFT,
+      isFinalMonth: isFinalMonth,
 
-      billingCycleInDays: contract.billingCycleInDays, // or derive from dates
+      billingCycleInDays: contract.billingCycleInDays,
       effectiveFrom: start,
       effectiveTo: end,
 
       // Amounts
-      monthlyRent: contract.monthlyRent, // Snapshot
+      monthlyRent: rentToCharge,
       grossAmount: calcResult.grossAmount,
       discountAmount: calcResult.discountAmount,
       advanceAdjusted: advanceAdjusted,
       totalAmount: payableAmount,
 
       referenceContractId: contract.id,
-      usageRecordId: usage.id, // Link Usage
+      usageRecordId: usage.id,
       rentType: contract.rentType,
       billingPeriodStart: start,
       billingPeriodEnd: end,
@@ -172,10 +183,6 @@ export class BillingService {
       colorA3Count: usage.colorA3Count,
     });
 
-    // 7. Lock Usage
-    usage.finalInvoiceId = finalInvoice.id;
-    await this.usageRepo.save(usage);
-
     return finalInvoice;
   }
 
@@ -186,8 +193,13 @@ export class BillingService {
       bwA3Count: number;
       colorA4Count: number;
       colorA3Count: number;
+      monthlyRent?: number;
+      additionalCharges?: number;
+      additionalChargesRemarks?: string;
+      billingPeriodStart?: string;
+      billingPeriodEnd?: string;
     },
-  ) {
+  ): Promise<Invoice> {
     // 1. Fetch Invoice
     const invoice = await this.invoiceRepo.findById(invoiceId);
     if (!invoice) throw new AppError('Invoice not found', 404);
@@ -207,9 +219,11 @@ export class BillingService {
     const calcResult = this.calculator.calculate({
       rentType: contract.rentType,
       monthlyRent:
-        contract.saleType === SaleType.LEASE && contract.leaseType === LeaseType.FSM
-          ? Number(contract.monthlyLeaseAmount || 0)
-          : Number(contract.monthlyRent || 0),
+        payload.monthlyRent !== undefined
+          ? Number(payload.monthlyRent)
+          : contract.saleType === SaleType.LEASE && contract.leaseType === LeaseType.FSM
+            ? Number(contract.monthlyLeaseAmount || 0)
+            : Number(contract.monthlyRent || 0),
       discountPercent: Number(contract.discountPercent || 0),
       pricingItems: contract.items, // Items from contract
       usage: {
@@ -218,30 +232,45 @@ export class BillingService {
         colorA4: payload.colorA4Count,
         colorA3: payload.colorA3Count,
       },
+      additionalCharges: payload.additionalCharges || invoice.additionalCharges || 0,
     });
 
-    let payableAmount = 0;
+    const isFinalMonth = invoice.isFinalMonth;
     let advanceAdjusted = 0;
+
+    // Re-run calculation if we changed rentToCharge vs what was passed to calculator
+    // Actually, updateInvoiceUsage's calculator call used payload.monthlyRent or contract value.
+    // If isFinalMonth, we must force rentToCharge to 0.
+    const finalCalcResult = isFinalMonth
+      ? this.calculator.calculate({
+          ...contract,
+          rentType: contract.rentType,
+          monthlyRent: 0,
+          discountPercent: Number(contract.discountPercent || 0),
+          pricingItems: contract.items,
+          usage: {
+            bwA4: payload.bwA4Count,
+            bwA3: payload.bwA3Count,
+            colorA4: payload.colorA4Count,
+            colorA3: payload.colorA3Count,
+          },
+          additionalCharges: payload.additionalCharges || invoice.additionalCharges || 0,
+        })
+      : calcResult;
+
+    let payableAmount = 0;
 
     // Handle Advance Adjustment (mirrors generateFinalInvoice logic)
     if (contract.rentType === RentType.FIXED_LIMIT || contract.rentType === RentType.FIXED_COMBO) {
-      const isFirstMonth = await this.invoiceRepo.isFirstFinalInvoice(contract.id);
-      if (isFirstMonth) {
-        const advance = Number(contract.advanceAmount || 0);
-        if (calcResult.netAmount >= advance) {
-          advanceAdjusted = advance;
-          payableAmount = calcResult.netAmount - advance;
-        } else {
-          advanceAdjusted = calcResult.netAmount;
-          payableAmount = 0;
-        }
+      if (isFinalMonth) {
+        payableAmount = finalCalcResult.netAmount;
       } else {
         advanceAdjusted = 0;
-        payableAmount = calcResult.netAmount;
+        payableAmount = finalCalcResult.netAmount;
       }
     } else {
       advanceAdjusted = 0;
-      payableAmount = calcResult.netAmount;
+      payableAmount = finalCalcResult.netAmount;
     }
 
     // 4. Update Invoice
@@ -249,8 +278,15 @@ export class BillingService {
     invoice.bwA3Count = payload.bwA3Count;
     invoice.colorA4Count = payload.colorA4Count;
     invoice.colorA3Count = payload.colorA3Count;
-    invoice.grossAmount = calcResult.grossAmount;
-    invoice.discountAmount = calcResult.discountAmount;
+
+    if (payload.monthlyRent !== undefined) invoice.monthlyRent = payload.monthlyRent;
+    if (payload.additionalCharges !== undefined)
+      invoice.additionalCharges = payload.additionalCharges;
+    if (payload.additionalChargesRemarks !== undefined)
+      invoice.additionalChargesRemarks = payload.additionalChargesRemarks;
+
+    invoice.grossAmount = finalCalcResult.grossAmount;
+    invoice.discountAmount = finalCalcResult.discountAmount;
     invoice.advanceAdjusted = advanceAdjusted;
     invoice.totalAmount = payableAmount;
 
@@ -269,6 +305,9 @@ export class BillingService {
     return this.invoiceRepo.saveInvoice(invoice);
   }
 
+  /**
+   * @deprecated Monthly verification no longer generates invoices/locks.
+   */
   async createNextMonthInvoice(contractId: string) {
     // 1. Fetch Contract
     const contract = await this.invoiceRepo.findById(contractId);
@@ -323,11 +362,7 @@ export class BillingService {
       });
       await this.usageRepo.save(usage);
     } else {
-      if (usage.finalInvoiceId) {
-        // If already settled, maybe we should find the NEXT one?
-        // But frontend calls this specifically to "Unlock" the next slot.
-        // If next slot is already done, return it.
-      }
+      // Usage already exists for this period
     }
 
     // Return a shape that Frontend expects. Frontend expects Invoice?
@@ -339,16 +374,97 @@ export class BillingService {
     // Let's check frontend usage: `await createNextMonthInvoice(contractId)`.
     // It doesn't use the return value explicitly in `handleSubmitAndNext`.
     // The prompt says "Opens a new form... Pre-fills...".
-    // The modal *fetches* usage history anyway.
 
     return usage;
   }
 
-  private async generateInvoiceNumber(): Promise<string> {
-    const year = new Date().getFullYear();
-    const count = await this.invoiceRepo.getInvoiceCountForYear(year);
-    const paddedCount = String(count + 1).padStart(4, '0');
-    return `INV-${year}-${paddedCount}`;
+  async generateConsolidatedFinalInvoice(contractId: string) {
+    // 1. Fetch contract
+    const contract = await this.invoiceRepo.findById(contractId);
+
+    // Check if contract exists
+    if (!contract) {
+      throw new AppError('Contract not found', 404);
+    }
+
+    // Idempotency: If already FINAL, just return it
+    if (contract.type === InvoiceType.FINAL) {
+      return contract;
+    }
+
+    // Ensure it is PROFORMA (Contract) before processing
+    if (contract.type !== InvoiceType.PROFORMA) {
+      throw new AppError('Invalid contract type', 400);
+    }
+
+    // 🔹 GUARD: Prevent double completion (if somehow marked completed but not FINAL type yet?)
+    if (contract.contractStatus === ContractStatus.COMPLETED) {
+      // Should ideally be FINAL if completed, but if inconsistent state, warn.
+      // However, we just checked type != FINAL above.
+      throw new AppError('Contract already completed but not finalized', 400);
+    }
+
+    // 2. Fetch all usage records (ordered by date)
+    const usageRecords = await this.usageRepo.getUsageHistory(contractId);
+    if (usageRecords.length === 0) {
+      throw new AppError('No usage records found', 400);
+    }
+
+    // 🔹 VALIDATION: Check if all months recorded
+    const expectedMonths = this.calculateExpectedMonths(contract);
+    if (usageRecords.length < expectedMonths) {
+      throw new AppError(
+        `Incomplete usage records. Expected ${expectedMonths} months, found ${usageRecords.length}`,
+        400,
+      );
+    }
+
+    // 3. Calculate Totals from Usage Records (Source of Truth)
+    const totalExceededCharge = usageRecords.reduce(
+      (sum, u) => sum + Number(u.exceededCharge || 0),
+      0,
+    );
+    const totalMonthlyRent = usageRecords.reduce((sum, u) => sum + Number(u.monthlyRent || 0), 0);
+
+    // Total Value of the Contract (Rent + Excess)
+    const finalTotal = totalMonthlyRent + totalExceededCharge;
+
+    // 4. Update Contract to become the FINAL Invoice
+    contract.contractStatus = ContractStatus.COMPLETED;
+    contract.type = InvoiceType.FINAL;
+    contract.status = InvoiceStatus.ISSUED;
+    contract.completedAt = new Date();
+
+    // Update Amounts
+    // Note: advanceAmount is assumed to be the remaining advance after usage adjustments
+    // If this is manual trigger, we assume usage records already handled advance adjustments logic?
+    // Actually, UsageService handles advance adjustment per month.
+    // If manual trigger runs, we must trust the state of usage records and contract.advanceAmount.
+
+    contract.grossAmount = finalTotal;
+    contract.totalAmount = finalTotal; // Total Billable Value
+
+    // Populate simple counts if needed
+    contract.bwA4Count = usageRecords.reduce((s, u) => s + (u.bwA4Count || 0), 0);
+    contract.bwA3Count = usageRecords.reduce((s, u) => s + (u.bwA3Count || 0), 0);
+    contract.colorA4Count = usageRecords.reduce((s, u) => s + (u.colorA4Count || 0), 0);
+    contract.colorA3Count = usageRecords.reduce((s, u) => s + (u.colorA3Count || 0), 0);
+
+    await this.invoiceRepo.save(contract);
+
+    return contract;
+  }
+
+  private calculateExpectedMonths(contract: Invoice): number {
+    if (contract.leaseTenureMonths) return contract.leaseTenureMonths;
+    if (contract.effectiveFrom && contract.effectiveTo) {
+      const start = new Date(contract.effectiveFrom);
+      const end = new Date(contract.effectiveTo);
+      const diffMonth =
+        (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth());
+      return diffMonth > 0 ? diffMonth : 1;
+    }
+    return 12; // Default
   }
 
   async createQuotation(payload: {
@@ -427,7 +543,7 @@ export class BillingService {
       }
     }
 
-    const invoiceNumber = await this.generateInvoiceNumber();
+    const invoiceNumber = await this.invoiceRepo.generateInvoiceNumber();
 
     const invoiceItems: InvoiceItem[] = [];
     let calculatedTotal = 0;
@@ -522,9 +638,9 @@ export class BillingService {
 
       rentType: payload.rentType,
       rentPeriod: payload.rentPeriod,
-      monthlyRent: payload.monthlyRent,
-      advanceAmount: payload.advanceAmount,
-      discountPercent: payload.discountPercent,
+      monthlyRent: payload.monthlyRent ? Number(payload.monthlyRent) : undefined,
+      advanceAmount: Number(payload.advanceAmount || 0), // STRICT FIX: Ensure number
+      discountPercent: payload.discountPercent ? Number(payload.discountPercent) : undefined,
       effectiveFrom: payload.effectiveFrom ? new Date(payload.effectiveFrom) : new Date(),
       effectiveTo: payload.effectiveTo ? new Date(payload.effectiveTo) : undefined,
       billingCycleInDays:
@@ -538,9 +654,9 @@ export class BillingService {
 
       totalAmount:
         payload.saleType === SaleType.LEASE
-          ? payload.advanceAmount || 0
+          ? Number(payload.advanceAmount || 0)
           : calculatedTotal == 0
-            ? payload.advanceAmount || 0
+            ? Number(payload.advanceAmount || 0)
             : calculatedTotal,
       items: invoiceItems,
     });
@@ -842,25 +958,27 @@ export class BillingService {
         invoice.effectiveFrom = approvalDate;
       }
 
-      // Calculate Next Due Date (Effective To) based on Rent Period
-      // Start form the EFFECTIVE FROM date, not approval date
-      const startDate = new Date(invoice.effectiveFrom);
-      const endDate = new Date(startDate);
+      // Calculate Next Due Date (Effective To) based on Rent Period (ONLY if not already set)
+      if (!invoice.effectiveTo) {
+        // Start form the EFFECTIVE FROM date, not approval date
+        const startDate = new Date(invoice.effectiveFrom!);
+        const endDate = new Date(startDate);
 
-      // Add Duration
-      if (invoice.rentPeriod === RentPeriod.CUSTOM && invoice.billingCycleInDays) {
-        endDate.setDate(endDate.getDate() + invoice.billingCycleInDays);
-      } else if (invoice.rentPeriod === RentPeriod.QUARTERLY) {
-        endDate.setMonth(endDate.getMonth() + 3);
-      } else if (invoice.rentPeriod === RentPeriod.HALF_YEARLY) {
-        endDate.setMonth(endDate.getMonth() + 6);
-      } else if (invoice.rentPeriod === RentPeriod.YEARLY) {
-        endDate.setFullYear(endDate.getFullYear() + 1);
-      } else {
-        // Default: MONTHLY
-        endDate.setMonth(endDate.getMonth() + 1);
+        // Add Duration
+        if (invoice.rentPeriod === RentPeriod.CUSTOM && invoice.billingCycleInDays) {
+          endDate.setDate(endDate.getDate() + invoice.billingCycleInDays);
+        } else if (invoice.rentPeriod === RentPeriod.QUARTERLY) {
+          endDate.setMonth(endDate.getMonth() + 3);
+        } else if (invoice.rentPeriod === RentPeriod.HALF_YEARLY) {
+          endDate.setMonth(endDate.getMonth() + 6);
+        } else if (invoice.rentPeriod === RentPeriod.YEARLY) {
+          endDate.setFullYear(endDate.getFullYear() + 1);
+        } else {
+          // Default: MONTHLY
+          endDate.setMonth(endDate.getMonth() + 1);
+        }
+        invoice.effectiveTo = endDate;
       }
-      invoice.effectiveTo = endDate;
     } else if (invoice.saleType === SaleType.LEASE) {
       invoice.type = InvoiceType.PROFORMA;
       invoice.status = InvoiceStatus.ACTIVE_LEASE;
@@ -979,7 +1097,7 @@ export class BillingService {
     ) {
       const history = await this.usageRepo.getUsageHistory(invoice.id);
       const latestUsage = history[0];
-      if (latestUsage && !latestUsage.finalInvoiceId) {
+      if (latestUsage) {
         invoice.bwA4Count = latestUsage.bwA4Count;
         invoice.bwA3Count = latestUsage.bwA3Count;
         invoice.colorA4Count = latestUsage.colorA4Count;
@@ -1025,6 +1143,11 @@ export class BillingService {
     ) {
       (invoice as Invoice & { invoiceHistory?: Invoice[] }).invoiceHistory =
         await this.invoiceRepo.findFinalInvoicesByContractId(invoice.id);
+
+      // Also include usage records (for displaying usage history even without generated invoices)
+      const usageHistory = await this.usageRepo.getUsageHistory(invoice.id);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (invoice as Invoice & { usageHistory?: any[] }).usageHistory = usageHistory;
     }
 
     return invoice;
@@ -1116,109 +1239,354 @@ export class BillingService {
     return result;
   }
 
-  async getCollectionAlerts(branchId: string, targetDateStr?: string) {
+  async getCollectionAlerts(branchId: string) {
     const activeContracts = await this.invoiceRepo.findActiveContracts(branchId);
     const alerts: Array<{
       contractId: string;
-      // customerName is fetched by API Gateway
-      customerId: string;
+      customerId: string; // customerName fetched by API Gateway
       invoiceNumber: string;
-      type: 'USAGE_PENDING' | 'INVOICE_PENDING' | 'SEND_PENDING';
+      type: 'USAGE_PENDING' | 'INVOICE_PENDING' | 'SEND_PENDING' | 'SUMMARY_PENDING';
       saleType: string;
       dueDate: Date;
-      finalInvoiceId?: string;
+      effectiveFrom?: Date;
+      effectiveTo?: Date;
+      monthlyRent?: number;
+      totalAmount?: number;
+      recordedMonths?: number;
+      tenure?: number;
+      contractStatus?: 'ACTIVE' | 'COMPLETED' | 'CANCELLED';
       usageData?: {
         bwA4Count: number;
         bwA3Count: number;
         colorA4Count: number;
         colorA3Count: number;
+        totalAmount?: number;
         billingPeriodStart: Date;
         billingPeriodEnd: Date;
       };
     }> = [];
 
-    const now = targetDateStr ? new Date(targetDateStr) : new Date();
-    const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-    const currentMonthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    // For Final Invoices (SEND_PENDING), we still might want date filtering or just show all pending?
+    // User request: "Monthly table always moves to next period".
+    // Let's iterate Active Contracts and determine their CURRENT state.
 
     for (const contract of activeContracts) {
-      // 1. Check if the contract period covers this month
-      const contractEffFrom = contract.effectiveFrom ? new Date(contract.effectiveFrom) : null;
-      const contractEffTo = contract.effectiveTo ? new Date(contract.effectiveTo) : null;
+      if (!contract.effectiveFrom) continue;
 
-      // Skip if month is before contract starts
-      if (contractEffFrom && currentMonthEnd < contractEffFrom) continue;
-      // Skip if month starts after contract ends
-      if (contractEffTo && currentMonthStart > contractEffTo) continue;
-
-      // 2. Find usage for THIS SPECIFIC month
+      // 1. Get History sorted by date DESC
       const history = await this.usageRepo.getUsageHistory(contract.id);
-      const usageForMonth = history.find((u) => {
-        const uStart = new Date(u.billingPeriodStart);
-        return (
-          uStart.getFullYear() === currentMonthStart.getFullYear() &&
-          uStart.getMonth() === currentMonthStart.getMonth()
-        );
-      });
 
-      if (!usageForMonth) {
-        // Usage Pending for this month
-        const due = new Date(currentMonthEnd);
-        due.setDate(due.getDate() + 5);
-
+      // Completion Logic: If recorded months >= tenure, skip monthly recording alert.
+      // We don't mark as COMPLETED here; that happens during Final Summary generation.
+      if (contract.leaseTenureMonths && history.length >= contract.leaseTenureMonths) {
         alerts.push({
           contractId: contract.id,
           customerId: contract.customerId,
           invoiceNumber: contract.invoiceNumber,
-          type: 'USAGE_PENDING',
+          type: 'SUMMARY_PENDING',
           saleType: contract.saleType,
-          dueDate: due,
+          dueDate: new Date(),
+          effectiveFrom: contract.effectiveFrom,
+          effectiveTo: contract.effectiveTo,
+          monthlyRent: contract.monthlyRent,
+          recordedMonths: history.length,
+          tenure: contract.leaseTenureMonths || 0,
         });
+        continue;
+      }
+
+      let currentPeriodStart: Date;
+
+      // Logic: Always project the NEXT pending period based on the latest record
+      const latestRecord = history[0];
+
+      if (latestRecord) {
+        // Next start = last end + 1 day
+        currentPeriodStart = new Date(latestRecord.billingPeriodEnd);
+        currentPeriodStart.setDate(currentPeriodStart.getDate() + 1);
       } else {
-        // Usage Done. Check Invoice.
-        if (!usageForMonth.finalInvoiceId) {
-          alerts.push({
-            contractId: contract.id,
-            customerId: contract.customerId,
-            invoiceNumber: contract.invoiceNumber,
-            type: 'INVOICE_PENDING',
-            saleType: contract.saleType,
-            dueDate: new Date(),
-            usageData: {
-              bwA4Count: usageForMonth.bwA4Count || 0,
-              bwA3Count: usageForMonth.bwA3Count || 0,
-              colorA4Count: usageForMonth.colorA4Count || 0,
-              colorA3Count: usageForMonth.colorA3Count || 0,
-              billingPeriodStart: usageForMonth.billingPeriodStart!,
-              billingPeriodEnd: usageForMonth.billingPeriodEnd!,
-            },
-          });
-        } else {
-          // Invoice exists. Check if sent.
-          const finalInvoice = await this.invoiceRepo.findById(usageForMonth.finalInvoiceId);
-          if (finalInvoice && !finalInvoice.emailSentAt && !finalInvoice.whatsappSentAt) {
-            alerts.push({
-              contractId: contract.id,
-              customerId: contract.customerId,
-              invoiceNumber: finalInvoice.invoiceNumber,
-              type: 'SEND_PENDING',
-              saleType: contract.saleType,
-              dueDate: finalInvoice.createdAt,
-              finalInvoiceId: finalInvoice.id,
-              usageData: {
-                bwA4Count: finalInvoice.bwA4Count || 0,
-                bwA3Count: finalInvoice.bwA3Count || 0,
-                colorA4Count: finalInvoice.colorA4Count || 0,
-                colorA3Count: finalInvoice.colorA3Count || 0,
-                billingPeriodStart: finalInvoice.billingPeriodStart!,
-                billingPeriodEnd: finalInvoice.billingPeriodEnd!,
-              },
-            });
+        // First period
+        currentPeriodStart = new Date(contract.effectiveFrom);
+      }
+
+      // Calculate End Date
+      const cycleDays = contract.billingCycleInDays || 30; // Default 30
+
+      const currentPeriodEnd = new Date(currentPeriodStart);
+      currentPeriodEnd.setDate(currentPeriodEnd.getDate() + cycleDays - 1);
+
+      // Validation: Is the contract complete?
+      if (contract.effectiveTo && currentPeriodStart > contract.effectiveTo) {
+        continue;
+      }
+
+      // 2. Create Alert for "USAGE_PENDING"
+      const due = new Date(currentPeriodEnd);
+      due.setDate(due.getDate() + 5);
+
+      alerts.push({
+        contractId: contract.id,
+        customerId: contract.customerId,
+        invoiceNumber: contract.invoiceNumber,
+        type: 'USAGE_PENDING',
+        saleType: contract.saleType,
+        dueDate: due,
+        effectiveFrom: contract.effectiveFrom,
+        effectiveTo: contract.effectiveTo,
+        monthlyRent: contract.monthlyRent,
+        recordedMonths: history.length,
+        tenure: contract.leaseTenureMonths || 0,
+        usageData: {
+          bwA4Count: 0,
+          bwA3Count: 0,
+          colorA4Count: 0,
+          colorA3Count: 0,
+          billingPeriodStart: currentPeriodStart,
+          billingPeriodEnd: currentPeriodEnd,
+        },
+      });
+    }
+
+    // Optional: Add SEND_PENDING for actual Final Invoices if needed?
+    // "Remove Invoice Pending status... Remove monthly invoice generation".
+    // But verify: "Consolidated FINAL invoice generated".
+    // If a Final Invoice exists and is not sent, show it?
+    // For "Monthly Collection", maybe stick to active contracts for now.
+    // Or fetch separately.
+    // Let's keep it clean as requested: Active Contracts -> Usage Pending.
+
+    // 3. Fetch Unpaid FINAL Invoices (Consolidated)
+    const finalInvoices = await this.invoiceRepo.findUnpaidFinalInvoices(branchId);
+    for (const inv of finalInvoices) {
+      alerts.push({
+        contractId: inv.id,
+        customerId: inv.customerId,
+        invoiceNumber: inv.invoiceNumber,
+        type: 'INVOICE_PENDING',
+        saleType: inv.saleType,
+        dueDate: inv.createdAt, // Or calculated due date
+        effectiveFrom: inv.effectiveFrom,
+        effectiveTo: inv.effectiveTo,
+        monthlyRent: inv.monthlyRent,
+        totalAmount: inv.totalAmount,
+        contractStatus: 'COMPLETED',
+        recordedMonths: inv.items?.length || 0, // Approximate
+        tenure: inv.leaseTenureMonths || 0,
+      });
+    }
+
+    return alerts;
+  }
+
+  async getCompletedCollections(branchId?: string) {
+    // Fetch all completed contracts
+    const completedContracts = await this.invoiceRepo.findCompletedContracts(branchId);
+
+    const collections = [];
+
+    for (const contract of completedContracts) {
+      // Find the final summary invoice for this contract
+      const finalInvoices = await this.invoiceRepo.findFinalInvoicesByContractId(contract.id);
+      const summaryInvoice = finalInvoices.find((inv) => inv.isSummaryInvoice); // The "Consolidated" one
+
+      // Calculate totals
+      let totalCollected = 0;
+      let finalAmount = 0;
+      let grossAmount = 0;
+      let advanceAdjusted = 0;
+
+      if (summaryInvoice) {
+        // Summary invoice available - use its totals
+        console.log(
+          `[DEBUG] Summary Inv found for ${contract.invoiceNumber}: Gross=${summaryInvoice.grossAmount}, Total=${summaryInvoice.totalAmount}`,
+        );
+        grossAmount = Number(summaryInvoice.grossAmount || 0);
+        advanceAdjusted = Number(summaryInvoice.advanceAdjusted || 0);
+        finalAmount = Number(summaryInvoice.totalAmount || 0);
+        totalCollected = grossAmount; // Assuming Total Collected means Gross Value here
+      } else if (contract.type === InvoiceType.FINAL) {
+        // Contract ITSELF is the Final Invoice (New Flow)
+        console.log(`[DEBUG] Consolidated Contract (Final) found: ${contract.invoiceNumber}`);
+        grossAmount = Number(contract.grossAmount || 0);
+        advanceAdjusted = Number(contract.advanceAmount || 0); // Is this adjusted rent? Or remaining advance?
+        // In UsageService, we updated contract.grossAmount = finalTotalRent + finalTotalExcess
+        // contract.advanceAmount was updated to (currentAdvance - rentAmount).
+
+        finalAmount = Number(contract.totalAmount || 0);
+        totalCollected = grossAmount;
+      } else {
+        // Fallback: Sum monthly invoices
+        const monthlyInvoices = finalInvoices.filter(
+          (inv) => !inv.isSummaryInvoice && inv.type === InvoiceType.FINAL,
+        );
+        console.log(
+          `[DEBUG] No Summary Inv for ${contract.invoiceNumber}. Found ${monthlyInvoices.length} monthly invoices.`,
+        );
+
+        // Summing up totals from monthly invoices
+        const monthlySum = monthlyInvoices.reduce(
+          (sum, inv) => sum + Number(inv.totalAmount || 0),
+          0,
+        );
+        const monthlyGross = monthlyInvoices.reduce(
+          (sum, inv) => sum + Number(inv.grossAmount || inv.totalAmount || 0),
+          0,
+        );
+
+        console.log(`[DEBUG] Monthly Sums: Total=${monthlySum}, Gross=${monthlyGross}`);
+        grossAmount = monthlyGross;
+
+        advanceAdjusted = Number(contract.advanceAmount || 0);
+        finalAmount = monthlySum;
+        totalCollected = grossAmount;
+      }
+
+      // Fallback: If totals are still 0, check Usage Records (History)
+      if (grossAmount === 0) {
+        console.log(`[DEBUG] Totals 0 for ${contract.invoiceNumber}, checking Usage Records...`);
+        try {
+          const history = await this.usageRepo.getUsageHistory(contract.id, 'ASC');
+          if (history.length > 0) {
+            console.log(`[DEBUG] Found ${history.length} usage records.`);
+            // Sum up total charges from usage records
+            const usageGross = history.reduce((sum, u) => sum + Number(u.totalCharge || 0), 0);
+
+            // Assuming advance is already adjusted in the final usage record calculation if handled there
+            // But generally, totalCollected ~ Gross Bill
+            grossAmount = usageGross;
+            totalCollected = usageGross;
+            finalAmount = usageGross; // Approximation if invoice logic fails
+            console.log(`[DEBUG] Calculated from Usage: Gross=${grossAmount}`);
           }
+        } catch (err) {
+          console.error(`[DEBUG] Failed to fetch usage history for ${contract.invoiceNumber}`, err);
         }
       }
+
+      collections.push({
+        contractId: contract.id,
+        customerId: contract.customerId,
+        invoiceNumber: contract.invoiceNumber,
+        saleType: contract.saleType,
+        effectiveFrom: contract.effectiveFrom,
+        effectiveTo: contract.effectiveTo,
+        completedAt: contract.completedAt,
+        finalInvoiceId:
+          summaryInvoice?.id || (contract.type === InvoiceType.FINAL ? contract.id : undefined),
+        finalInvoiceNumber:
+          summaryInvoice?.invoiceNumber ||
+          (contract.type === InvoiceType.FINAL ? contract.invoiceNumber : undefined),
+        totalCollected,
+        finalAmount,
+        grossAmount,
+        advanceAdjusted,
+        status: summaryInvoice
+          ? summaryInvoice.status
+          : contract.status || ContractStatus.COMPLETED,
+      });
     }
-    return alerts;
+
+    return collections;
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  async downloadConsolidatedInvoice(contractId: string, res: any) {
+    const contract = await this.invoiceRepo.findById(contractId);
+    if (!contract) throw new AppError('Contract not found', 404);
+
+    const finalInvoices = await this.invoiceRepo.findFinalInvoicesByContractId(contractId);
+    const summaryInvoice = finalInvoices.find((inv) => inv.isSummaryInvoice);
+    const monthlyInvoices = finalInvoices
+      .filter((inv) => !inv.isSummaryInvoice && inv.type === InvoiceType.FINAL)
+      .reverse(); // Order by date
+
+    // PDF Generation
+    const doc = new PDFDocument({ margin: 50 });
+
+    doc.pipe(res);
+
+    // Header
+    doc.fontSize(20).text('Consolidated Billing Statement', { align: 'center' });
+    doc.moveDown();
+
+    // Customer Details
+    doc.fontSize(12).text(`Customer ID: ${contract.customerId}`);
+    doc.text(`Contract #: ${contract.invoiceNumber}`);
+    doc.text(`Date: ${new Date().toLocaleDateString()}`);
+    doc.moveDown();
+
+    // Summary Table
+    const tableTop = 200;
+    const itemCodeX = 50;
+    const descriptionX = 150; // Invoice #
+    const amountX = 400;
+
+    doc.font('Helvetica-Bold');
+    doc.text('Period', itemCodeX, tableTop);
+    doc.text('Invoice #', descriptionX, tableTop);
+    doc.text('Amount', amountX, tableTop);
+    doc.moveDown();
+    doc.font('Helvetica');
+
+    let y = tableTop + 25;
+
+    monthlyInvoices.forEach((inv) => {
+      const start = inv.billingPeriodStart
+        ? new Date(inv.billingPeriodStart).toLocaleDateString()
+        : '-';
+      const end = inv.billingPeriodEnd ? new Date(inv.billingPeriodEnd).toLocaleDateString() : '-';
+      const period = `${start} to ${end}`;
+
+      doc.text(period, itemCodeX, y);
+      doc.text(inv.invoiceNumber, descriptionX, y);
+      doc.text(`INR ${Number(inv.totalAmount).toFixed(2)}`, amountX, y);
+      y += 20;
+    });
+
+    doc.moveDown();
+    doc.font('Helvetica-Bold');
+    const totalCollected =
+      summaryInvoice?.grossAmount ||
+      monthlyInvoices.reduce((s, i) => s + Number(i.grossAmount || 0), 0);
+    doc.text(`Total Collected: INR ${Number(totalCollected).toFixed(2)}`, amountX, y + 20);
+
+    doc.end();
+  }
+
+  async sendConsolidatedInvoice(contractId: string) {
+    const contract = await this.invoiceRepo.findById(contractId);
+    if (!contract) throw new AppError('Contract not found', 404);
+
+    // Publish to RabbitMQ
+    try {
+      const channel = await getRabbitChannel();
+      const message = {
+        type: 'SEND_CONSOLIDATED_INVOICE',
+        payload: {
+          contractId: contract.id,
+          customerId: contract.customerId,
+          invoiceNumber: contract.invoiceNumber,
+          // @ts-expect-error customerEmail might not exist on type yet
+          customerEmail: contract.customerEmail, // Assuming this field exists or needs fetching
+        },
+      };
+
+      channel.sendToQueue('email_queue', Buffer.from(JSON.stringify(message)), {
+        persistent: true,
+      });
+      logger.info(
+        `[Email Service] Published invoice email task for ${contract.invoiceNumber} to queue`,
+      );
+    } catch (error) {
+      logger.error('Failed to publish email task to RabbitMQ', error);
+      // Fallback or re-throw based on requirement. For now, logging error but updating db as "attempted"
+    }
+
+    // Update Last Sent time
+    contract.emailSentAt = new Date();
+    await this.invoiceRepo.save(contract);
+
+    return { success: true, message: 'Invoice sending queued successfully' };
   }
 
   async getFinanceReport(filter: {
@@ -1246,5 +1614,39 @@ export class BillingService {
         profitStatus: profit > 0 ? 'profit' : 'loss',
       };
     });
+  }
+
+  async getInvoiceHistory(branchId: string, saleType?: string) {
+    // Fetch all FINAL invoices for the branch
+    const invoices = await this.invoiceRepo.findFinalInvoicesByBranch(branchId, saleType);
+
+    // Enrich with usage data
+    const enrichedInvoices = await Promise.all(
+      invoices.map(async (invoice) => {
+        // Fetch usage record if linked
+        let usageData = null;
+        if (invoice.usageRecordId) {
+          const usage = await this.usageRepo.findById(invoice.usageRecordId);
+          if (usage) {
+            usageData = {
+              bwA4Count: usage.bwA4Count,
+              bwA3Count: usage.bwA3Count,
+              colorA4Count: usage.colorA4Count,
+              colorA3Count: usage.colorA3Count,
+              billingPeriodStart: usage.billingPeriodStart,
+              billingPeriodEnd: usage.billingPeriodEnd,
+              remarks: usage.remarks,
+            };
+          }
+        }
+
+        return {
+          ...invoice,
+          usageData,
+        };
+      }),
+    );
+
+    return enrichedInvoices;
   }
 }

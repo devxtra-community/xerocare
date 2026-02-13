@@ -293,3 +293,86 @@ export const getGlobalSalesTotals = async (req: Request, res: Response, next: Ne
     next(error);
   }
 };
+
+export const getInvoiceHistory = async (
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const user = req.user;
+    if (!user) throw new Error('User not authenticated');
+    const token = req.headers.authorization?.split(' ')[1] || '';
+    const saleType = req.query.saleType as string | undefined;
+
+    const history = await invoiceAggregationService.getInvoiceHistory(user, token, saleType);
+    return res.status(200).json({
+      success: true,
+      data: history,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getCompletedCollections = async (
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const user = req.user;
+    if (!user) throw new Error('User not authenticated');
+    const token = req.headers.authorization?.split(' ')[1] || '';
+
+    const collections = await invoiceAggregationService.getCompletedCollections(user, token);
+    return res.status(200).json({
+      success: true,
+      data: collections,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const downloadInvoice = async (
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const user = req.user;
+    if (!user) throw new Error('User not authenticated');
+    const token = req.headers.authorization?.split(' ')[1] || '';
+    const contractId = req.params.contractId as string;
+
+    const stream = await invoiceAggregationService.downloadInvoice(contractId, token);
+
+    // Pipe the stream to response
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename=consolidated-invoice-${contractId}.pdf`,
+    );
+    stream.pipe(res);
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const sendInvoice = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  try {
+    const user = req.user;
+    if (!user) throw new Error('User not authenticated');
+    const token = req.headers.authorization?.split(' ')[1] || '';
+    const contractId = req.params.contractId as string;
+
+    const result = await invoiceAggregationService.sendInvoice(contractId, token);
+    return res.status(200).json({
+      success: true,
+      message: result.message,
+    });
+  } catch (error) {
+    next(error);
+  }
+};

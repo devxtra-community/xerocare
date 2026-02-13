@@ -1,6 +1,8 @@
 import { SparePartRepository } from '../repositories/sparePartRepository';
 import { ModelRepository } from '../repositories/modelRepository';
 import { SparePart } from '../entities/sparePartEntity';
+import { getCached, setCached, deleteCached } from '../utils/cacheUtil';
+import { logger } from '../config/logger';
 
 interface BulkUploadRow {
   item_code: string;
@@ -50,7 +52,7 @@ export class SparePartService {
     // Always create a new entry for every upload.
     const quantity = data.quantity || 0;
 
-    await this.repo.createMaster({
+    const sparePart = await this.repo.createMaster({
       item_code: itemCode,
       part_name: data.part_name,
       brand: data.brand,
@@ -59,6 +61,9 @@ export class SparePartService {
       branch_id: branchId,
       quantity: quantity,
     });
+
+    // Pre-warm cache for newly created spare part
+    await setCached(`sparepart:${sparePart.id}`, sparePart, 3600);
 
     return { success: true, message: 'Spare part and stock processed' };
   }
@@ -79,6 +84,10 @@ export class SparePartService {
     );
 
     await this.repo.updateMaster(id, updateData);
+
+    // Invalidate cache after update
+    await deleteCached(`sparepart:${id}`);
+
     return { success: true, message: 'Spare part updated' };
   }
 
@@ -88,10 +97,39 @@ export class SparePartService {
       throw new Error('Cannot delete spare part with existing quantity > 0.');
     }
     await this.repo.deleteMaster(id);
+
+    // Invalidate cache
+    await deleteCached(`sparepart:${id}`);
+
     return { success: true, message: 'Spare part deleted' };
   }
 
   async getInventoryByBranch(branchId: string) {
     return this.repo.getInventoryByBranch(branchId);
+  }
+
+  /**
+   * Get spare part by ID with caching
+   */
+  async findById(id: string): Promise<SparePart | null> {
+    // Try cache first (cache-aside pattern)
+    const cacheKey = `sparepart:${id}`;
+    const cached = await getCached<SparePart>(cacheKey);
+
+    if (cached) {
+      logger.debug(`Cache HIT for spare part: ${id}`);
+      return cached;
+    }
+
+    // Cache miss - fetch from database
+    logger.debug(`Cache MISS for spare part: ${id}`);
+    const sparePart = await this.repo.findById(id);
+
+    if (sparePart) {
+      // Store in cache for future requests
+      await setCached(cacheKey, sparePart, 3600); // 1 hour TTL
+    }
+
+    return sparePart;
   }
 }

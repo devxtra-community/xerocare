@@ -84,4 +84,14 @@ export class EmployeeRepository {
   async countByRoleAndBranch(role: EmployeeRole, branchId: string) {
     return this.repo.count({ where: { role, branch_id: branchId } });
   }
+
+  async findLatestDisplayId(prefix: string) {
+    const result = await this.repo
+      .createQueryBuilder('employee')
+      .where('employee.display_id LIKE :prefix', { prefix: `${prefix}%` })
+      .orderBy('LENGTH(employee.display_id)', 'DESC')
+      .addOrderBy('employee.display_id', 'DESC')
+      .getOne();
+    return result?.display_id;
+  }
 }

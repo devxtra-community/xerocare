@@ -18,19 +18,20 @@ export const createUsageRecord = async (req: Request, res: Response, next: NextF
       bwA3Count,
       colorA4Count,
       colorA3Count,
+
       reportedBy,
       remarks,
     } = payload;
 
     const file = req.file as MulterS3File | undefined;
-    const meterImageUrl = file?.location; // Public URL from MulterS3/R2
+    const meterImageUrl = file?.key; // Store the KEY (path/filename), not the full URL.
 
-    if (!contractId || !billingPeriodStart || !billingPeriodEnd || !reportedBy) {
+    if (!contractId || !billingPeriodStart || !billingPeriodEnd) {
       throw new AppError('Missing required fields', 400);
     }
 
     // Safety: Ensure counts are numbers (default 0 handled in service/repo if undefined, but explicit is better)
-    const usage = await usageService.createUsageRecord({
+    const result = await usageService.recordUsage({
       contractId,
       billingPeriodStart,
       billingPeriodEnd,
@@ -38,15 +39,14 @@ export const createUsageRecord = async (req: Request, res: Response, next: NextF
       bwA3Count: Number(bwA3Count) || 0,
       colorA4Count: Number(colorA4Count) || 0,
       colorA3Count: Number(colorA3Count) || 0,
-      reportedBy,
-      recordedByEmployeeId: req.user?.userId,
-      remarks,
       meterImageUrl,
+      reportedBy: reportedBy || 'EMPLOYEE', // Default if missing
+      remarks,
     });
 
     return res.status(201).json({
       success: true,
-      data: usage,
+      data: result,
       message: 'Usage record created successfully',
     });
   } catch (error) {
@@ -54,28 +54,9 @@ export const createUsageRecord = async (req: Request, res: Response, next: NextF
   }
 };
 
-export const updateUsageRecord = async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const id = req.params.id as string;
-    const payload = req.body;
-
-    const usage = await usageService.updateUsageRecord(id, {
-      bwA4Count: payload.bwA4Count !== undefined ? Number(payload.bwA4Count) : undefined,
-      bwA3Count: payload.bwA3Count !== undefined ? Number(payload.bwA3Count) : undefined,
-      colorA4Count: payload.colorA4Count !== undefined ? Number(payload.colorA4Count) : undefined,
-      colorA3Count: payload.colorA3Count !== undefined ? Number(payload.colorA3Count) : undefined,
-      remarks: payload.remarks,
-    });
-
-    return res.status(200).json({
-      success: true,
-      data: usage,
-      message: 'Usage record updated',
-    });
-  } catch (error) {
-    next(error);
-  }
-};
+// Update endpoint removed as per simplified workflow.
+// If editing is required, it must follow the new calculation logic.
+// export const updateUsageRecord = ...
 
 export const getUsageHistory = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -84,6 +65,20 @@ export const getUsageHistory = async (req: Request, res: Response, next: NextFun
     return res.status(200).json({
       success: true,
       data: history,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const sendMonthlyInvoice = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = req.params.id as string;
+    const result = await usageService.sendMonthlyInvoice(id);
+    return res.status(200).json({
+      success: true,
+      data: result,
+      message: 'Monthly invoice sent successfully',
     });
   } catch (error) {
     next(error);

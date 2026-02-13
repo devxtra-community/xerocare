@@ -17,6 +17,10 @@ import {
   getGlobalSales,
   getGlobalSalesTotals,
   createNextMonthInvoice,
+  getInvoiceHistory,
+  getCompletedCollections,
+  downloadInvoice,
+  sendInvoice,
 } from '../controllers/invoiceController';
 import { authMiddleware } from '../middleware/authMiddleware';
 import { requireRole } from '../middleware/roleMiddleware';
@@ -58,6 +62,26 @@ router.get(
   '/alerts',
   requireRole(UserRole.ADMIN, UserRole.FINANCE),
   getCollectionAlerts, // Ensure import!
+);
+
+router.get('/history', requireRole(UserRole.ADMIN, UserRole.FINANCE), getInvoiceHistory);
+
+router.get(
+  '/completed-collections',
+  requireRole(UserRole.ADMIN, UserRole.FINANCE),
+  getCompletedCollections,
+);
+
+router.get(
+  '/completed-collections/:contractId/download',
+  requireRole(UserRole.ADMIN, UserRole.FINANCE),
+  downloadInvoice,
+);
+
+router.post(
+  '/completed-collections/:contractId/send',
+  requireRole(UserRole.ADMIN, UserRole.FINANCE),
+  sendInvoice,
 );
 
 router.get('/sales/global-overview', requireRole(UserRole.ADMIN, UserRole.FINANCE), getGlobalSales);

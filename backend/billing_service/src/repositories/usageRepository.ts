@@ -67,11 +67,11 @@ export class UsageRepository {
     return found || null;
   }
 
-  getUsageHistory(contractId: string) {
+  getUsageHistory(contractId: string, order: 'ASC' | 'DESC' = 'DESC') {
     return this.repo.find({
       where: { contractId },
       order: {
-        billingPeriodStart: 'DESC',
+        billingPeriodStart: order,
       },
     });
   }
