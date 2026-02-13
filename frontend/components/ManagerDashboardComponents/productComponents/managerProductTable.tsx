@@ -12,6 +12,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { SearchableSelect } from '@/components/ui/searchable-select';
+import { lotService } from '@/lib/lot';
 import {
   Table,
   TableBody,
@@ -23,10 +25,26 @@ import {
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import StatCard from '@/components/StatCard';
 import { BulkProductDialog } from './BulkProductDialog';
-import { productService, Product, CreateProductDTO } from '@/services/productService';
+import { productService, Product } from '@/services/productService';
 import { modelService, Model } from '@/services/modelService';
 import { commonService, Vendor, Warehouse } from '@/services/commonService';
+import { getBrands, Brand } from '@/lib/brand';
 import { toast } from 'sonner';
+
+interface LotItem {
+  itemType: string;
+  modelId?: string;
+  model?: { id: string };
+  quantity: number;
+  usedQuantity: number;
+}
+
+interface Lot {
+  id: string;
+  lotNumber: string;
+  vendor?: { name: string };
+  items?: LotItem[];
+}
 
 export default function ManagerProduct() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -288,42 +306,104 @@ function ProductFormModal({
   const [models, setModels] = useState<Model[]>([]);
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
+  const [brands, setBrands] = useState<Brand[]>([]);
+  const [lots, setLots] = useState<Lot[]>([]);
 
-  const [form, setForm] = useState<Partial<CreateProductDTO>>({
+  // Use string | number to allow empty string for better UX (prevent default 0 sticking)
+  const [form, setForm] = useState<{
+    name: string;
+    brand: string;
+    serial_no: string;
+    model_id: string;
+    vendor_id: string;
+    warehouse_id: string;
+    sale_price: string | number;
+    tax_rate: string | number;
+    MFD: string;
+    product_status: string;
+    imageUrl: string;
+    print_colour: 'BLACK_WHITE' | 'COLOUR' | 'BOTH';
+    max_discount_amount: string | number;
+    lot_id: string;
+  }>({
     name: initialData?.name || '',
     brand: initialData?.brand || '',
     serial_no: initialData?.serial_no || '',
     model_id: initialData?.model_id || initialData?.model?.id || '',
     vendor_id: initialData?.vendor_id || initialData?.vendor?.id || '',
     warehouse_id: initialData?.warehouse_id || initialData?.warehouse?.id || '',
-    sale_price: initialData?.sale_price ?? 0,
-    tax_rate: initialData?.tax_rate ?? 0,
+    sale_price: initialData?.sale_price ?? '',
+    tax_rate: initialData?.tax_rate ?? '',
     MFD: initialData?.MFD ? new Date(initialData.MFD).toISOString().split('T')[0] : '',
     product_status: initialData?.product_status || 'AVAILABLE',
     imageUrl: initialData?.imageUrl || '',
     print_colour: initialData?.print_colour || 'BLACK_WHITE',
-    max_discount_amount: initialData?.max_discount_amount || 0,
+    max_discount_amount: initialData?.max_discount_amount ?? '',
+    lot_id: initialData?.lot_id || '', // Check if initialData has lot_id support if needed
   });
+
+  // Derived state for filtering models
+  // We need to find the brand ID corresponding to the current form.brand name if we are editing
+  // However, form.brand is just a name.
+  // Models have brandRelation { id, name }.
+  // If editing, we might have initialData.model.brandRelation.id
+  // Ideally we track selectedBrandId explicitly for the dropdown.
+  const [selectedBrandId, setSelectedBrandId] = useState<string>('');
+
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string>(initialData?.imageUrl || '');
 
   useEffect(() => {
     const loadDependencies = async () => {
       try {
-        const [m, v, w] = await Promise.all([
+        const [m, v, w, b, l] = await Promise.all([
           modelService.getAllModels(),
           commonService.getAllVendors(),
           commonService.getWarehousesByBranch(),
+          getBrands(),
+          lotService.getAllLots(),
         ]);
         setModels(m);
         setVendors(v);
         setWarehouses(w);
+        if (b.success) {
+          setBrands(b.data);
+        }
+        setLots(l);
       } catch {
         toast.error('Failed to load form dependencies');
       }
     };
     loadDependencies();
   }, []);
+
+  // Initialize selectedBrandId when models and initialData are ready
+  useEffect(() => {
+    if (initialData && models.length > 0) {
+      const relevantModel = models.find(
+        (m) => m.id === (initialData.model_id || initialData.model?.id),
+      );
+      if (relevantModel?.brandRelation?.id) {
+        setSelectedBrandId(relevantModel.brandRelation.id);
+      } else if (initialData.brand) {
+        // Fallback: try to find brand by name
+        const brandByName = brands.find((b) => b.name === initialData.brand);
+        if (brandByName) setSelectedBrandId(brandByName.id);
+      }
+    }
+  }, [initialData, models, brands]);
+
+  // Filter models based on selectedBrandId
+  const filteredModels = selectedBrandId
+    ? models.filter((m) => {
+        // console.log('Checking model:', m.model_name, m); // Debug
+        return (
+          m.brandRelation?.id === selectedBrandId ||
+          m.brand?.id === selectedBrandId ||
+          m.brand_id === selectedBrandId
+        );
+      })
+    : [];
 
   const handleImageUpload = (file: File) => {
     setSelectedFile(file);
@@ -362,20 +442,65 @@ function ProductFormModal({
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Left Column */}
         <div className="space-y-4">
+          <Field label="Brand">
+            <Select
+              value={selectedBrandId}
+              disabled={!!initialData}
+              onValueChange={(v) => {
+                setSelectedBrandId(v);
+                const selectedBrand = brands.find((b) => b.id === v);
+                setForm({
+                  ...form,
+                  brand: selectedBrand?.name || '',
+                  model_id: '', // Reset model when brand changes
+                });
+              }}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select Brand" />
+              </SelectTrigger>
+              <SelectContent>
+                {brands.map((b) => (
+                  <SelectItem key={b.id} value={b.id}>
+                    {b.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Field>
+
+          <Field label="Model">
+            <Select
+              value={form.model_id}
+              disabled={!selectedBrandId || !!initialData}
+              onValueChange={(v) => {
+                setForm({
+                  ...form,
+                  model_id: v,
+                });
+              }}
+            >
+              <SelectTrigger>
+                <SelectValue
+                  placeholder={selectedBrandId ? 'Select Model' : 'Select Brand First'}
+                />
+              </SelectTrigger>
+              <SelectContent>
+                {filteredModels.map((m) => (
+                  <SelectItem key={m.id} value={m.id}>
+                    {m.model_name} ({m.model_no})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Field>
+
           <Field label="Product Name">
             <Input
               value={form.name}
+              disabled={!!initialData}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
               placeholder="Enter product name"
-              required
-            />
-          </Field>
-
-          <Field label="Brand">
-            <Input
-              value={form.brand}
-              onChange={(e) => setForm({ ...form, brand: e.target.value })}
-              placeholder="Enter brand name"
               required
             />
           </Field>
@@ -383,65 +508,82 @@ function ProductFormModal({
           <Field label="Serial Number">
             <Input
               value={form.serial_no}
+              disabled={!!initialData}
               onChange={(e) => setForm({ ...form, serial_no: e.target.value })}
               placeholder="Enter serial number"
               required
-            />
-          </Field>
-
-          <Field label="Date of Manufacture (MFD)">
-            <Input
-              type="date"
-              value={form.MFD as string}
-              onChange={(e) => setForm({ ...form, MFD: e.target.value })}
             />
           </Field>
         </div>
 
         {/* Right Column */}
         <div className="space-y-4">
-          <Field label="Model">
-            <Select
-              value={form.model_id}
-              onValueChange={(v) => {
-                const selectedModel = models.find((m) => m.id === v);
-                setForm({
-                  ...form,
-                  model_id: v,
-                  brand: selectedModel?.brandRelation?.name || form.brand,
-                });
-              }}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select Model" />
-              </SelectTrigger>
-              <SelectContent>
-                {models.map((m) => (
-                  <SelectItem key={m.id} value={m.id}>
-                    {m.model_name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <Field label="Date of Manufacture (MFD)">
+            <Input
+              type="date"
+              value={form.MFD as string}
+              disabled={!!initialData}
+              onChange={(e) => setForm({ ...form, MFD: e.target.value })}
+            />
           </Field>
 
-          <Field label="Vendor">
-            <Select
-              value={String(form.vendor_id)}
-              onValueChange={(v) => setForm({ ...form, vendor_id: v })}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select Vendor" />
-              </SelectTrigger>
-              <SelectContent>
-                {vendors.map((v) => (
-                  <SelectItem key={v.id} value={String(v.id)}>
-                    {v.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </Field>
+          <div className="grid grid-cols-2 gap-2">
+            <Field label="Vendor">
+              <Select
+                value={String(form.vendor_id)}
+                disabled={!!initialData}
+                onValueChange={(v) => setForm({ ...form, vendor_id: v })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select Vendor" />
+                </SelectTrigger>
+                <SelectContent>
+                  {vendors.map((v) => (
+                    <SelectItem key={v.id} value={String(v.id)}>
+                      {v.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+
+            <Field label="Lot (Optional)">
+              <SearchableSelect
+                value={form.lot_id}
+                onValueChange={(val) => setForm({ ...form, lot_id: val === 'none' ? '' : val })}
+                options={[
+                  { value: 'none', label: 'None', description: 'Clear selection' },
+                  ...lots.map((lot) => ({
+                    value: lot.id,
+                    label: lot.lotNumber,
+                    description: lot.vendor?.name || 'Unknown Vendor',
+                  })),
+                ]}
+                placeholder="Select Lot"
+                emptyText="No lots found."
+              />
+              {form.lot_id && form.model_id && (
+                <div className="text-xs mt-1">
+                  {(() => {
+                    const lot = lots.find((l) => l.id === form.lot_id);
+                    const item = lot?.items?.find(
+                      (i: LotItem) =>
+                        i.itemType === 'MODEL' &&
+                        (i.modelId === form.model_id || i.model?.id === form.model_id),
+                    );
+                    if (!item)
+                      return <span className="text-red-500">Model not found in this Lot!</span>;
+                    const remaining = item.quantity - item.usedQuantity;
+                    return (
+                      <span className={remaining > 0 ? 'text-green-600' : 'text-red-500 font-bold'}>
+                        Available in Lot: {remaining} / {item.quantity}
+                      </span>
+                    );
+                  })()}
+                </div>
+              )}
+            </Field>
+          </div>
 
           <Field label="Warehouse">
             <Select

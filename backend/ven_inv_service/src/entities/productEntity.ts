@@ -26,11 +26,12 @@ export enum PrintColour {
 
 import { Vendor } from './vendorEntity';
 import { SparePart } from './sparePartEntity';
+import { Lot } from './lotEntity';
 
 @Entity('products')
-@Check(
-  `("model_id" IS NOT NULL AND "spare_part_id" IS NULL) OR ("model_id" IS NULL AND "spare_part_id" IS NOT NULL)`,
-)
+// @Check(
+//   `("model_id" IS NOT NULL AND "spare_part_id" IS NULL) OR ("model_id" IS NULL AND "spare_part_id" IS NOT NULL)`,
+// )
 @Check(`"max_discount_amount" >= 0`)
 // Removed: @Check(`"max_discount_amount" <= "sale_price"`) - validation moved to application layer
 export class Product {
@@ -67,6 +68,13 @@ export class Product {
   @ManyToOne(() => Vendor)
   @JoinColumn({ name: 'vendor_id' })
   vendor!: Vendor;
+
+  @Column({ name: 'lot_id', nullable: true })
+  lot_id?: string;
+
+  @ManyToOne(() => Lot, { nullable: true })
+  @JoinColumn({ name: 'lot_id' })
+  lot?: Lot;
 
   @Column({ type: 'varchar', length: 255, unique: true })
   serial_no!: string;

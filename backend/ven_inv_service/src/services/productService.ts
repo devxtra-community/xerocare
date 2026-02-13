@@ -5,11 +5,14 @@ import { ModelRepository } from '../repositories/modelRepository';
 import { WarehouseRepository } from '../repositories/warehouseRepository';
 import { Product } from '../entities/productEntity';
 import { logger } from '../config/logger';
+import { LotService } from './lotService';
+import { LotItemType } from '../entities/lotItemEntity';
 
 export class ProductService {
   private productRepo = new ProductRepository();
   private model = new ModelRepository();
   private warehouse = new WarehouseRepository();
+  private lotService = new LotService();
 
   private validateDiscount(salePrice: number, maxDiscount?: number) {
     if (maxDiscount !== undefined) {
@@ -44,6 +47,20 @@ export class ProductService {
         if (!warehouseDetails) {
           throw new AppError('warehouse not found ', 404);
         }
+
+        // Check Lot Usage if lot_id provided
+        if (row.lot_id) {
+          await this.lotService.validateAndTrackUsage(
+            row.lot_id,
+            LotItemType.MODEL,
+            row.model_no, // assuming model_no is model_id or mapped correctly? Wait.
+            // row.model_no in bulk might be model_no string or UUID?
+            // ProductService.ts:39 uses this.model.findbyid(row.model_no).
+            // So row.model_no is treated as ID.
+            1,
+          );
+        }
+
         await this.model.updateModel(modelDetails.id, { quantity: modelDetails.quantity + 1 });
         await this.productRepo.addProduct({
           vendor_id: String(row.vendor_id),
@@ -58,6 +75,7 @@ export class ProductService {
           product_status: row.product_status,
           print_colour: row.print_colour,
           max_discount_amount: maxDiscount,
+          lot_id: row.lot_id,
         });
         success.push(row.serial_no);
       } catch (error: unknown) {
@@ -89,6 +107,17 @@ export class ProductService {
       if (!modelDetails) {
         throw new AppError('model not found', 404);
       }
+
+      // Check Lot Usage if lot_id provided
+      if (data.lot_id) {
+        await this.lotService.validateAndTrackUsage(
+          data.lot_id,
+          LotItemType.MODEL,
+          data.model_id,
+          1, // One product instance
+        );
+      }
+
       const warehouseDetails = await this.warehouse.findById(data.warehouse_id);
       if (!warehouseDetails) {
         throw new AppError('warehouse not found ', 404);
@@ -108,6 +137,7 @@ export class ProductService {
         print_colour: data.print_colour,
         max_discount_amount: maxDiscount,
         imageUrl: data.imageUrl,
+        lot_id: data.lot_id,
       });
     } catch (err: unknown) {
       if (err instanceof AppError) throw err;

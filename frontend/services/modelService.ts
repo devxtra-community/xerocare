@@ -5,6 +5,8 @@ export interface Model {
   model_no: string;
   model_name: string;
   brandRelation?: { id: string; name: string };
+  brand?: { id: string; name: string }; // Fallback
+  brand_id?: string; // Direct ID
   description: string;
   quantity: number;
 }

@@ -23,6 +23,7 @@ export interface Product {
   max_discount_amount: number;
   imageUrl?: string;
   stock?: number;
+  lot_id?: string;
 }
 
 export interface CreateProductDTO {
@@ -39,6 +40,7 @@ export interface CreateProductDTO {
   print_colour: 'BLACK_WHITE' | 'COLOUR' | 'BOTH';
   max_discount_amount: number;
   imageUrl?: string;
+  lot_id?: string;
 }
 
 export interface BulkProductRow {

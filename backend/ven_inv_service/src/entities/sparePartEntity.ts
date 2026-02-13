@@ -44,6 +44,13 @@ export class SparePart {
   @JoinColumn({ name: 'branch_id' })
   branch!: Branch;
 
+  @Column({ name: 'lot_id', nullable: true })
+  lot_id?: string;
+
+  //   @ManyToOne(() => Lot, { nullable: true })
+  //   @JoinColumn({ name: 'lot_id' })
+  //   lot?: Lot;
+
   @Column({ name: 'base_price', type: 'decimal', precision: 12, scale: 2, default: 0 })
   base_price!: number;
 
