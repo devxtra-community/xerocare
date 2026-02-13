@@ -810,18 +810,9 @@ export function InvoiceDetailsDialog({
                             <p className="font-bold text-gray-700 text-sm">
                               {getCleanProductName(item.description)}
                             </p>
-                            {(item.productId ||
-                              item.initialBwCount !== undefined ||
+                            {(item.initialBwCount !== undefined ||
                               item.initialColorCount !== undefined) && (
                               <div className="flex flex-wrap gap-2 mt-1">
-                                {item.productId && (
-                                  <Badge
-                                    variant="outline"
-                                    className="text-[9px] font-bold bg-green-50 text-green-700 border-green-100 px-1.5 py-0"
-                                  >
-                                    SN: {item.productId}
-                                  </Badge>
-                                )}
                                 {item.initialBwCount !== undefined && (
                                   <Badge
                                     variant="outline"

@@ -27,7 +27,18 @@ const handleNumberInput = (val: string) => {
   return val;
 };
 
-// ... (imports)
+interface PricingItem {
+  description: string;
+  bwIncludedLimit?: string;
+  colorIncludedLimit?: string;
+  combinedIncludedLimit?: string;
+  bwExcessRate?: string;
+  colorExcessRate?: string;
+  combinedExcessRate?: string;
+  bwSlabRanges?: Array<{ from: string; to: string; rate: string }>;
+  colorSlabRanges?: Array<{ from: string; to: string; rate: string }>;
+  comboSlabRanges?: Array<{ from: string; to: string; rate: string }>;
+}
 
 export default function RentFormModal({
   initialData,
@@ -61,18 +72,7 @@ export default function RentFormModal({
     totalLeaseAmount: string;
     monthlyEmiAmount: string;
     monthlyLeaseAmount: string;
-    pricingItems: {
-      description: string;
-      bwIncludedLimit?: string;
-      colorIncludedLimit?: string;
-      combinedIncludedLimit?: string;
-      bwExcessRate?: string;
-      colorExcessRate?: string;
-      combinedExcessRate?: string;
-      bwSlabRanges?: Array<{ from: string; to: string; rate: string }>;
-      colorSlabRanges?: Array<{ from: string; to: string; rate: string }>;
-      comboSlabRanges?: Array<{ from: string; to: string; rate: string }>;
-    }[];
+    pricingItems: PricingItem[];
   }>({
     customerId: initialData?.customerId || '',
     saleType: initialData?.saleType || defaultSaleType,
@@ -100,47 +100,117 @@ export default function RentFormModal({
       initialData?.monthlyEmiAmount !== undefined ? String(initialData.monthlyEmiAmount) : '',
     monthlyLeaseAmount:
       initialData?.monthlyLeaseAmount !== undefined ? String(initialData.monthlyLeaseAmount) : '',
-    pricingItems: initialData?.items
-      ?.filter((i) => i.itemType === 'PRICING_RULE')
-      ?.map((i) => ({
-        description: i.description,
-        bwIncludedLimit: i.bwIncludedLimit !== undefined ? String(i.bwIncludedLimit) : '',
-        colorIncludedLimit: i.colorIncludedLimit !== undefined ? String(i.colorIncludedLimit) : '',
-        combinedIncludedLimit:
-          i.combinedIncludedLimit !== undefined ? String(i.combinedIncludedLimit) : '',
-        bwExcessRate: i.bwExcessRate !== undefined ? String(i.bwExcessRate) : '',
-        colorExcessRate: i.colorExcessRate !== undefined ? String(i.colorExcessRate) : '',
-        combinedExcessRate: i.combinedExcessRate !== undefined ? String(i.combinedExcessRate) : '',
-        bwSlabRanges:
-          i.bwSlabRanges?.map((r) => ({
-            from: String(r.from),
-            to: String(r.to),
-            rate: String(r.rate),
-          })) || [],
-        colorSlabRanges:
-          i.colorSlabRanges?.map((r) => ({
-            from: String(r.from),
-            to: String(r.to),
-            rate: String(r.rate),
-          })) || [],
-        comboSlabRanges:
-          i.comboSlabRanges?.map((r) => ({
-            from: String(r.from),
-            to: String(r.to),
-            rate: String(r.rate),
-          })) || [],
-      })) || [
-      {
-        description: 'Black & White',
-        bwIncludedLimit: '',
-        bwExcessRate: '',
-      },
-      {
-        description: 'Color',
-        colorIncludedLimit: '',
-        colorExcessRate: '',
-      },
-    ],
+    pricingItems: (() => {
+      if (!initialData) {
+        // Default for NEW invoice
+        return [
+          { description: 'Black & White', bwIncludedLimit: '', bwExcessRate: '' },
+          { description: 'Color', colorIncludedLimit: '', colorExcessRate: '' },
+        ] as PricingItem[];
+      }
+
+      const extractedRules: PricingItem[] = [];
+      initialData.items?.forEach((item) => {
+        const isProduct =
+          item.itemType === 'PRODUCT' || (!item.itemType && !item.description.includes(' - '));
+        const baseDesc = item.description;
+
+        if (isProduct) {
+          // If product has limits, extract them as rules
+          const hasBw =
+            (item.bwIncludedLimit && Number(item.bwIncludedLimit) > 0) ||
+            (item.bwExcessRate && Number(item.bwExcessRate) > 0) ||
+            (item.bwSlabRanges && item.bwSlabRanges.length > 0);
+          const hasColor =
+            (item.colorIncludedLimit && Number(item.colorIncludedLimit) > 0) ||
+            (item.colorExcessRate && Number(item.colorExcessRate) > 0) ||
+            (item.colorSlabRanges && item.colorSlabRanges.length > 0);
+          const hasCombined =
+            (item.combinedIncludedLimit && Number(item.combinedIncludedLimit) > 0) ||
+            (item.combinedExcessRate && Number(item.combinedExcessRate) > 0) ||
+            (item.comboSlabRanges && item.comboSlabRanges.length > 0);
+
+          if (hasBw) {
+            extractedRules.push({
+              description: `Black & White - ${baseDesc}`,
+              bwIncludedLimit:
+                item.bwIncludedLimit !== undefined ? String(item.bwIncludedLimit) : '',
+              bwExcessRate: item.bwExcessRate !== undefined ? String(item.bwExcessRate) : '',
+              bwSlabRanges:
+                item.bwSlabRanges?.map((r) => ({
+                  from: String(r.from),
+                  to: String(r.to),
+                  rate: String(r.rate),
+                })) || [],
+            });
+          }
+          if (hasColor) {
+            extractedRules.push({
+              description: `Color - ${baseDesc}`,
+              colorIncludedLimit:
+                item.colorIncludedLimit !== undefined ? String(item.colorIncludedLimit) : '',
+              colorExcessRate:
+                item.colorExcessRate !== undefined ? String(item.colorExcessRate) : '',
+              colorSlabRanges:
+                item.colorSlabRanges?.map((r) => ({
+                  from: String(r.from),
+                  to: String(r.to),
+                  rate: String(r.rate),
+                })) || [],
+            });
+          }
+          if (hasCombined) {
+            extractedRules.push({
+              description: `Combined - ${baseDesc}`,
+              combinedIncludedLimit:
+                item.combinedIncludedLimit !== undefined ? String(item.combinedIncludedLimit) : '',
+              combinedExcessRate:
+                item.combinedExcessRate !== undefined ? String(item.combinedExcessRate) : '',
+              comboSlabRanges:
+                item.comboSlabRanges?.map((r) => ({
+                  from: String(r.from),
+                  to: String(r.to),
+                  rate: String(r.rate),
+                })) || [],
+            });
+          }
+        } else {
+          // It's already a PRICING_RULE or specifically formatted
+          extractedRules.push({
+            description: item.description,
+            bwIncludedLimit: item.bwIncludedLimit !== undefined ? String(item.bwIncludedLimit) : '',
+            colorIncludedLimit:
+              item.colorIncludedLimit !== undefined ? String(item.colorIncludedLimit) : '',
+            combinedIncludedLimit:
+              item.combinedIncludedLimit !== undefined ? String(item.combinedIncludedLimit) : '',
+            bwExcessRate: item.bwExcessRate !== undefined ? String(item.bwExcessRate) : '',
+            colorExcessRate: item.colorExcessRate !== undefined ? String(item.colorExcessRate) : '',
+            combinedExcessRate:
+              item.combinedExcessRate !== undefined ? String(item.combinedExcessRate) : '',
+            bwSlabRanges:
+              item.bwSlabRanges?.map((r) => ({
+                from: String(r.from),
+                to: String(r.to),
+                rate: String(r.rate),
+              })) || [],
+            colorSlabRanges:
+              item.colorSlabRanges?.map((r) => ({
+                from: String(r.from),
+                to: String(r.to),
+                rate: String(r.rate),
+              })) || [],
+            comboSlabRanges:
+              item.comboSlabRanges?.map((r) => ({
+                from: String(r.from),
+                to: String(r.to),
+                rate: String(r.rate),
+              })) || [],
+          });
+        }
+      });
+
+      return extractedRules;
+    })(),
   });
 
   // Effect to calculate Effective To date based on Tenure
@@ -264,7 +334,7 @@ export default function RentFormModal({
             return mergedItem;
           }),
 
-          pricingItems: undefined,
+          pricingItems: [],
         };
       } else {
         const isFixed = form.rentType.startsWith('FIXED');
@@ -343,7 +413,7 @@ export default function RentFormModal({
 
             return mergedItem;
           }),
-          pricingItems: undefined,
+          pricingItems: [],
         };
       }
 
@@ -818,8 +888,7 @@ export default function RentFormModal({
                             {product.name}
                           </div>
                           <div className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide truncate">
-                            {product.brand} • {product.model?.model_name || 'Generic Model'} •{' '}
-                            {product.serial_no}
+                            {product.brand} • {product.model?.model_name || 'Generic Model'}
                           </div>
                         </div>
                       </div>

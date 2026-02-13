@@ -23,8 +23,7 @@ import {
   UsageRecord,
 } from '@/lib/invoice';
 import { toast } from 'sonner';
-import { Loader2, IndianRupee, History } from 'lucide-react';
-import { format } from 'date-fns';
+import { Loader2, IndianRupee } from 'lucide-react';
 import UsagePreviewDialog from './UsagePreviewDialog';
 
 interface UsageRecordingModalProps {
@@ -65,7 +64,6 @@ export default function UsageRecordingModal({
   const [showPreview, setShowPreview] = useState(false);
   const [recordedUsageData, setRecordedUsageData] = useState<RecordedUsageData | null>(null);
   const [history, setHistory] = useState<UsageRecord[]>([]);
-  const [showHistory, setShowHistory] = useState(false);
 
   const [formData, setFormData] = useState({
     billingPeriodStart: '',
@@ -80,7 +78,6 @@ export default function UsageRecordingModal({
 
   React.useEffect(() => {
     if (editingInvoice) {
-      setContract(editingInvoice);
       setFormData({
         billingPeriodStart: editingInvoice.billingPeriodStart?.split('T')[0] || '',
         billingPeriodEnd: editingInvoice.billingPeriodEnd?.split('T')[0] || '',
@@ -90,6 +87,14 @@ export default function UsageRecordingModal({
         colorA3Count: String(editingInvoice.colorA3Count || 0),
         remarks: editingInvoice.financeRemarks || '',
       });
+
+      // Fetch the full contract details to get Pricing Rules (items)
+      // because editingInvoice (Final Invoice) might not have them.
+      if (editingInvoice.referenceContractId) {
+        getInvoiceById(editingInvoice.referenceContractId)
+          .then(setContract)
+          .catch((err) => console.error('Failed to fetch reference contract:', err));
+      }
     } else if (contractId) {
       getInvoiceById(contractId)
         .then((data) => {
@@ -482,59 +487,8 @@ export default function UsageRecordingModal({
       <Dialog open={isOpen} onOpenChange={onClose}>
         <DialogContent className="sm:max-w-[600px]">
           <DialogHeader>
-            <div className="flex justify-between items-center pr-8">
-              <DialogTitle>Record Usage for {customerName}</DialogTitle>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setShowHistory(!showHistory)}
-                className="text-xs"
-              >
-                <History className="mr-2 h-3 w-3" />
-                {showHistory ? 'Hide History' : 'Show History'}
-              </Button>
-            </div>
+            <DialogTitle>Record Usage for {customerName}</DialogTitle>
           </DialogHeader>
-
-          {showHistory && (
-            <div className="border border-border rounded-lg overflow-hidden mb-4 max-h-[200px] overflow-y-auto">
-              <table className="w-full text-[10px] text-left">
-                <thead className="bg-muted text-muted-foreground uppercase font-bold sticky top-0">
-                  <tr>
-                    <th className="p-2">Period</th>
-                    <th className="p-2">BW A4</th>
-                    <th className="p-2">BW A3</th>
-                    <th className="p-2">Col A4</th>
-                    <th className="p-2">Col A3</th>
-                    <th className="p-2">Remarks</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {history.length === 0 ? (
-                    <tr>
-                      <td colSpan={6} className="p-4 text-center text-muted-foreground">
-                        No previous records found
-                      </td>
-                    </tr>
-                  ) : (
-                    history.map((h) => (
-                      <tr key={h.id} className="hover:bg-muted/50">
-                        <td className="p-2">
-                          {format(new Date(h.billingPeriodStart), 'MMM yyyy')}
-                        </td>
-                        <td className="p-2">{h.bwA4Count}</td>
-                        <td className="p-2">{h.bwA3Count}</td>
-                        <td className="p-2">{h.colorA4Count}</td>
-                        <td className="p-2">{h.colorA3Count}</td>
-                        <td className="p-2 truncate max-w-[100px]">{h.remarks || '-'}</td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-2 gap-4">

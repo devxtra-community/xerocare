@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Search, Loader2, Eye, FileText, Plus } from 'lucide-react';
+import { Search, Loader2, Eye, FileText, Plus, Clock } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import {
@@ -21,13 +21,10 @@ import {
 } from '@/lib/invoice';
 import RentFormModal from './RentFormModal';
 import { Badge } from '@/components/ui/badge';
-import { Clock } from 'lucide-react';
 import { ApproveQuotationDialog } from '@/components/invoice/ApproveQuotationDialog';
 import { InvoiceDetailsDialog } from '@/components/invoice/InvoiceDetailsDialog';
 
 import { updateQuotation } from '@/lib/invoice'; // Ensure import
-import RentHistoryView from './RentHistoryView';
-import { History as HistoryIcon } from 'lucide-react';
 import UsageRecordingModal from '../Finance/UsageRecordingModal';
 
 const calculateRemainingDays = (end: string | Date | undefined) => {
@@ -51,7 +48,6 @@ export default function EmployeeRentTable({ mode = 'EMPLOYEE' }: EmployeeRentTab
   const [formOpen, setFormOpen] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [approveOpen, setApproveOpen] = useState(false);
-  const [historyOpen, setHistoryOpen] = useState(false);
   const [editInvoice, setEditInvoice] = useState<Invoice | undefined>(undefined); // For Edit Mode
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [isUsageModalOpen, setIsUsageModalOpen] = useState(false);
@@ -135,11 +131,6 @@ export default function EmployeeRentTable({ mode = 'EMPLOYEE' }: EmployeeRentTab
       console.error(error);
       toast.error('Failed to send for approval');
     }
-  };
-
-  const handleShowHistory = (inv: Invoice) => {
-    setSelectedInvoice(inv);
-    setHistoryOpen(true);
   };
 
   // ...
@@ -292,15 +283,6 @@ export default function EmployeeRentTable({ mode = 'EMPLOYEE' }: EmployeeRentTab
                                   <FileText className="h-4 w-4" />
                                 </Button>
                               )}
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8 text-slate-400 hover:text-purple-600 hover:bg-purple-50"
-                                onClick={() => handleShowHistory(inv)}
-                                title="History"
-                              >
-                                <HistoryIcon className="h-4 w-4" />
-                              </Button>
                             </>
                           )}
                         </div>
@@ -319,15 +301,6 @@ export default function EmployeeRentTable({ mode = 'EMPLOYEE' }: EmployeeRentTab
             lockSaleType={true}
             onClose={() => setFormOpen(false)}
             onConfirm={handleCreateOrUpdate}
-          />
-        )}
-
-        {/* History View Dialog */}
-        {historyOpen && selectedInvoice && (
-          <RentHistoryView
-            contractId={selectedInvoice.id}
-            isOpen={historyOpen}
-            onClose={() => setHistoryOpen(false)}
           />
         )}
 
