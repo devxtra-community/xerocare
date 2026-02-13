@@ -9,14 +9,58 @@ import {
   ResponsiveContainer,
   Tooltip,
 } from 'recharts';
-import { getInvoices, Invoice } from '@/lib/invoice';
+import { getGlobalSalesOverview } from '@/lib/invoice';
 
-// Removed unused static data
+interface SalesDataPoint {
+  month: string;
+  SALE: number;
+  RENT: number;
+  LEASE: number;
+}
+
+interface TooltipEntry {
+  name: string;
+  value: number;
+  color: string;
+  payload: SalesDataPoint;
+}
+
+const CustomTooltip = ({
+  active,
+  payload,
+  label,
+}: {
+  active?: boolean;
+  payload?: TooltipEntry[];
+  label?: string;
+}) => {
+  if (active && payload && payload.length) {
+    const total = payload.reduce((sum: number, entry: TooltipEntry) => sum + (entry.value || 0), 0);
+    return (
+      <div className="bg-background border rounded-lg p-2 shadow-sm text-[10px] sm:text-xs">
+        <p className="font-bold border-b pb-1 mb-1">{label}</p>
+        {payload.map((entry: TooltipEntry, index: number) => (
+          <div key={index} className="flex justify-between gap-4 py-0.5">
+            <span style={{ color: entry.color }}>{entry.name}:</span>
+            <span className="font-semibold">
+              {((entry.value as number) || 0).toLocaleString()} AED
+            </span>
+          </div>
+        ))}
+        <div className="flex justify-between gap-4 py-0.5 border-t mt-1 pt-1 font-bold">
+          <span>Total:</span>
+          <span>{total.toLocaleString()} AED</span>
+        </div>
+      </div>
+    );
+  }
+  return null;
+};
 
 export default function SalesChart() {
-  const [selectedPeriod, setSelectedPeriod] = useState('1M');
+  const [selectedPeriod, setSelectedPeriod] = useState('1Y');
   const [isClient, setIsClient] = useState(false);
-  const [data, setData] = useState<{ month: string; sales: number; fullMonth: string }[]>([]);
+  const [data, setData] = useState<SalesDataPoint[]>([]);
 
   useEffect(() => {
     setIsClient(true);
@@ -25,48 +69,62 @@ export default function SalesChart() {
   useEffect(() => {
     const fetchSalesData = async () => {
       try {
-        const invoices = await getInvoices();
+        const trendData = await getGlobalSalesOverview(selectedPeriod);
 
-        // Initialize all months with 0
-        const monthlyData = [
-          { month: 'Jan', sales: 0, fullMonth: 'January' },
-          { month: 'Feb', sales: 0, fullMonth: 'February' },
-          { month: 'Mar', sales: 0, fullMonth: 'March' },
-          { month: 'Apr', sales: 0, fullMonth: 'April' },
-          { month: 'May', sales: 0, fullMonth: 'May' },
-          { month: 'Jun', sales: 0, fullMonth: 'June' },
-          { month: 'Jul', sales: 0, fullMonth: 'July' },
-          { month: 'Aug', sales: 0, fullMonth: 'August' },
-          { month: 'Sep', sales: 0, fullMonth: 'September' },
-          { month: 'Oct', sales: 0, fullMonth: 'October' },
-          { month: 'Nov', sales: 0, fullMonth: 'November' },
-          { month: 'Dec', sales: 0, fullMonth: 'December' },
+        // Group by month
+        const monthlyMap: Record<string, SalesDataPoint> = {
+          Jan: { month: 'Jan', SALE: 0, RENT: 0, LEASE: 0 },
+          Feb: { month: 'Feb', SALE: 0, RENT: 0, LEASE: 0 },
+          Mar: { month: 'Mar', SALE: 0, RENT: 0, LEASE: 0 },
+          Apr: { month: 'Apr', SALE: 0, RENT: 0, LEASE: 0 },
+          May: { month: 'May', SALE: 0, RENT: 0, LEASE: 0 },
+          Jun: { month: 'Jun', SALE: 0, RENT: 0, LEASE: 0 },
+          Jul: { month: 'Jul', SALE: 0, RENT: 0, LEASE: 0 },
+          Aug: { month: 'Aug', SALE: 0, RENT: 0, LEASE: 0 },
+          Sep: { month: 'Sep', SALE: 0, RENT: 0, LEASE: 0 },
+          Oct: { month: 'Oct', SALE: 0, RENT: 0, LEASE: 0 },
+          Nov: { month: 'Nov', SALE: 0, RENT: 0, LEASE: 0 },
+          Dec: { month: 'Dec', SALE: 0, RENT: 0, LEASE: 0 },
+        };
+
+        const monthNames = [
+          'Jan',
+          'Feb',
+          'Mar',
+          'Apr',
+          'May',
+          'Jun',
+          'Jul',
+          'Aug',
+          'Sep',
+          'Oct',
+          'Nov',
+          'Dec',
         ];
 
-        // Filter for sales invoices from the current year
-        const currentYear = new Date().getFullYear();
-        invoices.forEach((inv: Invoice) => {
-          if (inv.saleType === 'SALE') {
-            const date = new Date(inv.createdAt);
-            if (date.getFullYear() === currentYear) {
-              const monthIndex = date.getMonth(); // 0-11
-              monthlyData[monthIndex].sales += Number(inv.totalAmount) || 0;
-            }
+        trendData.forEach((item) => {
+          const date = new Date(item.date);
+          const monthName = monthNames[date.getMonth()];
+          if (monthlyMap[monthName]) {
+            const type = item.saleType as 'SALE' | 'RENT' | 'LEASE';
+            monthlyMap[monthName][type] = (monthlyMap[monthName][type] || 0) + item.totalSales;
           }
         });
 
-        setData(monthlyData);
+        setData(Object.values(monthlyMap));
       } catch (error) {
         console.error('Failed to fetch sales chart data', error);
       }
     };
     fetchSalesData();
-  }, []);
+  }, [selectedPeriod]);
 
   return (
     <div className="rounded-2xl bg-card h-[260px] w-full shadow-sm flex flex-col p-3">
       <div className="flex flex-row items-center justify-between pb-2">
-        <p className="text-xs text-gray-600">Monthly Sales ({new Date().getFullYear()})</p>
+        <p className="text-xs text-gray-600 font-medium">
+          Global Sales Overview ({new Date().getFullYear()})
+        </p>
 
         <div className="flex gap-1.5 text-[10px]">
           {['1W', '1M', '3M', '1Y'].map((period) => (
@@ -90,9 +148,17 @@ export default function SalesChart() {
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={data} margin={{ top: 5, left: 0, right: 5, bottom: 0 }}>
               <defs>
-                <linearGradient id="salesGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#1d4ed8" stopOpacity={0.7} />
-                  <stop offset="100%" stopColor="#1d4ed8" stopOpacity={0.05} />
+                <linearGradient id="colorSale" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#1d4ed8" stopOpacity={0.1} />
+                  <stop offset="95%" stopColor="#1d4ed8" stopOpacity={0} />
+                </linearGradient>
+                <linearGradient id="colorRent" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#10b981" stopOpacity={0.1} />
+                  <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                </linearGradient>
+                <linearGradient id="colorLease" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.1} />
+                  <stop offset="95%" stopColor="#f59e0b" stopOpacity={0} />
                 </linearGradient>
               </defs>
 
@@ -109,26 +175,42 @@ export default function SalesChart() {
               <YAxis
                 axisLine={false}
                 tickLine={false}
-                tickFormatter={(v) => `${v / 1000}k`}
+                tickFormatter={(v) => (v >= 1000 ? `${v / 1000}k` : v)}
                 tickMargin={6}
-                // allowDecimals={false}
                 tick={{ fill: '#6b7280', fontSize: 10 }}
               />
 
-              <Tooltip
-                contentStyle={{ fontSize: 12 }}
-                labelStyle={{ color: '#1e3a8a' }}
-                formatter={(value: number) => [`${value.toFixed(2)} AZN`, 'Sales']}
-              />
+              <Tooltip content={<CustomTooltip />} />
 
               <Area
                 type="monotone"
-                dataKey="sales"
+                dataKey="SALE"
+                name="Sale"
                 stroke="#1d4ed8"
                 strokeWidth={2}
-                fill="url(#salesGradient)"
-                dot={false}
-                activeDot={{ r: 4 }}
+                fillOpacity={1}
+                fill="url(#colorSale)"
+                stackId="1"
+              />
+              <Area
+                type="monotone"
+                dataKey="RENT"
+                name="Rent"
+                stroke="#10b981"
+                strokeWidth={2}
+                fillOpacity={1}
+                fill="url(#colorRent)"
+                stackId="1"
+              />
+              <Area
+                type="monotone"
+                dataKey="LEASE"
+                name="Lease"
+                stroke="#f59e0b"
+                strokeWidth={2}
+                fillOpacity={1}
+                fill="url(#colorLease)"
+                stackId="1"
               />
             </AreaChart>
           </ResponsiveContainer>

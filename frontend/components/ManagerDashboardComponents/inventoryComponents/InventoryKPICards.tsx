@@ -5,8 +5,8 @@ import { inventoryService } from '@/services/inventoryService';
 
 export default function InventoryKPICards() {
   const [stats, setStats] = React.useState({
-    totalProducts: 0,
-    totalStockUnits: 0,
+    totalStock: 0,
+    productModels: 0,
     totalValue: 0,
     damagedStock: 0,
   });
@@ -26,7 +26,7 @@ export default function InventoryKPICards() {
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('en-IN', {
       style: 'currency',
-      currency: 'INR',
+      currency: 'AED',
       maximumFractionDigits: 0,
     }).format(value);
   };
@@ -34,13 +34,13 @@ export default function InventoryKPICards() {
   return (
     <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 sm:gap-2 md:gap-4">
       <StatCard
-        title="Total Products"
-        value={stats.totalProducts.toLocaleString()}
+        title="Product Models"
+        value={stats.productModels.toLocaleString()}
         subtitle="Across all categories"
       />
       <StatCard
-        title="Total Stock Units"
-        value={stats.totalStockUnits.toLocaleString()}
+        title="Total Stock"
+        value={stats.totalStock.toLocaleString()}
         subtitle="Items available in stock"
       />
       <StatCard

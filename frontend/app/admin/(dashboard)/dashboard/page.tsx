@@ -1,7 +1,10 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { getInvoices } from '@/lib/invoice';
+import { getGlobalSalesTotals } from '@/lib/invoice';
+import { getBranches } from '@/lib/branch';
+import { getWarehouses } from '@/lib/warehouse';
+import { getAllEmployees } from '@/lib/employee';
 import StatCard from '@/components/StatCard';
 import ProductsTable from '@/components/AdminDahboardComponents/dashboardComponents/productTable';
 import HrTable from '@/components/AdminDahboardComponents/dashboardComponents/HrTable';
@@ -13,53 +16,56 @@ import CategoryPieChart from '@/components/AdminDahboardComponents/dashboardComp
 export default function Dashboard() {
   const [stats, setStats] = useState({
     earnings: '0.00',
-    totalSold: '0',
-    bestSellingModel: 'N/A',
-    bestSellingProduct: 'N/A',
+    branchCount: '0',
+    warehouseCount: '0',
+    employeeCount: '0',
   });
 
   useEffect(() => {
     const fetchStats = async () => {
+      // Fetch each stat independently to be resilient
       try {
-        const invoices = await getInvoices();
-        const sales = invoices.filter((inv) => inv.saleType === 'SALE');
-
-        // Total Earnings (Assuming totalAmount is the final price)
-        const totalEarnings = sales.reduce((sum, inv) => sum + (Number(inv.totalAmount) || 0), 0);
-
-        // Total Items Sold & Best Sellers
-        let totalItems = 0;
-        const productCounts: Record<string, number> = {};
-
-        sales.forEach((inv) => {
-          if (inv.items) {
-            inv.items.forEach((item) => {
-              const qty = item.quantity || 0;
-              totalItems += qty;
-              const name = item.description || 'Unknown';
-              productCounts[name] = (productCounts[name] || 0) + qty;
-            });
-          }
+        const salesTotalsPromise = getGlobalSalesTotals().catch((err) => {
+          console.error('Failed to fetch sales totals:', err);
+          return null;
+        });
+        const branchesResPromise = getBranches().catch((err) => {
+          console.error('Failed to fetch branches:', err);
+          return null;
+        });
+        const warehousesResPromise = getWarehouses().catch((err) => {
+          console.error('Failed to fetch warehouses:', err);
+          return null;
+        });
+        const employeeResPromise = getAllEmployees().catch((err) => {
+          console.error('Failed to fetch employees:', err);
+          return null;
         });
 
-        // Find best selling
-        let bestProduct = 'N/A';
-        let maxCount = 0;
-        Object.entries(productCounts).forEach(([name, count]) => {
-          if (count > maxCount) {
-            maxCount = count;
-            bestProduct = name;
-          }
+        const [salesTotals, branchesRes, warehousesRes, employeeRes] = await Promise.all([
+          salesTotalsPromise,
+          branchesResPromise,
+          warehousesResPromise,
+          employeeResPromise,
+        ]);
+
+        console.log('Dashboard Data Fetch Summary:', {
+          hasSales: !!salesTotals,
+          branchesCount: branchesRes?.data?.length,
+          warehousesCount: warehousesRes?.data?.length,
+          employeesCount: employeeRes?.data?.employees?.length,
         });
 
         setStats({
-          earnings: totalEarnings.toLocaleString('en-US', { minimumFractionDigits: 2 }),
-          totalSold: totalItems.toString(),
-          bestSellingModel: 'N/A', // Placeholder as model is not in invoice items directly
-          bestSellingProduct: bestProduct,
+          earnings: `${(salesTotals?.totalSales || 0).toLocaleString('en-US', {
+            minimumFractionDigits: 2,
+          })} AED`,
+          branchCount: (branchesRes?.data?.length || 0).toString(),
+          warehouseCount: (warehousesRes?.data?.length || 0).toString(),
+          employeeCount: (employeeRes?.data?.employees?.length || 0).toString(),
         });
       } catch (error) {
-        console.error('Failed to fetch dashboard stats', error);
+        console.error('Critical error in fetchStats:', error);
       }
     };
     fetchStats();
@@ -72,25 +78,13 @@ export default function Dashboard() {
       </h3> */}
 
       <div className="flex flex-col space-y-3 sm:space-y-4">
-        <h3 className="text-lg sm:text-m font-bold text-primary">Sales</h3>
+        <h3 className="text-lg sm:text-m font-bold text-primary">Admin Dashboard</h3>
 
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 md:gap-4">
-          <StatCard title="Total Earnings" value={stats.earnings} subtitle="1 month indicator" />
-          <StatCard
-            title="Total Number Of Products Sold"
-            value={stats.totalSold}
-            subtitle="1 month indicator"
-          />
-          <StatCard
-            title="Best Selling Model"
-            value={stats.bestSellingModel}
-            subtitle="1 month indicator"
-          />
-          <StatCard
-            title="Best Selling Product"
-            value={stats.bestSellingProduct}
-            subtitle="1 month indicator"
-          />
+          <StatCard title="Total Earnings" value={stats.earnings} subtitle="All branches" />
+          <StatCard title="Branches" value={stats.branchCount} subtitle="Active branches" />
+          <StatCard title="Warehouses" value={stats.warehouseCount} subtitle="Total warehouses" />
+          <StatCard title="Employees" value={stats.employeeCount} subtitle="Total workforce" />
         </div>
 
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 sm:gap-6">

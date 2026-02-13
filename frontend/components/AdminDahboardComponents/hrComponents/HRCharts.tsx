@@ -17,23 +17,9 @@ import {
 import { getHRStats } from '@/lib/employee';
 import { Loader2 } from 'lucide-react';
 
-const mockGrowthData = [
-  { month: 'Jan', count: 12 },
-  { month: 'Feb', count: 15 },
-  { month: 'Mar', count: 18 },
-  { month: 'Apr', count: 22 },
-  { month: 'May', count: 25 },
-  { month: 'Jun', count: 32 },
-  { month: 'Jul', count: 38 },
-  { month: 'Aug', count: 42 },
-  { month: 'Sep', count: 55 },
-  { month: 'Oct', count: 62 },
-  { month: 'Nov', count: 75 },
-  { month: 'Dec', count: 88 },
-];
-
 export default function HRCharts() {
   const [roleData, setRoleData] = useState<{ name: string; value: number; color: string }[]>([]);
+  const [growthData, setGrowthData] = useState<{ month: string; count: number }[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -42,13 +28,19 @@ export default function HRCharts() {
         const response = await getHRStats();
         if (response.success) {
           const stats = response.data;
+
           const formatted = [
-            { name: 'ADMIN', value: stats.byRole.ADMIN || 0, color: '#003F7D' },
-            { name: 'HR', value: stats.byRole.HR || 0, color: '#0284C7' },
-            { name: 'MANAGER', value: stats.byRole.MANAGER || 0, color: '#60A5FA' },
-            { name: 'EMPLOYEE', value: stats.byRole.EMPLOYEE || 0, color: '#9BD0E5' },
-          ];
+            { name: 'ADMIN', value: stats.byRole.ADMIN || 0, color: '#0F172A' }, // Slate-900
+            { name: 'HR', value: stats.byRole.HR || 0, color: '#334155' }, // Slate-700
+            { name: 'MANAGER', value: stats.byRole.MANAGER || 0, color: '#475569' }, // Slate-600
+            { name: 'FINANCE', value: stats.byRole.FINANCE || 0, color: '#0D9488' }, // Teal-600
+            { name: 'EMPLOYEE', value: stats.byRole.EMPLOYEE || 0, color: '#2563EB' }, // Blue-600
+          ].filter((item) => item.value > 0);
+
           setRoleData(formatted);
+          if (stats.growthData) {
+            setGrowthData(stats.growthData);
+          }
         }
       } catch (error) {
         console.error('Failed to fetch HR stats for charts:', error);
@@ -74,7 +66,7 @@ export default function HRCharts() {
         <h3 className="text-lg font-semibold text-primary mb-4">Employee Growth (Monthly)</h3>
         <div className="h-[300px] w-full">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={mockGrowthData}>
+            <BarChart data={growthData}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
               <XAxis
                 dataKey="month"

@@ -157,12 +157,7 @@ export default function FinanceReport() {
     })
     .filter((d) => d.income > 0 || d.expense > 0);
 
-  const averageMargin =
-    dynamicChartData.length > 0
-      ? (
-          dynamicChartData.reduce((s: number, b) => s + b.margin, 0) / dynamicChartData.length
-        ).toFixed(1)
-      : '0.0';
+  const averageMargin = totalIncome > 0 ? ((netProfit / totalIncome) * 100).toFixed(1) : '0.0';
 
   return (
     <div className="bg-blue-100 min-h-screen p-4 space-y-8 sm:space-y-10">

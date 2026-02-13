@@ -231,6 +231,22 @@ export const getPendingCounts = async (): Promise<Record<string, number>> => {
   const response = await api.get('/b/invoices/pending-counts');
   return response.data.data;
 };
+
+export const getGlobalSalesTotals = async (): Promise<{
+  totalSales: number;
+  salesByType: { saleType: string; total: number }[];
+  totalInvoices: number;
+}> => {
+  const response = await api.get('/b/invoices/sales/global-totals');
+  return response.data.data;
+};
+
+export const getGlobalSalesOverview = async (
+  period: string = '1M',
+): Promise<{ date: string; saleType: string; totalSales: number }[]> => {
+  const response = await api.get(`/b/invoices/sales/global-overview?period=${period}`);
+  return response.data.data;
+};
 // Alerts & Collection
 export interface CollectionAlert {
   contractId: string;
@@ -321,4 +337,18 @@ export const updateInvoiceUsage = async (
 ): Promise<unknown> => {
   const response = await api.put(`/b/invoices/${invoiceId}/usage`, payload);
   return response.data;
+};
+
+export interface AdminSalesStats {
+  totalRevenue: number;
+  totalOrders: number;
+  productsSold: number;
+  topProduct: string;
+  monthlySales: { month: string; sales: number }[];
+  soldProductsByQty: { product: string; qty: number }[];
+}
+
+export const getAdminSalesStats = async (): Promise<AdminSalesStats> => {
+  const response = await api.get('/b/invoices/sales/admin-stats');
+  return response.data.data;
 };

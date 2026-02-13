@@ -21,9 +21,9 @@ import VendorSpendingTrend from '@/components/AdminDahboardComponents/vendorComp
 import { getVendorById, Vendor as ApiVendor } from '@/lib/vendor';
 import { toast } from 'sonner';
 
-export default function Page({ params }: { params: { id: string } }) {
+export default function Page({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
-  const id = params.id;
+  const { id } = React.use(params);
   const [vendor, setVendor] = React.useState<ApiVendor | null>(null);
   const [loading, setLoading] = React.useState(true);
 

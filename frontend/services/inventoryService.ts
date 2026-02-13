@@ -16,8 +16,8 @@ export interface InventoryItem {
 }
 
 export interface InventoryStats {
-  totalProducts: number;
-  totalStockUnits: number;
+  totalStock: number;
+  productModels: number;
   totalValue: number;
   damagedStock: number;
 }
