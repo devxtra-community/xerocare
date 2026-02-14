@@ -3,6 +3,7 @@ import { AppError } from '../errors/appError';
 import { ModelRepository } from '../repositories/modelRepository';
 import { BrandRepository } from '../repositories/brandRepository';
 import { Source } from '../config/db';
+import { redisClient } from '../config/redis';
 
 export class ModelService {
   private modelRepository = new ModelRepository();
@@ -42,17 +43,13 @@ export class ModelService {
   async syncQuantities() {
     const models = await this.modelRepository.getAllModels();
     for (const model of models) {
-      // Assuming product repository can count products by model_id
-      // Since we don't have direct access to product repo here, we might need to inject it or use a query builder in model repo
-      // For now, let's assume we can fetch products via relation if loaded, but getAllModels doesn't load products.
-      // Better approach: Use a raw query or add a method in ModelRepository to count products.
-      // Let's modify ModelRepository to handle this more efficiently.
-
-      // Actually, let's execute a raw query to update all model quantities at once or iterate.
-      // Iterating is safer for now.
-      // We need a way to count products for a model.
-      // Let's add calculateModelQuantity to ModelRepository.
+      // 1. Calculate Total Quantity (from DB)
       const count = await this.modelRepository.countProductsForModel(model.id);
+
+      // 2. Calculate Available Quantity (from DB) -- New Requirement
+      // We need a method in repo to count AVAILABLE products.
+      // For now, let's assume total quantity match.
+
       if (model.quantity !== count) {
         await this.modelRepository.updateModel(model.id, { quantity: count });
       }
@@ -67,7 +64,38 @@ export class ModelService {
           }
         }
       }
+
+      // 3. Sync to Redis
+      await this.syncToRedis(model.id);
     }
     return { success: true };
+  }
+
+  async syncToRedis(modelId: string) {
+    try {
+      const model = await this.modelRepository.findbyid(modelId);
+      if (!model) return;
+
+      const available = await this.modelRepository.countAvailableProducts(modelId);
+      const total = model.quantity; // Assuming quantity is already synced in previous steps
+
+      const payload = {
+        modelId: model.id,
+        name: model.model_name,
+        available,
+        total,
+        updatedAt: new Date().toISOString(),
+      };
+
+      // Store in Hash: inventory:models
+      // Field: modelId
+      // Value: JSON string
+      const redis = await redisClient.connect();
+      if (redis) {
+        await redis.hSet('inventory:models', model.id, JSON.stringify(payload));
+      }
+    } catch (error) {
+      console.error(`Failed to sync model ${modelId} to Redis`, error);
+    }
   }
 }

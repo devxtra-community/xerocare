@@ -710,11 +710,18 @@ export class InvoiceAggregationService {
     }
   }
 
-  async financeApprove(id: string, token: string) {
+  async financeApprove(
+    id: string,
+    token: string,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    deposit?: any,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    itemUpdates?: any[],
+  ) {
     try {
       const response = await axios.post<{ data: Invoice }>(
         `${BILLING_SERVICE_URL}/invoices/${id}/finance-approve`,
-        {},
+        { deposit, itemUpdates },
         {
           headers: { Authorization: `Bearer ${token}` },
         },

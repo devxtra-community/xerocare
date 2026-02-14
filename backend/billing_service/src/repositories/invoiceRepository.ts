@@ -14,6 +14,10 @@ export class InvoiceRepository {
     this.repo = Source.getRepository(Invoice);
   }
 
+  get manager() {
+    return this.repo.manager;
+  }
+
   createInvoice(data: Partial<Invoice>) {
     const invoice = this.repo.create(data);
     return this.repo.save(invoice);

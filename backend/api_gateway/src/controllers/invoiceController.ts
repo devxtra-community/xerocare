@@ -142,8 +142,9 @@ export const financeApprove = async (req: Request, res: Response, next: NextFunc
   try {
     const id = req.params.id as string;
     const token = req.headers.authorization?.split(' ')[1] || '';
+    const { deposit, itemUpdates } = req.body;
 
-    const invoice = await invoiceAggregationService.financeApprove(id, token);
+    const invoice = await invoiceAggregationService.financeApprove(id, token, deposit, itemUpdates);
     return res.status(200).json({
       success: true,
       data: invoice,

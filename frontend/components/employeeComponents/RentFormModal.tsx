@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Trash2, Calendar, Loader2 } from 'lucide-react';
+import { Trash2, Loader2, Calendar } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 import {
@@ -11,10 +11,11 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog';
+
 import { CustomerSelect } from '@/components/invoice/CustomerSelect';
 import { CreateInvoicePayload, Invoice, InvoiceItem } from '@/lib/invoice';
-import { ProductSelect, SelectableItem } from '@/components/invoice/ProductSelect';
-import { Product } from '@/lib/product';
+import { ModelSelect } from '@/components/invoice/ModelSelect';
+import { Model, getAllModels } from '@/lib/model';
 
 // Helper to strip empty/zero fields for API
 const cleanNumber = (val: string | number | undefined | null) =>
@@ -239,7 +240,249 @@ export default function RentFormModal({
     }
   }, [form.saleType, form.leaseTenureMonths, form.effectiveFrom, form.effectiveTo]);
 
-  // ... (handler methods)
+  const [selectedModels, setSelectedModels] = useState<
+    (Model & { quantity: number; id: string })[]
+  >(() => {
+    if (!initialData?.items) return [];
+    const productItems = initialData.items.filter((i) => i.itemType === 'PRODUCT' || !!i.modelId);
+    return productItems.map(
+      (item) =>
+        ({
+          id: item.modelId || item.productId || 'unknown',
+          model_name: item.description,
+          model_no: '',
+          description: '',
+          quantity: item.quantity || 1,
+          brandRelation: { id: '', name: '' },
+        }) as Model & { quantity: number; id: string },
+    );
+  });
+
+  // Hydrate models with full details from backend
+  useEffect(() => {
+    if (initialData?.items) {
+      const fetchFullModels = async () => {
+        try {
+          const allModels = await getAllModels();
+          // specific check inside async to satisfy TS
+          if (!initialData?.items) return;
+
+          const productItems = initialData.items.filter(
+            (i) => i.itemType === 'PRODUCT' || !!i.modelId,
+          );
+
+          const hydrated = productItems.map((item) => {
+            const found = allModels.find((m: Model) => m.id === item.modelId);
+            if (found) {
+              return { ...found, quantity: item.quantity || 1 };
+            }
+            return {
+              id: item.modelId || 'unknown',
+              model_name: item.description,
+              model_no: '',
+              description: '',
+              quantity: item.quantity || 1,
+              brandRelation: { id: '', name: '' },
+            } as Model & { quantity: number; id: string };
+          });
+
+          setSelectedModels(hydrated);
+
+          // Regenerate pricing rules based on hydrated models to ensure they appear
+          const generatedRules: typeof form.pricingItems = [];
+
+          // Helper to check if a rule exists in initialData (fuzzy match)
+          const findInitialRule = (desc: string) => {
+            // 1. Exact match
+            const found = initialData?.items?.find((i) => i.description === desc);
+            if (found) return found;
+
+            // 2. Fuzzy match (e.g. "Black & White - ModelName" vs "Black & White - Brand ModelName")
+            // Extract type prefix
+            const typePrefix = desc.split(' - ')[0]; // "Black & White"
+            const startDesc = desc.substring(typePrefix.length + 3); // "Brand ModelName"
+
+            return initialData?.items?.find((i) => {
+              if (i.itemType === 'PRICING_RULE' || i.bwIncludedLimit !== undefined) {
+                if (i.description.startsWith(typePrefix)) {
+                  // Check if the rest of the string matches partially
+                  const iRest = i.description.substring(typePrefix.length + 3);
+                  return startDesc.includes(iRest) || iRest.includes(startDesc);
+                }
+              }
+              return false;
+            });
+          };
+
+          const mapValues = (rule: PricingItem, source: InvoiceItem) => {
+            // Map limits and rates - Convert to String for Form State
+            if (source.bwIncludedLimit !== undefined && source.bwIncludedLimit !== null)
+              rule.bwIncludedLimit = String(source.bwIncludedLimit);
+            if (source.colorIncludedLimit !== undefined && source.colorIncludedLimit !== null)
+              rule.colorIncludedLimit = String(source.colorIncludedLimit);
+            if (source.combinedIncludedLimit !== undefined && source.combinedIncludedLimit !== null)
+              rule.combinedIncludedLimit = String(source.combinedIncludedLimit);
+
+            if (source.bwExcessRate !== undefined && source.bwExcessRate !== null)
+              rule.bwExcessRate = String(source.bwExcessRate);
+            if (source.colorExcessRate !== undefined && source.colorExcessRate !== null)
+              rule.colorExcessRate = String(source.colorExcessRate);
+            if (source.combinedExcessRate !== undefined && source.combinedExcessRate !== null)
+              rule.combinedExcessRate = String(source.combinedExcessRate);
+
+            // Map Slabs
+            if (source.bwSlabRanges) {
+              rule.bwSlabRanges = source.bwSlabRanges.map((r) => ({
+                from: String(r.from),
+                to: String(r.to),
+                rate: String(r.rate),
+              }));
+            }
+            if (source.colorSlabRanges) {
+              rule.colorSlabRanges = source.colorSlabRanges.map((r) => ({
+                from: String(r.from),
+                to: String(r.to),
+                rate: String(r.rate),
+              }));
+            }
+            if (source.comboSlabRanges) {
+              rule.comboSlabRanges = source.comboSlabRanges.map((r) => ({
+                from: String(r.from),
+                to: String(r.to),
+                rate: String(r.rate),
+              }));
+            }
+
+            return rule;
+          };
+
+          hydrated.forEach((m, index) => {
+            const prefix = m.product_name || m.brandRelation?.name;
+            const baseDesc = prefix ? `${prefix} ${m.model_name}` : m.model_name;
+            const sourceItem = productItems[index];
+
+            const addRule = (typeLabel: string, typeCode: 'BW' | 'COLOR' | 'COMBO') => {
+              const desc = `${typeLabel} - ${baseDesc}`;
+              // Try to find a separate rule first (Legacy)
+              let initialRule = findInitialRule(desc);
+
+              // If no separate rule found, check if the Source Product Item has the data (New Flow)
+              if (!initialRule && sourceItem) {
+                // Check if sourceItem has any relevant pricing fields populated
+                const hasPricing =
+                  sourceItem.bwIncludedLimit !== undefined ||
+                  sourceItem.colorIncludedLimit !== undefined ||
+                  sourceItem.combinedIncludedLimit !== undefined;
+                if (hasPricing) {
+                  initialRule = sourceItem;
+                }
+              }
+
+              let newRule = {
+                description: desc,
+                ...(typeCode === 'COMBO'
+                  ? { combinedIncludedLimit: '', combinedExcessRate: '' }
+                  : {}),
+                ...(typeCode === 'BW' ? { bwIncludedLimit: '', bwExcessRate: '' } : {}),
+                ...(typeCode === 'COLOR' ? { colorIncludedLimit: '', colorExcessRate: '' } : {}),
+              };
+
+              if (initialRule) {
+                newRule = mapValues(newRule, initialRule);
+              }
+              generatedRules.push(newRule);
+            };
+
+            if (form.rentType.includes('COMBO')) {
+              addRule('Combined', 'COMBO');
+            } else {
+              addRule('Black & White', 'BW');
+              if (m.print_colour !== 'BLACK_WHITE') {
+                addRule('Color', 'COLOR');
+              }
+            }
+          });
+
+          if (generatedRules.length > 0) {
+            setForm((prev) => ({ ...prev, pricingItems: generatedRules }));
+          }
+        } catch (error) {
+          console.error('Failed to hydrate models', error);
+        }
+      };
+      fetchFullModels();
+    }
+  }, [initialData]);
+
+  const updateUsageRules = (
+    models: (Model & { quantity: number })[],
+    overrideRentType?: string,
+  ) => {
+    const currentRentType = overrideRentType || form.rentType;
+    const isCombo = currentRentType.includes('COMBO');
+
+    let newItems: typeof form.pricingItems = [];
+
+    models.forEach((m) => {
+      // Assume models support both for now, or fetch capability
+      // For MVP, enable consistent rules based on Model Name
+      const prefix = m.product_name || m.brandRelation?.name;
+      const baseDesc = prefix ? `${prefix} ${m.model_name}` : m.model_name;
+
+      // ... (rule generation logic using baseDesc)
+      // Replicating existing logic but using model properties
+      const createItem = (prefix: string, type: 'BW' | 'COLOR' | 'COMBO') => {
+        const desc = `${prefix} - ${baseDesc}`;
+        const existing = form.pricingItems.find((i) => i.description === desc);
+        if (existing) return existing;
+
+        return {
+          description: desc,
+          ...(type === 'COMBO' ? { combinedIncludedLimit: '', combinedExcessRate: '' } : {}),
+          ...(type === 'BW' ? { bwIncludedLimit: '', bwExcessRate: '' } : {}),
+          ...(type === 'COLOR' ? { colorIncludedLimit: '', colorExcessRate: '' } : {}),
+        };
+      };
+
+      // Default to BOTH for now
+      if (isCombo) {
+        newItems.push(createItem('Combined', 'COMBO'));
+      } else {
+        newItems.push(createItem('Black & White', 'BW'));
+        // Only add Color if not strictly Black & White
+        if (m.print_colour !== 'BLACK_WHITE') {
+          newItems.push(createItem('Color', 'COLOR'));
+        }
+      }
+    });
+
+    if (models.length === 0) newItems = [];
+
+    setForm((prev) => ({
+      ...prev,
+      pricingItems: newItems,
+      ...(overrideRentType ? { rentType: overrideRentType } : {}),
+    }));
+  };
+
+  const handleModelAdd = (model: Model) => {
+    if (selectedModels.find((m) => m.id === model.id)) return;
+    const newModels = [...selectedModels, { ...model, quantity: 1 }];
+    setSelectedModels(newModels);
+    updateUsageRules(newModels);
+  };
+
+  const handleModelRemove = (id: string) => {
+    const newModels = selectedModels.filter((m) => m.id !== id);
+    setSelectedModels(newModels);
+    updateUsageRules(newModels);
+  };
+
+  const handleQuantityChange = (id: string, qty: number) => {
+    const newModels = selectedModels.map((m) => (m.id === id ? { ...m, quantity: qty } : m));
+    setSelectedModels(newModels);
+    // Rules don't change based on quantity
+  };
 
   const handleConfirm = async () => {
     if (!form.customerId) {
@@ -281,58 +524,63 @@ export default function RentFormModal({
           discountPercent: cleanNumber(form.discountPercent),
           advanceAmount: cleanNumber(form.advanceAmount),
 
-          items: selectedProducts.map((p) => {
-            const baseDesc = `${p.name}${p.model?.model_name ? ` - ${p.model.model_name}` : ''}`;
+          items: selectedModels.flatMap((m) => {
+            const prefix = m.product_name || m.brandRelation?.name;
+            const baseDesc = prefix ? `${prefix} ${m.model_name}` : m.model_name;
             const myRules = form.pricingItems.filter((i) => i.description.includes(baseDesc));
+            const quantity = m.quantity || 1;
 
-            const mergedItem: InvoiceItem = {
-              description: baseDesc,
-              quantity: p.quantity || 1,
-              unitPrice: 0,
-              itemType: 'PRODUCT' as const,
-              productId: p.id?.startsWith('restored_') ? undefined : p.id,
-            };
+            // Create an array of size 'quantity', each element representing 1 unit
+            return Array.from({ length: quantity }).map(() => {
+              const mergedItem: InvoiceItem = {
+                description: baseDesc,
+                quantity: 1, // Force 1 per item for serial allocation
+                unitPrice: 0,
+                itemType: 'PRODUCT' as const,
+                modelId: m.id,
+                // productId is NOT set here, as it is allocated later
+              };
 
-            myRules.forEach((rule) => {
-              if (rule.bwIncludedLimit !== '')
-                mergedItem.bwIncludedLimit = cleanNumber(rule.bwIncludedLimit);
-              if (rule.colorIncludedLimit !== '')
-                mergedItem.colorIncludedLimit = cleanNumber(rule.colorIncludedLimit);
-              if (rule.combinedIncludedLimit !== '')
-                mergedItem.combinedIncludedLimit = cleanNumber(rule.combinedIncludedLimit);
-              if (rule.bwExcessRate !== '')
-                mergedItem.bwExcessRate = cleanNumber(rule.bwExcessRate);
-              if (rule.colorExcessRate !== '')
-                mergedItem.colorExcessRate = cleanNumber(rule.colorExcessRate);
-              if (rule.combinedExcessRate !== '')
-                mergedItem.combinedExcessRate = cleanNumber(rule.combinedExcessRate);
+              myRules.forEach((rule) => {
+                if (rule.bwIncludedLimit !== '')
+                  mergedItem.bwIncludedLimit = cleanNumber(rule.bwIncludedLimit);
+                if (rule.colorIncludedLimit !== '')
+                  mergedItem.colorIncludedLimit = cleanNumber(rule.colorIncludedLimit);
+                if (rule.combinedIncludedLimit !== '')
+                  mergedItem.combinedIncludedLimit = cleanNumber(rule.combinedIncludedLimit);
+                if (rule.bwExcessRate !== '')
+                  mergedItem.bwExcessRate = cleanNumber(rule.bwExcessRate);
+                if (rule.colorExcessRate !== '')
+                  mergedItem.colorExcessRate = cleanNumber(rule.colorExcessRate);
+                if (rule.combinedExcessRate !== '')
+                  mergedItem.combinedExcessRate = cleanNumber(rule.combinedExcessRate);
 
-              if (rule.bwSlabRanges?.length) {
-                mergedItem.bwSlabRanges = rule.bwSlabRanges.map((r) => ({
-                  from: Number(r.from),
-                  to: Number(r.to),
-                  rate: Number(r.rate),
-                }));
-              }
-              if (rule.colorSlabRanges?.length) {
-                mergedItem.colorSlabRanges = rule.colorSlabRanges.map((r) => ({
-                  from: Number(r.from),
-                  to: Number(r.to),
-                  rate: Number(r.rate),
-                }));
-              }
-              if (rule.comboSlabRanges?.length) {
-                mergedItem.comboSlabRanges = rule.comboSlabRanges.map((r) => ({
-                  from: Number(r.from),
-                  to: Number(r.to),
-                  rate: Number(r.rate),
-                }));
-              }
+                if (rule.bwSlabRanges?.length) {
+                  mergedItem.bwSlabRanges = rule.bwSlabRanges.map((r) => ({
+                    from: Number(r.from),
+                    to: Number(r.to),
+                    rate: Number(r.rate),
+                  }));
+                }
+                if (rule.colorSlabRanges?.length) {
+                  mergedItem.colorSlabRanges = rule.colorSlabRanges.map((r) => ({
+                    from: Number(r.from),
+                    to: Number(r.to),
+                    rate: Number(r.rate),
+                  }));
+                }
+                if (rule.comboSlabRanges?.length) {
+                  mergedItem.comboSlabRanges = rule.comboSlabRanges.map((r) => ({
+                    from: Number(r.from),
+                    to: Number(r.to),
+                    rate: Number(r.rate),
+                  }));
+                }
+              });
+
+              return mergedItem as unknown as NonNullable<CreateInvoicePayload['items']>[number];
             });
-
-            return mergedItem as unknown as NonNullable<CreateInvoicePayload['items']>[number];
           }),
-
           pricingItems: [],
         };
       } else {
@@ -360,56 +608,59 @@ export default function RentFormModal({
           monthlyRent: isFixed ? cleanNumber(form.monthlyRent) : undefined,
           advanceAmount: isFixed ? cleanNumber(form.advanceAmount) : undefined,
           discountPercent: cleanNumber(form.discountPercent),
-          items: selectedProducts.map((p) => {
-            const baseDesc = `${p.name}${p.model?.model_name ? ` - ${p.model.model_name}` : ''}`;
+          items: selectedModels.flatMap((m) => {
+            const baseDesc = m.model_name;
             const myRules = form.pricingItems.filter((i) => i.description.includes(baseDesc));
+            const quantity = m.quantity || 1;
 
-            const mergedItem: InvoiceItem = {
-              description: baseDesc,
-              quantity: p.quantity || 1,
-              unitPrice: 0,
-              itemType: 'PRODUCT' as const,
-              productId: p.id?.startsWith('restored_') ? undefined : p.id,
-            };
+            return Array.from({ length: quantity }).map(() => {
+              const mergedItem: InvoiceItem = {
+                description: baseDesc,
+                quantity: 1, // Force 1 per item
+                unitPrice: 0,
+                itemType: 'PRODUCT' as const,
+                modelId: m.id,
+              };
 
-            myRules.forEach((rule) => {
-              if (rule.bwIncludedLimit !== '')
-                mergedItem.bwIncludedLimit = cleanNumber(rule.bwIncludedLimit);
-              if (rule.colorIncludedLimit !== '')
-                mergedItem.colorIncludedLimit = cleanNumber(rule.colorIncludedLimit);
-              if (rule.combinedIncludedLimit !== '')
-                mergedItem.combinedIncludedLimit = cleanNumber(rule.combinedIncludedLimit);
-              if (rule.bwExcessRate !== '')
-                mergedItem.bwExcessRate = cleanNumber(rule.bwExcessRate);
-              if (rule.colorExcessRate !== '')
-                mergedItem.colorExcessRate = cleanNumber(rule.colorExcessRate);
-              if (rule.combinedExcessRate !== '')
-                mergedItem.combinedExcessRate = cleanNumber(rule.combinedExcessRate);
+              myRules.forEach((rule) => {
+                if (rule.bwIncludedLimit !== '')
+                  mergedItem.bwIncludedLimit = cleanNumber(rule.bwIncludedLimit);
+                if (rule.colorIncludedLimit !== '')
+                  mergedItem.colorIncludedLimit = cleanNumber(rule.colorIncludedLimit);
+                if (rule.combinedIncludedLimit !== '')
+                  mergedItem.combinedIncludedLimit = cleanNumber(rule.combinedIncludedLimit);
+                if (rule.bwExcessRate !== '')
+                  mergedItem.bwExcessRate = cleanNumber(rule.bwExcessRate);
+                if (rule.colorExcessRate !== '')
+                  mergedItem.colorExcessRate = cleanNumber(rule.colorExcessRate);
+                if (rule.combinedExcessRate !== '')
+                  mergedItem.combinedExcessRate = cleanNumber(rule.combinedExcessRate);
 
-              if (rule.bwSlabRanges?.length) {
-                mergedItem.bwSlabRanges = rule.bwSlabRanges.map((r) => ({
-                  from: Number(r.from),
-                  to: Number(r.to),
-                  rate: Number(r.rate),
-                }));
-              }
-              if (rule.colorSlabRanges?.length) {
-                mergedItem.colorSlabRanges = rule.colorSlabRanges.map((r) => ({
-                  from: Number(r.from),
-                  to: Number(r.to),
-                  rate: Number(r.rate),
-                }));
-              }
-              if (rule.comboSlabRanges?.length) {
-                mergedItem.comboSlabRanges = rule.comboSlabRanges.map((r) => ({
-                  from: Number(r.from),
-                  to: Number(r.to),
-                  rate: Number(r.rate),
-                }));
-              }
+                if (rule.bwSlabRanges?.length) {
+                  mergedItem.bwSlabRanges = rule.bwSlabRanges.map((r) => ({
+                    from: Number(r.from),
+                    to: Number(r.to),
+                    rate: Number(r.rate),
+                  }));
+                }
+                if (rule.colorSlabRanges?.length) {
+                  mergedItem.colorSlabRanges = rule.colorSlabRanges.map((r) => ({
+                    from: Number(r.from),
+                    to: Number(r.to),
+                    rate: Number(r.rate),
+                  }));
+                }
+                if (rule.comboSlabRanges?.length) {
+                  mergedItem.comboSlabRanges = rule.comboSlabRanges.map((r) => ({
+                    from: Number(r.from),
+                    to: Number(r.to),
+                    rate: Number(r.rate),
+                  }));
+                }
+              });
+
+              return mergedItem as unknown as NonNullable<CreateInvoicePayload['items']>[number];
             });
-
-            return mergedItem as unknown as NonNullable<CreateInvoicePayload['items']>[number];
           }),
           pricingItems: [],
         };
@@ -422,223 +673,6 @@ export default function RentFormModal({
     } finally {
       setIsSubmitting(false);
     }
-  };
-
-  const [selectedProducts, setSelectedProducts] = useState<(Product & { quantity?: number })[]>(
-    () => {
-      if (!initialData?.items) return [];
-
-      // 1. Identify Machine Items (assuming non-PRICING_RULE items describe machines)
-      // Robust filtering: Check itemType OR infer from description/fields
-      // 1. Identify Machine Items
-      // Strict separation based on itemType if present
-      const machineItems =
-        initialData.items?.filter(
-          (i) =>
-            i.itemType === 'PRODUCT' ||
-            (!i.itemType &&
-              !i.description.startsWith('Black') &&
-              !i.description.startsWith('Color') &&
-              !i.description.startsWith('Combined')),
-        ) || [];
-
-      const ruleItems =
-        initialData.items?.filter(
-          (i) =>
-            i.itemType === 'PRICING_RULE' ||
-            (!i.itemType &&
-              (i.description.startsWith('Black') ||
-                i.description.startsWith('Color') ||
-                i.description.startsWith('Combined'))),
-        ) || [];
-
-      // 1. Reconstruct Valid Products
-      const reconstructedProducts: (Product & { quantity?: number })[] = [];
-
-      // Helper: Create a mock product from params
-      const createMockProduct = (
-        name: string,
-        serial: string,
-        qty: number,
-        capability: 'BLACK_WHITE' | 'COLOUR' | 'BOTH',
-        realId?: string,
-      ) =>
-        ({
-          id: realId || `restored_${Math.random()}`,
-          name: name,
-          serial_no: serial,
-          print_colour: capability,
-          quantity: qty,
-          brand: 'Existing',
-          status: 'AVAILABLE',
-          category: 'COPIER',
-          procurement_price: 0,
-          location: '',
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          specifications: {},
-          supplierId: '',
-          rentals: [],
-          latestRental: null,
-          vendor_id: '',
-          MFD: new Date().toISOString(),
-          rent_price_monthly: 0,
-          rent_price_yearly: 0,
-          model: { model_name: 'Generic Model' },
-          image: '',
-          features: [],
-          total_stock: 0,
-          available_stock: 0,
-          status_history: [],
-        }) as unknown as Product & { quantity?: number };
-
-      // A. Process Explicit Machine Items
-      machineItems.forEach((item) => {
-        const lastDashIndex = item.description.lastIndexOf(' - ');
-        let name = item.description;
-        let serial = 'Unknown';
-
-        // NOTE: Serial number removal change:
-        // Previously we expected "Name - Serial"
-        // Now we just have "Name". If there's no dash, it's just the name.
-        if (lastDashIndex !== -1) {
-          name = item.description.substring(0, lastDashIndex).trim();
-          serial = item.description.substring(lastDashIndex + 3).trim();
-        } else {
-          name = item.description;
-          // In case of restored items without SN in desc, we might lack the specific serial
-          // but reconstruction is primarily for UI display/pricing rule binding.
-        }
-
-        // Infer Capability
-        const myRules = ruleItems.filter((r) => r.description.includes(`(${serial})`));
-        const hasColor = myRules.some(
-          (r) => r.description.startsWith('Color') || r.description.startsWith('Combined'),
-        );
-        const capability = hasColor ? 'BOTH' : 'BLACK_WHITE';
-
-        reconstructedProducts.push(
-          createMockProduct(name, serial, item.quantity || 1, capability, item.productId),
-        );
-      });
-
-      // B. Process Orphan Rules (Virtual Machines)
-      // Find rules that don't belong to any reconstructed product's serial
-      const virtualMachines = new Map<string, typeof ruleItems>();
-
-      ruleItems.forEach((r) => {
-        const claimed = reconstructedProducts.some((p) =>
-          r.description.includes(`(${p.serial_no})`),
-        );
-        if (!claimed) {
-          // Extract "Name (Serial)" from "Color - Name (Serial)"
-          let suffix = r.description;
-          if (suffix.startsWith('Black & White - '))
-            suffix = suffix.replace('Black & White - ', '');
-          else if (suffix.startsWith('Color - ')) suffix = suffix.replace('Color - ', '');
-          else if (suffix.startsWith('Combined - ')) suffix = suffix.replace('Combined - ', '');
-          else if (suffix.startsWith('Black - ')) suffix = suffix.replace('Black - ', '');
-
-          if (!virtualMachines.has(suffix)) {
-            virtualMachines.set(suffix, []);
-          }
-          virtualMachines.get(suffix)?.push(r);
-        }
-      });
-
-      // Convert Virtual Machines to Products
-      virtualMachines.forEach((rules, suffix) => {
-        // Parse "Name (Serial)"
-        let name = suffix;
-        let serial = 'Unknown';
-
-        const openParen = suffix.lastIndexOf('(');
-        const closeParen = suffix.lastIndexOf(')');
-
-        if (openParen !== -1 && closeParen !== -1) {
-          name = suffix.substring(0, openParen).trim();
-          serial = suffix.substring(openParen + 1, closeParen).trim();
-        }
-
-        const hasColor = rules.some(
-          (r) => r.description.startsWith('Color') || r.description.startsWith('Combined'),
-        );
-        const capability = hasColor ? 'BOTH' : 'BLACK_WHITE';
-
-        reconstructedProducts.push(createMockProduct(name, serial, 1, capability));
-      });
-
-      return reconstructedProducts;
-    },
-  );
-
-  const updateUsageRules = (
-    products: (Product & { quantity?: number })[],
-    overrideRentType?: string,
-  ) => {
-    const currentRentType = overrideRentType || form.rentType;
-    const isCombo = currentRentType.includes('COMBO');
-
-    // Generate rules for each product, preserving existing values
-    let newItems: typeof form.pricingItems = [];
-
-    products.forEach((p) => {
-      const isBlackWhite = p.print_colour === 'BLACK_WHITE';
-      const isColorOnly = p.print_colour === 'COLOUR';
-      const isBoth = p.print_colour === 'BOTH';
-      const baseDesc = `${p.name}${p.model?.model_name ? ` - ${p.model.model_name}` : ''}`;
-
-      const createItem = (prefix: string, type: 'BW' | 'COLOR' | 'COMBO') => {
-        const desc = `${prefix} - ${baseDesc}`;
-        const existing = form.pricingItems.find((i) => i.description === desc);
-        if (existing) return existing;
-
-        return {
-          description: desc,
-          ...(type === 'COMBO' ? { combinedIncludedLimit: '', combinedExcessRate: '' } : {}),
-          ...(type === 'BW' ? { bwIncludedLimit: '', bwExcessRate: '' } : {}),
-          ...(type === 'COLOR' ? { colorIncludedLimit: '', colorExcessRate: '' } : {}),
-        };
-      };
-
-      // If Rent Type is COMBO, and product supports BOTH -> Combined Rule
-      if (isCombo && isBoth) {
-        newItems.push(createItem('Combined', 'COMBO'));
-      }
-      // Otherwise use Individual Rules
-      else {
-        if (isBlackWhite || isBoth) {
-          newItems.push(createItem('Black & White', 'BW'));
-        }
-        if (isColorOnly || isBoth) {
-          newItems.push(createItem('Color', 'COLOR'));
-        }
-      }
-    });
-
-    if (products.length === 0) {
-      newItems = [];
-    }
-
-    setForm((prev) => ({
-      ...prev,
-      pricingItems: newItems,
-      ...(overrideRentType ? { rentType: overrideRentType } : {}),
-    }));
-  };
-
-  const handleProductAdd = (item: SelectableItem) => {
-    if ('part_name' in item) return;
-    if (selectedProducts.find((p) => p.id === item.id)) return;
-    const newProducts = [...selectedProducts, item];
-    setSelectedProducts(newProducts);
-    updateUsageRules(newProducts);
-  };
-
-  const handleProductRemove = (id: string) => {
-    const newProducts = selectedProducts.filter((p) => p.id !== id);
-    setSelectedProducts(newProducts);
-    updateUsageRules(newProducts);
   };
 
   const updatePricingItem = (index: number, field: string, value: string) => {
@@ -684,7 +718,7 @@ export default function RentFormModal({
 
   const handleRentTypeChange = (newType: string) => {
     // Regenerate rules based on new type
-    updateUsageRules(selectedProducts, newType);
+    updateUsageRules(selectedModels, newType);
   };
 
   const isFixed = form.rentType.startsWith('FIXED');
@@ -865,28 +899,30 @@ export default function RentFormModal({
             <div className="p-5 rounded-xl bg-card border border-slate-100 shadow-sm space-y-4">
               <div className="space-y-2">
                 <label className="text-[11px] font-bold text-muted-foreground uppercase">
-                  Select Product
+                  Select Model
                 </label>
                 <div className="mb-4">
-                  <ProductSelect onSelect={handleProductAdd} />
+                  <ModelSelect onSelect={handleModelAdd} />
                 </div>
 
                 <div className="space-y-2">
-                  {selectedProducts.map((product) => (
+                  {selectedModels.map((model) => (
                     <div
-                      key={product.id}
+                      key={model.id}
                       className="p-3 bg-purple-50 rounded-lg border border-purple-100 flex items-center justify-between gap-3"
                     >
                       <div className="flex items-center gap-3 flex-1">
                         <div className="h-10 w-10 bg-purple-100 rounded-lg flex items-center justify-center text-purple-600 font-bold text-xs uppercase shrink-0">
-                          {product.print_colour === 'BLACK_WHITE' ? 'B&W' : 'CLR'}
+                          MDL
                         </div>
                         <div className="min-w-0">
                           <div className="text-sm font-bold text-slate-800 truncate">
-                            {product.name}
+                            {model.product_name || model.brandRelation?.name
+                              ? `${model.product_name || model.brandRelation?.name} ${model.model_name}`
+                              : model.model_name}
                           </div>
                           <div className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide truncate">
-                            {product.brand} • {product.model?.model_name || 'Generic Model'}
+                            Model No: {model.model_no}
                           </div>
                         </div>
                       </div>
@@ -899,20 +935,16 @@ export default function RentFormModal({
                             min="1"
                             className="h-8 text-xs font-bold text-center px-1 bg-card border-purple-200 focus:border-purple-400"
                             placeholder="Qty"
-                            value={product.quantity ?? ''}
+                            value={model.quantity ?? ''}
                             onChange={(e) => {
                               const val = e.target.value;
-                              const qty = val === '' ? undefined : parseInt(val);
-                              setSelectedProducts((prev) =>
-                                prev.map((p) =>
-                                  p.id === product.id ? { ...p, quantity: qty } : p,
-                                ),
-                              );
+                              const qty = val === '' ? 1 : parseInt(val);
+                              handleQuantityChange(model.id, qty);
                             }}
                           />
                         </div>
                         <button
-                          onClick={() => handleProductRemove(product.id)}
+                          onClick={() => handleModelRemove(model.id)}
                           className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors shrink-0"
                         >
                           <Trash2 size={16} />
@@ -920,9 +952,9 @@ export default function RentFormModal({
                       </div>
                     </div>
                   ))}
-                  {selectedProducts.length === 0 && (
+                  {selectedModels.length === 0 && (
                     <div className="text-xs text-slate-400 font-medium text-center py-4 border border-dashed border-border rounded-lg">
-                      No products selected
+                      No models selected
                     </div>
                   )}
                 </div>
@@ -954,7 +986,7 @@ export default function RentFormModal({
                           // Allow state update to settle? No, use current products
                           // But we need to pass the *new* lease type context or just force update
                           console.log('Switching to FSM, updating rules...');
-                          updateUsageRules(selectedProducts, form.rentType);
+                          updateUsageRules(selectedModels, form.rentType);
                         }
                       }}
                     >
@@ -973,16 +1005,16 @@ export default function RentFormModal({
                       onChange={(e) => handleRentTypeChange(e.target.value)}
                     >
                       <option value="FIXED_LIMIT">Fixed Rent + Individual Limit</option>
-                      {selectedProducts.length > 0 &&
-                        selectedProducts.every((p) => p.print_colour === 'BOTH') && (
-                          <option value="FIXED_COMBO">Fixed Rent + Combined Limit</option>
-                        )}
+                      {selectedModels.length > 0 && (
+                        // selectedModels.every((p) => p.print_colour === 'BOTH') && (
+                        <option value="FIXED_COMBO">Fixed Rent + Combined Limit</option>
+                      )}
                       <option value="FIXED_FLAT">Fixed Flat Rent (No Limits)</option>
                       <option value="CPC">CPC (Individual)</option>
-                      {selectedProducts.length > 0 &&
-                        selectedProducts.every((p) => p.print_colour === 'BOTH') && (
-                          <option value="CPC_COMBO">CPC (Combined)</option>
-                        )}
+                      {selectedModels.length > 0 && (
+                        // selectedModels.every((p) => p.print_colour === 'BOTH') && (
+                        <option value="CPC_COMBO">CPC (Combined)</option>
+                      )}
                     </select>
                   )}
                 </div>

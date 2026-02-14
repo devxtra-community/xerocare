@@ -10,6 +10,8 @@ export interface Model {
   };
   description: string;
   quantity: number; // Auto-managed by backend
+  product_name?: string;
+  print_colour?: 'BLACK_WHITE' | 'COLOUR' | 'BOTH';
 }
 
 export interface CreateModelData {
