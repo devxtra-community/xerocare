@@ -20,8 +20,11 @@ export interface InvoiceItem {
   quantity?: number;
   unitPrice?: number;
   productId?: string;
+  modelId?: string; // Added for finance flow
   initialBwCount?: number;
+  initialBwA3Count?: number;
   initialColorCount?: number;
+  initialColorA3Count?: number;
 }
 
 export interface Invoice {
@@ -60,7 +63,7 @@ export interface Invoice {
   endDate?: string;
   billingCycleInDays?: number;
   securityDepositAmount?: number;
-  securityDepositMode?: 'CASH' | 'CHEQUE';
+  securityDepositMode?: 'CASH' | 'CHEQUE' | 'UPI' | 'BANK_TRANSFER';
   securityDepositReference?: string;
   securityDepositReceivedDate?: string;
 
@@ -223,7 +226,9 @@ export const financeApproveInvoice = async (
       id: string;
       productId: string;
       initialBwCount?: number;
+      initialBwA3Count?: number;
       initialColorCount?: number;
+      initialColorA3Count?: number;
     }[];
   },
 ): Promise<Invoice> => {
@@ -399,5 +404,21 @@ export const downloadConsolidatedInvoice = async (contractId: string): Promise<B
 
 export const sendConsolidatedInvoice = async (contractId: string): Promise<unknown> => {
   const response = await api.post(`/b/invoices/completed-collections/${contractId}/send`);
+  return response.data;
+};
+
+export const sendEmailNotification = async (
+  id: string,
+  payload: { recipient: string; subject: string; body: string },
+): Promise<unknown> => {
+  const response = await api.post(`/b/invoices/${id}/notify/email`, payload);
+  return response.data;
+};
+
+export const sendWhatsappNotification = async (
+  id: string,
+  payload: { recipient: string; body: string },
+): Promise<unknown> => {
+  const response = await api.post(`/b/invoices/${id}/notify/whatsapp`, payload);
   return response.data;
 };

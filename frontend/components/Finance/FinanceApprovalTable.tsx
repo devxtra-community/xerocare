@@ -11,16 +11,10 @@ import {
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, CheckCircle, XCircle, Eye } from 'lucide-react';
+import { Loader2, CheckCircle, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
-import {
-  getBranchInvoices,
-  Invoice,
-  financeApproveInvoice,
-  financeRejectInvoice,
-} from '@/lib/invoice';
+import { getBranchInvoices, Invoice, financeRejectInvoice } from '@/lib/invoice';
 import { InvoiceDetailsDialog } from '@/components/invoice/InvoiceDetailsDialog';
-import { ProductSelect } from '@/components/invoice/ProductSelect';
 import {
   Dialog,
   DialogContent,
@@ -29,43 +23,37 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { FinanceApprovalModal } from '@/components/finance/FinanceApprovalModal';
 
-export default function FinanceApprovalTable() {
+interface FinanceApprovalTableProps {
+  saleType?: 'RENT' | 'LEASE' | 'SALE';
+}
+
+export default function FinanceApprovalTable({ saleType }: FinanceApprovalTableProps) {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [rejectOpen, setRejectOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
-
-  // Security Deposit State
-  const [depositOpen, setDepositOpen] = useState(false);
-  const [depositAmount, setDepositAmount] = useState('');
-  const [depositMode, setDepositMode] = useState<'CASH' | 'CHEQUE'>('CASH');
-  const [depositReference, setDepositReference] = useState('');
-  const [depositDate, setDepositDate] = useState('');
-
-  // Item Updates State (Product association + Readings)
-  const [itemUpdates, setItemUpdates] = useState<
-    {
-      id: string;
-      description: string;
-      productId: string;
-      productName?: string;
-      initialBwCount: string;
-      initialColorCount: string;
-    }[]
-  >([]);
+  const [approvalInvoice, setApprovalInvoice] = useState<Invoice | null>(null);
 
   const fetchInvoices = async () => {
     try {
       setLoading(true);
       const data = await getBranchInvoices();
-      setInvoices(data.filter((inv) => inv.status === 'EMPLOYEE_APPROVED'));
+      let filtered = data.filter(
+        (inv) => inv.status === 'EMPLOYEE_APPROVED' || inv.status === 'APPROVED',
+      );
+
+      if (saleType) {
+        filtered = filtered.filter(
+          (inv) => inv.saleType?.toString().toUpperCase() === saleType.toUpperCase(),
+        );
+      }
+
+      setInvoices(filtered);
     } catch (error) {
       console.error('Failed to fetch approval list:', error);
     } finally {
@@ -75,66 +63,11 @@ export default function FinanceApprovalTable() {
 
   useEffect(() => {
     fetchInvoices();
-  }, []);
+  }, [saleType]);
 
   const handleApproveClick = (invoice: Invoice) => {
-    setSelectedInvoice(invoice);
-    setDetailsOpen(false); // Close details modal if open
-    setDepositAmount('0');
-    setDepositMode('CASH');
-    setDepositReference('');
-    setDepositDate(new Date().toISOString().split('T')[0]);
-
-    // Initialize item updates for PRODUCT items or items with productId
-    const productItems =
-      invoice.items?.filter((item) => item.itemType === 'PRODUCT' || !!item.productId) || [];
-    setItemUpdates(
-      productItems.map((item) => ({
-        id: item.id!,
-        description: item.description,
-        productId: item.productId || '',
-        initialBwCount: '0',
-        initialColorCount: '0',
-      })),
-    );
-
-    setDepositOpen(true);
-  };
-
-  const confirmApprove = async () => {
-    if (!selectedInvoice) return;
-
-    // Validation: All product items must have a productId selected
-    if (itemUpdates.some((item) => !item.productId)) {
-      toast.error('Please select a serial number for all product items');
-      return;
-    }
-
-    try {
-      const payload = {
-        deposit: {
-          amount: parseFloat(depositAmount) || 0,
-          mode: depositMode,
-          reference: depositReference,
-          receivedDate: depositDate,
-        },
-        itemUpdates: itemUpdates.map((item) => ({
-          id: item.id,
-          productId: item.productId,
-          initialBwCount: parseInt(item.initialBwCount) || 0,
-          initialColorCount: parseInt(item.initialColorCount) || 0,
-        })),
-      };
-
-      await financeApproveInvoice(selectedInvoice.id, payload);
-      toast.success('Invoice Approved successfully');
-      setDepositOpen(false);
-      setDetailsOpen(false);
-      fetchInvoices();
-    } catch (error) {
-      console.error(error);
-      toast.error('Failed to approve invoice');
-    }
+    setApprovalInvoice(invoice);
+    setDetailsOpen(false);
   };
 
   const handleReject = async () => {
@@ -194,6 +127,7 @@ export default function FinanceApprovalTable() {
               <TableHead>Customer</TableHead>
               <TableHead>Type</TableHead>
               <TableHead>Amount</TableHead>
+              <TableHead>Advance Paid</TableHead>
               <TableHead>Date</TableHead>
               <TableHead>Created By</TableHead>
               <TableHead className="text-center">Actions</TableHead>
@@ -208,36 +142,29 @@ export default function FinanceApprovalTable() {
                   <Badge variant="outline">{inv.saleType}</Badge>
                 </TableCell>
                 <TableCell className="font-bold">₹{inv.totalAmount.toLocaleString()}</TableCell>
+                <TableCell className="text-blue-600 font-semibold">
+                  {inv.advanceAmount ? `₹${inv.advanceAmount.toLocaleString()}` : '₹0'}
+                </TableCell>
                 <TableCell>{new Date(inv.createdAt).toLocaleDateString()}</TableCell>
                 <TableCell>{inv.employeeName || 'Unknown'}</TableCell>
                 <TableCell className="text-center">
                   <div className="flex justify-center gap-2">
                     <Button
                       size="sm"
-                      variant="ghost"
-                      onClick={() => {
-                        setSelectedInvoice(inv);
-                        setDetailsOpen(true);
-                      }}
-                    >
-                      <Eye className="h-4 w-4 text-muted-foreground" />
-                    </Button>
-                    <Button
-                      size="sm"
-                      className="bg-green-600 hover:bg-green-700 text-white h-8 w-8 p-0 rounded-full"
+                      className="bg-green-600 hover:bg-green-700 text-white shadow-green-200 shadow-sm"
                       onClick={() => handleApproveClick(inv)}
-                      title="Approve"
+                      title="Review & Approve"
                     >
-                      <CheckCircle className="h-4 w-4" />
+                      <CheckCircle className="h-4 w-4 mr-1" /> Review
                     </Button>
                     <Button
                       size="sm"
-                      variant="destructive"
-                      className="h-8 w-8 p-0 rounded-full"
+                      variant="ghost"
+                      className="h-9 w-9 p-0"
                       onClick={() => openRejectDialog(inv)}
                       title="Reject"
                     >
-                      <XCircle className="h-4 w-4" />
+                      <XCircle className="h-4 w-4 text-red-500" />
                     </Button>
                   </div>
                 </TableCell>
@@ -286,171 +213,13 @@ export default function FinanceApprovalTable() {
           </DialogContent>
         </Dialog>
       )}
-      {depositOpen && (
-        <Dialog open={depositOpen} onOpenChange={setDepositOpen}>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>Finance Approval & Product Link</DialogTitle>
-              <DialogDescription>
-                Link actual units and record initial readings before final approval.
-              </DialogDescription>
-            </DialogHeader>
 
-            <div className="max-h-[60vh] overflow-y-auto px-1 py-4 space-y-6">
-              {/* Product Association & Readings */}
-              {itemUpdates.length > 0 && (
-                <div className="space-y-4">
-                  <h4 className="text-sm font-bold text-slate-700 border-b pb-2">
-                    Product Association
-                  </h4>
-                  {itemUpdates.map((item, idx) => (
-                    <div key={item.id} className="p-4 border rounded-lg bg-muted/20 space-y-4">
-                      <div className="flex justify-between items-center">
-                        <Label className="font-bold text-blue-600">Item: {item.description}</Label>
-                      </div>
-
-                      <div className="grid grid-cols-1 gap-4">
-                        <div className="space-y-1.5">
-                          <Label className="text-[11px] uppercase font-bold text-muted-foreground">
-                            Assign Unit (Serial Number)
-                          </Label>
-                          <ProductSelect
-                            onSelect={(selected) => {
-                              const newUpdates = [...itemUpdates];
-                              newUpdates[idx].productId = selected.id;
-                              // @ts-expect-error - name exists on Product
-                              newUpdates[idx].productName = selected.name;
-                              setItemUpdates(newUpdates);
-                            }}
-                          />
-                          {item.productId && (
-                            <p className="text-[10px] text-green-600 font-medium">
-                              Selected: {item.productName || 'Unit Assigned'}
-                            </p>
-                          )}
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="space-y-1.5">
-                            <Label className="text-[11px] uppercase font-bold text-muted-foreground">
-                              Initial B&W Reading
-                            </Label>
-                            <Input
-                              type="number"
-                              value={item.initialBwCount}
-                              onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                                const newUpdates = [...itemUpdates];
-                                newUpdates[idx].initialBwCount = e.target.value;
-                                setItemUpdates(newUpdates);
-                              }}
-                              placeholder="0"
-                            />
-                          </div>
-                          <div className="space-y-1.5">
-                            <Label className="text-[11px] uppercase font-bold text-muted-foreground">
-                              Initial Color Reading
-                            </Label>
-                            <Input
-                              type="number"
-                              value={item.initialColorCount}
-                              onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                                const newUpdates = [...itemUpdates];
-                                newUpdates[idx].initialColorCount = e.target.value;
-                                setItemUpdates(newUpdates);
-                              }}
-                              placeholder="0"
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {/* Security Deposit (Optional) */}
-              <div className="space-y-4 pt-2">
-                <h4 className="text-sm font-bold text-slate-700 border-b pb-2">
-                  Security Deposit (Optional)
-                </h4>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <Label className="text-[11px] uppercase font-bold text-muted-foreground">
-                      Amount
-                    </Label>
-                    <Input
-                      type="number"
-                      value={depositAmount}
-                      onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                        setDepositAmount(e.target.value)
-                      }
-                      placeholder="0.00"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-[11px] uppercase font-bold text-muted-foreground">
-                      Mode
-                    </Label>
-                    <RadioGroup
-                      value={depositMode}
-                      onValueChange={(val) => setDepositMode(val as 'CASH' | 'CHEQUE')}
-                      className="flex gap-4 pt-1"
-                    >
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="CASH" id="mode-cash" />
-                        <Label htmlFor="mode-cash" className="text-xs">
-                          Cash
-                        </Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="CHEQUE" id="mode-cheque" />
-                        <Label htmlFor="mode-cheque" className="text-xs">
-                          Cheque
-                        </Label>
-                      </div>
-                    </RadioGroup>
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-[11px] uppercase font-bold text-muted-foreground">
-                      Reference
-                    </Label>
-                    <Input
-                      value={depositReference}
-                      onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                        setDepositReference(e.target.value)
-                      }
-                      placeholder="Cheque # / TXN ID"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-[11px] uppercase font-bold text-muted-foreground">
-                      Date
-                    </Label>
-                    <Input
-                      type="date"
-                      value={depositDate}
-                      onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                        setDepositDate(e.target.value)
-                      }
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <DialogFooter className="border-t pt-4">
-              <Button variant="outline" onClick={() => setDepositOpen(false)}>
-                Cancel
-              </Button>
-              <Button
-                onClick={confirmApprove}
-                className="bg-green-600 hover:bg-green-700 text-white font-bold"
-              >
-                Confirm Approval & Finalize Contract
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+      {approvalInvoice && (
+        <FinanceApprovalModal
+          invoice={approvalInvoice}
+          onClose={() => setApprovalInvoice(null)}
+          onSuccess={fetchInvoices}
+        />
       )}
     </div>
   );

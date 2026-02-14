@@ -58,10 +58,19 @@ export class InvoiceItem {
   initialBwCount?: number;
 
   @Column({ type: 'int', nullable: true })
+  initialBwA3Count?: number;
+
+  @Column({ type: 'int', nullable: true })
   initialColorCount?: number;
+
+  @Column({ type: 'int', nullable: true })
+  initialColorA3Count?: number;
 
   @Column({ type: 'uuid', nullable: true })
   productId?: string;
+
+  @Column({ type: 'uuid', nullable: true })
+  modelId?: string;
 
   @ManyToOne(() => Invoice, (invoice) => invoice.items, {
     onDelete: 'CASCADE',

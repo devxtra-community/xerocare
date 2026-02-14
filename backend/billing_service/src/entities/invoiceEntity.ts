@@ -45,6 +45,12 @@ export class Invoice {
   securityDepositReference?: string;
 
   @Column({ type: 'date', nullable: true })
+  securityDepositDate?: Date;
+
+  @Column({ type: 'varchar', nullable: true })
+  securityDepositBank?: string;
+
+  @Column({ type: 'date', nullable: true })
   securityDepositReceivedDate?: Date;
 
   @Column()

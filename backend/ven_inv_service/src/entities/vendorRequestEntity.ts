@@ -20,8 +20,8 @@ export class VendorRequest {
   @JoinColumn({ name: 'vendor_id' })
   vendor!: Vendor;
 
-  @Column({ type: 'uuid' })
-  requested_by!: string;
+  @Column({ type: 'uuid', nullable: true })
+  requested_by?: string;
 
   @Column({ type: 'uuid', nullable: true })
   branch_id?: string;

@@ -184,9 +184,23 @@ export const financeApprove = async (req: Request, res: Response, next: NextFunc
     }
 
     const { deposit, itemUpdates } = req.body;
+    console.log('[Billing Controller] financeApprove request received:', {
+      invoiceId: id,
+      user: req.user?.userId,
+      bodyType: typeof req.body,
+      hasDeposit: !!deposit,
+      itemUpdatesCount: Array.isArray(itemUpdates) ? itemUpdates.length : 'not an array',
+      rawItemUpdates: JSON.stringify(itemUpdates),
+    });
 
     // Trigger final state transitions based on SaleType
-    const invoice = await billingService.financeApprove(id, req.user.userId, deposit, itemUpdates);
+    const invoice = await billingService.financeApprove(
+      id,
+      req.user.userId,
+      req.headers.authorization || '',
+      deposit,
+      itemUpdates,
+    );
 
     return res.status(200).json({
       success: true,
@@ -593,6 +607,56 @@ export const sendConsolidatedInvoice = async (req: Request, res: Response, next:
       message: result.message,
     });
   } catch (error) {
+    next(error);
+  }
+};
+
+export const sendEmailNotification = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    console.log('Received sendEmailNotification request');
+    const id = req.params.id as string;
+    const { recipient, subject, body } = req.body;
+    console.log('Params:', { id, recipient, subject });
+
+    if (!recipient || !body) {
+      throw new AppError('Recipient and Body are required', 400);
+    }
+
+    console.log('Calling billingService.sendEmailNotification');
+    await billingService.sendEmailNotification(id, recipient, subject, body);
+    console.log('Returned from billingService.sendEmailNotification');
+
+    return res.status(200).json({
+      success: true,
+      message: 'Email notification request sent successfully',
+    });
+  } catch (error) {
+    console.error('Error in sendEmailNotification controller:', error);
+    next(error);
+  }
+};
+
+export const sendWhatsappNotification = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    console.log('Received sendWhatsappNotification request');
+    const id = req.params.id as string;
+    const { recipient, body } = req.body;
+    console.log('Params:', { id, recipient });
+
+    if (!recipient || !body) {
+      throw new AppError('Recipient (Phone) and Body are required', 400);
+    }
+
+    console.log('Calling billingService.sendWhatsappNotification');
+    await billingService.sendWhatsappNotification(id, recipient, body);
+    console.log('Returned from billingService.sendWhatsappNotification');
+
+    return res.status(200).json({
+      success: true,
+      message: 'WhatsApp notification request sent successfully',
+    });
+  } catch (error) {
+    console.error('Error in sendWhatsappNotification controller:', error);
     next(error);
   }
 };

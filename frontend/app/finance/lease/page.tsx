@@ -6,8 +6,8 @@ import EmployeeLeaseGraphs from '@/components/employeeComponents/EmployeeLeaseGr
 import { getBranchInvoices, Invoice } from '@/lib/invoice';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import MonthlyCollectionTable from '@/components/Finance/MonthlyCollectionTable';
-import EmployeeLeaseTable from '@/components/employeeComponents/EmployeeLeaseTable';
 import CompletedCollectionsTable from '@/components/Finance/CompletedCollectionsTable';
+import FinanceApprovalTable from '@/components/Finance/FinanceApprovalTable';
 
 export default function LeasePage() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
@@ -47,7 +47,7 @@ export default function LeasePage() {
               Pending Finance Approval
             </h3>
             <div className="bg-card rounded-xl shadow-sm border border-slate-100 p-1">
-              <EmployeeLeaseTable mode="FINANCE" />
+              <FinanceApprovalTable saleType="LEASE" />
             </div>
           </TabsContent>
 

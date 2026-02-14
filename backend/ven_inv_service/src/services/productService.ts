@@ -2,6 +2,7 @@ import { AddProductDTO, BulkProductRow } from '../dto/product.dto';
 import { AppError } from '../errors/appError';
 import { ProductRepository } from '../repositories/productRepository';
 import { ModelRepository } from '../repositories/modelRepository';
+import { ModelService } from './modelService';
 import { WarehouseRepository } from '../repositories/warehouseRepository';
 import { Product } from '../entities/productEntity';
 import { logger } from '../config/logger';
@@ -13,6 +14,7 @@ export class ProductService {
   private productRepo = new ProductRepository();
   private model = new ModelRepository();
   private warehouse = new WarehouseRepository();
+  private modelService = new ModelService();
   private lotService = new LotService();
 
   private validateDiscount(salePrice: number, maxDiscount?: number) {
@@ -82,6 +84,9 @@ export class ProductService {
         // Pre-warm cache for newly created product
         await setCached(`product:${product.id}`, product, 3600);
 
+        // Sync Model Quantity to Redis
+        await this.modelService.syncToRedis(modelDetails.id);
+
         success.push(row.serial_no);
       } catch (error: unknown) {
         logger.error(`Bulk insert error at row ${i + 1}`, error);
@@ -148,6 +153,9 @@ export class ProductService {
       // Pre-warm cache for newly created product
       await setCached(`product:${product.id}`, product, 3600);
 
+      // Sync Model Quantity to Redis
+      await this.modelService.syncToRedis(modelDetails.id);
+
       return product;
     } catch (err: unknown) {
       if (err instanceof AppError) throw err;
@@ -168,6 +176,11 @@ export class ProductService {
 
     // Invalidate cache
     await deleteCached(`product:${id}`);
+
+    // Sync Model Quantity to Redis
+    if (product.model_id) {
+      await this.modelService.syncToRedis(product.model_id);
+    }
 
     return this.productRepo.deleteProduct(id);
   }
@@ -194,6 +207,15 @@ export class ProductService {
 
     // Invalidate cache after update
     await deleteCached(`product:${id}`);
+
+    // Sync Model Quantity using the existing product's model_id
+    // If model_id changed (unlikely for updateProduct?), we should sync both.
+    // For now, assuming model_id doesn't change or we fetch product.
+    // updateProduct in repo updates specific fields.
+    const updatedProduct = await this.findOne(id);
+    if (updatedProduct && updatedProduct.model_id) {
+      await this.modelService.syncToRedis(updatedProduct.model_id);
+    }
 
     return updated;
   }

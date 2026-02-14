@@ -16,11 +16,32 @@ export class ModelRepository {
   }
 
   async getAllModels() {
-    return this.repo.find({
-      relations: ['brandRelation'],
-      order: {
-        model_name: 'ASC',
-      },
+    const rawAndEntities = await this.repo
+      .createQueryBuilder('model')
+      .leftJoinAndSelect('model.brandRelation', 'brandRelation')
+      .addSelect((subQuery) => {
+        return subQuery
+          .select('p.name')
+          .from('products', 'p')
+          .where('p.model_id = model.id')
+          .limit(1);
+      }, 'product_name')
+      .addSelect((subQuery) => {
+        return subQuery
+          .select('p.print_colour')
+          .from('products', 'p')
+          .where('p.model_id = model.id')
+          .limit(1);
+      }, 'print_colour')
+      .orderBy('model.model_name', 'ASC')
+      .getRawAndEntities();
+
+    return rawAndEntities.entities.map((entity, index) => {
+      // @ts-expect-error - injecting dynamic property
+      entity.product_name = rawAndEntities.raw[index].product_name;
+      // @ts-expect-error - injecting dynamic property
+      entity.print_colour = rawAndEntities.raw[index].print_colour;
+      return entity;
     });
   }
 
@@ -61,5 +82,16 @@ export class ModelRepository {
       return null;
     }
     return result[0] as { brand: string };
+  }
+
+  async countAvailableProducts(modelId: string): Promise<number> {
+    const result = await Source.query(
+      `SELECT COUNT(*) as count FROM "products" WHERE "model_id" = $1 AND "product_status" = 'AVAILABLE'`,
+      [modelId],
+    );
+    if (!result || result.length === 0) {
+      return 0;
+    }
+    return parseInt(result[0].count, 10) || 0;
   }
 }

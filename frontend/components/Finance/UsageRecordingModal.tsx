@@ -249,6 +249,26 @@ export default function UsageRecordingModal({
     // Fallback to product capabilities
     return products.some((p) => p.print_colour === 'COLOUR' || p.print_colour === 'BOTH');
   }, [ruleItems, products]);
+
+  // Calculate Aggregated Initial Counts from ALL Product Items
+  const calculatedInitialCounts = React.useMemo(() => {
+    if (!contract?.items) return { bwA4: 0, bwA3: 0, clrA4: 0, clrA3: 0 };
+
+    let bwA4 = 0,
+      bwA3 = 0,
+      clrA4 = 0,
+      clrA3 = 0;
+    contract.items.forEach((item) => {
+      // Check for product items (Allocated items)
+      if (item.itemType === 'PRODUCT' || item.productId) {
+        bwA4 += item.initialBwCount || 0;
+        bwA3 += item.initialBwA3Count || 0;
+        clrA4 += item.initialColorCount || 0;
+        clrA3 += item.initialColorA3Count || 0;
+      }
+    });
+    return { bwA4, bwA3, clrA4, clrA3 };
+  }, [contract]);
   // Detect Last Month (Strict Date Match)
   const isLastMonth = React.useMemo(() => {
     if (!contract?.effectiveTo || !formData.billingPeriodEnd) return false;
@@ -365,12 +385,10 @@ export default function UsageRecordingModal({
     const clrA4 = safeParse(formData.colorA4Count);
     const clrA3 = safeParse(formData.colorA3Count);
 
-    const prevBwA4 = prevUsage
-      ? prevUsage.bwA4Count
-      : ruleItems.bw?.initialBwCount || ruleItems.combo?.initialBwCount || 0;
-    const prevBwA3 = prevUsage ? prevUsage.bwA3Count : 0;
-    const prevClrA4 = prevUsage ? prevUsage.colorA4Count : ruleItems.color?.initialColorCount || 0;
-    const prevClrA3 = prevUsage ? prevUsage.colorA3Count : 0;
+    const prevBwA4 = prevUsage ? prevUsage.bwA4Count : calculatedInitialCounts.bwA4;
+    const prevBwA3 = prevUsage ? prevUsage.bwA3Count : calculatedInitialCounts.bwA3;
+    const prevClrA4 = prevUsage ? prevUsage.colorA4Count : calculatedInitialCounts.clrA4;
+    const prevClrA3 = prevUsage ? prevUsage.colorA3Count : calculatedInitialCounts.clrA3;
 
     if (ruleItems.combo) {
       const breakdown = calculateRuleCost(
@@ -452,12 +470,10 @@ export default function UsageRecordingModal({
     const clrA4 = Number(formData.colorA4Count || 0);
     const clrA3 = Number(formData.colorA3Count || 0);
 
-    const prevBwA4 = prevUsage
-      ? prevUsage.bwA4Count
-      : ruleItems.bw?.initialBwCount || ruleItems.combo?.initialBwCount || 0;
-    const prevBwA3 = prevUsage ? prevUsage.bwA3Count : 0;
-    const prevClrA4 = prevUsage ? prevUsage.colorA4Count : ruleItems.color?.initialColorCount || 0;
-    const prevClrA3 = prevUsage ? prevUsage.colorA3Count : 0;
+    const prevBwA4 = prevUsage ? prevUsage.bwA4Count : calculatedInitialCounts.bwA4;
+    const prevBwA3 = prevUsage ? prevUsage.bwA3Count : calculatedInitialCounts.bwA3;
+    const prevClrA4 = prevUsage ? prevUsage.colorA4Count : calculatedInitialCounts.clrA4;
+    const prevClrA3 = prevUsage ? prevUsage.colorA3Count : calculatedInitialCounts.clrA3;
 
     if (bwA4 > 0 && bwA4 < prevBwA4) errs.bwA4 = `Cannot be less than ${prevBwA4}`;
     if (bwA3 > 0 && bwA3 < prevBwA3) errs.bwA3 = `Cannot be less than ${prevBwA3}`;
@@ -556,14 +572,10 @@ export default function UsageRecordingModal({
         const response = await recordUsage(payload);
         toast.success('Usage recorded successfully');
 
-        const prevBwA4 = prevUsage
-          ? prevUsage.bwA4Count
-          : ruleItems.bw?.initialBwCount || ruleItems.combo?.initialBwCount || 0;
-        const prevBwA3 = prevUsage ? prevUsage.bwA3Count : 0;
-        const prevClrA4 = prevUsage
-          ? prevUsage.colorA4Count
-          : ruleItems.color?.initialColorCount || 0;
-        const prevClrA3 = prevUsage ? prevUsage.colorA3Count : 0;
+        const prevBwA4 = prevUsage ? prevUsage.bwA4Count : calculatedInitialCounts.bwA4;
+        const prevBwA3 = prevUsage ? prevUsage.bwA3Count : calculatedInitialCounts.bwA3;
+        const prevClrA4 = prevUsage ? prevUsage.colorA4Count : calculatedInitialCounts.clrA4;
+        const prevClrA3 = prevUsage ? prevUsage.colorA3Count : calculatedInitialCounts.clrA3;
 
         setRecordedUsageData({
           bwA4Count: Number(formData.bwA4Count),
@@ -772,16 +784,16 @@ export default function UsageRecordingModal({
                       <div className="flex justify-between items-end">
                         <Label className="text-xs font-semibold">A4 Current Reading</Label>
                         <div className="text-right">
-                          {prevUsage && (
-                            <span className="text-[10px] text-orange-600 block">
-                              Prev: {prevUsage.bwA4Count}
-                            </span>
-                          )}
+                          <span className="text-[10px] text-orange-600 block">
+                            {prevUsage ? 'Prev' : 'Initial'}:{' '}
+                            {prevUsage ? prevUsage.bwA4Count : calculatedInitialCounts.bwA4}
+                          </span>
                           <span className="text-[10px] text-green-600 font-bold block">
                             Usage:{' '}
                             {Math.max(
                               0,
-                              Number(formData.bwA4Count || 0) - (prevUsage?.bwA4Count || 0),
+                              Number(formData.bwA4Count || 0) -
+                                (prevUsage ? prevUsage.bwA4Count : calculatedInitialCounts.bwA4),
                             )}
                           </span>
                         </div>
@@ -807,16 +819,16 @@ export default function UsageRecordingModal({
                       <div className="flex justify-between items-end">
                         <Label className="text-xs font-semibold">A3 Current Reading</Label>
                         <div className="text-right">
-                          {prevUsage && (
-                            <span className="text-[10px] text-orange-600 block">
-                              Prev: {prevUsage.bwA3Count}
-                            </span>
-                          )}
+                          <span className="text-[10px] text-orange-600 block">
+                            {prevUsage ? 'Prev' : 'Initial'}:{' '}
+                            {prevUsage ? prevUsage.bwA3Count : calculatedInitialCounts.bwA3}
+                          </span>
                           <span className="text-[10px] text-green-600 font-bold block">
                             Usage:{' '}
                             {Math.max(
                               0,
-                              Number(formData.bwA3Count || 0) - (prevUsage?.bwA3Count || 0),
+                              Number(formData.bwA3Count || 0) -
+                                (prevUsage ? prevUsage.bwA3Count : calculatedInitialCounts.bwA3),
                             )}
                           </span>
                         </div>
@@ -869,16 +881,18 @@ export default function UsageRecordingModal({
                       <div className="flex justify-between items-end">
                         <Label className="text-xs font-semibold">A4 Current Reading</Label>
                         <div className="text-right">
-                          {prevUsage && (
-                            <span className="text-[10px] text-orange-600 block">
-                              Prev: {prevUsage.colorA4Count}
-                            </span>
-                          )}
+                          <span className="text-[10px] text-orange-600 block">
+                            {prevUsage ? 'Prev' : 'Initial'}:{' '}
+                            {prevUsage ? prevUsage.colorA4Count : calculatedInitialCounts.clrA4}
+                          </span>
                           <span className="text-[10px] text-green-600 font-bold block">
                             Usage:{' '}
                             {Math.max(
                               0,
-                              Number(formData.colorA4Count || 0) - (prevUsage?.colorA4Count || 0),
+                              Number(formData.colorA4Count || 0) -
+                                (prevUsage
+                                  ? prevUsage.colorA4Count
+                                  : calculatedInitialCounts.clrA4),
                             )}
                           </span>
                         </div>
@@ -904,16 +918,18 @@ export default function UsageRecordingModal({
                       <div className="flex justify-between items-end">
                         <Label className="text-xs font-semibold">A3 Current Reading</Label>
                         <div className="text-right">
-                          {prevUsage && (
-                            <span className="text-[10px] text-orange-600 block">
-                              Prev: {prevUsage.colorA3Count}
-                            </span>
-                          )}
+                          <span className="text-[10px] text-orange-600 block">
+                            {prevUsage ? 'Prev' : 'Initial'}:{' '}
+                            {prevUsage ? prevUsage.colorA3Count : calculatedInitialCounts.clrA3}
+                          </span>
                           <span className="text-[10px] text-green-600 font-bold block">
                             Usage:{' '}
                             {Math.max(
                               0,
-                              Number(formData.colorA3Count || 0) - (prevUsage?.colorA3Count || 0),
+                              Number(formData.colorA3Count || 0) -
+                                (prevUsage
+                                  ? prevUsage.colorA3Count
+                                  : calculatedInitialCounts.clrA3),
                             )}
                           </span>
                         </div>
@@ -980,10 +996,10 @@ export default function UsageRecordingModal({
                           {(() => {
                             const prevA4 = prevUsage
                               ? prevUsage.bwA4Count
-                              : ruleItems.bw?.initialBwCount ||
-                                ruleItems.combo?.initialBwCount ||
-                                0;
-                            const prevA3 = prevUsage ? prevUsage.bwA3Count : 0;
+                              : calculatedInitialCounts.bwA4;
+                            const prevA3 = prevUsage
+                              ? prevUsage.bwA3Count
+                              : calculatedInitialCounts.bwA3;
                             const deltaA4 = Math.max(0, Number(formData.bwA4Count || 0) - prevA4);
                             const deltaA3 = Math.max(0, Number(formData.bwA3Count || 0) - prevA3);
                             return (deltaA4 + deltaA3 * 2).toLocaleString();
@@ -1009,10 +1025,10 @@ export default function UsageRecordingModal({
                             const bwA3 = Number(formData.bwA3Count || 0);
                             const prevA4 = prevUsage
                               ? prevUsage.bwA4Count
-                              : ruleItems.bw?.initialBwCount ||
-                                ruleItems.combo?.initialBwCount ||
-                                0;
-                            const prevA3 = prevUsage ? prevUsage.bwA3Count : 0;
+                              : calculatedInitialCounts.bwA4;
+                            const prevA3 = prevUsage
+                              ? prevUsage.bwA3Count
+                              : calculatedInitialCounts.bwA3;
 
                             // If it's a combo rule, we use the combo calculation
                             if (ruleItems.combo) {
@@ -1020,8 +1036,10 @@ export default function UsageRecordingModal({
                               const clrA3 = Number(formData.colorA3Count || 0);
                               const prevClrA4 = prevUsage
                                 ? prevUsage.colorA4Count
-                                : ruleItems.combo?.initialColorCount || 0;
-                              const prevClrA3 = prevUsage ? prevUsage.colorA3Count : 0;
+                                : calculatedInitialCounts.clrA4;
+                              const prevClrA3 = prevUsage
+                                ? prevUsage.colorA3Count
+                                : calculatedInitialCounts.clrA3;
                               return calculateRuleCost(
                                 ruleItems.combo,
                                 bwA4 + clrA4,
@@ -1061,8 +1079,10 @@ export default function UsageRecordingModal({
                           {(() => {
                             const prevA4 = prevUsage
                               ? prevUsage.colorA4Count
-                              : ruleItems.color?.initialColorCount || 0;
-                            const prevA3 = prevUsage ? prevUsage.colorA3Count : 0;
+                              : calculatedInitialCounts.clrA4;
+                            const prevA3 = prevUsage
+                              ? prevUsage.colorA3Count
+                              : calculatedInitialCounts.clrA3;
                             const deltaA4 = Math.max(
                               0,
                               Number(formData.colorA4Count || 0) - prevA4,
@@ -1094,8 +1114,10 @@ export default function UsageRecordingModal({
                             const clrA3 = Number(formData.colorA3Count || 0);
                             const prevClrA4 = prevUsage
                               ? prevUsage.colorA4Count
-                              : ruleItems.color?.initialColorCount || 0;
-                            const prevClrA3 = prevUsage ? prevUsage.colorA3Count : 0;
+                              : calculatedInitialCounts.clrA4;
+                            const prevClrA3 = prevUsage
+                              ? prevUsage.colorA3Count
+                              : calculatedInitialCounts.clrA3;
 
                             // If it's a combo rule, we use the combo calculation
                             if (ruleItems.combo) {
@@ -1103,8 +1125,10 @@ export default function UsageRecordingModal({
                               const bwA3 = Number(formData.bwA3Count || 0);
                               const prevBwA4 = prevUsage
                                 ? prevUsage.bwA4Count
-                                : ruleItems.combo?.initialBwCount || 0;
-                              const prevBwA3 = prevUsage ? prevUsage.bwA3Count : 0;
+                                : calculatedInitialCounts.bwA4;
+                              const prevBwA3 = prevUsage
+                                ? prevUsage.bwA3Count
+                                : calculatedInitialCounts.bwA3;
                               return calculateRuleCost(
                                 ruleItems.combo,
                                 bwA4 + clrA4,
