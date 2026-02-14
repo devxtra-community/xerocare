@@ -38,6 +38,7 @@ export async function startEmployeeConsumer() {
           employee_id: event.employeeId,
           email: event.email,
           status: event.status.toUpperCase(),
+          name: event.name,
         },
         ['employee_id'],
       );

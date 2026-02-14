@@ -11,6 +11,9 @@ export class EmployeeManager {
   @Column()
   status!: string;
 
+  @Column({ nullable: true })
+  name?: string;
+
   @CreateDateColumn()
   synced_at!: Date;
 }

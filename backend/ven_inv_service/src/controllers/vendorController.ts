@@ -71,7 +71,7 @@ export class VendorController {
 
   requestProducts = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { products, message } = req.body;
+      const { products, message, total_amount } = req.body;
       const { userId, branchId } = req.user!; // Auth middleware ensures user exists
 
       if (!products) {
@@ -80,7 +80,7 @@ export class VendorController {
 
       await this.vendorService.requestProducts(
         req.params.id as string,
-        { products, message },
+        { products, message, total_amount },
         userId,
         branchId,
       );

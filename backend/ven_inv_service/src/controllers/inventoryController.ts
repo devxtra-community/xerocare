@@ -6,7 +6,12 @@ const service = new InventoryService();
 // ADMIN
 export const getGlobalInventory = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const data = await service.getGlobalInventory();
+    const { product, warehouse, branch } = req.query as {
+      product?: string;
+      warehouse?: string;
+      branch?: string;
+    };
+    const data = await service.getGlobalInventory({ product, warehouse, branch });
     res.json({ success: true, data });
   } catch (err) {
     next(err);

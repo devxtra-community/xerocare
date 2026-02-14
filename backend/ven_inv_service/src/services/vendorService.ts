@@ -16,6 +16,7 @@ interface CreateVendorDTO {
 interface RequestProductsDTO {
   products: string;
   message: string;
+  total_amount?: number;
 }
 
 export class VendorService {
@@ -108,7 +109,17 @@ export class VendorService {
       branch_id: branchId,
       products: data.products,
       message: data.message,
+      total_amount: data.total_amount,
     });
+
+    // Update vendor stats
+    vendor.totalOrders = (vendor.totalOrders || 0) + 1;
+    if (data.total_amount) {
+      // Ensure purchaseValue is treated as a number
+      const currentPurchaseValue = Number(vendor.purchaseValue) || 0;
+      vendor.purchaseValue = currentPurchaseValue + Number(data.total_amount);
+    }
+    await this.vendorRepo.save(vendor);
 
     await publishEmailJob({
       type: 'REQUEST_PRODUCTS',
@@ -124,6 +135,7 @@ export class VendorService {
   async getVendorRequests(vendorId: string) {
     return this.requestRepo.find({
       where: { vendor_id: vendorId },
+      relations: ['branch', 'manager'],
       order: { created_at: 'DESC' },
     });
   }

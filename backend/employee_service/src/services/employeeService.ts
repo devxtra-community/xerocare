@@ -145,6 +145,7 @@ export class EmployeeService {
       email: employee.email,
       role: employee.role,
       status: employee.status,
+      name: `${employee.first_name} ${employee.last_name}`,
     });
 
     publishEmailJob({
@@ -282,6 +283,7 @@ export class EmployeeService {
       email: updated.email,
       role: updated.role,
       status: updated.status,
+      name: `${updated.first_name} ${updated.last_name}`,
     });
 
     return updated;
