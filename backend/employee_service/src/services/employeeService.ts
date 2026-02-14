@@ -98,7 +98,6 @@ export class EmployeeService {
       }
     }
 
-    const count = await this.employeeRepo.countByRole(roleEnum);
     const prefix =
       roleEnum === EmployeeRole.ADMIN
         ? 'A'
@@ -109,7 +108,17 @@ export class EmployeeService {
             : roleEnum === EmployeeRole.FINANCE
               ? 'F'
               : 'E';
-    const display_id = `${prefix}${String(count + 1).padStart(2, '0')}`;
+
+    const lastDisplayId = await this.employeeRepo.findLatestDisplayId(prefix);
+    let nextNum = 1;
+    if (lastDisplayId) {
+      // Remove prefix and parse
+      const numPart = lastDisplayId.substring(prefix.length);
+      if (!isNaN(Number(numPart))) {
+        nextNum = Number(numPart) + 1;
+      }
+    }
+    const display_id = `${prefix}${String(nextNum).padStart(2, '0')}`;
 
     const plainPassword = generateRandomPassword();
 

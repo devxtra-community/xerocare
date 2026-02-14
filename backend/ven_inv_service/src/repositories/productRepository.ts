@@ -73,4 +73,13 @@ export class ProductRepository {
     product.product_status = ProductStatus.SOLD;
     await this.repo.save(product);
   }
+
+  async findByIds(ids: string[]): Promise<Product[]> {
+    if (ids.length === 0) return [];
+
+    return this.repo.find({
+      where: ids.map((id) => ({ id })),
+      relations: { model: true, warehouse: true },
+    });
+  }
 }

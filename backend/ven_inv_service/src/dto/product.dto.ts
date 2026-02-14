@@ -14,6 +14,7 @@ export interface AddProductDTO {
   print_colour?: PrintColour;
   max_discount_amount?: number | null;
   imageUrl?: string | null;
+  lot_id?: string;
 }
 
 export interface BulkProductRow {
@@ -30,4 +31,5 @@ export interface BulkProductRow {
   print_colour?: PrintColour;
   max_discount_amount?: number | null;
   imageUrl?: string | null;
+  lot_id?: string;
 }

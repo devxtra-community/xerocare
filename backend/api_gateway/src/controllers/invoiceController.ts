@@ -294,13 +294,96 @@ export const getGlobalSalesTotals = async (req: Request, res: Response, next: Ne
   }
 };
 
+export const getInvoiceHistory = async (
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const user = req.user;
+    if (!user) throw new Error('User not authenticated');
+    const token = req.headers.authorization?.split(' ')[1] || '';
+    const saleType = req.query.saleType as string | undefined;
+
+    const history = await invoiceAggregationService.getInvoiceHistory(user, token, saleType);
+    return res.status(200).json({
+      success: true,
+      data: history,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getCompletedCollections = async (
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const user = req.user;
+    if (!user) throw new Error('User not authenticated');
+    const token = req.headers.authorization?.split(' ')[1] || '';
+
+    const collections = await invoiceAggregationService.getCompletedCollections(user, token);
+    return res.status(200).json({
+      success: true,
+      data: collections,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const downloadInvoice = async (
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const user = req.user;
+    if (!user) throw new Error('User not authenticated');
+    const token = req.headers.authorization?.split(' ')[1] || '';
+    const contractId = req.params.contractId as string;
+
+    const stream = await invoiceAggregationService.downloadInvoice(contractId, token);
+
+    // Pipe the stream to response
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename=consolidated-invoice-${contractId}.pdf`,
+    );
+    stream.pipe(res);
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const sendInvoice = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  try {
+    const user = req.user;
+    if (!user) throw new Error('User not authenticated');
+    const token = req.headers.authorization?.split(' ')[1] || '';
+    const contractId = req.params.contractId as string;
+
+    const result = await invoiceAggregationService.sendInvoice(contractId, token);
+    return res.status(200).json({
+      success: true,
+      message: result.message,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const getAdminSalesStats = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const token = req.headers.authorization?.split(' ')[1] || '';
-    const result = await invoiceAggregationService.getAdminSalesStats(token);
+    const stats = await invoiceAggregationService.getAdminSalesStats(token);
     return res.status(200).json({
       success: true,
-      data: result,
+      data: stats,
     });
   } catch (error) {
     next(error);
@@ -310,19 +393,10 @@ export const getAdminSalesStats = async (req: Request, res: Response, next: Next
 export const getFinanceReport = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const token = req.headers.authorization?.split(' ')[1] || '';
-    const { branchId, saleType, month, year } = req.query;
-
-    const report = await invoiceAggregationService.getFinanceReport(token, {
-      branchId: branchId as string,
-      saleType: saleType as string,
-      month: month ? parseInt(month as string, 10) : undefined,
-      year: year ? parseInt(year as string, 10) : undefined,
-    });
-
+    const report = await invoiceAggregationService.getFinanceReport(token);
     return res.status(200).json({
       success: true,
       data: report,
-      message: 'Finance report fetched successfully',
     });
   } catch (error) {
     next(error);

@@ -272,6 +272,29 @@ export const createNextMonthInvoice = async (req: Request, res: Response, next: 
   }
 };
 
+export const generateConsolidatedFinalInvoice = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const { contractId } = req.body;
+    if (!contractId) {
+      throw new AppError('contractId is required', 400);
+    }
+
+    const invoice = await billingService.generateConsolidatedFinalInvoice(contractId);
+
+    return res.status(201).json({
+      success: true,
+      data: invoice,
+      message: 'Consolidated Final Invoice generated successfully',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const getAllInvoices = async (req: Request, res: Response, next: NextFunction) => {
   try {
     // Branch filtering: Admin sees all invoices, others see only their branch
@@ -320,6 +343,7 @@ export const getBranchInvoices = async (req: Request, res: Response, next: NextF
       data: invoices,
     });
   } catch (error) {
+    console.error('Error in getBranchInvoices:', error);
     next(error);
   }
 };
@@ -421,8 +445,7 @@ export const getCollectionAlerts = async (req: Request, res: Response, next: Nex
     if (!branchId) {
       throw new AppError('Branch ID not found in user context', 400);
     }
-    const date = req.query.date as string;
-    const alerts = await billingService.getCollectionAlerts(branchId, date);
+    const alerts = await billingService.getCollectionAlerts(branchId);
     return res.status(200).json({
       success: true,
       data: alerts,
@@ -508,6 +531,79 @@ export const getAdminSalesStats = async (req: Request, res: Response, next: Next
       success: true,
       data: stats,
       message: 'Admin sales stats fetched successfully',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getInvoiceHistory = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const branchId = req.user?.branchId;
+    if (!branchId) {
+      throw new AppError('Branch ID not found in user context', 400);
+    }
+
+    const saleType = req.query.saleType as string | undefined;
+    const history = await billingService.getInvoiceHistory(branchId, saleType);
+
+    return res.status(200).json({
+      success: true,
+      data: history,
+      message: 'Invoice history fetched successfully',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getCompletedCollections = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    if (!req.user || !req.user.branchId) {
+      throw new AppError('User context missing or incomplete', 401);
+    }
+
+    const collections = await billingService.getCompletedCollections(req.user.branchId);
+    return res.status(200).json({
+      success: true,
+      data: collections,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const downloadConsolidatedInvoice = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const contractId = req.params.contractId as string;
+    if (!contractId) throw new AppError('Contract ID required', 400);
+
+    // Stream response
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename=consolidated-invoice-${contractId}.pdf`,
+    );
+
+    await billingService.downloadConsolidatedInvoice(contractId, res);
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const sendConsolidatedInvoice = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const contractId = req.params.contractId as string;
+    if (!contractId) throw new AppError('Contract ID required', 400);
+
+    const result = await billingService.sendConsolidatedInvoice(contractId);
+    return res.status(200).json({
+      success: true,
+      message: result.message,
     });
   } catch (error) {
     next(error);

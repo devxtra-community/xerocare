@@ -48,6 +48,8 @@ const getCleanProductName = (name: string) => {
   return clean.trim();
 };
 
+import { generateConsolidatedFinalInvoice } from '@/lib/invoice';
+
 export function InvoiceDetailsDialog({
   invoice,
   onClose,
@@ -60,6 +62,7 @@ export function InvoiceDetailsDialog({
   const [currentInvoice, setCurrentInvoice] = React.useState<Invoice>(invoice);
   const [rejectReason, setRejectReason] = React.useState('');
   const [rejecting, setRejecting] = React.useState(false);
+  const [completing, setCompleting] = React.useState(false);
   const [isLoading, setIsLoading] = React.useState(false);
   const [isUsageModalOpen, setIsUsageModalOpen] = React.useState(false);
   const historyRef = React.useRef<HTMLDivElement>(null);
@@ -76,6 +79,20 @@ export function InvoiceDetailsDialog({
       setCurrentInvoice(data);
     } catch {
       toast.error('Failed to load invoice details');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleCompleteContract = async () => {
+    setIsLoading(true);
+    try {
+      await generateConsolidatedFinalInvoice(currentInvoice.id);
+      toast.success('Contract Completed & Final Invoice Generated');
+      onClose();
+    } catch (error: unknown) {
+      const err = error as { message?: string };
+      toast.error(err.message || 'Failed to complete contract');
     } finally {
       setIsLoading(false);
     }
@@ -137,15 +154,17 @@ export function InvoiceDetailsDialog({
 
     if (bwRule) {
       const bwTotal = (currentInvoice.bwA4Count || 0) + (currentInvoice.bwA3Count || 0) * 2;
+      const extra = currentInvoice.extraBwA4Count || 0;
       const bwLimit = bwRule.bwIncludedLimit || 0;
-      const bwExcess = Math.max(0, bwTotal - bwLimit);
+      const bwExcess = Math.max(0, bwTotal + extra - bwLimit);
       total += bwExcess * (bwRule.bwExcessRate || 0);
     }
     if (colorRule) {
       const colorTotal =
         (currentInvoice.colorA4Count || 0) + (currentInvoice.colorA3Count || 0) * 2;
+      const extra = currentInvoice.extraColorA4Count || 0;
       const colorLimit = colorRule.colorIncludedLimit || 0;
-      const colorExcess = Math.max(0, colorTotal - colorLimit);
+      const colorExcess = Math.max(0, colorTotal + extra - colorLimit);
       total += colorExcess * (colorRule.colorExcessRate || 0);
     }
     if (comboRule) {
@@ -154,38 +173,18 @@ export function InvoiceDetailsDialog({
         (currentInvoice.bwA3Count || 0) * 2 +
         (currentInvoice.colorA4Count || 0) +
         (currentInvoice.colorA3Count || 0) * 2;
+      const extra = (currentInvoice.extraBwA4Count || 0) + (currentInvoice.extraColorA4Count || 0);
       const comboLimit = comboRule.combinedIncludedLimit || 0;
-      const comboExcess = Math.max(0, totalTotal - comboLimit);
+      const comboExcess = Math.max(0, totalTotal + extra - comboLimit);
       total += comboExcess * (comboRule.combinedExcessRate || 0);
     }
     return total;
   }, [currentInvoice]);
 
-  const financialSummary = React.useMemo(() => {
-    const history = currentInvoice.invoiceHistory || [];
-    const allInvoices = [currentInvoice, ...history];
-
-    const totalInvoiced = allInvoices.reduce((sum, inv) => sum + (inv.totalAmount || 0), 0);
-    const totalPaid = allInvoices
-      .filter((inv) => inv.status === 'PAID')
-      .reduce((sum, inv) => sum + (inv.totalAmount || 0), 0);
-
-    const pendingBalance = totalInvoiced - totalPaid;
-
-    return {
-      totalInvoiced,
-      totalPaid,
-      pendingBalance,
-      monthlyRent: currentInvoice.monthlyRent || 0,
-      advanceAdjusted: Number(currentInvoice.advanceAmount || currentInvoice.advanceAdjusted || 0),
-      extraUsage: excessAmount,
-      totalCurrentCharges: (currentInvoice.monthlyRent || 0) + excessAmount,
-    };
-  }, [currentInvoice, excessAmount]);
-
   const grandTotal = React.useMemo(() => {
     if (currentInvoice.saleType === 'RENT' || currentInvoice.saleType === 'LEASE') {
       const rent = currentInvoice.monthlyRent || 0;
+      const additional = currentInvoice.additionalCharges || 0;
       const advance = Number(currentInvoice.advanceAmount || currentInvoice.advanceAdjusted || 0);
 
       // Include other order items if any
@@ -199,14 +198,48 @@ export function InvoiceDetailsDialog({
         )
         .reduce((sum, item) => sum + (item.quantity || 0) * (item.unitPrice || 0), 0);
 
-      return Math.max(0, rent - advance + excessAmount + orderItemsTotal);
+      return Math.max(0, rent + additional - advance + excessAmount + orderItemsTotal);
     }
     return currentInvoice.totalAmount || 0;
   }, [currentInvoice, excessAmount]);
 
+  const financialSummary = React.useMemo(() => {
+    const history = currentInvoice.invoiceHistory || [];
+
+    // Use the calculated grandTotal for the current invoice instead of the raw totalAmount
+    // This ensures that advance adjustments and overrides are reflected in the pending balance
+    const currentInvoiceAmt = grandTotal;
+    const historyTotal = history.reduce((sum, inv) => sum + (inv.totalAmount || 0), 0);
+
+    const totalInvoiced = currentInvoiceAmt + historyTotal;
+
+    // Calculate total paid from history only, as current invoice is usually not paid if we are approving it
+    // If current invoice IS paid, it should be in history or handled separately?
+    // Usually approved invoice is PENDING.
+    const totalPaid =
+      history
+        .filter((inv) => inv.status === 'PAID')
+        .reduce((sum, inv) => sum + (inv.totalAmount || 0), 0) +
+      (currentInvoice.status === 'PAID' ? currentInvoiceAmt : 0);
+
+    const pendingBalance = totalInvoiced - totalPaid;
+
+    return {
+      totalInvoiced,
+      totalPaid,
+      pendingBalance,
+      monthlyRent: currentInvoice.monthlyRent || 0,
+      additionalCharges: currentInvoice.additionalCharges || 0,
+      advanceAdjusted: Number(currentInvoice.advanceAmount || currentInvoice.advanceAdjusted || 0),
+      extraUsage: excessAmount,
+      totalCurrentCharges:
+        (currentInvoice.monthlyRent || 0) + excessAmount + (currentInvoice.additionalCharges || 0),
+    };
+  }, [currentInvoice, excessAmount, grandTotal]);
+
   return (
     <Dialog open={true} onOpenChange={(val) => !val && onClose()}>
-      <DialogContent className="sm:max-w-xl p-0 overflow-hidden rounded-xl border border-gray-100 shadow-2xl bg-card flex flex-col max-h-[90vh]">
+      <DialogContent className="sm:max-w-xl p-0 overflow-y-auto rounded-xl border border-gray-100 shadow-2xl bg-card flex flex-col max-h-[95vh]">
         <DialogHeader className="p-8 pb-4">
           <div className="flex items-center gap-4">
             <div className="h-12 w-12 rounded-xl bg-info/10 text-info flex items-center justify-center shadow-sm">
@@ -281,53 +314,6 @@ export function InvoiceDetailsDialog({
                 <div className="flex items-center gap-2 text-gray-700">
                   <Printer size={14} className="opacity-50" />
                   <p className="text-xs font-bold">{currentInvoice.rentType?.replace('_', ' ')}</p>
-                </div>
-              </div>
-              <div className="space-y-1">
-                <p className="text-[10px] font-bold text-rent uppercase tracking-wider">
-                  Contract Period
-                </p>
-                <div className="flex items-center gap-2 text-gray-700">
-                  <Calendar size={14} className="opacity-50" />
-                  <p className="text-xs font-bold flex items-center gap-1">
-                    <span>
-                      {new Date(
-                        currentInvoice.startDate || currentInvoice.createdAt,
-                      ).toLocaleDateString(undefined, {
-                        dateStyle: 'medium',
-                      })}
-                    </span>
-                    <span> - </span>
-                    <span>
-                      {currentInvoice.endDate
-                        ? new Date(currentInvoice.endDate).toLocaleDateString(undefined, {
-                            dateStyle: 'medium',
-                          })
-                        : 'N/A'}
-                    </span>
-                    {currentInvoice.endDate &&
-                      (() => {
-                        const start = new Date(
-                          currentInvoice.startDate || currentInvoice.createdAt,
-                        );
-                        const end = new Date(currentInvoice.endDate);
-                        const months = differenceInMonths(end, start);
-                        const days = differenceInDays(end, start);
-
-                        if (months > 0) {
-                          return (
-                            <span className="text-gray-500 font-normal text-[10px] ml-1">
-                              ({months} Month{months !== 1 ? 's' : ''})
-                            </span>
-                          );
-                        }
-                        return (
-                          <span className="text-gray-500 font-normal text-[10px] ml-1">
-                            ({days} Day{days !== 1 ? 's' : ''})
-                          </span>
-                        );
-                      })()}
-                  </p>
                 </div>
               </div>
 
@@ -636,7 +622,13 @@ export function InvoiceDetailsDialog({
                               ALLOWED
                             </TableHead>
                             <TableHead className="text-[10px] font-bold text-sale text-center h-10">
+                              EXTRA
+                            </TableHead>
+                            <TableHead className="text-[10px] font-bold text-sale text-center h-10">
                               EXCESS
+                            </TableHead>
+                            <TableHead className="text-[10px] font-bold text-sale text-center h-10">
+                              EXCESS RATE
                             </TableHead>
                             <TableHead className="text-[10px] font-bold text-sale text-right h-10">
                               AMOUNT
@@ -669,8 +661,14 @@ export function InvoiceDetailsDialog({
                                   <TableCell className="text-center font-bold text-gray-400 text-xs">
                                     {bwLimit.toLocaleString()}
                                   </TableCell>
+                                  <TableCell className="text-center font-bold text-blue-500 text-xs">
+                                    {(currentInvoice.extraBwA4Count || 0).toLocaleString()}
+                                  </TableCell>
                                   <TableCell className="text-center font-bold text-sale text-xs">
                                     {bwExcess.toLocaleString()}
+                                  </TableCell>
+                                  <TableCell className="text-center font-bold text-gray-500 text-xs">
+                                    ₹{bwExcessRate}
                                   </TableCell>
                                   <TableCell className="text-right font-bold text-primary text-xs">
                                     ₹
@@ -710,8 +708,14 @@ export function InvoiceDetailsDialog({
                                   <TableCell className="text-center font-bold text-gray-400 text-xs">
                                     {colorLimit.toLocaleString()}
                                   </TableCell>
+                                  <TableCell className="text-center font-bold text-rose-500 text-xs">
+                                    {(currentInvoice.extraColorA4Count || 0).toLocaleString()}
+                                  </TableCell>
                                   <TableCell className="text-center font-bold text-sale text-xs">
                                     {colorExcess.toLocaleString()}
+                                  </TableCell>
+                                  <TableCell className="text-center font-bold text-gray-500 text-xs">
+                                    ₹{colorExcessRate}
                                   </TableCell>
                                   <TableCell className="text-right font-bold text-primary text-xs">
                                     ₹
@@ -753,8 +757,17 @@ export function InvoiceDetailsDialog({
                                   <TableCell className="text-center font-bold text-gray-400 text-xs">
                                     {comboLimit.toLocaleString()}
                                   </TableCell>
+                                  <TableCell className="text-center font-bold text-blue-400 text-xs">
+                                    {(
+                                      (currentInvoice.extraBwA4Count || 0) +
+                                      (currentInvoice.extraColorA4Count || 0)
+                                    ).toLocaleString()}
+                                  </TableCell>
                                   <TableCell className="text-center font-bold text-sale text-xs">
                                     {comboExcess.toLocaleString()}
+                                  </TableCell>
+                                  <TableCell className="text-center font-bold text-gray-500 text-xs">
+                                    ₹{comboExcessRate}
                                   </TableCell>
                                   <TableCell className="text-right font-bold text-primary text-xs">
                                     ₹
@@ -813,7 +826,7 @@ export function InvoiceDetailsDialog({
                             {(item.initialBwCount !== undefined ||
                               item.initialColorCount !== undefined) && (
                               <div className="flex flex-wrap gap-2 mt-1">
-                                {item.initialBwCount !== undefined && (
+                                {item.initialBwCount !== undefined && item.initialBwCount > 0 && (
                                   <Badge
                                     variant="outline"
                                     className="text-[9px] font-bold bg-blue-50 text-blue-700 border-blue-100 px-1.5 py-0"
@@ -821,14 +834,15 @@ export function InvoiceDetailsDialog({
                                     B&W: {item.initialBwCount}
                                   </Badge>
                                 )}
-                                {item.initialColorCount !== undefined && (
-                                  <Badge
-                                    variant="outline"
-                                    className="text-[9px] font-bold bg-purple-50 text-purple-700 border-purple-100 px-1.5 py-0"
-                                  >
-                                    CLR: {item.initialColorCount}
-                                  </Badge>
-                                )}
+                                {item.initialColorCount !== undefined &&
+                                  item.initialColorCount > 0 && (
+                                    <Badge
+                                      variant="outline"
+                                      className="text-[9px] font-bold bg-purple-50 text-purple-700 border-purple-100 px-1.5 py-0"
+                                    >
+                                      CLR: {item.initialColorCount}
+                                    </Badge>
+                                  )}
                               </div>
                             )}
                           </div>
@@ -870,18 +884,22 @@ export function InvoiceDetailsDialog({
               </div>
               {mode === 'FINANCE' && (
                 <>
-                  <div className="space-y-1">
-                    <p className="text-[10px] font-bold text-gray-400 uppercase">Extra Usage</p>
-                    <p className="text-sm font-bold text-warning">
-                      + ₹{financialSummary.extraUsage.toLocaleString()}
-                    </p>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-[10px] font-bold text-gray-400 uppercase">Rent + Usage</p>
-                    <p className="text-sm font-bold text-info">
-                      ₹{financialSummary.totalCurrentCharges.toLocaleString()}
-                    </p>
-                  </div>
+                  {financialSummary.extraUsage > 0 && (
+                    <div className="space-y-1">
+                      <p className="text-[10px] font-bold text-gray-400 uppercase">Extra Usage</p>
+                      <p className="text-sm font-bold text-warning">
+                        + ₹{financialSummary.extraUsage.toLocaleString()}
+                      </p>
+                    </div>
+                  )}
+                  {financialSummary.additionalCharges > 0 && (
+                    <div className="space-y-1">
+                      <p className="text-[10px] font-bold text-gray-400 uppercase">Extra Charges</p>
+                      <p className="text-sm font-bold text-orange-600">
+                        + ₹{financialSummary.additionalCharges.toLocaleString()}
+                      </p>
+                    </div>
+                  )}
                   <div className="col-span-full pt-3 mt-1 border-t border-gray-100 flex justify-between items-center">
                     <p className="text-[10px] font-bold text-primary uppercase">
                       Current Pending Balance
@@ -1018,6 +1036,40 @@ export function InvoiceDetailsDialog({
                       Approve
                     </Button>
                   </>
+                )
+              ) : mode === 'FINANCE' &&
+                (currentInvoice.saleType === 'RENT' || currentInvoice.saleType === 'LEASE') &&
+                currentInvoice.contractStatus === 'ACTIVE' ? (
+                completing ? (
+                  <div className="flex items-center gap-3 animate-in slide-in-from-right-4">
+                    <span className="text-xs font-bold text-slate-500">End Contract?</span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setCompleting(false)}
+                      className="h-10 text-muted-foreground hover:text-slate-800"
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      size="sm"
+                      className="h-10 bg-slate-900 text-white shadow-sm hover:bg-slate-800 px-4"
+                      onClick={handleCompleteContract}
+                      disabled={isLoading}
+                    >
+                      {isLoading ? <Loader2 className="animate-spin h-4 w-4 mr-2" /> : null}
+                      Confirm Completion
+                    </Button>
+                  </div>
+                ) : (
+                  <Button
+                    variant="outline"
+                    className="flex-1 sm:flex-none rounded-xl h-10 px-6 font-bold text-slate-700 border-slate-200 hover:bg-slate-50"
+                    onClick={() => setCompleting(true)}
+                    disabled={isLoading}
+                  >
+                    Complete Contract
+                  </Button>
                 )
               ) : mode === 'FINANCE' &&
                 (currentInvoice.saleType === 'RENT' ||

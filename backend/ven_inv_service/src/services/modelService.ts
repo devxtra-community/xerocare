@@ -38,4 +38,36 @@ export class ModelService {
     }
     return this.modelRepository.deleteModel(id);
   }
+
+  async syncQuantities() {
+    const models = await this.modelRepository.getAllModels();
+    for (const model of models) {
+      // Assuming product repository can count products by model_id
+      // Since we don't have direct access to product repo here, we might need to inject it or use a query builder in model repo
+      // For now, let's assume we can fetch products via relation if loaded, but getAllModels doesn't load products.
+      // Better approach: Use a raw query or add a method in ModelRepository to count products.
+      // Let's modify ModelRepository to handle this more efficiently.
+
+      // Actually, let's execute a raw query to update all model quantities at once or iterate.
+      // Iterating is safer for now.
+      // We need a way to count products for a model.
+      // Let's add calculateModelQuantity to ModelRepository.
+      const count = await this.modelRepository.countProductsForModel(model.id);
+      if (model.quantity !== count) {
+        await this.modelRepository.updateModel(model.id, { quantity: count });
+      }
+
+      // Restore missing brand association if possible
+      if (!model.brand_id && !model.brandRelation) {
+        const product = await this.modelRepository.findFirstProductForModel(model.id);
+        if (product && product.brand) {
+          const brand = await this.brandRepository.findOne({ where: { name: product.brand } });
+          if (brand) {
+            await this.modelRepository.updateModel(model.id, { brand_id: brand.id });
+          }
+        }
+      }
+    }
+    return { success: true };
+  }
 }

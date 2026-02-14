@@ -5,11 +5,15 @@ import { ModelRepository } from '../repositories/modelRepository';
 import { WarehouseRepository } from '../repositories/warehouseRepository';
 import { Product } from '../entities/productEntity';
 import { logger } from '../config/logger';
+import { LotService } from './lotService';
+import { LotItemType } from '../entities/lotItemEntity';
+import { getCached, setCached, deleteCached, getMultipleCached } from '../utils/cacheUtil';
 
 export class ProductService {
   private productRepo = new ProductRepository();
   private model = new ModelRepository();
   private warehouse = new WarehouseRepository();
+  private lotService = new LotService();
 
   private validateDiscount(salePrice: number, maxDiscount?: number) {
     if (maxDiscount !== undefined) {
@@ -44,8 +48,22 @@ export class ProductService {
         if (!warehouseDetails) {
           throw new AppError('warehouse not found ', 404);
         }
+
+        // Check Lot Usage if lot_id provided
+        if (row.lot_id) {
+          await this.lotService.validateAndTrackUsage(
+            row.lot_id,
+            LotItemType.MODEL,
+            row.model_no, // assuming model_no is model_id or mapped correctly? Wait.
+            // row.model_no in bulk might be model_no string or UUID?
+            // ProductService.ts:39 uses this.model.findbyid(row.model_no).
+            // So row.model_no is treated as ID.
+            1,
+          );
+        }
+
         await this.model.updateModel(modelDetails.id, { quantity: modelDetails.quantity + 1 });
-        await this.productRepo.addProduct({
+        const product = await this.productRepo.addProduct({
           vendor_id: String(row.vendor_id),
           serial_no: row.serial_no,
           name: row.name,
@@ -58,7 +76,12 @@ export class ProductService {
           product_status: row.product_status,
           print_colour: row.print_colour,
           max_discount_amount: maxDiscount,
+          lot_id: row.lot_id,
         });
+
+        // Pre-warm cache for newly created product
+        await setCached(`product:${product.id}`, product, 3600);
+
         success.push(row.serial_no);
       } catch (error: unknown) {
         logger.error(`Bulk insert error at row ${i + 1}`, error);
@@ -89,12 +112,23 @@ export class ProductService {
       if (!modelDetails) {
         throw new AppError('model not found', 404);
       }
+
+      // Check Lot Usage if lot_id provided
+      if (data.lot_id) {
+        await this.lotService.validateAndTrackUsage(
+          data.lot_id,
+          LotItemType.MODEL,
+          data.model_id,
+          1, // One product instance
+        );
+      }
+
       const warehouseDetails = await this.warehouse.findById(data.warehouse_id);
       if (!warehouseDetails) {
         throw new AppError('warehouse not found ', 404);
       }
       await this.model.updateModel(modelDetails.id, { quantity: modelDetails.quantity + 1 });
-      return await this.productRepo.addProduct({
+      const product = await this.productRepo.addProduct({
         vendor_id: String(data.vendor_id),
         serial_no: data.serial_no,
         name: data.name,
@@ -108,13 +142,20 @@ export class ProductService {
         print_colour: data.print_colour,
         max_discount_amount: maxDiscount,
         imageUrl: data.imageUrl,
+        lot_id: data.lot_id,
       });
+
+      // Pre-warm cache for newly created product
+      await setCached(`product:${product.id}`, product, 3600);
+
+      return product;
     } catch (err: unknown) {
       if (err instanceof AppError) throw err;
       logger.error('Failed to add product service error:', err);
       throw new AppError('Failed to add product', 500);
     }
   }
+
   async deleteProduct(id: string) {
     const product = await this.productRepo.findOne(id);
     if (!product) {
@@ -124,6 +165,10 @@ export class ProductService {
     if (modelDetails) {
       await this.model.updateModel(modelDetails.id, { quantity: modelDetails.quantity - 1 });
     }
+
+    // Invalidate cache
+    await deleteCached(`product:${id}`);
+
     return this.productRepo.deleteProduct(id);
   }
 
@@ -145,10 +190,71 @@ export class ProductService {
       this.validateDiscount(Number(newSalePrice), Number(newMaxDiscount));
     }
 
-    return this.productRepo.updateProduct(id, data);
+    const updated = await this.productRepo.updateProduct(id, data);
+
+    // Invalidate cache after update
+    await deleteCached(`product:${id}`);
+
+    return updated;
   }
 
   async findOne(id: string) {
-    return this.productRepo.findOne(id);
+    // Try cache first (cache-aside pattern)
+    const cacheKey = `product:${id}`;
+    const cached = await getCached<Product>(cacheKey);
+
+    if (cached) {
+      logger.debug(`Cache HIT for product: ${id}`);
+      return cached;
+    }
+
+    // Cache miss - fetch from database
+    logger.debug(`Cache MISS for product: ${id}`);
+    const product = await this.productRepo.findOne(id);
+
+    if (product) {
+      // Store in cache for future requests
+      await setCached(cacheKey, product, 3600); // 1 hour TTL
+    }
+
+    return product;
+  }
+
+  /**
+   * Batch fetch products with caching optimization
+   * Used by billing service to fetch multiple products efficiently
+   */
+  async findByIds(ids: string[]): Promise<Product[]> {
+    const results: Product[] = [];
+    const missingIds: string[] = [];
+
+    // Generate cache keys
+    const cacheKeys = ids.map((id) => `product:${id}`);
+
+    // Try to get all from cache
+    const cachedMap = await getMultipleCached<Product>(cacheKeys);
+
+    ids.forEach((id, index) => {
+      const cached = cachedMap.get(cacheKeys[index]);
+      if (cached) {
+        results.push(cached);
+      } else {
+        missingIds.push(id);
+      }
+    });
+
+    logger.debug(`Cache: ${results.length} hits, ${missingIds.length} misses`);
+
+    // Fetch missing products from database
+    if (missingIds.length > 0) {
+      const products = await this.productRepo.findByIds(missingIds);
+
+      // Cache the fetched products
+      await Promise.all(products.map((p) => setCached(`product:${p.id}`, p, 3600)));
+
+      results.push(...products);
+    }
+
+    return results;
   }
 }

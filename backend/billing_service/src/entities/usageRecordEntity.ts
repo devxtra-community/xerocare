@@ -45,14 +45,40 @@ export class UsageRecord {
   @Column({ type: 'int', default: 0 })
   colorA3Count!: number;
 
+  // Monthly Consumption (Delta)
+  @Column({ type: 'int', default: 0 })
+  bwA4Delta!: number;
+
+  @Column({ type: 'int', default: 0 })
+  bwA3Delta!: number;
+
+  @Column({ type: 'int', default: 0 })
+  colorA4Delta!: number;
+
+  @Column({ type: 'int', default: 0 })
+  colorA3Delta!: number;
+
+  @Column({ type: 'int', default: 0 })
+  exceededTotal!: number;
+
+  @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
+  exceededCharge!: number;
+
+  @Column('decimal', { precision: 10, scale: 2, default: 0 })
+  monthlyRent!: number;
+
+  @Column('decimal', { precision: 10, scale: 2, default: 0 })
+  advanceAdjusted!: number;
+
+  @Column('decimal', { precision: 10, scale: 2, default: 0 })
+  totalCharge!: number;
+
   @Column({
     type: 'enum',
     enum: ReportedBy,
+    default: ReportedBy.EMPLOYEE,
   })
   reportedBy!: ReportedBy;
-
-  @Column({ type: 'uuid', nullable: true })
-  recordedByEmployeeId?: string;
 
   @Column({ type: 'text', nullable: true })
   remarks?: string;
@@ -61,23 +87,15 @@ export class UsageRecord {
   @Column({ type: 'text', nullable: true })
   meterImageUrl?: string;
 
-  // Finance Approval
-  @Column({ type: 'boolean', default: false })
-  approvedByFinance!: boolean;
-
-  @Column({ type: 'timestamp', nullable: true })
-  approvedAt?: Date;
-
-  @Column({ type: 'text', nullable: true })
-  financeRemarks?: string;
-
-  // Locking mechanism: specific usage record tied to a final invoice
-  @Column({ type: 'uuid', nullable: true })
-  finalInvoiceId?: string;
-
   @CreateDateColumn()
   createdAt!: Date;
 
   @UpdateDateColumn()
   updatedAt!: Date;
+
+  @Column({ type: 'timestamp', nullable: true })
+  emailSentAt?: Date;
+
+  @Column({ type: 'timestamp', nullable: true })
+  whatsappSentAt?: Date;
 }

@@ -23,10 +23,19 @@ interface UsagePreviewDialogProps {
     bwA3Count: number;
     colorA4Count: number;
     colorA3Count: number;
+    bwA4Delta: number;
+    bwA3Delta: number;
+    colorA4Delta: number;
+    colorA3Delta: number;
     billingPeriodStart: string;
     billingPeriodEnd: string;
     meterImageUrl?: string;
     remarks?: string;
+    extraBwCount?: number;
+    extraColorCount?: number;
+    monthlyRent?: number;
+    additionalCharges?: number;
+    additionalChargesRemarks?: string;
   };
 }
 
@@ -51,7 +60,10 @@ export default function UsagePreviewDialog({
   // Calculate pricing breakdown
   const calculatePricing = () => {
     const isCpc = invoice.rentType?.includes('CPC');
-    const monthlyRent = isCpc ? 0 : safeParse(invoice.monthlyRent);
+    const baseRent =
+      usageData.monthlyRent !== undefined ? usageData.monthlyRent : safeParse(invoice.monthlyRent);
+    const monthlyRent = isCpc ? 0 : baseRent;
+    const additionalCharges = usageData.additionalCharges || 0;
     const advance = safeParse(invoice.advanceAmount);
 
     let bwExcessCost = 0;
@@ -65,33 +77,45 @@ export default function UsagePreviewDialog({
 
     // BW Excess Calculation
     const bwRule = invoice.items?.find(
-      (i) => i.itemType === 'PRICING_RULE' && i.description.includes('Black'),
+      (i) =>
+        (i.itemType === 'PRICING_RULE' || !i.itemType) &&
+        (i.description.includes('Black') || i.description.includes('Combined')),
     );
     if (bwRule) {
-      const totalCount = usageData.bwA4Count + usageData.bwA3Count * 2;
-      bwLimit = safeParse(bwRule.bwIncludedLimit);
-      bwRate = safeParse(bwRule.bwExcessRate);
-      bwExcessUnits = Math.max(0, totalCount - bwLimit);
+      const totalDelta = usageData.bwA4Delta + usageData.bwA3Delta * 2;
+      bwLimit =
+        bwRule.bwIncludedLimit !== undefined
+          ? bwRule.bwIncludedLimit
+          : bwRule.combinedIncludedLimit || 0;
+      bwRate = bwRule.bwExcessRate || bwRule.combinedExcessRate || 0;
+      bwExcessUnits = Math.max(0, totalDelta + (usageData.extraBwCount || 0) - bwLimit);
       bwExcessCost = bwExcessUnits * bwRate;
     }
 
     // Color Excess Calculation
     const colorRule = invoice.items?.find(
-      (i) => i.itemType === 'PRICING_RULE' && i.description.includes('Color'),
+      (i) =>
+        (i.itemType === 'PRICING_RULE' || !i.itemType) &&
+        (i.description.includes('Color') || i.description.includes('Combined')),
     );
     if (colorRule) {
-      const totalCount = usageData.colorA4Count + usageData.colorA3Count * 2;
-      colorLimit = safeParse(colorRule.colorIncludedLimit);
-      colorRate = safeParse(colorRule.colorExcessRate);
-      colorExcessUnits = Math.max(0, totalCount - colorLimit);
+      const totalDelta = usageData.colorA4Delta + usageData.colorA3Delta * 2;
+      colorLimit =
+        colorRule.colorIncludedLimit !== undefined
+          ? colorRule.colorIncludedLimit
+          : colorRule.combinedIncludedLimit || 0;
+      colorRate = colorRule.colorExcessRate || colorRule.combinedExcessRate || 0;
+      colorExcessUnits = Math.max(0, totalDelta + (usageData.extraColorCount || 0) - colorLimit);
       colorExcessCost = colorExcessUnits * colorRate;
     }
 
     const totalExcess = bwExcessCost + colorExcessCost;
-    const total = monthlyRent + totalExcess - advance;
+    const total = monthlyRent + totalExcess + additionalCharges - advance;
 
     return {
       monthlyRent,
+      additionalCharges,
+      additionalChargesRemarks: usageData.additionalChargesRemarks,
       advance,
       bwExcessCost,
       colorExcessCost,
@@ -102,6 +126,8 @@ export default function UsagePreviewDialog({
       bwLimit,
       colorLimit,
       totalExcess,
+      extraBw: usageData.extraBwCount || 0,
+      extraColor: usageData.extraColorCount || 0,
       total: Math.round((total + Number.EPSILON) * 100) / 100,
       isCpc,
     };
@@ -191,19 +217,19 @@ export default function UsagePreviewDialog({
                       <span className="font-semibold">{usageData.bwA3Count.toLocaleString()}</span>
                     </div>
                     <div className="flex justify-between pt-1 border-t border-orange-100">
-                      <span className="text-slate-600">Total (A4 equiv):</span>
+                      <span className="text-slate-600">Monthly Usage (A4 equiv):</span>
                       <span className="font-bold text-orange-600">
-                        {(usageData.bwA4Count + usageData.bwA3Count * 2).toLocaleString()}
+                        {(usageData.bwA4Delta + usageData.bwA3Delta * 2).toLocaleString()}
                       </span>
                     </div>
-                    <div className="flex justify-between text-xs text-slate-500">
-                      <span>Free Limit:</span>
-                      <span>{pricing.bwLimit.toLocaleString()}</span>
+                    <div className="flex justify-between text-xs text-blue-600">
+                      <span>Manual Extra:</span>
+                      <span>{pricing.extraBw.toLocaleString()}</span>
                     </div>
                     {pricing.bwExcessUnits > 0 && (
-                      <div className="flex justify-between pt-1 border-t border-orange-100">
-                        <span className="text-red-600 font-semibold">Excess Units:</span>
-                        <span className="font-bold text-red-600">
+                      <div className="flex justify-between pt-1 border-t border-orange-100 font-bold">
+                        <span className="text-red-600">Total Chargeable:</span>
+                        <span className="text-red-600">
                           {pricing.bwExcessUnits.toLocaleString()}
                         </span>
                       </div>
@@ -230,19 +256,19 @@ export default function UsagePreviewDialog({
                       </span>
                     </div>
                     <div className="flex justify-between pt-1 border-t border-orange-100">
-                      <span className="text-slate-600">Total (A4 equiv):</span>
+                      <span className="text-slate-600">Monthly Usage (A4 equiv):</span>
                       <span className="font-bold text-orange-600">
-                        {(usageData.colorA4Count + usageData.colorA3Count * 2).toLocaleString()}
+                        {(usageData.colorA4Delta + usageData.colorA3Delta * 2).toLocaleString()}
                       </span>
                     </div>
-                    <div className="flex justify-between text-xs text-slate-500">
-                      <span>Free Limit:</span>
-                      <span>{pricing.colorLimit.toLocaleString()}</span>
+                    <div className="flex justify-between text-xs text-blue-600">
+                      <span>Manual Extra:</span>
+                      <span>{pricing.extraColor.toLocaleString()}</span>
                     </div>
                     {pricing.colorExcessUnits > 0 && (
-                      <div className="flex justify-between pt-1 border-t border-orange-100">
-                        <span className="text-red-600 font-semibold">Excess Units:</span>
-                        <span className="font-bold text-red-600">
+                      <div className="flex justify-between pt-1 border-t border-orange-100 font-bold">
+                        <span className="text-red-600">Total Chargeable:</span>
+                        <span className="text-red-600">
                           {pricing.colorExcessUnits.toLocaleString()}
                         </span>
                       </div>
@@ -309,6 +335,39 @@ export default function UsagePreviewDialog({
                 </div>
               )}
 
+              {pricing.additionalCharges > 0 && (
+                <div className="flex justify-between items-center py-2 border-b border-green-100">
+                  <div>
+                    <span className="text-slate-700">Additional Charges</span>
+                    <p className="text-xs text-slate-500">
+                      {pricing.additionalChargesRemarks || 'Extra services/charges'}
+                    </p>
+                  </div>
+                  <span className="font-semibold text-orange-600 flex items-center gap-1">
+                    <IndianRupee size={16} />
+                    {pricing.additionalCharges.toLocaleString('en-IN', {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
+                  </span>
+                </div>
+              )}
+
+              <div className="flex justify-between items-center py-2 border-b border-green-100 mt-2">
+                <span className="text-base font-bold text-slate-700">Grand Total (Gross)</span>
+                <span className="text-lg font-bold text-slate-700 flex items-center gap-1">
+                  <IndianRupee size={18} />
+                  {(
+                    pricing.monthlyRent +
+                    pricing.totalExcess +
+                    pricing.additionalCharges
+                  ).toLocaleString('en-IN', {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}
+                </span>
+              </div>
+
               {pricing.advance > 0 && (
                 <div className="flex justify-between items-center py-2 border-b border-green-100">
                   <span className="text-slate-700">Advance (Deduction)</span>
@@ -323,7 +382,7 @@ export default function UsagePreviewDialog({
               )}
 
               <div className="flex justify-between items-center py-3 bg-green-100 rounded px-3 mt-2">
-                <span className="text-lg font-bold text-green-800">Total Amount</span>
+                <span className="text-lg font-bold text-green-800">Net Payable</span>
                 <span className="text-2xl font-bold text-green-700 flex items-center gap-1">
                   <IndianRupee size={24} />
                   {pricing.total.toLocaleString('en-IN', {

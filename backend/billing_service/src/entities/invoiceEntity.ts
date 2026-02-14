@@ -5,6 +5,7 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   OneToMany,
+  Index,
 } from 'typeorm';
 import { InvoiceItem } from './invoiceItemEntity';
 import { InvoiceStatus } from './enums/invoiceStatus';
@@ -13,6 +14,7 @@ import { InvoiceType } from './enums/invoiceType';
 import { RentType } from './enums/rentType';
 import { RentPeriod } from './enums/rentPeriod';
 import { LeaseType } from './enums/leaseType';
+import { ContractStatus } from './enums/contractStatus';
 
 export enum SecurityDepositMode {
   CASH = 'CASH',
@@ -20,6 +22,7 @@ export enum SecurityDepositMode {
 }
 
 @Entity('invoices')
+@Index(['contractStatus', 'type'], { where: "type = 'PROFORMA'" })
 export class Invoice {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
@@ -62,6 +65,14 @@ export class Invoice {
     default: InvoiceStatus.DRAFT,
   })
   status!: InvoiceStatus;
+
+  @Column({
+    name: 'contractStatus', // Explicitly map to DB column to handle case sensitivity
+    type: 'enum',
+    enum: ContractStatus,
+    nullable: true,
+  })
+  contractStatus?: ContractStatus;
 
   // --- Audit Fields ---
   @Column({ nullable: true })
@@ -150,6 +161,15 @@ export class Invoice {
   @Column({ type: 'timestamp', nullable: true })
   whatsappSentAt?: Date;
 
+  @Column({ type: 'boolean', default: false })
+  isFinalMonth?: boolean;
+
+  @Column({ type: 'boolean', default: false })
+  isSummaryInvoice?: boolean;
+
+  @Column({ type: 'timestamp', nullable: true })
+  completedAt?: Date;
+
   // --- Lease Fields ---
   @Column({
     type: 'enum',
@@ -199,4 +219,16 @@ export class Invoice {
 
   @Column({ type: 'int', nullable: true })
   colorA3Count?: number;
+
+  @Column({ type: 'int', nullable: true })
+  extraBwA4Count?: number;
+
+  @Column({ type: 'int', nullable: true })
+  extraColorA4Count?: number;
+
+  @Column({ type: 'decimal', precision: 12, scale: 2, nullable: true })
+  additionalCharges?: number;
+
+  @Column({ type: 'text', nullable: true })
+  additionalChargesRemarks?: string;
 }

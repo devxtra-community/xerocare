@@ -100,6 +100,14 @@ export const deleteProduct = async (id: string): Promise<void> => {
   await api.delete<ApiResponse<void>>(`/i/products/${id}`);
 };
 
+export const getProductById = async (id: string): Promise<Product> => {
+  const response = await api.get<ApiResponse<Product>>(`/i/products/${id}`);
+  if (!response.data.data) {
+    throw new Error('Product not found');
+  }
+  return response.data.data;
+};
+
 export interface BulkProductRow {
   model_no: string;
   warehouse_id: string;

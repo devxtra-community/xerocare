@@ -16,10 +16,16 @@ import modelRoute from './routes/modelRoute';
 import inventoryRouter from './routes/inventoryRoutes';
 import sparePartRouter from './routes/sparePartRoutes';
 import brandRouter from './routes/brandRoute';
+import lotRouter from './routes/lotRoutes';
 
 const app = express();
 
 app.use(express.json());
+// Request logging middleware
+app.use((req, res, next) => {
+  logger.info(`[${req.method}] ${req.url}`);
+  next();
+});
 
 app.use('/', healthRouter);
 app.use('/vendors', vendorRouter);
@@ -30,6 +36,7 @@ app.use('/products', productRoute);
 app.use('/inventory', inventoryRouter);
 app.use('/spare-parts', sparePartRouter);
 app.use('/brands', brandRouter);
+app.use('/lots', lotRouter);
 app.use(errorHandler);
 
 const startServer = async () => {

@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Search, Loader2, Eye, FileText, Plus, Clock } from 'lucide-react';
+import { Search, Loader2, Eye, FileText, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import {
@@ -27,13 +27,19 @@ import { InvoiceDetailsDialog } from '@/components/invoice/InvoiceDetailsDialog'
 import { updateQuotation } from '@/lib/invoice'; // Ensure import
 import UsageRecordingModal from '../Finance/UsageRecordingModal';
 
-const calculateRemainingDays = (end: string | Date | undefined) => {
-  if (!end) return null;
-  const e = new Date(end);
-  const now = new Date();
-  const diffTime = e.getTime() - now.getTime();
-  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-  return diffDays;
+const getCleanProductName = (name: string) => {
+  // Remove "Black & White - " or "Color - " prefixes
+  let clean = name.replace(/^(Black & White - |Color - |Combined - )/i, '');
+  // Remove serial number patterns like (SN-...) or - SN-... or (Serial...)
+  clean = clean.replace(/(\s*-\s*SN-[^,]+|\s*\(SN-[^)]+\)|\s*\(Serial[^)]+\))/gi, '');
+
+  // Also remove everything after the last dash if it looks like a serial number (legacy format)
+  const lastDashIndex = clean.lastIndexOf(' - ');
+  if (lastDashIndex !== -1 && clean.length - lastDashIndex < 25) {
+    // Heuristic: if there's a dash and the suffix is short, it's likely a serial number
+    clean = clean.substring(0, lastDashIndex).trim();
+  }
+  return clean.trim();
 };
 
 // ...
@@ -166,7 +172,6 @@ export default function EmployeeRentTable({ mode = 'EMPLOYEE' }: EmployeeRentTab
                 <TableHead className="text-primary font-bold">CUSTOMER</TableHead>
                 <TableHead className="text-primary font-bold">ITEMS</TableHead>
                 <TableHead className="text-primary font-bold uppercase">Contract Period</TableHead>
-                <TableHead className="text-primary font-bold">DURATION</TableHead>
                 <TableHead className="text-primary font-bold">AMOUNT</TableHead>
                 <TableHead className="text-primary font-bold">STATUS</TableHead>
                 <TableHead className="text-primary font-bold">DATE</TableHead>
@@ -204,33 +209,14 @@ export default function EmployeeRentTable({ mode = 'EMPLOYEE' }: EmployeeRentTab
                       <TableCell className="font-medium">{inv.customerName}</TableCell>
                       <TableCell className="max-w-[200px]">
                         <div className="text-xs font-medium text-slate-700 truncate">
-                          {inv.rentType?.replace('_', ' ') || 'Rent agreement'}
+                          {inv.items
+                            ?.map((item) => getCleanProductName(item.description))
+                            .join(', ') || 'No items'}
                         </div>
                       </TableCell>
                       <TableCell className="text-xs text-muted-foreground font-medium">
                         {inv.startDate ? format(new Date(inv.startDate), 'MMM dd, yyyy') : 'N/A'} -{' '}
                         {inv.endDate ? format(new Date(inv.endDate), 'MMM dd, yyyy') : 'N/A'}
-                      </TableCell>
-                      <TableCell>
-                        {(() => {
-                          const remaining = calculateRemainingDays(inv.endDate);
-                          const isExpired = remaining !== null && remaining <= 0;
-                          return (
-                            <Badge
-                              variant="secondary"
-                              className={`rounded-full px-3 py-0.5 text-[10px] font-bold tracking-wider whitespace-nowrap
-                                ${isExpired ? 'bg-red-50 text-red-600' : 'bg-blue-50 text-blue-700'}
-                              `}
-                            >
-                              <Clock className="w-3 h-3 mr-1" />
-                              {remaining !== null
-                                ? isExpired
-                                  ? 'Expired'
-                                  : `${remaining} Days Left`
-                                : 'N/A'}
-                            </Badge>
-                          );
-                        })()}
                       </TableCell>
                       <TableCell className="font-bold text-slate-700">
                         ₹{inv.totalAmount?.toLocaleString()}

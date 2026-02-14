@@ -1,10 +1,11 @@
-import { Repository, Between } from 'typeorm';
+import { Repository, Between, Brackets } from 'typeorm';
 import { Invoice } from '../entities/invoiceEntity';
 import { InvoiceStatus } from '../entities/enums/invoiceStatus';
 import { InvoiceType } from '../entities/enums/invoiceType';
 import { SaleType } from '../entities/enums/saleType';
 import { InvoiceItem } from '../entities/invoiceItemEntity';
 import { Source } from '../config/dataSource';
+import { ContractStatus } from '../entities/enums/contractStatus';
 
 export class InvoiceRepository {
   private repo: Repository<Invoice>;
@@ -24,17 +25,42 @@ export class InvoiceRepository {
     } as { invoice: { id: string } });
   }
 
-  save(invoice: Invoice) {
+  async save(invoice: Invoice) {
+    if (invoice.id && invoice.type === InvoiceType.PROFORMA) {
+      // Find existing to prevent date mutation
+      const existing = await this.repo.findOne({ where: { id: invoice.id } });
+      if (existing && existing.type === InvoiceType.PROFORMA) {
+        // Force dates to remain as they were
+        if (existing.effectiveFrom) invoice.effectiveFrom = existing.effectiveFrom;
+        if (existing.effectiveTo) invoice.effectiveTo = existing.effectiveTo;
+      }
+    }
     return this.repo.save(invoice);
   }
 
-  saveInvoice(invoice: Invoice) {
+  async saveInvoice(invoice: Invoice) {
+    if (invoice.id && invoice.type === InvoiceType.PROFORMA) {
+      // Find existing to prevent date mutation
+      const existing = await this.repo.findOne({ where: { id: invoice.id } });
+      if (existing && existing.type === InvoiceType.PROFORMA) {
+        // Force dates to remain as they were
+        if (existing.effectiveFrom) invoice.effectiveFrom = existing.effectiveFrom;
+        if (existing.effectiveTo) invoice.effectiveTo = existing.effectiveTo;
+      }
+    }
     return this.repo.save(invoice);
   }
 
   async isFirstFinalInvoice(contractId: string): Promise<boolean> {
     const count = await this.countFinalInvoicesByContractId(contractId);
     return count === 0;
+  }
+
+  async generateInvoiceNumber(): Promise<string> {
+    const year = new Date().getFullYear();
+    const count = await this.getInvoiceCountForYear(year);
+    const paddedCount = String(count + 1).padStart(4, '0');
+    return `INV-${year}-${paddedCount}`;
   }
 
   findById(id: string) {
@@ -57,10 +83,13 @@ export class InvoiceRepository {
     }
 
     // EXCLUDE FINAL Invoices (Monthly Settlements) from the main list, UNLESS it's a direct SALE
-    qb.andWhere('(invoice.type != :finalType OR invoice.saleType = :saleType)', {
-      finalType: InvoiceType.FINAL,
-      saleType: 'SALE',
-    });
+    qb.andWhere(
+      new Brackets((innerQb) => {
+        innerQb
+          .where('invoice.type != :finalType', { finalType: 'FINAL' })
+          .orWhere('invoice.saleType = :saleType', { saleType: 'SALE' });
+      }),
+    );
 
     return qb.getMany();
   }
@@ -76,19 +105,29 @@ export class InvoiceRepository {
   }
 
   async findByBranchId(branchId: string) {
-    const qb = this.repo
-      .createQueryBuilder('invoice')
-      .leftJoinAndSelect('invoice.items', 'items')
-      .where('invoice.branchId = :branchId', { branchId })
-      .orderBy('invoice.createdAt', 'DESC');
+    try {
+      // console.log('InvoiceRepo: findByBranchId called for', branchId);
+      const qb = this.repo
+        .createQueryBuilder('invoice')
+        .leftJoinAndSelect('invoice.items', 'items')
+        .where('invoice.branchId = :branchId', { branchId })
+        .orderBy('invoice.createdAt', 'DESC');
 
-    // EXCLUDE FINAL Invoices (Monthly Settlements) from the main list, UNLESS it's a direct SALE which becomes FINAL
-    qb.andWhere('(invoice.type != :finalType OR invoice.saleType = :saleType)', {
-      finalType: InvoiceType.FINAL,
-      saleType: 'SALE',
-    });
+      // EXCLUDE FINAL Invoices (Monthly Settlements) from the main list, UNLESS it's a direct SALE which becomes FINAL
+      // Using Brackets for safe OR condition and standard SQL <> operator
+      qb.andWhere(
+        new Brackets((innerQb) => {
+          innerQb
+            .where('invoice.type != :finalType', { finalType: 'FINAL' })
+            .orWhere('invoice.saleType = :saleType', { saleType: 'SALE' });
+        }),
+      );
 
-    return qb.getMany();
+      return qb.getMany();
+    } catch (error) {
+      console.error('InvoiceRepo: findByBranchId ERROR:', error);
+      throw error;
+    }
   }
 
   updateStatus(id: string, status: Invoice['status']) {
@@ -371,18 +410,49 @@ export class InvoiceRepository {
 
     // Rent = PROFORMA (Contract), Lease = ACTIVE_LEASE
     // Filter by Branch if provided
+    // EXCLUDE COMPLETED contracts
 
     qb.where('(invoice.type = :proforma OR invoice.status = :activeLease)', {
       proforma: InvoiceType.PROFORMA,
       activeLease: InvoiceStatus.ACTIVE_LEASE,
+    }).andWhere('(invoice.contractStatus IS NULL OR invoice.contractStatus != :completed)', {
+      completed: ContractStatus.COMPLETED,
     });
 
     if (branchId) {
       qb.andWhere('invoice.branchId = :branchId', { branchId });
     }
 
-    // Also maybe SaleType check? PROFORMA implies Rent usually.
-    // ACTIVE_LEASE implies Lease.
+    return qb.getMany();
+  }
+
+  async findCompletedContracts(branchId?: string) {
+    const qb = this.repo.createQueryBuilder('invoice').leftJoinAndSelect('invoice.items', 'items');
+
+    // Find contracts that are COMPLETED (can be PROFORMA or FINAL type)
+    // When a contract completes, its type changes from PROFORMA to FINAL
+    qb.where('invoice.contractStatus = :completed', { completed: ContractStatus.COMPLETED });
+
+    if (branchId) {
+      qb.andWhere('invoice.branchId = :branchId', { branchId });
+    }
+
+    qb.orderBy('invoice.completedAt', 'DESC');
+
+    return qb.getMany();
+  }
+
+  async findUnpaidFinalInvoices(branchId?: string) {
+    const qb = this.repo.createQueryBuilder('invoice');
+    qb.where('invoice.type = :type', { type: InvoiceType.FINAL })
+      .andWhere('invoice.status != :paid', { paid: InvoiceStatus.PAID })
+      .andWhere('invoice.status != :cancelled', { cancelled: InvoiceStatus.CANCELLED });
+
+    if (branchId) {
+      qb.andWhere('invoice.branchId = :branchId', { branchId });
+    }
+
+    qb.orderBy('invoice.createdAt', 'DESC');
     return qb.getMany();
   }
 
@@ -568,5 +638,34 @@ export class InvoiceRepository {
         qty: parseInt(r.qty, 10) || 0,
       })),
     };
+  }
+
+  async findFinalInvoicesByBranch(branchId: string, saleType?: string): Promise<Invoice[]> {
+    const qb = this.repo
+      .createQueryBuilder('invoice')
+      .leftJoinAndSelect('invoice.items', 'items')
+      .where('invoice.branchId = :branchId', { branchId })
+      // Show only finance-approved contracts (PROFORMA) and monthly invoices (FINAL)
+      // Exclude QUOTATION type (employee-approved awaiting finance approval)
+      .andWhere('(invoice.type = :proforma OR invoice.type = :final)', {
+        proforma: InvoiceType.PROFORMA,
+        final: InvoiceType.FINAL,
+      })
+      // Only show finance-approved and active contracts
+      .andWhere('invoice.status IN (:...statuses)', {
+        statuses: [
+          InvoiceStatus.FINANCE_APPROVED,
+          InvoiceStatus.ACTIVE_LEASE,
+          InvoiceStatus.ISSUED,
+          InvoiceStatus.PAID,
+        ],
+      })
+      .orderBy('invoice.createdAt', 'DESC');
+
+    if (saleType) {
+      qb.andWhere('invoice.saleType = :saleType', { saleType });
+    }
+
+    return qb.getMany();
   }
 }

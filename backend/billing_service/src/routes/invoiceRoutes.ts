@@ -22,6 +22,11 @@ import {
   getFinanceReport,
   updateInvoiceUsage,
   createNextMonthInvoice,
+  getInvoiceHistory,
+  generateConsolidatedFinalInvoice,
+  getCompletedCollections,
+  downloadConsolidatedInvoice,
+  sendConsolidatedInvoice,
 } from '../controllers/invoiceController';
 import { authMiddleware } from '../middlewares/authMiddleware';
 import { requireRole } from '../middlewares/roleMiddleware';
@@ -89,13 +94,49 @@ router.post(
   createNextMonthInvoice,
 );
 router.get('/pending-counts', authMiddleware, getPendingCounts);
+
+router.post(
+  '/settlements/consolidate',
+  authMiddleware,
+  requireRole(EmployeeRole.ADMIN, EmployeeRole.FINANCE),
+  generateConsolidatedFinalInvoice,
+);
 router.get(
   '/alerts',
   authMiddleware,
   requireRole(EmployeeRole.ADMIN, EmployeeRole.FINANCE),
   getCollectionAlerts,
 );
+
+router.get(
+  '/completed-collections',
+  authMiddleware,
+  requireRole(EmployeeRole.ADMIN, EmployeeRole.FINANCE),
+  getCompletedCollections,
+);
+
+router.get(
+  '/completed-collections/:contractId/download',
+  // authMiddleware, // Allow download? Auth needed.
+  authMiddleware,
+  requireRole(EmployeeRole.ADMIN, EmployeeRole.FINANCE),
+  downloadConsolidatedInvoice,
+);
+
+router.post(
+  '/completed-collections/:contractId/send',
+  authMiddleware,
+  requireRole(EmployeeRole.ADMIN, EmployeeRole.FINANCE),
+  sendConsolidatedInvoice,
+);
+
 router.get('/branch-invoices', authMiddleware, getBranchInvoices);
+router.get(
+  '/history',
+  authMiddleware,
+  requireRole(EmployeeRole.ADMIN, EmployeeRole.FINANCE),
+  getInvoiceHistory,
+);
 router.get('/finance/report', authMiddleware, requireRole(EmployeeRole.ADMIN), getFinanceReport);
 router.put(
   '/:id/usage',
