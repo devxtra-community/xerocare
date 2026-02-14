@@ -32,6 +32,8 @@ export interface Invoice {
   createdBy: string;
   totalAmount: number;
   status: string;
+  contractStatus?: 'ACTIVE' | 'COMPLETED' | 'CANCELLED';
+  type?: 'QUOTATION' | 'PROFORMA' | 'FINAL';
   saleType: string;
   rentType?: 'FIXED_LIMIT' | 'FIXED_COMBO' | 'FIXED_FLAT' | 'CPC' | 'CPC_COMBO';
   rentPeriod?: 'MONTHLY' | 'QUARTERLY' | 'HALF_YEARLY' | 'YEARLY' | 'CUSTOM';
@@ -74,8 +76,12 @@ export interface Invoice {
   bwA3Count?: number;
   colorA4Count?: number;
   colorA3Count?: number;
+  extraBwA4Count?: number;
+  extraColorA4Count?: number;
   billingPeriodStart?: string;
   billingPeriodEnd?: string;
+  additionalCharges?: number;
+  additionalChargesRemarks?: string;
   referenceContractId?: string; // Link to PROFORMA contract
   advanceAdjusted?: number;
   grossAmount?: number;
@@ -84,22 +90,34 @@ export interface Invoice {
 
 export interface UsageRecord {
   id: string;
-  contractId: string;
-  billingPeriodStart: string;
-  billingPeriodEnd: string;
+  periodStart: string;
+  periodEnd: string;
+  freeLimit: number | string;
+  totalUsage: number;
+  exceededCount: number;
+  rate: number;
+  exceededAmount: number;
+  rent: number;
+  finalTotal: number;
+  meterImageUrl?: string;
+  emailSentAt?: string;
+  whatsappSentAt?: string;
   bwA4Count: number;
   bwA3Count: number;
   colorA4Count: number;
+  bwA4Delta: number;
+  bwA3Delta: number;
+  colorA4Delta: number;
+  colorA3Delta: number;
   colorA3Count: number;
-  reportedBy: 'CUSTOMER' | 'EMPLOYEE';
   remarks?: string;
-  meterImageUrl?: string;
-  approvedByFinance: boolean;
-  approvedAt?: string;
-  financeRemarks?: string;
-  finalInvoiceId?: string;
-  createdAt: string;
+  advanceAdjusted?: number;
 }
+
+export const sendMonthlyUsageInvoice = async (usageId: string): Promise<unknown> => {
+  const response = await api.post(`/b/usage/${usageId}/send-invoice`);
+  return response.data.data;
+};
 
 export interface CreateInvoicePayload {
   customerId: string;
@@ -238,10 +256,14 @@ export interface CollectionAlert {
   customerName: string;
   customerPhone?: string; // Added for display
   invoiceNumber: string;
-  type: 'USAGE_PENDING' | 'INVOICE_PENDING' | 'SEND_PENDING';
+  type: 'USAGE_PENDING' | 'INVOICE_PENDING' | 'SEND_PENDING' | 'SUMMARY_PENDING';
   saleType: string;
   dueDate: string;
   finalInvoiceId?: string;
+  effectiveFrom?: string;
+  effectiveTo?: string;
+  monthlyRent?: number;
+  totalAmount?: number;
   usageData?: {
     bwA4Count: number;
     bwA3Count: number;
@@ -250,6 +272,28 @@ export interface CollectionAlert {
     billingPeriodStart: string;
     billingPeriodEnd: string;
   };
+  recordedMonths?: number;
+  tenure?: number;
+  contractStatus?: 'ACTIVE' | 'COMPLETED' | 'CANCELLED';
+}
+
+export interface CompletedCollection {
+  contractId: string;
+  customerId: string;
+  customerName: string;
+  customerPhone?: string;
+  invoiceNumber: string;
+  saleType: string;
+  effectiveFrom?: string;
+  effectiveTo?: string;
+  completedAt?: string;
+  finalInvoiceId?: string;
+  finalInvoiceNumber?: string;
+  totalCollected: number; // Total amount collected from all usage records
+  finalAmount: number;
+  grossAmount: number;
+  advanceAdjusted: number;
+  status: string;
 }
 
 export const getCollectionAlerts = async (date?: string): Promise<CollectionAlert[]> => {
@@ -270,6 +314,11 @@ export const getUsageHistory = async (contractId: string): Promise<UsageRecord[]
   return response.data.data;
 };
 
+export const getCompletedCollections = async (): Promise<CompletedCollection[]> => {
+  const response = await api.get('/b/invoices/completed-collections');
+  return response.data.data;
+};
+
 export const generateMonthlyInvoice = async (payload: {
   contractId: string;
   billingPeriodStart: string;
@@ -282,6 +331,11 @@ export const generateMonthlyInvoice = async (payload: {
 
 export const createNextMonthInvoice = async (contractId: string): Promise<Invoice> => {
   const response = await api.post('/b/invoices/settlements/next-month', { contractId });
+  return response.data.data;
+};
+
+export const generateConsolidatedFinalInvoice = async (contractId: string): Promise<Invoice> => {
+  const response = await api.post('/b/invoices/settlements/consolidate', { contractId });
   return response.data.data;
 };
 
@@ -317,8 +371,33 @@ export const updateInvoiceUsage = async (
     bwA3Count: number;
     colorA4Count: number;
     colorA3Count: number;
+    extraBwA4Count?: number;
+    extraColorA4Count?: number;
+    monthlyRent?: number;
+    additionalCharges?: number;
+    additionalChargesRemarks?: string;
+    billingPeriodStart?: string;
+    billingPeriodEnd?: string;
   },
 ): Promise<unknown> => {
   const response = await api.put(`/b/invoices/${invoiceId}/usage`, payload);
+  return response.data;
+};
+
+export const getInvoiceHistory = async (saleType?: string): Promise<Invoice[]> => {
+  const url = saleType ? `/b/invoices/history?saleType=${saleType}` : '/b/invoices/history';
+  const response = await api.get(url);
+  return response.data.data;
+};
+
+export const downloadConsolidatedInvoice = async (contractId: string): Promise<Blob> => {
+  const response = await api.get(`/b/invoices/completed-collections/${contractId}/download`, {
+    responseType: 'blob',
+  });
+  return response.data;
+};
+
+export const sendConsolidatedInvoice = async (contractId: string): Promise<unknown> => {
+  const response = await api.post(`/b/invoices/completed-collections/${contractId}/send`);
   return response.data;
 };

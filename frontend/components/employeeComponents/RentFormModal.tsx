@@ -12,7 +12,7 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import { CustomerSelect } from '@/components/invoice/CustomerSelect';
-import { CreateInvoicePayload, Invoice } from '@/lib/invoice';
+import { CreateInvoicePayload, Invoice, InvoiceItem } from '@/lib/invoice';
 import { ProductSelect, SelectableItem } from '@/components/invoice/ProductSelect';
 import { Product } from '@/lib/product';
 
@@ -285,8 +285,7 @@ export default function RentFormModal({
             const baseDesc = `${p.name}${p.model?.model_name ? ` - ${p.model.model_name}` : ''}`;
             const myRules = form.pricingItems.filter((i) => i.description.includes(baseDesc));
 
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const mergedItem: any = {
+            const mergedItem: InvoiceItem = {
               description: baseDesc,
               quantity: p.quantity || 1,
               unitPrice: 0,
@@ -331,7 +330,7 @@ export default function RentFormModal({
               }
             });
 
-            return mergedItem;
+            return mergedItem as unknown as NonNullable<CreateInvoicePayload['items']>[number];
           }),
 
           pricingItems: [],
@@ -365,8 +364,7 @@ export default function RentFormModal({
             const baseDesc = `${p.name}${p.model?.model_name ? ` - ${p.model.model_name}` : ''}`;
             const myRules = form.pricingItems.filter((i) => i.description.includes(baseDesc));
 
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const mergedItem: any = {
+            const mergedItem: InvoiceItem = {
               description: baseDesc,
               quantity: p.quantity || 1,
               unitPrice: 0,
@@ -411,7 +409,7 @@ export default function RentFormModal({
               }
             });
 
-            return mergedItem;
+            return mergedItem as unknown as NonNullable<CreateInvoicePayload['items']>[number];
           }),
           pricingItems: [],
         };

@@ -69,4 +69,11 @@ export class SparePartRepository {
       .orderBy('sp.created_at', 'DESC')
       .getRawMany();
   }
+
+  async findById(id: string): Promise<SparePart | null> {
+    return this.masterRepo.findOne({
+      where: { id },
+      relations: { model: true },
+    });
+  }
 }

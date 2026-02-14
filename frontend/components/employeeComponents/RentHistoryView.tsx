@@ -17,15 +17,29 @@ import {
   User,
   History as HistoryIcon,
   Printer,
-  Eye,
   Loader2,
   PlusCircle,
-  ArrowLeft,
 } from 'lucide-react';
-import { Invoice, getInvoiceById } from '@/lib/invoice';
+import { Invoice, getInvoiceById, generateConsolidatedFinalInvoice } from '@/lib/invoice';
 import { format } from 'date-fns';
 import { InvoiceDetailsDialog } from '../invoice/InvoiceDetailsDialog';
 import UsageRecordingModal from '@/components/Finance/UsageRecordingModal';
+
+interface UsageRecord {
+  id: string;
+  periodStart?: string;
+  periodEnd?: string;
+  monthlyRent?: number | string;
+  bwA4Count?: number;
+  bwA3Count?: number;
+  colorA4Count?: number;
+  colorA3Count?: number;
+  exceededTotal?: number;
+  exceededCharge?: number;
+  totalCharge?: number;
+  meterImageUrl?: string;
+  finalInvoiceId?: string;
+}
 
 interface RentHistoryViewProps {
   contractId: string;
@@ -35,7 +49,7 @@ interface RentHistoryViewProps {
 
 export default function RentHistoryView({ contractId, isOpen, onClose }: RentHistoryViewProps) {
   const [contract, setContract] = useState<Invoice | null>(null);
-  const [history, setHistory] = useState<Invoice[]>([]);
+  const [usageRecords, setUsageRecords] = useState<UsageRecord[]>([]);
   const [loading, setLoading] = useState(true);
 
   // State for viewing invoice details
@@ -49,9 +63,9 @@ export default function RentHistoryView({ contractId, isOpen, onClose }: RentHis
       setLoading(true);
       const data = await getInvoiceById(contractId);
       setContract(data);
-      // Assuming the backend populates invoiceHistory or we need to fetch it separately.
-      // If invoiceHistory is present on the object:
-      setHistory(data.invoiceHistory || []);
+      // Set usage records
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      setUsageRecords((data as any).usageHistory || []);
     } catch (error) {
       console.error('Failed to fetch contract history:', error);
     } finally {
@@ -65,18 +79,23 @@ export default function RentHistoryView({ contractId, isOpen, onClose }: RentHis
     }
   }, [isOpen, contractId, fetchData]);
 
-  const handleViewInvoice = (inv: Invoice) => {
-    setSelectedInvoice(inv);
-  };
-
-  const handlePreviousMonth = () => {
-    if (history.length === 0) return;
-    // By convention, history is desc. If we want "Previous Month", we might need the one after current in list.
-    // Since this is a list, maybe we just highlight or open the details for the most recent historical one?
-    // Or if they are ALREADY viewing details, that dialog has it.
-    // For now, let's make it open the Details Dialog for the second item in history (if current is first)
-    if (history.length > 0) {
-      handleViewInvoice(history[0]);
+  const handleCompleteContract = async () => {
+    if (
+      !contract ||
+      !window.confirm(
+        'Are you sure you want to complete this contract? This will generate the FINAL consolidated invoice.',
+      )
+    )
+      return;
+    try {
+      setLoading(true);
+      await generateConsolidatedFinalInvoice(contract.id);
+      await fetchData();
+    } catch (error) {
+      console.error('Failed to complete contract:', error);
+      alert('Failed to complete contract. Please try again.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -185,22 +204,30 @@ export default function RentHistoryView({ contractId, isOpen, onClose }: RentHis
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="p-4 flex flex-wrap gap-4">
-                    <Button
-                      className="bg-blue-600 hover:bg-blue-700 font-bold text-xs rounded-xl h-10 px-6 gap-2 text-white"
-                      onClick={() => setIsUsageModalOpen(true)}
-                    >
-                      <PlusCircle size={16} />
-                      Create New Usage
-                    </Button>
-                    <Button
-                      variant="outline"
-                      className="border-slate-200 text-slate-600 hover:bg-slate-50 font-bold text-xs rounded-xl h-10 px-6 gap-2"
-                      onClick={handlePreviousMonth}
-                      disabled={history.length === 0}
-                    >
-                      <ArrowLeft size={16} />
-                      Previous Month
-                    </Button>
+                    {contract.contractStatus !== 'COMPLETED' ? (
+                      <>
+                        <Button
+                          className="bg-blue-600 hover:bg-blue-700 font-bold text-xs rounded-xl h-10 px-6 gap-2 text-white"
+                          onClick={() => setIsUsageModalOpen(true)}
+                        >
+                          <PlusCircle size={16} />
+                          Record Monthly Usage
+                        </Button>
+                        <Button
+                          variant="destructive"
+                          className="font-bold text-xs rounded-xl h-10 px-6 gap-2"
+                          onClick={handleCompleteContract}
+                          disabled={usageRecords.length === 0}
+                        >
+                          <FileText size={16} />
+                          Complete Contract & Bill
+                        </Button>
+                      </>
+                    ) : (
+                      <Badge className="bg-green-100 text-green-700 hover:bg-green-100 px-4 py-2 text-sm">
+                        ✓ Contract Completed
+                      </Badge>
+                    )}
                   </CardContent>
                 </Card>
 
@@ -208,13 +235,13 @@ export default function RentHistoryView({ contractId, isOpen, onClose }: RentHis
                 <Card className="shadow-sm border-slate-200 overflow-hidden bg-white">
                   <CardHeader className="pb-3 bg-slate-50/50 border-b border-slate-100 flex flex-row items-center justify-between">
                     <CardTitle className="text-xs font-bold uppercase text-slate-500 tracking-widest flex items-center gap-2">
-                      <Printer size={14} className="text-purple-500" /> Generated Invoices
+                      <Printer size={14} className="text-purple-500" /> Monthly Usage & Invoices
                     </CardTitle>
                     <Badge
                       variant="outline"
                       className="bg-white text-slate-500 border-slate-200 font-mono text-[10px]"
                     >
-                      {history.length} RECORDS
+                      {usageRecords.length} RECORDS
                     </Badge>
                   </CardHeader>
                   <div className="overflow-x-auto">
@@ -222,107 +249,113 @@ export default function RentHistoryView({ contractId, isOpen, onClose }: RentHis
                       <TableHeader className="bg-slate-50/50">
                         <TableRow className="border-slate-100">
                           <TableHead className="font-bold text-[10px] uppercase tracking-wider text-slate-500 h-10">
-                            Invoice #
-                          </TableHead>
-                          <TableHead className="font-bold text-[10px] uppercase tracking-wider text-slate-500 h-10">
                             Period
                           </TableHead>
+                          <TableHead className="font-bold text-[10px] uppercase tracking-wider text-slate-500 h-10 text-right">
+                            Monthly Rent
+                          </TableHead>
                           <TableHead className="font-bold text-[10px] uppercase tracking-wider text-slate-500 h-10 text-center">
-                            Usage (A4/A3)
+                            Total Usage (Norm)
+                          </TableHead>
+                          <TableHead className="font-bold text-[10px] uppercase tracking-wider text-slate-500 h-10 text-center">
+                            Exceeded
                           </TableHead>
                           <TableHead className="font-bold text-[10px] uppercase tracking-wider text-slate-500 h-10 text-right">
-                            Amount
+                            Exceeded Charge
+                          </TableHead>
+                          <TableHead className="font-bold text-[10px] uppercase tracking-wider text-slate-500 h-10 text-right">
+                            Total Charge
+                          </TableHead>
+                          <TableHead className="font-bold text-[10px] uppercase tracking-wider text-slate-500 h-10 text-center">
+                            Meter Image
                           </TableHead>
                           <TableHead className="font-bold text-[10px] uppercase tracking-wider text-slate-500 h-10 text-center">
                             Status
                           </TableHead>
-                          <TableHead className="font-bold text-[10px] uppercase tracking-wider text-slate-500 h-10 text-right">
-                            Date
-                          </TableHead>
-                          <TableHead className="font-bold text-[10px] uppercase tracking-wider text-slate-500 h-10 text-center">
-                            Action
-                          </TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {history.length === 0 ? (
+                        {usageRecords.length === 0 ? (
                           <TableRow>
                             <TableCell
                               colSpan={7}
                               className="text-center py-12 text-muted-foreground text-xs font-medium bg-slate-50/20"
                             >
-                              No invoices generated yet.
+                              No usage records yet. Click &quot;Create New Usage&quot; to add one.
                             </TableCell>
                           </TableRow>
                         ) : (
-                          history.map((inv) => (
-                            <TableRow
-                              key={inv.id}
-                              className="hover:bg-blue-50/30 border-slate-50 transition-colors"
-                            >
-                              <TableCell className="font-bold text-blue-600 text-[11px] font-mono">
-                                {inv.invoiceNumber}
-                              </TableCell>
-                              <TableCell className="text-[11px] font-medium text-slate-600">
-                                {inv.billingPeriodStart
-                                  ? format(new Date(inv.billingPeriodStart), 'd MMM')
-                                  : '-'}
-                                {' - '}
-                                {inv.billingPeriodEnd
-                                  ? format(new Date(inv.billingPeriodEnd), 'd MMM yyyy')
-                                  : '-'}
-                              </TableCell>
-                              <TableCell className="text-center">
-                                <div className="flex justify-center gap-2">
-                                  <span className="text-[10px] font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded border border-slate-200 min-w-[3rem]">
-                                    BW:{' '}
-                                    {((inv.bwA4Count || 0) + (inv.bwA3Count || 0)).toLocaleString()}
-                                  </span>
-                                  <span className="text-[10px] font-bold text-purple-600 bg-purple-50 px-2 py-0.5 rounded border border-purple-100 min-w-[3rem]">
-                                    Cl:{' '}
-                                    {(
-                                      (inv.colorA4Count || 0) + (inv.colorA3Count || 0)
-                                    ).toLocaleString()}
-                                  </span>
-                                </div>
-                              </TableCell>
-                              <TableCell className="text-right font-bold text-slate-700 text-xs">
-                                ₹{inv.totalAmount?.toLocaleString()}
-                              </TableCell>
-                              <TableCell className="text-center">
-                                <Badge
-                                  className={`
-                                                      text-[9px] font-bold px-2 py-0.5 uppercase tracking-wide border shadow-none
-                                                      ${
-                                                        inv.status === 'PAID'
-                                                          ? 'bg-green-50 text-green-700 border-green-200'
-                                                          : inv.status === 'SENT'
-                                                            ? 'bg-blue-50 text-blue-700 border-blue-200'
-                                                            : inv.status === 'DRAFT'
-                                                              ? 'bg-slate-50 text-slate-500 border-slate-200'
-                                                              : 'bg-orange-50 text-orange-700 border-orange-200'
-                                                      }
-                                                  `}
-                                >
-                                  {inv.status}
-                                </Badge>
-                              </TableCell>
-                              <TableCell className="text-right text-[10px] font-medium text-slate-400">
-                                {format(new Date(inv.createdAt), 'dd MMM yyyy')}
-                              </TableCell>
-                              <TableCell className="text-center">
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-6 w-6 text-slate-400 hover:text-blue-600"
-                                  onClick={() => handleViewInvoice(inv)}
-                                  title="View Invoice Details"
-                                >
-                                  <Eye size={14} />
-                                </Button>
-                              </TableCell>
-                            </TableRow>
-                          ))
+                          usageRecords.map((usage) => {
+                            const isBilled = !!usage.finalInvoiceId;
+                            const totalUsage =
+                              (usage.bwA4Count || 0) +
+                              (usage.bwA3Count || 0) * 2 +
+                              ((usage.colorA4Count || 0) + (usage.colorA3Count || 0) * 2);
+
+                            return (
+                              <TableRow
+                                key={usage.id}
+                                className="hover:bg-blue-50/30 border-slate-50 transition-colors"
+                              >
+                                <TableCell className="text-[11px] font-medium text-slate-600">
+                                  {usage.periodStart
+                                    ? format(new Date(usage.periodStart), 'd MMM')
+                                    : '-'}
+                                  {' - '}
+                                  {usage.periodEnd
+                                    ? format(new Date(usage.periodEnd), 'd MMM yyyy')
+                                    : '-'}
+                                </TableCell>
+                                <TableCell className="text-right font-mono text-[11px] text-slate-600">
+                                  {usage.monthlyRent
+                                    ? `₹${Number(usage.monthlyRent).toLocaleString()}`
+                                    : '₹0'}
+                                </TableCell>
+                                <TableCell className="text-center font-mono text-[11px]">
+                                  {totalUsage.toLocaleString()}
+                                </TableCell>
+                                <TableCell className="text-center font-mono text-[11px] text-orange-600">
+                                  {usage.exceededTotal ? usage.exceededTotal.toLocaleString() : '-'}
+                                </TableCell>
+                                <TableCell className="text-right font-mono text-[11px] text-slate-600">
+                                  {usage.exceededCharge
+                                    ? `₹${Number(usage.exceededCharge).toLocaleString()}`
+                                    : '-'}
+                                </TableCell>
+                                <TableCell className="text-right font-bold text-slate-800 text-xs">
+                                  {usage.totalCharge
+                                    ? `₹${Number(usage.totalCharge).toLocaleString()}`
+                                    : `₹${(Number(usage.monthlyRent || 0) + Number(usage.exceededCharge || 0)).toLocaleString()}`}
+                                </TableCell>
+                                <TableCell className="text-center">
+                                  {usage.meterImageUrl ? (
+                                    <a
+                                      href={usage.meterImageUrl}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-blue-500 hover:underline text-[10px]"
+                                    >
+                                      View Image
+                                    </a>
+                                  ) : (
+                                    <span className="text-slate-300 text-[10px]">-</span>
+                                  )}
+                                </TableCell>
+                                <TableCell className="text-center">
+                                  <Badge
+                                    variant="outline"
+                                    className={`text-[9px] px-2 py-0.5 ${
+                                      isBilled
+                                        ? 'bg-green-50 text-green-700 border-green-200'
+                                        : 'bg-yellow-50 text-yellow-700 border-yellow-200'
+                                    }`}
+                                  >
+                                    {isBilled ? 'BILLED' : 'PENDING'}
+                                  </Badge>
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })
                         )}
                       </TableBody>
                     </Table>

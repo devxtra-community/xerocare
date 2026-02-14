@@ -1,8 +1,8 @@
 import { Router } from 'express';
 import {
   createUsageRecord,
-  updateUsageRecord,
   getUsageHistory,
+  sendMonthlyInvoice,
 } from '../controllers/usageController';
 import { authMiddleware } from '../middlewares/authMiddleware';
 import { requireRole } from '../middlewares/roleMiddleware';
@@ -32,10 +32,18 @@ router.post(
   createUsageRecord,
 );
 
-// Update Usage
-router.put('/:id', authMiddleware, requireRole(EmployeeRole.EMPLOYEE), updateUsageRecord);
+// Update Usage - Removed (Use create/upsert logic or restrict edits)
+// router.put('/:id', authMiddleware, requireRole(EmployeeRole.EMPLOYEE), updateUsageRecord);
 
 // Get History
 router.get('/contract/:contractId', authMiddleware, getUsageHistory);
+
+// Send Monthly Invoice
+router.post(
+  '/:id/send-invoice',
+  authMiddleware,
+  requireRole(EmployeeRole.FINANCE),
+  sendMonthlyInvoice,
+);
 
 export default router;

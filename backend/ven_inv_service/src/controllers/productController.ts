@@ -153,3 +153,23 @@ export const deleteproduct = async (req: Request, res: Response, next: NextFunct
     next(err);
   }
 };
+
+export const getproductbyid = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    if (typeof id !== 'string') {
+      throw new AppError('Invalid product id', 400);
+    }
+    const product = await service.findOne(id);
+    if (!product) {
+      throw new AppError('Product not found', 404);
+    }
+    return res.status(200).json({
+      success: true,
+      data: product,
+      message: 'Product fetched successfully',
+    });
+  } catch (err) {
+    next(err);
+  }
+};

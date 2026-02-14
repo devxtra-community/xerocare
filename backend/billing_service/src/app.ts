@@ -6,6 +6,7 @@ import { errorHandler } from './middlewares/errorHandler';
 import healthRouter from './routes/healthRoutes';
 import { Source } from './config/dataSource';
 import { getRabbitChannel } from './config/rabbitmq';
+import { startEmailWorker } from './workers/emailWorker';
 import invoiceRouter from './routes/invoiceRoutes';
 import usageRouter from './routes/usageRoutes';
 
@@ -46,6 +47,7 @@ const startServer = async () => {
     }
 
     await getRabbitChannel();
+    startEmailWorker();
     const PORT = process.env.PORT || 3004;
 
     app.listen(PORT, () => {

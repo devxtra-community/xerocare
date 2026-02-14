@@ -1,12 +1,13 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import EmployeeRentTable from '@/components/employeeComponents/EmployeeRentTable';
 import EmployeeRentStats from '@/components/employeeComponents/EmployeeRentStats';
 import EmployeeRentGraphs from '@/components/employeeComponents/EmployeeRentGraphs';
 import { getBranchInvoices, Invoice } from '@/lib/invoice';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import MonthlyCollectionTable from '@/components/Finance/MonthlyCollectionTable';
+import EmployeeRentTable from '@/components/employeeComponents/EmployeeRentTable';
+import CompletedCollectionsTable from '@/components/Finance/CompletedCollectionsTable';
 
 export default function RentPage() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
@@ -37,14 +38,17 @@ export default function RentPage() {
             Let's assume I will refactor it next. */}
         <EmployeeRentGraphs />
 
-        <Tabs defaultValue="operations" className="w-full space-y-4">
+        <Tabs defaultValue="pending" className="w-full space-y-4">
           <TabsList className="bg-card border text-slate-600">
-            <TabsTrigger value="operations">Operations</TabsTrigger>
+            <TabsTrigger value="pending">Pending Approvals</TabsTrigger>
             <TabsTrigger value="collection">Monthly Collection</TabsTrigger>
+            <TabsTrigger value="completed">Completed Collections</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="operations" className="space-y-4">
-            <h3 className="text-xl font-bold text-slate-800 tracking-tight">All Rentals</h3>
+          <TabsContent value="pending" className="space-y-4">
+            <h3 className="text-xl font-bold text-slate-800 tracking-tight">
+              Pending Finance Approval
+            </h3>
             <div className="bg-card rounded-xl shadow-sm border border-slate-100 p-1">
               <EmployeeRentTable mode="FINANCE" />
             </div>
@@ -56,6 +60,15 @@ export default function RentPage() {
             </h3>
             <div className="bg-card rounded-xl shadow-sm border border-slate-100 p-1">
               <MonthlyCollectionTable mode="RENT" />
+            </div>
+          </TabsContent>
+
+          <TabsContent value="completed" className="space-y-4">
+            <h3 className="text-xl font-bold text-slate-800 tracking-tight">
+              Completed Collections
+            </h3>
+            <div className="bg-card rounded-xl shadow-sm border border-slate-100 p-1">
+              <CompletedCollectionsTable mode="RENT" />
             </div>
           </TabsContent>
         </Tabs>
