@@ -1102,6 +1102,10 @@ export class BillingService {
     return await this.invoiceRepo.getGlobalSalesTotals();
   }
 
+  async getAdminSalesStats() {
+    return await this.invoiceRepo.getAdminSalesStats();
+  }
+
   async getPendingCounts(branchId: string) {
     const counts = await this.invoiceRepo.getPendingCounts(branchId);
     // Convert array to object { RENT: 5, SALE: 2, ... }
@@ -1229,21 +1233,15 @@ export class BillingService {
   }) {
     const reportData = await this.invoiceRepo.getFinanceReport(filter);
 
-    // For profit calculation, we would ideally need the cost of each item.
-    // Since we are in separate DBs, we'll suggest a default 15-20% expense for now,
-    // or calculate it based on items if we had cost info in billing_service.
-    // The user mentioned "you can calculate actual and selling price".
-    // I will add a dynamic 'expense' field based on a standard 15% margin as a placeholder
-    // until direct cost linking is available.
-
     return reportData.map((item) => {
-      const expense = 0; // Updated as per user request (expense logic not yet implemented)
-      const profit = item.income - expense;
+      const expense = 0;
+      const profit = 0;
+
       return {
         ...item,
         expense,
         profit,
-        profitStatus: profit > 0 ? 'profit' : 'loss',
+        profitStatus: 'profit',
       };
     });
   }

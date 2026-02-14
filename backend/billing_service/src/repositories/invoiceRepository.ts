@@ -198,22 +198,34 @@ export class InvoiceRepository {
     }));
   }
 
-  async getGlobalSalesTrend(startDate: Date): Promise<{ date: string; totalSales: number }[]> {
+  async getGlobalSalesTrend(
+    startDate: Date,
+  ): Promise<{ date: string; saleType: string; totalSales: number }[]> {
     const query = this.repo
       .createQueryBuilder('invoice')
       .select("TO_CHAR(invoice.createdAt, 'YYYY-MM-DD')", 'date')
+      .addSelect('invoice.saleType', 'saleType')
       .addSelect('SUM(invoice.totalAmount)', 'totalSales')
       .where('invoice.createdAt >= :startDate', { startDate })
       .andWhere('invoice.status IN (:...statuses)', {
-        statuses: [InvoiceStatus.PAID, InvoiceStatus.ISSUED, InvoiceStatus.FINANCE_APPROVED],
+        statuses: [
+          InvoiceStatus.PAID,
+          InvoiceStatus.ISSUED,
+          InvoiceStatus.FINANCE_APPROVED,
+          InvoiceStatus.ACTIVE_LEASE,
+          InvoiceStatus.EMPLOYEE_APPROVED,
+          InvoiceStatus.APPROVED,
+        ],
       })
-      .andWhere('invoice.type != :type', { type: InvoiceType.PROFORMA })
+      // Include all types for trend to support tooltip breakdown
       .groupBy("TO_CHAR(invoice.createdAt, 'YYYY-MM-DD')")
+      .addGroupBy('invoice.saleType')
       .orderBy('date', 'ASC');
 
     const results = await query.getRawMany();
     return results.map((r) => ({
       date: r.date,
+      saleType: r.saleType || r.saletype,
       totalSales: parseFloat(r.totalSales) || 0,
     }));
   }
@@ -228,9 +240,16 @@ export class InvoiceRepository {
       .select('SUM(invoice.totalAmount)', 'totalSales')
       .addSelect('COUNT(*)', 'totalInvoices')
       .where('invoice.status IN (:...statuses)', {
-        statuses: [InvoiceStatus.PAID, InvoiceStatus.ISSUED, InvoiceStatus.FINANCE_APPROVED],
+        statuses: [
+          InvoiceStatus.PAID,
+          InvoiceStatus.ISSUED,
+          InvoiceStatus.FINANCE_APPROVED,
+          InvoiceStatus.ACTIVE_LEASE,
+          InvoiceStatus.EMPLOYEE_APPROVED,
+          InvoiceStatus.APPROVED,
+        ],
       })
-      .andWhere('invoice.type != :type', { type: InvoiceType.PROFORMA })
+      // Include all types that represent a commitment
       .getRawOne();
 
     const totalSales = parseFloat(totalResult?.totalSales) || 0;
@@ -241,9 +260,15 @@ export class InvoiceRepository {
       .select('invoice.saleType', 'saleType')
       .addSelect('SUM(invoice.totalAmount)', 'total')
       .where('invoice.status IN (:...statuses)', {
-        statuses: [InvoiceStatus.PAID, InvoiceStatus.ISSUED, InvoiceStatus.FINANCE_APPROVED],
+        statuses: [
+          InvoiceStatus.PAID,
+          InvoiceStatus.ISSUED,
+          InvoiceStatus.FINANCE_APPROVED,
+          InvoiceStatus.ACTIVE_LEASE,
+          InvoiceStatus.EMPLOYEE_APPROVED,
+          InvoiceStatus.APPROVED,
+        ],
       })
-      .andWhere('invoice.type != :type', { type: InvoiceType.PROFORMA })
       .groupBy('invoice.saleType')
       .getRawMany();
 
@@ -271,9 +296,17 @@ export class InvoiceRepository {
       .addSelect('COUNT(*)', 'totalInvoices')
       .where('invoice.branchId = :branchId', { branchId })
       .andWhere('invoice.status IN (:...statuses)', {
-        statuses: [InvoiceStatus.PAID, InvoiceStatus.ISSUED],
+        statuses: [
+          InvoiceStatus.PAID,
+          InvoiceStatus.ISSUED,
+          InvoiceStatus.FINANCE_APPROVED,
+          InvoiceStatus.ACTIVE_LEASE,
+        ],
       })
-      .andWhere('invoice.type != :type', { type: InvoiceType.PROFORMA })
+      .andWhere('(invoice.type != :type OR invoice.saleType = :saleType)', {
+        type: InvoiceType.PROFORMA,
+        saleType: 'SALE',
+      })
       .getRawOne();
 
     const totalSales = parseFloat(totalResult?.totalSales) || 0;
@@ -286,9 +319,17 @@ export class InvoiceRepository {
       .addSelect('SUM(invoice.totalAmount)', 'total')
       .where('invoice.branchId = :branchId', { branchId })
       .andWhere('invoice.status IN (:...statuses)', {
-        statuses: [InvoiceStatus.PAID, InvoiceStatus.ISSUED],
+        statuses: [
+          InvoiceStatus.PAID,
+          InvoiceStatus.ISSUED,
+          InvoiceStatus.FINANCE_APPROVED,
+          InvoiceStatus.ACTIVE_LEASE,
+        ],
       })
-      .andWhere('invoice.type != :type', { type: InvoiceType.PROFORMA })
+      .andWhere('(invoice.type != :type OR invoice.saleType = :saleType)', {
+        type: InvoiceType.PROFORMA,
+        saleType: 'SALE',
+      })
       .groupBy('invoice.saleType')
       .getRawMany();
 
@@ -441,5 +482,91 @@ export class InvoiceRepository {
       grossIncome: parseFloat(r.grossIncome) || 0,
       count: parseInt(r.count, 10),
     }));
+  }
+
+  async getAdminSalesStats() {
+    const statuses = [
+      InvoiceStatus.PAID,
+      InvoiceStatus.ISSUED,
+      InvoiceStatus.FINANCE_APPROVED,
+      InvoiceStatus.SENT,
+      InvoiceStatus.EMPLOYEE_APPROVED,
+      InvoiceStatus.DRAFT,
+      InvoiceStatus.APPROVED,
+    ];
+
+    // 1. Basic totals for SALE type
+    const totals = await this.repo
+      .createQueryBuilder('invoice')
+      .select('SUM(invoice.totalAmount)', 'totalRevenue')
+      .addSelect('COUNT(invoice.id)', 'totalOrders')
+      .where('invoice.saleType = :saleType', { saleType: SaleType.SALE })
+      .andWhere('invoice.status IN (:...statuses)', { statuses })
+      .getRawOne();
+
+    // 2. Products sold count (Sum of quantities in SALE items)
+    const itemsStats = await Source.getRepository(InvoiceItem)
+      .createQueryBuilder('item')
+      .leftJoin('item.invoice', 'invoice')
+      .select('SUM(item.quantity)', 'productsSold')
+      .where('invoice.saleType = :saleType', { saleType: SaleType.SALE })
+      .andWhere('invoice.status IN (:...statuses)', { statuses })
+      .getRawOne();
+
+    // 3. Top Product
+    const topProductRes = await Source.getRepository(InvoiceItem)
+      .createQueryBuilder('item')
+      .leftJoin('item.invoice', 'invoice')
+      .select('item.description', 'name')
+      .addSelect('SUM(item.quantity)', 'qty')
+      .where('invoice.saleType = :saleType', { saleType: SaleType.SALE })
+      .andWhere('invoice.status IN (:...statuses)', { statuses })
+      .andWhere("item.itemType != 'PRICING_RULE'")
+      .groupBy('item.description')
+      .orderBy('qty', 'DESC')
+      .limit(1)
+      .getRawOne();
+
+    // 4. Monthly Sales (SALE only)
+    const monthlySalesRes = await this.repo
+      .createQueryBuilder('invoice')
+      .select("TO_CHAR(invoice.createdAt, 'Mon')", 'month')
+      .addSelect('SUM(invoice.totalAmount)', 'sales')
+      .addSelect('EXTRACT(MONTH FROM invoice.createdAt)', 'month_num')
+      .where('invoice.saleType = :saleType', { saleType: SaleType.SALE })
+      .andWhere('invoice.status IN (:...statuses)', { statuses })
+      .groupBy("TO_CHAR(invoice.createdAt, 'Mon')")
+      .addGroupBy('EXTRACT(MONTH FROM invoice.createdAt)')
+      .orderBy('month_num', 'ASC')
+      .getRawMany();
+
+    // 5. Most Sold Products (List for Chart)
+    const mostSoldProductsRes = await Source.getRepository(InvoiceItem)
+      .createQueryBuilder('item')
+      .leftJoin('item.invoice', 'invoice')
+      .select('item.description', 'product')
+      .addSelect('SUM(item.quantity)', 'qty')
+      .where('invoice.saleType = :saleType', { saleType: SaleType.SALE })
+      .andWhere('invoice.status IN (:...statuses)', { statuses })
+      .andWhere("item.itemType != 'PRICING_RULE'")
+      .groupBy('item.description')
+      .orderBy('qty', 'DESC')
+      .limit(5)
+      .getRawMany();
+
+    return {
+      totalRevenue: parseFloat(totals?.totalRevenue || totals?.totalrevenue) || 0,
+      totalOrders: parseInt(totals?.totalOrders || totals?.totalorders, 10) || 0,
+      productsSold: parseInt(itemsStats?.productsSold || itemsStats?.productssold, 10) || 0,
+      topProduct: topProductRes?.name || topProductRes?.name || 'N/A',
+      monthlySales: (monthlySalesRes || []).map((r) => ({
+        month: r.month,
+        sales: parseFloat(r.sales) || 0,
+      })),
+      soldProductsByQty: (mostSoldProductsRes || []).map((r) => ({
+        product: r.product,
+        qty: parseInt(r.qty, 10) || 0,
+      })),
+    };
   }
 }

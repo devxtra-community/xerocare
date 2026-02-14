@@ -500,3 +500,16 @@ export const updateInvoiceUsage = async (req: Request, res: Response, next: Next
     next(error);
   }
 };
+
+export const getAdminSalesStats = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const stats = await billingService.getAdminSalesStats();
+    return res.status(200).json({
+      success: true,
+      data: stats,
+      message: 'Admin sales stats fetched successfully',
+    });
+  } catch (error) {
+    next(error);
+  }
+};

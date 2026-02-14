@@ -84,4 +84,53 @@ export class EmployeeRepository {
   async countByRoleAndBranch(role: EmployeeRole, branchId: string) {
     return this.repo.count({ where: { role, branch_id: branchId } });
   }
+
+  async getEmployeeGrowthStats(branchId?: string) {
+    const currentYear = new Date().getFullYear();
+    const query = this.repo
+      .createQueryBuilder('employee')
+      .select("TO_CHAR(employee.createdAt, 'Mon')", 'month')
+      .addSelect('COUNT(employee.id)', 'count')
+      .where('EXTRACT(YEAR FROM employee.createdAt) = :year', { year: currentYear });
+
+    if (branchId) {
+      query.andWhere('employee.branch_id = :branchId', { branchId });
+    }
+
+    query
+      .groupBy("TO_CHAR(employee.createdAt, 'Mon')")
+      .addGroupBy('EXTRACT(MONTH FROM employee.createdAt)')
+      .orderBy('EXTRACT(MONTH FROM employee.createdAt)', 'ASC');
+
+    return query.getRawMany();
+  }
+
+  async countBeforeYear(year: number, branchId?: string) {
+    const query = this.repo
+      .createQueryBuilder('employee')
+      .where('EXTRACT(YEAR FROM employee.createdAt) < :year', { year });
+
+    if (branchId) {
+      query.andWhere('employee.branch_id = :branchId', { branchId });
+    }
+
+    return query.getCount();
+  }
+
+  async getJobTypeCounts(branchId?: string) {
+    const query = this.repo
+      .createQueryBuilder('employee')
+      .select('employee.employee_job', 'job')
+      .addSelect('employee.finance_job', 'financeJob')
+      .addSelect('COUNT(employee.id)', 'count')
+      .where('employee.status = :status', { status: EmployeeStatus.ACTIVE }); // Only active employees
+
+    if (branchId) {
+      query.andWhere('employee.branch_id = :branchId', { branchId });
+    }
+
+    query.groupBy('employee.employee_job').addGroupBy('employee.finance_job');
+
+    return query.getRawMany();
+  }
 }

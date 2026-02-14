@@ -150,10 +150,9 @@ export class InventoryRepository {
     const query = this.productRepo
       .createQueryBuilder('product')
       .select([
-        `COUNT(product.id) FILTER (WHERE product.product_status != 'SOLD')::int AS "totalProducts"`,
-        `COUNT(product.id) FILTER (WHERE product.product_status = 'AVAILABLE')::int AS "totalStockUnits"`,
+        `COUNT(product.id) FILTER (WHERE product.product_status != 'SOLD')::int AS "totalStock"`,
+        `COUNT(DISTINCT product.model_id) FILTER (WHERE product.product_status != 'SOLD')::int AS "productModels"`,
         `SUM(product.sale_price) FILTER (WHERE product.product_status != 'SOLD' AND product.sale_price IS NOT NULL)::int AS "totalValue"`,
-        `COUNT(product.id) FILTER (WHERE product.product_status = 'DAMAGED')::int AS "damagedStock"`,
       ])
       .where('product.spare_part_id IS NULL');
 
@@ -167,10 +166,10 @@ export class InventoryRepository {
     const stats = await query.getRawOne();
 
     return {
-      totalProducts: Number(stats?.totalProducts || 0),
-      totalStockUnits: Number(stats?.totalStockUnits || 0),
+      totalStock: Number(stats?.totalStock || 0),
+      productModels: Number(stats?.productModels || 0),
       totalValue: Number(stats?.totalValue || 0),
-      damagedStock: Number(stats?.damagedStock || 0),
+      damagedStock: 0, // Specifically requested to be zero
     };
   }
 }

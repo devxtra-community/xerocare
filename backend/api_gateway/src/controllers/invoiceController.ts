@@ -293,3 +293,38 @@ export const getGlobalSalesTotals = async (req: Request, res: Response, next: Ne
     next(error);
   }
 };
+
+export const getAdminSalesStats = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const token = req.headers.authorization?.split(' ')[1] || '';
+    const result = await invoiceAggregationService.getAdminSalesStats(token);
+    return res.status(200).json({
+      success: true,
+      data: result,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getFinanceReport = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const token = req.headers.authorization?.split(' ')[1] || '';
+    const { branchId, saleType, month, year } = req.query;
+
+    const report = await invoiceAggregationService.getFinanceReport(token, {
+      branchId: branchId as string,
+      saleType: saleType as string,
+      month: month ? parseInt(month as string, 10) : undefined,
+      year: year ? parseInt(year as string, 10) : undefined,
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: report,
+      message: 'Finance report fetched successfully',
+    });
+  } catch (error) {
+    next(error);
+  }
+};

@@ -15,6 +15,7 @@ import {
   getBranchSalesTotals,
   getGlobalSales,
   getGlobalSalesTotals,
+  getAdminSalesStats,
   getBranchInvoices,
   getPendingCounts,
   getCollectionAlerts,
@@ -65,6 +66,12 @@ router.put('/:id/approve', authMiddleware, approveQuotation);
 router.get('/my-invoices', authMiddleware, getMyInvoices);
 router.get('/', authMiddleware, getAllInvoices);
 router.get('/stats', authMiddleware, getStats);
+router.get(
+  '/sales/admin-stats',
+  authMiddleware,
+  requireRole(EmployeeRole.ADMIN),
+  getAdminSalesStats,
+); // Added this route
 router.get('/sales/branch-overview', authMiddleware, getBranchSales);
 router.get('/sales/branch-totals', authMiddleware, getBranchSalesTotals);
 router.get('/sales/global-overview', authMiddleware, getGlobalSales);
