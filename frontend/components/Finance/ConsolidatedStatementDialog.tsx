@@ -33,13 +33,7 @@ export default function ConsolidatedStatementDialog({
   const [loading, setLoading] = useState(true);
   const [history, setHistory] = useState<UsageRecord[]>([]);
 
-  useEffect(() => {
-    if (isOpen) {
-      fetchDetails();
-    }
-  }, [isOpen, collection]);
-
-  const fetchDetails = async () => {
+  const fetchDetails = React.useCallback(async () => {
     setLoading(true);
     try {
       // Fetch usage history as the primary source of truth for "History"
@@ -57,7 +51,13 @@ export default function ConsolidatedStatementDialog({
     } finally {
       setLoading(false);
     }
-  };
+  }, [collection.contractId, collection.finalInvoiceId]);
+
+  useEffect(() => {
+    if (isOpen) {
+      fetchDetails();
+    }
+  }, [isOpen, fetchDetails]);
 
   const handlePrint = () => {
     window.print();

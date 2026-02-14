@@ -49,7 +49,28 @@ export async function deleteVendor(id: string) {
   return res.data;
 }
 
-export async function requestProducts(id: string, data: { products: string; message: string }) {
+export interface VendorRequest {
+  id: string;
+  vendor_id: string;
+  requested_by: string;
+  branch_id?: string;
+  products: string;
+  message?: string;
+  total_amount?: number;
+  created_at: string;
+  branch?: {
+    name: string;
+  };
+  manager?: {
+    name: string;
+    email: string;
+  };
+}
+
+export async function requestProducts(
+  id: string,
+  data: { products: string; message: string; total_amount?: number },
+) {
   const res = await api.post(`/i/vendors/${id}/request-products`, data);
   return res.data;
 }

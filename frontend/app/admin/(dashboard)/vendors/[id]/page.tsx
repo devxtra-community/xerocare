@@ -18,22 +18,24 @@ import {
 import StatCard from '@/components/StatCard';
 import VendorTransactionsTable from '@/components/AdminDahboardComponents/vendorComponents/VendorTransactionsTable';
 import VendorSpendingTrend from '@/components/AdminDahboardComponents/vendorComponents/VendorSpendingTrend';
-import { getVendorById, Vendor as ApiVendor } from '@/lib/vendor';
+import { getVendorById, getVendorRequests, Vendor as ApiVendor, VendorRequest } from '@/lib/vendor';
 import { toast } from 'sonner';
 
 export default function Page({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
   const { id } = React.use(params);
   const [vendor, setVendor] = React.useState<ApiVendor | null>(null);
+  const [requests, setRequests] = React.useState<VendorRequest[]>([]);
   const [loading, setLoading] = React.useState(true);
+  const [requestsLoading, setRequestsLoading] = React.useState(true);
 
   React.useEffect(() => {
-    const fetchVendor = async () => {
+    const fetchData = async () => {
       try {
         setLoading(true);
-        const res = await getVendorById(id);
-        if (res.success) {
-          setVendor(res.data);
+        const vendorRes = await getVendorById(id);
+        if (vendorRes.success) {
+          setVendor(vendorRes.data);
         } else {
           toast.error('Failed to load vendor details');
         }
@@ -45,8 +47,23 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
       }
     };
 
+    const fetchRequests = async () => {
+      try {
+        setRequestsLoading(true);
+        const res = await getVendorRequests(id);
+        if (res.success) {
+          setRequests(res.data);
+        }
+      } catch (error) {
+        console.error('Failed to fetch requests', error);
+      } finally {
+        setRequestsLoading(false);
+      }
+    };
+
     if (id) {
-      fetchVendor();
+      fetchData();
+      fetchRequests();
     }
   }, [id]);
 
@@ -239,7 +256,7 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
                 <Clock className="h-3.5 w-3.5 text-primary" /> Transaction History
               </h3>
               <div className="flex-1 overflow-auto">
-                <VendorTransactionsTable />
+                <VendorTransactionsTable requests={requests} loading={requestsLoading} />
               </div>
             </div>
           </div>
@@ -252,7 +269,7 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
           </h3>
           <div className="bg-card rounded-xl p-6 shadow-sm border border-blue-100/30">
             <div className="h-[320px]">
-              <VendorSpendingTrend />
+              <VendorSpendingTrend requests={requests} />
             </div>
           </div>
         </div>

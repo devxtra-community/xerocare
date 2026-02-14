@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import Image from 'next/image';
 import {
   Dialog,
   DialogContent,
@@ -291,9 +292,11 @@ export default function UsageHistoryDialog({
           </DialogDescription>
           {previewImage && (
             <div className="relative group w-full flex justify-center">
-              <img
+              <Image
                 src={previewImage}
                 alt="Meter Reading"
+                width={1200}
+                height={800}
                 className="max-w-full max-h-[90vh] object-contain rounded-2xl shadow-2xl border-4 border-white/20 backdrop-blur-sm"
               />
               <Button
