@@ -24,6 +24,7 @@ export interface Product {
   imageUrl?: string;
   stock?: number;
   lot_id?: string;
+  lot?: { lotNumber: string; lot_number?: string };
 }
 
 export interface CreateProductDTO {
