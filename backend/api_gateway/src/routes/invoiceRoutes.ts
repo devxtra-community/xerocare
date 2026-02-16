@@ -23,6 +23,8 @@ import {
   downloadInvoice,
   sendInvoice,
   getFinanceReport,
+  sendEmailNotification,
+  sendWhatsappNotification,
 } from '../controllers/invoiceController';
 import { authMiddleware } from '../middleware/authMiddleware';
 import { requireRole } from '../middleware/roleMiddleware';
@@ -118,6 +120,18 @@ router.post(
 );
 router.post('/', requireRole(UserRole.EMPLOYEE), createInvoice);
 router.put('/:id', requireRole(UserRole.EMPLOYEE), updateQuotation);
+
+router.post(
+  '/:id/notify/email',
+  requireRole(UserRole.ADMIN, UserRole.FINANCE, UserRole.MANAGER, UserRole.EMPLOYEE),
+  sendEmailNotification,
+);
+
+router.post(
+  '/:id/notify/whatsapp',
+  requireRole(UserRole.ADMIN, UserRole.FINANCE, UserRole.MANAGER, UserRole.EMPLOYEE),
+  sendWhatsappNotification,
+);
 
 router.get(
   '/:id',

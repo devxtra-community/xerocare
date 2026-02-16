@@ -14,6 +14,17 @@ type RentType = 'FIXED_LIMIT' | 'FIXED_COMBO' | 'CPC' | 'CPC_COMBO';
 type RentPeriod = 'MONTHLY' | 'QUARTERLY' | 'HALF_YEARLY' | 'YEARLY';
 type InvoiceStatus = 'DRAFT' | 'SENT' | 'APPROVED' | 'REJECTED' | 'ISSUED' | 'PAID' | 'CANCELLED';
 
+interface CollectionAlert {
+  contractId: string;
+  customerId: string;
+  customerName: string;
+  customerPhone?: string;
+  invoiceNumber: string;
+  type: string;
+  saleType: string;
+  dueDate: string;
+}
+
 interface InvoiceItem {
   id?: string;
   itemType: 'PRICING_RULE' | 'PRODUCT';
@@ -825,8 +836,7 @@ export class InvoiceAggregationService {
       };
     } catch (error: unknown) {
       if (axios.isAxiosError(error)) {
-        logger.error('[API Gateway] Axios error in generateFinalInvoice', {
-          url: error.config?.url,
+        logger.error('Axios error in generate final invoice', {
           message: error.message,
           responseStatus: error.response?.status,
           responseData: error.response?.data,
@@ -840,6 +850,66 @@ export class InvoiceAggregationService {
     }
   }
 
+  async sendEmailNotification(
+    id: string,
+    payload: { recipient?: string; subject: string; body: string },
+    token: string,
+  ) {
+    try {
+      const response = await axios.post(
+        `${BILLING_SERVICE_URL}/invoices/${id}/notify/email`,
+        payload,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
+      return response.data;
+    } catch (error: unknown) {
+      if (axios.isAxiosError(error)) {
+        logger.error('Axios error in send email notification', {
+          message: error.message,
+          responseStatus: error.response?.status,
+          responseData: error.response?.data,
+        });
+        throw new AppError(
+          error.response?.data?.message || 'Failed to send email notification',
+          error.response?.status || 500,
+        );
+      }
+      throw new AppError('Internal Gateway Error during email notification', 500);
+    }
+  }
+
+  async sendWhatsappNotification(
+    id: string,
+    payload: { recipient?: string; body: string },
+    token: string,
+  ) {
+    try {
+      const response = await axios.post(
+        `${BILLING_SERVICE_URL}/invoices/${id}/notify/whatsapp`,
+        payload,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
+      return response.data;
+    } catch (error: unknown) {
+      if (axios.isAxiosError(error)) {
+        logger.error('Axios error in send whatsapp notification', {
+          message: error.message,
+          responseStatus: error.response?.status,
+          responseData: error.response?.data,
+        });
+        throw new AppError(
+          error.response?.data?.message || 'Failed to send whatsapp notification',
+          error.response?.status || 500,
+        );
+      }
+      throw new AppError('Internal Gateway Error during whatsapp notification', 500);
+    }
+  }
+
   async createNextMonthInvoice(contractId: string, token: string): Promise<Invoice> {
     try {
       const response = await axios.post<{ data: Invoice }>(
@@ -849,7 +919,8 @@ export class InvoiceAggregationService {
           headers: { Authorization: `Bearer ${token}` },
         },
       );
-      return response.data.data;
+      const invoice = response.data.data;
+      return invoice;
     } catch (error: unknown) {
       if (axios.isAxiosError(error)) {
         logger.error('Axios error in create next month invoice', {
@@ -872,34 +943,37 @@ export class InvoiceAggregationService {
     date?: string,
   ) {
     try {
-      if (!user.branchId) {
-        throw new AppError('Branch ID not found in user context', 400);
-      }
-      const response = await axios.get(
-        `${BILLING_SERVICE_URL}/invoices/alerts${date ? `?date=${date}` : ''}`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        },
-      );
-      const alerts = response.data.data; // Array of { contractId, customerId, ... }
+      const url = date
+        ? `${BILLING_SERVICE_URL}/invoices/alerts?date=${date}`
+        : `${BILLING_SERVICE_URL}/invoices/alerts`;
 
-      // Aggregate Customer Names
-      const enrichedAlerts = await Promise.all(
-        alerts.map(async (alert: { customerId: string } & Record<string, unknown>) => {
-          const customerDetails = await fetchCustomerDetails(
-            alert.customerId,
-            `${CRM_SERVICE_URL}/customers/${alert.customerId}`,
-            token,
-          );
-          return {
-            ...alert,
-            customerName: customerDetails.name,
-            customerPhone: customerDetails.phone,
-          };
+      const response = await axios.get<{ data: CollectionAlert[] }>(url, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const alerts = response.data.data;
+
+      // Enrich with Customer Phone/Name if missing?
+      // Alerts from Billing usually have minimal info.
+      // Let's enrich customerName/Phone if possible using cache
+      const enriched = await Promise.all(
+        alerts.map(async (alert) => {
+          if (alert.customerId) {
+            const customer = await fetchCustomerDetails(
+              alert.customerId,
+              `${CRM_SERVICE_URL}/customers/${alert.customerId}`,
+              token,
+            );
+            return {
+              ...alert,
+              customerName: customer.name || alert.customerName,
+              customerPhone: customer.phone,
+            };
+          }
+          return alert;
         }),
       );
 
-      return enrichedAlerts;
+      return enriched;
     } catch (error: unknown) {
       if (axios.isAxiosError(error)) {
         logger.error('Axios error in get collection alerts', {
@@ -918,42 +992,51 @@ export class InvoiceAggregationService {
   async getInvoiceStats(
     user: { userId: string; role: string; branchId?: string },
     token: string,
-    branchId?: string,
+    branchIdFilter?: string,
   ) {
     try {
-      const url = `${BILLING_SERVICE_URL}/invoices/stats`;
-      const params: { createdBy?: string; branchId?: string } = {};
+      // Build query params
+      const params = new URLSearchParams();
+      if (branchIdFilter) params.append('branchId', branchIdFilter);
 
       const role = user.role ? user.role.toUpperCase() : '';
       if (role === 'EMPLOYEE') {
-        params.createdBy = user.userId;
-      } else if (branchId) {
-        params.branchId = branchId;
+        params.append('createdBy', user.userId);
+      } else if (user.branchId) {
+        // If user has a branchId, filter by it unless branchIdFilter is provided
+        params.append('branchId', user.branchId);
       }
 
-      const response = await axios.get(url, {
-        headers: { Authorization: `Bearer ${token}` },
-        params,
-      });
-
+      const response = await axios.get(
+        `${BILLING_SERVICE_URL}/invoices/stats?${params.toString()}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
       return response.data.data;
     } catch (error: unknown) {
       if (axios.isAxiosError(error)) {
+        logger.error('Axios error in get invoice stats', {
+          message: error.message,
+          responseStatus: error.response?.status,
+        });
         throw new AppError(
           error.response?.data?.message || 'Failed to fetch stats',
           error.response?.status || 500,
         );
       }
-      throw new AppError('Failed to fetch stats', 500);
+      throw new AppError('Internal Gateway Error during stats fetch', 500);
     }
   }
 
   async getPendingCounts(token: string, branchId: string) {
     try {
-      const response = await axios.get(`${BILLING_SERVICE_URL}/invoices/pending-counts`, {
-        headers: { Authorization: `Bearer ${token}` },
-        params: { branchId },
-      });
+      const response = await axios.get(
+        `${BILLING_SERVICE_URL}/invoices/pending-counts?branchId=${branchId}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
       return response.data.data;
     } catch (error: unknown) {
       if (axios.isAxiosError(error)) {
@@ -973,10 +1056,12 @@ export class InvoiceAggregationService {
 
   async getGlobalSales(token: string, period: string) {
     try {
-      const response = await axios.get(`${BILLING_SERVICE_URL}/invoices/sales/global-overview`, {
-        headers: { Authorization: `Bearer ${token}` },
-        params: { period },
-      });
+      const response = await axios.get(
+        `${BILLING_SERVICE_URL}/invoices/sales/global-overview?period=${period}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
       return response.data.data;
     } catch (error: unknown) {
       if (axios.isAxiosError(error)) {
@@ -1109,9 +1194,14 @@ export class InvoiceAggregationService {
         },
       );
       return response.data;
-    } catch {
-      // Handle error properly, maybe log it
-      throw new AppError('Failed to download invoice', 500);
+    } catch (error: unknown) {
+      if (axios.isAxiosError(error)) {
+        throw new AppError(
+          error.response?.data?.message || 'Failed to download invoice',
+          error.response?.status || 500,
+        );
+      }
+      throw new AppError('Internal Gateway Error', 500);
     }
   }
 
@@ -1125,8 +1215,14 @@ export class InvoiceAggregationService {
         },
       );
       return response.data;
-    } catch {
-      throw new AppError('Failed to send invoice', 500);
+    } catch (error: unknown) {
+      if (axios.isAxiosError(error)) {
+        throw new AppError(
+          error.response?.data?.message || 'Failed to send invoice',
+          error.response?.status || 500,
+        );
+      }
+      throw new AppError('Internal Gateway Error', 500);
     }
   }
 

@@ -649,8 +649,8 @@ export const sendEmailNotification = async (req: Request, res: Response, next: N
     const id = req.params.id as string;
     const { recipient, subject, body } = req.body;
 
-    if (!recipient || !body) {
-      throw new AppError('Recipient and Body are required', 400);
+    if (!body) {
+      throw new AppError('Body is required', 400);
     }
 
     await notificationService.sendEmailNotification(id, recipient, subject, body);
@@ -672,8 +672,8 @@ export const sendWhatsappNotification = async (req: Request, res: Response, next
     const id = req.params.id as string;
     const { recipient, body } = req.body;
 
-    if (!recipient || !body) {
-      throw new AppError('Recipient (Phone) and Body are required', 400);
+    if (!body) {
+      throw new AppError('Body is required', 400);
     }
 
     await notificationService.sendWhatsappNotification(id, recipient, body);

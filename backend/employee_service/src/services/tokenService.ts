@@ -1,4 +1,4 @@
-import { signAccesstoken, signRefreshtoken } from '../utlis/jwt';
+import { signAccesstoken, signRefreshtoken } from '../utils/jwt';
 import { AuthRepository } from '../repositories/authRepository';
 import { Request, Response } from 'express';
 import { UAParser } from 'ua-parser-js';

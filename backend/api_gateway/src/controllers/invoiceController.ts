@@ -462,3 +462,37 @@ export const getFinanceReport = async (req: Request, res: Response, next: NextFu
     next(error);
   }
 };
+
+export const sendEmailNotification = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = req.params.id as string;
+    const token = req.headers.authorization?.split(' ')[1] || '';
+    const payload = req.body; // { recipient?, subject, body }
+
+    const result = await invoiceAggregationService.sendEmailNotification(id, payload, token);
+    return res.status(200).json({
+      success: true,
+      data: result,
+      message: 'Email notification request sent',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const sendWhatsappNotification = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = req.params.id as string;
+    const token = req.headers.authorization?.split(' ')[1] || '';
+    const payload = req.body; // { recipient?, body }
+
+    const result = await invoiceAggregationService.sendWhatsappNotification(id, payload, token);
+    return res.status(200).json({
+      success: true,
+      data: result,
+      message: 'WhatsApp notification request sent',
+    });
+  } catch (error) {
+    next(error);
+  }
+};

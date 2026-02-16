@@ -27,6 +27,8 @@ import {
   getCompletedCollections,
   downloadConsolidatedInvoice,
   sendConsolidatedInvoice,
+  sendEmailNotification,
+  sendWhatsappNotification,
 } from '../controllers/invoiceController';
 import { authMiddleware } from '../middlewares/authMiddleware';
 import { requireRole } from '../middlewares/roleMiddleware';
@@ -145,6 +147,10 @@ router.put(
   requireRole(EmployeeRole.ADMIN, EmployeeRole.FINANCE),
   updateInvoiceUsage,
 );
+
+router.post('/:id/notify/email', authMiddleware, sendEmailNotification);
+router.post('/:id/notify/whatsapp', authMiddleware, sendWhatsappNotification);
+
 router.get('/:id', authMiddleware, getInvoiceById);
 
 export default router;

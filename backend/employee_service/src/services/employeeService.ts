@@ -1,8 +1,8 @@
 import bcrypt from 'bcrypt';
 import { EmployeeRepository } from '../repositories/employeeRepository';
 import { EmployeeRole } from '../constants/employeeRole';
-import { generateRandomPassword } from '../utlis/passwordGenerator';
-import { getSignedIdProofUrl } from '../utlis/r2SignedUrl';
+import { generateRandomPassword } from '../utils/passwordGenerator';
+import { getSignedIdProofUrl } from '../utils/r2SignedUrl';
 import { publishEmailJob } from '../queues/emailProducer';
 import { AppError } from '../errors/appError';
 import { EmployeeStatus } from '../entities/employeeEntities';

@@ -148,3 +148,12 @@ export async function sendProductRequestMail(
     `,
   });
 }
+
+export async function sendEmail(to: string, subject: string, html: string) {
+  await mailer.sendMail({
+    from: process.env.MAIL_USER,
+    to,
+    subject,
+    html,
+  });
+}
