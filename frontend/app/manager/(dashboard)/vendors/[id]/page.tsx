@@ -256,7 +256,7 @@ export default function VendorProfilePage() {
           </h3>
           <div className="bg-card rounded-xl p-6 shadow-sm border border-blue-100/30">
             <div className="h-[320px]">
-              <VendorSpendingTrend />
+              <VendorSpendingTrend requests={[]} />
             </div>
           </div>
         </div>

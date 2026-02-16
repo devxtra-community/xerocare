@@ -2,40 +2,47 @@
 
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 
-const data = [
-  { month: 'Jan', sales: 12000 },
-  { month: 'Feb', sales: 18000 },
-  { month: 'Mar', sales: 15000 },
-  { month: 'Apr', sales: 22000 },
-  { month: 'May', sales: 26000 },
-  { month: 'Jun', sales: 30000 },
-  { month: 'Jul', sales: 35000 },
-  { month: 'Aug', sales: 28000 },
-  { month: 'Sep', sales: 42000 },
-  { month: 'Oct', sales: 38000 },
-  { month: 'Nov', sales: 45000 },
-  { month: 'Dec', sales: 50000 },
-];
+interface MonthlySalesBarChartProps {
+  data: { month: string; sales: number }[];
+}
 
-export default function MonthlySalesBarChart() {
+export default function MonthlySalesBarChart({ data }: MonthlySalesBarChartProps) {
   return (
-    <div className="bg-card rounded-xl p-3 sm:p-4">
-      <div className="h-[220px]">
-        <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={data} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis
-              dataKey="month"
-              tick={{ fontSize: 11, fill: '#1e3a8a' }}
-              axisLine={{ stroke: '#e5e7eb' }}
-              tickMargin={8}
-            />
-            <YAxis tick={{ fontSize: 11, fill: '#1e3a8a' }} axisLine={{ stroke: '#e5e7eb' }} />
-            <Tooltip contentStyle={{ fontSize: 12 }} labelStyle={{ color: '#1e3a8a' }} />
-            <Bar dataKey="sales" fill="#0D47A1" radius={[4, 4, 0, 0]} barSize={20} />
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
+    <div className="w-full h-[280px]">
+      <ResponsiveContainer width="100%" height="100%">
+        <BarChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+          <defs>
+            <linearGradient id="barGradient" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#1E3A8A" stopOpacity={1} />
+              <stop offset="100%" stopColor="#3B82F6" stopOpacity={0.8} />
+            </linearGradient>
+          </defs>
+          <CartesianGrid vertical={false} strokeDasharray="3 3" strokeOpacity={0.3} />
+          <XAxis
+            dataKey="month"
+            axisLine={false}
+            tickLine={false}
+            tick={{ fontSize: 10, fill: '#64748b' }}
+            tickMargin={10}
+          />
+          <YAxis
+            axisLine={false}
+            tickLine={false}
+            tick={{ fontSize: 10, fill: '#64748b' }}
+            tickFormatter={(value) => `${value >= 1000 ? (value / 1000).toFixed(0) + 'k' : value}`}
+          />
+          <Tooltip
+            cursor={{ fill: '#f1f5f9' }}
+            contentStyle={{
+              borderRadius: '8px',
+              border: 'none',
+              boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
+              fontSize: '12px',
+            }}
+          />
+          <Bar dataKey="sales" fill="url(#barGradient)" radius={[4, 4, 0, 0]} barSize={30} />
+        </BarChart>
+      </ResponsiveContainer>
     </div>
   );
 }

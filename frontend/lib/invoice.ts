@@ -20,8 +20,11 @@ export interface InvoiceItem {
   quantity?: number;
   unitPrice?: number;
   productId?: string;
+  modelId?: string; // Added for finance flow
   initialBwCount?: number;
+  initialBwA3Count?: number;
   initialColorCount?: number;
+  initialColorA3Count?: number;
 }
 
 export interface Invoice {
@@ -60,7 +63,7 @@ export interface Invoice {
   endDate?: string;
   billingCycleInDays?: number;
   securityDepositAmount?: number;
-  securityDepositMode?: 'CASH' | 'CHEQUE';
+  securityDepositMode?: 'CASH' | 'CHEQUE' | 'UPI' | 'BANK_TRANSFER';
   securityDepositReference?: string;
   securityDepositReceivedDate?: string;
 
@@ -196,7 +199,7 @@ export const approveQuotation = async (
   invoiceId: string,
   deposit?: {
     amount: number;
-    mode: 'CASH' | 'CHEQUE';
+    mode: 'CASH' | 'CHEQUE' | 'UPI' | 'BANK_TRANSFER';
     reference?: string;
     receivedDate?: string;
   },
@@ -215,7 +218,7 @@ export const financeApproveInvoice = async (
   payload: {
     deposit?: {
       amount: number;
-      mode: 'CASH' | 'CHEQUE';
+      mode: 'CASH' | 'CHEQUE' | 'UPI' | 'BANK_TRANSFER';
       reference?: string;
       receivedDate?: string;
     };
@@ -223,7 +226,9 @@ export const financeApproveInvoice = async (
       id: string;
       productId: string;
       initialBwCount?: number;
+      initialBwA3Count?: number;
       initialColorCount?: number;
+      initialColorA3Count?: number;
     }[];
   },
 ): Promise<Invoice> => {
@@ -247,6 +252,22 @@ export const getInvoiceStats = async (): Promise<Record<string, number>> => {
 
 export const getPendingCounts = async (): Promise<Record<string, number>> => {
   const response = await api.get('/b/invoices/pending-counts');
+  return response.data.data;
+};
+
+export const getGlobalSalesTotals = async (): Promise<{
+  totalSales: number;
+  salesByType: { saleType: string; total: number }[];
+  totalInvoices: number;
+}> => {
+  const response = await api.get('/b/invoices/sales/global-totals');
+  return response.data.data;
+};
+
+export const getGlobalSalesOverview = async (
+  period: string = '1M',
+): Promise<{ date: string; saleType: string; totalSales: number }[]> => {
+  const response = await api.get(`/b/invoices/sales/global-overview?period=${period}`);
   return response.data.data;
 };
 // Alerts & Collection
@@ -384,6 +405,20 @@ export const updateInvoiceUsage = async (
   return response.data;
 };
 
+export interface AdminSalesStats {
+  totalRevenue: number;
+  totalOrders: number;
+  productsSold: number;
+  topProduct: string;
+  monthlySales: { month: string; sales: number }[];
+  soldProductsByQty: { product: string; qty: number }[];
+}
+
+export const getAdminSalesStats = async (): Promise<AdminSalesStats> => {
+  const response = await api.get('/b/invoices/sales/admin-stats');
+  return response.data.data;
+};
+
 export const getInvoiceHistory = async (saleType?: string): Promise<Invoice[]> => {
   const url = saleType ? `/b/invoices/history?saleType=${saleType}` : '/b/invoices/history';
   const response = await api.get(url);
@@ -399,5 +434,21 @@ export const downloadConsolidatedInvoice = async (contractId: string): Promise<B
 
 export const sendConsolidatedInvoice = async (contractId: string): Promise<unknown> => {
   const response = await api.post(`/b/invoices/completed-collections/${contractId}/send`);
+  return response.data;
+};
+
+export const sendEmailNotification = async (
+  id: string,
+  payload: { recipient: string; subject: string; body: string },
+): Promise<unknown> => {
+  const response = await api.post(`/b/invoices/${id}/notify/email`, payload);
+  return response.data;
+};
+
+export const sendWhatsappNotification = async (
+  id: string,
+  payload: { recipient: string; body: string },
+): Promise<unknown> => {
+  const response = await api.post(`/b/invoices/${id}/notify/whatsapp`, payload);
   return response.data;
 };

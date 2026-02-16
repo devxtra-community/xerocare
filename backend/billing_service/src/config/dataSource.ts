@@ -7,10 +7,12 @@ import { Invoice } from '../entities/invoiceEntity';
 import { InvoiceItem } from '../entities/invoiceItemEntity';
 import { UsageRecord } from '../entities/usageRecordEntity';
 
+import { ProductAllocation } from '../entities/productAllocationEntity';
+
 export const Source = new DataSource({
   type: 'postgres',
   url: process.env.DATABASE_URL,
-  synchronize: false, // TEMPORARY FIX: Disable sync to stop TypeORM from trying to drop non-existent columns
+  synchronize: true, // TEMPORARY FIX: Enable sync to add missing columns
   logging: false,
-  entities: [Invoice, InvoiceItem, UsageRecord],
+  entities: [Invoice, InvoiceItem, UsageRecord, ProductAllocation],
 });

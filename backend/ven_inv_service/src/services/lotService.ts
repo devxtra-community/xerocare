@@ -514,11 +514,12 @@ export class LotService {
       groundFieldCost,
       certificationCost,
       labourCost,
-      notes: notes ? String(notes).trim() : 'Uploaded via Excel',
-      branchId, // Pass branchId to createLot
+      notes: notes ? String(notes) : undefined,
+      branchId,
+      createdBy: 'EXCEL_UPLOAD', // Or passed from controller
     };
 
-    return this.createLot(createLotDto);
+    return await this.createLot(createLotDto);
   }
 
   async generateProductsExcel(lotId: string): Promise<Buffer> {
@@ -531,8 +532,8 @@ export class LotService {
       throw new AppError('No products found in this lot', 404);
     }
 
-    // Prepare data for Excel - matching BulkProductRow interface
-    const rows: (string | number)[][] = [];
+    // Prepare data for Excel - matching BulkUploadRow interface
+    const rows: string[][] = [];
 
     // Header row
     rows.push([
@@ -569,7 +570,7 @@ export class LotService {
           modelName, // name
           brandName, // brand
           '', // MFD (user fills)
-          item.unitPrice, // sale_price
+          item.unitPrice.toString(), // sale_price
           '', // tax_rate (user fills)
           '', // print_colour (optional)
           '', // max_discount_amount (optional)

@@ -3,8 +3,8 @@ import { InventoryRepository } from '../repositories/inventoryRepository';
 export class InventoryService {
   private repo = new InventoryRepository();
 
-  getGlobalInventory() {
-    return this.repo.getGlobalInventory();
+  getGlobalInventory(filters?: { product?: string; warehouse?: string; branch?: string }) {
+    return this.repo.getGlobalInventory(filters);
   }
 
   getBranchInventory(branchId: string) {

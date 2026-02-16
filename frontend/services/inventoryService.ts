@@ -13,11 +13,12 @@ export interface InventoryItem {
   rented_qty: number;
   damaged_qty: number;
   sold_qty: number;
+  product_cost: number;
 }
 
 export interface InventoryStats {
-  totalProducts: number;
-  totalStockUnits: number;
+  totalStock: number;
+  productModels: number;
   totalValue: number;
   damagedStock: number;
 }

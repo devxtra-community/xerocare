@@ -82,7 +82,8 @@ export async function startProductStatusConsumer() {
 
       if (!product) {
         logger.error('Product not found', { productId });
-        return; // ❌ NO ACK → RabbitMQ retry
+        channel.ack(msg); // ACK to prevent infinite retries
+        return;
       }
 
       /**

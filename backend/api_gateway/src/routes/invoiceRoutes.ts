@@ -16,11 +16,13 @@ import {
   getCollectionAlerts,
   getGlobalSales,
   getGlobalSalesTotals,
+  getAdminSalesStats,
   createNextMonthInvoice,
   getInvoiceHistory,
   getCompletedCollections,
   downloadInvoice,
   sendInvoice,
+  getFinanceReport,
 } from '../controllers/invoiceController';
 import { authMiddleware } from '../middleware/authMiddleware';
 import { requireRole } from '../middleware/roleMiddleware';
@@ -58,6 +60,8 @@ router.get(
   getPendingCounts,
 );
 
+router.get('/finance/report', requireRole(UserRole.ADMIN), getFinanceReport);
+
 router.get(
   '/alerts',
   requireRole(UserRole.ADMIN, UserRole.FINANCE),
@@ -91,6 +95,8 @@ router.get(
   requireRole(UserRole.ADMIN, UserRole.FINANCE),
   getGlobalSalesTotals,
 );
+
+router.get('/sales/admin-stats', requireRole(UserRole.ADMIN), getAdminSalesStats);
 
 router.put('/:id/approve', requireRole(UserRole.EMPLOYEE), approveQuotation);
 router.post(

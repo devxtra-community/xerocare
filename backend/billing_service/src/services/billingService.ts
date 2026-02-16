@@ -17,6 +17,7 @@ import { InvoiceType } from '../entities/enums/invoiceType';
 import { emitProductStatusUpdate } from '../events/publisher/productStatusEvent';
 import { ReportedBy } from '../entities/usageRecordEntity';
 import { ContractStatus } from '../entities/enums/contractStatus';
+import { ProductAllocation, AllocationStatus } from '../entities/productAllocationEntity';
 import PDFDocument from 'pdfkit';
 
 export class BillingService {
@@ -497,7 +498,8 @@ export class BillingService {
       quantity: number;
       unitPrice: number;
       itemType?: ItemType;
-      productId?: string; // CRITICAL: Product ID for status updates
+      productId?: string; // Optional: Specific Serial (Sale)
+      modelId?: string; // Required for Rent/Lease Quotation
     }[];
     // Pricing Items (Rules)
     pricingItems?: {
@@ -566,9 +568,10 @@ export class BillingService {
         invItem.description = item.description;
         invItem.quantity = item.quantity;
         invItem.unitPrice = item.unitPrice;
-        invItem.productId = item.productId; // CRITICAL FIX: Save productId
+        invItem.modelId = item.modelId;
+        invItem.productId = item.productId; // Specific Serial (if Sale)
 
-        // Map pricing fields if present on the product item
+        // Map Pricing/Limit Fields for Product Items (Rent/Lease)
         invItem.bwIncludedLimit = item.bwIncludedLimit;
         invItem.colorIncludedLimit = item.colorIncludedLimit;
         invItem.combinedIncludedLimit = item.combinedIncludedLimit;
@@ -581,8 +584,10 @@ export class BillingService {
 
         logger.info('Created invoice item (cons)', {
           description: invItem.description,
+          modelId: invItem.modelId,
           productId: invItem.productId,
           hasPricing: !!(invItem.bwIncludedLimit || invItem.bwSlabRanges),
+          bwLimit: invItem.bwIncludedLimit,
         });
 
         return invItem;
@@ -706,7 +711,8 @@ export class BillingService {
         quantity: number;
         unitPrice: number;
         itemType?: ItemType;
-        productId?: string; // CRITICAL: Product ID for status updates
+        productId?: string;
+        modelId?: string;
       }[];
     },
   ) {
@@ -770,6 +776,7 @@ export class BillingService {
         invItem.description = item.description;
         invItem.quantity = item.quantity;
         invItem.unitPrice = item.unitPrice;
+        invItem.modelId = item.modelId;
         invItem.productId = item.productId;
 
         // Map pricing fields if present on the product item
@@ -905,6 +912,7 @@ export class BillingService {
   async financeApprove(
     id: string,
     userId: string,
+    token: string, // Added token for authenticated requests
     deposit?: {
       amount: number;
       mode: SecurityDepositMode;
@@ -915,144 +923,289 @@ export class BillingService {
       id: string;
       productId: string;
       initialBwCount?: number;
+      initialBwA3Count?: number;
       initialColorCount?: number;
+      initialColorA3Count?: number;
     }[],
   ) {
-    const invoice = await this.invoiceRepo.findById(id);
-    if (!invoice) throw new AppError('Quotation not found', 404);
+    const queryRunner = this.invoiceRepo.manager.connection.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
 
-    if (invoice.status !== InvoiceStatus.EMPLOYEE_APPROVED) {
-      throw new AppError('Only Employee Approved quotations can be finalized by Finance', 400);
-    }
-
-    // Apply item updates (productId + readings)
-    if (itemUpdates && itemUpdates.length > 0) {
-      for (const update of itemUpdates) {
-        const item = invoice.items.find((i) => i.id === update.id);
-        if (item) {
-          item.productId = update.productId;
-          if (update.initialBwCount !== undefined) item.initialBwCount = update.initialBwCount;
-          if (update.initialColorCount !== undefined)
-            item.initialColorCount = update.initialColorCount;
-        }
-      }
-    }
-
-    invoice.status = InvoiceStatus.FINANCE_APPROVED;
-    invoice.financeApprovedBy = userId;
-    invoice.financeApprovedAt = new Date();
-
-    // Final Transition Logic
-    if (invoice.saleType === SaleType.SALE) {
-      invoice.type = InvoiceType.FINAL;
-      invoice.status = InvoiceStatus.ISSUED;
-    } else if (invoice.saleType === SaleType.RENT) {
-      invoice.type = InvoiceType.PROFORMA;
-
-      // --- DATE RESET LOGIC (User Request) ---
-      // Reset the current Billing Cycle / Contract Period to start upon Approval
-      // FIX: Use the Contract's effectiveFrom if set, otherwise fallback to Approval Date.
-      // User reported that dates are showing "mistake" because we were forcing it to Today.
-      const approvalDate = new Date();
-      if (!invoice.effectiveFrom) {
-        invoice.effectiveFrom = approvalDate;
-      }
-
-      // Calculate Next Due Date (Effective To) based on Rent Period (ONLY if not already set)
-      if (!invoice.effectiveTo) {
-        // Start form the EFFECTIVE FROM date, not approval date
-        const startDate = new Date(invoice.effectiveFrom!);
-        const endDate = new Date(startDate);
-
-        // Add Duration
-        if (invoice.rentPeriod === RentPeriod.CUSTOM && invoice.billingCycleInDays) {
-          endDate.setDate(endDate.getDate() + invoice.billingCycleInDays);
-        } else if (invoice.rentPeriod === RentPeriod.QUARTERLY) {
-          endDate.setMonth(endDate.getMonth() + 3);
-        } else if (invoice.rentPeriod === RentPeriod.HALF_YEARLY) {
-          endDate.setMonth(endDate.getMonth() + 6);
-        } else if (invoice.rentPeriod === RentPeriod.YEARLY) {
-          endDate.setFullYear(endDate.getFullYear() + 1);
-        } else {
-          // Default: MONTHLY
-          endDate.setMonth(endDate.getMonth() + 1);
-        }
-        invoice.effectiveTo = endDate;
-      }
-    } else if (invoice.saleType === SaleType.LEASE) {
-      invoice.type = InvoiceType.PROFORMA;
-      invoice.status = InvoiceStatus.ACTIVE_LEASE;
-      // Leases typically have fixed tenure (effectiveTo set at creation), so strictly preserve or reset start?
-      // Assuming Lease starts on Approval too:
-      if (invoice.leaseTenureMonths) {
-        invoice.effectiveFrom = new Date();
-        const leaseEnd = new Date();
-        leaseEnd.setMonth(leaseEnd.getMonth() + invoice.leaseTenureMonths);
-        invoice.effectiveTo = leaseEnd;
-      }
-    }
-
-    // Security Deposit Logic (mirrored from approveQuotation)
-    if (deposit) {
-      invoice.securityDepositAmount = deposit.amount;
-      invoice.securityDepositMode = deposit.mode;
-      invoice.securityDepositReference = deposit.reference;
-      if (deposit.receivedDate) {
-        invoice.securityDepositReceivedDate = new Date(deposit.receivedDate);
-      }
-    }
-
-    // Save invoice first
-    const savedInvoice = await this.invoiceRepo.save(invoice);
-
-    logger.info('Finance approved invoice', {
-      invoiceId: savedInvoice.id,
-      saleType: savedInvoice.saleType,
-      itemsCount: savedInvoice.items?.length || 0,
-      hasDeposit: !!deposit,
-    });
-
-    // Emit product status update events
     try {
-      if (!savedInvoice.items || savedInvoice.items.length === 0) {
-        logger.warn('No items found in invoice for product status update', {
-          invoiceId: savedInvoice.id,
-        });
-        return savedInvoice;
+      const invoice = await queryRunner.manager.findOne(Invoice, {
+        where: { id },
+        relations: ['items'],
+      });
+
+      if (!invoice) throw new AppError('Quotation not found', 404);
+
+      if (invoice.status !== InvoiceStatus.EMPLOYEE_APPROVED) {
+        throw new AppError('Only Employee Approved quotations can be finalized by Finance', 400);
       }
 
-      for (const item of savedInvoice.items) {
-        if (!item.productId) {
-          logger.debug('Skipping item without productId', {
-            itemId: item.id,
-            itemType: item.itemType,
-          });
-          continue;
+      console.log(`[Billing Service] financeApprove started for invoice: ${id}. User: ${userId}`);
+      console.log('[Billing Service] Item Updates received:', JSON.stringify(itemUpdates, null, 2));
+
+      // 0. Ensure all PRODUCT items are allocated and have readings
+      const productItems = invoice.items.filter((item) => item.itemType === 'PRODUCT');
+
+      // Create a Map for O(1) and robust lookup
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const updatesMap = new Map<string, any>();
+      if (Array.isArray(itemUpdates)) {
+        itemUpdates.forEach((u) => {
+          if (u.id) {
+            const key = String(u.id).toLowerCase().trim();
+            updatesMap.set(key, u);
+            console.log(`[Billing Service] Indexed update for ID: ${key} -> PID: ${u.productId}`);
+          }
+        });
+      }
+
+      for (const item of productItems) {
+        const itemKey = String(item.id).toLowerCase().trim();
+        const update = updatesMap.get(itemKey);
+        const isAllocated = !!(item.productId || update?.productId);
+
+        console.log(`[Billing Service] Validating item ${item.description}:`, {
+          itemKey,
+          updateFound: !!update,
+          updatePID: update?.productId,
+          dbPID: item.productId,
+          isAllocated,
+          modelId: item.modelId,
+        });
+
+        if (!isAllocated && item.modelId) {
+          throw new AppError(
+            `Machine allocation (Serial Number) is required for: ${item.description}. ` +
+              `[Debug: ID=${item.id}, DB_PID=${item.productId || 'null'}, Upd_PID=${update?.productId || 'null'}, MapHas=${updatesMap.has(itemKey)}, TotalUpdates=${updatesMap.size}]`,
+            400,
+          );
         }
 
-        logger.info('Emitting product status update', {
-          productId: item.productId,
-          billType: savedInvoice.saleType,
-          invoiceId: savedInvoice.id,
-        });
-
-        await emitProductStatusUpdate({
-          productId: item.productId,
-          billType: savedInvoice.saleType,
-          invoiceId: savedInvoice.id,
-          approvedBy: userId,
-          approvedAt: savedInvoice.financeApprovedAt || new Date(),
-        });
+        // Check readings
+        const bwCount =
+          update?.initialBwCount !== undefined ? update.initialBwCount : item.initialBwCount;
+        if (bwCount === undefined || bwCount === null) {
+          throw new AppError(`Initial B&W reading missing for item: ${item.description}`, 400);
+        }
       }
-    } catch (error) {
-      logger.error('Failed to emit product status update events', {
-        error,
-        invoiceId: savedInvoice.id,
-      });
-      // Don't fail the approval if event emission fails
-    }
 
-    return savedInvoice;
+      // 0.1 Ensure Deposit is provided for non-LEASE contracts
+      if (invoice.saleType !== SaleType.LEASE) {
+        if (!deposit || !deposit.amount || deposit.amount <= 0) {
+          throw new AppError('Security Deposit is mandatory for Rent and Sale contracts', 400);
+        }
+      }
+
+      // Apply item updates (productId + readings) AND Create Allocations
+      if (itemUpdates && itemUpdates.length > 0) {
+        for (const update of itemUpdates) {
+          const item = invoice.items.find((i) => i.id === update.id);
+          if (item) {
+            // 1. Fetch Product Details for Validation
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            let product: any;
+            try {
+              const inventoryServiceUrl =
+                process.env.INVENTORY_SERVICE_URL || 'http://localhost:3003';
+              const response = await fetch(`${inventoryServiceUrl}/products/${update.productId}`, {
+                headers: {
+                  Authorization: token,
+                  'Content-Type': 'application/json',
+                },
+              });
+
+              if (!response.ok) {
+                throw new Error(
+                  `Failed to fetch product ${update.productId}: ${response.statusText}`,
+                );
+              }
+              const data = await response.json();
+              product = data.data;
+            } catch (error) {
+              logger.error(`Failed to validate product capability for ${update.productId}`, error);
+              throw new AppError(
+                `Failed to validate product ${update.productId}. Please try again.`,
+                500,
+              );
+            }
+
+            if (!product) {
+              throw new AppError(`Product ${update.productId} not found during validation`, 404);
+            }
+
+            // 2. Validate Capability
+            if (!product.print_colour) {
+              throw new AppError(
+                `Product capability (print_colour) undefined for product ${product.serial_no || update.productId}`,
+                400,
+              );
+            }
+
+            item.productId = update.productId;
+
+            // Always set B&W if provided
+            if (update.initialBwCount !== undefined) {
+              item.initialBwCount = update.initialBwCount;
+            }
+
+            if (update.initialBwA3Count !== undefined) {
+              item.initialBwA3Count = update.initialBwA3Count;
+            }
+
+            // Strictly handle Color
+            if (product.print_colour === 'BLACK_WHITE') {
+              item.initialColorCount = 0;
+            } else {
+              if (update.initialColorCount === undefined || update.initialColorCount === null) {
+                throw new AppError(
+                  `Initial Color reading missing for color product ${product.serial_no}`,
+                  400,
+                );
+              }
+              item.initialColorCount = update.initialColorCount;
+
+              if (update.initialColorA3Count !== undefined) {
+                item.initialColorA3Count = update.initialColorA3Count;
+              }
+            }
+
+            // 3. Create ProductAllocation Record
+            await queryRunner.manager.insert(ProductAllocation, {
+              contractId: invoice.id,
+              modelId: item.modelId,
+              productId: update.productId,
+              serialNumber: product.serial_no || 'Unknown',
+              initialBwA4: item.initialBwCount || 0,
+              initialBwA3: item.initialBwA3Count || 0,
+              initialColorA4: item.initialColorCount || 0,
+              initialColorA3: item.initialColorA3Count || 0,
+              currentBwA4: item.initialBwCount || 0,
+              currentBwA3: item.initialBwA3Count || 0,
+              currentColorA4: item.initialColorCount || 0,
+              currentColorA3: item.initialColorA3Count || 0,
+              status: AllocationStatus.ALLOCATED,
+            });
+          }
+        }
+      }
+
+      invoice.status = InvoiceStatus.FINANCE_APPROVED;
+      invoice.financeApprovedBy = userId;
+      invoice.financeApprovedAt = new Date();
+
+      // Final Transition Logic
+      if (invoice.saleType === SaleType.SALE) {
+        invoice.type = InvoiceType.FINAL;
+        invoice.status = InvoiceStatus.ISSUED;
+      } else if (invoice.saleType === SaleType.RENT) {
+        invoice.type = InvoiceType.PROFORMA;
+        invoice.contractStatus = ContractStatus.ACTIVE;
+
+        if (!invoice.effectiveFrom) {
+          invoice.effectiveFrom = new Date();
+        }
+
+        if (!invoice.effectiveTo) {
+          const startDate = new Date(invoice.effectiveFrom!);
+          const endDate = new Date(startDate);
+
+          if (invoice.rentPeriod === RentPeriod.CUSTOM && invoice.billingCycleInDays) {
+            endDate.setDate(endDate.getDate() + invoice.billingCycleInDays);
+          } else if (invoice.rentPeriod === RentPeriod.QUARTERLY) {
+            endDate.setMonth(endDate.getMonth() + 3);
+          } else if (invoice.rentPeriod === RentPeriod.HALF_YEARLY) {
+            endDate.setMonth(endDate.getMonth() + 6);
+          } else if (invoice.rentPeriod === RentPeriod.YEARLY) {
+            endDate.setFullYear(endDate.getFullYear() + 1);
+          } else {
+            endDate.setMonth(endDate.getMonth() + 1);
+          }
+          invoice.effectiveTo = endDate;
+        }
+      } else if (invoice.saleType === SaleType.LEASE) {
+        invoice.type = InvoiceType.PROFORMA;
+        invoice.status = InvoiceStatus.FINANCE_APPROVED;
+        invoice.contractStatus = ContractStatus.ACTIVE;
+
+        if (invoice.leaseTenureMonths) {
+          invoice.effectiveFrom = new Date();
+          const leaseEnd = new Date();
+          leaseEnd.setMonth(leaseEnd.getMonth() + invoice.leaseTenureMonths);
+          invoice.effectiveTo = leaseEnd;
+        }
+      }
+
+      // Security Deposit Logic
+      if (deposit) {
+        invoice.securityDepositAmount = deposit.amount;
+        invoice.securityDepositMode = deposit.mode;
+        invoice.securityDepositReference = deposit.reference;
+        if (deposit.receivedDate) {
+          invoice.securityDepositReceivedDate = new Date(deposit.receivedDate);
+        }
+      }
+
+      const savedInvoice = await queryRunner.manager.save(invoice);
+      await queryRunner.commitTransaction();
+
+      logger.info('Finance approved invoice', {
+        invoiceId: savedInvoice.id,
+        saleType: savedInvoice.saleType,
+        itemsCount: savedInvoice.items?.length || 0,
+        hasDeposit: !!deposit,
+      });
+
+      // Emit product status update events
+      try {
+        if (!savedInvoice.items || savedInvoice.items.length === 0) {
+          logger.warn('No items found in invoice for product status update', {
+            invoiceId: savedInvoice.id,
+          });
+          return savedInvoice;
+        }
+
+        for (const item of savedInvoice.items) {
+          if (!item.productId) {
+            logger.debug('Skipping item without productId', {
+              itemId: item.id,
+              itemType: item.itemType,
+            });
+            continue;
+          }
+
+          logger.info('Emitting product status update', {
+            productId: item.productId,
+            billType: savedInvoice.saleType,
+            invoiceId: savedInvoice.id,
+          });
+
+          await emitProductStatusUpdate({
+            productId: item.productId,
+            billType: savedInvoice.saleType,
+            invoiceId: savedInvoice.id,
+            approvedBy: userId,
+            approvedAt: savedInvoice.financeApprovedAt || new Date(),
+          });
+        }
+      } catch (error) {
+        logger.error('Failed to emit product status update events', {
+          error,
+          invoiceId: savedInvoice.id,
+        });
+        // Don't fail the approval if event emission fails
+      }
+
+      return savedInvoice;
+    } catch (err) {
+      await queryRunner.rollbackTransaction();
+      throw err;
+    } finally {
+      await queryRunner.release();
+    }
   }
 
   async financeReject(id: string, userId: string, reason: string) {
@@ -1176,11 +1329,7 @@ export class BillingService {
       // User asked for "Sale This Month" and "Today Count".
       // "Today Count" likely implies ALL orders today.
       // "Sale This Month" implies ALL orders (or Sales?) this month.
-      // Let's aggregate ALL types for Today and Month to be safe, or just SALE?
-      // Prompt: "add sale this month count today count".
-      // Assuming "Today Count" = All Orders Today.
-      // "Sale This Month" = All Orders This Month (or just Sales?).
-      // Let's sum up everything for now.
+      // Let's aggregate ALL types for now.
 
       result.SALE_TODAY += s.todayCount;
       result.SALE_THIS_MONTH += s.monthCount;
@@ -1223,6 +1372,10 @@ export class BillingService {
 
   async getGlobalSalesTotals() {
     return await this.invoiceRepo.getGlobalSalesTotals();
+  }
+
+  async getAdminSalesStats() {
+    return await this.invoiceRepo.getAdminSalesStats();
   }
 
   async getPendingCounts(branchId: string) {
@@ -1600,18 +1753,15 @@ export class BillingService {
     // For profit calculation, we would ideally need the cost of each item.
     // Since we are in separate DBs, we'll suggest a default 15-20% expense for now,
     // or calculate it based on items if we had cost info in billing_service.
-    // The user mentioned "you can calculate actual and selling price".
-    // I will add a dynamic 'expense' field based on a standard 15% margin as a placeholder
-    // until direct cost linking is available.
-
-    return reportData.map((item) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return reportData.map((item: any) => {
       const expense = 0; // Updated as per user request (expense logic not yet implemented)
-      const profit = item.income - expense;
+      const profit = (item.income || 0) - expense;
       return {
         ...item,
         expense,
         profit,
-        profitStatus: profit > 0 ? 'profit' : 'loss',
+        profitStatus: 'profit',
       };
     });
   }
@@ -1648,5 +1798,99 @@ export class BillingService {
     );
 
     return enrichedInvoices;
+  }
+
+  async completeContract(contractId: string) {
+    const queryRunner = this.invoiceRepo.manager.connection.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      const contract = await queryRunner.manager.findOne(Invoice, { where: { id: contractId } });
+      if (!contract) throw new AppError('Contract not found', 404);
+
+      // Fetch Allocations
+      const allocations = await queryRunner.manager.find(ProductAllocation, {
+        where: { contractId: contract.id, status: AllocationStatus.ALLOCATED },
+      });
+
+      if (allocations.length > 0) {
+        // Mark as RETURNED
+        await queryRunner.manager.update(
+          ProductAllocation,
+          { contractId: contract.id, status: AllocationStatus.ALLOCATED },
+          { status: AllocationStatus.RETURNED },
+        );
+      }
+
+      // Update Contract Status
+      contract.contractStatus = ContractStatus.COMPLETED;
+      contract.completedAt = new Date();
+      await queryRunner.manager.save(contract);
+
+      await queryRunner.commitTransaction();
+
+      // Emit Event
+      if (allocations.length > 0) {
+        try {
+          const channel = await getRabbitChannel();
+          if (channel) {
+            const eventPayload = {
+              contractId: contract.id,
+              allocations: allocations.map((a: ProductAllocation) => ({
+                productId: a.productId, // Physical Product ID
+                serialNumber: a.serialNumber,
+              })),
+            };
+            channel.sendToQueue('product.returned', Buffer.from(JSON.stringify(eventPayload)));
+          }
+        } catch (e) {
+          logger.error('Failed to emit product.returned event', e);
+        }
+      }
+
+      return contract;
+    } catch (err: unknown) {
+      await queryRunner.rollbackTransaction();
+      throw err;
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  async sendEmailNotification(
+    contractId: string,
+    recipient: string,
+    subject: string,
+    body: string,
+  ) {
+    const contract = await this.invoiceRepo.findById(contractId);
+    if (!contract) throw new AppError('Contract not found', 404);
+
+    // Ideally, generate signed URL for invoice PDF if not public
+    // For now, assuming body contains necessary info or link
+
+    // Import dynamically to avoid circular dependency issues if any, or just use import at top
+    const { NotificationPublisher } = await import('../events/publisher/notificationPublisher');
+
+    await NotificationPublisher.publishEmailRequest({
+      recipient,
+      subject,
+      body,
+      invoiceId: contract.id,
+    });
+  }
+
+  async sendWhatsappNotification(contractId: string, recipient: string, body: string) {
+    const contract = await this.invoiceRepo.findById(contractId);
+    if (!contract) throw new AppError('Contract not found', 404);
+
+    const { NotificationPublisher } = await import('../events/publisher/notificationPublisher');
+
+    await NotificationPublisher.publishWhatsappRequest({
+      recipient,
+      body,
+      invoiceId: contract.id,
+    });
   }
 }

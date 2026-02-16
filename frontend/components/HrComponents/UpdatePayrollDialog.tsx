@@ -28,9 +28,7 @@ export default function UpdatePayrollDialog({
 }: UpdatePayrollDialogProps) {
   const [formData, setFormData] = useState<Partial<PayrollRecord>>({
     salaryPerMonth: '',
-    workingDays: 0,
     leaveDays: 0,
-    grossSalary: '',
     status: 'PENDING',
     paidDate: '',
   });
@@ -39,11 +37,10 @@ export default function UpdatePayrollDialog({
     if (record) {
       setFormData({
         salaryPerMonth: record.salaryPerMonth,
-        workingDays: record.workingDays,
         leaveDays: record.leaveDays,
-        grossSalary: record.grossSalary,
         status: record.status,
         paidDate: record.paidDate,
+        payrollId: record.payrollId,
       });
     }
   }, [record]);
@@ -73,75 +70,61 @@ export default function UpdatePayrollDialog({
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4 pt-4">
           {/* Read-only Employee Info */}
-          <div className="grid grid-cols-2 gap-4 opacity-70 pointer-events-none bg-muted/50/50 p-2 rounded-lg">
-            <div className="space-y-1.5">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                Employee Name
-              </label>
-              <div className="text-sm font-medium">{record?.name}</div>
+          <div className="space-y-4">
+            <div className="opacity-70 pointer-events-none bg-muted/50 p-2 rounded-lg text-center">
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                  Employee Name
+                </label>
+                <div className="text-sm font-medium capitalize">{record?.name}</div>
+              </div>
             </div>
-            <div className="space-y-1.5">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                Employee ID
-              </label>
-              <div className="text-sm font-medium">{record?.employeeId}</div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="opacity-70 pointer-events-none bg-muted/50 p-2 rounded-lg text-center">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                    Branch
+                  </label>
+                  <div className="text-[10px] font-bold uppercase">{record?.branchName}</div>
+                </div>
+              </div>
+              <div className="opacity-70 pointer-events-none bg-muted/50 p-2 rounded-lg text-center">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                    Role
+                  </label>
+                  <div className="text-[10px] font-bold uppercase">{record?.role}</div>
+                </div>
+              </div>
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                Salary / Month
-              </label>
-              <Input
-                name="salaryPerMonth"
-                value={formData.salaryPerMonth}
-                onChange={handleChange}
-                className="h-10 rounded-lg bg-muted/50 border-none shadow-sm"
-                required
-              />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                Gross Salary
-              </label>
-              <Input
-                name="grossSalary"
-                value={formData.grossSalary}
-                onChange={handleChange}
-                className="h-10 rounded-lg bg-muted/50 border-none shadow-sm"
-                required
-              />
-            </div>
+          <div className="space-y-1.5">
+            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+              Salary / Month
+            </label>
+            <Input
+              name="salaryPerMonth"
+              value={formData.salaryPerMonth}
+              onChange={handleChange}
+              className="h-10 rounded-lg bg-muted/50 border-none shadow-sm"
+              required
+            />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                Working Days
-              </label>
-              <Input
-                name="workingDays"
-                type="number"
-                value={formData.workingDays}
-                onChange={handleChange}
-                className="h-10 rounded-lg bg-muted/50 border-none shadow-sm"
-                required
-              />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                Leave Days
-              </label>
-              <Input
-                name="leaveDays"
-                type="number"
-                value={formData.leaveDays}
-                onChange={handleChange}
-                className="h-10 rounded-lg bg-muted/50 border-none shadow-sm"
-                required
-              />
-            </div>
+          <div className="space-y-1.5">
+            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+              Leave Days
+            </label>
+            <Input
+              name="leaveDays"
+              type="number"
+              value={formData.leaveDays}
+              onChange={handleChange}
+              className="h-10 rounded-lg bg-muted/50 border-none shadow-sm"
+              required
+            />
           </div>
 
           <div className="grid grid-cols-2 gap-4">

@@ -64,6 +64,8 @@ export function InvoiceDetailsDialog({
   const [rejecting, setRejecting] = React.useState(false);
   const [completing, setCompleting] = React.useState(false);
   const [isLoading, setIsLoading] = React.useState(false);
+  const [isEmailSending, setIsEmailSending] = React.useState(false);
+  const [isWhatsappSending, setIsWhatsappSending] = React.useState(false);
   const [isUsageModalOpen, setIsUsageModalOpen] = React.useState(false);
   const historyRef = React.useRef<HTMLDivElement>(null);
   const scrollContainerRef = React.useRef<HTMLDivElement>(null);
@@ -1103,6 +1105,103 @@ export function InvoiceDetailsDialog({
                 >
                   Close
                 </Button>
+              )}
+
+              {/* Notification Actions for Draft/Sent/Approved Invoices */}
+              {(currentInvoice.status === 'DRAFT' ||
+                currentInvoice.status === 'SENT' ||
+                currentInvoice.status === 'APPROVED' ||
+                currentInvoice.status === 'FINANCE_APPROVED') && (
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-10 w-10 text-blue-600 border-blue-200 hover:bg-blue-50 rounded-xl"
+                    title="Send via Email"
+                    disabled={isLoading || isEmailSending}
+                    onClick={async () => {
+                      const email = currentInvoice.customerEmail || prompt('Enter Email Address');
+                      if (!email) return;
+                      setIsEmailSending(true);
+                      try {
+                        const { sendEmailNotification } = await import('@/lib/invoice');
+                        await sendEmailNotification(currentInvoice.id, {
+                          recipient: email,
+                          subject: `Invoice ${currentInvoice.invoiceNumber} from XeroCare`,
+                          body: `Dear Customer, please find attached your invoice ${currentInvoice.invoiceNumber}.`,
+                        });
+                        toast.success('Email request sent');
+                      } catch (e) {
+                        toast.error('Failed to send email');
+                        console.error(e);
+                      } finally {
+                        setIsEmailSending(false);
+                      }
+                    }}
+                  >
+                    {isEmailSending ? (
+                      <Loader2 className="animate-spin h-4 w-4" />
+                    ) : (
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="18"
+                        height="18"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <rect width="20" height="16" x="2" y="4" rx="2" />
+                        <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
+                      </svg>
+                    )}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-10 w-10 text-green-600 border-green-200 hover:bg-green-50 rounded-xl"
+                    title="Send via WhatsApp"
+                    disabled={isLoading || isWhatsappSending}
+                    onClick={async () => {
+                      const phone = currentInvoice.customerPhone || prompt('Enter Phone Number');
+                      if (!phone) return;
+                      setIsWhatsappSending(true);
+                      try {
+                        const { sendWhatsappNotification } = await import('@/lib/invoice');
+                        await sendWhatsappNotification(currentInvoice.id, {
+                          recipient: phone,
+                          body: `Dear Customer, here is your invoice ${currentInvoice.invoiceNumber}.`,
+                        });
+                        toast.success('WhatsApp request sent');
+                      } catch (e) {
+                        toast.error('Failed to send WhatsApp');
+                        console.error(e);
+                      } finally {
+                        setIsWhatsappSending(false);
+                      }
+                    }}
+                  >
+                    {isWhatsappSending ? (
+                      <Loader2 className="animate-spin h-4 w-4" />
+                    ) : (
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="18"
+                        height="18"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z" />
+                      </svg>
+                    )}
+                  </Button>
+                </div>
               )}
             </div>
           </div>

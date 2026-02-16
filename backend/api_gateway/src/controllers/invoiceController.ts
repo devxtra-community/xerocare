@@ -142,8 +142,9 @@ export const financeApprove = async (req: Request, res: Response, next: NextFunc
   try {
     const id = req.params.id as string;
     const token = req.headers.authorization?.split(' ')[1] || '';
+    const { deposit, itemUpdates } = req.body;
 
-    const invoice = await invoiceAggregationService.financeApprove(id, token);
+    const invoice = await invoiceAggregationService.financeApprove(id, token, deposit, itemUpdates);
     return res.status(200).json({
       success: true,
       data: invoice,
@@ -371,6 +372,32 @@ export const sendInvoice = async (req: AuthenticatedRequest, res: Response, next
     return res.status(200).json({
       success: true,
       message: result.message,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getAdminSalesStats = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const token = req.headers.authorization?.split(' ')[1] || '';
+    const stats = await invoiceAggregationService.getAdminSalesStats(token);
+    return res.status(200).json({
+      success: true,
+      data: stats,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getFinanceReport = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const token = req.headers.authorization?.split(' ')[1] || '';
+    const report = await invoiceAggregationService.getFinanceReport(token);
+    return res.status(200).json({
+      success: true,
+      data: report,
     });
   } catch (error) {
     next(error);

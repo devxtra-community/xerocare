@@ -45,6 +45,7 @@ const startServer = async () => {
     await getRabbitChannel();
     await startEmployeeConsumer();
     await startProductStatusConsumer();
+    // consumeBillingEvents removed as it is legacy
     logger.info('Database connected');
 
     const PORT = process.env.PORT;

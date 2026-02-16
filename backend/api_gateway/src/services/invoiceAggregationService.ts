@@ -710,11 +710,18 @@ export class InvoiceAggregationService {
     }
   }
 
-  async financeApprove(id: string, token: string) {
+  async financeApprove(
+    id: string,
+    token: string,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    deposit?: any,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    itemUpdates?: any[],
+  ) {
     try {
       const response = await axios.post<{ data: Invoice }>(
         `${BILLING_SERVICE_URL}/invoices/${id}/finance-approve`,
-        {},
+        { deposit, itemUpdates },
         {
           headers: { Authorization: `Bearer ${token}` },
         },
@@ -1118,6 +1125,40 @@ export class InvoiceAggregationService {
       return response.data;
     } catch {
       throw new AppError('Failed to send invoice', 500);
+    }
+  }
+
+  async getAdminSalesStats(token: string) {
+    try {
+      const response = await axios.get(`${BILLING_SERVICE_URL}/invoices/sales/admin-stats`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      return response.data.data;
+    } catch (error: unknown) {
+      if (axios.isAxiosError(error)) {
+        throw new AppError(
+          error.response?.data?.message || 'Failed to fetch admin sales stats',
+          error.response?.status || 500,
+        );
+      }
+      throw new AppError('Internal Gateway Error during admin sales stats fetch', 500);
+    }
+  }
+
+  async getFinanceReport(token: string) {
+    try {
+      const response = await axios.get(`${BILLING_SERVICE_URL}/invoices/finance/report`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      return response.data.data;
+    } catch (error: unknown) {
+      if (axios.isAxiosError(error)) {
+        throw new AppError(
+          error.response?.data?.message || 'Failed to fetch finance report',
+          error.response?.status || 500,
+        );
+      }
+      throw new AppError('Internal Gateway Error during finance report fetch', 500);
     }
   }
 }

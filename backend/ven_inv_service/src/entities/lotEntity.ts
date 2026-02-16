@@ -62,7 +62,6 @@ export class Lot {
   @Column({ name: 'labour_cost', type: 'decimal', precision: 12, scale: 2, default: 0 })
   labourCost!: number;
   // -------------
-  // -------------
 
   @Column({ name: 'branch_id', nullable: true })
   branchId?: string;

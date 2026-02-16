@@ -1,5 +1,13 @@
 import { Router } from 'express';
-import { createLot, getAllLots, getLotById, downloadLotExcel, uploadLotExcel, downloadLotProductsExcel, downloadLotSparePartsExcel } from '../controllers/lotController';
+import {
+  createLot,
+  getAllLots,
+  getLotById,
+  downloadLotExcel,
+  uploadLotExcel,
+  downloadLotProductsExcel,
+  downloadLotSparePartsExcel,
+} from '../controllers/lotController';
 import { authMiddleware } from '../middlewares/authMiddleware';
 import multer from 'multer';
 

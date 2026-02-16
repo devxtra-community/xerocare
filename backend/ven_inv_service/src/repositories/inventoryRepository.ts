@@ -7,18 +7,45 @@ export class InventoryRepository {
   private productRepo = Source.getRepository(Product);
 
   // ADMIN — GLOBAL INVENTORY (Model-based with quantity)
-  async getGlobalInventory() {
-    const rawData = await this.modelRepo
+  async getGlobalInventory(filters?: { product?: string; warehouse?: string; branch?: string }) {
+    const query = this.modelRepo
       .createQueryBuilder('model')
       .leftJoin('model.products', 'product', 'product.spare_part_id IS NULL')
+      .leftJoin('product.warehouse', 'warehouse')
+      .leftJoin('warehouse.branch', 'branch') // Join branch for filtering
       .select([
         'model.id AS id',
         'model.model_no AS model_no',
         'model.model_name AS model_name',
+        'product.name AS product_name', // Add product name
         'brandRelation.name AS brand',
         'model.description AS description',
+        'warehouse.warehouseName AS warehouse_name',
+        'branch.name AS branch_name', // Optional: Select branch name if needed
       ])
-      .leftJoin('model.brandRelation', 'brandRelation')
+      .leftJoin('model.brandRelation', 'brandRelation');
+
+    // Apply Filters
+    if (filters?.product) {
+      query.andWhere(
+        '(LOWER(model.model_name) LIKE :product OR LOWER(model.model_no) LIKE :product OR LOWER(product.name) LIKE :product)',
+        { product: `%${filters.product.toLowerCase()}%` },
+      );
+    }
+
+    if (filters?.warehouse) {
+      query.andWhere('LOWER(warehouse.warehouseName) LIKE :warehouse', {
+        warehouse: `%${filters.warehouse.toLowerCase()}%`,
+      });
+    }
+
+    if (filters?.branch) {
+      query.andWhere('LOWER(branch.name) LIKE :branch', {
+        branch: `%${filters.branch.toLowerCase()}%`,
+      });
+    }
+
+    const rawData = await query
       .addSelect('COUNT(product.id)', 'total_quantity')
       .addSelect(
         "COUNT(CASE WHEN product.product_status = 'AVAILABLE' THEN 1 END)",
@@ -28,17 +55,16 @@ export class InventoryRepository {
       .addSelect("COUNT(CASE WHEN product.product_status = 'LEASE' THEN 1 END)", 'lease_qty')
       .addSelect("COUNT(CASE WHEN product.product_status = 'SOLD' THEN 1 END)", 'sold_qty')
       .addSelect("COUNT(CASE WHEN product.product_status = 'DAMAGED' THEN 1 END)", 'damaged_qty')
-      // Only include models that have at least one product if desired, OR include all.
-      // The previous code filtered 'quantity > 0'.
-      // If we want to show only models with inventory, we can use HAVING or INNER JOIN.
-      // Given "inventory" context, usually implies things in stock.
-      // But user complained about "didn't getting any data". Safe bet is LEFT JOIN to show models even if empty, or filter `total_quantity > 0` in having.
-      // Sticking to LEFT JOIN results in all models. I'll add a filter if needed, but showing 0s is better than showing nothing when debuging.
-      // However, previous code explicitly had `.where('model.quantity > 0')`.
-      // I will filter out models with 0 total products to keep it identical to "inventory with items" logic, but fixing the source of truth.
+      .addSelect('AVG(product.sale_price)', 'product_cost')
       .groupBy('model.id')
       .addGroupBy('brandRelation.id')
       .addGroupBy('brandRelation.name')
+      .addGroupBy('product.id') // Group by product to show individual products
+      .addGroupBy('product.name')
+      .addGroupBy('warehouse.id')
+      .addGroupBy('warehouse.warehouseName')
+      .addGroupBy('branch.id') // Group by branch
+      .addGroupBy('branch.name')
       .having('COUNT(product.id) > 0')
       .getRawMany();
 
@@ -50,6 +76,7 @@ export class InventoryRepository {
       lease_qty: Number(item.lease_qty),
       sold_qty: Number(item.sold_qty),
       damaged_qty: Number(item.damaged_qty),
+      product_cost: Number(item.product_cost || 0),
     }));
   }
 
@@ -150,10 +177,9 @@ export class InventoryRepository {
     const query = this.productRepo
       .createQueryBuilder('product')
       .select([
-        `COUNT(product.id) FILTER (WHERE product.product_status != 'SOLD')::int AS "totalProducts"`,
-        `COUNT(product.id) FILTER (WHERE product.product_status = 'AVAILABLE')::int AS "totalStockUnits"`,
+        `COUNT(product.id) FILTER (WHERE product.product_status != 'SOLD')::int AS "totalStock"`,
+        `COUNT(DISTINCT product.model_id) FILTER (WHERE product.product_status != 'SOLD')::int AS "productModels"`,
         `SUM(product.sale_price) FILTER (WHERE product.product_status != 'SOLD' AND product.sale_price IS NOT NULL)::int AS "totalValue"`,
-        `COUNT(product.id) FILTER (WHERE product.product_status = 'DAMAGED')::int AS "damagedStock"`,
       ])
       .where('product.spare_part_id IS NULL');
 
@@ -167,10 +193,10 @@ export class InventoryRepository {
     const stats = await query.getRawOne();
 
     return {
-      totalProducts: Number(stats?.totalProducts || 0),
-      totalStockUnits: Number(stats?.totalStockUnits || 0),
+      totalStock: Number(stats?.totalStock || 0),
+      productModels: Number(stats?.productModels || 0),
       totalValue: Number(stats?.totalValue || 0),
-      damagedStock: Number(stats?.damagedStock || 0),
+      damagedStock: 0, // Specifically requested to be zero
     };
   }
 }

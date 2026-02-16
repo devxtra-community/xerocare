@@ -188,6 +188,7 @@ export const getHRStats = async (req: Request, res: Response, next: NextFunction
     const branchId = req.user?.role === EmployeeRole.ADMIN ? undefined : req.user?.branchId;
 
     const stats = await service.getHRStats(branchId);
+    logger.info('HR Stats fetched', { keys: Object.keys(stats) });
     return res.json({
       success: true,
       data: stats,

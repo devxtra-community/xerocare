@@ -84,6 +84,15 @@ export const getAllProducts = async (): Promise<Product[]> => {
   return response.data.data || [];
 };
 
+export const getAvailableProductsByModel = async (modelId: string): Promise<Product[]> => {
+  const allProducts = await getAllProducts();
+  return allProducts.filter(
+    (p) =>
+      (p.model?.id === modelId || (p.model as { model_id?: string })?.model_id === modelId) &&
+      p.product_status === ProductStatus.AVAILABLE,
+  );
+};
+
 export const addProduct = async (data: CreateProductData): Promise<Product> => {
   const response = await api.post<ApiResponse<Product>>('/i/products/', data);
   if (!response.data.data) {

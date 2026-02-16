@@ -6,8 +6,8 @@ import EmployeeRentGraphs from '@/components/employeeComponents/EmployeeRentGrap
 import { getBranchInvoices, Invoice } from '@/lib/invoice';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import MonthlyCollectionTable from '@/components/Finance/MonthlyCollectionTable';
-import EmployeeRentTable from '@/components/employeeComponents/EmployeeRentTable';
 import CompletedCollectionsTable from '@/components/Finance/CompletedCollectionsTable';
+import FinanceApprovalTable from '@/components/Finance/FinanceApprovalTable';
 
 export default function RentPage() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
@@ -50,7 +50,7 @@ export default function RentPage() {
               Pending Finance Approval
             </h3>
             <div className="bg-card rounded-xl shadow-sm border border-slate-100 p-1">
-              <EmployeeRentTable mode="FINANCE" />
+              <FinanceApprovalTable saleType="RENT" />
             </div>
           </TabsContent>
 

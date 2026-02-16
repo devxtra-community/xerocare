@@ -26,18 +26,27 @@ const SalesSummaryTable = () => {
     const fetchSales = async () => {
       try {
         const invoices = await getInvoices();
-        // Filter for sales and flatten items
+        // Flatten items and map to table rows
         const sales = invoices
-          .filter((inv: Invoice) => inv.saleType === 'SALE' && inv.items && inv.items.length > 0)
+          .filter((inv: Invoice) => inv.items && inv.items.length > 0 && inv.saleType === 'SALE')
           .flatMap((inv: Invoice) =>
             (inv.items || []).map((item: InvoiceItem) => {
               const date = new Date(inv.createdAt);
+
+              // Correct price logic based on sale type
+              let displayPrice = `${item.unitPrice || 0} AED`;
+              if (inv.saleType === 'RENT') {
+                displayPrice = `${inv.monthlyRent || 0} AED/Mo`;
+              } else if (inv.saleType === 'LEASE') {
+                displayPrice = `${inv.monthlyEmiAmount || inv.monthlyLeaseAmount || 0} AED/Mo`;
+              }
+
               return {
-                productId: item.id || inv.invoiceNumber, // Fallback to invoice number if item id missing
+                productId: item.id || inv.invoiceNumber,
                 product: item.description,
-                model: 'N/A', // Model info not directly in invoice item
-                quantity: item.quantity || 0,
-                price: `${item.unitPrice || 0} AZN`,
+                model: 'N/A',
+                quantity: item.quantity || 1, // Default 1 for Rent/Lease contracts if qty 0
+                price: displayPrice,
                 month: date.toLocaleString('default', { month: 'long' }),
                 year: date.getFullYear(),
               };

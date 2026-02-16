@@ -11,8 +11,19 @@ import { FinanceJob } from '../constants/financeJob';
 import { publishEmployeeEvent } from '../events/publishers/eventPublisher';
 import { EmployeeEventType } from '../events/employeeEvents';
 import { logger } from '../config/logger';
-import { Branch } from '../entities/branchEntity';
 import { Source } from '../config/dataSource';
+import { Branch } from '../entities/branchEntity';
+
+interface GrowthStat {
+  month: string;
+  count: string;
+}
+
+interface JobCountStat {
+  job: string | null;
+  financeJob: string | null;
+  count: string;
+}
 
 export class EmployeeService {
   private employeeRepo = new EmployeeRepository();
@@ -134,6 +145,7 @@ export class EmployeeService {
       email: employee.email,
       role: employee.role,
       status: employee.status,
+      name: `${employee.first_name} ${employee.last_name}`,
     });
 
     publishEmailJob({
@@ -271,6 +283,7 @@ export class EmployeeService {
       email: updated.email,
       role: updated.role,
       status: updated.status,
+      name: `${updated.first_name} ${updated.last_name}`,
     });
 
     return updated;
@@ -317,11 +330,73 @@ export class EmployeeService {
         : await this.employeeRepo.countByRole(role as EmployeeRole);
     }
 
+    const rawGrowthData = await this.employeeRepo.getEmployeeGrowthStats(branchId);
+
+    // Format growth data to ensure all months are present (optional, but good for charts)
+    // For now, returning raw data which `recharts` can handle or frontend can process
+    // Actually, let's map it to ensure consistency with the frontend expectation
+    const monthsOrder = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+
+    const currentYear = new Date().getFullYear();
+    const baseCount = await this.employeeRepo.countBeforeYear(currentYear, branchId);
+    let cumulativeCount = baseCount;
+
+    // We need to know the base count before this year to do a true cumulative graph for "Total Employees"
+    // However, if we just want "Growth this year", we can start from 0 or the first month's value.
+    // The previous mock data was 12 -> 88, suggesting a running total.
+    // Ideally, we should get the total count *before* Jan 1st of current year as the starting point.
+    // For simplicity and immediate visual feedback based on "Growth", let's just use the current year's joins cumulatively.
+    // BETTER APPROACH: The user likely wants to see the total number of employees at the end of each month.
+    // So we need the total count of active employees up to that month.
+    // But calculating that historically is complex (checking join dates vs exit dates).
+    // Let's stick to "Cumulative New Joins" for this year for now, effectively showing the "Growth" aspect.
+
+    const growthMap = new Map<string, number>();
+    rawGrowthData.forEach((item: GrowthStat) => {
+      growthMap.set(item.month.trim(), parseInt(item.count, 10));
+    });
+
+    const growthData = monthsOrder.map((month) => {
+      const count = growthMap.get(month) || 0;
+      cumulativeCount += count;
+      return { month, count: cumulativeCount };
+    });
+
+    const jobCounts = await this.employeeRepo.getJobTypeCounts(branchId);
+
+    // Map job counts to a clean object
+    const byJob: Record<string, number> = {};
+    jobCounts.forEach((item: JobCountStat) => {
+      if (item.financeJob) {
+        byJob[item.financeJob] = (byJob[item.financeJob] || 0) + parseInt(item.count, 10);
+      } else if (item.job) {
+        byJob[item.job] = (byJob[item.job] || 0) + parseInt(item.count, 10);
+      } else {
+        // Fallback for employees without specific job
+        byJob['OTHER'] = (byJob['OTHER'] || 0) + parseInt(item.count, 10);
+      }
+    });
+
     return {
       total,
       active,
       inactive,
       byRole,
+      byJob,
+      growthData,
     };
   }
 }

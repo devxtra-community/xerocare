@@ -4,7 +4,6 @@ import InventoryKPICards from '@/components/AdminDahboardComponents/inventoryCom
 import InventoryProductsTable from '@/components/AdminDahboardComponents/inventoryComponents/InventoryProductsTable';
 import InventoryChart from '@/components/AdminDahboardComponents/inventoryComponents/InventoryChart';
 import StockStatusDonut from '@/components/AdminDahboardComponents/inventoryComponents/StockStatusDonut';
-import StockMovementTrend from '@/components/AdminDahboardComponents/inventoryComponents/StockMovementTrend';
 
 export default function InventoryPage() {
   return (
@@ -16,36 +15,29 @@ export default function InventoryPage() {
         {/* SUMMARY CARDS */}
         <InventoryKPICards />
 
-        {/* TABLE + TREND */}
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 sm:gap-6 items-stretch">
-          <div className="xl:col-span-2 flex flex-col space-y-4">
-            <h3 className="text-lg sm:text-xl font-bold text-primary">Product Inventory</h3>
-            <div className="flex-1">
-              <InventoryProductsTable />
-            </div>
-          </div>
-
-          <div className="flex flex-col space-y-4">
-            <h3 className="text-lg sm:text-xl font-bold text-primary">Stock Activity</h3>
-            <div className="bg-card rounded-xl p-3 flex-1">
-              <InventoryChart />
-            </div>
+        {/* TABLE */}
+        <div className="flex flex-col space-y-4">
+          <h3 className="text-lg sm:text-xl font-bold text-primary">Product Inventory</h3>
+          <div className="flex-1">
+            <InventoryProductsTable />
           </div>
         </div>
 
-        {/* ANALYTICS */}
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 sm:gap-6">
-          <div className="space-y-4">
+        {/* ANALYTICS & STOCK ACTIVITY */}
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 sm:gap-6 items-stretch">
+          {/* Stock Overview (1/3 width) */}
+          <div className="space-y-4 xl:col-span-1">
             <h4 className="text-lg sm:text-xl font-bold text-primary">Stock Status Overview</h4>
             <div className="bg-card rounded-xl p-3 h-[280px]">
               <StockStatusDonut />
             </div>
           </div>
 
-          <div className="space-y-4">
-            <h4 className="text-lg sm:text-xl font-bold text-primary">Movement Trend</h4>
+          {/* Stock Activity (2/3 width) - Replaces Movement Trend */}
+          <div className="space-y-4 xl:col-span-2">
+            <h3 className="text-lg sm:text-xl font-bold text-primary">Stock Activity</h3>
             <div className="bg-card rounded-xl p-3 h-[280px]">
-              <StockMovementTrend />
+              <InventoryChart />
             </div>
           </div>
         </div>

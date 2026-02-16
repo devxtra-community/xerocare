@@ -9,6 +9,7 @@ export interface EmployeeCreatedEvent {
   email: string;
   role: string;
   status: string;
+  name: string;
 }
 
 export interface EmployeeUpdatedEvent {
@@ -16,6 +17,7 @@ export interface EmployeeUpdatedEvent {
   email: string;
   role: string;
   status: string;
+  name: string;
 }
 
 export interface EmployeeDeletedEvent {

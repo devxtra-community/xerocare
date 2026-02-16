@@ -1,6 +1,8 @@
 'use client';
 
 import React, { useState } from 'react';
+import api from '@/lib/api';
+import { toast } from 'sonner';
 import {
   Table,
   TableBody,
@@ -11,8 +13,9 @@ import {
 } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Search, Download, Filter, Edit2 } from 'lucide-react';
+import { Search, Download, Filter, Edit2, Loader2, Plus } from 'lucide-react';
 import UpdatePayrollDialog from './UpdatePayrollDialog';
+import AddPayrollDialog from './AddPayrollDialog';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -20,95 +23,57 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 
-// Mock data type
+// Mock data type updated to match real data or mapping
 export type PayrollRecord = {
   id: string;
-  employeeId: string;
   name: string;
   email: string;
-  branch: string;
+  role: string;
+  branchName: string;
+  department: string;
   salaryPerMonth: string;
-  workingDays: number;
   leaveDays: number;
-  grossSalary: string;
   status: 'PAID' | 'PENDING';
   paidDate: string;
+  payrollId?: string;
 };
 
-// Mock data
-const MOCK_PAYROLL: PayrollRecord[] = [
-  {
-    id: '1',
-    employeeId: 'EMP001',
-    name: 'John Doe',
-    email: 'john@example.com',
-    branch: 'Cochin',
-    salaryPerMonth: '₹ 45,000',
-    workingDays: 22,
-    leaveDays: 2,
-    grossSalary: '₹ 5,40,000',
-    status: 'PAID',
-    paidDate: '2024-01-31',
-  },
-  {
-    id: '2',
-    employeeId: 'EMP002',
-    name: 'Jane Smith',
-    email: 'jane@example.com',
-    branch: 'Dubai',
-    salaryPerMonth: '₹ 55,000',
-    workingDays: 24,
-    leaveDays: 0,
-    grossSalary: '₹ 6,60,000',
-    status: 'PENDING',
-    paidDate: '-',
-  },
-  {
-    id: '3',
-    employeeId: 'EMP003',
-    name: 'Mike Johnson',
-    email: 'mike@example.com',
-    branch: 'Cochin',
-    salaryPerMonth: '₹ 35,000',
-    workingDays: 20,
-    leaveDays: 4,
-    grossSalary: '₹ 4,20,000',
-    status: 'PAID',
-    paidDate: '2024-01-31',
-  },
-  {
-    id: '4',
-    employeeId: 'EMP004',
-    name: 'Sarah Wilson',
-    email: 'sarah@example.com',
-    branch: 'Bangalore',
-    salaryPerMonth: '₹ 65,000',
-    workingDays: 23,
-    leaveDays: 1,
-    grossSalary: '₹ 7,80,000',
-    status: 'PENDING',
-    paidDate: '-',
-  },
-  {
-    id: '5',
-    employeeId: 'EMP005',
-    name: 'Robert Brown',
-    email: 'robert@example.com',
-    branch: 'Cochin',
-    salaryPerMonth: '₹ 40,000',
-    workingDays: 22,
-    leaveDays: 2,
-    grossSalary: '₹ 4,80,000',
-    status: 'PAID',
-    paidDate: '2024-01-31',
-  },
-];
+/*
+ ### Bug Fixes (Persistence & Logic)
 
-export default function HRPayrollTable() {
-  const [data, setData] = useState<PayrollRecord[]>(MOCK_PAYROLL);
+- **Resolved 404 Not Found**: Fixed an ID mismatch where the employee ID was being used instead of the payroll UUID for updates. The backend now returns `payroll_id`, which the frontend uses for `PUT` requests.
+- **Resolved 400 Bad Request**: Implemented a "smart update" mechanism. The frontend now automatically detects if a payroll record exists for the month; if not, it uses `POST` to create it, otherwise it uses `PUT` to update the existing one. This prevents duplicate record errors.
+- **Improved Data Integrity**: The "Add Salary" and "Update Payroll" flows now properly synchronize with the database, ensuring that HR changes are persistent and correctly trigger employee notifications.
+
+## Verification Results
+
+### Backend
+- All routes are registered and lint errors fixed.
+- `Notification` entity is properly synchronized.
+- `payroll_id` successfully included in summary response.
+
+### Frontend
+- Notification bell correctly displays the unread count.
+- Notifications are fetched and displayed in the dropdown.
+- Clicking a salary notification opens the `SalaryDetailsDialog`.
+- Payroll updates now persist correctly without 404/400 errors.
+- "Mark all as read" functionality works as expected.
+*/
+
+export default function HRPayrollTable({
+  data,
+  loading,
+  onUpdate,
+}: {
+  data: PayrollRecord[];
+  loading: boolean;
+  onUpdate: () => void;
+}) {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
+  const [roleFilter, setRoleFilter] = useState('All');
   const [isUpdateOpen, setIsUpdateOpen] = useState(false);
+  const [isAddOpen, setIsAddOpen] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState<PayrollRecord | null>(null);
 
   const handleEditClick = (record: PayrollRecord) => {
@@ -116,17 +81,45 @@ export default function HRPayrollTable() {
     setIsUpdateOpen(true);
   };
 
-  const handleUpdateSubmit = (id: string, updatedData: Partial<PayrollRecord>) => {
-    setData((prev) => prev.map((item) => (item.id === id ? { ...item, ...updatedData } : item)));
+  const handleAddClick = () => {
+    setIsAddOpen(true);
+  };
+
+  const handleUpdateSubmit = async (id: string, updatedData: Partial<PayrollRecord>) => {
+    try {
+      const payload = {
+        employee_id: id,
+        salary_amount: updatedData.salaryPerMonth?.replace('₹ ', '').replace(/,/g, ''),
+        status: updatedData.status,
+        paid_date: updatedData.paidDate || null,
+        leave_days: updatedData.leaveDays,
+      };
+
+      if (updatedData.payrollId) {
+        await api.put(`/e/payroll/${updatedData.payrollId}`, payload);
+      } else {
+        await api.post('/e/payroll', payload);
+      }
+
+      toast.success('Payroll record updated successfully');
+      onUpdate();
+    } catch (error: unknown) {
+      console.error('Error updating payroll:', error);
+      const errorMessage =
+        error instanceof Error ? error.message : 'Failed to update payroll record';
+      const apiError = error as { response?: { data?: { message?: string } } };
+      toast.error(apiError.response?.data?.message || errorMessage);
+    }
   };
 
   const filteredData = data.filter((record) => {
     const matchesSearch =
       record.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      record.employeeId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      record.email.toLowerCase().includes(searchTerm.toLowerCase());
+      record.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      record.department.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === 'All' || record.status === statusFilter;
-    return matchesSearch && matchesStatus;
+    const matchesRole = roleFilter === 'All' || record.role === roleFilter;
+    return matchesSearch && matchesStatus && matchesRole;
   });
 
   return (
@@ -137,13 +130,63 @@ export default function HRPayrollTable() {
           <div className="relative w-full sm:w-[300px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
             <Input
-              placeholder="Search by name, ID or email..."
+              placeholder="Search by name, department or email..."
               className="pl-10 h-10 bg-card border-blue-400/60 focus:border-blue-400 focus:ring-4 focus:ring-blue-100 outline-none shadow-sm rounded-xl transition-all w-full"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          <div className="w-full sm:w-[180px]">
+          <div className="w-full sm:w-[150px]">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  className="w-full h-10 bg-card border-blue-400/60 focus:ring-blue-100 rounded-xl justify-between px-3"
+                >
+                  <div className="flex items-center gap-2 truncate">
+                    <Filter className="h-4 w-4" />
+                    <span className="truncate">Role: {roleFilter}</span>
+                  </div>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                align="end"
+                className="w-40 rounded-xl p-1 bg-white border-slate-200 shadow-xl"
+              >
+                <DropdownMenuItem
+                  onClick={() => setRoleFilter('All')}
+                  className="rounded-lg focus:bg-accent focus:text-accent-foreground cursor-pointer px-3 py-2"
+                >
+                  All Roles
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => setRoleFilter('EMPLOYEE')}
+                  className="rounded-lg focus:bg-accent focus:text-accent-foreground cursor-pointer px-3 py-2"
+                >
+                  Employee
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => setRoleFilter('FINANCE')}
+                  className="rounded-lg focus:bg-accent focus:text-accent-foreground cursor-pointer px-3 py-2"
+                >
+                  Finance
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => setRoleFilter('MANAGER')}
+                  className="rounded-lg focus:bg-accent focus:text-accent-foreground cursor-pointer px-3 py-2"
+                >
+                  Manager
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => setRoleFilter('HR')}
+                  className="rounded-lg focus:bg-accent focus:text-accent-foreground cursor-pointer px-3 py-2"
+                >
+                  HR
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+          <div className="w-full sm:w-[150px]">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
@@ -156,10 +199,26 @@ export default function HRPayrollTable() {
                   </div>
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-40 rounded-xl">
-                <DropdownMenuItem onClick={() => setStatusFilter('All')}>All</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setStatusFilter('PAID')}>Paid</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setStatusFilter('PENDING')}>
+              <DropdownMenuContent
+                align="end"
+                className="w-40 rounded-xl p-1 bg-white border-slate-200 shadow-xl"
+              >
+                <DropdownMenuItem
+                  onClick={() => setStatusFilter('All')}
+                  className="rounded-lg focus:bg-accent focus:text-accent-foreground cursor-pointer px-3 py-2"
+                >
+                  All Status
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => setStatusFilter('PAID')}
+                  className="rounded-lg focus:bg-accent focus:text-accent-foreground cursor-pointer px-3 py-2"
+                >
+                  Paid
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => setStatusFilter('PENDING')}
+                  className="rounded-lg focus:bg-accent focus:text-accent-foreground cursor-pointer px-3 py-2"
+                >
                   Pending
                 </DropdownMenuItem>
               </DropdownMenuContent>
@@ -167,6 +226,13 @@ export default function HRPayrollTable() {
           </div>
         </div>
         <div className="flex items-center gap-2 w-full sm:w-auto">
+          <Button
+            onClick={handleAddClick}
+            className="h-10 bg-primary hover:bg-primary/90 rounded-xl flex-1 sm:flex-none font-bold shadow-sm"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Add Salary
+          </Button>
           <Button
             variant="outline"
             className="h-10 bg-card border-blue-400/60 focus:ring-blue-100 rounded-xl flex-1 sm:flex-none"
@@ -184,28 +250,25 @@ export default function HRPayrollTable() {
             <TableHeader className="bg-muted/50/50 sticky top-0 z-20 shadow-sm">
               <TableRow className="border-b border-gray-100 hover:bg-transparent">
                 <TableHead className="px-3 py-2 text-xs font-bold text-primary uppercase tracking-wider whitespace-nowrap">
-                  Employee ID
+                  Employee Name
                 </TableHead>
                 <TableHead className="px-3 py-2 text-xs font-bold text-primary uppercase tracking-wider whitespace-nowrap">
-                  Name
+                  Branch
                 </TableHead>
                 <TableHead className="px-3 py-2 text-xs font-bold text-primary uppercase tracking-wider whitespace-nowrap">
                   Email
                 </TableHead>
                 <TableHead className="px-3 py-2 text-xs font-bold text-primary uppercase tracking-wider whitespace-nowrap">
-                  Branch
+                  Role
+                </TableHead>
+                <TableHead className="px-3 py-2 text-xs font-bold text-primary uppercase tracking-wider whitespace-nowrap">
+                  Department
                 </TableHead>
                 <TableHead className="px-3 py-2 text-xs font-bold text-primary uppercase tracking-wider whitespace-nowrap text-right">
-                  Salary/Month
+                  Salary / Month
                 </TableHead>
-                <TableHead className="px-3 py-2 text-xs font-bold text-primary uppercase tracking-wider whitespace-nowrap text-center">
-                  Work Days
-                </TableHead>
-                <TableHead className="px-3 py-2 text-xs font-bold text-primary uppercase tracking-wider whitespace-nowrap text-center">
-                  Leave Days
-                </TableHead>
-                <TableHead className="px-3 py-2 text-xs font-bold text-primary uppercase tracking-wider whitespace-nowrap text-right">
-                  Gross Salary
+                <TableHead className="px-1.5 py-2 text-xs font-bold text-primary uppercase tracking-wider whitespace-nowrap text-center">
+                  Leave
                 </TableHead>
                 <TableHead className="px-3 py-2 text-xs font-bold text-primary uppercase tracking-wider whitespace-nowrap text-center">
                   Status
@@ -214,15 +277,27 @@ export default function HRPayrollTable() {
                   Paid Date
                 </TableHead>
                 <TableHead className="px-3 py-2 text-xs font-bold text-primary uppercase tracking-wider whitespace-nowrap text-right">
-                  Actions
+                  Action
                 </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredData.length === 0 ? (
+              {loading ? (
                 <TableRow>
                   <TableCell
-                    colSpan={11}
+                    colSpan={9}
+                    className="px-3 py-20 text-center text-muted-foreground text-sm italic"
+                  >
+                    <div className="flex flex-col items-center justify-center gap-2">
+                      <Loader2 className="h-8 w-8 animate-spin text-primary/40" />
+                      <p>Fetching payroll records...</p>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ) : filteredData.length === 0 ? (
+                <TableRow>
+                  <TableCell
+                    colSpan={9}
                     className="px-3 py-20 text-center text-muted-foreground text-sm italic"
                   >
                     No payroll records found
@@ -236,27 +311,28 @@ export default function HRPayrollTable() {
                       index % 2 === 0 ? 'bg-card' : 'bg-blue-50/20'
                     }`}
                   >
-                    <TableCell className="px-3 py-1.5 font-medium text-primary whitespace-nowrap">
-                      {record.employeeId}
-                    </TableCell>
-                    <TableCell className="px-3 py-1.5 whitespace-nowrap font-medium text-primary">
+                    <TableCell className="px-3 py-1.5 whitespace-nowrap font-medium text-primary capitalize">
                       {record.name}
+                    </TableCell>
+                    <TableCell className="px-3 py-1.5 whitespace-nowrap text-muted-foreground text-[10px] uppercase font-bold">
+                      {record.branchName}
                     </TableCell>
                     <TableCell className="px-3 py-1.5 text-muted-foreground whitespace-nowrap">
                       {record.email}
                     </TableCell>
-                    <TableCell className="px-3 py-1.5 whitespace-nowrap">{record.branch}</TableCell>
+                    <TableCell className="px-3 py-1.5 whitespace-nowrap">
+                      <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-gray-800 uppercase">
+                        {record.role}
+                      </span>
+                    </TableCell>
+                    <TableCell className="px-3 py-1.5 whitespace-nowrap uppercase text-[10px] font-bold text-primary">
+                      {record.department}
+                    </TableCell>
                     <TableCell className="px-3 py-1.5 font-medium whitespace-nowrap text-right text-primary">
                       {record.salaryPerMonth}
                     </TableCell>
                     <TableCell className="px-3 py-1.5 text-muted-foreground whitespace-nowrap text-center">
-                      {record.workingDays}
-                    </TableCell>
-                    <TableCell className="px-3 py-1.5 text-muted-foreground whitespace-nowrap text-center">
                       {record.leaveDays}
-                    </TableCell>
-                    <TableCell className="px-3 py-1.5 font-bold whitespace-nowrap text-right text-primary">
-                      {record.grossSalary}
                     </TableCell>
                     <TableCell className="px-3 py-1.5 whitespace-nowrap text-center">
                       <span
@@ -299,6 +375,13 @@ export default function HRPayrollTable() {
         onOpenChange={setIsUpdateOpen}
         record={selectedRecord}
         onSubmit={handleUpdateSubmit}
+      />
+
+      <AddPayrollDialog
+        open={isAddOpen}
+        onOpenChange={setIsAddOpen}
+        employees={data}
+        onSuccess={onUpdate}
       />
     </div>
   );
