@@ -49,7 +49,8 @@ export class ModelRepository {
     if (!result || result.length === 0) {
       return 0;
     }
-    return parseInt(result[0].count, 10) || 0;
+    // PostgreSQL COUNT returns a string, convert to number explicitly
+    return Number(result[0].count);
   }
 
   async findFirstProductForModel(modelId: string) {

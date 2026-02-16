@@ -11,7 +11,7 @@ export class ProductRepository {
 
   async getAllProducts() {
     return this.repo.find({
-      relations: { model: true, warehouse: true },
+      relations: { model: true, warehouse: true, lot: true },
       where: { spare_part_id: IsNull() },
     });
   }

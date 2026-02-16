@@ -62,7 +62,9 @@ export class ProductService {
           );
         }
 
-        await this.model.updateModel(modelDetails.id, { quantity: modelDetails.quantity + 1 });
+        await this.model.updateModel(modelDetails.id, {
+          quantity: Number(modelDetails.quantity) + 1,
+        });
         const product = await this.productRepo.addProduct({
           vendor_id: String(row.vendor_id),
           serial_no: row.serial_no,
@@ -127,7 +129,9 @@ export class ProductService {
       if (!warehouseDetails) {
         throw new AppError('warehouse not found ', 404);
       }
-      await this.model.updateModel(modelDetails.id, { quantity: modelDetails.quantity + 1 });
+      await this.model.updateModel(modelDetails.id, {
+        quantity: Number(modelDetails.quantity) + 1,
+      });
       const product = await this.productRepo.addProduct({
         vendor_id: String(data.vendor_id),
         serial_no: data.serial_no,
@@ -163,7 +167,9 @@ export class ProductService {
     }
     const modelDetails = await this.model.findbyid(product.model_id);
     if (modelDetails) {
-      await this.model.updateModel(modelDetails.id, { quantity: modelDetails.quantity - 1 });
+      await this.model.updateModel(modelDetails.id, {
+        quantity: Number(modelDetails.quantity) - 1,
+      });
     }
 
     // Invalidate cache
