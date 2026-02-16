@@ -582,13 +582,9 @@ export class BillingService {
         invItem.colorSlabRanges = item.colorSlabRanges;
         invItem.comboSlabRanges = item.comboSlabRanges;
 
-        logger.info('Created invoice item (cons)', {
-          description: invItem.description,
-          modelId: invItem.modelId,
-          productId: invItem.productId,
-          hasPricing: !!(invItem.bwIncludedLimit || invItem.bwSlabRanges),
-          bwLimit: invItem.bwIncludedLimit,
-        });
+        logger.info(
+          `Created invoice item (cons): Desc=${invItem.description} Model=${invItem.modelId} BWLimit=${invItem.bwIncludedLimit} ColorLimit=${invItem.colorIncludedLimit} BWExcess=${invItem.bwExcessRate}`,
+        );
 
         return invItem;
       });
@@ -1858,38 +1854,213 @@ export class BillingService {
     }
   }
 
+  async getCustomerDetails(customerId: string) {
+    try {
+      const crmServiceUrl = process.env.CRM_SERVICE_URL || 'http://localhost:3005';
+
+      // Generate Service Token
+      const { sign } = await import('jsonwebtoken');
+      const token = sign(
+        { userId: 'billing_service', role: 'ADMIN' }, // Use ADMIN or SERVICE role to bypass restrictions
+        process.env.ACCESS_SECRET as string,
+        { expiresIn: '1m' },
+      );
+
+      const response = await fetch(`${crmServiceUrl}/customers/${customerId}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        logger.error(`Failed to fetch customer details for ${customerId}: ${response.statusText}`);
+        return null;
+      }
+
+      const data = await response.json();
+      return data.data; // Assuming response structure { success: true, data: { ... } }
+    } catch (error) {
+      logger.error(`Error fetching customer details for ${customerId}`, error);
+      return null;
+    }
+  }
+
   async sendEmailNotification(
     contractId: string,
-    recipient: string,
+    recipient: string | undefined,
     subject: string,
     body: string,
   ) {
     const contract = await this.invoiceRepo.findById(contractId);
     if (!contract) throw new AppError('Contract not found', 404);
 
-    // Ideally, generate signed URL for invoice PDF if not public
-    // For now, assuming body contains necessary info or link
+    let finalRecipient = recipient;
+
+    // Fetch from CRM if recipient is missing
+    if (!finalRecipient && contract.customerId) {
+      const customer = await this.getCustomerDetails(contract.customerId);
+      if (customer && customer.email) {
+        finalRecipient = customer.email;
+        logger.info(`Fetched email for customer ${contract.customerId}: ${finalRecipient}`);
+      } else {
+        logger.warn(`Could not fetch email for customer ${contract.customerId}`);
+      }
+    }
+
+    if (!finalRecipient) {
+      throw new AppError('Recipient email is required and could not be fetched from CRM', 400);
+    }
+
+    // Construct Detailed HTML Body
+    const itemsHtml = contract.items
+      ?.map(
+        (item) => `
+      <tr>
+        <td style="border: 1px solid #ddd; padding: 8px;">${item.description}</td>
+        <td style="border: 1px solid #ddd; padding: 8px; text-align: center;">${item.quantity || 1}</td>
+        <td style="border: 1px solid #ddd; padding: 8px; text-align: center;">${item.bwIncludedLimit ?? '-'}</td>
+        <td style="border: 1px solid #ddd; padding: 8px; text-align: center;">${item.colorIncludedLimit ?? '-'}</td>
+        <td style="border: 1px solid #ddd; padding: 8px; text-align: center;">${item.bwExcessRate ?? '-'}</td>
+        <td style="border: 1px solid #ddd; padding: 8px; text-align: center;">${item.colorExcessRate ?? '-'}</td>
+        <td style="border: 1px solid #ddd; padding: 8px; text-align: right;">${item.unitPrice || 0}</td>
+        <td style="border: 1px solid #ddd; padding: 8px; text-align: right;">${(item.quantity || 1) * (item.unitPrice || 0)}</td>
+      </tr>
+    `,
+      )
+      .join('');
+
+    // helper to display fields if they exist
+    const showRow = (label: string, value: string | number | undefined | null) => {
+      if (value === undefined || value === null) return '';
+      return `<tr>
+        <td style="padding: 5px; font-weight: bold; width: 40%;">${label}:</td>
+        <td style="padding: 5px;">${value}</td>
+      </tr>`;
+    };
+
+    // Extract Limit/Excess info from the first pricing rule or item (assuming uniform for quotation usually, or list them)
+    // For simplicity in summary, we check if there's a pricing rule.
+    // const pricingRule = contract.items?.find((i) => i.itemType === ItemType.PRICING_RULE) || contract.items?.[0];
+
+    const htmlBody = `
+      <div style="font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; border: 1px solid #eee; padding: 20px;">
+        <h2 style="color: #333;">Quotation / Invoice Details</h2>
+        <p>${body}</p>
+        
+        <div style="background-color: #f8f9fa; padding: 15px; border-radius: 5px; margin-bottom: 20px;">
+          <h3 style="margin-top: 0; color: #555;">Contract Overview</h3>
+          <table style="width: 100%; border-collapse: collapse;">
+            ${showRow('Invoice Number', contract.invoiceNumber)}
+            ${showRow('Date', new Date(contract.createdAt).toLocaleDateString())}
+            ${showRow('Type', contract.saleType)}
+            ${showRow('Advance Amount', contract.advanceAmount)}
+            ${showRow('Monthly Rent', contract.monthlyRent)}
+            ${showRow('Rent Period', contract.rentPeriod)}
+            ${showRow('Billing Cycle', contract.billingCycleInDays ? `${contract.billingCycleInDays} Days` : undefined)}
+          </table>
+        </div>
+
+        <div style="margin-bottom: 20px; overflow-x: auto;">
+          <h3 style="color: #555;">Itemized Breakdown & Usage Limits</h3>
+          <table style="width: 100%; border-collapse: collapse; border: 1px solid #ddd; font-size: 13px;">
+            <thead style="background-color: #f2f2f2;">
+              <tr>
+                <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Description</th>
+                <th style="border: 1px solid #ddd; padding: 8px; text-align: center;">Qty</th>
+                <th style="border: 1px solid #ddd; padding: 8px; text-align: center;">B&W Limit</th>
+                <th style="border: 1px solid #ddd; padding: 8px; text-align: center;">Color Limit</th>
+                <th style="border: 1px solid #ddd; padding: 8px; text-align: center;">B&W Excess</th>
+                <th style="border: 1px solid #ddd; padding: 8px; text-align: center;">Color Excess</th>
+                <th style="border: 1px solid #ddd; padding: 8px; text-align: right;">Unit Price</th>
+                <th style="border: 1px solid #ddd; padding: 8px; text-align: right;">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${itemsHtml || '<tr><td colspan="8" style="text-align: center; padding: 10px;">No Items</td></tr>'}
+            </tbody>
+            <tfoot>
+               <tr>
+                 <td colspan="7" style="border: 1px solid #ddd; padding: 8px; text-align: right; font-weight: bold;">Total Amount</td>
+                 <td style="border: 1px solid #ddd; padding: 8px; text-align: right; font-weight: bold;">${contract.totalAmount}</td>
+               </tr>
+            </tfoot>
+          </table>
+          <p style="font-size: 11px; color: #666; margin-top: 5px;">* Limits are included in the rental. Excess rates apply after limits are crossed.</p>
+        </div>
+        
+        <p style="font-size: 12px; color: #888;">Thank you for choosing XeroCare.</p>
+      </div>
+    `;
 
     // Import dynamically to avoid circular dependency issues if any, or just use import at top
     const { NotificationPublisher } = await import('../events/publisher/notificationPublisher');
 
     await NotificationPublisher.publishEmailRequest({
-      recipient,
+      recipient: finalRecipient,
       subject,
-      body,
+      body: htmlBody, // Sending HTML as body
       invoiceId: contract.id,
     });
   }
 
-  async sendWhatsappNotification(contractId: string, recipient: string, body: string) {
+  async sendWhatsappNotification(contractId: string, recipient: string | undefined, body: string) {
     const contract = await this.invoiceRepo.findById(contractId);
     if (!contract) throw new AppError('Contract not found', 404);
 
+    let finalRecipient = recipient;
+
+    // Fetch from CRM if recipient is missing
+    if (!finalRecipient && contract.customerId) {
+      const customer = await this.getCustomerDetails(contract.customerId);
+      if (customer && customer.phone) {
+        finalRecipient = customer.phone;
+        logger.info(`Fetched phone for customer ${contract.customerId}: ${finalRecipient}`);
+      } else {
+        logger.warn(`Could not fetch phone for customer ${contract.customerId}`);
+      }
+    }
+
+    if (!finalRecipient) {
+      throw new AppError('Recipient phone is required and could not be fetched from CRM', 400);
+    }
+
     const { NotificationPublisher } = await import('../events/publisher/notificationPublisher');
 
+    // Construct Detailed WhatsApp Message
+    let details = `*Invoice:* ${contract.invoiceNumber}\n`;
+    details += `*Date:* ${new Date(contract.createdAt).toLocaleDateString()}\n`;
+    details += `*Total:* ${contract.totalAmount}\n`;
+
+    if (contract.advanceAmount) details += `*Advance:* ${contract.advanceAmount}\n`;
+    if (contract.monthlyRent) details += `*Rent:* ${contract.monthlyRent}\n`;
+    details += `----------------\n`;
+
+    // Per Item Details
+    if (contract.items && contract.items.length > 0) {
+      contract.items.forEach((item) => {
+        details += `*Item:* ${item.description} (Qty: ${item.quantity || 1})\n`;
+
+        const hasLimits =
+          item.bwIncludedLimit !== undefined || item.colorIncludedLimit !== undefined;
+        const hasRates = item.bwExcessRate !== undefined || item.colorExcessRate !== undefined;
+
+        if (hasLimits) {
+          details += `   • *Limits:* BW: ${item.bwIncludedLimit ?? '-'} | Clr: ${item.colorIncludedLimit ?? '-'}\n`;
+        }
+        if (hasRates) {
+          details += `   • *Excess:* BW: ${item.bwExcessRate ?? '-'} | Clr: ${item.colorExcessRate ?? '-'}\n`;
+        }
+      });
+      details += `----------------\n`;
+    }
+
+    const fullBody = `${body}\n\n${details}\n_Thank you, XeroCare_`;
+
     await NotificationPublisher.publishWhatsappRequest({
-      recipient,
-      body,
+      recipient: finalRecipient,
+      body: fullBody,
       invoiceId: contract.id,
     });
   }

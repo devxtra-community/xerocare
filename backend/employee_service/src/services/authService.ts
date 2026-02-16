@@ -1,6 +1,6 @@
 import bcrypt from 'bcrypt';
 import { EmployeeRepository } from '../repositories/employeeRepository';
-import { verifyRefreshToken } from '../utlis/jwt';
+import { verifyRefreshToken } from '../utils/jwt';
 import { AuthRepository } from '../repositories/authRepository';
 import { AppError } from '../errors/appError';
 import { AdminRepository } from '../repositories/adminRepository';
