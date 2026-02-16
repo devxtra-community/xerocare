@@ -18,6 +18,11 @@ const COLORS = [
   '#ef4444', // Under Service - Red
 ];
 
+/**
+ * Donut chart visualizing the distribution of printer statuses across the fleet.
+ * segments printers into Available, Rented, Leased, Sold, and Under Service categories.
+ * Provides an immediate visual snapshot of asset allocation.
+ */
 export default function PrinterStatusDonut() {
   const [isClient, setIsClient] = useState(false);
 

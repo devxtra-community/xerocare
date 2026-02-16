@@ -42,6 +42,11 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 
+/**
+ * Manager Model Management Page.
+ * Lists all product models with search, add, update, and delete capabilities.
+ * Displays total model count and allows managing model details like Name, Brand, and Description.
+ */
 export default function ManagerModel() {
   const [models, setModels] = useState<Model[]>([]);
   const [search, setSearch] = useState('');

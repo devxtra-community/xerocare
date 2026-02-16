@@ -52,6 +52,11 @@ const CustomTooltip = ({
   return null;
 };
 
+/**
+ * Bar chart highlighting the top products based on stock quantity.
+ * Features a custom tooltip providing additional details like Vendor and Warehouse for each product.
+ * Helps in identifying high-volume stock items.
+ */
 export default function TopProductsChart() {
   const [isClient, setIsClient] = useState(false);
 

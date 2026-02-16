@@ -26,6 +26,10 @@ interface PayrollSummaryRecord {
   leave_days: number;
 }
 
+/**
+ * Dialog component for displaying detailed salary breakdown.
+ * Fetches and shows payment status, dates, and amounts.
+ */
 export function SalaryDetailsDialog({ open, onOpenChange, payrollId }: SalaryDetailsDialogProps) {
   const [loading, setLoading] = useState(false);
   const [details, setDetails] = useState<PayrollSummaryRecord | null>(null);

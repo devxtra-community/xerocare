@@ -13,6 +13,9 @@ export class LeadService {
     this.customerService = new CustomerService();
   }
 
+  /**
+   * Creates a new lead.
+   */
   async createLead(data: Partial<ILead>, userId: string): Promise<ILead> {
     if (!data.name) {
       throw new AppError('Name is required', 400);
@@ -25,28 +28,34 @@ export class LeadService {
     return await this.leadRepository.createLead(leadData);
   }
 
+  /**
+   * Retrieves all leads based on permissions and filters.
+   */
   async getAllLeads(
     userId: string,
     role: string,
     includeDeleted: boolean = false,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    _branchId?: string,
   ): Promise<ILead[]> {
     return this.leadRepository.findAllLeads(includeDeleted);
   }
 
+  /**
+   * Retrieves a single lead by ID, checking permissions.
+   */
   async getLeadById(leadId: string, userId: string, role: string): Promise<ILead> {
     const lead = await this.leadRepository.findLeadById(leadId);
     if (!lead) {
       throw new AppError('Lead not found', 404);
     }
-    // Access control logic
     if (role !== 'ADMIN' && lead.assignedTo !== userId) {
-      // Relaxing for now
+      throw new AppError('Unauthorized access to lead', 403);
     }
     return lead;
   }
 
+  /**
+   * Updates an existing lead.
+   */
   async updateLead(
     leadId: string,
     data: Partial<ILead>,
@@ -54,18 +63,23 @@ export class LeadService {
     role: string,
   ): Promise<ILead> {
     const lead = await this.getLeadById(leadId, userId, role);
-    // Use lead.id or lead._id. Mongoose docs have _id. String id is usually a virtual.
-    // Using _id for safety given the prompt.
+
     const updated = await this.leadRepository.updateLead(String(lead._id), data);
     if (!updated) throw new AppError('Lead not found after update', 404);
     return updated;
   }
 
+  /**
+   * Deletes a lead.
+   */
   async deleteLead(leadId: string, userId: string, role: string): Promise<void> {
     await this.getLeadById(leadId, userId, role);
     await this.leadRepository.deleteLead(leadId);
   }
 
+  /**
+   * Converts a lead into a customer entity.
+   */
   async convertLeadToCustomer(
     leadId: string,
     userId: string,
@@ -97,12 +111,6 @@ export class LeadService {
     const customer = await this.customerService.createCustomer(customerData);
 
     await this.leadRepository.updateLeadStatus(leadId, LeadStatus.CONVERTED, customer.id);
-    // Status and customer info already updated by updateLeadStatus
-    // await this.leadRepository.updateLead(leadId, {
-    //   status: LeadStatus.CONVERTED,
-    //   isCustomer: true,
-    //   customerId: customer.id
-    // });
 
     return customer.id;
   }

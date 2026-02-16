@@ -2,6 +2,10 @@ import { Request, Response, NextFunction } from 'express';
 import { AppError } from '../errors/appError';
 import { logger } from '../config/logger';
 
+/**
+ * Global error handling middleware.
+ * Logs errors and sends standardized JSON responses.
+ */
 export const errorHandler = (err: Error, req: Request, res: Response, next: NextFunction) => {
   void next;
   logger.error('Unhandled error', {

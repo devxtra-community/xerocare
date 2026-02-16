@@ -7,6 +7,11 @@ import MostSoldProductChart from './MostSoldProductChart';
 import { useState, useEffect } from 'react';
 import { salesService } from '@/services/salesService';
 
+/**
+ * Manager Sales Dashboard Page.
+ * Aggregates sales data including Total Revenue, Orders, and Sales by Type (Sale/Rent/Lease).
+ * Integrates `SalesSummaryTable`, `MonthlySalesBarChart`, and `MostSoldProductChart` for detailed analytics.
+ */
 export default function ManagerSalesPage() {
   const [totalSales, setTotalSales] = useState(0);
   const [saleAmount, setSaleAmount] = useState(0);

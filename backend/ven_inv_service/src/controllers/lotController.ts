@@ -3,31 +3,35 @@ import { LotService } from '../services/lotService';
 
 const lotService = new LotService();
 
+/**
+ * Creates a new lot.
+ */
 export const createLot = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    console.log('=== CREATE LOT REQUEST ===');
-    console.log('Request body:', JSON.stringify(req.body, null, 2));
     const branchId = req.user?.branchId;
     const lotData = { ...req.body, branchId };
     const lot = await lotService.createLot(lotData);
-    console.log('✓ Lot created successfully:', lot.id, lot.lotNumber);
     res.status(201).json({ success: true, data: lot });
   } catch (err) {
-    console.error('✗ Lot creation failed:', err);
     next(err);
   }
 };
 
+/**
+ * Retrieves all lots.
+ */
 export const getAllLots = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const lots = await lotService.getAllLots();
-    // console.log('Fetching all lots:', JSON.stringify(lots, null, 2));
     res.status(200).json({ success: true, data: lots });
   } catch (err) {
     next(err);
   }
 };
 
+/**
+ * Retrieves a single lot by ID.
+ */
 export const getLotById = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
@@ -38,6 +42,9 @@ export const getLotById = async (req: Request, res: Response, next: NextFunction
   }
 };
 
+/**
+ * Generates and downloads an Excel report for a lot.
+ */
 export const downloadLotExcel = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
@@ -55,12 +62,12 @@ export const downloadLotExcel = async (req: Request, res: Response, next: NextFu
   }
 };
 
+/**
+ * Uploads an Excel file to create/update a lot.
+ */
 export const uploadLotExcel = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    console.log('Received file upload request');
-    console.log('File:', req.file);
     if (!req.file) {
-      console.error('No file found in request');
       throw new Error('No file uploaded');
     }
 
@@ -76,11 +83,13 @@ export const uploadLotExcel = async (req: Request, res: Response, next: NextFunc
       data: lot,
     });
   } catch (err) {
-    console.error('Error processing upload:', err);
     next(err);
   }
 };
 
+/**
+ * Downloads an Excel report of products in a lot.
+ */
 export const downloadLotProductsExcel = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
@@ -98,6 +107,9 @@ export const downloadLotProductsExcel = async (req: Request, res: Response, next
   }
 };
 
+/**
+ * Downloads an Excel report of spare parts in a lot.
+ */
 export const downloadLotSparePartsExcel = async (
   req: Request,
   res: Response,

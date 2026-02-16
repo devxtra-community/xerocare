@@ -56,6 +56,11 @@ const formatDate = (dateString: string) => {
   });
 };
 
+/**
+ * Comprehensive Branch management page.
+ * Includes statistics/summary cards for branch status.
+ * Features a listed view of branches with searching, and add/edit/delete functionality.
+ */
 export default function BranchReport() {
   const [branches, setBranches] = useState<Branch[]>([]);
   const [managers, setManagers] = useState<Employee[]>([]);

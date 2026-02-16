@@ -25,6 +25,10 @@ interface ConsolidatedStatementDialogProps {
   collection: CompletedCollection;
 }
 
+/**
+ * Modal dialog for viewing a consolidated statement of account.
+ * Shows detailed transaction history including usage, rent, and excess charges.
+ */
 export default function ConsolidatedStatementDialog({
   isOpen,
   onClose,

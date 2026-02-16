@@ -8,6 +8,10 @@ type Props = {
   isOverdue?: boolean;
 };
 
+/**
+ * Component for displaying status labels with appropriate styling.
+ * Supports InvoiceStatus, APInvoiceStatus, and AccountStatus.
+ */
 export default function StatusBadge({ status, isOverdue }: Props) {
   return (
     <span

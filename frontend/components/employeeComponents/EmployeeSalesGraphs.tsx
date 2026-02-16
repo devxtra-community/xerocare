@@ -195,6 +195,10 @@ interface EmployeeSalesGraphsProps {
   invoices?: Invoice[];
 }
 
+/**
+ * Analytics charts for employee sales performance.
+ * Displays total sales revenue per month and per day.
+ */
 export default function EmployeeSalesGraphs({ invoices: propInvoices }: EmployeeSalesGraphsProps) {
   const [loading, setLoading] = useState(true);
   const [monthlyData, setMonthlyData] = useState<SalesChartDataItem[]>([]);

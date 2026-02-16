@@ -21,6 +21,10 @@ interface AddPurchaseDialogProps {
   onSuccess: () => void;
 }
 
+/**
+ * Dialog component for recording a new purchase.
+ * Captures purchase number, lot reference, vendor, total amount, and status.
+ */
 export default function AddPurchaseDialog({
   open,
   onOpenChange,

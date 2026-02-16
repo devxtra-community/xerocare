@@ -4,6 +4,11 @@ import { useEffect, useState } from 'react';
 import StatCard from '@/components/StatCard';
 import { getAllEmployees, Employee } from '@/lib/employee';
 
+/**
+ * Component displaying high-level HR statistics.
+ * Shows Total Employees, Active Today (Attendance), On Leave, and Department count.
+ * Data is fetched from the employee API and processed for display.
+ */
 export default function HRStatCards() {
   const [stats, setStats] = useState({
     totalEmployees: 0,

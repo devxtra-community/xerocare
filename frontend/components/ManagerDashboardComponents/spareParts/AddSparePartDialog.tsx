@@ -25,6 +25,13 @@ interface AddSparePartDialogProps {
   onSuccess: () => void;
 }
 
+/**
+ * Dialog component for adding a single spare part to inventory.
+ * Features:
+ * - Lot selection with dependency loading (Models, Vendors, Warehouses).
+ * - Auto-populating fields based on selected lot item.
+ * - Validation of quantity against lot availability.
+ */
 export default function AddSparePartDialog({
   open,
   onOpenChange,

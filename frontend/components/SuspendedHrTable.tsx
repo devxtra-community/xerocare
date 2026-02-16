@@ -85,6 +85,10 @@ const humanResourcedatas = [
 
 const ITEMS_PER_PAGE = 5;
 
+/**
+ * Table component for displaying suspended HR staff.
+ * Includes pagination and styled table rows.
+ */
 export default function SuspendedHrTable() {
   const [page, setPage] = useState(1);
 

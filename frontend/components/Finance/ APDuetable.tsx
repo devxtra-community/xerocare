@@ -27,6 +27,10 @@ const formatDate = (dateString: string) => {
   });
 };
 
+/**
+ * Table displaying upcoming accounts payable invoices.
+ * Highlights overdue invoices and provides quick access to full details.
+ */
 export default function APDueTable() {
   const dueInvoices = apInvoices
     .filter((inv) => inv.status !== 'Paid')

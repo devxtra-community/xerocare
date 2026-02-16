@@ -6,6 +6,11 @@ import AuditLogTable from './AuditLogTable';
 import WarehouseInventoryTable from './WarehouseInventoryTable';
 import LowStockTable from './LowStockTable';
 
+/**
+ * Container component managing various inventory views via tabs.
+ * Allows switching between Inventory Master, Stock Movement Logs, Warehouse Summaries, and Critical Alerts.
+ * Central hub for accessing different aspects of inventory management.
+ */
 export default function InventoryTables() {
   return (
     <div className="w-full bg-card rounded-2xl shadow-sm border p-4 sm:p-6">

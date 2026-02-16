@@ -43,6 +43,11 @@ const lowStockData = [
   },
 ];
 
+/**
+ * Table displaying inventory items that have fallen below their reorder level.
+ * Highlights the shortage amount and classifies status as 'Warning' or 'Critical'.
+ * Enables quick identification of stock replenishment needs.
+ */
 export default function LowStockTable() {
   // Pagination logic removed as buttons are missing from UI
   // const [page, setPage] = useState(1);

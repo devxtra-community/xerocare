@@ -34,6 +34,10 @@ interface ChangePasswordDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
+/**
+ * Dialog component for changing user password.
+ * Validates current password and ensures new password confirmation matches.
+ */
 export function ChangePasswordDialog({ open, onOpenChange }: ChangePasswordDialogProps) {
   const [loading, setLoading] = useState(false);
 

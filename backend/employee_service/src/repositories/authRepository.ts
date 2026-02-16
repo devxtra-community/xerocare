@@ -8,6 +8,9 @@ type UserType = Employee | Admin;
 export class AuthRepository {
   private authRepo = Source.getRepository(Auth);
 
+  /**
+   * Saves a refresh token for a user.
+   */
   async saveRefreshToken(
     user: UserType,
     refreshToken: string,
@@ -23,6 +26,9 @@ export class AuthRepository {
     return this.authRepo.save(auth);
   }
 
+  /**
+   * Finds an auth record by refresh token.
+   */
   async findByToken(refreshToken: string) {
     return this.authRepo.findOne({
       where: { refresh_token: refreshToken },
@@ -30,10 +36,16 @@ export class AuthRepository {
     });
   }
 
+  /**
+   * Deletes a refresh token.
+   */
   async deleteToken(refreshToken: string) {
     return this.authRepo.delete({ refresh_token: refreshToken });
   }
 
+  /**
+   * Deletes all other tokens for a user except the current one.
+   */
   async deleteOtherTokens(userId: string, currentToken: string) {
     return this.authRepo
       .createQueryBuilder()
@@ -43,6 +55,9 @@ export class AuthRepository {
       .execute();
   }
 
+  /**
+   * Retrieves active sessions for a user.
+   */
   async getUserSessions(userId: string, is_admin: boolean = false) {
     return this.authRepo.find({
       where: is_admin ? { admin: { id: userId } } : { employee: { id: userId } },
@@ -50,8 +65,10 @@ export class AuthRepository {
     });
   }
 
+  /**
+   * Deletes a specific session.
+   */
   async deleteSessionById(sessionId: string, userId: string) {
-    // Attempt deletion for either employee or admin
     const result = await this.authRepo.delete({
       id: sessionId,
       employee: { id: userId },

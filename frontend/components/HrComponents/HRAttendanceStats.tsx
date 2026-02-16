@@ -4,6 +4,10 @@ import { useEffect, useState } from 'react';
 import StatCard from '@/components/StatCard';
 import { getAllEmployees } from '@/lib/employee';
 
+/**
+ * Component displaying summary statistics for attendance.
+ * Fetches total employee count and computes (or mocks) stats for Present, On Leave, and Late Arrivals.
+ */
 export default function HRAttendanceStats() {
   const [stats, setStats] = useState({
     totalEmployees: 0,

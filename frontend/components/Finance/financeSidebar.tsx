@@ -81,6 +81,10 @@ const getBadgeCount = (title: string, counts: Record<string, number>) => {
   return counts[key] || 0;
 };
 
+/**
+ * Sidebar navigation for the Finance module.
+ * Displays dynamic badges for pending actions (Rent, Lease, Sale, Orders).
+ */
 export default function FinanceSidebar() {
   const router = useRouter();
   const pathname = usePathname();

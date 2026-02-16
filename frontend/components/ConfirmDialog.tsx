@@ -21,6 +21,10 @@ type ConfirmDialogProps = {
   onConfirm: () => void;
 };
 
+/**
+ * Reusable confirmation dialog component.
+ * Used for confirming destructive actions or critical decisions.
+ */
 export default function ConfirmDialog({
   open,
   onOpenChange,

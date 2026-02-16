@@ -31,6 +31,10 @@ interface UsageHistoryDialogProps {
   customerName: string;
 }
 
+/**
+ * Modal dialog for viewing historical usage records of a contract.
+ * Displays past meter readings, usage counts, excess charges, and invoice status.
+ */
 export default function UsageHistoryDialog({
   isOpen,
   onClose,

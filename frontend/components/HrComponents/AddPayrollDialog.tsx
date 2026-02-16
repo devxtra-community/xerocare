@@ -28,6 +28,11 @@ interface AddPayrollDialogProps {
   onSuccess: () => void;
 }
 
+/**
+ * Dialog component for adding a new payroll record.
+ * Allows HR to select an employee and enter salary details, status, and payment date.
+ * Pre-fills employee information (Department, Role, Branch) upon selection.
+ */
 export default function AddPayrollDialog({
   open,
   onOpenChange,

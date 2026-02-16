@@ -39,6 +39,10 @@ interface UsagePreviewDialogProps {
   };
 }
 
+/**
+ * Modal dialog for previewing usage charges before recording.
+ * Shows checks calculated costs, excess usage, and net payable amount.
+ */
 export default function UsagePreviewDialog({
   isOpen,
   onClose,

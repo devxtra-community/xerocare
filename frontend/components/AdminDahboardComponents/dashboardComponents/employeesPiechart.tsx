@@ -17,6 +17,10 @@ const COLORS = {
   Other: '#CBD5E1',
 };
 
+/**
+ * Pie chart component displaying employee distribution by department/role.
+ * Categorizes employees into groups like Employee, Finance, HR, and Other.
+ */
 export default function EmployeePieChart() {
   const [isClient, setIsClient] = useState(false);
   const [data, setData] = useState<ChartData[]>([]);

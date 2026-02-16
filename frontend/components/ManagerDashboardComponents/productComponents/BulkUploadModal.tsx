@@ -20,6 +20,11 @@ interface BulkUploadModalProps {
   onSuccess: () => void;
 }
 
+/**
+ * Modal component for handling bulk product uploads.
+ * Provides file selection, validation preview, and upload functionality.
+ * Ensures required fields are present before attempting bulk creation.
+ */
 export function BulkUploadModal({ onClose, onSuccess }: BulkUploadModalProps) {
   const [file, setFile] = useState<File | null>(null);
   const [previewData, setPreviewData] = useState<BulkProductRow[]>([]);

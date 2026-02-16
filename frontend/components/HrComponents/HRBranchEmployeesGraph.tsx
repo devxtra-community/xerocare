@@ -21,6 +21,10 @@ interface BranchData {
 
 const COLORS = ['#2563eb', '#3b82f6', '#60a5fa', '#93c5fd', '#bfdbfe'];
 
+/**
+ * Bar chart visualizing employee distribution across branches.
+ * Fetches all employees and aggregates them by branch name.
+ */
 export default function HRBranchEmployeesGraph() {
   const [data, setData] = useState<BranchData[]>([]);
   const [isLoading, setIsLoading] = useState(true);

@@ -16,6 +16,10 @@ interface VendorSpendingTrendProps {
   requests: VendorRequest[];
 }
 
+/**
+ * Area chart displaying monthly vendor spending trends for the current year.
+ * Aggregates total purchase amounts per month to track procurement costs.
+ */
 export default function VendorSpendingTrend({ requests }: VendorSpendingTrendProps) {
   const [isClient, setIsClient] = useState(false);
 

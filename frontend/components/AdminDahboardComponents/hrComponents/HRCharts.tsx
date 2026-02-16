@@ -17,6 +17,11 @@ import {
 import { getHRStats } from '@/lib/employee';
 import { Loader2 } from 'lucide-react';
 
+/**
+ * Container component for HR analytics charts.
+ * Displays employee growth (bar chart) and role distribution (pie chart).
+ * Visualizes workforce trends and composition.
+ */
 export default function HRCharts() {
   const [roleData, setRoleData] = useState<{ name: string; value: number; color: string }[]>([]);
   const [growthData, setGrowthData] = useState<{ month: string; count: number }[]>([]);

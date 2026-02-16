@@ -4,6 +4,10 @@ type Props = {
   action?: React.ReactNode;
 };
 
+/**
+ * Reusable header component for finance pages.
+ * Displays title, description, and optional action buttons.
+ */
 export default function PageHeader({ title, description, action }: Props) {
   return (
     <div className="flex items-center justify-between p-2 mb-6">

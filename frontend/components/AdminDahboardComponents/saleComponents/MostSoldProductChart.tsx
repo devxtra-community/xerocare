@@ -31,6 +31,10 @@ const CustomTooltip = ({ active, payload }: { active?: boolean; payload?: PieToo
   return null;
 };
 
+/**
+ * Pie chart displaying the distribution of most sold products by quantity.
+ * Visualizes the popularity of different items in the inventory.
+ */
 export default function MostSoldProductChart({ data }: MostSoldProductChartProps) {
   const chartData = (data || []).map((item) => ({
     name: item.product.length > 20 ? item.product.substring(0, 20) + '...' : item.product,

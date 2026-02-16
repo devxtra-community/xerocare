@@ -20,6 +20,11 @@ interface LotDetailsDialogProps {
   onClose: () => void;
 }
 
+/**
+ * Dialog component displaying detailed information about a specific lot.
+ * Shows vendor details, items list with usage stats, cost breakdown, and grand total.
+ * supports exporting lot data (All, Products, Spare Parts) to Excel.
+ */
 export default function LotDetailsDialog({ lot, onClose }: LotDetailsDialogProps) {
   const handleExportAll = async () => {
     try {

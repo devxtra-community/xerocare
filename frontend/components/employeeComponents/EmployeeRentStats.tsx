@@ -8,6 +8,10 @@ interface EmployeeRentStatsProps {
   invoices: Invoice[];
 }
 
+/**
+ * Statistical summary cards for employee rent metrics.
+ * Displays total rentals, rentals this month, and total rent revenue.
+ */
 export default function EmployeeRentStats({ invoices }: EmployeeRentStatsProps) {
   const rentInvoices = invoices.filter((inv) => inv.saleType === 'RENT');
 

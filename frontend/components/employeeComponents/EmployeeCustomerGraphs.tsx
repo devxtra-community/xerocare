@@ -50,6 +50,15 @@ const ChartCard = ({ title, children }: { title: string; children: React.ReactNo
   </div>
 );
 
+/**
+ * Charts displaying customer acquisition trends for employees.
+ * Shows new customers per month and per day.
+ */
+/**
+ * Charts displaying customer acquisition trends for employees.
+ * Shows new customers per month (Bar Chart) and per day for the current month (Line Chart).
+ * Helps employees track their customer growth performance.
+ */
 export default function EmployeeCustomerGraphs() {
   const [loading, setLoading] = useState(true);
   const [monthlyData, setMonthlyData] = useState<ChartDataItem[]>([]);

@@ -30,6 +30,10 @@ interface FinanceApprovalTableProps {
   saleType?: 'RENT' | 'LEASE' | 'SALE';
 }
 
+/**
+ * Table displaying invoices pending finance approval.
+ * Allows finance team to review, approve, or reject invoices created by employees.
+ */
 export default function FinanceApprovalTable({ saleType }: FinanceApprovalTableProps) {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);

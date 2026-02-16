@@ -43,6 +43,12 @@ interface BulkSparePartRow {
   // lot_number come from Global State
 }
 
+/**
+ * Dialog component for bulk uploading spare parts via Excel.
+ * - Parses Excel files to preview data.
+ * - Validates foreign keys (Vendor, Model, Warehouse) by name matching.
+ * - Allows manual addition/editing of rows before submission.
+ */
 export default function BulkSparePartDialog({
   open,
   onOpenChange,

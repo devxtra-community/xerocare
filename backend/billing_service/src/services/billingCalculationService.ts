@@ -28,15 +28,16 @@ interface CalculationResult {
 }
 
 export class BillingCalculationService {
+  /**
+   * Calculates the billing amount based on rent type and usage.
+   */
   calculate(input: CalculationInput): CalculationResult {
-    // 1. Normalize Usage
     const effectiveBw = input.usage.bwA4 + input.usage.bwA3 * 2;
     const effectiveColor = input.usage.colorA4 + input.usage.colorA3 * 2;
     const totalUsage = effectiveBw + effectiveColor;
 
     let grossAmount = 0;
 
-    // 2. Calculate Gross based on Rent Type
     switch (input.rentType) {
       case RentType.FIXED_LIMIT:
         grossAmount = this.calculateFixedLimit(
@@ -62,10 +63,8 @@ export class BillingCalculationService {
         throw new AppError(`Unsupported Rent Type: ${input.rentType}`, 400);
     }
 
-    // 2.5 Add Additional Charges
     grossAmount += Number(input.additionalCharges || 0);
 
-    // 3. Apply Discount
     const discountAmount = grossAmount * ((input.discountPercent || 0) / 100);
     const netAmount = Math.max(0, grossAmount - discountAmount);
 
@@ -79,6 +78,9 @@ export class BillingCalculationService {
     };
   }
 
+  /**
+   * Calculates amount for FIXED_LIMIT rent type.
+   */
   private calculateFixedLimit(
     input: CalculationInput,
     bwUsage: number,
@@ -119,6 +121,9 @@ export class BillingCalculationService {
     return Number(baseRent) + excessAmount;
   }
 
+  /**
+   * Calculates amount for FIXED_COMBO rent type.
+   */
   private calculateFixedCombo(
     input: CalculationInput,
     totalUsage: number,
@@ -148,6 +153,9 @@ export class BillingCalculationService {
     return Number(baseRent) + excessAmount;
   }
 
+  /**
+   * Calculates amount for CPC (Cost Per Copy) rent type.
+   */
   private calculateCPC(
     input: CalculationInput,
     bwUsage: number,
@@ -176,6 +184,9 @@ export class BillingCalculationService {
     return amount;
   }
 
+  /**
+   * Calculates amount for CPC_COMBO rent type.
+   */
   private calculateCPCCombo(
     input: CalculationInput,
     totalUsage: number,

@@ -70,6 +70,11 @@ type VendorFormData = {
 
 export { type Vendor }; // Export so parent can use it
 
+/**
+ * Comprehensive table for managing vendors.
+ * Features search, filtering by type, adding/editing vendors, and requesting products.
+ * Displays key metrics like total orders and outstanding amounts for each vendor.
+ */
 export default function VendorTable({
   vendors,
   loading,

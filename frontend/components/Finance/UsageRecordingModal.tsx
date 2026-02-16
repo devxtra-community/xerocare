@@ -56,6 +56,10 @@ interface RecordedUsageData {
   additionalChargesRemarks?: string;
 }
 
+/**
+ * Modal dialog for recording new meter readings.
+ * Handles input validation, cost estimation, and submission of usage data.
+ */
 export default function UsageRecordingModal({
   isOpen,
   onClose,

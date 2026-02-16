@@ -81,6 +81,10 @@ const menuItems = [
   },
 ];
 
+/**
+ * Sidebar navigation for the employee application.
+ * Dynamically filters menu items based on the employee's assigned job role and permissions.
+ */
 export default function EmployeeSidebar() {
   const router = useRouter();
   const pathname = usePathname();

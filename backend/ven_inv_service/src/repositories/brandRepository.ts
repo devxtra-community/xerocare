@@ -6,6 +6,9 @@ export class BrandRepository extends Repository<Brand> {
     super(Brand, dataSource.createEntityManager());
   }
 
+  /**
+   * Finds a brand by its name.
+   */
   async findByName(name: string): Promise<Brand | null> {
     return this.findOne({ where: { name } });
   }

@@ -20,6 +20,10 @@ interface Props {
   employee: AttendanceEmployee | null;
 }
 
+/**
+ * Dialog component displaying detailed attendance information for a specific employee.
+ * Shows employee profile, role, branch, and a summary of attendance metrics (days present, leaves, late arrivals).
+ */
 export default function HRAttendanceDetailDialog({ open, onOpenChange, employee }: Props) {
   if (!employee) return null;
 

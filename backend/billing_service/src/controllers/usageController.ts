@@ -5,6 +5,10 @@ import { AppError } from '../errors/appError';
 
 const usageService = new UsageService();
 
+/**
+ * Creates a new usage record for a contract (e.g., meter readings).
+ * Handles file upload for meter image evidence.
+ */
 export const createUsageRecord = async (req: Request, res: Response, next: NextFunction) => {
   try {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -58,6 +62,9 @@ export const createUsageRecord = async (req: Request, res: Response, next: NextF
 // If editing is required, it must follow the new calculation logic.
 // export const updateUsageRecord = ...
 
+/**
+ * Retrieves the usage history for a specific contract.
+ */
 export const getUsageHistory = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const contractId = req.params.contractId as string;
@@ -71,6 +78,9 @@ export const getUsageHistory = async (req: Request, res: Response, next: NextFun
   }
 };
 
+/**
+ * Manually accepts usage triggering the sending of monthly invoice.
+ */
 export const sendMonthlyInvoice = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = req.params.id as string;

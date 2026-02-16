@@ -35,6 +35,15 @@ const CustomTooltip = ({ active, payload, label }: TooltipProps<number, string>)
   return null;
 };
 
+/**
+ * Component visualizing daily attendance trends.
+ * Uses a LineChart to display the number of employees present over the current month.
+ * Currently uses mock data for demonstration purposes.
+ */
+/**
+ * Line chart component visualizing daily attendance trends.
+ * Displays the number of employees present each day of the month using mock data.
+ */
 export default function HRAttendanceGraph() {
   const [data, setData] = useState<AttendanceData[]>([]);
 

@@ -19,6 +19,10 @@ interface RequestProductDialogProps {
   onConfirm: (data: { products: string; message: string }) => Promise<void>;
 }
 
+/**
+ * Dialog to request specific products from a vendor.
+ * Captures product list and optional message to be sent to the vendor.
+ */
 export default function RequestProductDialog({
   open,
   onOpenChange,

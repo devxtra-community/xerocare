@@ -124,6 +124,11 @@ const CostInput = <T extends import('react-hook-form').FieldValues>({
   );
 };
 
+/**
+ * Dialog component for creating or uploading new inventory lots.
+ * Supports manual entry of lot details, items (Products/Spare Parts), and associated costs.
+ * Also provides functionality to upload lot data via Excel templates.
+ */
 export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) {
   const [loading, setLoading] = useState(false);
   const [vendors, setVendors] = useState<Vendor[]>([]);

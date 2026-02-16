@@ -5,6 +5,10 @@ import {} from // Table imports removed as they were unused
 '@/components/ui/table';
 import { Product, getAllProducts } from '@/lib/product';
 
+/**
+ * Dashboard widget displaying recent products and their stock levels.
+ * Shows product name, total aggregated quantity, price, and creation date.
+ */
 export default function ProductsTable() {
   const [page, setPage] = useState(1);
   const [data, setData] = useState<Product[]>([]);

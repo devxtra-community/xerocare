@@ -30,6 +30,10 @@ interface LeadFormDialogProps {
   onSuccess: () => void;
 }
 
+/**
+ * Comprehensive form dialog for adding or editing lead information.
+ * Features fields for personal details, source tracking, and additional notes.
+ */
 export function LeadFormDialog({
   open,
   onOpenChange,

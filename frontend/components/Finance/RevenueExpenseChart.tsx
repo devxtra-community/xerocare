@@ -63,6 +63,10 @@ const CustomTooltip = ({
   return null;
 };
 
+/**
+ * Bar chart displaying monthly revenue vs expenses.
+ * Visualises financial performance trends over time.
+ */
 export default function RevenueExpenseChart() {
   return (
     <div className="w-full h-[310px] mt-0">

@@ -19,8 +19,6 @@ export class PayrollController {
 
       const employeeRepo = Source.getRepository(Employee);
 
-      // Fetch active employees belonging to the HR's branch
-      // This ensures HR managers only see data for their own branch, enhancing security and data segregation.
       const employees = await employeeRepo.find({
         where: {
           status: EmployeeStatus.ACTIVE,
@@ -29,7 +27,6 @@ export class PayrollController {
         relations: ['branch'],
       });
 
-      // Transform data for the payroll table as requested
       const payrollRepo = Source.getRepository(Payroll);
       const now = new Date();
       const currentMonth = now.getMonth() + 1;
@@ -37,7 +34,6 @@ export class PayrollController {
 
       const payrollData = await Promise.all(
         employees.map(async (emp) => {
-          // Find payroll record for this employee for the current month
           const record = await payrollRepo.findOne({
             where: {
               employee_id: emp.id,
@@ -102,7 +98,6 @@ export class PayrollController {
       const payrollMonth = month || now.getMonth() + 1;
       const payrollYear = year || now.getFullYear();
 
-      // Check if payroll already exists for this employee, month and year
       const existingPayroll = await payrollRepo.findOne({
         where: { employee_id, month: payrollMonth, year: payrollYear },
       });
@@ -121,13 +116,12 @@ export class PayrollController {
         salary_amount: parseFloat(salary_amount),
         status: status || PayrollStatus.PENDING,
         paid_date: paid_date ? new Date(paid_date) : null,
-        work_days: 25, // Default for now
-        leave_days: 0, // Default for now
+        work_days: 25,
+        leave_days: 0,
       });
 
       await payrollRepo.save(newPayroll);
 
-      // Create notification if status is PAID
       if (status === PayrollStatus.PAID) {
         const notificationRepo = Source.getRepository(Notification);
         const notification = notificationRepo.create({
@@ -180,7 +174,6 @@ export class PayrollController {
 
       await payrollRepo.save(payroll);
 
-      // Create notification if status changed to PAID
       if (status === PayrollStatus.PAID && oldStatus !== PayrollStatus.PAID) {
         const notificationRepo = Source.getRepository(Notification);
         const notification = notificationRepo.create({

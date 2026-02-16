@@ -10,6 +10,10 @@ interface ViewPurchaseDialogProps {
   purchase: Purchase;
 }
 
+/**
+ * Dialog component for viewing detailed purchase information.
+ * Read-only view showing all purchase attributes including associated products and models.
+ */
 export default function ViewPurchaseDialog({
   open,
   onOpenChange,

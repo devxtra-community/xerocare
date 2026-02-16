@@ -33,6 +33,11 @@ const data = [
   },
 ];
 
+/**
+ * Table analyzing the operational impact of printer service events.
+ * Aggregates service counts, calculating total downtime and repair costs per printer model.
+ * Aims to identify problematic models and assess maintenance costs.
+ */
 export default function ServiceImpactTable() {
   return (
     <div className="rounded-xl border bg-card shadow-sm overflow-hidden">

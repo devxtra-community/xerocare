@@ -20,6 +20,11 @@ const data = [
   { month: 'Jul', stockIn: 349, stockOut: 430 },
 ];
 
+/**
+ * Area chart displaying detailed stock movement trends (Stock IN vs. Stock OUT).
+ * Allows filtering by time periods (1M, 3M, 6M, 1Y) to analyze flow dynamics.
+ * Essential for understanding inventory turnover and demand patterns.
+ */
 export default function StockMovementTrend() {
   const [selectedPeriod, setSelectedPeriod] = useState('1Y');
   const [isClient, setIsClient] = useState(false);

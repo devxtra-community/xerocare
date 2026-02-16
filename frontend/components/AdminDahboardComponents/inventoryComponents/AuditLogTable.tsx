@@ -57,6 +57,11 @@ const auditData = [
   },
 ];
 
+/**
+ * Table displaying detailed inventory audit logs.
+ * Tracks product movements (IN/OUT/TRANSFER), adjustments, and the user responsible for each action.
+ * Provides transparency and accountability for stock changes.
+ */
 export default function AuditLogTable() {
   const [page, setPage] = useState(1);
   const ITEMS_PER_PAGE = 5;

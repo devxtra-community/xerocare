@@ -6,18 +6,30 @@ export class VendorRepository extends Repository<Vendor> {
     super(Vendor, dataSource.manager);
   }
 
+  /**
+   * Finds a vendor by email.
+   */
   findByEmail(email: string) {
     return this.findOne({ where: { email } });
   }
 
+  /**
+   * Finds a vendor by ID.
+   */
   findById(id: string) {
     return this.findOne({ where: { id } });
   }
 
+  /**
+   * Finds a vendor by name.
+   */
   findByName(name: string) {
     return this.findOne({ where: { name } });
   }
 
+  /**
+   * Finds all active vendors.
+   */
   findActive() {
     return this.find({
       where: { status: VendorStatus.ACTIVE },
@@ -25,6 +37,9 @@ export class VendorRepository extends Repository<Vendor> {
     });
   }
 
+  /**
+   * Finds an active vendor by ID.
+   */
   findByIdActive(id: string) {
     return this.findOne({
       where: { id, status: VendorStatus.ACTIVE },

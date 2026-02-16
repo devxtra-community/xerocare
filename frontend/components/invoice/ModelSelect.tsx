@@ -8,6 +8,10 @@ interface ModelSelectProps {
   onSelect: (model: Model) => void;
 }
 
+/**
+ * Searchable select component for machine models.
+ * Displays model name, number, and availability status.
+ */
 export function ModelSelect({ onSelect }: ModelSelectProps) {
   const [models, setModels] = useState<Model[]>([]);
   const [loading, setLoading] = useState(false);

@@ -48,6 +48,10 @@ interface EmployeeRentTableProps {
   mode?: 'EMPLOYEE' | 'FINANCE';
 }
 
+/**
+ * Table displaying rental agreements managed by the employee.
+ * Features search, creation of new rentals, and status tracking (Draft, Sent, Paid).
+ */
 export default function EmployeeRentTable({ mode = 'EMPLOYEE' }: EmployeeRentTableProps) {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);

@@ -12,6 +12,10 @@ const apAgingData = [
   { bucket: '90+ Days', amount: 1100, color: 'bg-rose-400', percentage: 2 },
 ];
 
+/**
+ * Component visualising Accounts Payable aging buckets.
+ * categorizes payables by overdue duration (Current, 1-30, 31-60, 61-90, 90+ days).
+ */
 export default function APDueAgingChart() {
   const totalAP = apAgingData.reduce((acc, curr) => acc + curr.amount, 0);
 

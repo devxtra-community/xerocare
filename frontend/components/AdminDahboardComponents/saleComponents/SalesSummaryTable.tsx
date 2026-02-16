@@ -17,6 +17,11 @@ interface SalesRow {
   year: number;
 }
 
+/**
+ * Table displaying detailed sales records aggregated from invoices.
+ * Supports searching by product/ID and lists quantity, price (Sale/Rent/Lease), and date.
+ * Provides a granular view of sales performance.
+ */
 const SalesSummaryTable = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);

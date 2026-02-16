@@ -20,6 +20,10 @@ import { getInvoiceById, Invoice } from '@/lib/invoice';
 import UsageRecordingModal from './UsageRecordingModal';
 import UsageHistoryDialog from './UsageHistoryDialog';
 
+/**
+ * Table displaying monthly collection alerts for active contracts.
+ * Shows pending usage recording, invoicing, and final summary actions.
+ */
 export default function MonthlyCollectionTable({ mode }: { mode?: 'RENT' | 'LEASE' }) {
   const [alerts, setAlerts] = useState<CollectionAlert[]>([]);
   const [loading, setLoading] = useState(true);

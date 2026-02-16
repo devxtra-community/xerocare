@@ -35,6 +35,10 @@ const CustomTooltip = ({ active, payload, label }: TooltipProps<number, string>)
   return null;
 };
 
+/**
+ * Line chart component visualizing monthly leave trends.
+ * Displays the number of employees on leave per day using mock data.
+ */
 export default function HRLeaveGraph() {
   const [data, setData] = useState<LeaveData[]>([]);
 

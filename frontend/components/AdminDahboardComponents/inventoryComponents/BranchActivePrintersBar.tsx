@@ -19,6 +19,10 @@ const data = [
   { branch: 'West', active: 22 },
 ];
 
+/**
+ * Bar chart displaying the number of active printers per branch.
+ * Visualizes the distribution of operational units across different locations.
+ */
 export default function BranchActivePrintersBar() {
   const [isClient, setIsClient] = useState(false);
 

@@ -46,6 +46,12 @@ interface Lot {
   items?: LotItem[];
 }
 
+/**
+ * Manager Product Management Page.
+ * Main interface for managing inventory products.
+ * Features listing, searching, filtering, adding (single/bulk), updating, and deleting products.
+ * Displays key inventory stats like Total, Available, Rented, and Sold counts.
+ */
 export default function ManagerProduct() {
   const [products, setProducts] = useState<Product[]>([]);
   const [search, setSearch] = useState('');

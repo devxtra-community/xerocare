@@ -9,6 +9,10 @@ type StatCardProps = {
   subtitle?: string;
 };
 
+/**
+ * Reusable statistics card component.
+ * Displays a title, value, and optional subtitle with responsive font sizing.
+ */
 export default function StatCard({ title, value, subtitle }: StatCardProps) {
   // Logic to decrease font size for longer content
   const getFontSizeClass = (text: string) => {

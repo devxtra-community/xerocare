@@ -59,6 +59,14 @@ type VendorFormData = {
   status: 'Active' | 'On Hold';
 };
 
+/**
+ * Vendor Management Table Component.
+ * Lists vendors with details like Type (Supplier/Distributor), Contact info, and Financial stats.
+ * Features:
+ * - Search and Filter by Type.
+ * - Add/Edit/Delete Vendor functionality.
+ * - View details navigation.
+ */
 export default function VendorTable({
   vendors,
   loading,

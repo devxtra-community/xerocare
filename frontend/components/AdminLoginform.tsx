@@ -21,6 +21,10 @@ interface APIError {
   message?: string;
 }
 
+/**
+ * Admin login form component.
+ * Handles user authentication, token storage, and redirection based on role.
+ */
 export function AdminLoginForm({ className, ...props }: React.ComponentProps<'div'>) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');

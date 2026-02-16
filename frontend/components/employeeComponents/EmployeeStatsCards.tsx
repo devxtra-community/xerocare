@@ -6,6 +6,11 @@ import { getInvoiceStats } from '@/lib/invoice';
 import { getUserFromToken } from '@/lib/auth';
 import { EmployeeJob } from '@/lib/employeeJob';
 
+/**
+ * Statistical summary cards for the employee dashboard.
+ * Displays total orders, sales, active rentals, and active leases.
+ * Adjusts displayed cards based on the employee's role (e.g., hides Sales for Rent/Lease employees).
+ */
 export default function EmployeeStatsCards() {
   const [stats, setStats] = useState({
     SALE: 0,

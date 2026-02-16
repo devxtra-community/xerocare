@@ -28,6 +28,11 @@ interface BulkProductDialogProps {
   onSuccess: () => void;
 }
 
+/**
+ * Dialog component for bulk product uploads via Excel.
+ * Parsing Excel files, validating data, and allowing manual adjustments before submission.
+ * Supports adding multiple products at once with details like Model, Serial No, Warehouse, etc.
+ */
 export function BulkProductDialog({ open, onClose, onSuccess }: BulkProductDialogProps) {
   const [rows, setRows] = useState<Partial<BulkProductRow>[]>([]);
   const [vendors, setVendors] = useState<Vendor[]>([]);

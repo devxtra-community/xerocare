@@ -50,6 +50,12 @@ const getCleanProductName = (name: string) => {
 
 import { generateConsolidatedFinalInvoice } from '@/lib/invoice';
 
+/**
+ * Comprehensive dialog for viewing invoice details.
+ * improved financial summary, broken down by Rent, Lease, Sale, and Usage.
+ * Supports Invoice Approval/Rejection workflows and Contract Completion.
+ * Calculates detailed usage breakdown for Rent/Lease contracts including slab-based pricing.
+ */
 export function InvoiceDetailsDialog({
   invoice,
   onClose,

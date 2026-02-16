@@ -46,6 +46,10 @@ const data = [
   { date: '2024-03-22', type: 'Sales', count: 9, total: '₹31,400', paid: '₹31,400', pending: '₹0' },
 ];
 
+/**
+ * Table summarizing daily revenue by type.
+ * Shows invoice counts, total amounts, paid amounts, and pending balances per day and type.
+ */
 export default function RevenueSummaryTable() {
   return (
     <div className="bg-card rounded-2xl shadow-sm border border-blue-100 overflow-hidden">

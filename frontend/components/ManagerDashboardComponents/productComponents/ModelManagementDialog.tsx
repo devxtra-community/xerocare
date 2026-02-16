@@ -26,6 +26,10 @@ interface ModelManagementDialogProps {
   onClose: () => void;
 }
 
+/**
+ * Dialog for managing models within other contexts.
+ * lists available models and provides add/edit/delete actions similar to the main page.
+ */
 export function ModelManagementDialog({ open, onClose }: ModelManagementDialogProps) {
   const [models, setModels] = useState<Model[]>([]);
   const [loading, setLoading] = useState(false);

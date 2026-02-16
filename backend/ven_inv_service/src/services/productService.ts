@@ -28,6 +28,9 @@ export class ProductService {
     }
   }
 
+  /**
+   * Creates multiple products in bulk, reporting successes and failures.
+   */
   async bulkCreateProducts(rows: BulkProductRow[]) {
     const success: string[] = [];
     const failed: { row: number; error: string }[] = [];
@@ -38,7 +41,6 @@ export class ProductService {
           throw new AppError('vendor_id missing', 400);
         }
 
-        // Validate discount
         const maxDiscount = row.max_discount_amount ?? 0;
         this.validateDiscount(row.sale_price, maxDiscount);
 
@@ -51,15 +53,11 @@ export class ProductService {
           throw new AppError('warehouse not found ', 404);
         }
 
-        // Check Lot Usage if lot_id provided
         if (row.lot_id) {
           await this.lotService.validateAndTrackUsage(
             row.lot_id,
             LotItemType.MODEL,
-            row.model_no, // assuming model_no is model_id or mapped correctly? Wait.
-            // row.model_no in bulk might be model_no string or UUID?
-            // ProductService.ts:39 uses this.model.findbyid(row.model_no).
-            // So row.model_no is treated as ID.
+            row.model_no,
             1,
           );
         }
@@ -83,10 +81,8 @@ export class ProductService {
           lot_id: row.lot_id,
         });
 
-        // Pre-warm cache for newly created product
         await setCached(`product:${product.id}`, product, 3600);
 
-        // Sync Model Quantity to Redis
         await this.modelService.syncToRedis(modelDetails.id);
 
         success.push(row.serial_no);
@@ -109,9 +105,11 @@ export class ProductService {
     return { success, failed };
   }
 
+  /**
+   * Adds a new product, updating model quantities and Lot usage.
+   */
   async addProduct(data: AddProductDTO) {
     try {
-      // Validate discount
       const maxDiscount = data.max_discount_amount ?? 0;
       this.validateDiscount(data.sale_price, maxDiscount);
 
@@ -120,13 +118,12 @@ export class ProductService {
         throw new AppError('model not found', 404);
       }
 
-      // Check Lot Usage if lot_id provided
       if (data.lot_id) {
         await this.lotService.validateAndTrackUsage(
           data.lot_id,
           LotItemType.MODEL,
           data.model_id,
-          1, // One product instance
+          1,
         );
       }
 
@@ -154,10 +151,8 @@ export class ProductService {
         lot_id: data.lot_id,
       });
 
-      // Pre-warm cache for newly created product
       await setCached(`product:${product.id}`, product, 3600);
 
-      // Sync Model Quantity to Redis
       await this.modelService.syncToRedis(modelDetails.id);
 
       return product;
@@ -168,6 +163,9 @@ export class ProductService {
     }
   }
 
+  /**
+   * Deletes a product and updates model quantities.
+   */
   async deleteProduct(id: string) {
     const product = await this.productRepo.findOne(id);
     if (!product) {
@@ -180,10 +178,8 @@ export class ProductService {
       });
     }
 
-    // Invalidate cache
     await deleteCached(`product:${id}`);
 
-    // Sync Model Quantity to Redis
     if (product.model_id) {
       await this.modelService.syncToRedis(product.model_id);
     }
@@ -191,12 +187,17 @@ export class ProductService {
     return this.productRepo.deleteProduct(id);
   }
 
+  /**
+   * Retrieves all products.
+   */
   async getAllProducts() {
     return this.productRepo.getAllProducts();
   }
 
+  /**
+   * Updates a product and clears relevant caches.
+   */
   async updateProduct(id: string, data: Partial<Product>) {
-    // If validation fields are present, we need to check constraints
     if (data.max_discount_amount !== undefined || data.sale_price !== undefined) {
       const currentProduct = await this.productRepo.findOne(id);
       if (!currentProduct) {
@@ -211,13 +212,8 @@ export class ProductService {
 
     const updated = await this.productRepo.updateProduct(id, data);
 
-    // Invalidate cache after update
     await deleteCached(`product:${id}`);
 
-    // Sync Model Quantity using the existing product's model_id
-    // If model_id changed (unlikely for updateProduct?), we should sync both.
-    // For now, assuming model_id doesn't change or we fetch product.
-    // updateProduct in repo updates specific fields.
     const updatedProduct = await this.findOne(id);
     if (updatedProduct && updatedProduct.model_id) {
       await this.modelService.syncToRedis(updatedProduct.model_id);
@@ -226,8 +222,10 @@ export class ProductService {
     return updated;
   }
 
+  /**
+   * Finds a product by ID, utilizing cache.
+   */
   async findOne(id: string) {
-    // Try cache first (cache-aside pattern)
     const cacheKey = `product:${id}`;
     const cached = await getCached<Product>(cacheKey);
 
@@ -236,30 +234,25 @@ export class ProductService {
       return cached;
     }
 
-    // Cache miss - fetch from database
     logger.debug(`Cache MISS for product: ${id}`);
     const product = await this.productRepo.findOne(id);
 
     if (product) {
-      // Store in cache for future requests
-      await setCached(cacheKey, product, 3600); // 1 hour TTL
+      await setCached(cacheKey, product, 3600);
     }
 
     return product;
   }
 
   /**
-   * Batch fetch products with caching optimization
-   * Used by billing service to fetch multiple products efficiently
+   * Finds multiple products by their IDs, using cache where available.
    */
   async findByIds(ids: string[]): Promise<Product[]> {
     const results: Product[] = [];
     const missingIds: string[] = [];
 
-    // Generate cache keys
     const cacheKeys = ids.map((id) => `product:${id}`);
 
-    // Try to get all from cache
     const cachedMap = await getMultipleCached<Product>(cacheKeys);
 
     ids.forEach((id, index) => {
@@ -273,11 +266,9 @@ export class ProductService {
 
     logger.debug(`Cache: ${results.length} hits, ${missingIds.length} misses`);
 
-    // Fetch missing products from database
     if (missingIds.length > 0) {
       const products = await this.productRepo.findByIds(missingIds);
 
-      // Cache the fetched products
       await Promise.all(products.map((p) => setCached(`product:${p.id}`, p, 3600)));
 
       results.push(...products);

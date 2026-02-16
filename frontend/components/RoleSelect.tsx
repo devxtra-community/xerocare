@@ -12,6 +12,9 @@ interface Props {
   onChange?: (value: string) => void;
 }
 
+/**
+ * Dropdown component for selecting user roles.
+ */
 export default function RoleSelect({ value, onChange }: Props) {
   return (
     <Select value={value} onValueChange={onChange}>

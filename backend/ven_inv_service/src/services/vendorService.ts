@@ -25,6 +25,9 @@ export class VendorService {
     private readonly requestRepo: VendorRequestRepository,
   ) {}
 
+  /**
+   * Creates a new vendor, validating uniqueness and sending a welcome email.
+   */
   async createVendor(data: CreateVendorDTO): Promise<Vendor> {
     const existingByEmail = await this.vendorRepo.findByEmail(data.email);
     if (existingByEmail) {
@@ -46,15 +49,21 @@ export class VendorService {
     return this.vendorRepo.save(vendor);
   }
 
+  /**
+   * Retrieves all active vendors.
+   */
   async getAllVendors(): Promise<Vendor[]> {
     return this.vendorRepo.find({
       where: {
-        status: VendorStatus.ACTIVE, // Only Active vendors for the list (soft delete filtering)
+        status: VendorStatus.ACTIVE,
       },
       order: { createdAt: 'DESC' },
     });
   }
 
+  /**
+   * Retrieves a vendor by ID.
+   */
   async getVendorById(id: string): Promise<Vendor> {
     const vendor = await this.vendorRepo.findOne({ where: { id } });
     if (!vendor) {
@@ -63,10 +72,12 @@ export class VendorService {
     return vendor;
   }
 
+  /**
+   * Updates a vendor's details.
+   */
   async updateVendor(id: string, data: Partial<CreateVendorDTO>): Promise<Vendor> {
     const vendor = await this.getVendorById(id);
 
-    // Filter out undefined values and update
     Object.keys(data).forEach((key) => {
       const val = (data as unknown as Record<string, unknown>)[key];
       if (val !== undefined) {
@@ -77,6 +88,9 @@ export class VendorService {
     return this.vendorRepo.save(vendor);
   }
 
+  /**
+   * Soft deletes a vendor.
+   */
   async deleteVendor(id: string) {
     const vendor = await this.vendorRepo.findById(id);
 
@@ -94,6 +108,9 @@ export class VendorService {
 
     return true;
   }
+  /**
+   * Creates a product request for a vendor and notifies via email.
+   */
   async requestProducts(
     vendorId: string,
     data: RequestProductsDTO,
@@ -102,7 +119,6 @@ export class VendorService {
   ) {
     const vendor = await this.getVendorById(vendorId);
 
-    // Save history
     await this.requestRepo.createRequest({
       vendor_id: vendorId,
       requested_by: userId,
@@ -112,10 +128,8 @@ export class VendorService {
       total_amount: data.total_amount,
     });
 
-    // Update vendor stats
     vendor.totalOrders = (vendor.totalOrders || 0) + 1;
     if (data.total_amount) {
-      // Ensure purchaseValue is treated as a number
       const currentPurchaseValue = Number(vendor.purchaseValue) || 0;
       vendor.purchaseValue = currentPurchaseValue + Number(data.total_amount);
     }
@@ -132,6 +146,9 @@ export class VendorService {
     return { success: true, message: 'Product request email sent' };
   }
 
+  /**
+   * Retrieves all product requests for a vendor.
+   */
   async getVendorRequests(vendorId: string) {
     return this.requestRepo.find({
       where: { vendor_id: vendorId },

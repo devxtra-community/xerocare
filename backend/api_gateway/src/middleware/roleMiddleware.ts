@@ -1,6 +1,10 @@
 import { Request, Response, NextFunction } from 'express';
 import { AppError } from '../errors/appError';
 
+/**
+ * Middleware factory to restrict access to specific user roles.
+ * @param allowedRoles - List of roles permitted to access the route.
+ */
 export const requireRole = (...allowedRoles: string[]) => {
   return (req: Request, res: Response, next: NextFunction) => {
     if (!req.user) {

@@ -3,6 +3,11 @@ import React, { useEffect, useState } from 'react';
 import StatCard from '@/components/StatCard';
 import { inventoryService, InventoryStats } from '@/services/inventoryService';
 
+/**
+ * Component displaying key inventory performance indicators (KPIs).
+ * Shows total stock count, damaged items, unique model count, and total inventory valuation.
+ * Provides a high-level financial and operational summary of inventory.
+ */
 export default function InventoryKPICards() {
   const [stats, setStats] = useState<InventoryStats | null>(null);
   const [loading, setLoading] = useState(true);
