@@ -22,8 +22,8 @@ import UsageHistoryDialog from './UsageHistoryDialog';
 import ConsolidatedStatementDialog from './ConsolidatedStatementDialog';
 
 /**
- * Table displaying completed contract collections (Rent/Lease).
- * Allows viewing usage history, generating statements, and sending invoices.
+ * Table displaying completed rental and lease collections.
+ * Allows viewing consolidated statements and sending final invoices.
  */
 export default function CompletedCollectionsTable({ mode }: { mode?: 'RENT' | 'LEASE' }) {
   const [collections, setCollections] = useState<CompletedCollection[]>([]);

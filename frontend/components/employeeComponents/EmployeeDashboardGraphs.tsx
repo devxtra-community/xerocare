@@ -75,12 +75,6 @@ const ChartCard = ({ title, children }: { title: string; children: React.ReactNo
  * Main dashboard graphs for employees showing performance analytics.
  * Adapts to show relevant metrics (Rent/Lease or Sales/Customers) based on employee role.
  */
-/**
- * Main dashboard graphs for employees showing performance analytics.
- * Adapts to show relevant metrics based on employee role:
- * - Rent/Lease Employees: Rent & Lease Revenue per month.
- * - Sales Employees: Customers & Sales Revenue per month.
- */
 export default function EmployeeDashboardGraphs() {
   const [loading, setLoading] = useState(true);
   const [customerData, setCustomerData] = useState<ChartDataItem[]>([]);

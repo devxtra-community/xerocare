@@ -28,14 +28,6 @@ import { toast } from 'sonner';
  * Table displaying all customers managed by the employee.
  * Features search, filtering, and actions to add/edit/delete customers.
  */
-/**
- * Table displaying all customers managed by the employee.
- * Features:
- * - List of customers with Name, Email, Phone, Status.
- * - Search by name or ID.
- * - Add, Edit, and Delete customer functionality.
- * - Integration with CustomerFormDialog.
- */
 export default function EmployeeCustomerTable() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);

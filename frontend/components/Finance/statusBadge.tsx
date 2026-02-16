@@ -9,7 +9,8 @@ type Props = {
 };
 
 /**
- * Component for displaying status labels with appropriate styling.
+ * Reusable badge component for displaying account or invoice status.
+ * Color-coded based on status (PAID, UNPAID, OVERDUE, etc.).
  * Supports InvoiceStatus, APInvoiceStatus, and AccountStatus.
  */
 export default function StatusBadge({ status, isOverdue }: Props) {

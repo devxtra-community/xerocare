@@ -10,6 +10,10 @@ const data = [
   { name: 'Finance', value: 19, color: '#CBD5E1' },
 ];
 
+/**
+ * Pie chart component showing the distribution of employees across teams.
+ * Visualizes team composition by department (Sales, Service, Inventory, Finance).
+ */
 export default function TeamDistributionChart() {
   const [isClient, setIsClient] = useState(false);
 

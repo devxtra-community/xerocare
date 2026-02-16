@@ -71,6 +71,10 @@ const mockEmployees = [
   },
 ];
 
+/**
+ * Table component for viewing and managing employee records in the Manager Dashboard.
+ * Supports searching and provides actions to enable/disable employee accounts.
+ */
 export default function EmployeeTable() {
   const router = useRouter();
   const [employees, setEmployees] = useState(mockEmployees);

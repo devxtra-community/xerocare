@@ -417,7 +417,7 @@ export default function RentFormModal({
       };
       fetchFullModels();
     }
-  }, [initialData]);
+  }, [initialData, form]);
 
   const updateUsageRules = (
     models: (Model & { quantity: number })[],

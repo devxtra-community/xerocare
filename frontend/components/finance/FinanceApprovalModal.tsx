@@ -40,6 +40,11 @@ interface FinanceApprovalModalProps {
   onSuccess: () => void;
 }
 
+/**
+ * High-stakes modal for finance level invoice approval.
+ * Performs detailed calculations of usage, rent, and charges before final approval.
+ * Updates invoice status and records financial transactions upon approval.
+ */
 export function FinanceApprovalModal({ invoice, onClose, onSuccess }: FinanceApprovalModalProps) {
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);

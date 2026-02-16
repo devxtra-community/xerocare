@@ -9,11 +9,6 @@ import { Loader2 } from 'lucide-react';
  * Statistical summary cards for employee customer metrics.
  * Displays total customers, new this month, and new today.
  */
-/**
- * Statistical summary cards for employee customer metrics.
- * Displays total customers, new this month, and new today.
- * Provides a quick overview of customer acquisition velocity.
- */
 export default function EmployeeCustomerStats() {
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({

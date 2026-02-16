@@ -79,11 +79,20 @@ interface ApiResponse<T> {
   data?: T;
 }
 
+/**
+ * Retrieves a list of all products from the inventory service.
+ * @returns Array of Product objects
+ */
 export const getAllProducts = async (): Promise<Product[]> => {
   const response = await api.get<ApiResponse<Product[]>>('/i/products/');
   return response.data.data || [];
 };
 
+/**
+ * Filters available products by their associated model ID.
+ * @param modelId The ID of the model to filter by
+ * @returns Array of available products for the specified model
+ */
 export const getAvailableProductsByModel = async (modelId: string): Promise<Product[]> => {
   const allProducts = await getAllProducts();
   return allProducts.filter(
@@ -93,6 +102,11 @@ export const getAvailableProductsByModel = async (modelId: string): Promise<Prod
   );
 };
 
+/**
+ * Registers a new product in the inventory.
+ * @param data Product creation data including model, warehouse, and vendor IDs
+ * @returns The newly created Product object
+ */
 export const addProduct = async (data: CreateProductData): Promise<Product> => {
   const response = await api.post<ApiResponse<Product>>('/i/products/', data);
   if (!response.data.data) {
@@ -101,14 +115,28 @@ export const addProduct = async (data: CreateProductData): Promise<Product> => {
   return response.data.data;
 };
 
+/**
+ * Updates an existing product's information.
+ * @param id The ID of the product to update
+ * @param data Partial product data for update
+ */
 export const updateProduct = async (id: string, data: UpdateProductData): Promise<void> => {
   await api.put<ApiResponse<void>>(`/i/products/${id}`, data);
 };
 
+/**
+ * Permanently removes a product from the inventory.
+ * @param id The ID of the product to delete
+ */
 export const deleteProduct = async (id: string): Promise<void> => {
   await api.delete<ApiResponse<void>>(`/i/products/${id}`);
 };
 
+/**
+ * Retrieves full details for a specific product by its ID.
+ * @param id The ID of the product to retrieve
+ * @returns The Product object
+ */
 export const getProductById = async (id: string): Promise<Product> => {
   const response = await api.get<ApiResponse<Product>>(`/i/products/${id}`);
   if (!response.data.data) {
@@ -133,6 +161,11 @@ export interface BulkProductRow {
   tax_rate: number;
 }
 
+/**
+ * Performs a bulk creation of multiple products.
+ * @param rows Array of product data rows for bulk insertion
+ * @returns Success count and details of any failed rows
+ */
 export const bulkCreateProducts = async (
   rows: BulkProductRow[],
 ): Promise<{ successCount: number; failedRows: { row: number; error: string }[] }> => {

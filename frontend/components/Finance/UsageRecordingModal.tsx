@@ -464,7 +464,19 @@ export default function UsageRecordingModal({
     });
 
     setEstimatedCost((isNaN(finalVal) ? 0 : finalVal) + applicableRent);
-  }, [formData, contract, history, calculateRuleCost, ruleItems, prevUsage, isLastMonth]);
+  }, [
+    formData,
+    contract,
+    history,
+    calculateRuleCost,
+    ruleItems,
+    prevUsage,
+    isLastMonth,
+    calculatedInitialCounts.bwA4,
+    calculatedInitialCounts.bwA3,
+    calculatedInitialCounts.clrA4,
+    calculatedInitialCounts.clrA3,
+  ]);
 
   // Real-time error detection for UI feedback
   const getErrors = React.useMemo(() => {
@@ -486,7 +498,14 @@ export default function UsageRecordingModal({
 
     // check zero usage if all are touched or not (maybe just block at submit for zero usage)
     return errs;
-  }, [formData, prevUsage, ruleItems]);
+  }, [
+    formData,
+    prevUsage,
+    calculatedInitialCounts.bwA3,
+    calculatedInitialCounts.bwA4,
+    calculatedInitialCounts.clrA3,
+    calculatedInitialCounts.clrA4,
+  ]);
 
   const hasErrors = Object.keys(getErrors).length > 0;
 

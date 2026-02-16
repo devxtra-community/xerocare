@@ -25,11 +25,6 @@ const data = [
  * Bar chart displaying lead sources (Website, WhatsApp, Instagram).
  * Visualises lead acquisition channels over time.
  */
-/**
- * Bar chart displaying lead sources (Website, WhatsApp, Instagram).
- * Visualises lead acquisition channels over time.
- * Note: Currently uses static mock data.
- */
 export default function EmployeeLeadsGraph() {
   return (
     <div className="bg-card p-4 rounded-2xl shadow-sm border-none flex flex-col h-[350px] w-full">

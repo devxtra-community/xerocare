@@ -117,6 +117,10 @@ export interface UsageRecord {
   advanceAdjusted?: number;
 }
 
+/**
+ * Sends a monthly usage invoice for a specific usage record.
+ * @param usageId The ID of the usage record to send
+ */
 export const sendMonthlyUsageInvoice = async (usageId: string): Promise<unknown> => {
   const response = await api.post(`/b/usage/${usageId}/send-invoice`);
   return response.data.data;
@@ -167,26 +171,45 @@ export interface CreateInvoicePayload {
   billingCycleInDays?: number;
 }
 
+/**
+ * Retrieves all invoices in the system.
+ * @returns Array of Invoice objects
+ */
 export const getInvoices = async (): Promise<Invoice[]> => {
   const response = await api.get('/b/invoices');
   return response.data.data;
 };
 
+/**
+ * Retrieves invoices created by or assigned to the current user.
+ */
 export const getMyInvoices = async (): Promise<Invoice[]> => {
   const response = await api.get('/b/invoices/my-invoices');
   return response.data.data;
 };
 
+/**
+ * Retrieves all invoices for the current branch.
+ */
 export const getBranchInvoices = async (): Promise<Invoice[]> => {
   const response = await api.get('/b/invoices/branch-invoices');
   return response.data.data;
 };
 
+/**
+ * Creates a new invoice, quotation, or contract record.
+ * @param payload Creation data including customer, items, and sale type
+ */
 export const createInvoice = async (payload: CreateInvoicePayload): Promise<Invoice> => {
   const response = await api.post('/b/invoices', payload);
   return response.data.data;
 };
 
+/**
+ * Updates an existing quotation or invoice.
+ * @param id The ID of the record to update
+ * @param payload Partial update data
+ */
 export const updateQuotation = async (
   id: string,
   payload: Partial<CreateInvoicePayload>,
@@ -195,6 +218,11 @@ export const updateQuotation = async (
   return response.data.data;
 };
 
+/**
+ * Approves a quotation and handles security deposit recording.
+ * @param invoiceId The ID of the quotation to approve
+ * @param deposit Optional deposit information
+ */
 export const approveQuotation = async (
   invoiceId: string,
   deposit?: {
@@ -208,11 +236,19 @@ export const approveQuotation = async (
   return response.data.data;
 };
 
+/**
+ * Marks an invoice as approved by the employee.
+ */
 export const employeeApproveInvoice = async (id: string): Promise<Invoice> => {
   const response = await api.post(`/b/invoices/${id}/employee-approve`);
   return response.data.data;
 };
 
+/**
+ * Performs final finance approval for an invoice, including initial meter readings.
+ * @param id The ID of the invoice
+ * @param payload Approval data including deposit and item updates
+ */
 export const financeApproveInvoice = async (
   id: string,
   payload: {
@@ -236,25 +272,42 @@ export const financeApproveInvoice = async (
   return response.data.data;
 };
 
+/**
+ * Rejects an invoice from a finance perspective with a provided reason.
+ * @param id The ID of the invoice
+ * @param reason The reason for rejection
+ */
 export const financeRejectInvoice = async (id: string, reason: string): Promise<Invoice> => {
   const response = await api.post(`/b/invoices/${id}/finance-reject`, { reason });
   return response.data.data;
 };
 
+/**
+ * Retrieves a single invoice by its ID.
+ */
 export const getInvoiceById = async (id: string): Promise<Invoice> => {
   const response = await api.get(`/b/invoices/${id}`);
   return response.data.data;
 };
+/**
+ * Retrieves aggregate statistics for invoices (counts by status/type).
+ */
 export const getInvoiceStats = async (): Promise<Record<string, number>> => {
   const response = await api.get('/b/invoices/stats');
   return response.data.data;
 };
 
+/**
+ * Retrieves counts of invoices pending approval or action.
+ */
 export const getPendingCounts = async (): Promise<Record<string, number>> => {
   const response = await api.get('/b/invoices/pending-counts');
   return response.data.data;
 };
 
+/**
+ * Retrieves global sales totals across all branches.
+ */
 export const getGlobalSalesTotals = async (): Promise<{
   totalSales: number;
   salesByType: { saleType: string; total: number }[];
@@ -264,6 +317,10 @@ export const getGlobalSalesTotals = async (): Promise<{
   return response.data.data;
 };
 
+/**
+ * Retrieves a historical overview of global sales for charting.
+ * @param period The time period to look back (e.g., '1M', '1Y')
+ */
 export const getGlobalSalesOverview = async (
   period: string = '1M',
 ): Promise<{ date: string; saleType: string; totalSales: number }[]> => {
@@ -317,12 +374,20 @@ export interface CompletedCollection {
   status: string;
 }
 
+/**
+ * Retrieves collection-related alerts (pending usage, invoicing, etc.).
+ * @param date Optional date to filter alerts for
+ */
 export const getCollectionAlerts = async (date?: string): Promise<CollectionAlert[]> => {
   const url = date ? `/b/invoices/alerts?date=${date}` : '/b/invoices/alerts';
   const response = await api.get(url);
   return response.data.data;
 };
 
+/**
+ * Records meter usage for a contract.
+ * @param payload FormData containing meter readings and images
+ */
 export const recordUsage = async (payload: FormData): Promise<unknown> => {
   const response = await api.post('/b/usage', payload, {
     headers: { 'Content-Type': 'multipart/form-data' },
@@ -330,16 +395,26 @@ export const recordUsage = async (payload: FormData): Promise<unknown> => {
   return response.data.data;
 };
 
+/**
+ * Retrieves the history of usage records for a specific contract.
+ */
 export const getUsageHistory = async (contractId: string): Promise<UsageRecord[]> => {
   const response = await api.get(`/b/usage/contract/${contractId}`);
   return response.data.data;
 };
 
+/**
+ * Retrieves a list of contracts where all collections are completed.
+ */
 export const getCompletedCollections = async (): Promise<CompletedCollection[]> => {
   const response = await api.get('/b/invoices/completed-collections');
   return response.data.data;
 };
 
+/**
+ * Generates a final monthly invoice based on recorded usage.
+ * @param payload Contract and billing period details
+ */
 export const generateMonthlyInvoice = async (payload: {
   contractId: string;
   billingPeriodStart: string;
@@ -350,11 +425,17 @@ export const generateMonthlyInvoice = async (payload: {
   return response.data.data;
 };
 
+/**
+ * Triggers the creation of the invoice for the subsequent billing month.
+ */
 export const createNextMonthInvoice = async (contractId: string): Promise<Invoice> => {
   const response = await api.post('/b/invoices/settlements/next-month', { contractId });
   return response.data.data;
 };
 
+/**
+ * Generates a consolidated statement and final final invoice for a completed contract.
+ */
 export const generateConsolidatedFinalInvoice = async (contractId: string): Promise<Invoice> => {
   const response = await api.post('/b/invoices/settlements/consolidate', { contractId });
   return response.data.data;
@@ -370,6 +451,10 @@ export interface FinanceReportItem {
   profitStatus: 'profit' | 'loss';
 }
 
+/**
+ * Retrieves a detailed financial report with income, expenses, and profit.
+ * @param filters Optional filters for branch, sale type, month, and year
+ */
 export const getFinanceReport = async (filters: {
   branchId?: string;
   saleType?: string;
@@ -385,6 +470,11 @@ export const getFinanceReport = async (filters: {
   const response = await api.get(`/b/invoices/finance/report?${params.toString()}`);
   return response.data.data;
 };
+/**
+ * Updates usage counts and additional charges for an existing invoice.
+ * @param invoiceId The ID of the invoice to update
+ * @param payload Updated usage and charge details
+ */
 export const updateInvoiceUsage = async (
   invoiceId: string,
   payload: {
@@ -414,17 +504,26 @@ export interface AdminSalesStats {
   soldProductsByQty: { product: string; qty: number }[];
 }
 
+/**
+ * Retrieves sales statistics specifically for the admin dashboard.
+ */
 export const getAdminSalesStats = async (): Promise<AdminSalesStats> => {
   const response = await api.get('/b/invoices/sales/admin-stats');
   return response.data.data;
 };
 
+/**
+ * Retrieves a history of invoices, optionally filtered by sale type.
+ */
 export const getInvoiceHistory = async (saleType?: string): Promise<Invoice[]> => {
   const url = saleType ? `/b/invoices/history?saleType=${saleType}` : '/b/invoices/history';
   const response = await api.get(url);
   return response.data.data;
 };
 
+/**
+ * Downloads a consolidated statement in binary format (e.g., PDF).
+ */
 export const downloadConsolidatedInvoice = async (contractId: string): Promise<Blob> => {
   const response = await api.get(`/b/invoices/completed-collections/${contractId}/download`, {
     responseType: 'blob',
@@ -432,11 +531,17 @@ export const downloadConsolidatedInvoice = async (contractId: string): Promise<B
   return response.data;
 };
 
+/**
+ * Sends a consolidated statement to the customer.
+ */
 export const sendConsolidatedInvoice = async (contractId: string): Promise<unknown> => {
   const response = await api.post(`/b/invoices/completed-collections/${contractId}/send`);
   return response.data;
 };
 
+/**
+ * Sends an email notification related to a specific invoice.
+ */
 export const sendEmailNotification = async (
   id: string,
   payload: { recipient: string; subject: string; body: string },
@@ -445,6 +550,9 @@ export const sendEmailNotification = async (
   return response.data;
 };
 
+/**
+ * Sends a WhatsApp notification related to a specific invoice.
+ */
 export const sendWhatsappNotification = async (
   id: string,
   payload: { recipient: string; body: string },
