@@ -1,5 +1,6 @@
 import { Model } from '../entities/modelEntity';
 import { Product } from '../entities/productEntity';
+import { SparePart } from '../entities/sparePartEntity';
 import { Source } from '../config/db';
 
 export class InventoryRepository {
@@ -10,7 +11,7 @@ export class InventoryRepository {
   async getGlobalInventory(filters?: { product?: string; warehouse?: string; branch?: string }) {
     const query = this.modelRepo
       .createQueryBuilder('model')
-      .leftJoin('model.products', 'product', 'product.spare_part_id IS NULL')
+      .leftJoin('model.products', 'product')
       .leftJoin('product.warehouse', 'warehouse')
       .leftJoin('warehouse.branch', 'branch') // Join branch for filtering
       .select([
@@ -46,7 +47,7 @@ export class InventoryRepository {
     }
 
     const rawData = await query
-      .addSelect('COUNT(product.id)', 'total_quantity')
+      .addSelect('COUNT(product.id)', 'total_qty')
       .addSelect(
         "COUNT(CASE WHEN product.product_status = 'AVAILABLE' THEN 1 END)",
         'available_qty',
@@ -59,7 +60,6 @@ export class InventoryRepository {
       .groupBy('model.id')
       .addGroupBy('brandRelation.id')
       .addGroupBy('brandRelation.name')
-      .addGroupBy('product.id') // Group by product to show individual products
       .addGroupBy('product.name')
       .addGroupBy('warehouse.id')
       .addGroupBy('warehouse.warehouseName')
@@ -70,7 +70,7 @@ export class InventoryRepository {
 
     return rawData.map((item) => ({
       ...item,
-      total_quantity: Number(item.total_quantity),
+      total_qty: Number(item.total_qty),
       available_qty: Number(item.available_qty),
       rented_qty: Number(item.rented_qty),
       lease_qty: Number(item.lease_qty),
@@ -86,13 +86,21 @@ export class InventoryRepository {
       .createQueryBuilder('product')
       .leftJoin('product.model', 'model')
       .leftJoin('model.brandRelation', 'brandRelation')
+      .leftJoin('product.vendor', 'vendorRelation')
+      .leftJoin('product.spare_part', 'spare_part')
       .innerJoin('product.warehouse', 'warehouse')
       .innerJoin('warehouse.branch', 'branch')
       .select([
         'model.id AS model_id',
         'model.model_no AS model_no',
         'model.model_name AS model_name',
+        'spare_part.part_name AS spare_name',
+        'spare_part.item_code AS part_code',
+        'product.name AS product_name',
+        'product.imageUrl AS image_url',
         'brandRelation.name AS brand',
+        'vendorRelation.name AS vendor_name',
+        'product.vendor_id AS vendor_id',
         'warehouse.id AS warehouse_id',
         'warehouse.warehouseName AS warehouse_name',
         'COUNT(product.id)::int AS total_qty',
@@ -102,13 +110,18 @@ export class InventoryRepository {
         `SUM(CASE WHEN product.product_status = 'DAMAGED' THEN 1 ELSE 0 END)::int AS damaged_qty`,
         `SUM(CASE WHEN product.product_status = 'SOLD' THEN 1 ELSE 0 END)::int AS sold_qty`,
       ])
-      .where('branch.id = :branchId', { branchId })
-      .andWhere('product.spare_part_id IS NULL')
+      .where('warehouse.branchId = :branchId', { branchId })
       .groupBy('model.id')
       .addGroupBy('model.model_no')
       .addGroupBy('model.model_name')
+      .addGroupBy('spare_part.part_name')
+      .addGroupBy('spare_part.item_code')
+      .addGroupBy('product.name')
+      .addGroupBy('product.imageUrl')
+      .addGroupBy('product.vendor_id')
       .addGroupBy('brandRelation.name')
       .addGroupBy('brandRelation.id')
+      .addGroupBy('vendorRelation.name')
       .addGroupBy('warehouse.id')
       .addGroupBy('warehouse.warehouseName')
       .orderBy('model.model_name', 'ASC')
@@ -116,9 +129,13 @@ export class InventoryRepository {
 
     return result.map((row) => ({
       model_id: row.model_id,
-      model_no: row.model_no,
+      model_no: row.part_code || row.model_no,
       model_name: row.model_name,
+      product_name: row.spare_name || row.product_name,
+      image_url: row.image_url,
       brand: row.brand,
+      vendor_name: row.vendor_name,
+      vendor_id: row.vendor_id,
       warehouse_id: row.warehouse_id,
       warehouse_name: row.warehouse_name,
       total_qty: Number(row.total_qty),
@@ -140,6 +157,7 @@ export class InventoryRepository {
         'model.id AS model_id',
         'model.model_no AS model_no',
         'model.model_name AS model_name',
+        'product.name AS product_name',
         'brandRelation.name AS brand',
         'COUNT(product.id)::int AS total_qty',
         `SUM(CASE WHEN product.product_status = 'AVAILABLE' THEN 1 ELSE 0 END)::int AS available_qty`,
@@ -149,10 +167,10 @@ export class InventoryRepository {
         `SUM(CASE WHEN product.product_status = 'SOLD' THEN 1 ELSE 0 END)::int AS sold_qty`,
       ])
       .where('product.warehouse_id = :warehouseId', { warehouseId })
-      .andWhere('product.spare_part_id IS NULL')
       .groupBy('model.id')
       .addGroupBy('model.model_no')
       .addGroupBy('model.model_name')
+      .addGroupBy('product.name')
       .addGroupBy('brandRelation.name')
       .addGroupBy('brandRelation.id')
       .orderBy('model.model_name', 'ASC')
@@ -162,6 +180,7 @@ export class InventoryRepository {
       model_id: row.model_id,
       model_no: row.model_no,
       model_name: row.model_name,
+      product_name: row.product_name,
       brand: row.brand,
       total_qty: Number(row.total_qty),
       available_qty: Number(row.available_qty),
@@ -174,29 +193,41 @@ export class InventoryRepository {
 
   // DASHBOARD STATS
   async getInventoryStats(branchId?: string) {
-    const query = this.productRepo
+    const productQuery = this.productRepo
       .createQueryBuilder('product')
       .select([
         `COUNT(product.id) FILTER (WHERE product.product_status != 'SOLD')::int AS "totalStock"`,
-        `COUNT(DISTINCT product.model_id) FILTER (WHERE product.product_status != 'SOLD')::int AS "productModels"`,
         `SUM(product.sale_price) FILTER (WHERE product.product_status != 'SOLD' AND product.sale_price IS NOT NULL)::int AS "totalValue"`,
-      ])
-      .where('product.spare_part_id IS NULL');
+      ]);
 
     if (branchId) {
-      query
+      productQuery
         .innerJoin('product.warehouse', 'warehouse')
-        .innerJoin('warehouse.branch', 'branch')
-        .andWhere('branch.id = :branchId', { branchId });
+        .andWhere('warehouse.branchId = :branchId', { branchId });
     }
 
-    const stats = await query.getRawOne();
+    const sparePartRepo = Source.getRepository(SparePart);
+    const sparePartQuery = sparePartRepo
+      .createQueryBuilder('sp')
+      .select([
+        `SUM(sp.quantity)::int AS "spareStock"`,
+        `SUM(sp.quantity * sp.base_price)::int AS "spareValue"`,
+      ]);
+
+    if (branchId) {
+      sparePartQuery.andWhere('sp.branch_id = :branchId', { branchId });
+    }
+
+    const [productStats, spareStats] = await Promise.all([
+      productQuery.getRawOne(),
+      sparePartQuery.getRawOne(),
+    ]);
 
     return {
-      totalStock: Number(stats?.totalStock || 0),
-      productModels: Number(stats?.productModels || 0),
-      totalValue: Number(stats?.totalValue || 0),
-      damagedStock: 0, // Specifically requested to be zero
+      productStock: Number(productStats?.totalStock || 0),
+      productValue: Number(productStats?.totalValue || 0),
+      spareStock: Number(spareStats?.spareStock || 0),
+      spareValue: Number(spareStats?.spareValue || 0),
     };
   }
 }

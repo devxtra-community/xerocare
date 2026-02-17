@@ -14,6 +14,8 @@ interface BulkUploadRow {
   base_price: number;
   quantity?: number;
   lot_id?: string;
+  vendor_id?: string;
+  warehouse_id?: string;
 }
 
 export class SparePartService {
@@ -75,6 +77,8 @@ export class SparePartService {
       branch_id: branchId,
       quantity: quantity,
       lot_id: data.lot_id,
+      vendor_id: data.vendor_id,
+      warehouse_id: data.warehouse_id,
     });
 
     // Pre-warm cache for newly created spare part

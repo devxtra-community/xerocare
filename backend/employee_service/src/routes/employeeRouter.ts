@@ -29,14 +29,14 @@ employeeRouter.post(
 
 employeeRouter.get('/:id/id-proof', authMiddleware, requireRole('ADMIN', 'HR'), getEmployeeIdProof);
 
-employeeRouter.get('/stats', requireRole('ADMIN', 'HR'), getHRStats);
+employeeRouter.get('/stats', requireRole('ADMIN', 'HR', 'MANAGER'), getHRStats);
 
-employeeRouter.get('/', requireRole('ADMIN', 'HR'), getAllEmployees);
+employeeRouter.get('/', requireRole('ADMIN', 'HR', 'MANAGER'), getAllEmployees);
 employeeRouter.get('/public/:id', getPublicEmployeeProfile);
-employeeRouter.get('/:id', requireRole('ADMIN', 'HR'), getEmployeeById);
+employeeRouter.get('/:id', requireRole('ADMIN', 'HR', 'MANAGER'), getEmployeeById);
 employeeRouter.put(
   '/:id',
-  requireRole('ADMIN', 'HR'),
+  requireRole('ADMIN', 'HR', 'MANAGER'),
   uploadEmployeeFiles.fields([
     { name: 'profile_image', maxCount: 1 },
     { name: 'id_proof', maxCount: 1 },

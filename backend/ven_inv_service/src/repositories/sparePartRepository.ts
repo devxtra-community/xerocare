@@ -55,6 +55,10 @@ export class SparePartRepository {
     return this.masterRepo
       .createQueryBuilder('sp')
       .leftJoin('sp.model', 'model')
+      .leftJoin('sp.lot', 'lot')
+      .leftJoin('lot.vendor', 'lotVendor')
+      .leftJoin('sp.vendor', 'directVendor')
+      .leftJoin('sp.warehouse', 'warehouse')
       .select([
         'sp.id AS id',
         'sp.item_code AS item_code',
@@ -62,8 +66,11 @@ export class SparePartRepository {
         'sp.part_name AS part_name',
         'sp.brand AS brand',
         'model.model_name AS compatible_model',
+        'warehouse.warehouseName AS warehouse_name',
+        'COALESCE(directVendor.name, lotVendor.name) AS vendor_name',
         'sp.quantity AS quantity',
         'sp.base_price AS price',
+        'sp.image_url AS image_url',
       ])
       .where('sp.branch_id = :branchId', { branchId })
       .orderBy('sp.created_at', 'DESC')

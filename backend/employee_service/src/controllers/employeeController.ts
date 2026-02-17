@@ -81,8 +81,11 @@ export const getAllEmployees = async (req: Request, res: Response, next: NextFun
     const limit = Number(req.query.limit) || 20;
     const role = req.query.role as EmployeeRole | undefined;
 
-    // Branch filtering: Admin sees all employees, others see only their branch
-    const branchId = req.user?.role === EmployeeRole.ADMIN ? undefined : req.user?.branchId;
+    // Branch filtering: Admin and HR see all employees, others (MANAGERS) see only their branch
+    const branchId =
+      req.user?.role === EmployeeRole.ADMIN || req.user?.role === EmployeeRole.HR
+        ? undefined
+        : req.user?.branchId;
 
     const result = await service.getAllEmployees(page, limit, role, branchId);
     logger.debug('Fetched employees', {
@@ -106,6 +109,11 @@ export const getAllEmployees = async (req: Request, res: Response, next: NextFun
 export const getEmployeeById = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const employee = await service.getEmployeeById(req.params.id as string);
+
+    // Security check for managers: can only see employees in their branch
+    if (req.user?.role === EmployeeRole.MANAGER && employee.branch_id !== req.user.branchId) {
+      throw new AppError('Access denied: employee belongs to another branch', 403);
+    }
 
     return res.json({
       success: true,
@@ -155,6 +163,13 @@ export const updateEmployee = async (req: Request, res: Response, next: NextFunc
       branchId: req.body.branchId || undefined,
     };
 
+    const employee = await service.getEmployeeById(req.params.id as string);
+
+    // Security check for managers: can only update employees in their branch
+    if (req.user?.role === EmployeeRole.MANAGER && employee.branch_id !== req.user.branchId) {
+      throw new AppError('Access denied: employee belongs to another branch', 403);
+    }
+
     const updatedEmployee = await service.updateEmployee(req.params.id as string, payload);
 
     return res.json({
@@ -184,8 +199,11 @@ export const deleteEmployee = async (req: Request, res: Response, next: NextFunc
 
 export const getHRStats = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    // Branch filtering: Admin sees all stats, others see only their branch
-    const branchId = req.user?.role === EmployeeRole.ADMIN ? undefined : req.user?.branchId;
+    // Branch filtering: Admin and HR see all stats, others (MANAGERS) see only their branch
+    const branchId =
+      req.user?.role === EmployeeRole.ADMIN || req.user?.role === EmployeeRole.HR
+        ? undefined
+        : req.user?.branchId;
 
     const stats = await service.getHRStats(branchId);
     logger.info('HR Stats fetched', { keys: Object.keys(stats) });
