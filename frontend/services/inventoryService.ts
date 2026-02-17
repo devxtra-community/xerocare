@@ -5,6 +5,8 @@ export interface InventoryItem {
   warehouse_name?: string;
   model_id: string;
   model_name: string;
+  product_name: string;
+  image_url?: string;
   brand: string;
   vendor_id?: string;
   vendor_name?: string;

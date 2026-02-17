@@ -111,7 +111,7 @@ export default function AddSparePartDialog({
         base_price: '',
         warehouse_id: '',
         vendor_id: '',
-        quantity: '',
+        quantity: '0',
         lot_id: '',
       });
     } catch (error: unknown) {
@@ -245,6 +245,7 @@ export default function AddSparePartDialog({
             <div className="space-y-2">
               <Label>Quantity (In Stock)</Label>
               <Input
+                required
                 type="number"
                 min="0"
                 value={formData.quantity}

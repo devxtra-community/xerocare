@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import {
-  Bar,
-  BarChart,
+  Area,
+  AreaChart,
   CartesianGrid,
   XAxis,
   YAxis,
@@ -11,7 +11,6 @@ import {
   Tooltip,
   Legend,
 } from 'recharts';
-import { ChartTooltipContent } from '@/components/ui/ChartTooltip';
 import { salesService } from '@/services/salesService';
 
 interface ChartDataItem {
@@ -21,8 +20,17 @@ interface ChartDataItem {
   lease: number;
 }
 
-export default function BranchSalesChart() {
-  const [selectedPeriod, setSelectedPeriod] = useState('1M');
+interface BranchSalesChartProps {
+  period: string;
+  title: string;
+  subtitle: string;
+}
+
+export default function BranchSalesChart({
+  period: selectedPeriod,
+  title,
+  subtitle,
+}: BranchSalesChartProps) {
   const [isClient, setIsClient] = useState(false);
   const [chartData, setChartData] = useState<ChartDataItem[]>([]);
 
@@ -73,24 +81,8 @@ export default function BranchSalesChart() {
       {/* Header */}
       <div className="flex items-center justify-between pb-4">
         <div>
-          <h4 className="text-sm font-semibold text-gray-800">Branch Sales Overview</h4>
-          <p className="text-[10px] text-gray-500">Revenue breakdown by category</p>
-        </div>
-
-        <div className="flex bg-gray-50 p-1 rounded-lg border border-gray-100">
-          {['1W', '1M', '3M', '1Y'].map((period) => (
-            <button
-              key={period}
-              onClick={() => setSelectedPeriod(period)}
-              className={`px-3 py-1 rounded-md text-[10px] transition-all duration-200 ${
-                selectedPeriod === period
-                  ? 'bg-white text-primary font-bold shadow-sm border border-blue-100'
-                  : 'text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              {period}
-            </button>
-          ))}
+          <h4 className="text-sm font-semibold text-gray-800">{title}</h4>
+          <p className="text-[10px] text-gray-500">{subtitle}</p>
         </div>
       </div>
 
@@ -98,19 +90,19 @@ export default function BranchSalesChart() {
       <div className="flex-1 w-full -ml-4">
         {isClient && (
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={chartData} margin={{ top: 10, right: 30, left: 10, bottom: 0 }}>
+            <AreaChart data={chartData} margin={{ top: 10, right: 30, left: 10, bottom: 0 }}>
               <defs>
                 <linearGradient id="saleGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#3b82f6" stopOpacity={1} />
-                  <stop offset="100%" stopColor="#60a5fa" stopOpacity={0.8} />
+                  <stop offset="5%" stopColor="#2563eb" stopOpacity={0.3} />
+                  <stop offset="95%" stopColor="#2563eb" stopOpacity={0} />
                 </linearGradient>
                 <linearGradient id="rentGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#8b5cf6" stopOpacity={1} />
-                  <stop offset="100%" stopColor="#a78bfa" stopOpacity={0.8} />
+                  <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.2} />
+                  <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
                 </linearGradient>
                 <linearGradient id="leaseGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#06b6d4" stopOpacity={1} />
-                  <stop offset="100%" stopColor="#22d3ee" stopOpacity={0.8} />
+                  <stop offset="5%" stopColor="#60a5fa" stopOpacity={0.15} />
+                  <stop offset="95%" stopColor="#60a5fa" stopOpacity={0} />
                 </linearGradient>
               </defs>
 
@@ -124,37 +116,62 @@ export default function BranchSalesChart() {
                 tick={{ fill: '#94a3b8', fontSize: 10 }}
                 tickFormatter={(val) => {
                   const d = new Date(val);
-                  if (selectedPeriod === '1Y') {
-                    return d.toLocaleDateString('en-US', { month: 'short' });
+                  if (selectedPeriod === '1W') {
+                    return d.toLocaleDateString('en-US', { weekday: 'short' });
                   }
-                  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                  return d.toLocaleDateString('en-US', { month: 'short' });
                 }}
               />
-
               <YAxis
-                axisLine={false}
+                axisLine={{ stroke: '#f1f5f9' }}
                 tickLine={false}
-                tickFormatter={(v) => (v >= 1000 ? `₹${(v / 1000).toFixed(0)}k` : `₹${v}`)}
+                tickFormatter={(v) => (v >= 1000 ? `${(v / 1000).toFixed(0)}k` : `${v}`)}
                 tickMargin={12}
                 tick={{ fill: '#94a3b8', fontSize: 10 }}
               />
 
               <Tooltip
-                cursor={{ fill: '#f8fafc' }}
-                content={
-                  <ChartTooltipContent
-                    labelFormatter={(val) => {
-                      const d = new Date(val);
-                      return d.toLocaleDateString('en-US', {
-                        weekday: 'long',
-                        month: 'short',
-                        day: 'numeric',
-                        year: 'numeric',
-                      });
-                    }}
-                    valueFormatter={(v) => `₹${Number(v).toLocaleString()}`}
-                  />
-                }
+                cursor={{ stroke: '#cbd5e1', strokeWidth: 1 }}
+                content={({ active, payload, label }) => {
+                  if (active && payload && payload.length) {
+                    const date = new Date(label);
+                    const formattedDate =
+                      selectedPeriod === '1W'
+                        ? date.toLocaleDateString('en-US', {
+                            weekday: 'short',
+                            month: 'short',
+                            day: 'numeric',
+                          })
+                        : date.toLocaleDateString('en-US', {
+                            month: 'long',
+                            year: 'numeric',
+                          });
+                    return (
+                      <div className="bg-white p-4 rounded-xl shadow-[0_8px_30px_rgb(0,0,0,0.08)] border border-gray-50 flex flex-col gap-2 min-w-[120px]">
+                        <p className="text-xs font-bold text-gray-700 mb-2">{formattedDate}</p>
+                        {payload.map((entry: unknown, index: number) => {
+                          const item = entry as { name: string; value: number; color: string };
+                          return (
+                            <div key={index} className="flex items-center gap-2">
+                              <span className="text-[12px]" style={{ color: item.color }}>
+                                {item.name} :
+                              </span>
+                              <span
+                                className="text-[12px] font-medium"
+                                style={{ color: item.color }}
+                              >
+                                {item.value >= 1000
+                                  ? `${(item.value / 1000).toFixed(0)}k`
+                                  : item.value}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  }
+                  return null;
+                }}
               />
 
               <Legend
@@ -170,31 +187,37 @@ export default function BranchSalesChart() {
                 }}
               />
 
-              <Bar
+              <Area
+                type="monotone"
                 dataKey="sale"
-                name="Sales"
-                stackId="a"
+                name="Product Revenue"
+                stroke="#2563eb"
                 fill="url(#saleGradient)"
-                radius={[0, 0, 0, 0]}
-                barSize={20}
+                strokeWidth={2}
+                dot={{ r: 4, fill: '#2563eb', stroke: '#fff', strokeWidth: 2 }}
+                activeDot={{ r: 6, fill: '#2563eb', stroke: '#fff', strokeWidth: 2 }}
               />
-              <Bar
+              <Area
+                type="monotone"
                 dataKey="rent"
-                name="Rent"
-                stackId="a"
+                name="Rent Revenue"
+                stroke="#3b82f6"
                 fill="url(#rentGradient)"
-                radius={[0, 0, 0, 0]}
-                barSize={20}
+                strokeWidth={2}
+                dot={{ r: 4, fill: '#3b82f6', stroke: '#fff', strokeWidth: 2 }}
+                activeDot={{ r: 6, fill: '#3b82f6', stroke: '#fff', strokeWidth: 2 }}
               />
-              <Bar
+              <Area
+                type="monotone"
                 dataKey="lease"
-                name="Lease"
-                stackId="a"
+                name="Lease Revenue"
+                stroke="#93c5fd"
                 fill="url(#leaseGradient)"
-                radius={[4, 4, 0, 0]}
-                barSize={20}
+                strokeWidth={2}
+                dot={{ r: 4, fill: '#93c5fd', stroke: '#fff', strokeWidth: 2 }}
+                activeDot={{ r: 6, fill: '#93c5fd', stroke: '#fff', strokeWidth: 2 }}
               />
-            </BarChart>
+            </AreaChart>
           </ResponsiveContainer>
         )}
       </div>

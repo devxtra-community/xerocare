@@ -2,6 +2,7 @@
 import React from 'react';
 import InventoryKPICards from '@/components/ManagerDashboardComponents/inventoryComponents/InventoryKPICards';
 import InventoryTable from '@/components/ManagerDashboardComponents/inventoryComponents/InventoryTable';
+import SparePartTable from '@/components/ManagerDashboardComponents/inventoryComponents/SparePartTable';
 import StockByCategoryChart from '@/components/ManagerDashboardComponents/inventoryComponents/StockByCategoryChart';
 import MostMovedProductsChart from '@/components/ManagerDashboardComponents/inventoryComponents/MostMovedProductsChart';
 
@@ -15,11 +16,20 @@ export default function ManagerInventoryPage() {
         {/* SUMMARY CARDS */}
         <InventoryKPICards />
 
-        {/* MAIN TABLE */}
-        <div className="space-y-3">
-          <h3 className="text-base sm:text-lg font-bold text-primary">Product Inventory</h3>
-          <div className="bg-card rounded-xl shadow-sm border border-gray-100">
-            <InventoryTable mode="branch" />
+        {/* MAIN TABLES */}
+        <div className="space-y-6">
+          <div className="space-y-3">
+            <h3 className="text-base sm:text-lg font-bold text-primary">Product Inventory</h3>
+            <div className="bg-card rounded-xl shadow-sm border border-gray-100">
+              <InventoryTable mode="branch" />
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <h3 className="text-base sm:text-lg font-bold text-primary">Spare Part Inventory</h3>
+            <div className="bg-card rounded-xl shadow-sm border border-gray-100 p-4">
+              <SparePartTable />
+            </div>
           </div>
         </div>
 

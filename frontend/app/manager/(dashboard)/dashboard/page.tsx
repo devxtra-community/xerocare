@@ -87,9 +87,23 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div className="space-y-2">
-        <h3 className="text-lg sm:text-xl font-bold text-primary">Branch Sales Overview</h3>
-        <BranchSalesChart />
+      <div className="flex flex-col lg:flex-row gap-4 sm:gap-6">
+        <div className="flex-1 space-y-2">
+          <h3 className="text-lg sm:text-xl font-bold text-primary">Daily Sales Trends</h3>
+          <BranchSalesChart
+            period="1W"
+            title="Weekly Overview"
+            subtitle="Revenue by day for the last 7 days"
+          />
+        </div>
+        <div className="flex-1 space-y-2">
+          <h3 className="text-lg sm:text-xl font-bold text-primary">Monthly Sales Trends</h3>
+          <BranchSalesChart
+            period="1Y"
+            title="Yearly Overview"
+            subtitle="Revenue by month for the current year"
+          />
+        </div>
       </div>
     </div>
   );

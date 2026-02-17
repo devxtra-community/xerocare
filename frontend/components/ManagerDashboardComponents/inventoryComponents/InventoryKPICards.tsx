@@ -1,10 +1,10 @@
 'use client';
 import React from 'react';
 import StatCard from '@/components/StatCard';
-import { inventoryService } from '@/services/inventoryService';
+import { inventoryService, InventoryStats } from '@/services/inventoryService';
 
 export default function InventoryKPICards() {
-  const [stats, setStats] = React.useState({
+  const [stats, setStats] = React.useState<InventoryStats>({
     totalStock: 0,
     productModels: 0,
     totalValue: 0,
@@ -34,24 +34,24 @@ export default function InventoryKPICards() {
   return (
     <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 sm:gap-2 md:gap-4">
       <StatCard
-        title="Product Models"
-        value={stats.productModels.toLocaleString()}
-        subtitle="Across all categories"
-      />
-      <StatCard
         title="Total Stock"
         value={stats.totalStock.toLocaleString()}
-        subtitle="Items available in stock"
+        subtitle="Items in inventory"
       />
       <StatCard
-        title="Total Inventory Value"
+        title="Product Models"
+        value={stats.productModels.toLocaleString()}
+        subtitle="Unique models"
+      />
+      <StatCard
+        title="Total Value"
         value={formatCurrency(stats.totalValue)}
-        subtitle="Total valuation"
+        subtitle="Inventory worth"
       />
       <StatCard
-        title="Damaged / Returned Stock"
+        title="Damaged Stock"
         value={stats.damagedStock.toLocaleString()}
-        subtitle="Requiring inspection"
+        subtitle="Items damaged"
       />
     </div>
   );

@@ -11,6 +11,7 @@ export interface SparePartInventoryItem {
   quantity: number;
   status: string;
   price: number;
+  image_url?: string;
 }
 
 export const sparePartService = {

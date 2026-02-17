@@ -3,7 +3,7 @@
 import React from 'react';
 import FinanceStats from '@/components/ManagerDashboardComponents/financeComponents/FinanceStats';
 import RevenueSummaryTable from '@/components/ManagerDashboardComponents/financeComponents/RevenueSummaryTable';
-import OutstandingReceivablesTable from '@/components/ManagerDashboardComponents/financeComponents/OutstandingReceivablesTable';
+
 import RevenueVsExpenseChart from '@/components/ManagerDashboardComponents/financeComponents/RevenueVsExpenseChart';
 import RevenueBySourceChart from '@/components/ManagerDashboardComponents/financeComponents/RevenueBySourceChart';
 import ProfitChart from '@/components/ManagerDashboardComponents/financeComponents/ProfitChart';
@@ -40,12 +40,6 @@ export default function ManagerFinancePage() {
             Revenue Summary
           </h3>
           <RevenueSummaryTable />
-        </div>
-        <div className="space-y-3">
-          <h3 className="text-lg font-bold text-primary uppercase tracking-tighter">
-            Outstanding Receivables
-          </h3>
-          <OutstandingReceivablesTable />
         </div>
       </div>
     </div>
