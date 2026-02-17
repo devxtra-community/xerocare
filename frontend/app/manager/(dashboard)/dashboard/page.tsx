@@ -46,6 +46,13 @@ export default function Dashboard() {
     fetchData();
   }, []);
 
+  const formatToK = (value: number) => {
+    if (value >= 1000) {
+      return `₹${(value / 1000).toFixed(1)}k`;
+    }
+    return `₹${value.toLocaleString()}`;
+  };
+
   return (
     <div className="bg-blue-100 min-h-full p-3 sm:p-4 md:p-6 space-y-6 sm:space-y-8">
       <div className="flex flex-col space-y-4 sm:space-y-6">
@@ -54,22 +61,22 @@ export default function Dashboard() {
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 md:gap-4">
           <StatCard
             title="Total Revenue"
-            value={loading ? '...' : `₹${totalSales.toLocaleString()}`}
+            value={loading ? '...' : formatToK(totalSales)}
             subtitle="All sales, rent, and lease"
           />
           <StatCard
             title="Product Sales"
-            value={loading ? '...' : `₹${saleAmount.toLocaleString()}`}
+            value={loading ? '...' : formatToK(saleAmount)}
             subtitle="Products and spare parts"
           />
           <StatCard
             title="Rent Revenue"
-            value={loading ? '...' : `₹${rentAmount.toLocaleString()}`}
+            value={loading ? '...' : formatToK(rentAmount)}
             subtitle="Rental income"
           />
           <StatCard
             title="Lease Revenue"
-            value={loading ? '...' : `₹${leaseAmount.toLocaleString()}`}
+            value={loading ? '...' : formatToK(leaseAmount)}
             subtitle="Lease income"
           />
         </div>

@@ -1,20 +1,12 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  Tooltip,
-  ResponsiveContainer,
-  CartesianGrid,
-  TooltipProps,
-} from 'recharts';
-import { NameType, ValueType } from 'recharts/types/component/DefaultTooltipContent';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
+
 import { getCustomers } from '@/lib/customer';
 import { getMyInvoices } from '@/lib/invoice';
 import { Loader2 } from 'lucide-react';
+import { ChartTooltipContent } from '@/components/ui/ChartTooltip';
 import { getUserFromToken } from '@/lib/auth';
 import { EmployeeJob } from '@/lib/employeeJob';
 
@@ -23,46 +15,6 @@ interface ChartDataItem {
   value: number;
   orderCount?: number;
 }
-
-const CustomTooltip = ({
-  active,
-  payload,
-  label,
-  type,
-}: TooltipProps<ValueType, NameType> & { type: 'customers' | 'sales' }) => {
-  if (active && payload && payload.length) {
-    const data = payload[0].payload as ChartDataItem;
-    const value = payload[0].value;
-
-    return (
-      <div className="bg-card p-3 rounded-xl shadow-lg border border-blue-100 min-w-[120px]">
-        <p className="font-bold text-[#2563eb] text-[10px] mb-2 uppercase tracking-widest border-b border-blue-50 pb-1">
-          {label}
-        </p>
-        <div className="space-y-1">
-          {type === 'customers' ? (
-            <p className="text-[11px] font-bold text-gray-400 uppercase tracking-tighter flex justify-between gap-4">
-              <span>Customers:</span>
-              <span className="text-[#2563eb]">{value}</span>
-            </p>
-          ) : (
-            <>
-              <p className="text-[11px] font-bold text-gray-400 uppercase tracking-tighter flex justify-between gap-4">
-                <span>Orders:</span>
-                <span className="text-[#2563eb]">{data.orderCount || 0}</span>
-              </p>
-              <p className="text-[11px] font-bold text-gray-400 uppercase tracking-tighter flex justify-between gap-4">
-                <span>Revenue:</span>
-                <span className="text-[#2563eb]">₹{Number(value).toLocaleString()}</span>
-              </p>
-            </>
-          )}
-        </div>
-      </div>
-    );
-  }
-  return null;
-};
 
 const ChartCard = ({ title, children }: { title: string; children: React.ReactNode }) => (
   <div className="bg-card p-5 rounded-2xl shadow-sm border border-blue-100/50 flex flex-col h-[300px] w-full">
@@ -85,9 +37,15 @@ export default function EmployeeDashboardGraphs() {
         // Fetch customers and invoices in parallel
         const [customers, invoices] = await Promise.all([getCustomers(), getMyInvoices()]);
 
-        const salesInvoices = invoices.filter((inv) => inv.saleType === 'SALE');
-        const rentInvoices = invoices.filter((inv) => inv.saleType === 'RENT');
-        const leaseInvoices = invoices.filter((inv) => inv.saleType === 'LEASE');
+        const salesInvoices = invoices.filter(
+          (inv) => inv.saleType === 'SALE' && inv.status !== 'REJECTED',
+        );
+        const rentInvoices = invoices.filter(
+          (inv) => inv.saleType === 'RENT' && inv.status !== 'REJECTED',
+        );
+        const leaseInvoices = invoices.filter(
+          (inv) => inv.saleType === 'LEASE' && inv.status !== 'REJECTED',
+        );
 
         // Initialize Monthly Data
         const months = [
@@ -216,7 +174,15 @@ export default function EmployeeDashboardGraphs() {
                   }
                 />
                 <Tooltip
-                  content={<CustomTooltip type={chart.type as 'customers' | 'sales'} />}
+                  content={
+                    <ChartTooltipContent
+                      valueFormatter={
+                        chart.type === 'sales'
+                          ? (val) => `₹${Number(val).toLocaleString()}`
+                          : undefined
+                      }
+                    />
+                  }
                   cursor={{ fill: '#f1f5f9', opacity: 0.4 }}
                 />
                 <Bar

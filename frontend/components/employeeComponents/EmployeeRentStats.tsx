@@ -9,29 +9,35 @@ interface EmployeeRentStatsProps {
 }
 
 export default function EmployeeRentStats({ invoices }: EmployeeRentStatsProps) {
-  const rentInvoices = invoices.filter((inv) => inv.saleType === 'RENT');
+  // 1. Total Rent: Only active rental contracts (PROFORMA)
+  const activeRentals = invoices.filter(
+    (inv) => inv.saleType === 'RENT' && inv.contractStatus === 'ACTIVE',
+  );
 
+  // 2. Rent Per Month: Active contracts created this month
   const now = new Date();
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-  const monthlyRent = rentInvoices.filter((inv) => new Date(inv.createdAt) >= startOfMonth);
+  const monthlyRentals = activeRentals.filter((inv) => new Date(inv.createdAt) >= startOfMonth);
 
-  // Total Income usually refers to paid amounts, but can also mean total billing.
-  // I will use total PAID amount for "Income" as is common in finance dashboards.
-  const totalIncome = rentInvoices.reduce(
-    (sum, inv) => (inv.status === 'PAID' ? sum + (inv.totalAmount || 0) : sum),
+  // 3. Total Income: All PAID rent-related invoices (including security deposits and monthly bills)
+  const totalIncome = invoices.reduce(
+    (sum, inv) =>
+      inv.saleType === 'RENT' && (inv.status === 'PAID' || inv.status === 'PARTIALLY_PAID')
+        ? sum + (inv.totalAmount || 0)
+        : sum,
     0,
   );
 
   const cards = [
     {
       title: 'Total Rent',
-      value: rentInvoices.length.toString(),
-      subtitle: 'All time rentals',
+      value: activeRentals.length.toString(),
+      subtitle: 'Active contracts',
     },
     {
       title: 'Rent Per Month',
-      value: monthlyRent.length.toString(),
-      subtitle: 'Current month',
+      value: monthlyRentals.length.toString(),
+      subtitle: 'New this month',
     },
     {
       title: 'Total Income from Rent',

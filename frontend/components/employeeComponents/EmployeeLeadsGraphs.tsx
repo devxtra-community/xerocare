@@ -8,10 +8,10 @@ import {
   YAxis,
   Tooltip,
   ResponsiveContainer,
-  TooltipProps,
   CartesianGrid,
 } from 'recharts';
-import { NameType, ValueType } from 'recharts/types/component/DefaultTooltipContent';
+
+import { ChartTooltipContent } from '@/components/ui/ChartTooltip';
 
 const data = [
   { name: 'Jan', website: 40, whatsapp: 24, instagram: 24 },
@@ -28,43 +28,16 @@ const data = [
   { name: 'Dec', website: 52, whatsapp: 54, instagram: 32 },
 ];
 
-const CustomTooltip = ({
-  active,
-  payload,
-  label,
-  sourceKey,
-  sourceName,
-}: TooltipProps<ValueType, NameType> & { sourceKey: string; sourceName: string }) => {
-  if (active && payload && payload.length) {
-    const dataItem = payload[0].payload;
-    return (
-      <div className="bg-card p-3 rounded-xl shadow-lg border border-blue-100">
-        <p className="font-bold text-[#2563eb] text-[10px] mb-2 uppercase tracking-widest border-b border-blue-50 pb-1">
-          {label}
-        </p>
-        <div className="space-y-1">
-          <p className="text-[11px] font-bold text-gray-400 uppercase tracking-tighter">
-            {sourceName} Leads: <span className="text-[#2563eb] ml-1">{dataItem[sourceKey]}</span>
-          </p>
-        </div>
-      </div>
-    );
-  }
-  return null;
-};
-
 const ChartContainer = ({
   title,
   color,
   dataKey,
-  sourceName,
   isClient,
   gradientId,
 }: {
   title: string;
   color: string;
   dataKey: string;
-  sourceName: string;
   isClient: boolean;
   gradientId: string;
 }) => (
@@ -107,7 +80,7 @@ const ChartContainer = ({
               tick={{ fill: '#94a3b8', fontSize: 9, fontWeight: 700 }}
             />
             <Tooltip
-              content={<CustomTooltip sourceKey={dataKey} sourceName={sourceName} />}
+              content={<ChartTooltipContent />}
               cursor={{ stroke: color, strokeWidth: 1, strokeDasharray: '4 4' }}
             />
             <Area
@@ -143,7 +116,6 @@ export default function EmployeeLeadsGraphs() {
         title="Website Source (Jan - Dec)"
         color={websiteColor}
         dataKey="website"
-        sourceName="Website"
         isClient={isClient}
         gradientId="colorWebsite"
       />
@@ -151,7 +123,6 @@ export default function EmployeeLeadsGraphs() {
         title="WhatsApp Source (Jan - Dec)"
         color={whatsappColor}
         dataKey="whatsapp"
-        sourceName="WhatsApp"
         isClient={isClient}
         gradientId="colorWhatsapp"
       />
@@ -159,7 +130,6 @@ export default function EmployeeLeadsGraphs() {
         title="Instagram Source (Jan - Dec)"
         color={instagramColor}
         dataKey="instagram"
-        sourceName="Instagram"
         isClient={isClient}
         gradientId="colorInstagram"
       />

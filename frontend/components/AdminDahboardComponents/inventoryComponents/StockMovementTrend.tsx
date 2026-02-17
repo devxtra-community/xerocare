@@ -9,6 +9,7 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts';
+import { ChartTooltipContent } from '@/components/ui/ChartTooltip';
 
 const data = [
   { month: 'Jan', stockIn: 400, stockOut: 240 },
@@ -81,13 +82,7 @@ export default function StockMovementTrend() {
             />
             <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748B', fontSize: 10 }} />
             <Tooltip
-              contentStyle={{
-                borderRadius: '8px',
-                border: 'none',
-                boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
-                padding: '8px',
-                fontSize: '11px',
-              }}
+              content={<ChartTooltipContent />}
               cursor={{ stroke: '#e2e8f0', strokeWidth: 1 }}
             />
             <Area

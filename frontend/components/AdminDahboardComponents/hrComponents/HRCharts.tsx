@@ -16,6 +16,7 @@ import {
 } from 'recharts';
 import { getHRStats } from '@/lib/employee';
 import { Loader2 } from 'lucide-react';
+import { ChartTooltipContent } from '@/components/ui/ChartTooltip';
 
 export default function HRCharts() {
   const [roleData, setRoleData] = useState<{ name: string; value: number; color: string }[]>([]);
@@ -75,14 +76,7 @@ export default function HRCharts() {
                 tick={{ fill: '#64748B', fontSize: 12 }}
               />
               <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748B', fontSize: 12 }} />
-              <Tooltip
-                contentStyle={{
-                  borderRadius: '12px',
-                  border: 'none',
-                  boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
-                }}
-                cursor={{ fill: '#f1f5f9' }}
-              />
+              <Tooltip content={<ChartTooltipContent />} cursor={{ fill: '#f1f5f9' }} />
               <Bar dataKey="count" fill="#003F7D" radius={[4, 4, 0, 0]} barSize={30} />
             </BarChart>
           </ResponsiveContainer>
@@ -108,13 +102,7 @@ export default function HRCharts() {
                   <Cell key={`cell-${index}`} fill={entry.color} />
                 ))}
               </Pie>
-              <Tooltip
-                contentStyle={{
-                  borderRadius: '12px',
-                  border: 'none',
-                  boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
-                }}
-              />
+              <Tooltip content={<ChartTooltipContent />} />
               <Legend
                 verticalAlign="bottom"
                 align="center"

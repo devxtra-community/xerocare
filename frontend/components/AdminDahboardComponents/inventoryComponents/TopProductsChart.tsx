@@ -10,6 +10,7 @@ import {
   ResponsiveContainer,
   Cell,
 } from 'recharts';
+import { ChartTooltipContent } from '@/components/ui/ChartTooltip';
 
 const data = [
   {
@@ -28,29 +29,6 @@ const data = [
   { productName: 'Bandages', stock: 1500, vendor: 'HealthFirst', warehouse: 'East Wing' },
   { productName: 'Paracetamol', stock: 1200, vendor: 'PharmaCorp', warehouse: 'Downtown Clinic' },
 ];
-
-const CustomTooltip = ({
-  active,
-  payload,
-}: {
-  active?: boolean;
-  payload?: { payload: (typeof data)[0] }[];
-}) => {
-  if (active && payload && payload.length) {
-    const data = payload[0].payload;
-    return (
-      <div className="bg-card p-3 border rounded-lg shadow-lg">
-        <p className="font-semibold text-sm">{data.productName}</p>
-        <p className="text-xs text-gray-600">
-          Stock: <span className="font-bold text-primary">{data.stock}</span>
-        </p>
-        <p className="text-xs text-muted-foreground mt-1">Vendor: {data.vendor}</p>
-        <p className="text-xs text-muted-foreground">Warehouse: {data.warehouse}</p>
-      </div>
-    );
-  }
-  return null;
-};
 
 export default function TopProductsChart() {
   const [isClient, setIsClient] = useState(false);
@@ -91,7 +69,28 @@ export default function TopProductsChart() {
               tick={{ fill: '#4b5563', fontSize: 10, fontWeight: 500 }}
               width={80}
             />
-            <Tooltip content={<CustomTooltip />} cursor={{ fill: 'transparent' }} />
+            <Tooltip
+              content={
+                <ChartTooltipContent
+                  labelFormatter={(_: string, payload?: { payload?: (typeof data)[0] }[]) =>
+                    payload?.[0]?.payload?.productName || ''
+                  }
+                  footer={(payload: { payload?: (typeof data)[0] }[]) => (
+                    <div className="space-y-0.5 border-t border-blue-50 mt-1 pt-1">
+                      <p className="text-[10px] text-gray-500 font-medium uppercase tracking-tighter">
+                        Vendor:{' '}
+                        <span className="text-gray-700">{payload?.[0]?.payload?.vendor}</span>
+                      </p>
+                      <p className="text-[10px] text-gray-500 font-medium uppercase tracking-tighter">
+                        Warehouse:{' '}
+                        <span className="text-gray-700">{payload?.[0]?.payload?.warehouse}</span>
+                      </p>
+                    </div>
+                  )}
+                />
+              }
+              cursor={{ fill: 'transparent' }}
+            />
             <Bar dataKey="stock" radius={[0, 4, 4, 0]}>
               {data.map((entry, index) => (
                 <Cell key={`cell-${index}`} fill="#2563eb" />

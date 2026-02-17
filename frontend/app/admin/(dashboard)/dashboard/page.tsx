@@ -13,6 +13,20 @@ import EmployeePieChart from '@/components/AdminDahboardComponents/dashboardComp
 import WarehouseTable from '@/components/AdminDahboardComponents/dashboardComponents/WarehouseTable';
 import CategoryPieChart from '@/components/AdminDahboardComponents/dashboardComponents/CategoryPieChart';
 
+// Utility function to format numbers in compact format (k, M, B)
+function formatCompactNumber(num: number): string {
+  if (num >= 1_000_000_000) {
+    return (num / 1_000_000_000).toFixed(1).replace(/\.0$/, '') + 'B';
+  }
+  if (num >= 1_000_000) {
+    return (num / 1_000_000).toFixed(1).replace(/\.0$/, '') + 'M';
+  }
+  if (num >= 1_000) {
+    return (num / 1_000).toFixed(1).replace(/\.0$/, '') + 'k';
+  }
+  return num.toFixed(2);
+}
+
 export default function Dashboard() {
   const [stats, setStats] = useState({
     earnings: '0.00',
@@ -57,9 +71,7 @@ export default function Dashboard() {
         });
 
         setStats({
-          earnings: `${(salesTotals?.totalSales || 0).toLocaleString('en-US', {
-            minimumFractionDigits: 2,
-          })} AED`,
+          earnings: `${formatCompactNumber(salesTotals?.totalSales || 0)} AED`,
           branchCount: (branchesRes?.data?.length || 0).toString(),
           warehouseCount: (warehousesRes?.data?.length || 0).toString(),
           employeeCount: (employeeRes?.data?.employees?.length || 0).toString(),

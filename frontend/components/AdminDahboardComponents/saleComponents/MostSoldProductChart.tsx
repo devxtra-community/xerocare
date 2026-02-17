@@ -1,35 +1,13 @@
 'use client';
 
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
+import { ChartTooltipContent } from '@/components/ui/ChartTooltip';
 
 interface MostSoldProductChartProps {
   data: { product: string; qty: number }[];
 }
 
 const COLORS = ['#0D47A1', '#1976D2', '#2196F3', '#00BCD4', '#009688'];
-interface PieTooltipEntry {
-  name: string;
-  value: number;
-  payload: {
-    fullName: string;
-    value: number;
-  };
-}
-
-const CustomTooltip = ({ active, payload }: { active?: boolean; payload?: PieTooltipEntry[] }) => {
-  if (active && payload && payload.length) {
-    const itemData = payload[0].payload;
-    return (
-      <div className="bg-white p-2 border rounded shadow-md text-xs">
-        <p className="font-bold text-primary">{itemData.fullName}</p>
-        <p className="text-gray-600">
-          Quantity: <span className="font-semibold text-blue-600">{payload[0].value}</span>
-        </p>
-      </div>
-    );
-  }
-  return null;
-};
 
 export default function MostSoldProductChart({ data }: MostSoldProductChartProps) {
   const chartData = (data || []).map((item) => ({
@@ -55,7 +33,15 @@ export default function MostSoldProductChart({ data }: MostSoldProductChartProps
               <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
             ))}
           </Pie>
-          <Tooltip content={<CustomTooltip />} />
+          <Tooltip
+            content={
+              <ChartTooltipContent
+                labelFormatter={(_: string, payload?: { payload?: (typeof chartData)[0] }[]) =>
+                  payload?.[0]?.payload?.fullName || ''
+                }
+              />
+            }
+          />
           <Legend
             verticalAlign="bottom"
             align="center"

@@ -10,6 +10,21 @@ import {
   Tooltip,
 } from 'recharts';
 import { getGlobalSalesOverview } from '@/lib/invoice';
+import { ChartTooltipContent } from '@/components/ui/ChartTooltip';
+
+// Utility function to format numbers in compact format (k, M, B)
+function formatCompactNumber(num: number): string {
+  if (num >= 1_000_000_000) {
+    return (num / 1_000_000_000).toFixed(1).replace(/\.0$/, '') + 'B';
+  }
+  if (num >= 1_000_000) {
+    return (num / 1_000_000).toFixed(1).replace(/\.0$/, '') + 'M';
+  }
+  if (num >= 1_000) {
+    return (num / 1_000).toFixed(1).replace(/\.0$/, '') + 'k';
+  }
+  return num.toFixed(0);
+}
 
 interface SalesDataPoint {
   month: string;
@@ -17,45 +32,6 @@ interface SalesDataPoint {
   RENT: number;
   LEASE: number;
 }
-
-interface TooltipEntry {
-  name: string;
-  value: number;
-  color: string;
-  payload: SalesDataPoint;
-}
-
-const CustomTooltip = ({
-  active,
-  payload,
-  label,
-}: {
-  active?: boolean;
-  payload?: TooltipEntry[];
-  label?: string;
-}) => {
-  if (active && payload && payload.length) {
-    const total = payload.reduce((sum: number, entry: TooltipEntry) => sum + (entry.value || 0), 0);
-    return (
-      <div className="bg-background border rounded-lg p-2 shadow-sm text-[10px] sm:text-xs">
-        <p className="font-bold border-b pb-1 mb-1">{label}</p>
-        {payload.map((entry: TooltipEntry, index: number) => (
-          <div key={index} className="flex justify-between gap-4 py-0.5">
-            <span style={{ color: entry.color }}>{entry.name}:</span>
-            <span className="font-semibold">
-              {((entry.value as number) || 0).toLocaleString()} AED
-            </span>
-          </div>
-        ))}
-        <div className="flex justify-between gap-4 py-0.5 border-t mt-1 pt-1 font-bold">
-          <span>Total:</span>
-          <span>{total.toLocaleString()} AED</span>
-        </div>
-      </div>
-    );
-  }
-  return null;
-};
 
 export default function SalesChart() {
   const [selectedPeriod, setSelectedPeriod] = useState('1Y');
@@ -175,12 +151,19 @@ export default function SalesChart() {
               <YAxis
                 axisLine={false}
                 tickLine={false}
-                tickFormatter={(v) => (v >= 1000 ? `${v / 1000}k` : v)}
+                tickFormatter={(v) => formatCompactNumber(v)}
                 tickMargin={6}
                 tick={{ fill: '#6b7280', fontSize: 10 }}
               />
 
-              <Tooltip content={<CustomTooltip />} />
+              <Tooltip
+                content={
+                  <ChartTooltipContent
+                    showTotal
+                    valueFormatter={(v) => `${formatCompactNumber(Number(v))} AED`}
+                  />
+                }
+              />
 
               <Area
                 type="monotone"

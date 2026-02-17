@@ -31,9 +31,12 @@ export default function EmployeeOrderStats({ invoices: propInvoices }: EmployeeO
         const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
         const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
-        const total = invoices.length;
-        const month = invoices.filter((inv) => new Date(inv.createdAt) >= startOfMonth).length;
-        const today = invoices.filter((inv) => new Date(inv.createdAt) >= startOfDay).length;
+        // Filter out rejected sales
+        const validInvoices = invoices.filter((inv) => inv.status !== 'REJECTED');
+
+        const total = validInvoices.length;
+        const month = validInvoices.filter((inv) => new Date(inv.createdAt) >= startOfMonth).length;
+        const today = validInvoices.filter((inv) => new Date(inv.createdAt) >= startOfDay).length;
 
         setStats({
           total,

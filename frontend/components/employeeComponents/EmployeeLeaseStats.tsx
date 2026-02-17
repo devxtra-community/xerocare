@@ -31,28 +31,34 @@ export default function EmployeeLeaseStats({ invoices: propInvoices }: EmployeeL
     fetchInvoices();
   }, [propInvoices]);
 
-  const leaseInvoices = invoices.filter((inv) => inv.saleType === 'LEASE');
+  // 1. Total Lease: Only active lease contracts
+  const activeLeases = invoices.filter(
+    (inv) => inv.saleType === 'LEASE' && inv.contractStatus === 'ACTIVE',
+  );
 
   const now = new Date();
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-  const monthlyLease = leaseInvoices.filter((inv) => new Date(inv.createdAt) >= startOfMonth);
+  const monthlyLeases = activeLeases.filter((inv) => new Date(inv.createdAt) >= startOfMonth);
 
-  // Total Revenue from Lease (sum of PAID lease invoices)
-  const totalRevenue = leaseInvoices.reduce(
-    (sum, inv) => (inv.status === 'PAID' ? sum + (inv.totalAmount || 0) : sum),
+  // Total Revenue from Lease (sum of PAID/PARTIALLY_PAID lease invoices)
+  const totalRevenue = invoices.reduce(
+    (sum, inv) =>
+      inv.saleType === 'LEASE' && (inv.status === 'PAID' || inv.status === 'PARTIALLY_PAID')
+        ? sum + (inv.totalAmount || 0)
+        : sum,
     0,
   );
 
   const cards = [
     {
       title: 'Total Lease',
-      value: loading ? '...' : leaseInvoices.length.toString(),
-      subtitle: 'All time leases',
+      value: loading ? '...' : activeLeases.length.toString(),
+      subtitle: 'Active contracts',
     },
     {
       title: 'Lease Per Month',
-      value: loading ? '...' : monthlyLease.length.toString(),
-      subtitle: 'Current month',
+      value: loading ? '...' : monthlyLeases.length.toString(),
+      subtitle: 'New this month',
     },
     {
       title: 'Total Revenue from Lease',

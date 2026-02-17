@@ -313,15 +313,17 @@ export default function EmployeeOrdersTable({
           approveLabel={mode === 'EMPLOYEE' ? 'Send for Finance Approval' : 'Approve'}
           onApprove={async () => {
             if (mode === 'EMPLOYEE') {
-              // Employee logic (if any specific, usually handled by InvoiceDetailsDialog default or passed func)
-              // But InvoiceDetailsDialog uses onApprove callback only if provided.
-              // We need to import employeeApproveInvoice if we want it here, but SalesTable used handleSendForApproval
-              // Let's implement basics or assume Dialog handles it if we don't pass onApprove?
-              // Actually InvoiceDetailsDialog calls onApprove.
-              // SalesTable had handleSendForApproval. OrdersTable didn't have actions before?
-              // Checking original code: OrdersTable passed nothing to onApprove in original code.
-              // "view only"? Employee Orders typically view only unless DRAFT.
-              // Whatever, for Finance we NEED approve.
+              try {
+                const { employeeApproveInvoice } = await import('@/lib/invoice');
+                await employeeApproveInvoice(selectedInvoice.id);
+                toast.success('Sent for Finance Approval');
+                setDetailsOpen(false);
+                // Simple refresh for now
+                window.location.reload();
+              } catch (error) {
+                console.error(error);
+                toast.error('Failed to send for approval');
+              }
             } else {
               // FINANCE Appprove
               try {

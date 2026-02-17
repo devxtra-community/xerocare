@@ -11,37 +11,16 @@ import {
   CartesianGrid,
   LineChart,
   Line,
-  TooltipProps,
 } from 'recharts';
-import { NameType, ValueType } from 'recharts/types/component/DefaultTooltipContent';
+
 import { getCustomers } from '@/lib/customer';
 import { Loader2 } from 'lucide-react';
+import { ChartTooltipContent } from '@/components/ui/ChartTooltip';
 
 interface ChartDataItem {
   name: string;
   customers: number;
 }
-
-const CustomTooltip = ({ active, payload, label }: TooltipProps<ValueType, NameType>) => {
-  if (active && payload && payload.length) {
-    return (
-      <div className="bg-card p-3 rounded-xl shadow-lg border border-blue-100">
-        <p className="font-bold text-[#2563eb] text-[10px] mb-2 uppercase tracking-widest border-b border-blue-50 pb-1">
-          {label}
-        </p>
-        {payload.map((entry, index) => (
-          <p
-            key={index}
-            className="text-[11px] font-bold text-muted-foreground uppercase tracking-tighter"
-          >
-            {entry.name}: <span className="text-[#2563eb] ml-1">{entry.value}</span>
-          </p>
-        ))}
-      </div>
-    );
-  }
-  return null;
-};
 
 const ChartCard = ({ title, children }: { title: string; children: React.ReactNode }) => (
   <div className="bg-card p-5 rounded-2xl shadow-sm border border-blue-100/50 flex flex-col h-[300px] w-full">
@@ -159,7 +138,7 @@ export default function EmployeeCustomerGraphs() {
               tickLine={false}
               tick={{ fill: '#94a3b8', fontSize: 9, fontWeight: 700 }}
             />
-            <Tooltip content={<CustomTooltip />} cursor={{ fill: '#f1f5f9', opacity: 0.4 }} />
+            <Tooltip content={<ChartTooltipContent />} cursor={{ fill: '#f1f5f9', opacity: 0.4 }} />
             <Bar dataKey="customers" fill="#2563eb" radius={[4, 4, 0, 0]} barSize={10} />
           </BarChart>
         </ResponsiveContainer>
@@ -192,7 +171,7 @@ export default function EmployeeCustomerGraphs() {
               domain={['auto', 'auto']}
             />
             <Tooltip
-              content={<CustomTooltip />}
+              content={<ChartTooltipContent />}
               cursor={{ stroke: '#2563eb', strokeWidth: 1, strokeDasharray: '4 4' }}
             />
             <Line

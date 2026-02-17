@@ -9,10 +9,10 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  TooltipProps,
   Cell,
 } from 'recharts';
 import { getAllEmployees, Employee } from '@/lib/employee';
+import { ChartTooltipContent } from '@/components/ui/ChartTooltip';
 
 interface BranchData {
   branch: string;
@@ -55,24 +55,6 @@ export default function HRBranchEmployeesGraph() {
     fetchBranchData();
   }, []);
 
-  const CustomTooltip = ({ active, payload, label }: TooltipProps<number, string>) => {
-    if (active && payload && payload.length) {
-      return (
-        <div className="bg-card p-3 rounded-xl shadow-lg border border-blue-100">
-          <p className="font-bold text-[#2563eb] text-[10px] mb-2 uppercase tracking-widest border-b border-blue-50 pb-1">
-            {label}
-          </p>
-          <div className="space-y-1">
-            <p className="text-[11px] font-bold text-gray-400 uppercase tracking-tighter">
-              Staff: <span className="text-[#2563eb] ml-1">{payload[0].value}</span>
-            </p>
-          </div>
-        </div>
-      );
-    }
-    return null;
-  };
-
   if (isLoading) {
     return (
       <div className="bg-card rounded-2xl shadow-sm border-0 p-6 h-[300px]">
@@ -108,7 +90,10 @@ export default function HRBranchEmployeesGraph() {
               axisLine={false}
               tickLine={false}
             />
-            <Tooltip content={<CustomTooltip />} cursor={{ fill: '#f1f5f9' }} />
+            <Tooltip
+              content={<ChartTooltipContent valueFormatter={(val) => `${val} staff`} />}
+              cursor={{ fill: '#f1f5f9' }}
+            />
             <Bar dataKey="count" radius={[4, 4, 0, 0]} barSize={30}>
               {data.map((entry, index) => (
                 <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />

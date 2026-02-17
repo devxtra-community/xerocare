@@ -11,6 +11,7 @@ import {
   CartesianGrid,
   Legend,
 } from 'recharts';
+import { ChartTooltipContent } from '@/components/ui/ChartTooltip';
 
 const data = [
   { month: 'Jan', revenue: 120000, expense: 85000 },
@@ -19,49 +20,6 @@ const data = [
   { month: 'Apr', revenue: 110000, expense: 95000 },
   { month: 'May', revenue: 145000, expense: 88000 },
 ];
-
-// 1. Custom Tooltip for Professional Data Display
-const CustomTooltip = ({
-  active,
-  payload,
-  label,
-}: {
-  active?: boolean;
-  payload?: Array<{ value: number }>;
-  label?: string;
-}) => {
-  if (active && payload && payload.length) {
-    const net = payload[0].value - payload[1].value;
-    return (
-      <div className="bg-card p-2 border border-border shadow-xl rounded-lg text-sm">
-        <p className="font-bold text-foreground mb-2 border-b pb-1">{label} Summary</p>
-        <div className="space-y-1">
-          <div className="flex justify-between gap-8">
-            <span className="text-muted-foreground">Revenue:</span>
-            <span className="font-mono font-semibold text-blue-600">
-              AED {payload[0].value.toLocaleString()}
-            </span>
-          </div>
-          <div className="flex justify-between gap-8">
-            <span className="text-muted-foreground">Expenses:</span>
-            <span className="font-mono font-semibold text-rose-500">
-              AED {payload[1].value.toLocaleString()}
-            </span>
-          </div>
-          <div className="flex justify-between gap-8 pt-2 mt-1 border-t border-slate-100">
-            <span className="font-bold text-slate-700">Net:</span>
-            <span
-              className={`font-mono font-bold ${net >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}
-            >
-              AED {net.toLocaleString()}
-            </span>
-          </div>
-        </div>
-      </div>
-    );
-  }
-  return null;
-};
 
 export default function RevenueExpenseChart() {
   return (
@@ -87,8 +45,29 @@ export default function RevenueExpenseChart() {
           />
 
           <Tooltip
-            content={<CustomTooltip />}
-            cursor={{ fill: '#f8fafc' }} // Subtle background highlight on hover
+            content={
+              <ChartTooltipContent
+                valueFormatter={(val) => `AED ${Number(val).toLocaleString()}`}
+                footer={(payload) => {
+                  const net = (Number(payload[0]?.value) || 0) - (Number(payload[1]?.value) || 0);
+                  return (
+                    <div className="flex justify-between gap-4 pt-1 mt-1 border-t border-blue-50">
+                      <span className="text-[11px] font-bold text-gray-500 uppercase tracking-tighter">
+                        Net:
+                      </span>
+                      <span
+                        className={`text-[11px] font-bold ${
+                          net >= 0 ? 'text-emerald-600' : 'text-rose-600'
+                        }`}
+                      >
+                        AED {net.toLocaleString()}
+                      </span>
+                    </div>
+                  );
+                }}
+              />
+            }
+            cursor={{ fill: '#f8fafc' }}
           />
 
           <Legend

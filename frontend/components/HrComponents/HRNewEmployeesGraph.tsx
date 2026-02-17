@@ -9,9 +9,9 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  TooltipProps,
 } from 'recharts';
 import { getAllEmployees, Employee } from '@/lib/employee';
+import { ChartTooltipContent } from '@/components/ui/ChartTooltip';
 
 interface MonthlyGrowth {
   month: string;
@@ -71,24 +71,6 @@ export default function HRNewEmployeesGraph() {
     fetchGrowthData();
   }, []);
 
-  const CustomTooltip = ({ active, payload, label }: TooltipProps<number, string>) => {
-    if (active && payload && payload.length) {
-      return (
-        <div className="bg-card p-3 rounded-xl shadow-lg border border-blue-100">
-          <p className="font-bold text-[#2563eb] text-[10px] mb-2 uppercase tracking-widest border-b border-blue-50 pb-1">
-            {label}
-          </p>
-          <div className="space-y-1">
-            <p className="text-[11px] font-bold text-gray-400 uppercase tracking-tighter">
-              New Hires: <span className="text-[#2563eb] ml-1">{payload[0].value}</span>
-            </p>
-          </div>
-        </div>
-      );
-    }
-    return null;
-  };
-
   if (isLoading) {
     return (
       <div className="bg-card rounded-2xl shadow-sm border-0 p-6 h-[300px]">
@@ -124,7 +106,7 @@ export default function HRNewEmployeesGraph() {
               axisLine={false}
               tickLine={false}
             />
-            <Tooltip content={<CustomTooltip />} />
+            <Tooltip content={<ChartTooltipContent valueFormatter={(val) => `${val} hires`} />} />
             <Line
               type="monotone"
               dataKey="count"

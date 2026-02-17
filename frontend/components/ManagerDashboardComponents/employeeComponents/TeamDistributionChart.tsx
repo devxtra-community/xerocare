@@ -3,14 +3,22 @@
 import React, { useState, useEffect } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 
-const data = [
-  { name: 'Sales', value: 45, color: '#003F7D' },
-  { name: 'Service', value: 32, color: '#0284C7' },
-  { name: 'Inventory', value: 28, color: '#9BD0E5' },
-  { name: 'Finance', value: 19, color: '#CBD5E1' },
+interface TeamDistributionChartProps {
+  data?: { name: string; value: number; color: string }[];
+  loading?: boolean;
+}
+
+const defaultData = [
+  { name: 'Sales', value: 0, color: '#003F7D' },
+  { name: 'Rent', value: 0, color: '#0284C7' },
+  { name: 'Lease', value: 0, color: '#0891b2' },
+  { name: 'Other', value: 0, color: '#CBD5E1' },
 ];
 
-export default function TeamDistributionChart() {
+export default function TeamDistributionChart({
+  data = defaultData,
+  loading,
+}: TeamDistributionChartProps) {
   const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
@@ -28,7 +36,7 @@ export default function TeamDistributionChart() {
 
       <div className="flex-1 flex flex-col sm:flex-row items-center gap-6">
         <div className="relative w-[180px] h-[180px]">
-          {isClient && (
+          {isClient && !loading && (
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
@@ -60,8 +68,11 @@ export default function TeamDistributionChart() {
               </PieChart>
             </ResponsiveContainer>
           )}
+          {loading && (
+            <div className="w-full h-full rounded-full border-4 border-muted border-t-primary animate-spin" />
+          )}
           <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-            <span className="text-2xl font-bold text-primary">{total}</span>
+            <span className="text-2xl font-bold text-primary">{loading ? '...' : total}</span>
             <span className="text-[10px] text-muted-foreground font-bold uppercase">Total</span>
           </div>
         </div>
@@ -76,7 +87,7 @@ export default function TeamDistributionChart() {
               <div className="flex items-center gap-4">
                 <span className="text-xs font-bold text-primary">{item.value}</span>
                 <span className="text-[10px] font-bold text-gray-400 w-8 text-right">
-                  {Math.round((item.value / total) * 100)}%
+                  {total > 0 ? Math.round((item.value / total) * 100) : 0}%
                 </span>
               </div>
             </div>

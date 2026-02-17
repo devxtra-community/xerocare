@@ -3,6 +3,7 @@
 import React from 'react';
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, CartesianGrid } from 'recharts';
 import { ArrowUpRight, TrendingUp } from 'lucide-react';
+import { ChartTooltipContent } from '@/components/ui/ChartTooltip';
 
 const cashFlowData = [
   { month: 'Jan', inflow: 42000, outflow: 31000 },
@@ -40,12 +41,12 @@ export default function CashFlowMiniChart() {
           <AreaChart data={cashFlowData} margin={{ top: 5, right: 10, left: 10, bottom: 0 }}>
             <defs>
               <linearGradient id="colorInflow" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#10b981" stopOpacity={0.1} />
-                <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                <stop offset="5%" stopColor="#2563eb" stopOpacity={0.1} />
+                <stop offset="95%" stopColor="#2563eb" stopOpacity={0} />
               </linearGradient>
               <linearGradient id="colorOutflow" x1="0" y1="0" x2="2" y2="1">
-                <stop offset="5%" stopColor="#64748b" stopOpacity={0.1} />
-                <stop offset="95%" stopColor="#64748b" stopOpacity={0} />
+                <stop offset="5%" stopColor="#60a5fa" stopOpacity={0.1} />
+                <stop offset="95%" stopColor="#60a5fa" stopOpacity={0} />
               </linearGradient>
             </defs>
 
@@ -60,18 +61,23 @@ export default function CashFlowMiniChart() {
             />
 
             <Tooltip
-              contentStyle={{
-                borderRadius: '8px',
-                border: '1px solid #e2e8f0',
-                boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)',
-              }}
-              itemStyle={{ fontSize: '12px', fontWeight: 600 }}
+              content={
+                <ChartTooltipContent
+                  valueFormatter={(value) => {
+                    const val = Number(value);
+                    return `AED ${
+                      val >= 1000 ? (val / 1000).toFixed(1) + 'k' : val.toLocaleString()
+                    }`;
+                  }}
+                />
+              }
+              cursor={{ stroke: '#2563eb', strokeWidth: 1, strokeDasharray: '4 4' }}
             />
 
             <Area
               type="monotone"
               dataKey="inflow"
-              stroke="#10b981"
+              stroke="#2563eb"
               strokeWidth={2}
               fillOpacity={1}
               fill="url(#colorInflow)"
@@ -80,7 +86,7 @@ export default function CashFlowMiniChart() {
             <Area
               type="monotone"
               dataKey="outflow"
-              stroke="#64748b"
+              stroke="#60a5fa"
               strokeWidth={2}
               fillOpacity={1}
               fill="url(#colorOutflow)"

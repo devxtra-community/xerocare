@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
+import { ChartTooltipContent } from '@/components/ui/ChartTooltip';
 
 const data = [
   { name: 'Sales', value: 450000, color: '#003F7D' },
@@ -39,15 +40,9 @@ export default function RevenueBySourceChart() {
                 ))}
               </Pie>
               <Tooltip
-                formatter={(val: number) => `₹${val.toLocaleString()}`}
-                contentStyle={{
-                  borderRadius: '8px',
-                  border: 'none',
-                  boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
-                  padding: '4px 8px',
-                  fontSize: '10px',
-                }}
-                itemStyle={{ padding: 0, fontWeight: 'bold' }}
+                content={
+                  <ChartTooltipContent valueFormatter={(val) => `₹${val.toLocaleString()}`} />
+                }
               />
               <Legend iconType="circle" wrapperStyle={{ fontSize: '10px', fontWeight: 'bold' }} />
             </PieChart>

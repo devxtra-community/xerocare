@@ -2,6 +2,7 @@ import api from '@/lib/api';
 
 export interface SalesTrendData {
   date: string;
+  saleType: string;
   totalSales: number;
 }
 

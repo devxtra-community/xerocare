@@ -33,6 +33,7 @@ export interface HRStats {
     EMPLOYEE: number;
     FINANCE: number;
   };
+  byJob: Record<string, number>;
 }
 
 export interface EmployeeResponse {

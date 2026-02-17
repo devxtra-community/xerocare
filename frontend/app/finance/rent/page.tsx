@@ -33,10 +33,7 @@ export default function RentPage() {
         </div>
 
         <EmployeeRentStats invoices={invoices} />
-        {/* Helper function check for Graphs - EmployeeRentGraphs fetches internal getMyInvoices by default.
-            We need to refactor it or it will show "My Invoices" instead of Branch.
-            Let's assume I will refactor it next. */}
-        <EmployeeRentGraphs />
+        <EmployeeRentGraphs invoices={invoices} />
 
         <Tabs defaultValue="pending" className="w-full space-y-4">
           <TabsList className="bg-card border text-slate-600">

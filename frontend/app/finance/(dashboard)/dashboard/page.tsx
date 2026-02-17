@@ -1,11 +1,11 @@
 'use client';
 
 import React from 'react';
-import { Wallet, ArrowUpRight, ArrowDownRight } from 'lucide-react';
+import { Wallet, ArrowUpRight } from 'lucide-react';
 
 // Finance components (self-contained visuals)
-import CashFlowMiniChart from '@/components/Finance/ CashFlowMIniChart';
-import RevenueExpenseChart from '@/components/Finance/RevenueExpenseChart';
+import RevenueBreakdownChart from '@/components/Finance/RevenueBreakdownChart';
+import DailyRevenueChart from '@/components/Finance/DailyRevenueChart';
 
 export default function FinanceDashboard() {
   return (
@@ -30,24 +30,24 @@ export default function FinanceDashboard() {
       <KPIStats />
 
       {/* PRIMARY ANALYTICS */}
-      <section className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6">
-        {/* Revenue vs Expense */}
-        <div className="lg:col-span-12 rounded-2xl bg-card shadow-sm">
+      <section className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+        {/* Monthly Revenue Breakdown */}
+        <div className="rounded-2xl bg-card shadow-sm">
           <div className="px-4 py-3 border-b border-border">
-            <h3 className="text-base font-bold text-primary">Revenue vs Expenses</h3>
+            <h3 className="text-base font-bold text-primary">Monthly Revenue</h3>
           </div>
           <div className="p-4">
-            <RevenueExpenseChart />
+            <RevenueBreakdownChart />
           </div>
         </div>
 
-        {/* Net Cash Flow */}
-        <div className="lg:col-span-5 rounded-2xl bg-card shadow-sm">
+        {/* Daily Revenue Breakdown */}
+        <div className="rounded-2xl bg-card shadow-sm">
           <div className="px-4 py-3 border-b border-border">
-            <h3 className="text-base font-bold text-primary">Net Cash Flow</h3>
+            <h3 className="text-base font-bold text-primary">Daily Revenue</h3>
           </div>
           <div className="p-4">
-            <CashFlowMiniChart />
+            <DailyRevenueChart />
           </div>
         </div>
       </section>
@@ -55,48 +55,92 @@ export default function FinanceDashboard() {
   );
 }
 
-const stats = [
-  {
-    label: 'Cash Balance',
-    value: '120,000',
-    trend: '+2.5%',
-    upward: true,
-    icon: Wallet,
-  },
-
-  {
-    label: 'Net Profit',
-    value: '18,500',
-    trend: '+18.2%',
-    upward: true,
-    icon: ArrowUpRight,
-  },
-];
+import { getGlobalSalesTotals } from '@/lib/invoice';
+import { Loader2 } from 'lucide-react';
 
 function KPIStats() {
+  const [loading, setLoading] = React.useState(true);
+  const [data, setData] = React.useState({
+    totalSales: 0,
+    salesByType: [] as { saleType: string; total: number }[],
+  });
+
+  React.useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const result = await getGlobalSalesTotals();
+        setData(result);
+      } catch (error) {
+        console.error('Failed to fetch finance stats:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, []);
+
+  const formatCurrency = (amount: number) => {
+    if (amount >= 1000) {
+      return (amount / 1000).toFixed(1) + ' k';
+    }
+    return amount.toLocaleString();
+  };
+
+  const getAmountByType = (type: string) => {
+    const item = data.salesByType.find((s) => s.saleType === type);
+    return item ? item.total : 0;
+  };
+
+  const stats = [
+    {
+      label: 'Total Income',
+      value: formatCurrency(data.totalSales),
+      icon: Wallet,
+      color: 'text-blue-600',
+    },
+    {
+      label: 'From Rent',
+      value: formatCurrency(getAmountByType('RENT')),
+      icon: ArrowUpRight,
+      color: 'text-emerald-600',
+    },
+    {
+      label: 'From Sale',
+      value: formatCurrency(getAmountByType('SALE')),
+      icon: ArrowUpRight,
+      color: 'text-emerald-600',
+    },
+    {
+      label: 'From Lease',
+      value: formatCurrency(getAmountByType('LEASE')),
+      icon: ArrowUpRight,
+      color: 'text-emerald-600',
+    },
+  ];
+
+  if (loading) {
+    return (
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {[1, 2, 3, 4].map((i) => (
+          <div
+            key={i}
+            className="rounded-2xl min-h-[70px] sm:h-[80px] bg-card shadow-sm p-3 flex items-center justify-center"
+          >
+            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+          </div>
+        ))}
+      </div>
+    );
+  }
+
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
       {stats.map((s) => (
         <div
           key={s.label}
-          className="rounded-2xl min-h-[70px] sm:h-[80px] bg-card shadow-sm p-3 flex flex-col justify-center gap-1"
+          className="rounded-2xl min-h-[70px] sm:h-[80px] bg-card shadow-sm p-3 flex flex-col justify-center items-center gap-1 text-center"
         >
-          <div className="flex items-center justify-between">
-            <p className="text-xs font-medium text-muted-foreground">{s.label}</p>
-            <span
-              className={`flex items-center text-[10px] font-semibold ${
-                s.upward ? 'text-emerald-600' : 'text-rose-600'
-              }`}
-            >
-              {s.upward ? (
-                <ArrowUpRight className="w-3 h-3 mr-0.5" />
-              ) : (
-                <ArrowDownRight className="w-3 h-3 mr-0.5" />
-              )}
-              {s.trend}
-            </span>
-          </div>
-
+          <p className="text-xs font-medium text-muted-foreground uppercase">{s.label}</p>
           <p className="text-xl sm:text-2xl font-bold text-primary">{s.value}</p>
         </div>
       ))}

@@ -988,15 +988,17 @@ export class BillingService {
         // Check readings
         const bwCount =
           update?.initialBwCount !== undefined ? update.initialBwCount : item.initialBwCount;
-        if (bwCount === undefined || bwCount === null) {
+        if (invoice.saleType !== SaleType.SALE && (bwCount === undefined || bwCount === null)) {
           throw new AppError(`Initial B&W reading missing for item: ${item.description}`, 400);
         }
       }
 
       // 0.1 Ensure Deposit is provided for non-LEASE contracts
-      if (invoice.saleType !== SaleType.LEASE) {
+      // User Update: Security Deposit is optional for SALE contracts too.
+      // So effectively, it is mandatory ONLY for RENT.
+      if (invoice.saleType !== SaleType.LEASE && invoice.saleType !== SaleType.SALE) {
         if (!deposit || !deposit.amount || deposit.amount <= 0) {
-          throw new AppError('Security Deposit is mandatory for Rent and Sale contracts', 400);
+          throw new AppError('Security Deposit is mandatory for Rent contracts', 400);
         }
       }
 
@@ -1060,7 +1062,10 @@ export class BillingService {
             if (product.print_colour === 'BLACK_WHITE') {
               item.initialColorCount = 0;
             } else {
-              if (update.initialColorCount === undefined || update.initialColorCount === null) {
+              if (
+                invoice.saleType !== SaleType.SALE &&
+                (update.initialColorCount === undefined || update.initialColorCount === null)
+              ) {
                 throw new AppError(
                   `Initial Color reading missing for color product ${product.serial_no}`,
                   400,

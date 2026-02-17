@@ -15,6 +15,7 @@ export default function EmployeeSalesStats({ invoices: propInvoices }: EmployeeS
     salesCount: 0,
     salesMonth: 0,
     totalAmount: 0,
+    rejectedCount: 0,
   });
   const [loading, setLoading] = useState(true);
 
@@ -31,13 +32,19 @@ export default function EmployeeSalesStats({ invoices: propInvoices }: EmployeeS
 
         const totalOrders = invoices.length;
         const salesInvoices = invoices.filter((inv) => inv.saleType === 'SALE');
-        const salesCount = salesInvoices.length;
-        const salesMonth = salesInvoices.filter(
+
+        // Filter out rejected sales for stats and graphs
+        const approvedSalesInvoices = salesInvoices.filter((inv) => inv.status !== 'REJECTED');
+        const rejectedSalesInvoices = salesInvoices.filter((inv) => inv.status === 'REJECTED');
+
+        const salesCount = approvedSalesInvoices.length;
+        const salesMonth = approvedSalesInvoices.filter(
           (inv) => new Date(inv.createdAt) >= startOfMonth,
         ).length;
+        const rejectedCount = rejectedSalesInvoices.length;
 
         // Parse float to avoid string concatenation if API returns strings
-        const totalAmount = salesInvoices.reduce(
+        const totalAmount = approvedSalesInvoices.reduce(
           (sum, inv) => sum + (parseFloat(String(inv.totalAmount)) || 0),
           0,
         );
@@ -47,6 +54,7 @@ export default function EmployeeSalesStats({ invoices: propInvoices }: EmployeeS
           salesCount,
           salesMonth,
           totalAmount,
+          rejectedCount,
         });
       } catch (error) {
         console.error('Failed to fetch sales stats:', error);
@@ -70,15 +78,26 @@ export default function EmployeeSalesStats({ invoices: propInvoices }: EmployeeS
     },
     {
       title: 'Total Sales Amount',
-      value: loading ? '...' : `₹${stats.totalAmount.toLocaleString()}`,
+      value: loading
+        ? '...'
+        : `₹${
+            stats.totalAmount >= 1000
+              ? (stats.totalAmount / 1000).toFixed(1) + ' k'
+              : stats.totalAmount.toLocaleString()
+          }`,
       subtitle: 'Total revenue generated',
+    },
+    {
+      title: 'Rejected Sales',
+      value: loading ? '...' : stats.rejectedCount.toLocaleString(),
+      subtitle: 'Finance rejected count',
     },
   ];
 
   if (loading) {
     return (
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3 md:gap-4">
-        {[1, 2, 3].map((i) => (
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 md:gap-4">
+        {[1, 2, 3, 4].map((i) => (
           <div
             key={i}
             className="bg-card p-4 rounded-xl shadow-sm h-32 flex items-center justify-center"
@@ -91,7 +110,7 @@ export default function EmployeeSalesStats({ invoices: propInvoices }: EmployeeS
   }
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3 md:gap-4">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 md:gap-4">
       {cards.map((c) => (
         <StatCard key={c.title} title={c.title} value={c.value} subtitle={c.subtitle} />
       ))}

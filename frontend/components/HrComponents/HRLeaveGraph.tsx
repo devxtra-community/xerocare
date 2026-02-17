@@ -9,31 +9,13 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  TooltipProps,
 } from 'recharts';
+import { ChartTooltipContent } from '@/components/ui/ChartTooltip';
 
 interface LeaveData {
   day: string;
   leaves: number;
 }
-
-const CustomTooltip = ({ active, payload, label }: TooltipProps<number, string>) => {
-  if (active && payload && payload.length) {
-    return (
-      <div className="bg-card p-3 rounded-xl shadow-lg border border-blue-100">
-        <p className="font-bold text-[#2563eb] text-[10px] mb-2 uppercase tracking-widest border-b border-blue-50 pb-1">
-          Day {label}
-        </p>
-        <div className="space-y-1">
-          <p className="text-[11px] font-bold text-gray-400 uppercase tracking-tighter">
-            On Leave: <span className="text-[#2563eb] ml-1">{payload[0].value} employees</span>
-          </p>
-        </div>
-      </div>
-    );
-  }
-  return null;
-};
 
 export default function HRLeaveGraph() {
   const [data, setData] = useState<LeaveData[]>([]);
@@ -84,7 +66,14 @@ export default function HRLeaveGraph() {
               axisLine={false}
               tickLine={false}
             />
-            <Tooltip content={<CustomTooltip />} />
+            <Tooltip
+              content={
+                <ChartTooltipContent
+                  labelFormatter={(label) => `Day ${label}`}
+                  valueFormatter={(val) => `${val} employees`}
+                />
+              }
+            />
             <Line
               type="monotone"
               dataKey="leaves"

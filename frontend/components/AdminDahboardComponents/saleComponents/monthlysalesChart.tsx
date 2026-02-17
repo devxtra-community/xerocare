@@ -1,6 +1,7 @@
 'use client';
 
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { ChartTooltipContent } from '@/components/ui/ChartTooltip';
 
 interface MonthlySalesBarChartProps {
   data: { month: string; sales: number }[];
@@ -33,12 +34,13 @@ export default function MonthlySalesBarChart({ data }: MonthlySalesBarChartProps
           />
           <Tooltip
             cursor={{ fill: '#f1f5f9' }}
-            contentStyle={{
-              borderRadius: '8px',
-              border: 'none',
-              boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
-              fontSize: '12px',
-            }}
+            content={
+              <ChartTooltipContent
+                valueFormatter={(value) =>
+                  `${Number(value) >= 1000 ? (Number(value) / 1000).toFixed(0) + 'k' : value}`
+                }
+              />
+            }
           />
           <Bar dataKey="sales" fill="url(#barGradient)" radius={[4, 4, 0, 0]} barSize={30} />
         </BarChart>

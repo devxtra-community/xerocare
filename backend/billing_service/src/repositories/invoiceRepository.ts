@@ -220,23 +220,31 @@ export class InvoiceRepository {
   async getBranchSalesTrend(
     branchId: string,
     startDate: Date,
-  ): Promise<{ date: string; totalSales: number }[]> {
+  ): Promise<{ date: string; saleType: string; totalSales: number }[]> {
     const query = this.repo
       .createQueryBuilder('invoice')
       .select("TO_CHAR(invoice.createdAt, 'YYYY-MM-DD')", 'date')
+      .addSelect('invoice.saleType', 'saleType')
       .addSelect('SUM(invoice.totalAmount)', 'totalSales')
       .where('invoice.branchId = :branchId', { branchId })
       .andWhere('invoice.createdAt >= :startDate', { startDate })
       .andWhere('invoice.status IN (:...statuses)', {
-        statuses: [InvoiceStatus.PAID, InvoiceStatus.ISSUED, InvoiceStatus.FINANCE_APPROVED],
+        statuses: [
+          InvoiceStatus.PAID,
+          InvoiceStatus.ISSUED,
+          InvoiceStatus.FINANCE_APPROVED,
+          InvoiceStatus.ACTIVE_LEASE,
+          InvoiceStatus.APPROVED,
+        ],
       })
-      .andWhere('invoice.type != :type', { type: InvoiceType.PROFORMA })
       .groupBy("TO_CHAR(invoice.createdAt, 'YYYY-MM-DD')")
+      .addGroupBy('invoice.saleType')
       .orderBy('date', 'ASC');
 
     const results = await query.getRawMany();
     return results.map((r) => ({
       date: r.date,
+      saleType: r.saleType || r.saletype,
       totalSales: parseFloat(r.totalSales) || 0,
     }));
   }
@@ -344,11 +352,13 @@ export class InvoiceRepository {
           InvoiceStatus.ISSUED,
           InvoiceStatus.FINANCE_APPROVED,
           InvoiceStatus.ACTIVE_LEASE,
+          InvoiceStatus.APPROVED,
+          InvoiceStatus.EMPLOYEE_APPROVED,
         ],
       })
-      .andWhere('(invoice.type != :type OR invoice.saleType = :saleType)', {
+      .andWhere('(invoice.type != :type OR invoice.saleType IN (:...saleTypes))', {
         type: InvoiceType.PROFORMA,
-        saleType: 'SALE',
+        saleTypes: ['SALE', 'RENT', 'LEASE'],
       })
       .getRawOne();
 
@@ -367,11 +377,13 @@ export class InvoiceRepository {
           InvoiceStatus.ISSUED,
           InvoiceStatus.FINANCE_APPROVED,
           InvoiceStatus.ACTIVE_LEASE,
+          InvoiceStatus.APPROVED,
+          InvoiceStatus.EMPLOYEE_APPROVED,
         ],
       })
-      .andWhere('(invoice.type != :type OR invoice.saleType = :saleType)', {
+      .andWhere('(invoice.type != :type OR invoice.saleType IN (:...saleTypes))', {
         type: InvoiceType.PROFORMA,
-        saleType: 'SALE',
+        saleTypes: ['SALE', 'RENT', 'LEASE'],
       })
       .groupBy('invoice.saleType')
       .getRawMany();

@@ -8,16 +8,16 @@ import {
   YAxis,
   Tooltip,
   ResponsiveContainer,
-  TooltipProps,
   CartesianGrid,
   LineChart,
   Line,
   ReferenceLine,
   Brush,
 } from 'recharts';
-import { NameType, ValueType } from 'recharts/types/component/DefaultTooltipContent';
+
 import { getMyInvoices, Invoice } from '@/lib/invoice';
 import { Loader2 } from 'lucide-react';
+import { ChartTooltipContent } from '@/components/ui/ChartTooltip';
 
 interface SalesChartDataItem {
   name: string;
@@ -26,46 +26,15 @@ interface SalesChartDataItem {
   [key: string]: string | number;
 }
 
-const CustomTooltip = ({
-  active,
-  payload,
-  label,
-  countKey,
-  amountKey,
-}: TooltipProps<ValueType, NameType> & { countKey: string; amountKey: string }) => {
-  if (active && payload && payload.length) {
-    const dataItem = payload[0].payload;
-    return (
-      <div className="bg-card p-3 rounded-xl shadow-lg border border-blue-100">
-        <p className="font-bold text-[#2563eb] text-[10px] mb-2 uppercase tracking-widest border-b border-blue-50 pb-1">
-          {label}
-        </p>
-        <div className="space-y-1">
-          <p className="text-[11px] font-bold text-gray-400 uppercase tracking-tighter">
-            Orders: <span className="text-[#2563eb] ml-1">{dataItem[countKey]}</span>
-          </p>
-          <p className="text-[11px] font-bold text-gray-400 uppercase tracking-tighter">
-            Income:{' '}
-            <span className="text-[#2563eb] ml-1">₹{dataItem[amountKey]?.toLocaleString()}</span>
-          </p>
-        </div>
-      </div>
-    );
-  }
-  return null;
-};
-
 const ChartContainer = ({
   title,
   color,
   dataKeyAmount,
-  dataKeyCount,
   data,
 }: {
   title: string;
   color: string;
   dataKeyAmount: string;
-  dataKeyCount: string;
   data: SalesChartDataItem[];
 }) => (
   <div className="bg-card p-5 rounded-2xl shadow-sm border border-blue-100/50 flex flex-col h-[300px] w-full">
@@ -101,10 +70,7 @@ const ChartContainer = ({
             tick={{ fill: '#94a3b8', fontSize: 9, fontWeight: 700 }}
             tickFormatter={(val) => `₹${val >= 1000 ? (val / 1000).toFixed(0) + 'k' : val}`}
           />
-          <Tooltip
-            content={<CustomTooltip countKey={dataKeyCount} amountKey={dataKeyAmount} />}
-            cursor={{ fill: '#f1f5f9', opacity: 0.4 }}
-          />
+          <Tooltip content={<ChartTooltipContent />} cursor={{ fill: '#f1f5f9', opacity: 0.4 }} />
           <Bar dataKey={dataKeyAmount} fill={color} radius={[4, 4, 0, 0]} barSize={10} />
         </BarChart>
       </ResponsiveContainer>
@@ -116,13 +82,11 @@ const ForexChartContainer = ({
   title,
   color,
   dataKeyAmount,
-  dataKeyCount,
   data,
 }: {
   title: string;
   color: string;
   dataKeyAmount: string;
-  dataKeyCount: string;
   data: SalesChartDataItem[];
 }) => {
   const average =
@@ -166,7 +130,11 @@ const ForexChartContainer = ({
               domain={['auto', 'auto']}
             />
             <Tooltip
-              content={<CustomTooltip countKey={dataKeyCount} amountKey={dataKeyAmount} />}
+              content={
+                <ChartTooltipContent
+                  valueFormatter={(value) => `₹${Number(value).toLocaleString()}`}
+                />
+              }
               cursor={{ stroke: color, strokeWidth: 1, strokeDasharray: '4 4' }}
             />
             <ReferenceLine
@@ -211,7 +179,10 @@ export default function EmployeeSalesGraphs({ invoices: propInvoices }: Employee
         if (!invoices) {
           invoices = await getMyInvoices();
         }
-        const salesInvoices = invoices.filter((inv) => inv.saleType === 'SALE');
+        // Filter out rejected sales from graphs
+        const salesInvoices = invoices.filter(
+          (inv) => inv.saleType === 'SALE' && inv.status !== 'REJECTED',
+        );
 
         // Initialize Monthly Data
         const months = [
@@ -298,14 +269,12 @@ export default function EmployeeSalesGraphs({ invoices: propInvoices }: Employee
         title="Sales Per Month"
         color={salesColor}
         dataKeyAmount="salesAmount"
-        dataKeyCount="salesCount"
         data={monthlyData}
       />
       <ForexChartContainer
         title={`Sales Per Day (${new Date().toLocaleString('default', { month: 'short' })})`}
         color={dailyColor}
         dataKeyAmount="salesAmount"
-        dataKeyCount="salesCount"
         data={dailyData}
       />
     </div>
