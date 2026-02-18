@@ -47,6 +47,7 @@ export interface Lot {
   totalAmount: number;
   status: LotStatus;
   notes?: string;
+  warehouseId?: string;
   items: LotItem[];
   createdAt: string;
   updatedAt: string;
@@ -74,6 +75,7 @@ export interface CreateLotData {
   labourCost?: number;
   notes?: string;
   branchId?: string;
+  warehouseId?: string;
   createdBy?: string;
   items: CreateLotItemData[];
 }

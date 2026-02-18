@@ -10,6 +10,22 @@ import { LotService } from './lotService';
 import { LotItemType } from '../entities/lotItemEntity';
 import { getCached, setCached, deleteCached, getMultipleCached } from '../utils/cacheUtil';
 
+/**
+ * Safely parses an MFD value which may be a Date, ISO string, or Excel serial number.
+ * Excel stores dates as days since Dec 30, 1899.
+ */
+function parseMFD(value: string | Date | number | undefined): Date {
+  if (!value) return new Date();
+  if (value instanceof Date) return value;
+  const num = Number(value);
+  // Excel serial date: a number > 1000 that isn't a Unix timestamp
+  if (!isNaN(num) && num > 1000 && num < 200000) {
+    const excelEpoch = new Date(1899, 11, 30);
+    return new Date(excelEpoch.getTime() + num * 86400000);
+  }
+  return new Date(value as string);
+}
+
 export class ProductService {
   private productRepo = new ProductRepository();
   private model = new ModelRepository();
@@ -70,7 +86,7 @@ export class ProductService {
           serial_no: row.serial_no,
           name: row.name,
           brand: row.brand,
-          MFD: new Date(row.MFD),
+          MFD: parseMFD(row.MFD),
           sale_price: row.sale_price,
           tax_rate: row.tax_rate,
           model: modelDetails,
@@ -139,7 +155,7 @@ export class ProductService {
         serial_no: data.serial_no,
         name: data.name,
         brand: modelDetails.brandRelation?.name || data.brand,
-        MFD: new Date(data.MFD),
+        MFD: parseMFD(data.MFD),
         sale_price: data.sale_price,
         tax_rate: data.tax_rate,
         model: modelDetails,

@@ -30,6 +30,7 @@ import { getVendors } from '@/lib/vendor';
 import { getUserFromToken } from '@/lib/auth';
 import { brandService, Brand } from '@/services/brandService';
 import { SearchableSelect } from '@/components/ui/searchable-select';
+import { getMyBranchWarehouses, Warehouse } from '@/lib/warehouse';
 import * as XLSX from 'xlsx';
 
 // --- Schema Definition ---
@@ -61,6 +62,7 @@ const lotItemSchema = z
 
 const createLotSchema = z.object({
   vendorId: z.string().min(1, 'Vendor is required'),
+  warehouseId: z.string().min(1, 'Warehouse is required'),
   lotNumber: z.string().min(1, 'Lot number is required'),
   purchaseDate: z.string().min(1, 'Purchase date is required'),
   notes: z.string().optional(),
@@ -134,6 +136,7 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [models, setModels] = useState<Model[]>([]);
   const [brands, setBrands] = useState<Brand[]>([]);
+  const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [isUploadMode, setIsUploadMode] = useState(false);
   const [uploadFile, setUploadFile] = useState<File | null>(null);
 
@@ -141,6 +144,7 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
     resolver: zodResolver(createLotSchema) as Resolver<CreateLotFormValues>,
     defaultValues: {
       vendorId: '',
+      warehouseId: '',
       lotNumber: '',
       purchaseDate: new Date().toISOString().split('T')[0],
       notes: '',
@@ -173,14 +177,16 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [vData, mData, bData] = await Promise.all([
+        const [vData, mData, bData, wData] = await Promise.all([
           getVendors(),
           getAllModels(),
           brandService.getAllBrands(),
+          getMyBranchWarehouses(),
         ]);
         setVendors(vData.data || []);
         setModels(mData || []);
         setBrands(bData || []);
+        setWarehouses(wData.data || []);
       } catch {
         toast.error('Failed to load form data');
       }
@@ -285,7 +291,7 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
   const formControl = form.control as unknown as Control<CreateLotFormValues>;
 
   return (
-    <Dialog open={true} onOpenChange={(open) => !open && onClose()}>
+    <Dialog open={true} onOpenChange={() => {}}>
       <DialogContent
         showCloseButton={false}
         className="sm:max-w-[80vw] lg:max-w-7xl h-[90vh] flex flex-col p-0 overflow-hidden bg-white shadow-2xl"
@@ -427,6 +433,36 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
                               {vendors.map((v) => (
                                 <SelectItem key={v.id} value={v.id}>
                                   {v.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={formControl}
+                      name="warehouseId"
+                      render={({ field }) => (
+                        <FormItem className="space-y-1.5">
+                          <FormLabel className="text-sm font-medium text-gray-700">
+                            Warehouse
+                          </FormLabel>
+                          <Select
+                            onValueChange={field.onChange}
+                            defaultValue={field.value}
+                            value={field.value}
+                          >
+                            <FormControl>
+                              <SelectTrigger className="h-10">
+                                <SelectValue placeholder="Select Warehouse" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {warehouses.map((w) => (
+                                <SelectItem key={w.id} value={w.id}>
+                                  {w.warehouseName}
                                 </SelectItem>
                               ))}
                             </SelectContent>

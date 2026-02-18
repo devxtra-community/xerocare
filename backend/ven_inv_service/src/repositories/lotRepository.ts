@@ -29,7 +29,8 @@ export class LotRepository {
       lot.purchaseDate = new Date(data.purchaseDate);
       lot.notes = data.notes;
       lot.status = LotStatus.COMPLETED;
-      lot.branchId = data.branchId;
+      lot.branch_id = data.branchId;
+      lot.warehouse_id = data.warehouseId;
       lot.createdBy = data.createdBy;
 
       lot.transportationCost = data.transportationCost || 0;
@@ -112,21 +113,28 @@ export class LotRepository {
     transactionManager?: EntityManager,
   ): Promise<void> {
     const runInTransaction = async (manager: EntityManager) => {
-      const query = manager
-        .createQueryBuilder(LotItem, 'lotItem')
-        .leftJoinAndSelect('lotItem.sparePart', 'sparePart')
-        .where('lotItem.lotId = :lotId', { lotId })
-        .andWhere('lotItem.itemType = :itemType', { itemType });
+      let lotItem: LotItem | null;
 
       if (itemType === LotItemType.MODEL) {
-        query.andWhere('lotItem.modelId = :identifier', { identifier });
+        // For MODEL type: no join needed, just filter by modelId directly
+        lotItem = await manager
+          .createQueryBuilder(LotItem, 'lotItem')
+          .where('lotItem.lotId = :lotId', { lotId })
+          .andWhere('lotItem.itemType = :itemType', { itemType })
+          .andWhere('lotItem.modelId = :identifier', { identifier })
+          .setLock('pessimistic_write')
+          .getOne();
       } else {
-        query.andWhere('sparePart.item_code = :identifier', { identifier });
+        // For SPARE_PART type: use INNER JOIN so FOR UPDATE is valid (no nullable side)
+        lotItem = await manager
+          .createQueryBuilder(LotItem, 'lotItem')
+          .innerJoinAndSelect('lotItem.sparePart', 'sparePart')
+          .where('lotItem.lotId = :lotId', { lotId })
+          .andWhere('lotItem.itemType = :itemType', { itemType })
+          .andWhere('sparePart.item_code = :identifier', { identifier })
+          .setLock('pessimistic_write')
+          .getOne();
       }
-
-      query.setLock('pessimistic_write');
-
-      const lotItem = await query.getOne();
 
       if (!lotItem) {
         throw new AppError(
@@ -160,20 +168,29 @@ export class LotRepository {
    * Retrieves all lots with relations.
    */
   async getAllLots() {
-    return this.repo.find({
-      relations: {
-        vendor: true,
-        items: {
-          model: {
-            brandRelation: true,
+    console.log('LotRepository: getAllLots called');
+    try {
+      const result = await this.repo.find({
+        relations: {
+          vendor: true,
+          warehouse: true, // I should add this!
+          items: {
+            model: {
+              brandRelation: true,
+            },
+            sparePart: true,
           },
-          sparePart: true,
         },
-      },
-      order: {
-        createdAt: 'DESC',
-      },
-    });
+        order: {
+          createdAt: 'DESC',
+        },
+      });
+      console.log('LotRepository: getAllLots success, count:', result.length);
+      return result;
+    } catch (err) {
+      console.error('LotRepository: getAllLots FAILED', err);
+      throw err;
+    }
   }
 
   /**

@@ -3,6 +3,7 @@ import express from 'express';
 import './config/env'; // Restart for Lease fix & Schema Sync
 import { logger } from './config/logger';
 import { errorHandler } from './middlewares/errorHandler';
+import { httpLogger } from './middlewares/httpLogger';
 import healthRouter from './routes/healthRoutes';
 import { Source } from './config/dataSource';
 import { getRabbitChannel } from './config/rabbitmq';
@@ -13,6 +14,7 @@ import usageRouter from './routes/usageRoutes';
 const app = express();
 
 app.use(express.json());
+app.use(httpLogger);
 
 app.use('/health', healthRouter);
 app.use('/invoices', invoiceRouter);

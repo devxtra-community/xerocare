@@ -13,7 +13,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { SearchableSelect } from '@/components/ui/searchable-select';
-import { lotService } from '@/lib/lot';
+import { lotService, Lot, LotItem } from '@/lib/lot';
 import {
   Table,
   TableBody,
@@ -31,20 +31,7 @@ import { commonService, Vendor, Warehouse } from '@/services/commonService';
 import { getBrands, Brand } from '@/lib/brand';
 import { toast } from 'sonner';
 
-interface LotItem {
-  itemType: string;
-  modelId?: string;
-  model?: { id: string };
-  quantity: number;
-  usedQuantity: number;
-}
-
-interface Lot {
-  id: string;
-  lotNumber: string;
-  vendor?: { name: string };
-  items?: LotItem[];
-}
+// Local interfaces removed in favor of imports from @/lib/lot
 
 /**
  * Manager Product Management Page.
@@ -359,6 +346,7 @@ function ProductFormModal({
   // If editing, we might have initialData.model.brandRelation.id
   // Ideally we track selectedBrandId explicitly for the dropdown.
   const [selectedBrandId, setSelectedBrandId] = useState<string>('');
+  const [selectedLotItemId, setSelectedLotItemId] = useState<string>('');
 
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string>(initialData?.imageUrl || '');
@@ -388,7 +376,7 @@ function ProductFormModal({
     loadDependencies();
   }, []);
 
-  // Initialize selectedBrandId when models and initialData are ready
+  // Initialize selectedBrandId and selectedLotItemId when models and initialData are ready
   useEffect(() => {
     if (initialData && models.length > 0) {
       const relevantModel = models.find(
@@ -401,8 +389,22 @@ function ProductFormModal({
         const brandByName = brands.find((b) => b.name === initialData.brand);
         if (brandByName) setSelectedBrandId(brandByName.id);
       }
+
+      // If there's a lot_id, try to find the lot item and auto-fill the selection
+      if (initialData.lot_id && lots.length > 0) {
+        const lot = lots.find((l) => l.id === initialData.lot_id);
+        const item = lot?.items?.find(
+          (i: LotItem) =>
+            i.itemType === 'MODEL' &&
+            (i.modelId === initialData.model_id || i.model?.id === initialData.model_id),
+        );
+        if (item) {
+          // Use item.id as the selection value (same as what the options use)
+          setSelectedLotItemId(item.id || item.modelId || '');
+        }
+      }
     }
-  }, [initialData, models, brands]);
+  }, [initialData, models, brands, lots]);
 
   // Filter models based on selectedBrandId
   const filteredModels = selectedBrandId
@@ -566,7 +568,11 @@ function ProductFormModal({
             <Field label="Lot (Optional)">
               <SearchableSelect
                 value={form.lot_id}
-                onValueChange={(val) => setForm({ ...form, lot_id: val === 'none' ? '' : val })}
+                onValueChange={(val) => {
+                  const newLotId = val === 'none' ? '' : val;
+                  setForm({ ...form, lot_id: newLotId });
+                  setSelectedLotItemId(''); // Reset selection
+                }}
                 options={[
                   { value: 'none', label: 'None', description: 'Clear selection' },
                   ...lots.map((lot) => ({
@@ -578,27 +584,87 @@ function ProductFormModal({
                 placeholder="Select Lot"
                 emptyText="No lots found."
               />
-              {form.lot_id && form.model_id && (
-                <div className="text-xs mt-1">
-                  {(() => {
-                    const lot = lots.find((l) => l.id === form.lot_id);
-                    const item = lot?.items?.find(
-                      (i: LotItem) =>
-                        i.itemType === 'MODEL' &&
-                        (i.modelId === form.model_id || i.model?.id === form.model_id),
-                    );
-                    if (!item)
-                      return <span className="text-red-500">Model not found in this Lot!</span>;
-                    const remaining = item.quantity - item.usedQuantity;
-                    return (
-                      <span className={remaining > 0 ? 'text-green-600' : 'text-red-500 font-bold'}>
-                        Available in Lot: {remaining} / {item.quantity}
-                      </span>
-                    );
-                  })()}
-                </div>
-              )}
             </Field>
+
+            {form.lot_id && (
+              <div className="col-span-2">
+                <Field label="Select Product from Lot">
+                  <SearchableSelect
+                    value={selectedLotItemId}
+                    onValueChange={(val) => {
+                      setSelectedLotItemId(val);
+                      const lot = lots.find((l) => l.id === form.lot_id);
+                      const item = lot?.items?.find((i: LotItem) => {
+                        return i.id === val || i.modelId === val || i.model?.id === val;
+                      });
+
+                      if (item) {
+                        const modelId = item.modelId || item.model?.id || '';
+                        const model = models.find((m) => m.id === modelId);
+                        setSelectedBrandId(
+                          model?.brandRelation?.id || model?.brand?.id || model?.brand_id || '',
+                        );
+                        setForm({
+                          ...form,
+                          model_id: modelId,
+                          brand: model?.brandRelation?.name || model?.brand?.name || '',
+                          vendor_id: lot?.vendorId || lot?.vendor?.id || form.vendor_id || '',
+                        });
+                      }
+                    }}
+                    options={(() => {
+                      const lot = lots.find((l) => l.id === form.lot_id);
+                      return (
+                        lot?.items
+                          ?.filter((i) => i.itemType === 'MODEL')
+                          .map((i, idx) => {
+                            const mId = i.modelId || i.model?.id;
+                            const model = models.find((m) => m.id === mId);
+                            const available = i.quantity - i.usedQuantity;
+                            return {
+                              value: i.id || mId || String(idx),
+                              label: model
+                                ? `${model.model_name} (${model.model_no})`
+                                : 'Unknown Model',
+                              description: `Available: ${available} / ${i.quantity}`,
+                            };
+                          }) || []
+                      );
+                    })()}
+                    placeholder="Select Product"
+                    emptyText="No products found in this lot."
+                  />
+                  {selectedLotItemId && (
+                    <div className="text-xs mt-1">
+                      {(() => {
+                        const lot = lots.find((l) => l.id === form.lot_id);
+                        const item = lot?.items?.find(
+                          (i: LotItem) =>
+                            i.id === selectedLotItemId ||
+                            i.modelId === selectedLotItemId ||
+                            i.model?.id === selectedLotItemId,
+                        );
+                        if (!item) return null;
+                        const available = item.quantity - item.usedQuantity;
+                        return (
+                          <span
+                            className={
+                              available > 0
+                                ? 'text-green-600 font-medium'
+                                : 'text-red-500 font-bold'
+                            }
+                          >
+                            {available > 0
+                              ? `✓ Available in Lot: ${available} / ${item.quantity}`
+                              : `✗ Out of Stock in Lot: ${available} / ${item.quantity}`}
+                          </span>
+                        );
+                      })()}
+                    </div>
+                  )}
+                </Field>
+              </div>
+            )}
           </div>
 
           <Field label="Warehouse">

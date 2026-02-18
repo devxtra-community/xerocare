@@ -136,23 +136,44 @@ export default function BulkSparePartDialog({
       const getVal = (keys: string[]) => {
         for (const k of keys) {
           if (row[k] !== undefined) return row[k];
+          // Try case insensitive match for common variations
+          const lowerK = k.toLowerCase().replace(/\s/g, '');
+          for (const rowKey of Object.keys(row)) {
+            const lowerRowKey = rowKey.toLowerCase().replace(/\s/g, '');
+            if (lowerRowKey === lowerK) return row[rowKey];
+          }
         }
         return '';
       };
 
-      const rawModel = getVal(['model_id', 'Model ID', 'Model', 'Compatible Model']);
+      const rawModel = getVal([
+        'model_id',
+        'Model ID',
+        'Model',
+        'Compatible Model',
+        'Select Product from Lot',
+      ]);
       const rawVendor = getVal(['vendor_id', 'Vendor ID', 'Vendor']);
       const rawWarehouse = getVal(['warehouse_id', 'Warehouse ID', 'Warehouse']);
 
+      let modelId = findIdByName(rawModel, models);
+      if (!modelId && rawModel) {
+        // Try to match by model name from the "Select Product from Lot" string which is "Name (ModelNo)"
+        const match = rawModel.toString().match(/\(([^)]+)\)/);
+        if (match && match[1]) {
+          modelId = findIdByName(match[1], models);
+        }
+      }
+
       return {
-        // item_code removed
-        part_name: getVal(['part_name', 'Item Name', 'Name']),
+        part_name: getVal(['part_name', 'Item Name', 'Name', 'Part Name']),
         brand: getVal(['brand', 'Brand']),
-        model_id: findIdByName(rawModel, models),
-        base_price: Number(getVal(['base_price', 'Price']))!,
+        model_id: modelId,
+        base_price: Number(getVal(['base_price', 'Price', 'Base Price']))!,
         quantity: Number(getVal(['quantity', 'Quantity', 'Qty']))!,
         vendor_id: findIdByName(rawVendor, vendors),
         warehouse_id: findIdByName(rawWarehouse, warehouses),
+        lot_id: getVal(['lot_id', 'Lot ID', 'Lot', 'lot_number']),
       };
     });
 

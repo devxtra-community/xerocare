@@ -4,15 +4,19 @@ import { logger } from '../config/logger';
 
 /**
  * Global error handling middleware.
- * Logs errors and sends standardized JSON responses.
+ * Logs errors with full context and sends standardized JSON responses.
  */
-export const errorHandler = (err: Error, req: Request, res: Response, next: NextFunction) => {
-  void next;
-  logger.error('Unhandled error', {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export const errorHandler = (err: Error, req: Request, res: Response, _next: NextFunction) => {
+  const statusCode = err instanceof AppError ? err.statusCode : 500;
+
+  logger.error(`✗ ${req.method} ${req.originalUrl} → ${statusCode} ${err.message}`, {
+    method: req.method,
+    url: req.originalUrl,
+    statusCode,
     message: err.message,
     stack: err.stack,
-    path: req.originalUrl,
-    method: req.method,
+    body: req.body,
   });
 
   if (err instanceof AppError) {
