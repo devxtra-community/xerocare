@@ -25,7 +25,7 @@ export class LotItem {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
 
-  @Column({ name: 'lot_id' })
+  @Column({ name: 'lot_id', type: 'uuid' })
   lotId!: string;
 
   @ManyToOne(() => Lot, (lot) => lot.items, { onDelete: 'CASCADE' })
@@ -35,14 +35,14 @@ export class LotItem {
   @Column({ name: 'item_type', type: 'enum', enum: LotItemType })
   itemType!: LotItemType;
 
-  @Column({ name: 'model_id', nullable: true })
+  @Column({ name: 'model_id', type: 'uuid', nullable: true })
   modelId?: string;
 
   @ManyToOne(() => Model, { nullable: true })
   @JoinColumn({ name: 'model_id' })
   model?: Model;
 
-  @Column({ name: 'spare_part_id', nullable: true })
+  @Column({ name: 'spare_part_id', type: 'uuid', nullable: true })
   sparePartId?: string;
 
   @ManyToOne(() => SparePart, { nullable: true })

@@ -32,14 +32,14 @@ export class SparePart {
   @Column({ type: 'text', nullable: true })
   description?: string;
 
-  @Column({ name: 'model_id', nullable: true }) // Nullable implies universal parts
+  @Column({ name: 'model_id', type: 'uuid', nullable: true }) // Nullable implies universal parts
   model_id?: string;
 
   @ManyToOne(() => Model, { nullable: true })
   @JoinColumn({ name: 'model_id' })
   model?: Model;
 
-  @Column({ name: 'branch_id' })
+  @Column({ name: 'branch_id', type: 'uuid' })
   @Index()
   branch_id!: string;
 
@@ -47,14 +47,14 @@ export class SparePart {
   @JoinColumn({ name: 'branch_id' })
   branch!: Branch;
 
-  @Column({ name: 'lot_id', nullable: true })
+  @Column({ name: 'lot_id', type: 'uuid', nullable: true })
   lot_id?: string;
 
   @ManyToOne(() => Lot, { nullable: true })
   @JoinColumn({ name: 'lot_id' })
   lot?: Lot;
 
-  @Column({ name: 'vendor_id', nullable: true })
+  @Column({ name: 'vendor_id', type: 'uuid', nullable: true })
   @Index()
   vendor_id?: string;
 
@@ -62,7 +62,7 @@ export class SparePart {
   @JoinColumn({ name: 'vendor_id' })
   vendor?: Vendor;
 
-  @Column({ name: 'warehouse_id', nullable: true })
+  @Column({ name: 'warehouse_id', type: 'uuid', nullable: true })
   @Index()
   warehouse_id?: string;
 

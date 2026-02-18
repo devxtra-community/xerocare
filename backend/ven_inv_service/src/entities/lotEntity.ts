@@ -27,7 +27,7 @@ export class Lot {
   @Index()
   lotNumber!: string;
 
-  @Column({ name: 'vendor_id' })
+  @Column({ name: 'vendor_id', type: 'uuid' })
   vendorId!: string;
 
   @ManyToOne(() => Vendor)
