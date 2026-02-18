@@ -342,9 +342,12 @@ export class ExcelHandler {
       const remaining = item.quantity - item.usedQuantity;
       const partName = item.sparePart?.part_name || '';
       const brand = item.sparePart?.brand || '';
-      const modelId = item.sparePart?.model_id || '';
-      const modelName = item.model?.model_name || '';
-      const modelNo = item.model?.model_no || '';
+      // Use the model linked to the spare part master record (item.sparePart.model),
+      // NOT item.model which is always null for SPARE_PART lot items.
+      const sparePartModel = item.sparePart?.model;
+      const modelId = item.sparePart?.model_id || sparePartModel?.id || '';
+      const modelName = sparePartModel?.model_name || '';
+      const modelNo = sparePartModel?.model_no || '';
       const selectProductFromLot = modelName ? `${modelName} (${modelNo})` : '';
 
       rows.push([

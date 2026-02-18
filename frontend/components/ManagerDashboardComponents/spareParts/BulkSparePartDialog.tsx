@@ -19,10 +19,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { sparePartService } from '@/services/sparePartService'; // Typo fix
+import { SearchableSelect } from '@/components/ui/searchable-select';
+import { sparePartService } from '@/services/sparePartService';
 import { warehouseService, Warehouse } from '@/services/warehouseService';
-import { modelService } from '@/services/modelService';
 import { vendorService } from '@/services/vendorService';
+import { lotService, Lot, LotItemType } from '@/lib/lot';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
 
@@ -40,13 +41,22 @@ interface BulkSparePartRow {
   quantity: number;
   vendor_id: string;
   warehouse_id: string;
-  // lot_number come from Global State
+  lot_id?: string;
+}
+
+/** A model option derived from the selected lot's spare part items */
+interface LotModelOption {
+  modelId: string;
+  modelName: string;
+  modelNo: string;
+  label: string; // "ModelName (ModelNo)"
 }
 
 /**
  * Dialog component for bulk uploading spare parts via Excel.
  * - Parses Excel files to preview data.
  * - Validates foreign keys (Vendor, Model, Warehouse) by name matching.
+ * - Allows selecting a Lot and a Product from that Lot per row.
  * - Allows manual addition/editing of rows before submission.
  */
 export default function BulkSparePartDialog({
@@ -57,21 +67,24 @@ export default function BulkSparePartDialog({
   const [rows, setRows] = useState<Partial<BulkSparePartRow>[]>([]);
   const [vendors, setVendors] = useState<{ id: string; name: string }[]>([]);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
-  const [models, setModels] = useState<{ id: string; model_name: string }[]>([]);
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [file, setFile] = useState<File | null>(null);
-  const [lotNumber, setLotNumber] = useState('');
+
+  // Lot state
+  const [lots, setLots] = useState<Lot[]>([]);
+  const [selectedLotId, setSelectedLotId] = useState('');
+  const [lotModelOptions, setLotModelOptions] = useState<LotModelOption[]>([]);
 
   const loadDependencies = async () => {
     try {
-      const [v, w, m] = await Promise.all([
+      const [v, w, l] = await Promise.all([
         vendorService.getVendors(),
         warehouseService.getWarehousesByBranch(),
-        modelService.getAllModels(),
+        lotService.getAllLots(),
       ]);
       setVendors(v || []);
       setWarehouses(w || []);
-      setModels(m || []);
+      setLots(l || []);
     } catch {
       toast.error('Failed to load dependencies');
     }
@@ -81,10 +94,45 @@ export default function BulkSparePartDialog({
     if (open) {
       setRows([]);
       setFile(null);
-      setLotNumber('');
+      setSelectedLotId('');
+      setLotModelOptions([]);
       loadDependencies();
     }
   }, [open]);
+
+  /** When a lot is selected, extract the model options from its spare part items */
+  const handleLotSelect = (lotId: string) => {
+    setSelectedLotId(lotId);
+
+    if (!lotId) {
+      setLotModelOptions([]);
+      return;
+    }
+
+    const lot = lots.find((l) => l.id === lotId);
+    if (!lot) return;
+
+    // Collect unique models from spare part items in this lot
+    const modelMap = new Map<string, LotModelOption>();
+    lot.items
+      .filter((item) => item.itemType === LotItemType.SPARE_PART && item.sparePart?.model)
+      .forEach((item) => {
+        const model = item.sparePart!.model!;
+        if (model.id && !modelMap.has(model.id)) {
+          modelMap.set(model.id, {
+            modelId: model.id,
+            modelName: model.model_name,
+            modelNo: model.model_no,
+            label: `${model.model_name} (${model.model_no})`,
+          });
+        }
+      });
+
+    setLotModelOptions(Array.from(modelMap.values()));
+
+    // Apply the lot_id to all existing rows
+    setRows((prev) => prev.map((r) => ({ ...r, lot_id: lotId })));
+  };
 
   const createEmptyRow = (): Partial<BulkSparePartRow> => ({
     part_name: '',
@@ -94,27 +142,8 @@ export default function BulkSparePartDialog({
     quantity: 0,
     vendor_id: '',
     warehouse_id: '',
+    lot_id: selectedLotId || undefined,
   });
-
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFile = e.target.files?.[0];
-    if (!selectedFile) return;
-
-    setFile(selectedFile);
-    const reader = new FileReader();
-
-    reader.onload = (event) => {
-      const bstr = event.target?.result;
-      const wb = XLSX.read(bstr, { type: 'binary' });
-      const wsname = wb.SheetNames[0];
-      const ws = wb.Sheets[wsname];
-      const data = XLSX.utils.sheet_to_json(ws);
-
-      parseExcelData(data);
-    };
-
-    reader.readAsBinaryString(selectedFile);
-  };
 
   const findIdByName = (
     name: string,
@@ -136,7 +165,6 @@ export default function BulkSparePartDialog({
       const getVal = (keys: string[]) => {
         for (const k of keys) {
           if (row[k] !== undefined) return row[k];
-          // Try case insensitive match for common variations
           const lowerK = k.toLowerCase().replace(/\s/g, '');
           for (const rowKey of Object.keys(row)) {
             const lowerRowKey = rowKey.toLowerCase().replace(/\s/g, '');
@@ -156,24 +184,32 @@ export default function BulkSparePartDialog({
       const rawVendor = getVal(['vendor_id', 'Vendor ID', 'Vendor']);
       const rawWarehouse = getVal(['warehouse_id', 'Warehouse ID', 'Warehouse']);
 
-      let modelId = findIdByName(rawModel, models);
+      let modelId = findIdByName(rawModel, []);
       if (!modelId && rawModel) {
         // Try to match by model name from the "Select Product from Lot" string which is "Name (ModelNo)"
         const match = rawModel.toString().match(/\(([^)]+)\)/);
         if (match && match[1]) {
-          modelId = findIdByName(match[1], models);
+          // Try matching against lot model options if a lot is already selected
+          const found = lotModelOptions.find(
+            (o) => o.modelNo.toLowerCase() === match[1].toLowerCase(),
+          );
+          if (found) modelId = found.modelId;
         }
+        // Fall back to using the raw value (could be a UUID)
+        if (!modelId) modelId = rawModel;
       }
+
+      const lotIdFromExcel = getVal(['lot_id', 'Lot ID', 'Lot', 'lot_number']);
 
       return {
         part_name: getVal(['part_name', 'Item Name', 'Name', 'Part Name']),
         brand: getVal(['brand', 'Brand']),
         model_id: modelId,
-        base_price: Number(getVal(['base_price', 'Price', 'Base Price']))!,
-        quantity: Number(getVal(['quantity', 'Quantity', 'Qty']))!,
+        base_price: Number(getVal(['base_price', 'Price', 'Base Price'])) || 0,
+        quantity: Number(getVal(['quantity', 'Quantity', 'Qty'])) || 0,
         vendor_id: findIdByName(rawVendor, vendors),
         warehouse_id: findIdByName(rawWarehouse, warehouses),
-        lot_id: getVal(['lot_id', 'Lot ID', 'Lot', 'lot_number']),
+        lot_id: lotIdFromExcel || selectedLotId || undefined,
       };
     });
 
@@ -181,8 +217,34 @@ export default function BulkSparePartDialog({
       toast.warning('No data found in the file');
     } else {
       setRows(parsedRows);
+
+      // Auto-select lot from Excel's lot_id column if not already selected
+      const firstLotId = parsedRows[0]?.lot_id;
+      if (firstLotId && !selectedLotId) {
+        handleLotSelect(firstLotId);
+      }
+
       toast.success(`Parsed ${parsedRows.length} rows`);
     }
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = e.target.files?.[0];
+    if (!selectedFile) return;
+
+    setFile(selectedFile);
+    const reader = new FileReader();
+
+    reader.onload = (event) => {
+      const bstr = event.target?.result;
+      const wb = XLSX.read(bstr, { type: 'binary' });
+      const wsname = wb.SheetNames[0];
+      const ws = wb.Sheets[wsname];
+      const data = XLSX.utils.sheet_to_json(ws);
+      parseExcelData(data);
+    };
+
+    reader.readAsBinaryString(selectedFile);
   };
 
   const handleAddRow = () => {
@@ -201,11 +263,10 @@ export default function BulkSparePartDialog({
   };
 
   const handleSubmit = async () => {
-    // Validate rows - require part_name
     const validRows = rows.filter((r) => r.part_name);
 
-    if (!lotNumber) {
-      toast.error('Please enter a Batch Lot/Order Number');
+    if (!selectedLotId && !rows.some((r) => r.lot_id)) {
+      toast.error('Please select a Lot before uploading');
       return;
     }
 
@@ -215,17 +276,14 @@ export default function BulkSparePartDialog({
     }
 
     try {
-      // Cast quantity and price to numbers to be sure
       const payload = validRows.map((r) => ({
         ...r,
-        // If model_id is empty string or 'universal', make it undefined
         model_id: !r.model_id || r.model_id === 'universal' ? undefined : r.model_id,
         base_price: Number(r.base_price),
         quantity: Number(r.quantity),
-        lot_number: lotNumber || undefined, // Pass the Lot Number (global for batch)
+        lot_id: r.lot_id || selectedLotId || undefined,
       }));
 
-      // sparePartService.bulkUpload type definition matches payload
       const result = await sparePartService.bulkUpload(payload);
 
       if (result.success) {
@@ -246,9 +304,12 @@ export default function BulkSparePartDialog({
 
   if (!open) return null;
 
+  const selectedLot = lots.find((l) => l.id === selectedLotId);
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <div className="bg-card rounded-xl w-full max-w-6xl h-[85vh] flex flex-col shadow-2xl">
+        {/* Header */}
         <div className="p-4 border-b flex justify-between items-center">
           <h2 className="text-xl font-bold flex items-center gap-2">
             <Upload size={20} /> Bulk Spare Part Upload
@@ -261,6 +322,7 @@ export default function BulkSparePartDialog({
           </button>
         </div>
 
+        {/* Toolbar: Upload Excel + row count */}
         <div className="p-4 bg-muted/50 border-b flex flex-col sm:flex-row gap-4 items-center justify-between">
           <div className="flex gap-4 items-center w-full sm:w-auto">
             <div className="relative">
@@ -285,24 +347,53 @@ export default function BulkSparePartDialog({
           </div>
         </div>
 
-        {/* Global Batch Fields */}
-        <div className="px-4 py-2 bg-white border-b flex gap-4 items-center">
-          <div className="w-64">
+        {/* Lot Selector + Product from Lot info */}
+        <div className="px-4 py-3 bg-white border-b flex flex-wrap gap-4 items-end">
+          {/* Select Lot — searchable, same as AddSparePartDialog */}
+          <div className="w-80">
             <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">
-              Batch Lot / Order Number
+              Select Lot <span className="text-red-500">*</span>
             </label>
-            <Input
-              placeholder="e.g. ORD-2024-001"
-              value={lotNumber}
-              onChange={(e) => setLotNumber(e.target.value)}
-              className="h-9"
+            <SearchableSelect
+              value={selectedLotId}
+              onValueChange={(val) => handleLotSelect(val === 'none' ? '' : val)}
+              options={lots.map((lot) => ({
+                value: lot.id,
+                label: lot.lotNumber,
+                description: lot.vendor?.name || 'Unknown Vendor',
+              }))}
+              placeholder="Search by lot number or vendor…"
+              emptyText="No lots found."
             />
           </div>
-          <div className="text-xs text-blue-500 mt-5 font-medium">
-            * This Lot Number will be applied to all items in this batch.
-          </div>
+
+          {/* Info: available models from this lot */}
+          {selectedLot && (
+            <div className="text-xs text-blue-600 font-medium mt-5">
+              {lotModelOptions.length > 0 ? (
+                <>
+                  ✓ {lotModelOptions.length} model(s) available from this lot:{' '}
+                  <span className="text-gray-600">
+                    {lotModelOptions.map((o) => o.label).join(', ')}
+                  </span>
+                </>
+              ) : (
+                <span className="text-amber-600">
+                  ⚠ No models linked to spare parts in this lot. Parts will be uploaded as
+                  Universal.
+                </span>
+              )}
+            </div>
+          )}
+
+          {!selectedLotId && (
+            <div className="text-xs text-amber-500 mt-5 font-medium">
+              * Select a lot to link spare parts and enable product-from-lot selection.
+            </div>
+          )}
         </div>
 
+        {/* Table */}
         <div className="flex-1 overflow-auto p-4">
           {rows.length > 0 ? (
             <Table>
@@ -316,9 +407,9 @@ export default function BulkSparePartDialog({
                   </TableHead>
                   <TableHead className="w-[100px]">Price</TableHead>
                   <TableHead className="w-[80px]">Qty</TableHead>
-                  <TableHead className="w-[150px]">Vendor (for Qty)</TableHead>
+                  <TableHead className="w-[150px]">Vendor</TableHead>
                   <TableHead className="w-[150px]">Warehouse</TableHead>
-                  <TableHead className="w-[150px]">Model</TableHead>
+                  <TableHead className="w-[200px]">Select Product from Lot</TableHead>
                   <TableHead className="w-[50px]"></TableHead>
                 </TableRow>
               </TableHeader>
@@ -390,20 +481,28 @@ export default function BulkSparePartDialog({
                       </Select>
                     </TableCell>
                     <TableCell>
+                      {/* Select Product from Lot — shows models from the selected lot */}
                       <Select
-                        value={row.model_id}
-                        onValueChange={(v) => updateRow(i, 'model_id', v)}
+                        value={row.model_id || 'universal'}
+                        onValueChange={(v) => updateRow(i, 'model_id', v === 'universal' ? '' : v)}
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="Universal" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="universal">Universal</SelectItem>
-                          {models.map((m) => (
-                            <SelectItem key={m.id} value={m.id}>
-                              {m.model_name}
+                          <SelectItem value="universal">Universal (no model)</SelectItem>
+                          {lotModelOptions.length > 0 ? (
+                            lotModelOptions.map((opt) => (
+                              <SelectItem key={opt.modelId} value={opt.modelId}>
+                                {opt.label}
+                              </SelectItem>
+                            ))
+                          ) : (
+                            // Fallback: show a disabled hint if no lot selected
+                            <SelectItem value="__none__" disabled>
+                              {selectedLotId ? 'No models in this lot' : 'Select a lot first'}
                             </SelectItem>
-                          ))}
+                          )}
                         </SelectContent>
                       </Select>
                     </TableCell>
@@ -428,6 +527,7 @@ export default function BulkSparePartDialog({
           )}
         </div>
 
+        {/* Footer */}
         <div className="p-4 border-t flex justify-between items-center bg-muted/50">
           <Button variant="outline" onClick={handleAddRow} className="gap-2">
             <Plus size={16} /> Add Row

@@ -205,7 +205,11 @@ export class LotRepository {
           model: {
             brandRelation: true,
           },
-          sparePart: true,
+          sparePart: {
+            model: {
+              brandRelation: true,
+            },
+          },
         },
       },
     });
