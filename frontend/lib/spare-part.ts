@@ -1,4 +1,5 @@
 import api from './api';
+import type { Model } from './model';
 
 export interface SparePart {
   id: string;
@@ -7,6 +8,7 @@ export interface SparePart {
   brand: string;
   description?: string;
   model_id?: string;
+  model?: Model; // Populated when joined (e.g. via lot items)
   branch_id?: string;
   base_price: number; // Decimal string or number
   image_url?: string;
