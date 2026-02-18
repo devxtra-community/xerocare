@@ -1,6 +1,6 @@
 import bcrypt from 'bcrypt';
 import { EmployeeRepository } from '../repositories/employeeRepository';
-import { verifyRefreshToken } from '../utlis/jwt';
+import { verifyRefreshToken } from '../utils/jwt';
 import { AuthRepository } from '../repositories/authRepository';
 import { AppError } from '../errors/appError';
 import { AdminRepository } from '../repositories/adminRepository';
@@ -10,8 +10,10 @@ export class AuthService {
   private authRepo = new AuthRepository();
   private adminRepo = new AdminRepository();
 
+  /**
+   * Authenticates a user (Employee or Admin) with email/password.
+   */
   async login(payload: { email: string; password: string }) {
-    // ... existing login code ...
     const { email, password } = payload;
 
     const user = await this.employeeRepo.findByEmail(email);
@@ -27,7 +29,9 @@ export class AuthService {
     return { user };
   }
 
-  // ... existing refresh, logout, changePassword methods ...
+  /**
+   * Refreshes an access token using a valid refresh token.
+   */
   async refresh(refreshToken: string) {
     const payload = verifyRefreshToken<{ id: string }>(refreshToken);
     if (!payload) {
@@ -49,11 +53,17 @@ export class AuthService {
     return user;
   }
 
+  /**
+   * Logs out a user by deleting their refresh token.
+   */
   async logout(refreshToken: string) {
     await this.authRepo.deleteToken(refreshToken);
     return true;
   }
 
+  /**
+   * Changes the user's password.
+   */
   async changePassword(payload: { userId: string; currentPassword: string; newPassword: string }) {
     const { userId, currentPassword, newPassword } = payload;
 
@@ -74,6 +84,9 @@ export class AuthService {
     return true;
   }
 
+  /**
+   * Finds a user by email.
+   */
   async findUserByEmail(email: string) {
     const user = await this.employeeRepo.findByEmail(email.toLowerCase().trim());
 
@@ -84,6 +97,9 @@ export class AuthService {
     return user;
   }
 
+  /**
+   * Finds a user by ID, either from Employee or Admin table.
+   */
   async findUserById(id: string, role: string = 'EMPLOYEE') {
     let user;
 
@@ -100,11 +116,17 @@ export class AuthService {
     return user;
   }
 
+  /**
+   * Resets a user's password (typically used by Admin).
+   */
   async resetPassword(userId: string, newPassword: string) {
     const hash = await bcrypt.hash(newPassword, 10);
     await this.employeeRepo.updatePassword(userId, hash);
   }
 
+  /**
+   * Logs out all other devices/sessions for a user.
+   */
   async logoutOtherDevices(userId: string, currentRefreshToken: string) {
     if (!currentRefreshToken) {
       throw new AppError('No refresh token found', 400);
@@ -115,6 +137,9 @@ export class AuthService {
     return true;
   }
 
+  /**
+   * Retrieves active sessions for a user.
+   */
   async getSessions(userId: string, currentToken: string, is_admin: boolean = false) {
     const sessions = await this.authRepo.getUserSessions(userId, is_admin);
 
@@ -127,6 +152,9 @@ export class AuthService {
     }));
   }
 
+  /**
+   * Terminates a specific session.
+   */
   async logoutSession(userId: string, sessionId: string) {
     await this.authRepo.deleteSessionById(sessionId, userId);
     return true;

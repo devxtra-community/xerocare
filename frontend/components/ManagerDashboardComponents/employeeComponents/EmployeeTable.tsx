@@ -16,6 +16,10 @@ import { useRouter } from 'next/navigation';
 import { getAllEmployees, updateEmployee, Employee } from '@/lib/employee';
 import { toast } from 'sonner';
 
+/**
+ * Table component for viewing and managing employee records in the Manager Dashboard.
+ * Supports searching and provides actions to enable/disable employee accounts.
+ */
 export default function EmployeeTable() {
   const router = useRouter();
   const [employees, setEmployees] = useState<Employee[]>([]);

@@ -60,6 +60,20 @@ export type PayrollRecord = {
 - "Mark all as read" functionality works as expected.
 */
 
+/**
+ * Main Payroll Management Table.
+ * Features:
+ * - List of all employee payroll records.
+ * - Filtering by Role and Status (Paid/Pending).
+ * - Searching by name, email, or department.
+ * - Integration with Add and Update Payroll dialogs.
+ * - Smart handling of payroll record creation vs update.
+ */
+/**
+ * Payroll Management Table.
+ * Displays employee payroll records with salary details and payment status.
+ * Allows HR to add new payroll entries or update existing ones, with search and filter support.
+ */
 export default function HRPayrollTable({
   data,
   loading,

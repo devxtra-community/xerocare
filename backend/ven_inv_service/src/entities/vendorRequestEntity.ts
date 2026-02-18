@@ -23,7 +23,7 @@ export class VendorRequest {
   vendor!: Vendor;
 
   @Column({ type: 'uuid', nullable: true })
-  requested_by?: string;
+  requested_by!: string;
 
   @Column({ type: 'uuid', nullable: true })
   branch_id?: string;

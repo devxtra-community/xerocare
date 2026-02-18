@@ -4,6 +4,11 @@ import { useEffect, useState } from 'react';
 import StatCard from '@/components/StatCard';
 import { getAllEmployees, Employee } from '@/lib/employee';
 
+/**
+ * Component displaying employee distribution statistics.
+ * Shows total count and breakdown by key roles (Managers, Employees, Finance).
+ * Data is fetched dynamically from the backend.
+ */
 export default function HREmployeeStats() {
   const [stats, setStats] = useState({
     totalEmployees: 0,

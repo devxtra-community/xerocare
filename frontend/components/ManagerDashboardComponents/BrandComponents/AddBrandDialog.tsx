@@ -32,6 +32,13 @@ interface AddBrandDialogProps {
   onSuccess: () => void;
 }
 
+/**
+ * Dialog component for adding a new brand.
+ * key features:
+ * - Validates brand name input.
+ * - Supports optional description.
+ * - Handles asynchronous submission with loading state.
+ */
 export function AddBrandDialog({ open, onOpenChange, onSuccess }: AddBrandDialogProps) {
   const [loading, setLoading] = useState(false);
   const {

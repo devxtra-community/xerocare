@@ -48,6 +48,11 @@ const warehouseData = [
   },
 ];
 
+/**
+ * Inventory summary table grouped by warehouse.
+ * Displays total product count, aggregated quantity, and operational status (Operational/Warning/Critical) for each facility.
+ * Monitors warehouse capacity and health.
+ */
 export default function WarehouseInventoryTable() {
   const [page, setPage] = useState(1);
   const ITEMS_PER_PAGE = 5;

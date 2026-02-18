@@ -47,6 +47,10 @@ interface RentHistoryViewProps {
   onClose: () => void;
 }
 
+/**
+ * View displaying the history of a rental contract.
+ * Shows contract terms, usage records, invoices, and allows recording new usage or completing the contract.
+ */
 export default function RentHistoryView({ contractId, isOpen, onClose }: RentHistoryViewProps) {
   const [contract, setContract] = useState<Invoice | null>(null);
   const [usageRecords, setUsageRecords] = useState<UsageRecord[]>([]);

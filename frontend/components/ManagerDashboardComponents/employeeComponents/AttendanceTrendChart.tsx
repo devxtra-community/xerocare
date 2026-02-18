@@ -21,6 +21,10 @@ const data = [
   { name: 'Sun', attendance: 75 },
 ];
 
+/**
+ * Line chart component visualizing weekly attendance trends.
+ * Displays average attendance percentage over the week.
+ */
 export default function AttendanceTrendChart() {
   const [isClient, setIsClient] = useState(false);
 

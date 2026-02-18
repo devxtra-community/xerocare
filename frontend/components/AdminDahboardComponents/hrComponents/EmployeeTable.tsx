@@ -44,6 +44,11 @@ import {
   EmployeeResponse,
 } from '@/lib/employee';
 
+/**
+ * Table component for listing, filtering, and managing employees.
+ * Supports search, role filtering, pagination, and actions (edit/delete/view).
+ * Displays key details like branch, salary, status, and join date.
+ */
 export default function EmployeeTable() {
   const router = useRouter();
   const [searchTerm, setSearchTerm] = useState('');

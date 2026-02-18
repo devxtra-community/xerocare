@@ -31,6 +31,11 @@ interface InventoryResponse {
   total: number;
 }
 
+/**
+ * Inventory Table focused on critical stock alerts.
+ * Identifies items with stock levels below a reorder threshold (e.g., < 20).
+ * Helps prioritize restocking actions to prevent stockouts.
+ */
 export default function InventoryTable() {
   const [data, setData] = useState<InventoryItem[]>([]);
 

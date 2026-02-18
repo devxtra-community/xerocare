@@ -3,7 +3,10 @@ import { InventoryService } from '../services/inventoryService';
 import { AppError } from '../errors/appError';
 
 const service = new InventoryService();
-// ADMIN
+
+/**
+ * Retrieves global inventory across all warehouses.
+ */
 export const getGlobalInventory = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { product, warehouse, branch } = req.query as {
@@ -18,7 +21,9 @@ export const getGlobalInventory = async (req: Request, res: Response, next: Next
   }
 };
 
-// MANAGER — uses token branchId
+/**
+ * Retrieves inventory specific to a branch.
+ */
 export const getBranchInventory = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const branchId = req.user?.branchId as string;
@@ -32,7 +37,9 @@ export const getBranchInventory = async (req: Request, res: Response, next: Next
   }
 };
 
-// WAREHOUSE STAFF
+/**
+ * Retrieves inventory for a specific warehouse.
+ */
 export const getWarehouseInventory = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { warehouseId } = req.query as { warehouseId: string };
@@ -43,7 +50,9 @@ export const getWarehouseInventory = async (req: Request, res: Response, next: N
   }
 };
 
-// DASHBOARD STATS
+/**
+ * Retrieves inventory statistics.
+ */
 export const getInventoryStats = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const branchId = req.user?.branchId;

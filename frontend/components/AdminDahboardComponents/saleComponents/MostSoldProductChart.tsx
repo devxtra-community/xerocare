@@ -9,6 +9,10 @@ interface MostSoldProductChartProps {
 
 const COLORS = ['#0D47A1', '#1976D2', '#2196F3', '#00BCD4', '#009688'];
 
+/**
+ * Pie chart displaying the distribution of most sold products by quantity.
+ * Visualizes the popularity of different items in the inventory.
+ */
 export default function MostSoldProductChart({ data }: MostSoldProductChartProps) {
   const chartData = (data || []).map((item) => ({
     name: item.product.length > 20 ? item.product.substring(0, 20) + '...' : item.product,

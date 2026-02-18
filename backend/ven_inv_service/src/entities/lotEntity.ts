@@ -63,6 +63,12 @@ export class Lot {
   labourCost!: number;
   // -------------
 
+  @Column({ name: 'branch_id', nullable: true })
+  branchId?: string;
+
+  @Column({ name: 'created_by', nullable: true })
+  createdBy?: string;
+
   @Column({ type: 'text', nullable: true })
   notes?: string;
 

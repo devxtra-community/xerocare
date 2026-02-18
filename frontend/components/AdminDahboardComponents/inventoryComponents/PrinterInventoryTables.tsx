@@ -5,6 +5,11 @@ import IdlePrintersTable from './IdlePrintersTable';
 import ServiceImpactTable from './ServiceImpactTable';
 import InventoryActionsTable from './InventoryActionsTable';
 
+/**
+ * Container component for comprehensive printer inventory reports.
+ * Features tabs to toggle between Asset Summary, Idle Printers list, Service Impact analysis, and Audit Logs.
+ * Consolidates all printer-related inventory data into a single view.
+ */
 export default function PrinterInventoryTables() {
   return (
     <div className="w-full">

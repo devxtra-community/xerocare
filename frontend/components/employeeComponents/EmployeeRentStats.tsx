@@ -8,6 +8,10 @@ interface EmployeeRentStatsProps {
   invoices: Invoice[];
 }
 
+/**
+ * Statistical summary cards for employee rent metrics.
+ * Displays total rentals, rentals this month, and total rent revenue.
+ */
 export default function EmployeeRentStats({ invoices }: EmployeeRentStatsProps) {
   // 1. Total Rent: Only active rental contracts (PROFORMA)
   const activeRentals = invoices.filter(

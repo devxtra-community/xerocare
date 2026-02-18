@@ -23,6 +23,11 @@ import {
 import { Search, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
+/**
+ * Dashboard table displaying a snapshot of branch inventory.
+ * Lists models, brands, vendors, and their current stock levels.
+ * Provides a quick overview of available products.
+ */
 export default function DashbordTable() {
   const [data, setData] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);

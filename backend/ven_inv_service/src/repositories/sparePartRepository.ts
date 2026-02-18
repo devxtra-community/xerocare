@@ -15,23 +15,38 @@ export class SparePartRepository {
 
   // --- Master Data Operations ---
 
+  /**
+   * Finds spare part master data by item code.
+   */
   async findMasterByItemCode(itemCode: string) {
     return this.masterRepo.find({ where: { item_code: itemCode } });
   }
 
+  /**
+   * Creates new spare part master data.
+   */
   async createMaster(data: Partial<SparePart>) {
     const part = this.masterRepo.create(data);
     return this.masterRepo.save(part);
   }
 
+  /**
+   * Updates spare part master data.
+   */
   async updateMaster(id: string, data: Partial<SparePart>) {
     return this.masterRepo.update(id, data);
   }
 
+  /**
+   * Deletes spare part master data.
+   */
   async deleteMaster(id: string) {
     return this.masterRepo.delete(id);
   }
 
+  /**
+   * Checks if a spare part has inventory.
+   */
   async hasInventory(sparePartId: string): Promise<boolean> {
     const part = await this.masterRepo.findOne({
       where: { id: sparePartId },
@@ -42,6 +57,9 @@ export class SparePartRepository {
 
   // --- Inventory Operations ---
 
+  /**
+   * Updates stock quantity for a spare part.
+   */
   async updateStock(sparePartId: string, quantityToAdd: number) {
     const part = await this.masterRepo.findOneBy({ id: sparePartId });
     if (!part) throw new Error('Spare Part not found');
@@ -51,6 +69,9 @@ export class SparePartRepository {
   }
 
   // Listing for Manager
+  /**
+   * Retrieves spare part inventory for a branch.
+   */
   async getInventoryByBranch(branchId: string) {
     return this.masterRepo
       .createQueryBuilder('sp')
@@ -77,6 +98,9 @@ export class SparePartRepository {
       .getRawMany();
   }
 
+  /**
+   * Finds a spare part by ID.
+   */
   async findById(id: string): Promise<SparePart | null> {
     return this.masterRepo.findOne({
       where: { id },

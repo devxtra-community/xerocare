@@ -6,6 +6,10 @@ interface EmployeeLeadsStatsProps {
   leads: Lead[];
 }
 
+/**
+ * Statistical summary cards for employee lead metrics.
+ * Displays total leads and breakdowns by source (Website, WhatsApp, Direct).
+ */
 export default function EmployeeLeadsStats({ leads }: EmployeeLeadsStatsProps) {
   const statsData = [
     { title: 'Total Leads', value: leads.length.toString() },

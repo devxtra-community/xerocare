@@ -82,7 +82,6 @@ export class LeaveApplicationRepository {
     return this.repo.delete(id);
   }
 
-  // Check for overlapping leave applications for the same employee
   async findOverlappingLeaves(
     employeeId: string,
     startDate: Date,
@@ -106,7 +105,6 @@ export class LeaveApplicationRepository {
     return query.getMany();
   }
 
-  // Get statistics for dashboard
   async countByStatus(branchId?: string, status?: LeaveStatus): Promise<number> {
     const whereCondition: Record<string, string | LeaveStatus> = {};
 
@@ -121,7 +119,6 @@ export class LeaveApplicationRepository {
     return this.repo.count({ where: whereCondition });
   }
 
-  // Get pending applications for a branch
   async findPendingByBranch(branchId: string): Promise<LeaveApplication[]> {
     return this.repo.find({
       where: {
@@ -133,7 +130,6 @@ export class LeaveApplicationRepository {
     });
   }
 
-  // Get leave applications for a date range
   async findByDateRange(
     branchId: string,
     startDate: Date,

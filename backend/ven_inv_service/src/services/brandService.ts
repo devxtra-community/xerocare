@@ -11,6 +11,9 @@ interface CreateBrandDTO {
 export class BrandService {
   constructor(private readonly brandRepo: BrandRepository) {}
 
+  /**
+   * Creates a new brand ensuring name uniqueness.
+   */
   async createBrand(data: CreateBrandDTO): Promise<Brand> {
     const existing = await this.brandRepo.findByName(data.name);
     if (existing) {
@@ -20,12 +23,18 @@ export class BrandService {
     return this.brandRepo.save(brand);
   }
 
+  /**
+   * Retrieves all brands sorted by creation date.
+   */
   async getAllBrands(): Promise<Brand[]> {
     return this.brandRepo.find({
       order: { created_at: 'DESC' },
     });
   }
 
+  /**
+   * Updates a brand's details.
+   */
   async updateBrand(id: string, data: Partial<CreateBrandDTO>): Promise<Brand> {
     const brand = await this.brandRepo.findOne({ where: { id } });
     if (!brand) {
@@ -43,6 +52,9 @@ export class BrandService {
     return this.brandRepo.save(brand);
   }
 
+  /**
+   * Deletes a brand if no models are associated.
+   */
   async deleteBrand(id: string): Promise<void> {
     const brand = await this.brandRepo.findOne({ where: { id }, relations: ['models'] });
     if (!brand) {

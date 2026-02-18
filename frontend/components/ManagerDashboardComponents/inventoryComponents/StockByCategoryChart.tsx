@@ -18,6 +18,10 @@ const data = [
   { category: 'Accessory', units: 300, color: '#06b6d4' },
 ];
 
+/**
+ * Bar chart displaying stock distribution by category (Printer, Spare, Consumable, Accessory).
+ * Visualizes the composition of inventory to ensure balanced stock levels.
+ */
 export default function StockByCategoryChart() {
   const [isClient, setIsClient] = useState(false);
 

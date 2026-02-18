@@ -11,6 +11,10 @@ interface ProtectedRouteProps {
   fallbackPath?: string;
 }
 
+/**
+ * HOC for protecting routes based on user role and module access.
+ * Redirects unauthorized users to a fallback path or login.
+ */
 export default function ProtectedRoute({
   children,
   requiredModules,

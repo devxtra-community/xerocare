@@ -20,6 +20,10 @@ const data = [
   { month: 'Jun', BranchA: 63000 },
 ];
 
+/**
+ * Bar chart component visualizing monthly sales performance.
+ * Shows revenue trends over time for the branch.
+ */
 export default function MonthlySalesBarChart() {
   return (
     <div className="bg-card rounded-xl p-3 sm:p-4">

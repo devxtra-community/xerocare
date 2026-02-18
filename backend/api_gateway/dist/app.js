@@ -8,6 +8,8 @@ const express_1 = __importDefault(require("express"));
 const cors_1 = __importDefault(require("cors"));
 const http_proxy_middleware_1 = require("http-proxy-middleware");
 const health_1 = __importDefault(require("./routes/health"));
+const customerUpdatedConsumer_1 = require("./events/consumers/customerUpdatedConsumer");
+const customerUpdatedConsumer_1 = require("./events/consumers/customerUpdatedConsumer");
 const invoiceRoutes_1 = __importDefault(require("./routes/invoiceRoutes"));
 const httplogger_1 = require("./middleware/httplogger");
 const logger_1 = require("./config/logger");
@@ -16,6 +18,10 @@ const rateLimitter_1 = require("./middleware/rateLimitter");
 const app = (0, express_1.default)();
 app.set('trust proxy', 1);
 app.use(rateLimitter_1.globalRateLimiter);
+(async () => {
+    await (0, customerUpdatedConsumer_1.startCustomerConsumer)();
+    logger_1.logger.info('Customer Consumer initialized');
+})();
 const PORT = process.env.PORT;
 const EMPLOYEE_SERVICE_URL = process.env.EMPLOYEE_SERVICE_URL;
 const VENDOR_INVENTORY_SERVICE_URL = process.env.VENDOR_INVENTORY_SERVICE_URL;
@@ -28,7 +34,7 @@ app.use((0, cors_1.default)({
     credentials: true,
 }));
 // Specific Rate Limits
-app.post('/e/auth/login', rateLimitter_1.loginLimiter);
+// app.post('/e/auth/login', loginLimiter);
 app.post(['/e/auth/login/verify', '/e/auth/forgot-password/verify', '/e/auth/magic-link/verify'], rateLimitter_1.otpVerifyLimiter);
 app.post(['/e/auth/forgot-password', '/e/auth/magic-link'], rateLimitter_1.otpSendLimiter);
 const empProxyOptions = {

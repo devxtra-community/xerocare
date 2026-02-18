@@ -4,6 +4,9 @@ import { BrandService } from '../services/brandService';
 export class BrandController {
   constructor(private readonly brandService: BrandService) {}
 
+  /**
+   * Creates a new brand.
+   */
   createBrand = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const brand = await this.brandService.createBrand(req.body);
@@ -13,6 +16,9 @@ export class BrandController {
     }
   };
 
+  /**
+   * Retrieves all brands.
+   */
   getAllBrands = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const brands = await this.brandService.getAllBrands();
@@ -22,6 +28,9 @@ export class BrandController {
     }
   };
 
+  /**
+   * Updates a brand.
+   */
   updateBrand = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const brand = await this.brandService.updateBrand(req.params.id as string, req.body);
@@ -31,6 +40,9 @@ export class BrandController {
     }
   };
 
+  /**
+   * Deletes a brand.
+   */
   deleteBrand = async (req: Request, res: Response, next: NextFunction) => {
     try {
       await this.brandService.deleteBrand(req.params.id as string);

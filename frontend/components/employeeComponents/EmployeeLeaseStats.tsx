@@ -8,6 +8,10 @@ interface EmployeeLeaseStatsProps {
   invoices?: Invoice[];
 }
 
+/**
+ * Statistical summary cards for employee lease metrics.
+ * Displays total leases, leases this month, and total lease revenue.
+ */
 export default function EmployeeLeaseStats({ invoices: propInvoices }: EmployeeLeaseStatsProps) {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);

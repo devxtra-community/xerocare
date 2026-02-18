@@ -29,6 +29,11 @@ import {
 import { getBranches, Branch } from '@/lib/branch';
 import { toast } from 'sonner';
 
+/**
+ * Comprehensive Warehouse management dashboard component.
+ * Features a statistical summary, searchable warehouse list, and CRUD (Add/Edit/Delete) functionality.
+ * Manages warehouse details including code, location, capacity, and status.
+ */
 export default function WarehouseReport() {
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [branches, setBranches] = useState<Branch[]>([]);

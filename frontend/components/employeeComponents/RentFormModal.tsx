@@ -28,6 +28,12 @@ const handleNumberInput = (val: string) => {
   return val;
 };
 
+interface SlabRange {
+  from: number;
+  to: number;
+  rate: number;
+}
+
 interface PricingItem {
   description: string;
   bwIncludedLimit?: string;
@@ -41,6 +47,11 @@ interface PricingItem {
   comboSlabRanges?: Array<{ from: string; to: string; rate: string }>;
 }
 
+/**
+ * Comprehensive modal for creating or editing rental/lease contracts.
+ * Handles complex pricing logic, including tiered pricing (slabs) for black & white and color prints.
+ * Supports different contract types (Rent/Lease) and durations.
+ */
 export default function RentFormModal({
   initialData,
   onClose,
@@ -297,21 +308,10 @@ export default function RentFormModal({
             const found = initialData?.items?.find((i) => i.description === desc);
             if (found) return found;
 
-            // 2. Fuzzy match (e.g. "Black & White - ModelName" vs "Black & White - Brand ModelName")
-            // Extract type prefix
-            const typePrefix = desc.split(' - ')[0]; // "Black & White"
-            const startDesc = desc.substring(typePrefix.length + 3); // "Brand ModelName"
-
-            return initialData?.items?.find((i) => {
-              if (i.itemType === 'PRICING_RULE' || i.bwIncludedLimit !== undefined) {
-                if (i.description.startsWith(typePrefix)) {
-                  // Check if the rest of the string matches partially
-                  const iRest = i.description.substring(typePrefix.length + 3);
-                  return startDesc.includes(iRest) || iRest.includes(startDesc);
-                }
-              }
-              return false;
-            });
+            // 2. Fallback: Check if the Source Product Item has the data (New Flow)
+            // This is handled in the `addRule` function below, so we don't need fuzzy matching here anymore.
+            // Fuzzy matching was the cause of the bug.
+            return undefined;
           };
 
           const mapValues = (rule: PricingItem, source: InvoiceItem) => {
@@ -412,7 +412,7 @@ export default function RentFormModal({
       };
       fetchFullModels();
     }
-  }, [initialData]);
+  }, [initialData, form]);
 
   const updateUsageRules = (
     models: (Model & { quantity: number })[],
@@ -527,12 +527,34 @@ export default function RentFormModal({
           items: selectedModels.flatMap((m) => {
             const prefix = m.product_name || m.brandRelation?.name;
             const baseDesc = prefix ? `${prefix} ${m.model_name}` : m.model_name;
-            const myRules = form.pricingItems.filter((i) => i.description.includes(baseDesc));
+
+            // STRICT MATCHING LOGIC
+            // Ensure we look for the exact description keys we generated in `updateUsageRules`
+            const possibleDescriptions = [
+              `Black & White - ${baseDesc}`,
+              `Color - ${baseDesc}`,
+              `Combined - ${baseDesc}`,
+            ];
+
+            const myRules = form.pricingItems.filter((i) =>
+              possibleDescriptions.includes(i.description.trim()),
+            );
+
             const quantity = m.quantity || 1;
 
             // Create an array of size 'quantity', each element representing 1 unit
             return Array.from({ length: quantity }).map(() => {
-              const mergedItem: InvoiceItem = {
+              const mergedItem: InvoiceItem & {
+                bwIncludedLimit?: number;
+                colorIncludedLimit?: number;
+                combinedIncludedLimit?: number;
+                bwExcessRate?: number;
+                colorExcessRate?: number;
+                combinedExcessRate?: number;
+                bwSlabRanges?: SlabRange[];
+                colorSlabRanges?: SlabRange[];
+                comboSlabRanges?: SlabRange[];
+              } = {
                 description: baseDesc,
                 quantity: 1, // Force 1 per item for serial allocation
                 unitPrice: 0,
@@ -542,18 +564,23 @@ export default function RentFormModal({
               };
 
               myRules.forEach((rule) => {
-                if (rule.bwIncludedLimit !== '')
-                  mergedItem.bwIncludedLimit = cleanNumber(rule.bwIncludedLimit);
-                if (rule.colorIncludedLimit !== '')
-                  mergedItem.colorIncludedLimit = cleanNumber(rule.colorIncludedLimit);
-                if (rule.combinedIncludedLimit !== '')
-                  mergedItem.combinedIncludedLimit = cleanNumber(rule.combinedIncludedLimit);
-                if (rule.bwExcessRate !== '')
-                  mergedItem.bwExcessRate = cleanNumber(rule.bwExcessRate);
-                if (rule.colorExcessRate !== '')
-                  mergedItem.colorExcessRate = cleanNumber(rule.colorExcessRate);
-                if (rule.combinedExcessRate !== '')
-                  mergedItem.combinedExcessRate = cleanNumber(rule.combinedExcessRate);
+                const bwLimit = cleanNumber(rule.bwIncludedLimit);
+                if (bwLimit !== undefined) mergedItem.bwIncludedLimit = bwLimit;
+
+                const colorLimit = cleanNumber(rule.colorIncludedLimit);
+                if (colorLimit !== undefined) mergedItem.colorIncludedLimit = colorLimit;
+
+                const combinedLimit = cleanNumber(rule.combinedIncludedLimit);
+                if (combinedLimit !== undefined) mergedItem.combinedIncludedLimit = combinedLimit;
+
+                const bwRate = cleanNumber(rule.bwExcessRate);
+                if (bwRate !== undefined) mergedItem.bwExcessRate = bwRate;
+
+                const colorRate = cleanNumber(rule.colorExcessRate);
+                if (colorRate !== undefined) mergedItem.colorExcessRate = colorRate;
+
+                const combinedRate = cleanNumber(rule.combinedExcessRate);
+                if (combinedRate !== undefined) mergedItem.combinedExcessRate = combinedRate;
 
                 if (rule.bwSlabRanges?.length) {
                   mergedItem.bwSlabRanges = rule.bwSlabRanges.map((r) => ({
@@ -609,8 +636,17 @@ export default function RentFormModal({
           advanceAmount: isFixed ? cleanNumber(form.advanceAmount) : undefined,
           discountPercent: cleanNumber(form.discountPercent),
           items: selectedModels.flatMap((m) => {
-            const baseDesc = m.model_name;
-            const myRules = form.pricingItems.filter((i) => i.description.includes(baseDesc));
+            const prefix = m.product_name || m.brandRelation?.name;
+            const baseDesc = prefix ? `${prefix} ${m.model_name}` : m.model_name;
+
+            const possibleDescriptions = [
+              `Black & White - ${baseDesc}`,
+              `Color - ${baseDesc}`,
+              `Combined - ${baseDesc}`,
+            ];
+            const myRules = form.pricingItems.filter((i) =>
+              possibleDescriptions.includes(i.description.trim()),
+            );
             const quantity = m.quantity || 1;
 
             return Array.from({ length: quantity }).map(() => {
@@ -623,18 +659,23 @@ export default function RentFormModal({
               };
 
               myRules.forEach((rule) => {
-                if (rule.bwIncludedLimit !== '')
-                  mergedItem.bwIncludedLimit = cleanNumber(rule.bwIncludedLimit);
-                if (rule.colorIncludedLimit !== '')
-                  mergedItem.colorIncludedLimit = cleanNumber(rule.colorIncludedLimit);
-                if (rule.combinedIncludedLimit !== '')
-                  mergedItem.combinedIncludedLimit = cleanNumber(rule.combinedIncludedLimit);
-                if (rule.bwExcessRate !== '')
-                  mergedItem.bwExcessRate = cleanNumber(rule.bwExcessRate);
-                if (rule.colorExcessRate !== '')
-                  mergedItem.colorExcessRate = cleanNumber(rule.colorExcessRate);
-                if (rule.combinedExcessRate !== '')
-                  mergedItem.combinedExcessRate = cleanNumber(rule.combinedExcessRate);
+                const bwLimit = cleanNumber(rule.bwIncludedLimit);
+                if (bwLimit !== undefined) mergedItem.bwIncludedLimit = bwLimit;
+
+                const colorLimit = cleanNumber(rule.colorIncludedLimit);
+                if (colorLimit !== undefined) mergedItem.colorIncludedLimit = colorLimit;
+
+                const combinedLimit = cleanNumber(rule.combinedIncludedLimit);
+                if (combinedLimit !== undefined) mergedItem.combinedIncludedLimit = combinedLimit;
+
+                const bwRate = cleanNumber(rule.bwExcessRate);
+                if (bwRate !== undefined) mergedItem.bwExcessRate = bwRate;
+
+                const colorRate = cleanNumber(rule.colorExcessRate);
+                if (colorRate !== undefined) mergedItem.colorExcessRate = colorRate;
+
+                const combinedRate = cleanNumber(rule.combinedExcessRate);
+                if (combinedRate !== undefined) mergedItem.combinedExcessRate = combinedRate;
 
                 if (rule.bwSlabRanges?.length) {
                   mergedItem.bwSlabRanges = rule.bwSlabRanges.map((r) => ({

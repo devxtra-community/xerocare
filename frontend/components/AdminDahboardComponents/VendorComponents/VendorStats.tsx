@@ -7,11 +7,11 @@ export interface VendorStatsProps {
   newVendors: number;
 }
 
-export default function VendorStats({
-  totalVendors,
-  activeVendors,
-  newVendors,
-}: VendorStatsProps) {
+/**
+ * Component displaying summarized vendor statistics.
+ * Shows total vendors, active vendors, outstanding payables, and new vendors.
+ */
+export default function VendorStats({ totalVendors, activeVendors, newVendors }: VendorStatsProps) {
   return (
     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
       <StatCard
@@ -24,16 +24,8 @@ export default function VendorStats({
         value={activeVendors.toString()}
         subtitle="Currently active"
       />
-      <StatCard
-        title="Outstanding Payables"
-        value="₹ 0"
-        subtitle="To be paid"
-      />
-      <StatCard
-        title="New Vendors"
-        value={newVendors.toString()}
-        subtitle="Added this month"
-      />
+      <StatCard title="Outstanding Payables" value="₹ 0" subtitle="To be paid" />
+      <StatCard title="New Vendors" value={newVendors.toString()} subtitle="Added this month" />
     </div>
   );
 }

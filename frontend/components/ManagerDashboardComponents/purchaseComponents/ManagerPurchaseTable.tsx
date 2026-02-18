@@ -19,6 +19,11 @@ import EditPurchaseDialog from './EditPurchaseDialog';
 import ViewPurchaseDialog from './ViewPurchaseDialog';
 import PurchaseStats from './PurchaseStats';
 
+/**
+ * Manager Purchase Management Page.
+ * Lists all purchase records with search, filtering, and CRUD operations.
+ * Includes a statistical overview of total costs, vendors, products, and models purchased.
+ */
 export default function ManagerPurchaseTable() {
   const [purchases, setPurchases] = useState<Purchase[]>([]);
   const [search, setSearch] = useState('');

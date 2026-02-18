@@ -14,6 +14,11 @@ const COLORS = [
   '#ef4444', // Out of Stock - Red
 ];
 
+/**
+ * Donut chart displaying the overall health of inventory stock levels.
+ * Segments items into In Stock, Low Stock, and Out of Stock categories.
+ * Provides a quick health check indicator for inventory management.
+ */
 export default function StockStatusDonut() {
   const [isClient, setIsClient] = useState(false);
 

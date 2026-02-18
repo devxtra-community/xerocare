@@ -4,6 +4,9 @@ import { logger } from '../config/logger';
 
 const service = new SparePartService();
 
+/**
+ * Bulk uploads spare parts.
+ */
 export const bulkUploadSpareParts = async (req: Request, res: Response) => {
   try {
     const { rows } = req.body;
@@ -27,6 +30,9 @@ export const bulkUploadSpareParts = async (req: Request, res: Response) => {
   }
 };
 
+/**
+ * Adds a single spare part.
+ */
 export const addSparePart = async (req: Request, res: Response) => {
   try {
     const branchId = req.user?.branchId;
@@ -42,6 +48,9 @@ export const addSparePart = async (req: Request, res: Response) => {
   }
 };
 
+/**
+ * Lists spare parts for the user's branch.
+ */
 export const listSpareParts = async (req: Request, res: Response) => {
   try {
     const branchId = req.user?.branchId;
@@ -63,6 +72,9 @@ export const listSpareParts = async (req: Request, res: Response) => {
   }
 };
 
+/**
+ * Updates a spare part.
+ */
 export const updateSparePart = async (req: Request, res: Response) => {
   try {
     const { id } = req.params as { id: string };
@@ -78,6 +90,9 @@ export const updateSparePart = async (req: Request, res: Response) => {
   }
 };
 
+/**
+ * Deletes a spare part if no inventory exists.
+ */
 export const deleteSparePart = async (req: Request, res: Response) => {
   try {
     const { id } = req.params as { id: string };
@@ -87,9 +102,7 @@ export const deleteSparePart = async (req: Request, res: Response) => {
     const result = await service.deleteSparePart(id);
     res.status(200).json(result);
   } catch (error: unknown) {
-    console.log(error);
     const message = error instanceof Error ? error.message : 'Internal server error';
-    // 409 Conflict if inventory exists
     const status = message.includes('inventory') ? 409 : 500;
     res.status(status).json({ success: false, message });
   }

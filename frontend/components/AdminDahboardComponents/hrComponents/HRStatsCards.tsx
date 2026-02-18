@@ -5,6 +5,11 @@ import StatCard from '@/components/StatCard';
 import { getHRStats, HRStats } from '@/lib/employee';
 import { Loader2 } from 'lucide-react';
 
+/**
+ * Component displaying key HR statistics cards.
+ * Shows total employees, active rate, and department counts.
+ * Provides quick insights into workforce size and health.
+ */
 export default function HRStatsCards() {
   const [stats, setStats] = useState<HRStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);

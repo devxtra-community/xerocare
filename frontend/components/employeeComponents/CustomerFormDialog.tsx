@@ -29,6 +29,10 @@ interface CustomerFormDialogProps {
   onSubmit: (customerData: Partial<CreateCustomerData>) => Promise<void>;
 }
 
+/**
+ * Modal dialog for creating or editing customer profiles.
+ * Handles form validation and pre-fills data when editing existing customers.
+ */
 export default function CustomerFormDialog({
   open,
   onOpenChange,

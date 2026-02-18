@@ -24,6 +24,10 @@ import LeadDialog from './LeadDialog';
 import { Lead, getLeads, createLead, updateLead, deleteLead, CreateLeadData } from '@/lib/lead';
 import { toast } from 'sonner';
 
+/**
+ * Table displaying leads managed by the employee.
+ * Features search, filtering by source, and lead management actions (add, edit, delete).
+ */
 export default function EmployeeLeadsTable() {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);

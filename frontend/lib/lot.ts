@@ -56,6 +56,8 @@ export interface CreateLotItemData {
   itemType: LotItemType;
   modelId?: string;
   sparePartId?: string;
+  brand?: string;
+  partName?: string;
   quantity: number;
   unitPrice: number;
 }
@@ -71,6 +73,8 @@ export interface CreateLotData {
   certificationCost?: number;
   labourCost?: number;
   notes?: string;
+  branchId?: string;
+  createdBy?: string;
   items: CreateLotItemData[];
 }
 

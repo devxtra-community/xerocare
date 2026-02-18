@@ -40,6 +40,10 @@ interface EmployeeLeaseTableProps {
   mode?: 'EMPLOYEE' | 'FINANCE';
 }
 
+/**
+ * Table displaying lease agreements managed by the employee.
+ * Features search, creation of new leases, and status tracking (Draft, Sent, Paid).
+ */
 export default function EmployeeLeaseTable({ mode = 'EMPLOYEE' }: EmployeeLeaseTableProps) {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);

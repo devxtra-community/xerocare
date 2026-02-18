@@ -8,6 +8,10 @@ interface PurchaseStatsProps {
   totalModels: number;
 }
 
+/**
+ * Component displaying summary statistics for purchases.
+ * Visualizes Key Performance Indicators (KPIs) like Total Cost, Vendor Count, and Item Volumes.
+ */
 export default function PurchaseStats({
   totalCost,
   totalVendors,

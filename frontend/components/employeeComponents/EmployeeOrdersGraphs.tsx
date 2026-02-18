@@ -33,6 +33,10 @@ interface EmployeeOrdersGraphsProps {
   invoices?: Invoice[];
 }
 
+/**
+ * Analytics charts for employee order performance.
+ * Displays number of orders generated per month and per day.
+ */
 export default function EmployeeOrdersGraphs({
   invoices: propInvoices,
 }: EmployeeOrdersGraphsProps) {

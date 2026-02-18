@@ -7,6 +7,10 @@ type PaginationProps = {
   onPageChange: (page: number) => void;
 };
 
+/**
+ * Reusable pagination control component.
+ * Displays current page, total pages, and navigation buttons.
+ */
 export default function Pagination({ page, totalPages, onPageChange }: PaginationProps) {
   return (
     <div className="flex items-center justify-between">

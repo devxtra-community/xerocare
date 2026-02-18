@@ -22,6 +22,11 @@ const data = [
   { month: 'Jun', revenue: 480000, expense: 310000 },
 ];
 
+/**
+ * Composed chart comparing monthly revenue against expenses.
+ * Uses bars for revenue/expenses and a line for revenue trend.
+ * Critical for analyzing financial performance and efficiency.
+ */
 export default function RevenueVsExpenseChart() {
   const [isClient, setIsClient] = useState(false);
 

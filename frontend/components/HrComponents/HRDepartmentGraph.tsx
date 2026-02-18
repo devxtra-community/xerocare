@@ -18,6 +18,10 @@ interface DepartmentData {
   count: number;
 }
 
+/**
+ * Line chart visualizing employee distribution across departments (Roles).
+ * Fetches all employees and aggregates them by role.
+ */
 export default function HRDepartmentGraph() {
   const [data, setData] = useState<DepartmentData[]>([]);
   const [isLoading, setIsLoading] = useState(true);

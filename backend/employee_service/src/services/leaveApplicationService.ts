@@ -21,7 +21,6 @@ export class LeaveApplicationService {
   }
 
   async submitLeaveApplication(employeeId: string, data: SubmitLeaveApplicationData) {
-    // Validate employee exists and get branch info
     const employee = await this.employeeRepo.findById(employeeId);
     if (!employee) {
       throw new AppError('Employee not found', 404);
@@ -31,7 +30,6 @@ export class LeaveApplicationService {
       throw new AppError('Employee must be assigned to a branch to apply for leave', 400);
     }
 
-    // Parse and validate dates
     const startDate = new Date(data.start_date);
     const endDate = new Date(data.end_date);
     const today = new Date();
@@ -45,12 +43,10 @@ export class LeaveApplicationService {
       throw new AppError('End date must be on or after start date', 400);
     }
 
-    // Validate reason length
     if (!data.reason || data.reason.trim().length < 10) {
       throw new AppError('Reason must be at least 10 characters long', 400);
     }
 
-    // Check for overlapping leave applications
     const overlappingLeaves = await this.leaveRepo.findOverlappingLeaves(
       employeeId,
       startDate,
@@ -61,7 +57,6 @@ export class LeaveApplicationService {
       throw new AppError('You already have a leave application for overlapping dates', 400);
     }
 
-    // Create leave application
     const leaveApplication = await this.leaveRepo.createLeaveApplication({
       employee_id: employeeId,
       branch_id: employee.branch_id,
@@ -162,7 +157,6 @@ export class LeaveApplicationService {
       throw new AppError('Leave application not found', 404);
     }
 
-    // Only the employee who created the leave can cancel it
     if (leaveApplication.employee_id !== employeeId) {
       throw new AppError('You can only cancel your own leave applications', 403);
     }

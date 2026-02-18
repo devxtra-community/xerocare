@@ -36,6 +36,11 @@ const data = [
   },
 ];
 
+/**
+ * Table displaying idle printers that are not currently in use.
+ * Shows model, location, idle duration in days, and reason for inactivity.
+ * Helps identify underutilized assets.
+ */
 export default function IdlePrintersTable() {
   return (
     <div className="rounded-xl border bg-card shadow-sm overflow-hidden">

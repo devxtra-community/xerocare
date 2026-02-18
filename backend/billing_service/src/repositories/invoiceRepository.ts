@@ -18,17 +18,26 @@ export class InvoiceRepository {
     return this.repo.manager;
   }
 
+  /**
+   * Creates a new invoice entity from partial data.
+   */
   createInvoice(data: Partial<Invoice>) {
     const invoice = this.repo.create(data);
     return this.repo.save(invoice);
   }
 
+  /**
+   * Removes all items associated with an invoice.
+   */
   async clearItems(invoiceId: string) {
     await Source.getRepository(InvoiceItem).delete({
       invoice: { id: invoiceId },
     } as { invoice: { id: string } });
   }
 
+  /**
+   * Saves an invoice, preserving original dates for Proforma invoices.
+   */
   async save(invoice: Invoice) {
     if (invoice.id && invoice.type === InvoiceType.PROFORMA) {
       // Find existing to prevent date mutation
@@ -42,6 +51,9 @@ export class InvoiceRepository {
     return this.repo.save(invoice);
   }
 
+  /**
+   * Alias for save, ensuring consistent date handling.
+   */
   async saveInvoice(invoice: Invoice) {
     if (invoice.id && invoice.type === InvoiceType.PROFORMA) {
       // Find existing to prevent date mutation
@@ -55,11 +67,17 @@ export class InvoiceRepository {
     return this.repo.save(invoice);
   }
 
+  /**
+   * Checks if this is the first final invoice generated for a contract.
+   */
   async isFirstFinalInvoice(contractId: string): Promise<boolean> {
     const count = await this.countFinalInvoicesByContractId(contractId);
     return count === 0;
   }
 
+  /**
+   * Generates a unique invoice number (INV-YYYY-XXXX).
+   */
   async generateInvoiceNumber(): Promise<string> {
     const year = new Date().getFullYear();
     const count = await this.getInvoiceCountForYear(year);
@@ -67,6 +85,9 @@ export class InvoiceRepository {
     return `INV-${year}-${paddedCount}`;
   }
 
+  /**
+   * Finds an invoice by ID, including its items.
+   */
   findById(id: string) {
     return this.repo.findOne({
       where: { id },
@@ -74,8 +95,10 @@ export class InvoiceRepository {
     });
   }
 
-  // RE-IMPLEMENTING findAll and findByBranchId using QueryBuilder to properly exclude FINAL
-
+  /**
+   * Finds all invoices, optionally filtered by branch.
+   * Excludes FINAL invoices unless they are direct SALES.
+   */
   async findAll(branchId?: string) {
     const qb = this.repo
       .createQueryBuilder('invoice')
@@ -86,7 +109,6 @@ export class InvoiceRepository {
       qb.andWhere('invoice.branchId = :branchId', { branchId });
     }
 
-    // EXCLUDE FINAL Invoices (Monthly Settlements) from the main list, UNLESS it's a direct SALE
     qb.andWhere(
       new Brackets((innerQb) => {
         innerQb
@@ -98,6 +120,9 @@ export class InvoiceRepository {
     return qb.getMany();
   }
 
+  /**
+   * Finds invoices created by a specific user.
+   */
   async findByCreatorId(createdBy: string) {
     return this.repo.find({
       where: { createdBy },
@@ -108,32 +133,30 @@ export class InvoiceRepository {
     });
   }
 
+  /**
+   * Finds invoices for a branch, excluding certain types.
+   */
   async findByBranchId(branchId: string) {
-    try {
-      // console.log('InvoiceRepo: findByBranchId called for', branchId);
-      const qb = this.repo
-        .createQueryBuilder('invoice')
-        .leftJoinAndSelect('invoice.items', 'items')
-        .where('invoice.branchId = :branchId', { branchId })
-        .orderBy('invoice.createdAt', 'DESC');
+    const qb = this.repo
+      .createQueryBuilder('invoice')
+      .leftJoinAndSelect('invoice.items', 'items')
+      .where('invoice.branchId = :branchId', { branchId })
+      .orderBy('invoice.createdAt', 'DESC');
 
-      // EXCLUDE FINAL Invoices (Monthly Settlements) from the main list, UNLESS it's a direct SALE which becomes FINAL
-      // Using Brackets for safe OR condition and standard SQL <> operator
-      qb.andWhere(
-        new Brackets((innerQb) => {
-          innerQb
-            .where('invoice.type != :finalType', { finalType: 'FINAL' })
-            .orWhere('invoice.saleType = :saleType', { saleType: 'SALE' });
-        }),
-      );
+    qb.andWhere(
+      new Brackets((innerQb) => {
+        innerQb
+          .where('invoice.type != :finalType', { finalType: 'FINAL' })
+          .orWhere('invoice.saleType = :saleType', { saleType: 'SALE' });
+      }),
+    );
 
-      return qb.getMany();
-    } catch (error) {
-      console.error('InvoiceRepo: findByBranchId ERROR:', error);
-      throw error;
-    }
+    return qb.getMany();
   }
 
+  /**
+   * Updates the status of an invoice.
+   */
   updateStatus(id: string, status: Invoice['status']) {
     return this.repo.update(id, { status });
   }
@@ -149,6 +172,9 @@ export class InvoiceRepository {
     });
   }
 
+  /**
+   * Counts how many final invoices exist for a contract.
+   */
   async countFinalInvoicesByContractId(contractId: string): Promise<number> {
     return this.repo.count({
       where: {
@@ -158,6 +184,9 @@ export class InvoiceRepository {
     });
   }
 
+  /**
+   * Finds all final invoices for a contract.
+   */
   async findFinalInvoicesByContractId(contractId: string): Promise<Invoice[]> {
     return this.repo.find({
       where: {
@@ -170,6 +199,9 @@ export class InvoiceRepository {
     });
   }
 
+  /**
+   * Aggregates invoice statistics (counts by type, today/month counts).
+   */
   async getStats(
     filter: {
       createdBy?: string;
@@ -183,7 +215,6 @@ export class InvoiceRepository {
       .select('invoice.saleType', 'saleType')
       .addSelect('COUNT(*)', 'count');
 
-    // Conditional Aggregation for Time-based stats
     if (filter.startOfDay) {
       query.addSelect(
         'SUM(CASE WHEN invoice.createdAt >= :startOfDay THEN 1 ELSE 0 END)',
@@ -207,8 +238,6 @@ export class InvoiceRepository {
     }
 
     const results = await query.groupBy('invoice.saleType').getRawMany();
-    // console.log('Invoice Stats Raw Results:', results);
-
     return results.map((r) => ({
       saleType: r.saleType || r.saletype,
       count: parseInt(r.count, 10),
@@ -217,6 +246,9 @@ export class InvoiceRepository {
     }));
   }
 
+  /**
+   * Retrieves daily sales totals for a branch since a start date.
+   */
   async getBranchSalesTrend(
     branchId: string,
     startDate: Date,
@@ -249,6 +281,9 @@ export class InvoiceRepository {
     }));
   }
 
+  /**
+   * Retrieves global sales trends breakdown by sale type.
+   */
   async getGlobalSalesTrend(
     startDate: Date,
   ): Promise<{ date: string; saleType: string; totalSales: number }[]> {
@@ -281,6 +316,9 @@ export class InvoiceRepository {
     }));
   }
 
+  /**
+   * Retrieves global total sales and breakdown by type.
+   */
   async getGlobalSalesTotals(): Promise<{
     totalSales: number;
     salesByType: { saleType: string; total: number }[];
@@ -335,12 +373,14 @@ export class InvoiceRepository {
     };
   }
 
+  /**
+   * Retrieves branch-specific total sales and breakdown by type.
+   */
   async getBranchSalesTotals(branchId: string): Promise<{
     totalSales: number;
     salesByType: { saleType: string; total: number }[];
     totalInvoices: number;
   }> {
-    // Get total sales amount for the branch (PAID and ISSUED invoices only, excluding PROFORMA)
     const totalResult = await this.repo
       .createQueryBuilder('invoice')
       .select('SUM(invoice.totalAmount)', 'totalSales')
@@ -365,7 +405,6 @@ export class InvoiceRepository {
     const totalSales = parseFloat(totalResult?.totalSales) || 0;
     const totalInvoices = parseInt(totalResult?.totalInvoices, 10) || 0;
 
-    // Get sales breakdown by sale type
     const salesByTypeResults = await this.repo
       .createQueryBuilder('invoice')
       .select('invoice.saleType', 'saleType')
@@ -399,8 +438,10 @@ export class InvoiceRepository {
       totalInvoices,
     };
   }
+  /**
+   * Counts pending employee-approved invoices for a branch.
+   */
   async getPendingCounts(branchId?: string) {
-    console.log('InvoiceRepo: getPendingCounts branchId:', branchId);
     const qb = this.repo
       .createQueryBuilder('invoice')
       .select('invoice.saleType', 'saleType')
@@ -412,7 +453,6 @@ export class InvoiceRepository {
     }
 
     const results = await qb.groupBy('invoice.saleType').getRawMany();
-    // returns array like [{ saleType: 'SALE', count: '5' }, ...]
     console.log('InvoiceRepo: getPendingCounts results:', results);
 
     return results.map((r) => ({
@@ -421,12 +461,11 @@ export class InvoiceRepository {
     }));
   }
 
+  /**
+   * Finds active contracts (Proforma or Active Lease) for colleciton alerts.
+   */
   async findActiveContracts(branchId?: string) {
     const qb = this.repo.createQueryBuilder('invoice');
-
-    // Rent = PROFORMA (Contract), Lease = ACTIVE_LEASE
-    // Filter by Branch if provided
-    // EXCLUDE COMPLETED contracts
 
     qb.where('(invoice.type = :proforma OR invoice.status = :activeLease)', {
       proforma: InvoiceType.PROFORMA,
@@ -442,11 +481,12 @@ export class InvoiceRepository {
     return qb.getMany();
   }
 
+  /**
+   * Finds completed contracts.
+   */
   async findCompletedContracts(branchId?: string) {
     const qb = this.repo.createQueryBuilder('invoice').leftJoinAndSelect('invoice.items', 'items');
 
-    // Find contracts that are COMPLETED (can be PROFORMA or FINAL type)
-    // When a contract completes, its type changes from PROFORMA to FINAL
     qb.where('invoice.contractStatus = :completed', { completed: ContractStatus.COMPLETED });
 
     if (branchId) {
@@ -458,6 +498,9 @@ export class InvoiceRepository {
     return qb.getMany();
   }
 
+  /**
+   * Finds final invoices that are not yet paid.
+   */
   async findUnpaidFinalInvoices(branchId?: string) {
     const qb = this.repo.createQueryBuilder('invoice');
     qb.where('invoice.type = :type', { type: InvoiceType.FINAL })
@@ -472,6 +515,9 @@ export class InvoiceRepository {
     return qb.getMany();
   }
 
+  /**
+   * Generates a comprehensive financial report based on filters.
+   */
   async getFinanceReport(
     filter: {
       branchId?: string;
@@ -570,6 +616,9 @@ export class InvoiceRepository {
     }));
   }
 
+  /**
+   * Retrieves high-level sales statistics for the Admin dashboard.
+   */
   async getAdminSalesStats() {
     const statuses = [
       InvoiceStatus.PAID,
@@ -581,7 +630,6 @@ export class InvoiceRepository {
       InvoiceStatus.APPROVED,
     ];
 
-    // 1. Basic totals for SALE type
     const totals = await this.repo
       .createQueryBuilder('invoice')
       .select('SUM(invoice.totalAmount)', 'totalRevenue')
@@ -590,7 +638,6 @@ export class InvoiceRepository {
       .andWhere('invoice.status IN (:...statuses)', { statuses })
       .getRawOne();
 
-    // 2. Products sold count (Sum of quantities in SALE items)
     const itemsStats = await Source.getRepository(InvoiceItem)
       .createQueryBuilder('item')
       .leftJoin('item.invoice', 'invoice')
@@ -599,7 +646,6 @@ export class InvoiceRepository {
       .andWhere('invoice.status IN (:...statuses)', { statuses })
       .getRawOne();
 
-    // 3. Top Product
     const topProductRes = await Source.getRepository(InvoiceItem)
       .createQueryBuilder('item')
       .leftJoin('item.invoice', 'invoice')
@@ -613,7 +659,6 @@ export class InvoiceRepository {
       .limit(1)
       .getRawOne();
 
-    // 4. Monthly Sales (SALE only)
     const monthlySalesRes = await this.repo
       .createQueryBuilder('invoice')
       .select("TO_CHAR(invoice.createdAt, 'Mon')", 'month')
@@ -626,7 +671,6 @@ export class InvoiceRepository {
       .orderBy('month_num', 'ASC')
       .getRawMany();
 
-    // 5. Most Sold Products (List for Chart)
     const mostSoldProductsRes = await Source.getRepository(InvoiceItem)
       .createQueryBuilder('item')
       .leftJoin('item.invoice', 'invoice')
@@ -656,18 +700,18 @@ export class InvoiceRepository {
     };
   }
 
+  /**
+   * Finds final invoices for a branch to show history.
+   */
   async findFinalInvoicesByBranch(branchId: string, saleType?: string): Promise<Invoice[]> {
     const qb = this.repo
       .createQueryBuilder('invoice')
       .leftJoinAndSelect('invoice.items', 'items')
       .where('invoice.branchId = :branchId', { branchId })
-      // Show only finance-approved contracts (PROFORMA) and monthly invoices (FINAL)
-      // Exclude QUOTATION type (employee-approved awaiting finance approval)
       .andWhere('(invoice.type = :proforma OR invoice.type = :final)', {
         proforma: InvoiceType.PROFORMA,
         final: InvoiceType.FINAL,
       })
-      // Only show finance-approved and active contracts
       .andWhere('invoice.status IN (:...statuses)', {
         statuses: [
           InvoiceStatus.FINANCE_APPROVED,

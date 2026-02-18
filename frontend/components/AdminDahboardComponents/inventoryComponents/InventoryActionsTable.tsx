@@ -44,6 +44,11 @@ const data = [
   },
 ];
 
+/**
+ * Table displaying recent actionable inventory events.
+ * Tracks printer rentals, returns, service requests, and lease renewals along with approvals.
+ * Monitors operational activities related to inventory assets.
+ */
 export default function InventoryActionsTable() {
   return (
     <div className="rounded-xl border bg-card shadow-sm overflow-hidden">

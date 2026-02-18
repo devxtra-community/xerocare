@@ -33,6 +33,10 @@ interface EmployeeRentGraphsProps {
   invoices?: Invoice[];
 }
 
+/**
+ * Analytics charts for employee rental performance.
+ * Displays number of rentals generated per month and per day.
+ */
 export default function EmployeeRentGraphs({ invoices: propInvoices }: EmployeeRentGraphsProps) {
   const [loading, setLoading] = useState(true);
   const [monthlyData, setMonthlyData] = useState<ChartDataItem[]>([]);

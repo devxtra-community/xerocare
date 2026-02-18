@@ -9,6 +9,9 @@ export class CustomerService {
     this.customerRepository = new CustomerRepository();
   }
 
+  /**
+   * Creates a new customer after checking for duplicates.
+   */
   async createCustomer(data: Partial<Customer>): Promise<Customer> {
     if (data.email) {
       const existingCustomer = await this.customerRepository.findByEmail(data.email);
@@ -20,12 +23,16 @@ export class CustomerService {
     return this.customerRepository.createCustomer(data);
   }
 
+  /**
+   * Retrieves all customers.
+   */
   async getAllCustomers(): Promise<Customer[]> {
-    // Note: Customer entity currently doesn't have branchId field
-    // Branch filtering for customers would require database schema migration
     return this.customerRepository.findAll();
   }
 
+  /**
+   * Retrieves a single customer by ID.
+   */
   async getCustomerById(id: string): Promise<Customer> {
     const customer = await this.customerRepository.findById(id);
     if (!customer) {
@@ -34,15 +41,16 @@ export class CustomerService {
     return customer;
   }
 
+  /**
+   * Updates an existing customer and publishes an update event.
+   */
   async updateCustomer(id: string, data: Partial<Customer>): Promise<Customer> {
     const updated = await this.customerRepository.updateCustomer(id, data);
     if (!updated) {
       throw new AppError('Customer not found for update', 404);
     }
 
-    // Publish event if name is updated (or always, for simplicity)
     if (updated.name) {
-      // Avoid circular dependency if imported directly, but here it's fine
       const { publishCustomerUpdated } = await import('../events/publishers/customerPublisher');
       await publishCustomerUpdated({ id: updated.id, name: updated.name });
     }
@@ -50,6 +58,9 @@ export class CustomerService {
     return updated;
   }
 
+  /**
+   * Soft deletes a customer.
+   */
   async deleteCustomer(id: string): Promise<void> {
     const success = await this.customerRepository.deleteCustomer(id);
     if (!success) {

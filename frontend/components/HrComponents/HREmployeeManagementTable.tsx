@@ -32,6 +32,21 @@ import EmployeeFormDialog from '@/components/AdminDahboardComponents/hrComponent
 import DeleteEmployeeDialog from '@/components/AdminDahboardComponents/hrComponents/DeleteEmployeeDialog';
 import { useRouter } from 'next/navigation';
 
+/**
+ * HR Employee Management Component.
+ * Comprehensive table for managing employee records with CRUD capabilities.
+ * Features:
+ * - List all employees with pagination.
+ * - Add new employees.
+ * - Edit existing employee details.
+ * - Enable/Disable employee access (Soft delete).
+ * - Filter by Role and Branch.
+ */
+/**
+ * HR Employee Management Table.
+ * Provides a comprehensive interface for managing employee records, including
+ * adding, editing, enabling/disabling, and filtering by role and branch.
+ */
 export default function HREmployeeManagementTable() {
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState('All');

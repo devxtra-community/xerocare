@@ -12,6 +12,10 @@ const agingData = [
   { bucket: '90+ Days', amount: 2100, color: 'bg-rose-500', percentage: 3 },
 ];
 
+/**
+ * Component visualising Accounts Receivable aging buckets.
+ * Highlights total receivables and overdue amounts with risk distribution.
+ */
 export default function ARAgingChart() {
   const totalAR = agingData.reduce((acc, curr) => acc + curr.amount, 0);
   const overdueTotal = totalAR - agingData[0].amount;

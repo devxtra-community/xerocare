@@ -45,6 +45,10 @@ interface EmployeeSalesTableProps {
   mode?: 'EMPLOYEE' | 'FINANCE';
 }
 
+/**
+ * Table displaying sales invoices managed by the employee.
+ * Features search, creation of new sales, and detailed invoice view.
+ */
 export default function EmployeeSalesTable({ mode = 'EMPLOYEE' }: EmployeeSalesTableProps) {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);

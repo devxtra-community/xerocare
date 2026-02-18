@@ -18,6 +18,11 @@ import { format } from 'date-fns';
 import AddLotDialog from './AddLotDialog';
 import LotDetailsDialog from './LotDetailsDialog';
 
+/**
+ * Manager Lot Management Page.
+ * Displays a list of inventory lots with search validation and status tracking.
+ * Provides access to create new lots and view detailed lot reports.
+ */
 export default function ManagerLotTable() {
   const [lots, setLots] = useState<Lot[]>([]);
   const [search, setSearch] = useState('');

@@ -6,6 +6,9 @@ export class ModelRepository {
     return Source.getRepository(Model);
   }
 
+  /**
+   * Adds a new model.
+   */
   async addModel(data: Partial<Model>) {
     const model = this.repo.create(data);
     await this.repo.save(model);
@@ -15,6 +18,9 @@ export class ModelRepository {
     });
   }
 
+  /**
+   * Retrieves all models with associated product details.
+   */
   async getAllModels() {
     const rawAndEntities = await this.repo
       .createQueryBuilder('model')
@@ -45,6 +51,9 @@ export class ModelRepository {
     });
   }
 
+  /**
+   * Updates an existing model.
+   */
   async updateModel(id: string, data: Partial<Model>) {
     await this.repo.update(id, data);
     return this.repo.findOne({
@@ -53,24 +62,32 @@ export class ModelRepository {
     });
   }
 
+  /**
+   * Deletes a model.
+   */
   async deleteModel(id: string) {
     return this.repo.delete(id);
   }
 
+  /**
+   * Finds a model by ID.
+   */
   async findbyid(id: string) {
     return this.repo.findOne({ where: { id } });
   }
 
+  /**
+   * Counts products associated with a model.
+   */
   async countProductsForModel(modelId: string): Promise<number> {
     const result = await Source.query(
       `SELECT COUNT(*) as count FROM "products" WHERE "model_id" = $1`,
       [modelId],
     );
-    // Ensure result is valid
     if (!result || result.length === 0) {
       return 0;
     }
-    return parseInt(result[0].count, 10) || 0;
+    return Number(result[0].count);
   }
 
   async findFirstProductForModel(modelId: string) {
@@ -84,6 +101,9 @@ export class ModelRepository {
     return result[0] as { brand: string };
   }
 
+  /**
+   * Counts available products for a model.
+   */
   async countAvailableProducts(modelId: string): Promise<number> {
     const result = await Source.query(
       `SELECT COUNT(*) as count FROM "products" WHERE "model_id" = $1 AND "product_status" = 'AVAILABLE'`,

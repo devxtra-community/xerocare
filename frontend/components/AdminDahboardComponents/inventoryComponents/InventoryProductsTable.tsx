@@ -36,6 +36,12 @@ interface InventoryResponse {
   data: InventoryItem[];
 }
 
+/**
+ * Comprehensive Inventory Products Table with advanced filtering.
+ * Displays all inventory items with filtering by product, warehouse, and branch.
+ * Columns include model details, quantities (total/available/rented/damaged), and unit cost.
+ * Allows drilling down into specific inventory segments.
+ */
 export default function InventoryProductsTable() {
   const [page, setPage] = useState(1);
   const [data, setData] = useState<InventoryItem[]>([]);

@@ -51,7 +51,12 @@ const menuItems = [
   },
 ];
 
-export default function HrSidebar() {
+/**
+ * Sidebar navigation component for the HR dashboard.
+ * Provides links to key modules: Dashboard, Employees, Attendance, Leaves, Payroll, and Reports.
+ * includes user logout functionality.
+ */
+export default function HrAppSidebar() {
   const router = useRouter();
   const pathname = usePathname();
 

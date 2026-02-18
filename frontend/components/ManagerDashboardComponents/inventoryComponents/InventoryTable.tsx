@@ -25,6 +25,11 @@ interface InventoryTableProps {
   warehouseId?: string;
 }
 
+/**
+ * Comprehensive Inventory Table for Managers.
+ * Supports viewing inventory globally, by branch, or by warehouse.
+ * Displays detailed stock information: Total, Available, Rented, and Damaged quantities along with Model and Brand details.
+ */
 export default function InventoryTable({ mode = 'global', warehouseId }: InventoryTableProps) {
   // const router = useRouter();
   const [page, setPage] = useState(1);

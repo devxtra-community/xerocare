@@ -13,6 +13,10 @@ interface EmployeeDisplay {
 
 const ITEMS_PER_PAGE = 5;
 
+/**
+ * Dashboard widget displaying recent employee additions.
+ * Shows a paginated list of employees with their position, start date, and salary.
+ */
 export default function HrTable() {
   const [page, setPage] = useState(1);
   const [employees, setEmployees] = useState<EmployeeDisplay[]>([]);

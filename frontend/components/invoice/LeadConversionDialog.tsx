@@ -22,6 +22,10 @@ interface LeadConversionDialogProps {
   onConverted: (customerId: string) => void;
 }
 
+/**
+ * Dialog to convert a qualified Lead into a Customer.
+ * Prompts for missing essential information (Name, Email, Phone) required for customer creation.
+ */
 export function LeadConversionDialog({
   open,
   onOpenChange,

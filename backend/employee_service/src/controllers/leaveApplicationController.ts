@@ -7,7 +7,6 @@ import { EmployeeRole } from '../constants/employeeRole';
 
 const service = new LeaveApplicationService();
 
-// Submit leave application (all authenticated users)
 export const submitLeaveApplication = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const employeeId = req.user?.userId;
@@ -18,12 +17,10 @@ export const submitLeaveApplication = async (req: Request, res: Response, next: 
 
     const { start_date, end_date, leave_type, reason } = req.body;
 
-    // Validate required fields
     if (!start_date || !end_date || !leave_type || !reason) {
       throw new AppError('All fields are required', 400);
     }
 
-    // Validate leave type
     if (!Object.values(LeaveType).includes(leave_type)) {
       throw new AppError('Invalid leave type', 400);
     }
@@ -46,7 +43,6 @@ export const submitLeaveApplication = async (req: Request, res: Response, next: 
   }
 };
 
-// Get employee's own leave applications
 export const getMyLeaveApplications = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const employeeId = req.user?.userId;
@@ -71,7 +67,6 @@ export const getMyLeaveApplications = async (req: Request, res: Response, next: 
   }
 };
 
-// Get branch leave applications (HR and Admin only)
 export const getBranchLeaveApplications = async (
   req: Request,
   res: Response,
@@ -82,12 +77,10 @@ export const getBranchLeaveApplications = async (
     const limit = Number(req.query.limit) || 10;
     const status = req.query.status as LeaveStatus | undefined;
 
-    // Validate status if provided
     if (status && !Object.values(LeaveStatus).includes(status)) {
       throw new AppError('Invalid status filter', 400);
     }
 
-    // Admin sees all, others see only their branch
     const branchId = req.user?.role === EmployeeRole.ADMIN ? undefined : req.user?.branchId;
 
     if (!branchId && req.user?.role !== EmployeeRole.ADMIN) {
@@ -107,13 +100,11 @@ export const getBranchLeaveApplications = async (
   }
 };
 
-// Get single leave application
 export const getLeaveApplicationById = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = req.params.id as string;
     const leaveApplication = await service.getLeaveApplicationById(id);
 
-    // Access control: employee can view own, HR/Admin can view their branch
     const isOwner = leaveApplication.employee_id === req.user?.userId;
     const isHROrAdmin = [EmployeeRole.HR, EmployeeRole.ADMIN].includes(
       req.user?.role as EmployeeRole,
@@ -135,7 +126,6 @@ export const getLeaveApplicationById = async (req: Request, res: Response, next:
   }
 };
 
-// Approve leave application (HR and Admin only)
 export const approveLeaveApplication = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = req.params.id as string;
@@ -145,7 +135,6 @@ export const approveLeaveApplication = async (req: Request, res: Response, next:
       throw new AppError('User not authenticated', 401);
     }
 
-    // Verify the leave application belongs to the reviewer's branch (unless admin)
     const leaveApplication = await service.getLeaveApplicationById(id);
     if (
       req.user?.role !== EmployeeRole.ADMIN &&
@@ -167,7 +156,6 @@ export const approveLeaveApplication = async (req: Request, res: Response, next:
   }
 };
 
-// Reject leave application (HR and Admin only)
 export const rejectLeaveApplication = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = req.params.id as string;
@@ -182,7 +170,6 @@ export const rejectLeaveApplication = async (req: Request, res: Response, next: 
       throw new AppError('Rejection reason is required', 400);
     }
 
-    // Verify the leave application belongs to the reviewer's branch (unless admin)
     const leaveApplication = await service.getLeaveApplicationById(id);
     if (
       req.user?.role !== EmployeeRole.ADMIN &&
@@ -204,7 +191,6 @@ export const rejectLeaveApplication = async (req: Request, res: Response, next: 
   }
 };
 
-// Cancel leave application (employee can cancel their own pending leave)
 export const cancelLeaveApplication = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = req.params.id as string;
@@ -227,10 +213,8 @@ export const cancelLeaveApplication = async (req: Request, res: Response, next: 
   }
 };
 
-// Get leave statistics (HR and Admin only)
 export const getLeaveStats = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    // Admin sees all stats, others see only their branch
     const branchId = req.user?.role === EmployeeRole.ADMIN ? undefined : req.user?.branchId;
 
     const stats = await service.getLeaveStats(branchId);

@@ -23,6 +23,11 @@ interface VendorRequest {
   created_at: string;
 }
 
+/**
+ * Component listing history of product requests made to a specific vendor.
+ * Displays date, requested products, and messages.
+ * Allows viewing full details of past requests.
+ */
 export default function VendorRequestHistory() {
   const params = useParams();
   const id = params.id as string;

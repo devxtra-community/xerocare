@@ -46,6 +46,12 @@ interface Lot {
   items?: LotItem[];
 }
 
+/**
+ * Manager Product Management Page.
+ * Main interface for managing inventory products.
+ * Features listing, searching, filtering, adding (single/bulk), updating, and deleting products.
+ * Displays key inventory stats like Total, Available, Rented, and Sold counts.
+ */
 export default function ManagerProduct() {
   const [products, setProducts] = useState<Product[]>([]);
   const [search, setSearch] = useState('');
@@ -153,6 +159,7 @@ export default function ManagerProduct() {
                 'IMAGE',
                 'PRODUCT',
                 'BRAND',
+                'LOT NUMBER',
                 'SERIAL NO',
                 'PRICE',
                 'PRINT COLOUR',
@@ -169,13 +176,13 @@ export default function ManagerProduct() {
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={8} className="text-center py-8">
+                <TableCell colSpan={9} className="text-center py-8">
                   Loading...
                 </TableCell>
               </TableRow>
             ) : filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                   No products found.
                 </TableCell>
               </TableRow>
@@ -209,6 +216,9 @@ export default function ManagerProduct() {
                     {p.name} {p.model?.model_name ? ` - ${p.model.model_name}` : ''}
                   </TableCell>
                   <TableCell className="px-4">{p.brand}</TableCell>
+                  <TableCell className="px-4">
+                    {p.lot?.lotNumber || p.lot?.lot_number || '-'}
+                  </TableCell>
                   <TableCell className="px-4">{p.serial_no}</TableCell>
                   <TableCell className="px-4">₹{p.sale_price}</TableCell>
                   <TableCell className="px-4">{p.print_colour}</TableCell>
@@ -352,6 +362,7 @@ function ProductFormModal({
 
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string>(initialData?.imageUrl || '');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     const loadDependencies = async () => {
@@ -413,7 +424,10 @@ function ProductFormModal({
   };
 
   const handleSubmit = async () => {
+    if (isSubmitting) return; // Prevent duplicate submissions
+
     try {
+      setIsSubmitting(true);
       const formData = new FormData();
       Object.entries(form).forEach(([key, value]) => {
         if (value !== undefined && value !== null) {
@@ -434,6 +448,8 @@ function ProductFormModal({
       onConfirm();
     } catch {
       toast.error('Operation failed');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -682,11 +698,11 @@ function ProductFormModal({
       </div>
 
       <div className="flex justify-end gap-3 mt-6">
-        <Button variant="outline" onClick={onClose}>
+        <Button variant="outline" onClick={onClose} disabled={isSubmitting}>
           Cancel
         </Button>
-        <Button className="bg-primary text-white" onClick={handleSubmit}>
-          Confirm
+        <Button className="bg-primary text-white" onClick={handleSubmit} disabled={isSubmitting}>
+          {isSubmitting ? 'Processing...' : 'Confirm'}
         </Button>
       </div>
     </Modal>

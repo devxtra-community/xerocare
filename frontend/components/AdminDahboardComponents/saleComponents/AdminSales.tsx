@@ -8,6 +8,11 @@ import MonthlySalesBarChart from './monthlysalesChart';
 import MostSoldProductChart from './MostSoldProductChart';
 import { getAdminSalesStats, AdminSalesStats } from '@/lib/invoice';
 
+/**
+ * Admin Sales Dashboard page.
+ * Displays comprehensive sales statistics, summary tables, and analytical charts.
+ * Aggregates key metrics like Total Revenue, Orders, and Products Sold.
+ */
 export default function AdminSalesPage() {
   const [stats, setStats] = useState<AdminSalesStats | null>(null);
   const [loading, setLoading] = useState(true);

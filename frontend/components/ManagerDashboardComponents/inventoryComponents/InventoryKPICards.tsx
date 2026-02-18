@@ -3,6 +3,11 @@ import React from 'react';
 import StatCard from '@/components/StatCard';
 import { inventoryService, InventoryStats } from '@/services/inventoryService';
 
+/**
+ * KPI Cards for Manager Inventory Dashboard.
+ * Displays key metrics: Product Models count, Total Stock, Total Inventory Value, and Damaged Stock.
+ * Provides high-level inventory health indicators.
+ */
 export default function InventoryKPICards() {
   const [stats, setStats] = React.useState<InventoryStats>({
     totalStock: 0,

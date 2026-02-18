@@ -46,6 +46,10 @@ const leaveTypeLabels: Record<LeaveType, string> = {
   [LeaveType.EMERGENCY]: 'Emergency Leave',
 };
 
+/**
+ * Table displaying an employee's leave application history.
+ * Shows status (Pending, Approved, Rejected) and allows cancellation of pending requests.
+ */
 export default function EmployeeLeaveApplicationsTable() {
   const [leaveApplications, setLeaveApplications] = useState<LeaveApplication[]>([]);
   const [isLoading, setIsLoading] = useState(true);

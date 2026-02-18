@@ -10,6 +10,9 @@ export class UsageService {
   private usageRepo = new UsageRepository();
   private invoiceRepo = new InvoiceRepository();
 
+  /**
+   * Records usage data (meter readings) for a contract.
+   */
   async recordUsage(payload: {
     contractId: string;
     billingPeriodStart: string;
@@ -316,6 +319,9 @@ export class UsageService {
     };
   }
 
+  /**
+   * Retrieves usage history for a contract.
+   */
   async getUsageHistory(contractId: string) {
     const history = await this.usageRepo.getUsageHistory(contractId, 'ASC');
     if (history.length === 0) return [];
@@ -482,6 +488,9 @@ export class UsageService {
     return result.reverse(); // Return DESC order for UI
   }
 
+  /**
+   * Triggers the monthly invoice generation based on usage.
+   */
   async sendMonthlyInvoice(usageId: string) {
     const usage = await this.usageRepo.findById(usageId);
     if (!usage) {
@@ -507,7 +516,9 @@ export class UsageService {
     };
   }
 
-  // Helper: Generate Final Summary Invoice
+  /**
+   * Helper: Generate Final Summary Invoice
+   */
   private async generateFinalSummary(contractId: string) {
     // Fetch all usages for this contract
     const history = await this.usageRepo.getUsageHistory(contractId, 'ASC'); // Get all

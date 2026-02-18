@@ -30,6 +30,9 @@ export interface CreatePurchaseDTO {
 export type UpdatePurchaseDTO = Partial<CreatePurchaseDTO>;
 
 export const purchaseService = {
+  /**
+   * Retrieves all purchases.
+   */
   getAllPurchases: async (): Promise<Purchase[]> => {
     // Mock data for now if backend isn't ready, or try to fetch
     // return (await axios.get(API_URL)).data;
@@ -67,6 +70,9 @@ export const purchaseService = {
     ];
   },
 
+  /**
+   * Retrieves a purchase by ID.
+   */
   getPurchaseById: async (id: string): Promise<Purchase> => {
     // const response = await axios.get(`${API_URL}/${id}`);
     // return response.data;
@@ -86,6 +92,9 @@ export const purchaseService = {
     };
   },
 
+  /**
+   * Creates a new purchase.
+   */
   createPurchase: async (data: CreatePurchaseDTO): Promise<Purchase> => {
     // const response = await axios.post(API_URL, data);
     // return response.data;
@@ -100,6 +109,9 @@ export const purchaseService = {
     } as Purchase;
   },
 
+  /**
+   * Updates an existing purchase.
+   */
   updatePurchase: async (id: string, data: UpdatePurchaseDTO): Promise<Purchase> => {
     // const response = await axios.put(`${API_URL}/${id}`, data);
     // return response.data;
@@ -121,6 +133,9 @@ export const purchaseService = {
     } as Purchase;
   },
 
+  /**
+   * Deletes a purchase.
+   */
   deletePurchase: async (id: string): Promise<void> => {
     // await axios.delete(`${API_URL}/${id}`);
     console.log('Deleting purchase:', id);

@@ -24,6 +24,10 @@ import {
 import CustomerFormDialog from './CustomerFormDialog';
 import { toast } from 'sonner';
 
+/**
+ * Table displaying all customers managed by the employee.
+ * Features search, filtering, and actions to add/edit/delete customers.
+ */
 export default function EmployeeCustomerTable() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);

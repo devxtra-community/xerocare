@@ -15,6 +15,9 @@ declare global {
   }
 }
 
+/**
+ * Middleware to verify JWT access tokens and attach user to request.
+ */
 export const authMiddleware = (req: Request, res: Response, next: NextFunction) => {
   const token = req.headers?.authorization?.split(' ')[1];
   if (!token) {

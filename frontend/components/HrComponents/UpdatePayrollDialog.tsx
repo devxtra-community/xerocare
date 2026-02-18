@@ -20,6 +20,11 @@ interface UpdatePayrollDialogProps {
   onSubmit: (id: string, data: Partial<PayrollRecord>) => void;
 }
 
+/**
+ * Dialog component for updating an existing payroll record.
+ * Enables modifying salary, leave days, payment status, and date.
+ * Displays read-only employee details for context.
+ */
 export default function UpdatePayrollDialog({
   open,
   onOpenChange,

@@ -21,6 +21,11 @@ const data = [
   { day: 'Sun', stockIn: 3490, stockOut: 4300 },
 ];
 
+/**
+ * Area chart displaying inventory stock movement (in/out) over time.
+ * Visualizes the volume of stock additions vs. removals/sales.
+ * Supports filtering by different time periods (Weekly, Monthly).
+ */
 export default function InventoryChart() {
   const [selectedPeriod, setSelectedPeriod] = useState('Weekly');
   const [isClient, setIsClient] = useState(false);

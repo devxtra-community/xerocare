@@ -32,6 +32,10 @@ export interface Notification {
   createdAt: string;
 }
 
+/**
+ * Global dashboard header component.
+ * Contains search, notifications, user profile menu, and access to account settings.
+ */
 export default function DashboardHeader({ title = 'Dashboard' }: { title?: string }) {
   const router = useRouter();
   const [user, setUser] = useState({

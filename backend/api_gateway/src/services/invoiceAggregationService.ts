@@ -9,11 +9,21 @@ const VENDOR_INVENTORY_SERVICE_URL =
 const BILLING_SERVICE_URL = process.env.BILLING_SERVICE_URL || 'http://127.0.0.1:3004';
 const CRM_SERVICE_URL = process.env.CRM_SERVICE_URL || 'http://127.0.0.1:3005';
 
-// Enums
 type InvoiceType = 'QUOTATION' | 'PROFORMA' | 'FINAL';
 type RentType = 'FIXED_LIMIT' | 'FIXED_COMBO' | 'CPC' | 'CPC_COMBO';
 type RentPeriod = 'MONTHLY' | 'QUARTERLY' | 'HALF_YEARLY' | 'YEARLY';
 type InvoiceStatus = 'DRAFT' | 'SENT' | 'APPROVED' | 'REJECTED' | 'ISSUED' | 'PAID' | 'CANCELLED';
+
+interface CollectionAlert {
+  contractId: string;
+  customerId: string;
+  customerName: string;
+  customerPhone?: string;
+  invoiceNumber: string;
+  type: string;
+  saleType: string;
+  dueDate: string;
+}
 
 interface InvoiceItem {
   id?: string;
@@ -21,22 +31,18 @@ interface InvoiceItem {
   description: string;
   productId?: string;
 
-  // Fixed
   bwIncludedLimit?: number;
   colorIncludedLimit?: number;
   combinedIncludedLimit?: number;
 
-  // Excess
   bwExcessRate?: number;
   colorExcessRate?: number;
   combinedExcessRate?: number;
 
-  // Slabs
   bwSlabRanges?: Array<{ from: number; to: number; rate: number }>;
   colorSlabRanges?: Array<{ from: number; to: number; rate: number }>;
   comboSlabRanges?: Array<{ from: number; to: number; rate: number }>;
 
-  // Legacy (ignored/nullable)
   quantity?: number;
   unitPrice?: number;
 }
@@ -50,7 +56,6 @@ interface Invoice {
   totalAmount?: number;
   status: InvoiceStatus;
 
-  // Quotation Fields
   type: InvoiceType;
   rentType?: RentType;
   rentPeriod?: RentPeriod;
@@ -67,13 +72,11 @@ interface Invoice {
   endDate?: string;
   billingCycleInDays?: number;
 
-  // Lease Fields
   leaseType?: string;
   leaseTenureMonths?: number;
   totalLeaseAmount?: number;
   monthlyEmiAmount?: number;
 
-  // Usage Snapshot Fields (Enriched)
   bwA4Count?: number;
   bwA3Count?: number;
   colorA4Count?: number;
@@ -91,17 +94,15 @@ interface AggregatedInvoice extends Invoice {
   customerEmail?: string;
 }
 
-// Module-level cache for persistence across requests
 const employeeCache = new Map<string, { name: string; timestamp: number }>();
 const branchCache = new Map<string, { name: string; timestamp: number }>();
-// Updated cache to store phone as well for customers
+
 const customerCache = new Map<
   string,
   { name: string; phone?: string; email?: string; timestamp: number }
 >();
 const CACHE_TTL = 10 * 60 * 1000; // 5 minutes
 
-// Helper to fetch entity name with cache
 const fetchEntityName = async (
   id: string | undefined,
   cache: Map<string, { name: string; timestamp: number }>,
@@ -192,6 +193,9 @@ const fetchCustomerDetails = async (
 };
 
 export class InvoiceAggregationService {
+  /**
+   * Aggregates invoice data with employee, branch, and customer details.
+   */
   async getAllInvoices(
     user: { role: string; branchId?: string },
     token: string,
@@ -290,6 +294,9 @@ export class InvoiceAggregationService {
     }
   }
 
+  /**
+   * Fetches and aggregates the authenticated user's own invoices.
+   */
   async getMyInvoices(token: string): Promise<AggregatedInvoice[]> {
     try {
       const billingResponse = await axios.get<{ data: Invoice[] }>(
@@ -298,23 +305,11 @@ export class InvoiceAggregationService {
           headers: { Authorization: `Bearer ${token}` },
         },
       );
-      // logger.info('Billing Service Response (My Invoices):', { data: billingResponse.data });
+
       const invoices = billingResponse.data.data;
 
       const aggregated = await Promise.all(
         invoices.map(async (inv) => {
-          // DEBUG: START
-          if (inv.invoiceNumber === 'INV-2026-0002') {
-            console.log('[Aggregation] Raw Invoice from Billing:', JSON.stringify(inv, null, 2));
-            const mapped = {
-              startDate: inv.effectiveFrom || inv.createdAt,
-              endDate: inv.effectiveTo,
-              effectiveFrom: inv.effectiveFrom,
-              createdAt: inv.createdAt,
-            };
-            console.log('[Aggregation] Mapped Dates:', mapped);
-          }
-          // DEBUG: END
           const customerDetails = await fetchCustomerDetails(
             inv.customerId,
             `${CRM_SERVICE_URL}/customers/${inv.customerId}`,
@@ -352,6 +347,9 @@ export class InvoiceAggregationService {
     }
   }
 
+  /**
+   * Fetches and aggregates invoices for a specific branch.
+   */
   async getBranchInvoices(token: string): Promise<AggregatedInvoice[]> {
     try {
       const billingResponse = await axios.get<{ data: Invoice[] }>(
@@ -361,11 +359,6 @@ export class InvoiceAggregationService {
         },
       );
       const invoices = billingResponse.data.data;
-      if (invoices.length > 0) {
-        logger.info(
-          `Branch Invoices Sample: ID=${invoices[0].id}, CustomerID=${invoices[0].customerId}`,
-        );
-      }
 
       const aggregated = await Promise.all(
         invoices.map(async (inv) => {
@@ -385,7 +378,7 @@ export class InvoiceAggregationService {
           return {
             ...inv,
             employeeName,
-            branchName: '', // Usually not needed for branch view as it is same branch, or fetch if needed
+            branchName: '',
             customerName: customerDetails.name,
             customerPhone: customerDetails.phone,
             customerEmail: customerDetails.email,
@@ -413,6 +406,9 @@ export class InvoiceAggregationService {
     }
   }
 
+  /**
+   * Fetches and aggregates a single invoice by ID.
+   */
   async getInvoiceById(invoiceId: string, token: string): Promise<AggregatedInvoice> {
     try {
       const invoiceResponse = await axios.get<{ data: Invoice }>(
@@ -470,6 +466,9 @@ export class InvoiceAggregationService {
     }
   }
 
+  /**
+   * Creates a new invoice/quotation and aggregates the result.
+   */
   async createInvoice(
     payload: {
       branchId: string;
@@ -488,12 +487,6 @@ export class InvoiceAggregationService {
     token: string,
   ): Promise<AggregatedInvoice> {
     try {
-      // Forwarding to Billing Service. Assuming endpoint is /invoices/quotation
-      // Since I haven't updated the Routing yet, I should probably check that.
-      // But based on "Create Invoice behaves as Create Quotation", maybe I should use /invoices root?
-      // I'll assume /invoices/quotation for clarity as per plan, but realize I need to implement that route in billing service.
-      // Wait, I updated BillingService logic but did NOT update the Controller/Router in Billing Service yet.
-      // I must do that in the NEXT step. For now, referencing the future endpoint.
       const billingResponse = await axios.post<{ data: Invoice }>(
         `${BILLING_SERVICE_URL}/invoices/quotation`,
         payload,
@@ -549,6 +542,9 @@ export class InvoiceAggregationService {
     }
   }
 
+  /**
+   * Updates an existing quotation and aggregates the result.
+   */
   async updateQuotation(
     id: string,
     payload: {
@@ -619,6 +615,9 @@ export class InvoiceAggregationService {
     }
   }
 
+  /**
+   * Records usage data for a contract (Billing Service) and returns the result.
+   */
   async recordUsage(
     payload: {
       contractId: string;
@@ -654,6 +653,9 @@ export class InvoiceAggregationService {
     }
   }
 
+  /**
+   * Approves a quotation with a deposit.
+   */
   async approveQuotation(
     id: string,
     deposit: { amount: number; mode: string; reference?: string; receivedDate?: string },
@@ -684,6 +686,9 @@ export class InvoiceAggregationService {
     }
   }
 
+  /**
+   * Submits a quotation for Finance approval.
+   */
   async employeeApprove(id: string, token: string) {
     try {
       const response = await axios.post<{ data: Invoice }>(
@@ -710,6 +715,9 @@ export class InvoiceAggregationService {
     }
   }
 
+  /**
+   * Finance approves a quotation.
+   */
   async financeApprove(
     id: string,
     token: string,
@@ -728,7 +736,6 @@ export class InvoiceAggregationService {
       );
       const invoice = response.data.data;
 
-      // Log success but just return data
       return invoice;
     } catch (error: unknown) {
       if (axios.isAxiosError(error)) {
@@ -746,6 +753,9 @@ export class InvoiceAggregationService {
     }
   }
 
+  /**
+   * Finance rejects a quotation.
+   */
   async financeReject(id: string, reason: string, token: string) {
     try {
       const response = await axios.post<{ data: Invoice }>(
@@ -772,6 +782,9 @@ export class InvoiceAggregationService {
     }
   }
 
+  /**
+   * Generates a final invoice (settlement).
+   */
   async generateFinalInvoice(
     payload: {
       contractId: string;
@@ -823,8 +836,7 @@ export class InvoiceAggregationService {
       };
     } catch (error: unknown) {
       if (axios.isAxiosError(error)) {
-        logger.error('[API Gateway] Axios error in generateFinalInvoice', {
-          url: error.config?.url,
+        logger.error('Axios error in generate final invoice', {
           message: error.message,
           responseStatus: error.response?.status,
           responseData: error.response?.data,
@@ -838,6 +850,66 @@ export class InvoiceAggregationService {
     }
   }
 
+  async sendEmailNotification(
+    id: string,
+    payload: { recipient?: string; subject: string; body: string },
+    token: string,
+  ) {
+    try {
+      const response = await axios.post(
+        `${BILLING_SERVICE_URL}/invoices/${id}/notify/email`,
+        payload,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
+      return response.data;
+    } catch (error: unknown) {
+      if (axios.isAxiosError(error)) {
+        logger.error('Axios error in send email notification', {
+          message: error.message,
+          responseStatus: error.response?.status,
+          responseData: error.response?.data,
+        });
+        throw new AppError(
+          error.response?.data?.message || 'Failed to send email notification',
+          error.response?.status || 500,
+        );
+      }
+      throw new AppError('Internal Gateway Error during email notification', 500);
+    }
+  }
+
+  async sendWhatsappNotification(
+    id: string,
+    payload: { recipient?: string; body: string },
+    token: string,
+  ) {
+    try {
+      const response = await axios.post(
+        `${BILLING_SERVICE_URL}/invoices/${id}/notify/whatsapp`,
+        payload,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
+      return response.data;
+    } catch (error: unknown) {
+      if (axios.isAxiosError(error)) {
+        logger.error('Axios error in send whatsapp notification', {
+          message: error.message,
+          responseStatus: error.response?.status,
+          responseData: error.response?.data,
+        });
+        throw new AppError(
+          error.response?.data?.message || 'Failed to send whatsapp notification',
+          error.response?.status || 500,
+        );
+      }
+      throw new AppError('Internal Gateway Error during whatsapp notification', 500);
+    }
+  }
+
   async createNextMonthInvoice(contractId: string, token: string): Promise<Invoice> {
     try {
       const response = await axios.post<{ data: Invoice }>(
@@ -847,7 +919,8 @@ export class InvoiceAggregationService {
           headers: { Authorization: `Bearer ${token}` },
         },
       );
-      return response.data.data;
+      const invoice = response.data.data;
+      return invoice;
     } catch (error: unknown) {
       if (axios.isAxiosError(error)) {
         logger.error('Axios error in create next month invoice', {
@@ -870,34 +943,37 @@ export class InvoiceAggregationService {
     date?: string,
   ) {
     try {
-      if (!user.branchId) {
-        throw new AppError('Branch ID not found in user context', 400);
-      }
-      const response = await axios.get(
-        `${BILLING_SERVICE_URL}/invoices/alerts${date ? `?date=${date}` : ''}`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        },
-      );
-      const alerts = response.data.data; // Array of { contractId, customerId, ... }
+      const url = date
+        ? `${BILLING_SERVICE_URL}/invoices/alerts?date=${date}`
+        : `${BILLING_SERVICE_URL}/invoices/alerts`;
 
-      // Aggregate Customer Names
-      const enrichedAlerts = await Promise.all(
-        alerts.map(async (alert: { customerId: string } & Record<string, unknown>) => {
-          const customerDetails = await fetchCustomerDetails(
-            alert.customerId,
-            `${CRM_SERVICE_URL}/customers/${alert.customerId}`,
-            token,
-          );
-          return {
-            ...alert,
-            customerName: customerDetails.name,
-            customerPhone: customerDetails.phone,
-          };
+      const response = await axios.get<{ data: CollectionAlert[] }>(url, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const alerts = response.data.data;
+
+      // Enrich with Customer Phone/Name if missing?
+      // Alerts from Billing usually have minimal info.
+      // Let's enrich customerName/Phone if possible using cache
+      const enriched = await Promise.all(
+        alerts.map(async (alert) => {
+          if (alert.customerId) {
+            const customer = await fetchCustomerDetails(
+              alert.customerId,
+              `${CRM_SERVICE_URL}/customers/${alert.customerId}`,
+              token,
+            );
+            return {
+              ...alert,
+              customerName: customer.name || alert.customerName,
+              customerPhone: customer.phone,
+            };
+          }
+          return alert;
         }),
       );
 
-      return enrichedAlerts;
+      return enriched;
     } catch (error: unknown) {
       if (axios.isAxiosError(error)) {
         logger.error('Axios error in get collection alerts', {
@@ -916,42 +992,51 @@ export class InvoiceAggregationService {
   async getInvoiceStats(
     user: { userId: string; role: string; branchId?: string },
     token: string,
-    branchId?: string,
+    branchIdFilter?: string,
   ) {
     try {
-      const url = `${BILLING_SERVICE_URL}/invoices/stats`;
-      const params: { createdBy?: string; branchId?: string } = {};
+      // Build query params
+      const params = new URLSearchParams();
+      if (branchIdFilter) params.append('branchId', branchIdFilter);
 
       const role = user.role ? user.role.toUpperCase() : '';
       if (role === 'EMPLOYEE') {
-        params.createdBy = user.userId;
-      } else if (branchId) {
-        params.branchId = branchId;
+        params.append('createdBy', user.userId);
+      } else if (user.branchId) {
+        // If user has a branchId, filter by it unless branchIdFilter is provided
+        params.append('branchId', user.branchId);
       }
 
-      const response = await axios.get(url, {
-        headers: { Authorization: `Bearer ${token}` },
-        params,
-      });
-
+      const response = await axios.get(
+        `${BILLING_SERVICE_URL}/invoices/stats?${params.toString()}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
       return response.data.data;
     } catch (error: unknown) {
       if (axios.isAxiosError(error)) {
+        logger.error('Axios error in get invoice stats', {
+          message: error.message,
+          responseStatus: error.response?.status,
+        });
         throw new AppError(
           error.response?.data?.message || 'Failed to fetch stats',
           error.response?.status || 500,
         );
       }
-      throw new AppError('Failed to fetch stats', 500);
+      throw new AppError('Internal Gateway Error during stats fetch', 500);
     }
   }
 
   async getPendingCounts(token: string, branchId: string) {
     try {
-      const response = await axios.get(`${BILLING_SERVICE_URL}/invoices/pending-counts`, {
-        headers: { Authorization: `Bearer ${token}` },
-        params: { branchId },
-      });
+      const response = await axios.get(
+        `${BILLING_SERVICE_URL}/invoices/pending-counts?branchId=${branchId}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
       return response.data.data;
     } catch (error: unknown) {
       if (axios.isAxiosError(error)) {
@@ -971,10 +1056,12 @@ export class InvoiceAggregationService {
 
   async getGlobalSales(token: string, period: string) {
     try {
-      const response = await axios.get(`${BILLING_SERVICE_URL}/invoices/sales/global-overview`, {
-        headers: { Authorization: `Bearer ${token}` },
-        params: { period },
-      });
+      const response = await axios.get(
+        `${BILLING_SERVICE_URL}/invoices/sales/global-overview?period=${period}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
       return response.data.data;
     } catch (error: unknown) {
       if (axios.isAxiosError(error)) {
@@ -1107,9 +1194,14 @@ export class InvoiceAggregationService {
         },
       );
       return response.data;
-    } catch {
-      // Handle error properly, maybe log it
-      throw new AppError('Failed to download invoice', 500);
+    } catch (error: unknown) {
+      if (axios.isAxiosError(error)) {
+        throw new AppError(
+          error.response?.data?.message || 'Failed to download invoice',
+          error.response?.status || 500,
+        );
+      }
+      throw new AppError('Internal Gateway Error', 500);
     }
   }
 
@@ -1123,8 +1215,14 @@ export class InvoiceAggregationService {
         },
       );
       return response.data;
-    } catch {
-      throw new AppError('Failed to send invoice', 500);
+    } catch (error: unknown) {
+      if (axios.isAxiosError(error)) {
+        throw new AppError(
+          error.response?.data?.message || 'Failed to send invoice',
+          error.response?.status || 500,
+        );
+      }
+      throw new AppError('Internal Gateway Error', 500);
     }
   }
 

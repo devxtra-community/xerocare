@@ -50,6 +50,12 @@ const getCleanProductName = (name: string) => {
 
 import { generateConsolidatedFinalInvoice } from '@/lib/invoice';
 
+/**
+ * Comprehensive dialog for viewing invoice details.
+ * improved financial summary, broken down by Rent, Lease, Sale, and Usage.
+ * Supports Invoice Approval/Rejection workflows and Contract Completion.
+ * Calculates detailed usage breakdown for Rent/Lease contracts including slab-based pricing.
+ */
 export function InvoiceDetailsDialog({
   invoice,
   onClose,
@@ -801,6 +807,12 @@ export function InvoiceDetailsDialog({
                     <TableHead className="text-[10px] font-bold text-gray-400 h-10">
                       DESCRIPTION
                     </TableHead>
+                    <TableHead className="text-[10px] font-bold text-gray-400 h-10">
+                      LIMITS
+                    </TableHead>
+                    <TableHead className="text-[10px] font-bold text-gray-400 h-10">
+                      EXCESS RATES
+                    </TableHead>
                     <TableHead className="text-[10px] font-bold text-gray-400 text-center h-10">
                       QTY
                     </TableHead>
@@ -849,10 +861,52 @@ export function InvoiceDetailsDialog({
                             )}
                           </div>
                         </TableCell>
-                        <TableCell className="text-center font-bold text-muted-foreground text-sm">
+                        <TableCell className="text-xs font-medium text-gray-600 align-top py-3">
+                          <div className="flex flex-col gap-1">
+                            {item.bwIncludedLimit ? (
+                              <span className="whitespace-nowrap">BW: {item.bwIncludedLimit}</span>
+                            ) : null}
+                            {item.colorIncludedLimit ? (
+                              <span className="whitespace-nowrap">
+                                CLR: {item.colorIncludedLimit}
+                              </span>
+                            ) : null}
+                            {item.combinedIncludedLimit ? (
+                              <span className="whitespace-nowrap">
+                                CMB: {item.combinedIncludedLimit}
+                              </span>
+                            ) : null}
+                            {!item.bwIncludedLimit &&
+                              !item.colorIncludedLimit &&
+                              !item.combinedIncludedLimit && (
+                                <span className="text-gray-300">-</span>
+                              )}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-xs font-medium text-gray-600 align-top py-3">
+                          <div className="flex flex-col gap-1">
+                            {item.bwExcessRate ? (
+                              <span className="whitespace-nowrap">BW: ₹{item.bwExcessRate}</span>
+                            ) : null}
+                            {item.colorExcessRate ? (
+                              <span className="whitespace-nowrap">
+                                CLR: ₹{item.colorExcessRate}
+                              </span>
+                            ) : null}
+                            {item.combinedExcessRate ? (
+                              <span className="whitespace-nowrap">
+                                CMB: ₹{item.combinedExcessRate}
+                              </span>
+                            ) : null}
+                            {!item.bwExcessRate &&
+                              !item.colorExcessRate &&
+                              !item.combinedExcessRate && <span className="text-gray-300">-</span>}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-center font-bold text-muted-foreground text-sm align-top py-3">
                           {item.quantity}
                         </TableCell>
-                        <TableCell className="text-right font-bold text-foreground text-sm">
+                        <TableCell className="text-right font-bold text-foreground text-sm align-top py-3">
                           ₹{((item.quantity || 0) * (item.unitPrice || 0)).toLocaleString()}
                         </TableCell>
                       </TableRow>

@@ -48,6 +48,12 @@ type Finance = {
   count: number;
 };
 
+/**
+ * Main Finance Report Page.
+ * Aggregates financial data (income, expense, profit) from all branches.
+ * Features comprehensive filtering by month, branch, and source (Sale/Lease/Rent).
+ * Visualizes data using interactive charts and summary cards.
+ */
 export default function FinanceReport() {
   const [finance, setFinance] = useState<Finance[]>([]);
   const [branches, setBranches] = useState<Branch[]>([]);

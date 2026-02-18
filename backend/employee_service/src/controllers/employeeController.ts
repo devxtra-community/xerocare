@@ -7,6 +7,9 @@ import { EmployeeRole } from '../constants/employeeRole';
 
 const service = new EmployeeService();
 
+/**
+ * Adds a new employee.
+ */
 export const addEmployee = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const {
@@ -33,9 +36,6 @@ export const addEmployee = async (req: Request, res: Response, next: NextFunctio
       : null;
 
     const idProofKey = files?.id_proof?.[0]?.key ?? null;
-    // - [ ] Define specific rate limiters in `rateLimitter.ts` [/]
-    // - [ ] Apply specific rate limiters to paths in `api_gateway/src/app.ts` [/]
-    // - [ ] Verify rate limits via typecheck and manual review [/]
 
     const employee = await service.addEmployee({
       first_name,
@@ -62,6 +62,9 @@ export const addEmployee = async (req: Request, res: Response, next: NextFunctio
   }
 };
 
+/**
+ * Retrieves a signed URL for viewing an employee's ID proof.
+ */
 export const getEmployeeIdProof = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const employeeId = req.params.id as string;
@@ -75,6 +78,9 @@ export const getEmployeeIdProof = async (req: Request, res: Response, next: Next
   }
 };
 
+/**
+ * Retrieves all employees with pagination and filtering.
+ */
 export const getAllEmployees = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const page = Number(req.query.page) || 1;
@@ -106,6 +112,9 @@ export const getAllEmployees = async (req: Request, res: Response, next: NextFun
   }
 };
 
+/**
+ * Retrieves a single employee by ID.
+ */
 export const getEmployeeById = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const employee = await service.getEmployeeById(req.params.id as string);
@@ -126,6 +135,9 @@ export const getEmployeeById = async (req: Request, res: Response, next: NextFun
   }
 };
 
+/**
+ * Retrieves a public profile for an employee (limited data).
+ */
 export const getPublicEmployeeProfile = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const employee = await service.getPublicEmployeeProfile(req.params.id as string);
@@ -141,6 +153,9 @@ export const getPublicEmployeeProfile = async (req: Request, res: Response, next
   }
 };
 
+/**
+ * Updates an employee's details.
+ */
 export const updateEmployee = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const files = req.files as {
@@ -183,6 +198,9 @@ export const updateEmployee = async (req: Request, res: Response, next: NextFunc
   }
 };
 
+/**
+ * Soft deletes an employee (marks as INACTIVE).
+ */
 export const deleteEmployee = async (req: Request, res: Response, next: NextFunction) => {
   try {
     await service.deleteEmployee(req.params.id as string);
@@ -197,6 +215,9 @@ export const deleteEmployee = async (req: Request, res: Response, next: NextFunc
   }
 };
 
+/**
+ * Retrieves HR statistics (counts, growth, job types).
+ */
 export const getHRStats = async (req: Request, res: Response, next: NextFunction) => {
   try {
     // Branch filtering: Admin and HR see all stats, others (MANAGERS) see only their branch

@@ -21,6 +21,11 @@ import {
 import { useState, useEffect } from 'react';
 import { getBranchInvoices, Invoice } from '@/lib/invoice';
 
+/**
+ * Table component displaying a summary of recent sales transactions.
+ * Fetches and lists invoices with details like invoice number, customer, sale type, amount, employee, status, and date.
+ * Highlights payment status with color-coded badges.
+ */
 export default function SalesSummaryTable() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);

@@ -29,6 +29,10 @@ interface SessionsDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
+/**
+ * Dialog component for managing active user sessions.
+ * Allows viewing current sessions and logging out from specific or all devices.
+ */
 export function SessionsDialog({ open, onOpenChange }: SessionsDialogProps) {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [loading, setLoading] = useState(false);
