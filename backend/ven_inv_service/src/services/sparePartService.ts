@@ -14,6 +14,7 @@ interface BulkUploadRow {
   base_price: number;
   quantity?: number;
   lot_id?: string;
+  lot_number?: string;
   vendor_id?: string;
   warehouse_id?: string;
 }
@@ -48,7 +49,8 @@ export class SparePartService {
    */
   async addSingleSparePart(data: BulkUploadRow, branchId: string) {
     const itemCode = data.item_code?.trim().toUpperCase();
-    if (!itemCode) throw new Error('Item Code is required');
+    // In bulk upload, item_code might be missing as it's generated
+    // if (!itemCode) throw new Error('Item Code is required');
 
     const modelId = data.model_id;
     if (modelId) {
@@ -57,14 +59,33 @@ export class SparePartService {
     }
 
     const quantity = data.quantity || 0;
+    let lotId = data.lot_id;
+    let vendorId = data.vendor_id;
 
-    if (data.lot_id) {
-      await this.lotService.validateAndTrackUsage(
-        data.lot_id,
-        LotItemType.SPARE_PART,
-        itemCode,
-        quantity,
-      );
+    // If lot_id is missing but lot_number is provided, lookup the lot
+    if (!lotId && data.lot_number) {
+      const lot = await this.lotService.getLotByNumber(data.lot_number);
+      if (lot) {
+        lotId = lot.id;
+        // If vendor_id is missing, use the one from the lot
+        if (!vendorId) {
+          vendorId = lot.vendorId;
+        }
+      }
+    }
+
+    if (lotId) {
+      // If we don't have an itemCode yet (new part being added),
+      // we might need to be careful with validateAndTrackUsage
+      // however, the lot tracking currently uses item_code.
+      if (itemCode) {
+        await this.lotService.validateAndTrackUsage(
+          lotId,
+          LotItemType.SPARE_PART,
+          itemCode,
+          quantity,
+        );
+      }
     }
 
     const sparePart = await this.repo.createMaster({
@@ -75,8 +96,8 @@ export class SparePartService {
       base_price: data.base_price,
       branch_id: branchId,
       quantity: quantity,
-      lot_id: data.lot_id,
-      vendor_id: data.vendor_id,
+      lot_id: lotId,
+      vendor_id: vendorId,
       warehouse_id: data.warehouse_id,
     });
 

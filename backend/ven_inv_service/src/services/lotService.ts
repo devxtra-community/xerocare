@@ -90,4 +90,11 @@ export class LotService {
     const lot = await this.getLotById(lotId);
     return this.excelHandler.generateSparePartsExcel(lot);
   }
+
+  /**
+   * Retrieves a lot by lot number.
+   */
+  async getLotByNumber(lotNumber: string): Promise<Lot | null> {
+    return await this.lotRepository.getLotByNumber(lotNumber);
+  }
 }

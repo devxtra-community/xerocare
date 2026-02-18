@@ -193,4 +193,16 @@ export class LotRepository {
       },
     });
   }
+
+  /**
+   * Retrieves a lot by lot number.
+   */
+  async getLotByNumber(lotNumber: string) {
+    return this.repo.findOne({
+      where: { lotNumber },
+      relations: {
+        vendor: true,
+      },
+    });
+  }
 }

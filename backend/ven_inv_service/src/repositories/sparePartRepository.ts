@@ -68,10 +68,6 @@ export class SparePartRepository {
     return this.masterRepo.save(part);
   }
 
-  // Listing for Manager
-  /**
-   * Retrieves spare part inventory for a branch.
-   */
   async getInventoryByBranch(branchId: string) {
     return this.masterRepo
       .createQueryBuilder('sp')
@@ -83,7 +79,7 @@ export class SparePartRepository {
       .select([
         'sp.id AS id',
         'sp.item_code AS item_code',
-        'sp.item_code AS lot_number',
+        'lot.lotNumber AS lot_number',
         'sp.part_name AS part_name',
         'sp.brand AS brand',
         'model.model_name AS compatible_model',
