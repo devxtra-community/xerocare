@@ -77,6 +77,17 @@ export function BulkProductDialog({ open, onClose, onSuccess }: BulkProductDialo
     max_discount_amount: 0,
   });
 
+  /**
+   * Converts an Excel serial date number to a YYYY-MM-DD string.
+   * Excel dates are days since 1900-01-01 (with a leap year bug offset).
+   */
+  const excelSerialToDateString = (serial: number): string => {
+    // Excel's epoch is Dec 30, 1899 (accounting for the 1900 leap year bug)
+    const excelEpoch = new Date(1899, 11, 30);
+    const date = new Date(excelEpoch.getTime() + serial * 86400000);
+    return date.toISOString().split('T')[0];
+  };
+
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
     if (!selectedFile) return;
@@ -104,6 +115,12 @@ export function BulkProductDialog({ open, onClose, onSuccess }: BulkProductDialo
       const getVal = (keys: string[]) => {
         for (const k of keys) {
           if (row[k] !== undefined) return row[k];
+          // Try case insensitive match for common variations
+          const lowerK = k.toLowerCase().replace(/\s/g, '');
+          for (const rowKey of Object.keys(row)) {
+            const lowerRowKey = rowKey.toLowerCase().replace(/\s/g, '');
+            if (lowerRowKey === lowerK) return row[rowKey];
+          }
         }
         return '';
       };
@@ -120,22 +137,50 @@ export function BulkProductDialog({ open, onClose, onSuccess }: BulkProductDialo
         printColour = 'BOTH';
       if (rawColour === 'bw' || rawColour.includes('black')) printColour = 'BLACK_WHITE';
 
+      const selectProductFromLot = getVal(['Select Product from Lot', 'Product Match']);
+      const modelId = getVal(['model_no', 'model_id', 'Model No', 'Model ID', 'Model']);
+
+      if (selectProductFromLot && !modelId) {
+        // Try to match by model name from the "Select Product from Lot" string which is "Name (ModelNo)"
+        const match = selectProductFromLot.toString().match(/\(([^)]+)\)/);
+        if (match && match[1]) {
+          // We need to match this to an actual model ID from our loaded models
+          // But parsing here doesn't have access to models state directly in a good way without passing it.
+          // Let's rely on findIdByName pattern if possible or just use the model_no as model_id
+          // and let the submission logic handle it if needed.
+          // Actually, let's keep modelId as is, the user can select from dropdown if it fails.
+          void match[1]; // acknowledged but unused at parse time
+        }
+      }
+
       return {
-        model_id: getVal(['model_no', 'model_id', 'Model No', 'Model ID', 'Model']),
+        model_id: modelId,
         model_no: getVal(['model_no', 'model_id', 'Model No', 'Model ID']),
-        serial_no: getVal(['serial_no', 'Serial No', 'Serial']),
+        serial_no: getVal(['serial_no', 'Serial No', 'Serial', 'Seriel No']),
         name: getVal(['name', 'Name', 'Product Name']),
         brand: getVal(['brand', 'Brand']),
         warehouse_id: getVal(['warehouse_id', 'Warehouse ID', 'Warehouse']),
         vendor_id: getVal(['vendor_id', 'Vendor ID', 'Vendor']),
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        product_status: (getVal(['product_status', 'Status']) || 'AVAILABLE').toUpperCase() as any,
-        MFD: getVal(['MFD', 'mfd', 'Date']),
-        sale_price: Number(getVal(['sale_price', 'Price'])) || 0,
-        tax_rate: Number(getVal(['tax_rate', 'Tax Rate', 'Tax'])) || 0,
+        product_status: (
+          getVal(['product_status', 'Status', 'Product Status']) || 'AVAILABLE'
+        ).toUpperCase() as 'AVAILABLE' | 'RENTED' | 'LEASE' | 'SOLD' | 'DAMAGED',
+        MFD: (() => {
+          const raw = getVal(['MFD', 'mfd', 'Date', 'Date of Manufacture']);
+          // Excel stores dates as serial numbers (e.g. 46066). Convert to YYYY-MM-DD.
+          if (typeof raw === 'number' && raw > 1000) {
+            return excelSerialToDateString(raw);
+          }
+          // If it's already a string date, return as-is
+          return raw ? String(raw).split('T')[0] : '';
+        })(),
+        sale_price: Number(getVal(['sale_price', 'Price', 'Sale Price'])) || 0,
+        tax_rate: Number(getVal(['tax_rate', 'Tax Rate', 'Tax', 'Tax %'])) || 0,
         print_colour: printColour,
         max_discount_amount:
-          Number(getVal(['max_discount_amount', 'Max Discount', 'Discount'])) || 0,
+          Number(
+            getVal(['max_discount_amount', 'Max Discount', 'Discount', 'Max Discount Amount']),
+          ) || 0,
+        lot_id: getVal(['lot_id', 'Lot ID', 'Lot']),
       };
     });
 
@@ -356,7 +401,9 @@ export function BulkProductDialog({ open, onClose, onSuccess }: BulkProductDialo
                             row.MFD
                               ? row.MFD instanceof Date
                                 ? row.MFD.toISOString().split('T')[0]
-                                : String(row.MFD).split('T')[0]
+                                : typeof row.MFD === 'number'
+                                  ? excelSerialToDateString(row.MFD as number)
+                                  : String(row.MFD).split('T')[0]
                               : ''
                           }
                           onChange={(e) => updateRow(i, 'MFD', e.target.value)}

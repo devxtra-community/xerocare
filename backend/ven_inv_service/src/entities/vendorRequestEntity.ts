@@ -23,7 +23,7 @@ export class VendorRequest {
   vendor!: Vendor;
 
   @Column({ type: 'uuid', nullable: true })
-  requested_by!: string;
+  requested_by?: string;
 
   @Column({ type: 'uuid', nullable: true })
   branch_id?: string;
@@ -32,7 +32,7 @@ export class VendorRequest {
   @JoinColumn({ name: 'branch_id' })
   branch?: Branch;
 
-  @ManyToOne(() => EmployeeManager)
+  @ManyToOne(() => EmployeeManager, { nullable: true })
   @JoinColumn({ name: 'requested_by', referencedColumnName: 'employee_id' })
   manager?: EmployeeManager;
 

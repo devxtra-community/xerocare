@@ -23,6 +23,7 @@ export interface CreateLotDto {
   certificationCost?: number;
   labourCost?: number;
   branchId?: string;
+  warehouseId?: string;
   createdBy?: string;
 }
 

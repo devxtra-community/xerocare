@@ -27,6 +27,11 @@ export const getWarehouses = async () => {
   return res.data;
 };
 
+export const getMyBranchWarehouses = async () => {
+  const res = await api.get('/i/warehouses/my-branch');
+  return res.data;
+};
+
 export const getWarehouseById = async (id: string) => {
   const res = await api.get(`/i/warehouses/${id}`);
   return res.data;

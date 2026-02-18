@@ -250,6 +250,7 @@ export class ExcelHandler {
 
     rows.push([
       'model_no',
+      'Select Product from Lot',
       'warehouse_id',
       'vendor_id',
       'product_status',
@@ -268,14 +269,17 @@ export class ExcelHandler {
       const remaining = item.quantity - item.usedQuantity;
       const modelId = item.modelId || '';
       const modelName = item.model?.model_name || '';
+      const modelNo = item.model?.model_no || '';
       const brandName = item.model?.brandRelation?.name || '';
+      const selectProductFromLot = `${modelName} (${modelNo})`;
 
       for (let i = 0; i < remaining; i++) {
         rows.push([
           modelId,
-          '',
+          selectProductFromLot,
+          lot.warehouse_id || '',
           lot.vendorId,
-          'IN_STOCK',
+          'AVAILABLE',
           '',
           modelName,
           brandName,
@@ -294,6 +298,7 @@ export class ExcelHandler {
 
     const wscols = [
       { wch: 38 },
+      { wch: 40 },
       { wch: 38 },
       { wch: 38 },
       { wch: 15 },
@@ -323,15 +328,34 @@ export class ExcelHandler {
 
     const rows: (string | number)[][] = [];
 
-    rows.push(['part_name', 'brand', 'model_id', 'base_price', 'quantity', 'lot_id']);
+    rows.push([
+      'part_name',
+      'brand',
+      'Select Product from Lot',
+      'model_id',
+      'base_price',
+      'quantity',
+      'lot_id',
+    ]);
 
     sparePartItems.forEach((item) => {
       const remaining = item.quantity - item.usedQuantity;
       const partName = item.sparePart?.part_name || '';
       const brand = item.sparePart?.brand || '';
       const modelId = item.sparePart?.model_id || '';
+      const modelName = item.model?.model_name || '';
+      const modelNo = item.model?.model_no || '';
+      const selectProductFromLot = modelName ? `${modelName} (${modelNo})` : '';
 
-      rows.push([partName, brand, modelId, item.unitPrice, remaining, lot.id]);
+      rows.push([
+        partName,
+        brand,
+        selectProductFromLot,
+        modelId,
+        item.unitPrice,
+        remaining,
+        lot.id,
+      ]);
     });
 
     const workbook = XLSX.utils.book_new();
@@ -340,10 +364,10 @@ export class ExcelHandler {
     const wscols = [
       { wch: 20 },
       { wch: 30 },
+      { wch: 40 },
       { wch: 20 },
-      { wch: 38 },
+      { wch: 15 },
       { wch: 12 },
-      { wch: 10 },
       { wch: 38 },
     ];
     worksheet['!cols'] = wscols;
