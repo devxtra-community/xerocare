@@ -188,6 +188,9 @@ export default function InventoryTable({ mode = 'global', warehouseId }: Invento
                 <TableHead className="text-[10px] font-bold text-primary uppercase py-2 px-3">
                   Brand
                 </TableHead>
+                <TableHead className="text-[10px] font-bold text-primary uppercase py-2 px-3 text-right">
+                  Price
+                </TableHead>
                 <TableHead className="text-[10px] font-bold text-primary uppercase py-2 px-3 text-center">
                   Total Qty
                 </TableHead>
@@ -231,6 +234,9 @@ export default function InventoryTable({ mode = 'global', warehouseId }: Invento
                     </TableCell>
                     <TableCell className="px-3 py-1.5 text-gray-600 text-[11px]">
                       {item.brand}
+                    </TableCell>
+                    <TableCell className="px-3 py-1.5 text-right font-bold text-primary text-[12px]">
+                      ₹{(item.product_cost || 0).toLocaleString('en-IN')}
                     </TableCell>
                     <TableCell className="px-3 py-1.5 text-center font-bold text-[12px]">
                       {item.total_qty}

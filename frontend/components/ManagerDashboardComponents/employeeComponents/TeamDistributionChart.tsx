@@ -10,8 +10,8 @@ interface TeamDistributionChartProps {
 
 const defaultData = [
   { name: 'Sales', value: 0, color: '#003F7D' },
-  { name: 'Rent', value: 0, color: '#0284C7' },
-  { name: 'Lease', value: 0, color: '#0891b2' },
+  { name: 'Rent & Lease', value: 0, color: '#0284C7' },
+  { name: 'Service', value: 0, color: '#0891b2' },
   { name: 'Other', value: 0, color: '#CBD5E1' },
 ];
 

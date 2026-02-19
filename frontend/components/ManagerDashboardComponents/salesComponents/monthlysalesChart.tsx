@@ -1,35 +1,21 @@
 'use client';
 
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-  Legend,
-} from 'recharts';
+import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 
-const data = [
-  { month: 'Jan', BranchA: 25000 },
-  { month: 'Feb', BranchA: 37000 },
-  { month: 'Mar', BranchA: 39000 },
-  { month: 'Apr', BranchA: 43000 },
-  { month: 'May', BranchA: 53000 },
-  { month: 'Jun', BranchA: 63000 },
-];
+interface MonthlySalesBarChartProps {
+  data: { month: string; value: number }[];
+  title?: string;
+}
 
 /**
- * Bar chart component visualizing monthly sales performance.
- * Shows revenue trends over time for the branch.
+ * Bar chart component visualizing monthly performance trends.
  */
-export default function MonthlySalesBarChart() {
+export default function MonthlySalesBarChart({ data, title }: MonthlySalesBarChartProps) {
   return (
-    <div className="bg-card rounded-xl p-3 sm:p-4">
+    <div className="bg-card rounded-xl p-0">
       <div className="h-[250px]">
         <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={data} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+          <BarChart data={data} margin={{ top: 20, right: 20, left: 0, bottom: 5 }}>
             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f9ff" />
             <XAxis
               dataKey="month"
@@ -42,7 +28,7 @@ export default function MonthlySalesBarChart() {
               tick={{ fontSize: 11, fill: '#1e3a8a', fontWeight: 500 }}
               axisLine={false}
               tickLine={false}
-              tickFormatter={(value) => `₹${value / 1000}k`}
+              tickFormatter={(value) => `₹${(value / 1000).toFixed(1)}k`}
             />
             <Tooltip
               contentStyle={{
@@ -54,14 +40,9 @@ export default function MonthlySalesBarChart() {
               }}
               labelStyle={{ color: '#1e3a8a', fontWeight: 'bold', marginBottom: '4px' }}
               cursor={{ fill: '#f8fafc' }}
+              formatter={(value: number) => [`₹${value.toLocaleString()}`, 'Amount']}
             />
-            <Legend
-              verticalAlign="top"
-              align="right"
-              iconType="circle"
-              wrapperStyle={{ fontSize: '11px', paddingBottom: '20px' }}
-            />
-            <Bar dataKey="BranchA" name="Branch A" fill="#0D47A1" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="value" name={title || 'Amount'} fill="#0D47A1" radius={[4, 4, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
       </div>

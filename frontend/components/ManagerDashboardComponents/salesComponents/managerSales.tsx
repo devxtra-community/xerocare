@@ -3,7 +3,6 @@
 import StatCard from '@/components/StatCard';
 import SalesSummaryTable from './SalesSummaryTable';
 import MonthlySalesBarChart from './monthlysalesChart';
-import MostSoldProductChart from './MostSoldProductChart';
 import { useState, useEffect } from 'react';
 import { salesService } from '@/services/salesService';
 
@@ -19,12 +18,17 @@ export default function ManagerSalesPage() {
   const [leaseAmount, setLeaseAmount] = useState(0);
   const [totalInvoices, setTotalInvoices] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [salesTrend, setSalesTrend] = useState<{ month: string; value: number }[]>([]);
+  const [rentTrend, setRentTrend] = useState<{ month: string; value: number }[]>([]);
 
   useEffect(() => {
     const fetchSalesData = async () => {
       try {
         setLoading(true);
-        const salesData = await salesService.getBranchSalesTotals();
+        const [salesData, trendData] = await Promise.all([
+          salesService.getBranchSalesTotals(),
+          salesService.getBranchSalesOverview('1Y'),
+        ]);
 
         setTotalSales(salesData.totalSales);
         setTotalInvoices(salesData.totalInvoices);
@@ -35,6 +39,42 @@ export default function ManagerSalesPage() {
           else if (item.saleType === 'RENT') setRentAmount(item.total);
           else if (item.saleType === 'LEASE') setLeaseAmount(item.total);
         });
+
+        // Process trend data
+        const months = [
+          'Jan',
+          'Feb',
+          'Mar',
+          'Apr',
+          'May',
+          'Jun',
+          'Jul',
+          'Aug',
+          'Sep',
+          'Oct',
+          'Nov',
+          'Dec',
+        ];
+        const salesMap: Record<string, number> = {};
+        const rentMap: Record<string, number> = {};
+
+        trendData.forEach((item) => {
+          const date = new Date(item.date);
+          const monthLabel = months[date.getMonth()];
+
+          if (item.saleType === 'SALE') {
+            salesMap[monthLabel] = (salesMap[monthLabel] || 0) + item.totalSales;
+          } else {
+            rentMap[monthLabel] = (rentMap[monthLabel] || 0) + item.totalSales;
+          }
+        });
+
+        const formattedSales = months.map((m) => ({ month: m, value: salesMap[m] || 0 }));
+        const formattedRent = months.map((m) => ({ month: m, value: rentMap[m] || 0 }));
+
+        // Only show up to current month or last 6 months for better visibility if data is sparse
+        setSalesTrend(formattedSales);
+        setRentTrend(formattedRent);
       } catch (error) {
         console.error('Failed to fetch sales data', error);
       } finally {
@@ -43,6 +83,13 @@ export default function ManagerSalesPage() {
     };
     fetchSalesData();
   }, []);
+
+  const formatToK = (value: number) => {
+    if (value >= 1000) {
+      return `₹${(value / 1000).toFixed(1)}k`;
+    }
+    return `₹${value.toLocaleString()}`;
+  };
 
   return (
     <div className="bg-blue-100 min-h-screen p-3 sm:p-4 md:p-6 space-y-8 sm:space-y-10">
@@ -54,7 +101,7 @@ export default function ManagerSalesPage() {
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 sm:gap-2 md:gap-4">
           <StatCard
             title="Total Revenue"
-            value={loading ? '...' : `₹${totalSales.toLocaleString()}`}
+            value={loading ? '...' : formatToK(totalSales)}
             subtitle="All sales, rent & lease"
           />
           <StatCard
@@ -64,12 +111,12 @@ export default function ManagerSalesPage() {
           />
           <StatCard
             title="Product Sales"
-            value={loading ? '...' : `₹${saleAmount.toLocaleString()}`}
+            value={loading ? '...' : formatToK(saleAmount)}
             subtitle="Products & spare parts"
           />
           <StatCard
             title="Rent + Lease"
-            value={loading ? '...' : `₹${(rentAmount + leaseAmount).toLocaleString()}`}
+            value={loading ? '...' : formatToK(rentAmount + leaseAmount)}
             subtitle="Rental & lease income"
           />
         </div>
@@ -85,14 +132,14 @@ export default function ManagerSalesPage() {
           <div className="space-y-4">
             <h4 className="text-lg sm:text-xl font-bold text-primary">Sales per Month</h4>
             <div className="bg-card rounded-xl p-3">
-              <MonthlySalesBarChart />
+              <MonthlySalesBarChart data={salesTrend} title="Product Sales" />
             </div>
           </div>
 
           <div className="space-y-4">
-            <h4 className="text-lg sm:text-xl font-bold text-primary">Sold Products by Quantity</h4>
+            <h4 className="text-lg sm:text-xl font-bold text-primary">Rent + Lease per Month</h4>
             <div className="bg-card rounded-xl p-3">
-              <MostSoldProductChart />
+              <MonthlySalesBarChart data={rentTrend} title="Rent & Lease" />
             </div>
           </div>
         </div>

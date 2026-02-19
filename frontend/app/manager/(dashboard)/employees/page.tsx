@@ -30,34 +30,44 @@ export default function EmployeesPage() {
   // Transform stats for components
   const displayStats = {
     total: stats?.total || 0,
-    rent: (stats?.byJob?.['RENT'] || 0) + (stats?.byJob?.['FINANCE_RENT'] || 0),
-    lease: (stats?.byJob?.['LEASE'] || 0) + (stats?.byJob?.['FINANCE_LEASE'] || 0),
-    sale: (stats?.byJob?.['SALES'] || 0) + (stats?.byJob?.['FINANCE_SALES'] || 0),
+    branchManager: stats?.byRole?.['MANAGER'] || 0,
+    employeeManager: stats?.byJob?.['EMPLOYEE_MANAGER'] || 0,
+    salesStaff: (stats?.byJob?.['SALES'] || 0) + (stats?.byJob?.['FINANCE_SALES'] || 0),
+    rentLeaseStaff:
+      (stats?.byJob?.['RENT'] || 0) +
+      (stats?.byJob?.['LEASE'] || 0) +
+      (stats?.byJob?.['RENT_LEASE'] || 0) +
+      (stats?.byJob?.['FINANCE_RENT'] || 0) +
+      (stats?.byJob?.['FINANCE_LEASE'] || 0) +
+      (stats?.byJob?.['FINANCE_RENT_LEASE'] || 0),
+    finance: stats?.byRole?.['FINANCE'] || 0,
+    service:
+      (stats?.byJob?.['TECHNICIAN'] || 0) +
+      (stats?.byJob?.['DELIVERY'] || 0) +
+      (stats?.byJob?.['READING_AGENT'] || 0),
   };
 
   const distributionData = [
-    { name: 'Sales', value: displayStats.sale, color: '#003F7D' },
-    { name: 'Rent', value: displayStats.rent, color: '#0284C7' },
-    { name: 'Lease', value: displayStats.lease, color: '#0891b2' },
-    {
-      name: 'Service',
-      value:
-        (stats?.byJob?.['TECHNICIAN'] || 0) +
-        (stats?.byJob?.['DELIVERY'] || 0) +
-        (stats?.byJob?.['READING_AGENT'] || 0),
-      color: '#9BD0E5',
-    },
+    { name: 'Branch Manager', value: displayStats.branchManager, color: '#003F7D' },
+    { name: 'Employee Manager', value: displayStats.employeeManager, color: '#0284C7' },
+    { name: 'Sales Staff', value: displayStats.salesStaff, color: '#0891b2' },
+    { name: 'Rent & Lease Staff', value: displayStats.rentLeaseStaff, color: '#7dd3fc' },
+    { name: 'Finance', value: displayStats.finance, color: '#94a3b8' },
+    { name: 'Service', value: displayStats.service, color: '#9BD0E5' },
     {
       name: 'Other',
-      value: stats
-        ? stats.total -
-          (displayStats.sale +
-            displayStats.rent +
-            displayStats.lease +
-            (stats?.byJob?.['TECHNICIAN'] || 0) +
-            (stats?.byJob?.['DELIVERY'] || 0) +
-            (stats?.byJob?.['READING_AGENT'] || 0))
-        : 0,
+      value: Math.max(
+        0,
+        stats
+          ? stats.total -
+              (displayStats.branchManager +
+                displayStats.employeeManager +
+                displayStats.salesStaff +
+                displayStats.rentLeaseStaff +
+                displayStats.finance +
+                displayStats.service)
+          : 0,
+      ),
       color: '#CBD5E1',
     },
   ].filter((item) => item.value > 0 || item.name === 'Other');

@@ -108,6 +108,9 @@ export default function EmployeeTable() {
                   Role
                 </TableHead>
                 <TableHead className="px-3 py-2 text-[10px] font-bold text-primary uppercase">
+                  Department
+                </TableHead>
+                <TableHead className="px-3 py-2 text-[10px] font-bold text-primary uppercase">
                   Display ID
                 </TableHead>
                 <TableHead className="px-3 py-2 text-[10px] font-bold text-primary uppercase">
@@ -161,6 +164,27 @@ export default function EmployeeTable() {
                       <span className="px-1.5 py-0.5 rounded-full text-[9px] font-semibold uppercase bg-blue-100 text-blue-700">
                         {emp.role}
                       </span>
+                    </TableCell>
+                    <TableCell className="px-3 py-1.5 whitespace-nowrap text-[11px] font-medium text-gray-700">
+                      {(() => {
+                        if (emp.role === 'MANAGER') return 'Branch Manager';
+                        if (emp.employee_job === 'EMPLOYEE_MANAGER') return 'Employee Manager';
+                        if (emp.role === 'FINANCE') return 'Finance Staff';
+
+                        const job = emp.finance_job || emp.employee_job;
+                        if (!job) return 'Other';
+
+                        const formattedJob = job
+                          .toLowerCase()
+                          .replace('finance_', '')
+                          .split('_')
+                          .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+                          .join(' & ');
+
+                        const base =
+                          formattedJob === 'Sales' ? 'Sales Staff' : `${formattedJob} Staff`;
+                        return base;
+                      })()}
                     </TableCell>
                     <TableCell className="px-3 py-1.5 text-[11px] text-muted-foreground whitespace-nowrap">
                       {emp.display_id || 'N/A'}

@@ -49,24 +49,24 @@ export default function InventoryKPICards() {
   return (
     <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 sm:gap-2 md:gap-4">
       <StatCard
-        title="Total Stock"
-        value={stats?.totalStock.toLocaleString() || '0'}
-        subtitle="Combined active items"
+        title="Product Stock"
+        value={stats?.productStock.toLocaleString() || '0'}
+        subtitle="Total printers in inventory"
       />
       <StatCard
-        title="Damaged Products"
-        value={stats?.damagedStock.toLocaleString() || '0'}
-        subtitle="Requires attention"
+        title="Spare Parts Stock"
+        value={stats?.spareStock.toLocaleString() || '0'}
+        subtitle="Total spare parts items"
       />
       <StatCard
-        title="Total Product Models"
-        value={stats?.productModels.toLocaleString() || '0'}
-        subtitle="Unique printer models"
+        title="Product Inventory Value"
+        value={formatCurrency(stats?.productValue || 0)}
+        subtitle="Total printer valuation"
       />
       <StatCard
-        title="Total Stock Value"
-        value={formatCurrency(stats?.totalValue || 0)}
-        subtitle="Inventory valuation"
+        title="Spare Parts Value"
+        value={formatCurrency(stats?.spareValue || 0)}
+        subtitle="Total spare parts valuation"
       />
     </div>
   );

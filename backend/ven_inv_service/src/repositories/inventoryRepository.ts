@@ -113,6 +113,7 @@ export class InventoryRepository {
         `SUM(CASE WHEN product.product_status = 'LEASE' THEN 1 ELSE 0 END)::int AS lease_qty`,
         `SUM(CASE WHEN product.product_status = 'DAMAGED' THEN 1 ELSE 0 END)::int AS damaged_qty`,
         `SUM(CASE WHEN product.product_status = 'SOLD' THEN 1 ELSE 0 END)::int AS sold_qty`,
+        'AVG(product.sale_price) AS product_cost',
       ])
       .where('warehouse.branchId = :branchId', { branchId })
       .groupBy('model.id')
@@ -148,6 +149,7 @@ export class InventoryRepository {
       lease_qty: Number(row.lease_qty),
       damaged_qty: Number(row.damaged_qty),
       sold_qty: Number(row.sold_qty),
+      product_cost: Number(row.product_cost || 0),
     }));
   }
 
@@ -171,6 +173,7 @@ export class InventoryRepository {
         `SUM(CASE WHEN product.product_status = 'LEASE' THEN 1 ELSE 0 END)::int AS lease_qty`,
         `SUM(CASE WHEN product.product_status = 'DAMAGED' THEN 1 ELSE 0 END)::int AS damaged_qty`,
         `SUM(CASE WHEN product.product_status = 'SOLD' THEN 1 ELSE 0 END)::int AS sold_qty`,
+        'AVG(product.sale_price) AS product_cost',
       ])
       .where('product.warehouse_id = :warehouseId', { warehouseId })
       .groupBy('model.id')
@@ -194,6 +197,7 @@ export class InventoryRepository {
       lease_qty: Number(row.lease_qty),
       damaged_qty: Number(row.damaged_qty),
       sold_qty: Number(row.sold_qty),
+      product_cost: Number(row.product_cost || 0),
     }));
   }
 

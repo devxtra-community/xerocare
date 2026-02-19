@@ -22,7 +22,9 @@ interface GrowthStat {
 interface JobCountStat {
   job: string | null;
   financeJob: string | null;
+  role: string | null;
   count: string;
+  totalSalary: string;
 }
 
 export class EmployeeService {
@@ -382,13 +384,50 @@ export class EmployeeService {
     const jobCounts = await this.employeeRepo.getJobTypeCounts(branchId);
 
     const byJob: Record<string, number> = {};
+    const bySalary: Record<string, number> = {};
+
     jobCounts.forEach((item: JobCountStat) => {
+      const count = parseInt(item.count, 10);
+      const salary = parseFloat(item.totalSalary);
+
+      // Determine category (same logic as used in frontend)
+      let category = 'OTHER';
+      if (item.role === 'MANAGER') category = 'BRANCH_MANAGER';
+      else if (item.job === 'EMPLOYEE_MANAGER') category = 'EMPLOYEE_MANAGER';
+      else if (item.role === 'FINANCE') category = 'FINANCE';
+      else if (
+        ['SALES', 'FINANCE_SALES'].includes(item.job || '') ||
+        ['SALES', 'FINANCE_SALES'].includes(item.financeJob || '')
+      )
+        category = 'SALES_STAFF';
+      else if (
+        [
+          'RENT',
+          'LEASE',
+          'RENT_LEASE',
+          'FINANCE_RENT',
+          'FINANCE_LEASE',
+          'FINANCE_RENT_LEASE',
+        ].includes(item.job || '') ||
+        [
+          'RENT',
+          'LEASE',
+          'RENT_LEASE',
+          'FINANCE_RENT',
+          'FINANCE_LEASE',
+          'FINANCE_RENT_LEASE',
+        ].includes(item.financeJob || '')
+      )
+        category = 'RENT_LEASE_STAFF';
+
+      byJob[category] = (byJob[category] || 0) + count;
+      bySalary[category] = (bySalary[category] || 0) + salary;
+
+      // Also keep raw byJob for other uses if needed, but the above is better for charts
       if (item.financeJob) {
-        byJob[item.financeJob] = (byJob[item.financeJob] || 0) + parseInt(item.count, 10);
+        byJob[item.financeJob] = (byJob[item.financeJob] || 0) + count;
       } else if (item.job) {
-        byJob[item.job] = (byJob[item.job] || 0) + parseInt(item.count, 10);
-      } else {
-        byJob['OTHER'] = (byJob['OTHER'] || 0) + parseInt(item.count, 10);
+        byJob[item.job] = (byJob[item.job] || 0) + count;
       }
     });
 
@@ -398,6 +437,7 @@ export class EmployeeService {
       inactive,
       byRole,
       byJob,
+      bySalary,
       growthData,
     };
   }

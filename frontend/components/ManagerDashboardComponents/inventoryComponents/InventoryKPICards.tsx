@@ -10,17 +10,17 @@ import { inventoryService, InventoryStats } from '@/services/inventoryService';
  */
 export default function InventoryKPICards() {
   const [stats, setStats] = React.useState<InventoryStats>({
-    totalStock: 0,
-    productModels: 0,
-    totalValue: 0,
-    damagedStock: 0,
+    productStock: 0,
+    spareStock: 0,
+    productValue: 0,
+    spareValue: 0,
   });
 
   React.useEffect(() => {
     const fetchStats = async () => {
       try {
         const data = await inventoryService.getInventoryStats();
-        setStats(data);
+        if (data) setStats(data);
       } catch (error) {
         console.error('Failed to fetch inventory stats:', error);
       }
@@ -29,34 +29,33 @@ export default function InventoryKPICards() {
   }, []);
 
   const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency: 'AED',
-      maximumFractionDigits: 0,
-    }).format(value);
+    if (value >= 1000) {
+      return `AED ${(value / 1000).toFixed(1)}k`;
+    }
+    return `AED ${(value || 0).toLocaleString()}`;
   };
 
   return (
     <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 sm:gap-2 md:gap-4">
       <StatCard
-        title="Total Stock"
-        value={stats.totalStock.toLocaleString()}
+        title="Product Stock"
+        value={(stats?.productStock ?? 0).toLocaleString()}
         subtitle="Items in inventory"
       />
       <StatCard
-        title="Product Models"
-        value={stats.productModels.toLocaleString()}
-        subtitle="Unique models"
+        title="Spare Parts Stock"
+        value={(stats?.spareStock ?? 0).toLocaleString()}
+        subtitle="Parts in inventory"
       />
       <StatCard
-        title="Total Value"
-        value={formatCurrency(stats.totalValue)}
-        subtitle="Inventory worth"
+        title="Product Inventory Value"
+        value={formatCurrency(stats?.productValue ?? 0)}
+        subtitle="Products worth"
       />
       <StatCard
-        title="Damaged Stock"
-        value={stats.damagedStock.toLocaleString()}
-        subtitle="Items damaged"
+        title="Spare Parts Value"
+        value={formatCurrency(stats?.spareValue ?? 0)}
+        subtitle="Spare parts worth"
       />
     </div>
   );

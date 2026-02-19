@@ -45,6 +45,7 @@ export default function DashboardHeader({ title = 'Dashboard' }: { title?: strin
   });
 
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [mounted, setMounted] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false);
   const [isSessionsDialogOpen, setIsSessionsDialogOpen] = useState(false);
@@ -62,6 +63,7 @@ export default function DashboardHeader({ title = 'Dashboard' }: { title?: strin
   };
 
   useEffect(() => {
+    setMounted(true);
     const fetchProfile = async () => {
       try {
         const res = await getProfile();
@@ -151,69 +153,73 @@ export default function DashboardHeader({ title = 'Dashboard' }: { title?: strin
         {/* Right: Icons and User Profile */}
         <div className="flex items-center gap-2 sm:gap-4">
           {/* Notifications */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="text-white hover:bg-card/10 h-8 w-8 sm:h-10 sm:w-10 relative"
+          {mounted && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="text-white hover:bg-card/10 h-8 w-8 sm:h-10 sm:w-10 relative"
+                >
+                  <Bell className="h-4 w-4 sm:h-5 sm:w-5" />
+                  {unreadCount > 0 && (
+                    <span className="absolute top-1.5 right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold">
+                      {unreadCount}
+                    </span>
+                  )}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                align="end"
+                className="w-80 bg-card text-black max-h-[400px] overflow-y-auto"
               >
-                <Bell className="h-4 w-4 sm:h-5 sm:w-5" />
-                {unreadCount > 0 && (
-                  <span className="absolute top-1.5 right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold">
-                    {unreadCount}
-                  </span>
-                )}
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent
-              align="end"
-              className="w-80 bg-card text-black max-h-[400px] overflow-y-auto"
-            >
-              <div className="flex items-center justify-between px-4 py-2">
-                <DropdownMenuLabel className="p-0">Notifications</DropdownMenuLabel>
-                {unreadCount > 0 && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-xs h-8 text-primary hover:text-primary/80"
-                    onClick={markAllAsRead}
-                  >
-                    Mark all as read
-                  </Button>
-                )}
-              </div>
-              <DropdownMenuSeparator />
-              {notifications.length === 0 ? (
-                <div className="p-8 text-center text-sm text-gray-500">No notifications yet</div>
-              ) : (
-                notifications.map((notification) => (
-                  <DropdownMenuItem
-                    key={notification.id}
-                    className={`flex flex-col items-start gap-1 p-4 cursor-pointer focus:bg-primary/5 ${!notification.is_read ? 'bg-primary/5' : ''}`}
-                    onClick={() => handleNotificationClick(notification)}
-                  >
-                    <div className="flex w-full items-center justify-between gap-2">
-                      <span
-                        className={`font-semibold text-sm ${!notification.is_read ? 'text-primary' : ''}`}
-                      >
-                        {notification.title}
-                      </span>
-                      <span className="text-[10px] text-gray-400 whitespace-nowrap">
-                        {formatDistanceToNow(new Date(notification.createdAt), { addSuffix: true })}
-                      </span>
-                    </div>
-                    <p className="text-xs text-gray-600 line-clamp-2">{notification.message}</p>
-                    {!notification.is_read && (
-                      <div className="mt-1 flex w-full justify-end">
-                        <div className="h-1.5 w-1.5 rounded-full bg-primary" />
+                <div className="flex items-center justify-between px-4 py-2">
+                  <DropdownMenuLabel className="p-0">Notifications</DropdownMenuLabel>
+                  {unreadCount > 0 && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-xs h-8 text-primary hover:text-primary/80"
+                      onClick={markAllAsRead}
+                    >
+                      Mark all as read
+                    </Button>
+                  )}
+                </div>
+                <DropdownMenuSeparator />
+                {notifications.length === 0 ? (
+                  <div className="p-8 text-center text-sm text-gray-500">No notifications yet</div>
+                ) : (
+                  notifications.map((notification) => (
+                    <DropdownMenuItem
+                      key={notification.id}
+                      className={`flex flex-col items-start gap-1 p-4 cursor-pointer focus:bg-primary/5 ${!notification.is_read ? 'bg-primary/5' : ''}`}
+                      onClick={() => handleNotificationClick(notification)}
+                    >
+                      <div className="flex w-full items-center justify-between gap-2">
+                        <span
+                          className={`font-semibold text-sm ${!notification.is_read ? 'text-primary' : ''}`}
+                        >
+                          {notification.title}
+                        </span>
+                        <span className="text-[10px] text-gray-400 whitespace-nowrap">
+                          {formatDistanceToNow(new Date(notification.createdAt), {
+                            addSuffix: true,
+                          })}
+                        </span>
                       </div>
-                    )}
-                  </DropdownMenuItem>
-                ))
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
+                      <p className="text-xs text-gray-600 line-clamp-2">{notification.message}</p>
+                      {!notification.is_read && (
+                        <div className="mt-1 flex w-full justify-end">
+                          <div className="h-1.5 w-1.5 rounded-full bg-primary" />
+                        </div>
+                      )}
+                    </DropdownMenuItem>
+                  ))
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
 
           {/* Help (hidden on mobile) */}
           <Button
@@ -225,68 +231,72 @@ export default function DashboardHeader({ title = 'Dashboard' }: { title?: strin
           </Button>
 
           {/* User Profile */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                className="flex items-center gap-2 sm:gap-3 pl-2 sm:pl-4 border-l border-white/20 hover:bg-card/5 py-2 px-1 rounded transition-colors h-auto"
-              >
-                <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-full bg-white/20 flex items-center justify-center text-xs sm:text-sm font-medium shrink-0">
-                  {user.initial}
-                </div>
-                <div className="hidden sm:flex flex-col min-w-0 items-start">
-                  <span className="text-sm font-medium truncate">{user.name}</span>
-                  <span className="text-xs text-sidebar-foreground/70 truncate">{user.email}</span>
-                </div>
-                <ChevronDown className="hidden sm:block h-4 w-4 text-sidebar-foreground/70" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent
-              align="end"
-              className="w-64 p-2 bg-white border-slate-200 shadow-xl rounded-2xl"
-            >
-              <div className="flex items-center gap-3 p-3 mb-1 bg-slate-50 rounded-xl">
-                <div className="h-10 w-10 rounded-full bg-primary flex items-center justify-center text-white text-sm font-bold shrink-0 shadow-sm">
-                  {user.initial}
-                </div>
-                <div className="flex flex-col min-w-0">
-                  <span className="text-sm font-bold text-slate-900 truncate">{user.name}</span>
-                  <span className="text-[10px] text-slate-500 truncate font-medium">
-                    {user.email}
-                  </span>
-                </div>
-              </div>
-
-              <DropdownMenuSeparator className="my-1 opacity-50" />
-
-              <div className="space-y-1">
-                <DropdownMenuItem
-                  onClick={() => setIsSessionsDialogOpen(true)}
-                  className="rounded-lg px-3 py-2.5 focus:bg-accent focus:text-accent-foreground cursor-pointer transition-colors"
+          {mounted && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  className="flex items-center gap-2 sm:gap-3 pl-2 sm:pl-4 border-l border-white/20 hover:bg-card/5 py-2 px-1 rounded transition-colors h-auto"
                 >
-                  <Monitor className="mr-3 h-4 w-4" />
-                  <span className="text-sm font-medium">Session Info</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => setIsPasswordDialogOpen(true)}
-                  className="rounded-lg px-3 py-2.5 focus:bg-accent focus:text-accent-foreground cursor-pointer transition-colors"
-                >
-                  <Key className="mr-3 h-4 w-4" />
-                  <span className="text-sm font-medium">Change Password</span>
-                </DropdownMenuItem>
-              </div>
-
-              <DropdownMenuSeparator className="my-1 opacity-50" />
-
-              <DropdownMenuItem
-                onClick={handleLogout}
-                className="rounded-lg px-3 py-2.5 text-danger focus:text-danger focus:bg-danger/10 cursor-pointer transition-colors"
+                  <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-full bg-white/20 flex items-center justify-center text-xs sm:text-sm font-medium shrink-0">
+                    {user.initial}
+                  </div>
+                  <div className="hidden sm:flex flex-col min-w-0 items-start">
+                    <span className="text-sm font-medium truncate">{user.name}</span>
+                    <span className="text-xs text-sidebar-foreground/70 truncate">
+                      {user.email}
+                    </span>
+                  </div>
+                  <ChevronDown className="hidden sm:block h-4 w-4 text-sidebar-foreground/70" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                align="end"
+                className="w-64 p-2 bg-white border-slate-200 shadow-xl rounded-2xl"
               >
-                <LogOut className="mr-3 h-4 w-4" />
-                <span className="text-sm font-bold">Log out</span>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+                <div className="flex items-center gap-3 p-3 mb-1 bg-slate-50 rounded-xl">
+                  <div className="h-10 w-10 rounded-full bg-primary flex items-center justify-center text-white text-sm font-bold shrink-0 shadow-sm">
+                    {user.initial}
+                  </div>
+                  <div className="flex flex-col min-w-0">
+                    <span className="text-sm font-bold text-slate-900 truncate">{user.name}</span>
+                    <span className="text-[10px] text-slate-500 truncate font-medium">
+                      {user.email}
+                    </span>
+                  </div>
+                </div>
+
+                <DropdownMenuSeparator className="my-1 opacity-50" />
+
+                <div className="space-y-1">
+                  <DropdownMenuItem
+                    onClick={() => setIsSessionsDialogOpen(true)}
+                    className="rounded-lg px-3 py-2.5 focus:bg-accent focus:text-accent-foreground cursor-pointer transition-colors"
+                  >
+                    <Monitor className="mr-3 h-4 w-4" />
+                    <span className="text-sm font-medium">Session Info</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => setIsPasswordDialogOpen(true)}
+                    className="rounded-lg px-3 py-2.5 focus:bg-accent focus:text-accent-foreground cursor-pointer transition-colors"
+                  >
+                    <Key className="mr-3 h-4 w-4" />
+                    <span className="text-sm font-medium">Change Password</span>
+                  </DropdownMenuItem>
+                </div>
+
+                <DropdownMenuSeparator className="my-1 opacity-50" />
+
+                <DropdownMenuItem
+                  onClick={handleLogout}
+                  className="rounded-lg px-3 py-2.5 text-danger focus:text-danger focus:bg-danger/10 cursor-pointer transition-colors"
+                >
+                  <LogOut className="mr-3 h-4 w-4" />
+                  <span className="text-sm font-bold">Log out</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
         </div>
       </div>
 

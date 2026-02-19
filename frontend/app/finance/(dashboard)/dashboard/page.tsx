@@ -6,6 +6,7 @@ import { Wallet, ArrowUpRight } from 'lucide-react';
 // Finance components (self-contained visuals)
 import RevenueBreakdownChart from '@/components/Finance/RevenueBreakdownChart';
 import DailyRevenueChart from '@/components/Finance/DailyRevenueChart';
+import RevenueTable from '@/components/Finance/RevenueTable';
 
 export default function FinanceDashboard() {
   return (
@@ -50,6 +51,11 @@ export default function FinanceDashboard() {
             <DailyRevenueChart />
           </div>
         </div>
+      </section>
+
+      {/* REVENUE TABLE */}
+      <section>
+        <RevenueTable />
       </section>
     </div>
   );

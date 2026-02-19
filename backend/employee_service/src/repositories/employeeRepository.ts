@@ -182,12 +182,18 @@ export class EmployeeRepository {
       .createQueryBuilder('employee')
       .select('employee.employee_job', 'job')
       .addSelect('employee.finance_job', 'financeJob')
-      .addSelect('COUNT(employee.id)', 'count');
+      .addSelect('employee.role', 'role')
+      .addSelect('COUNT(employee.id)', 'count')
+      .addSelect('SUM(COALESCE(employee.salary, 0))', 'totalSalary');
 
     if (branchId) {
       query.andWhere('employee.branch_id = :branchId', { branchId });
     }
 
-    return query.groupBy('employee.employee_job').addGroupBy('employee.finance_job').getRawMany();
+    return query
+      .groupBy('employee.employee_job')
+      .addGroupBy('employee.finance_job')
+      .addGroupBy('employee.role')
+      .getRawMany();
   }
 }

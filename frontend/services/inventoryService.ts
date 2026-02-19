@@ -19,10 +19,10 @@ export interface InventoryItem {
 }
 
 export interface InventoryStats {
-  totalStock: number;
-  productModels: number;
-  totalValue: number;
-  damagedStock: number;
+  productStock: number;
+  spareStock: number;
+  productValue: number;
+  spareValue: number;
 }
 
 export const inventoryService = {

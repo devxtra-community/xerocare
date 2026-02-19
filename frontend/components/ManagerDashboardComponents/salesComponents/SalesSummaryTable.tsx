@@ -81,6 +81,12 @@ export default function SalesSummaryTable() {
       </div>
     );
   }
+  const formatToK = (value: number) => {
+    if (value >= 1000) {
+      return `₹${(value / 1000).toFixed(1)}k`;
+    }
+    return `₹${value.toLocaleString()}`;
+  };
 
   return (
     <div className="rounded-2xl bg-card p-2 sm:p-4 shadow-sm w-full h-full flex flex-col border border-primary/10 overflow-hidden">
@@ -169,7 +175,7 @@ export default function SalesSummaryTable() {
                     </Badge>
                   </TableCell>
                   <TableCell className="py-3 px-2 text-[10px] sm:text-sm font-bold text-primary">
-                    ₹{invoice.totalAmount.toLocaleString()}
+                    {formatToK(invoice.totalAmount)}
                   </TableCell>
                   <TableCell className="py-3 px-2 text-[10px] sm:text-sm text-primary/80">
                     {invoice.employeeName || 'N/A'}

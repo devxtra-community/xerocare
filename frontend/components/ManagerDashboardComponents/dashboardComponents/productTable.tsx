@@ -31,11 +31,13 @@ import { Button } from '@/components/ui/button';
 export default function DashbordTable() {
   const [data, setData] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [mounted, setMounted] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedBrand, setSelectedBrand] = useState<string>('all');
   const [selectedVendor, setSelectedVendor] = useState<string>('all');
 
   useEffect(() => {
+    setMounted(true);
     const fetchData = async () => {
       try {
         setLoading(true);
@@ -108,37 +110,41 @@ export default function DashbordTable() {
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
-          <div className="w-40">
-            <Select value={selectedBrand} onValueChange={setSelectedBrand}>
-              <SelectTrigger className="h-10 border-blue-100 bg-white/50">
-                <SelectValue placeholder="Brand" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Brands</SelectItem>
-                {brands.map((brand) => (
-                  <SelectItem key={brand} value={brand}>
-                    {brand}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          {mounted && (
+            <div className="w-40">
+              <Select value={selectedBrand} onValueChange={setSelectedBrand}>
+                <SelectTrigger className="h-10 border-blue-100 bg-white/50">
+                  <SelectValue placeholder="Brand" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Brands</SelectItem>
+                  {brands.map((brand) => (
+                    <SelectItem key={brand} value={brand}>
+                      {brand}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
-          <div className="w-44">
-            <Select value={selectedVendor} onValueChange={setSelectedVendor}>
-              <SelectTrigger className="h-10 border-blue-100 bg-white/50">
-                <SelectValue placeholder="Vendor" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Vendors</SelectItem>
-                {vendors.map((vendor) => (
-                  <SelectItem key={vendor} value={vendor}>
-                    {vendor}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          {mounted && (
+            <div className="w-44">
+              <Select value={selectedVendor} onValueChange={setSelectedVendor}>
+                <SelectTrigger className="h-10 border-blue-100 bg-white/50">
+                  <SelectValue placeholder="Vendor" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Vendors</SelectItem>
+                  {vendors.map((vendor) => (
+                    <SelectItem key={vendor} value={vendor}>
+                      {vendor}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           {(searchQuery || selectedBrand !== 'all' || selectedVendor !== 'all') && (
             <Button

@@ -20,6 +20,8 @@ export interface Employee {
     branch_id: string;
     name: string;
   } | null;
+  employee_job?: string | null;
+  finance_job?: string | null;
 }
 
 export interface HRStats {
@@ -34,6 +36,8 @@ export interface HRStats {
     FINANCE: number;
   };
   byJob: Record<string, number>;
+  bySalary: Record<string, number>;
+  growthData: { month: string; count: number }[];
 }
 
 export interface EmployeeResponse {
