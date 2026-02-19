@@ -24,7 +24,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
-import { FinanceApprovalModal } from '@/components/finance/FinanceApprovalModal';
+import { FinanceApprovalModal } from '@/components/Finance/FinanceApprovalModal';
 
 interface FinanceApprovalTableProps {
   saleType?: 'RENT' | 'LEASE' | 'SALE';

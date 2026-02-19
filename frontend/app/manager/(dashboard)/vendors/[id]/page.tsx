@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 import StatCard from '@/components/StatCard';
 
-import VendorSpendingTrend from '@/components/AdminDahboardComponents/vendorComponents/VendorSpendingTrend';
+import VendorSpendingTrend from '@/components/AdminDahboardComponents/VendorComponents/VendorSpendingTrend';
 import VendorRequestHistory from '@/components/ManagerDashboardComponents/VendorComponents/VendorRequestHistory';
 import { getVendorById, Vendor as ApiVendor } from '@/lib/vendor';
 import { toast } from 'sonner';
