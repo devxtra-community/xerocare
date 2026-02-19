@@ -10,6 +10,10 @@ const data = [
   { name: 'Service', value: 150000, color: '#CBD5E1' },
 ];
 
+/**
+ * Pie chart displaying revenue distribution by source (Sales, Rental, Leasing, Service).
+ * Visualizes the contribution of different business streams to total revenue.
+ */
 export default function RevenueBySourceChart() {
   const [isClient, setIsClient] = useState(false);
 

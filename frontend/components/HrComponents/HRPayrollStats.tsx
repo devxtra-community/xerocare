@@ -2,6 +2,11 @@ import StatCard from '@/components/StatCard';
 import { PayrollRecord } from './HRPayrollTable';
 import { Loader2 } from 'lucide-react';
 
+/**
+ * Component displaying key payroll statistics.
+ * Shows total employee count, total monthly payroll cost, unique departments, and overall status.
+ * implementation utilizes StatCard components for visualization.
+ */
 export default function HRPayrollStats({
   data,
   loading,

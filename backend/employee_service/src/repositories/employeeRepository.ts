@@ -5,33 +5,50 @@ import { EmployeeRole } from '../constants/employeeRole';
 export class EmployeeRepository {
   private repo = Source.getRepository(Employee);
 
+  /**
+   * Finds an employee by email.
+   */
   async findByEmail(email: string) {
     return this.repo.findOne({ where: { email } });
   }
 
+  /**
+   * Saves an employee entity.
+   */
   async save(employee: Employee) {
     return this.repo.save(employee);
   }
 
+  /**
+   * Finds an employee by ID.
+   */
   async findById(id: string) {
     return this.repo.findOne({ where: { id } });
   }
 
+  /**
+   * Creates and saves a new employee.
+   */
   async createEmployee(data: Partial<Employee>) {
     const employee = this.repo.create(data);
     return this.repo.save(employee);
   }
 
+  /**
+   * Updates an employee's password hash.
+   */
   async updatePassword(userId: string, passwordHash: string) {
     return this.repo.update(userId, {
       password_hash: passwordHash,
     });
   }
 
+  /**
+   * Retrieves paginated employees with optional filtering.
+   */
   async findAll(skip = 0, take = 20, role?: EmployeeRole, branchId?: string) {
     const whereCondition: Record<string, string | EmployeeRole> = role ? { role } : {};
 
-    // Add branch filter if provided (for non-admin users)
     if (branchId) {
       whereCondition.branch_id = branchId;
     }
@@ -47,12 +64,18 @@ export class EmployeeRepository {
     return { data, total };
   }
 
+  /**
+   * Finds an employee by ID, including branch relation.
+   */
   async findByIdSafe(id: string) {
     return this.repo.findOne({
       where: { id },
       relations: ['branch'],
     });
   }
+  /**
+   * Updates an employee by ID.
+   */
   async updateById(id: string, payload: Partial<Employee>): Promise<Employee | null> {
     const employee = await this.findById(id);
     if (!employee) return null;
@@ -61,30 +84,51 @@ export class EmployeeRepository {
     return this.repo.save(employee);
   }
 
+  /**
+   * Counts total employees.
+   */
   async count() {
     return this.repo.count();
   }
 
+  /**
+   * Counts employees by status.
+   */
   async countByStatus(status: EmployeeStatus) {
     return this.repo.count({ where: { status } });
   }
 
+  /**
+   * Counts employees by role.
+   */
   async countByRole(role: EmployeeRole) {
     return this.repo.count({ where: { role } });
   }
 
+  /**
+   * Counts employees by branch.
+   */
   async countByBranch(branchId: string) {
     return this.repo.count({ where: { branch_id: branchId } });
   }
 
+  /**
+   * Counts employees by status and branch.
+   */
   async countByStatusAndBranch(status: EmployeeStatus, branchId: string) {
     return this.repo.count({ where: { status, branch_id: branchId } });
   }
 
+  /**
+   * Counts employees by role and branch.
+   */
   async countByRoleAndBranch(role: EmployeeRole, branchId: string) {
     return this.repo.count({ where: { role, branch_id: branchId } });
   }
 
+  /**
+   * Finds the latest display ID for a given prefix.
+   */
   async findLatestDisplayId(prefix: string) {
     const result = await this.repo
       .createQueryBuilder('employee')
@@ -95,6 +139,9 @@ export class EmployeeRepository {
     return result?.display_id;
   }
 
+  /**
+   * Retrieves employee growth statistics for the current year.
+   */
   async getEmployeeGrowthStats(branchId?: string) {
     const query = this.repo
       .createQueryBuilder('employee')
@@ -112,6 +159,9 @@ export class EmployeeRepository {
       .getRawMany();
   }
 
+  /**
+   * Counts employees created before a given year.
+   */
   async countBeforeYear(year: number, branchId?: string) {
     const query = this.repo
       .createQueryBuilder('employee')
@@ -124,6 +174,9 @@ export class EmployeeRepository {
     return query.getCount();
   }
 
+  /**
+   * Retrieves counts of employees by job type.
+   */
   async getJobTypeCounts(branchId?: string) {
     const query = this.repo
       .createQueryBuilder('employee')

@@ -11,18 +11,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { sparePartService } from '@/services/sparePartService';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { SearchableSelect } from '@/components/ui/searchable-select';
-import { lotService, Lot, Vendor, LotItem } from '@/lib/lot';
+import { lotService, Lot, Vendor } from '@/lib/lot';
 import { warehouseService } from '@/services/warehouseService';
 import { vendorService } from '@/services/vendorService';
 import { modelService } from '@/services/modelService';
+import { brandService } from '@/services/brandService';
+import { Brand } from '@/lib/brand';
 
 interface AddSparePartDialogProps {
   open: boolean;
@@ -30,6 +25,13 @@ interface AddSparePartDialogProps {
   onSuccess: () => void;
 }
 
+/**
+ * Dialog component for adding a single spare part to inventory.
+ * Features:
+ * - Lot selection with dependency loading (Models, Vendors, Warehouses).
+ * - Auto-populating fields based on selected lot item.
+ * - Validation of quantity against lot availability.
+ */
 export default function AddSparePartDialog({
   open,
   onOpenChange,
@@ -49,18 +51,20 @@ export default function AddSparePartDialog({
   const [models, setModels] = useState<Model[]>([]);
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [lots, setLots] = useState<Lot[]>([]);
+  const [brands, setBrands] = useState<Brand[]>([]);
 
   const [formData, setFormData] = useState({
-    lot_number: '', // Keeps item code / legacy lot number field if needed, or we repurpose it.
     part_name: '',
     brand: '',
     model_id: '',
     base_price: '',
     warehouse_id: '',
     vendor_id: '',
-    quantity: '0',
+    quantity: '1',
     lot_id: '',
   });
+
+  const [selectedLotItemId, setSelectedLotItemId] = useState<string>('');
 
   useEffect(() => {
     if (open) {
@@ -70,16 +74,18 @@ export default function AddSparePartDialog({
 
   const loadDependencies = async () => {
     try {
-      const [whRes, modelRes, vendorRes, lotsRes] = await Promise.all([
+      const [whRes, modelRes, vendorRes, lotsRes, brandsRes] = await Promise.all([
         warehouseService.getWarehousesByBranch(),
         modelService.getAllModels(),
         vendorService.getVendors(),
         lotService.getAllLots(),
+        brandService.getAllBrands(),
       ]);
       setWarehouses(whRes || []);
       setModels(modelRes || []);
       setVendors(vendorRes || []);
       setLots(lotsRes || []);
+      setBrands(brandsRes || []);
     } catch (error) {
       console.error('Failed to load dependencies', error);
     }
@@ -87,33 +93,69 @@ export default function AddSparePartDialog({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Validate lot selection
+    if (!formData.lot_id) {
+      toast.error('Please select a lot');
+      return;
+    }
+
+    // Validate lot item selection
+    if (!selectedLotItemId) {
+      toast.error('Please select a spare part from the lot');
+      return;
+    }
+
+    // Get the selected lot and lot item
+    const selectedLot = lots.find((l) => l.id === formData.lot_id);
+    const selectedLotItem = selectedLot?.items?.find((item) => item.id === selectedLotItemId);
+
+    if (!selectedLotItem || !selectedLotItem.sparePart) {
+      toast.error('Invalid lot item selection');
+      return;
+    }
+
+    // Validate quantity against available stock
+    const availableQuantity = selectedLotItem.quantity - selectedLotItem.usedQuantity;
+    const requestedQuantity = Number(formData.quantity);
+
+    if (requestedQuantity > availableQuantity) {
+      toast.error(`Quantity exceeds available stock. Available: ${availableQuantity}`);
+      return;
+    }
+
+    if (requestedQuantity <= 0) {
+      toast.error('Quantity must be greater than 0');
+      return;
+    }
+
     setLoading(true);
     try {
       const respo = await sparePartService.addSparePart({
         ...formData,
-        lot_number: formData.lot_number.toUpperCase(),
+        item_code: selectedLotItem.sparePart.item_code.toUpperCase(),
         model_id: formData.model_id === 'null' ? undefined : formData.model_id,
         warehouse_id: formData.warehouse_id || undefined,
         vendor_id: formData.vendor_id || undefined,
         base_price: Number(formData.base_price),
-        quantity: Number(formData.quantity)!,
-        lot_id: formData.lot_id === 'null' || !formData.lot_id ? undefined : formData.lot_id,
+        quantity: requestedQuantity,
+        lot_id: formData.lot_id,
       });
       console.log(respo);
       toast.success('Spare part added successfully');
       onSuccess();
       onOpenChange(false);
       setFormData({
-        lot_number: '',
         part_name: '',
         brand: '',
         model_id: '',
         base_price: '',
         warehouse_id: '',
         vendor_id: '',
-        quantity: '',
+        quantity: '1',
         lot_id: '',
       });
+      setSelectedLotItemId('');
     } catch (error: unknown) {
       console.log(error);
       const err = error as { response?: { data?: { message?: string } } };
@@ -132,180 +174,212 @@ export default function AddSparePartDialog({
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Item Code / Legacy Lot No</Label>
-              <Input
-                required
-                value={formData.lot_number}
-                onChange={(e) => setFormData({ ...formData, lot_number: e.target.value })}
-                placeholder="Unique Item Code"
-              />
-            </div>
-            <div className="space-y-2">
+            <div className="space-y-2 col-span-2">
+              <Label>
+                Lot Selection <span className="text-red-500">*</span>
+              </Label>
               <SearchableSelect
                 value={formData.lot_id}
-                onValueChange={(val) =>
-                  setFormData({ ...formData, lot_id: val === 'none' ? '' : val })
-                }
-                options={[
-                  { value: 'none', label: 'None', description: 'Clear selection' },
-                  ...lots.map((lot) => ({
-                    value: lot.id,
-                    label: lot.lotNumber,
-                    description: lot.vendor?.name || 'Unknown Vendor',
-                  })),
-                ]}
-                placeholder="Select Lot (Optional)"
+                onValueChange={(val) => {
+                  const newLotId = val === 'none' ? '' : val;
+                  const selectedLot = lots.find((l) => l.id === newLotId);
+                  setFormData({
+                    ...formData,
+                    lot_id: newLotId,
+                    vendor_id: selectedLot?.vendor?.id || '',
+                  });
+                  setSelectedLotItemId(''); // Reset lot item when lot changes
+                }}
+                options={lots.map((lot) => ({
+                  value: lot.id,
+                  label: lot.lotNumber,
+                  description: lot.vendor?.name || 'Unknown Vendor',
+                }))}
+                placeholder="Select Lot (Required)"
                 emptyText="No lots found."
               />
-              {formData.lot_id && formData.lot_number && (
-                <div className="text-xs mt-1">
-                  {(() => {
-                    const lot = lots.find((l) => l.id === formData.lot_id);
-                    // Validate by Item Code (sparePart.item_code)
-                    // But wait, existing lot items are linked to SparePart ID, not just code.
-                    // However, creating a new spare part means we might match by code if it exists?
-                    // The requirement says "Spare Parts by item_code".
-                    // In LotItem, we have `sparePart` relation.
-                    // If we are creating a *new* spare part, how do we match?
-                    // "Prevent adding items not in a lot".
-                    // If I am adding a spare part that is supposed to be in a lot,
-                    // the lot must ALREADY have that spare part (or at least the item code listed in the lot?).
-                    // In the backend, `validateAndTrackUsage` checks `sparePart.item_code = :identifier`.
-                    // So the LotItem must exist and be linked to a SparePart with that item_code.
-                    // This implies the Spare Part must exist BEFORE the Lot is created?
-                    // Or the Lot is created with "Pending" spare parts?
-                    // In `LotService`, we create LotItems with `spare_part_id`.
-                    // So yes, the Spare Part Master must exist.
-                    // But here we are in `AddSparePartDialog`. This implies creating a NEW Spare Part?
-                    // Or adding stock to existing?
-                    // `addSingleSparePart` creates a master record.
-                    // If `item_code` is unique, we can't create it again if it exists.
-                    // If we are adding stock to existing spare part, we use `update` or internal logic.
-                    // `SparePartService.addSingleSparePart` fails if item_code exists (actually it creates a new row in my code? No, `createMaster` usually throws if unique constraint).
-                    // Wait, my `SparePartService` does `createMaster`.
-                    // If the user wants to add stock to existing part from a Lot...
-                    // The `AddSparePartDialog` seems to be for "New Item".
-                    // If the item is in the Lot, it must have been added to the Lot with a valid `spare_part_id`.
-                    // So the global "Spare Part" definition must exist.
-                    // This flow is slightly circular if we can't create Lot without Spare Part, and can't create Spare Part without Lot (if enforcing).
-                    // But typically:
-                    // 1. Create Spare Part Master (Code, Name) - maybe without stock.
-                    // 2. Create Lot (referencing Spare Part Master).
-                    // 3. Receive Stock (Update Spare Part Qty / Confirm Lot).
-                    // usage: When "consuming" or "instantiating" unique items?
-                    // Spare Parts are quantity based.
-                    // The `LotItem.usedQuantity` logic implies we track how many we "registered" into the system?
-                    // If `AddSparePartDialog` adds to `SparePart` table (Inventory), then yes, we are "receiving" into inventory.
-                    // So we match by `item_code`?
-                    // But `LotItem` stores `sparePartId`.
-                    // So we should find the LotItem that matches the `item_code` we are entering.
-                    // But since we are creating it, we might not know the ID yet?
-                    // Ah, if `item_code` is the link, we iterate lot items, check `item.sparePart?.item_code`.
-
-                    const item = lot?.items?.find(
-                      (i: LotItem) =>
-                        i.itemType === 'SPARE_PART' &&
-                        i.sparePart?.lot_number === formData.lot_number,
-                    );
-
-                    if (!item)
-                      return <span className="text-red-500">Item Code not found in this Lot!</span>;
-                    const remaining = item.quantity - item.usedQuantity;
-                    const requested = Number(formData.quantity) || 0;
-                    return (
-                      <span
-                        className={
-                          remaining >= requested ? 'text-green-600' : 'text-red-500 font-bold'
-                        }
-                      >
-                        Available in Lot: {remaining} / {item.quantity}
-                      </span>
-                    );
-                  })()}
-                </div>
-              )}
             </div>
+
+            {/* Lot Item Selection - Only show when lot is selected */}
+            {formData.lot_id && (
+              <div className="space-y-2 col-span-2">
+                <Label>
+                  Select Spare Part from Lot <span className="text-red-500">*</span>
+                </Label>
+                <SearchableSelect
+                  value={selectedLotItemId}
+                  onValueChange={(val) => {
+                    setSelectedLotItemId(val);
+
+                    // Auto-populate fields from selected lot item
+                    const selectedLot = lots.find((l) => l.id === formData.lot_id);
+                    const selectedItem = selectedLot?.items?.find((item) => item.id === val);
+
+                    if (selectedItem?.sparePart) {
+                      setFormData({
+                        ...formData,
+                        part_name: selectedItem.sparePart.part_name,
+                        brand: selectedItem.sparePart.brand,
+                        base_price: selectedItem.unitPrice.toString(),
+                        model_id: selectedItem.sparePart.model_id || '',
+                      });
+                    }
+                  }}
+                  options={(() => {
+                    const selectedLot = lots.find((l) => l.id === formData.lot_id);
+                    const sparePartItems =
+                      selectedLot?.items?.filter(
+                        (item) => item.itemType === 'SPARE_PART' && item.sparePart,
+                      ) || [];
+
+                    return sparePartItems.map((item) => {
+                      const available = item.quantity - item.usedQuantity;
+                      return {
+                        value: item.id,
+                        label: `${item.sparePart!.item_code} - ${item.sparePart!.part_name}`,
+                        description: `Available: ${available} / ${item.quantity} | Price: ₹${item.unitPrice}`,
+                      };
+                    });
+                  })()}
+                  placeholder="Select Spare Part"
+                  emptyText="No spare parts found in this lot."
+                />
+
+                {/* Quantity Validation Feedback */}
+                {selectedLotItemId && formData.quantity && (
+                  <div className="text-xs mt-1">
+                    {(() => {
+                      const selectedLot = lots.find((l) => l.id === formData.lot_id);
+                      const selectedItem = selectedLot?.items?.find(
+                        (item) => item.id === selectedLotItemId,
+                      );
+
+                      if (!selectedItem) return null;
+
+                      const available = selectedItem.quantity - selectedItem.usedQuantity;
+                      const requested = Number(formData.quantity) || 0;
+                      const remaining = available - requested;
+
+                      return (
+                        <span
+                          className={
+                            remaining >= 0 && requested > 0
+                              ? 'text-green-600 font-medium'
+                              : 'text-red-500 font-bold'
+                          }
+                        >
+                          {remaining >= 0 && requested > 0
+                            ? `✓ Valid - Remaining in lot after this: ${remaining} / ${selectedItem.quantity}`
+                            : `✗ Invalid - Available: ${available}, Requested: ${requested}`}
+                        </span>
+                      );
+                    })()}
+                  </div>
+                )}
+              </div>
+            )}
             <div className="space-y-2">
               <Label>Part Name</Label>
               <Input
                 required
                 value={formData.part_name}
                 onChange={(e) => setFormData({ ...formData, part_name: e.target.value })}
+                disabled={!!selectedLotItemId}
+                className={selectedLotItemId ? 'bg-muted cursor-not-allowed' : ''}
               />
+              {selectedLotItemId && (
+                <p className="text-xs text-muted-foreground mt-1">Auto-filled from lot item</p>
+              )}
             </div>
             <div className="space-y-2">
               <Label>Brand</Label>
-              <Input
-                required
-                value={formData.brand}
-                onChange={(e) => setFormData({ ...formData, brand: e.target.value })}
-              />
+              {selectedLotItemId ? (
+                <>
+                  <Input value={formData.brand} disabled className="bg-muted cursor-not-allowed" />
+                  <p className="text-xs text-muted-foreground mt-1">Auto-filled from lot item</p>
+                </>
+              ) : (
+                <SearchableSelect
+                  value={formData.brand}
+                  onValueChange={(val) => setFormData({ ...formData, brand: val })}
+                  options={brands.map((brand) => ({
+                    value: brand.name,
+                    label: brand.name,
+                    description: brand.description || '',
+                  }))}
+                  placeholder="Select Brand"
+                  emptyText="No brands found."
+                />
+              )}
             </div>
             <div className="space-y-2">
               <Label>Quantity (In Stock)</Label>
               <Input
                 type="number"
-                min="0"
+                min="1"
                 value={formData.quantity}
                 onChange={(e) => setFormData({ ...formData, quantity: e.target.value })}
-                placeholder="0"
+                placeholder="1"
               />
             </div>
             <div className="space-y-2">
               <Label>Vendor</Label>
-              <Select
+              <SearchableSelect
                 value={formData.vendor_id}
-                onValueChange={(val) => setFormData({ ...formData, vendor_id: val })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select Vendor (Optional)" />
-                </SelectTrigger>
-                <SelectContent>
-                  {vendors.map((v) => (
-                    <SelectItem key={v.id} value={v.id}>
-                      {v.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                onValueChange={(val) =>
+                  setFormData({ ...formData, vendor_id: val === 'none' ? '' : val })
+                }
+                options={[
+                  { value: 'none', label: 'None', description: 'Clear selection' },
+                  ...vendors.map((v) => ({
+                    value: v.id,
+                    label: v.name,
+                    description: '',
+                  })),
+                ]}
+                placeholder="Select Vendor (Optional)"
+                emptyText="No vendors found."
+              />
             </div>
             <div className="space-y-2">
               <Label>Preferred Warehouse</Label>
-              <Select
+              <SearchableSelect
                 value={formData.warehouse_id}
-                onValueChange={(val) => setFormData({ ...formData, warehouse_id: val })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select Warehouse (Optional)" />
-                </SelectTrigger>
-                <SelectContent>
-                  {warehouses.map((w) => (
-                    <SelectItem key={w.id} value={w.id}>
-                      {w.warehouseName}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                onValueChange={(val) =>
+                  setFormData({ ...formData, warehouse_id: val === 'none' ? '' : val })
+                }
+                options={[
+                  { value: 'none', label: 'None', description: 'Clear selection' },
+                  ...warehouses.map((w) => ({
+                    value: w.id,
+                    label: w.warehouseName,
+                    description: '',
+                  })),
+                ]}
+                placeholder="Select Warehouse (Optional)"
+                emptyText="No warehouses found."
+              />
             </div>
             <div className="space-y-2">
               <Label>Compatible Model</Label>
-              <Select
+              <SearchableSelect
                 value={formData.model_id}
                 onValueChange={(val) => setFormData({ ...formData, model_id: val })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select Model (Optional)" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="null">Universal (No Model)</SelectItem>
-                  {models.map((m) => (
-                    <SelectItem key={m.id} value={m.id}>
-                      {m.model_name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                options={[
+                  {
+                    value: 'null',
+                    label: 'Universal (No Model)',
+                    description: 'Compatible with all models',
+                  },
+                  ...models.map((m) => ({
+                    value: m.id,
+                    label: m.model_name,
+                    description: '',
+                  })),
+                ]}
+                placeholder="Select Model (Optional)"
+                emptyText="No models found."
+              />
             </div>
             <div className="space-y-2">
               <Label>Base Price</Label>
@@ -316,6 +390,9 @@ export default function AddSparePartDialog({
                 value={formData.base_price}
                 onChange={(e) => setFormData({ ...formData, base_price: e.target.value })}
               />
+              {selectedLotItemId && (
+                <p className="text-xs text-muted-foreground mt-1">Auto-filled from lot item</p>
+              )}
             </div>
           </div>
           <DialogFooter>

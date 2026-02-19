@@ -6,6 +6,10 @@ interface MonthlySalesBarChartProps {
   data: { month: string; sales: number }[];
 }
 
+/**
+ * Bar chart displaying monthly sales performance.
+ * Visualizes revenue trends over the course of the year.
+ */
 export default function MonthlySalesBarChart({ data }: MonthlySalesBarChartProps) {
   return (
     <div className="w-full h-[280px]">

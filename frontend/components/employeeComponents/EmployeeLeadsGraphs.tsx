@@ -125,6 +125,10 @@ const ChartContainer = ({
   </div>
 );
 
+/**
+ * Area charts visualizing lead acquisition from different sources.
+ * Shows trends for Website, WhatsApp, and Instagram leads throughout the year.
+ */
 export default function EmployeeLeadsGraphs() {
   const [isClient, setIsClient] = useState(false);
 

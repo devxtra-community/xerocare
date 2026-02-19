@@ -11,6 +11,10 @@ interface ProductSelectProps {
   onSelect: (item: SelectableItem) => void;
 }
 
+/**
+ * Unified searchable select for Products and Spare Parts.
+ * Fetches both resources and allows selection for invoice line items.
+ */
 export function ProductSelect({ onSelect }: ProductSelectProps) {
   const [items, setItems] = useState<SelectableItem[]>([]);
   const [loading, setLoading] = useState(false);

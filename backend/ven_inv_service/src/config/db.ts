@@ -21,7 +21,7 @@ export const Source = new DataSource({
   ssl: {
     rejectUnauthorized: false,
   },
-  synchronize: true,
+  synchronize: false,
   entities: [
     Vendor,
     Model,

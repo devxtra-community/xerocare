@@ -31,6 +31,10 @@ interface EditSparePartDialogProps {
   onSuccess: () => void;
 }
 
+/**
+ * Dialog component for editing an existing spare part.
+ * Pre-fills form with current part details and allows modifying attributes like quantity, price, and location.
+ */
 export default function EditSparePartDialog({
   open,
   onOpenChange,

@@ -70,6 +70,10 @@ const menuItems = [
   },
 ];
 
+/**
+ * Admin dashboard sidebar navigation component.
+ * Displays menu items and handles logout functionality.
+ */
 export default function AppSidebar() {
   const router = useRouter();
   const pathname = usePathname();

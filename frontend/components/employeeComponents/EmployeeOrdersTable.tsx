@@ -29,6 +29,10 @@ interface EmployeeOrdersTableProps {
   invoices?: Invoice[]; // Optional prop to avoid double fetching if page already fetches
 }
 
+/**
+ * Table displaying all orders (invoices) managed by the employee.
+ * Features search, filtering by type (Sale/Rent/Lease), and detailed view.
+ */
 export default function EmployeeOrdersTable({
   mode = 'EMPLOYEE',
   invoices: propInvoices,

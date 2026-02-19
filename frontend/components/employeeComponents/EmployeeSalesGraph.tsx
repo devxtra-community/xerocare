@@ -21,6 +21,10 @@ const data = [
   { name: 'Jul', sales: 3490, rent: 4300, lease: 2100 },
 ];
 
+/**
+ * Area chart visualizing sales performance across different categories (Sales, Rent, Lease).
+ * Shows revenue trends over time.
+ */
 export default function EmployeeSalesGraph() {
   return (
     <div className="bg-card p-4 rounded-2xl shadow-sm border-none flex flex-col h-[350px] w-full">

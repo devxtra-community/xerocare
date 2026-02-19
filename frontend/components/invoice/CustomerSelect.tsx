@@ -24,6 +24,10 @@ interface CustomerSelectProps {
   onChange: (id: string, entity: SelectableCustomer) => void;
 }
 
+/**
+ * Searchable select component for choosing a customer or a lead.
+ * If a lead is selected who hasn't been converted to a customer yet, it triggers the conversion process.
+ */
 export function CustomerSelect({ value, onChange }: CustomerSelectProps) {
   const [items, setItems] = useState<SelectableCustomer[]>([]);
   const [loading, setLoading] = useState(false);

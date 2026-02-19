@@ -18,6 +18,10 @@ interface MonthlyGrowth {
   count: number;
 }
 
+/**
+ * Line chart visualizing new employee hiring trends over the months.
+ * Aggregates employee creation dates to show hiring velocity.
+ */
 export default function HRNewEmployeesGraph() {
   const [data, setData] = useState<MonthlyGrowth[]>([]);
   const [isLoading, setIsLoading] = useState(true);

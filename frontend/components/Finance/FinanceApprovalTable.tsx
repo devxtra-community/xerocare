@@ -28,8 +28,14 @@ import { FinanceApprovalModal } from '@/components/Finance/FinanceApprovalModal'
 
 interface FinanceApprovalTableProps {
   saleType?: 'RENT' | 'LEASE' | 'SALE';
+  onSuccess?: () => void;
 }
 
+/**
+ * Table for finance department to review and approve/reject branch invoices.
+ * Supports filtering by sale type and detailed invoice inspection.
+ * Allows finance team to review, approve, or reject invoices created by employees.
+ */
 export default function FinanceApprovalTable({ saleType }: FinanceApprovalTableProps) {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
@@ -39,7 +45,7 @@ export default function FinanceApprovalTable({ saleType }: FinanceApprovalTableP
   const [rejectReason, setRejectReason] = useState('');
   const [approvalInvoice, setApprovalInvoice] = useState<Invoice | null>(null);
 
-  const fetchInvoices = async () => {
+  const fetchInvoices = React.useCallback(async () => {
     try {
       setLoading(true);
       const data = await getBranchInvoices();
@@ -59,11 +65,11 @@ export default function FinanceApprovalTable({ saleType }: FinanceApprovalTableP
     } finally {
       setLoading(false);
     }
-  };
+  }, [saleType]);
 
   useEffect(() => {
     fetchInvoices();
-  }, [saleType]);
+  }, [fetchInvoices]);
 
   const handleApproveClick = (invoice: Invoice) => {
     setApprovalInvoice(invoice);

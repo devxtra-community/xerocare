@@ -20,70 +20,75 @@ import { logout } from '@/lib/auth';
 import { toast } from 'sonner';
 import { useRouter, usePathname } from 'next/navigation';
 
-type FinanceMenuItem = {
-  title: string;
-  icon: LucideIcon;
-  href: string;
-  disabled?: boolean;
-};
-
-type FinanceMenuGroup = {
-  group: string;
-  items: FinanceMenuItem[];
-};
-
-const financeMenu: FinanceMenuGroup[] = [
-  {
-    group: 'Main',
-    items: [
-      {
-        title: 'Dashboard',
-        icon: LayoutDashboard,
-        href: '/finance/dashboard',
-      },
-    ],
-  },
-  {
-    group: 'Operations',
-    items: [
-      {
-        title: 'Rent',
-        icon: Key,
-        href: '/finance/rent',
-      },
-      {
-        title: 'Lease',
-        icon: Home,
-        href: '/finance/lease',
-      },
-      {
-        title: 'Sale',
-        icon: Tag,
-        href: '/finance/sale',
-      },
-      {
-        title: 'Orders',
-        icon: ShoppingCart,
-        href: '/finance/orders',
-      },
-    ],
-  },
-];
-
 /**
- * Helper to get badge count for a specific title from the counts object
- * 'Rent' -> counts.RENT
- * 'Lease' -> counts.LEASE
- * 'Sale' -> counts.SALE
+ * Sidebar navigation component for the Finance dashboard.
+ * Includes links to Accounts Receivable, Payable, Collections, and Performance analytics.
+ * Displays dynamic badges for pending actions (Rent, Lease, Sale, Orders).
  */
-const getBadgeCount = (title: string, counts: Record<string, number>) => {
-  const key = title.toUpperCase();
-  return counts[key] || 0;
-};
-
 export default function FinanceSidebar() {
   const router = useRouter();
   const pathname = usePathname();
+
+  type FinanceMenuItem = {
+    title: string;
+    icon: LucideIcon;
+    href: string;
+    disabled?: boolean;
+  };
+
+  type FinanceMenuGroup = {
+    group: string;
+    items: FinanceMenuItem[];
+  };
+
+  const financeMenu: FinanceMenuGroup[] = [
+    {
+      group: 'Main',
+      items: [
+        {
+          title: 'Dashboard',
+          icon: LayoutDashboard,
+          href: '/finance/dashboard',
+        },
+      ],
+    },
+    {
+      group: 'Operations',
+      items: [
+        {
+          title: 'Rent',
+          icon: Key,
+          href: '/finance/rent',
+        },
+        {
+          title: 'Lease',
+          icon: Home,
+          href: '/finance/lease',
+        },
+        {
+          title: 'Sale',
+          icon: Tag,
+          href: '/finance/sale',
+        },
+        {
+          title: 'Orders',
+          icon: ShoppingCart,
+          href: '/finance/orders',
+        },
+      ],
+    },
+  ];
+
+  /**
+   * Helper to get badge count for a specific title from the counts object
+   * 'Rent' -> counts.RENT
+   * 'Lease' -> counts.LEASE
+   * 'Sale' -> counts.SALE
+   */
+  const getBadgeCount = (title: string, counts: Record<string, number>) => {
+    const key = title.toUpperCase();
+    return counts[key] || 0;
+  };
 
   const handleLogOut = async () => {
     try {

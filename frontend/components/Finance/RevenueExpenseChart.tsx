@@ -20,14 +20,13 @@ const data = [
   { month: 'May', revenue: 145000, expense: 88000 },
 ];
 
-// 1. Custom Tooltip for Professional Data Display
 const CustomTooltip = ({
   active,
   payload,
   label,
 }: {
   active?: boolean;
-  payload?: Array<{ value: number }>;
+  payload?: Array<{ value: number; name: string; color: string }>;
   label?: string;
 }) => {
   if (active && payload && payload.length) {
@@ -63,6 +62,10 @@ const CustomTooltip = ({
   return null;
 };
 
+/**
+ * Bar chart comparing monthly revenue and expenses.
+ * Provides a high-level view of financial performance.
+ */
 export default function RevenueExpenseChart() {
   return (
     <div className="w-full h-[310px] mt-0">

@@ -67,6 +67,11 @@ const data = [
   },
 ];
 
+/**
+ * Summary table for printer assets categorized by model and usage type.
+ * Segments printers into Sale, Lease, or Rental categories and tracks their operational status (Active/Available/Service/Idle).
+ * Provides a clear overview of fleet composition and utilization.
+ */
 export default function PrinterAssetTable() {
   return (
     <div className="rounded-xl border bg-card shadow-sm overflow-hidden">

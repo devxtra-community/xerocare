@@ -21,7 +21,6 @@ import {
   deleteModel,
   CreateModelData,
   UpdateModelData,
-  syncQuantities,
 } from '@/lib/model';
 import { getBrands, Brand } from '@/lib/brand';
 import { toast } from 'sonner';
@@ -43,6 +42,11 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 
+/**
+ * Manager Model Management Page.
+ * Lists all product models with search, add, update, and delete capabilities.
+ * Displays total model count and allows managing model details like Name, Brand, and Description.
+ */
 export default function ManagerModel() {
   const [models, setModels] = useState<Model[]>([]);
   const [search, setSearch] = useState('');
@@ -136,21 +140,6 @@ export default function ManagerModel() {
         </div>
 
         <div className="flex gap-2">
-          <Button
-            className="bg-green-600 text-white gap-2 hover:bg-green-700"
-            onClick={async () => {
-              try {
-                await syncQuantities();
-                toast.success('Quantities synced successfully');
-                loadModels();
-              } catch (e) {
-                console.error(e);
-                toast.error('Failed to sync quantities');
-              }
-            }}
-          >
-            Sync Quantities
-          </Button>
           <Button
             className="bg-primary text-white gap-2"
             onClick={() => {

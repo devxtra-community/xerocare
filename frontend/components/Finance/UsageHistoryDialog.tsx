@@ -31,6 +31,9 @@ interface UsageHistoryDialogProps {
   customerName: string;
 }
 
+/**
+ * Displays past meter readings, usage counts, excess charges, and invoice status.
+ */
 export default function UsageHistoryDialog({
   isOpen,
   onClose,

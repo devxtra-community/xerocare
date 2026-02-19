@@ -15,6 +15,11 @@ import { salesService } from '@/services/salesService';
 
 // Remove hardcoded data
 
+/**
+ * Area chart displaying branch sales overview over time.
+ * Allows filtering by time periods (1W, 1M, 3M, 1Y).
+ * Visualizes sales performance trends.
+ */
 export default function BranchSalesChart() {
   const [selectedPeriod, setSelectedPeriod] = useState('1M');
   const [isClient, setIsClient] = useState(false);

@@ -7,6 +7,10 @@ import { getAllProducts, Product } from '@/lib/product';
 
 const COLORS = ['#FF6B35', '#004E89', '#00A8E8', '#F7B500', '#E040FB', '#2E7D32'];
 
+/**
+ * Pie chart component displaying product distribution by brand.
+ * Visualizes the proportion of products associated with different brands.
+ */
 export default function CategoryPieChart() {
   const [isClient, setIsClient] = useState(false);
   const [data, setData] = useState<{ name: string; value: number; color: string }[]>([]);

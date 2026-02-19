@@ -12,6 +12,10 @@ const data = [
   { month: 'Jun', profit: 170000 },
 ];
 
+/**
+ * Bar chart visualizing monthly net profit trends.
+ * Enables quick assessment of profitability over time.
+ */
 export default function ProfitChart() {
   const [isClient, setIsClient] = useState(false);
 

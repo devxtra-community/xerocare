@@ -15,6 +15,10 @@ import { createEmployee } from '@/lib/employee';
 import { getBranches, Branch } from '@/lib/branch';
 import { toast } from 'sonner';
 
+/**
+ * Dialog component for adding a new employee.
+ * Handles form validation, file uploads, and employee creation.
+ */
 export default function AddEmployeeDialog() {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);

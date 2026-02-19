@@ -65,6 +65,11 @@ const masterData = [
   // Add more rows if needed to demonstrate scroll or pagination
 ];
 
+/**
+ * Master table for inventory items (paginated view).
+ * Displays detailed product information including SKU, category, warehouse location, and stock status.
+ * Serves as the central registry for all inventory items.
+ */
 export default function InventoryMasterTable() {
   const [page, setPage] = useState(1);
   const ITEMS_PER_PAGE = 5;

@@ -11,6 +11,10 @@ interface EmployeeOrderStatsProps {
   invoices?: Invoice[];
 }
 
+/**
+ * Statistical summary cards for employee order metrics.
+ * Displays total orders, orders this month, and orders today.
+ */
 export default function EmployeeOrderStats({ invoices: propInvoices }: EmployeeOrderStatsProps) {
   const [stats, setStats] = useState({
     total: 0,

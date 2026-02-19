@@ -2,12 +2,16 @@ import { BranchRepository } from '../repositories/branchRepository';
 import { AppError } from '../errors/appError';
 import { publishBranchCreated, publishBranchUpdated } from '../events/publishers/branchPublisher';
 import { BranchStatus } from '../entities/branchEntity';
-import { Source } from '../config/db';
-import { EmployeeManager } from '../entities/employeeManagerEntity';
+import { EmployeeManagerRepository } from '../repositories/employeeManagerRepository';
 
 export class BranchService {
+  private managerRepo = new EmployeeManagerRepository();
+
   constructor(private readonly repo: BranchRepository) {}
 
+  /**
+   * Creates a new branch and publishes an event.
+   */
   async createBranch(payload: {
     name: string;
     address: string;
@@ -15,14 +19,7 @@ export class BranchService {
     manager_id: string;
     started_date: Date;
   }) {
-    const managerRepo = Source.getRepository(EmployeeManager);
-
-    const manager = await managerRepo.findOne({
-      where: {
-        employee_id: payload.manager_id,
-        status: 'ACTIVE',
-      },
-    });
+    const manager = await this.managerRepo.findActiveManager(payload.manager_id);
 
     if (!manager) {
       throw new AppError('Manager does not exist or inactive', 400);
@@ -45,10 +42,16 @@ export class BranchService {
     return branch;
   }
 
+  /**
+   * Retrieves all branches.
+   */
   getBranches() {
     return this.repo.findAll();
   }
 
+  /**
+   * Retrieves a branch by ID.
+   */
   async getBranchById(id: string) {
     const branch = await this.repo.findById(id);
     if (!branch) {
@@ -57,6 +60,9 @@ export class BranchService {
     return branch;
   }
 
+  /**
+   * Soft deletes a branch.
+   */
   async deleteBranch(id: string) {
     const branch = await this.repo.findById(id);
     if (!branch) {
@@ -67,6 +73,9 @@ export class BranchService {
     return true;
   }
 
+  /**
+   * Updates a branch and publishes an update event.
+   */
   async updateBranch(
     id: string,
     payload: {
@@ -79,14 +88,7 @@ export class BranchService {
     },
   ) {
     if (payload.manager_id) {
-      const managerRepo = Source.getRepository(EmployeeManager);
-
-      const manager = await managerRepo.findOne({
-        where: {
-          employee_id: payload.manager_id,
-          status: 'ACTIVE',
-        },
-      });
+      const manager = await this.managerRepo.findActiveManager(payload.manager_id);
 
       if (!manager) {
         throw new AppError('Manager does not exist or inactive', 400);

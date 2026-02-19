@@ -9,18 +9,30 @@ export class UsageRepository {
     this.repo = Source.getRepository(UsageRecord);
   }
 
+  /**
+   * Saves a usage record.
+   */
   save(usage: UsageRecord) {
     return this.repo.save(usage);
   }
 
+  /**
+   * Creates a usage record entity from partial data.
+   */
   create(data: Partial<UsageRecord>) {
     return this.repo.create(data);
   }
 
+  /**
+   * Finds a usage record by ID.
+   */
   findById(id: string) {
     return this.repo.findOne({ where: { id } });
   }
 
+  /**
+   * Finds a usage record for a specific contract and billing period.
+   */
   async findByContractAndPeriod(
     contractId: string,
     billingPeriodStart: Date,
@@ -67,6 +79,9 @@ export class UsageRepository {
     return found || null;
   }
 
+  /**
+   * Retrieves usage history for a contract, ordered by billing period.
+   */
   getUsageHistory(contractId: string, order: 'ASC' | 'DESC' = 'DESC') {
     return this.repo.find({
       where: { contractId },

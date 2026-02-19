@@ -22,6 +22,10 @@ interface EditPurchaseDialogProps {
   onSuccess: () => void;
 }
 
+/**
+ * Dialog component for editing an existing purchase record.
+ * Pre-fills the form with current purchase data and allows updates to details and status.
+ */
 export default function EditPurchaseDialog({
   open,
   onOpenChange,

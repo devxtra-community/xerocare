@@ -9,6 +9,10 @@ interface EmployeeSalesStatsProps {
   invoices?: Invoice[];
 }
 
+/**
+ * Statistical summary cards for employee sales metrics.
+ * Displays total sales count, sales this month, and total revenue.
+ */
 export default function EmployeeSalesStats({ invoices: propInvoices }: EmployeeSalesStatsProps) {
   const [stats, setStats] = useState({
     totalOrders: 0,

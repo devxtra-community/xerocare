@@ -21,6 +21,10 @@ const data = [
   { name: 'Sun', Printer: 34, Toner: 43, Spare: 35 },
 ];
 
+/**
+ * Area chart visualizing the movement of products (Printers, Toners, Spares) over the week.
+ * Helps identify high-velocity items and daily consumption trends.
+ */
 export default function MostMovedProductsChart() {
   const [isClient, setIsClient] = useState(false);
 

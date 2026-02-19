@@ -57,6 +57,11 @@ const data = [
   },
 ];
 
+/**
+ * Table displaying outstanding receivables.
+ * Lists customers with pending invoices, due dates, amounts, and aging status.
+ * Helps track and manage overdue payments.
+ */
 export default function OutstandingReceivablesTable() {
   return (
     <div className="bg-card rounded-2xl shadow-sm border border-blue-100 overflow-hidden">

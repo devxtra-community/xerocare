@@ -23,6 +23,11 @@ interface EmployeeProfileProps {
   id: string;
 }
 
+/**
+ * Detailed view of a single employee's profile.
+ * Displays personal info, usage stats (leaves/lates), and ID proof access.
+ * Provides a comprehensive portfolio view for HR management.
+ */
 export default function EmployeeProfile({ id }: EmployeeProfileProps) {
   const router = useRouter();
   const [emp, setEmp] = useState<Employee | null>(null);

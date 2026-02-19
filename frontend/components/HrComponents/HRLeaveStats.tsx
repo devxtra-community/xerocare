@@ -6,6 +6,11 @@ import { Loader2 } from 'lucide-react';
 import { getLeaveStats } from '@/lib/leaveApplicationService';
 import { toast } from 'sonner';
 
+/**
+ * Component displaying summary statistics for leave applications.
+ * Fetches and displays counts for Pending, Approved, and Rejected applications,
+ * along with the total number of applications.
+ */
 export default function HRLeaveStats() {
   const [stats, setStats] = useState({
     totalPending: 0,

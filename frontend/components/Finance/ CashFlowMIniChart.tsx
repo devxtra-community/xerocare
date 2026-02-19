@@ -12,6 +12,10 @@ const cashFlowData = [
   { month: 'May', inflow: 52000, outflow: 31000 },
 ];
 
+/**
+ * Mini chart displaying recent cash flow trends (inflow vs outflow).
+ * Shows net cash position and percentage growth.
+ */
 export default function CashFlowMiniChart() {
   // Calculate net for the latest month (May)
   const latest = cashFlowData[cashFlowData.length - 1];

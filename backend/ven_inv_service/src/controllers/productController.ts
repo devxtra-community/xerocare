@@ -7,10 +7,12 @@ import { MulterS3File } from '../types/multer-s3-file';
 
 const service = new ProductService();
 
+/**
+ * Bulk creates multiple products.
+ */
 export const bulkCreateProducts = async (req: Request, res: Response) => {
   try {
     const { rows } = req.body;
-    console.log(rows);
     if (!Array.isArray(rows) || rows.length === 0) {
       throw new AppError('Invalid data', 400);
     }
@@ -21,12 +23,14 @@ export const bulkCreateProducts = async (req: Request, res: Response) => {
       failed: result.failed.length,
       errors: result.failed,
     });
-  } catch (e) {
-    console.log(e);
+  } catch {
     throw new AppError('Failed to bulk create products', 500);
   }
 };
 
+/**
+ * Adds a new product.
+ */
 export const addproduct = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const {
@@ -74,6 +78,9 @@ export const addproduct = async (req: Request, res: Response, next: NextFunction
   }
 };
 
+/**
+ * Retrieves all products.
+ */
 export const getallproducts = async (req: Request, res: Response) => {
   try {
     logger.info('Fetching all products');
@@ -89,13 +96,13 @@ export const getallproducts = async (req: Request, res: Response) => {
       .json({ message: 'Fetched all products successfully', data: products, success: true });
   } catch (error) {
     logger.error('Error in getallproducts:', error);
-    // User said: "if the data cant fetch then only show error".
-    // So 500 is correct for database connection failure etc.
-    // The issue was likely treating empty results as errors (which I fixed above for products just in case).
     throw new AppError('Failed to fetch products', 500);
   }
 };
 
+/**
+ * Updates an existing product.
+ */
 export const updateproduct = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
@@ -135,6 +142,9 @@ export const updateproduct = async (req: Request, res: Response, next: NextFunct
   }
 };
 
+/**
+ * Deletes a product.
+ */
 export const deleteproduct = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
@@ -154,6 +164,9 @@ export const deleteproduct = async (req: Request, res: Response, next: NextFunct
   }
 };
 
+/**
+ * Retrieves a single product by ID.
+ */
 export const getproductbyid = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;

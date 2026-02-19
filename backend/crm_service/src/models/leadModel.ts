@@ -16,8 +16,8 @@ export interface ILead extends Document {
   status: LeadStatus;
   metadata?: Record<string, unknown>;
   customerId?: string;
-  isCustomer: boolean; // default false
-  assignedTo?: string; // userId
+  isCustomer: boolean;
+  assignedTo?: string;
   createdBy?: string;
   convertedBy?: string;
   isDeleted: boolean;
@@ -47,7 +47,6 @@ const LeadSchema: Schema = new Schema(
   { timestamps: true },
 );
 
-// Indexes
 LeadSchema.index({ email: 1 });
 LeadSchema.index({ phone: 1 });
 LeadSchema.index({ isDeleted: 1 });

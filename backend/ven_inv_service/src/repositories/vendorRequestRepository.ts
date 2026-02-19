@@ -6,6 +6,9 @@ export class VendorRequestRepository extends Repository<VendorRequest> {
     super(VendorRequest, dataSource.createEntityManager());
   }
 
+  /**
+   * Creates a new vendor request.
+   */
   async createRequest(data: Partial<VendorRequest>): Promise<VendorRequest> {
     const request = this.create(data);
     return this.save(request);

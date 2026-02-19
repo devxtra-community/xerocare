@@ -9,6 +9,10 @@ interface AuthGuardProps {
   loginUrl?: string;
 }
 
+/**
+ * Wrapper component to protect routes requiring authentication.
+ * Redirects unauthenticated users to the login page.
+ */
 export default function AuthGuard({ children, loginUrl = '/login' }: AuthGuardProps) {
   const router = useRouter();
   const [authorized, setAuthorized] = useState(false);

@@ -39,6 +39,10 @@ const emptyLead: CreateLeadData = {
   },
 };
 
+/**
+ * Modal dialog for creating or updating a lead.
+ * Handles form validation for lead details including name, contact info, source, and priority.
+ */
 export default function LeadDialog({ open, onOpenChange, initialData, onSave }: LeadDialogProps) {
   const [formData, setFormData] = useState<CreateLeadData>(emptyLead);
   const [loading, setLoading] = useState(false);

@@ -26,6 +26,10 @@ interface InvoiceItemRow {
   unitPrice: number;
 }
 
+/**
+ * Form for creating a new Sales Invoice.
+ * Allows selecting a customer, adding multiple products/spare parts, and calculating totals.
+ */
 export default function InvoiceForm() {
   const router = useRouter();
   const searchParams = useSearchParams();

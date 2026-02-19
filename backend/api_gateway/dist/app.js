@@ -9,6 +9,7 @@ const cors_1 = __importDefault(require("cors"));
 const http_proxy_middleware_1 = require("http-proxy-middleware");
 const health_1 = __importDefault(require("./routes/health"));
 const customerUpdatedConsumer_1 = require("./events/consumers/customerUpdatedConsumer");
+const customerUpdatedConsumer_1 = require("./events/consumers/customerUpdatedConsumer");
 const invoiceRoutes_1 = __importDefault(require("./routes/invoiceRoutes"));
 const httplogger_1 = require("./middleware/httplogger");
 const logger_1 = require("./config/logger");
@@ -16,7 +17,7 @@ const errorHandler_1 = require("./middleware/errorHandler");
 const rateLimitter_1 = require("./middleware/rateLimitter");
 const app = (0, express_1.default)();
 app.set('trust proxy', 1);
-// app.use(globalRateLimiter);
+app.use(rateLimitter_1.globalRateLimiter);
 (async () => {
     await (0, customerUpdatedConsumer_1.startCustomerConsumer)();
     logger_1.logger.info('Customer Consumer initialized');

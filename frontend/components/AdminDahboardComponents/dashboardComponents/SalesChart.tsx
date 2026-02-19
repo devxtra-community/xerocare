@@ -57,6 +57,11 @@ const CustomTooltip = ({
   return null;
 };
 
+/**
+ * Area chart component displaying global sales trends over time.
+ * Visualizes summaries for SALE, RENT, and LEASE categories.
+ * Supports filtering by time period (1W, 1M, 3M, 1Y).
+ */
 export default function SalesChart() {
   const [selectedPeriod, setSelectedPeriod] = useState('1Y');
   const [isClient, setIsClient] = useState(false);

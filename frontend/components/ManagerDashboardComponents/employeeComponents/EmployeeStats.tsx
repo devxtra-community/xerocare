@@ -3,6 +3,10 @@
 import React from 'react';
 import StatCard from '@/components/StatCard';
 
+/**
+ * Component displaying a row of high-level employee statistics cards.
+ * Shows counts for total employees, presence, leave, and total working hours.
+ */
 export default function EmployeeStats() {
   return (
     <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 sm:gap-2 md:gap-4">

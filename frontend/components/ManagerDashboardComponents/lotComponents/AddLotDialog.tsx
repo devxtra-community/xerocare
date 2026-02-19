@@ -26,8 +26,11 @@ import { Plus, Trash2, Upload, FileSpreadsheet, Download, Loader2 } from 'lucide
 import { toast } from 'sonner';
 import { LotItemType, lotService, Vendor } from '@/lib/lot';
 import { getAllModels, Model } from '@/lib/model';
-import { getAllSpareParts, SparePart } from '@/lib/spare-part';
 import { getVendors } from '@/lib/vendor';
+import { getUserFromToken } from '@/lib/auth';
+import { brandService, Brand } from '@/services/brandService';
+import { SearchableSelect } from '@/components/ui/searchable-select';
+import { getMyBranchWarehouses, Warehouse } from '@/lib/warehouse';
 import * as XLSX from 'xlsx';
 
 // --- Schema Definition ---
@@ -36,6 +39,8 @@ const lotItemSchema = z
     itemType: z.nativeEnum(LotItemType),
     modelId: z.string().optional(),
     sparePartId: z.string().optional(),
+    brand: z.string().optional(),
+    partName: z.string().optional(),
     quantity: z.coerce.number().min(1, 'Quantity must be at least 1'),
     unitPrice: z.coerce.number().min(0, 'Price cannot be negative'),
   })
@@ -44,19 +49,20 @@ const lotItemSchema = z
       if (data.itemType === LotItemType.MODEL && !data.modelId) {
         return false;
       }
-      if (data.itemType === LotItemType.SPARE_PART && !data.sparePartId) {
+      if (data.itemType === LotItemType.SPARE_PART && (!data.brand || !data.partName)) {
         return false;
       }
       return true;
     },
     {
-      message: 'Item selection is required',
-      path: ['modelId'],
+      message: 'Brand and Part Name are required for spare parts',
+      path: ['brand'],
     },
   );
 
 const createLotSchema = z.object({
   vendorId: z.string().min(1, 'Vendor is required'),
+  warehouseId: z.string().min(1, 'Warehouse is required'),
   lotNumber: z.string().min(1, 'Lot number is required'),
   purchaseDate: z.string().min(1, 'Purchase date is required'),
   notes: z.string().optional(),
@@ -120,11 +126,17 @@ const CostInput = <T extends import('react-hook-form').FieldValues>({
   );
 };
 
+/**
+ * Dialog component for creating or uploading new inventory lots.
+ * Supports manual entry of lot details, items (Products/Spare Parts), and associated costs.
+ * Also provides functionality to upload lot data via Excel templates.
+ */
 export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) {
   const [loading, setLoading] = useState(false);
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [models, setModels] = useState<Model[]>([]);
-  const [spareParts, setSpareParts] = useState<SparePart[]>([]);
+  const [brands, setBrands] = useState<Brand[]>([]);
+  const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [isUploadMode, setIsUploadMode] = useState(false);
   const [uploadFile, setUploadFile] = useState<File | null>(null);
 
@@ -132,11 +144,20 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
     resolver: zodResolver(createLotSchema) as Resolver<CreateLotFormValues>,
     defaultValues: {
       vendorId: '',
+      warehouseId: '',
       lotNumber: '',
       purchaseDate: new Date().toISOString().split('T')[0],
       notes: '',
       items: [
-        { itemType: LotItemType.MODEL, quantity: 1, unitPrice: 0, modelId: '', sparePartId: '' },
+        {
+          itemType: LotItemType.MODEL,
+          quantity: 1,
+          unitPrice: 0,
+          modelId: '',
+          sparePartId: '',
+          brand: '',
+          partName: '',
+        },
       ],
       transportationCost: 0,
       documentationCost: 0,
@@ -156,14 +177,16 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [vData, mData, sData] = await Promise.all([
+        const [vData, mData, bData, wData] = await Promise.all([
           getVendors(),
           getAllModels(),
-          getAllSpareParts(),
+          brandService.getAllBrands(),
+          getMyBranchWarehouses(),
         ]);
         setVendors(vData.data || []);
         setModels(mData || []);
-        setSpareParts(sData || []);
+        setBrands(bData || []);
+        setWarehouses(wData.data || []);
       } catch {
         toast.error('Failed to load form data');
       }
@@ -174,7 +197,12 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
   const onSubmit = async (data: CreateLotFormValues) => {
     setLoading(true);
     try {
-      await lotService.createLot(data);
+      const user = getUserFromToken();
+      await lotService.createLot({
+        ...data,
+        branchId: user?.branchId,
+        createdBy: user?.userId,
+      });
       toast.success('Lot created successfully');
       onSuccess();
       onClose();
@@ -221,13 +249,13 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
       ['Labour', 0],
       [],
       ['LOT ITEMS'],
-      ['Item Type', 'Item Name', 'Quantity', 'Unit Price'],
-      ['PRODUCT', 'Example Model Name', 10, 100],
-      ['SPARE PART', 'Example Part Name', 5, 50],
+      ['Item Type', 'Item Name', 'Brand', 'Quantity', 'Unit Price'],
+      ['PRODUCT', 'Example Model Name', 'Example Brand', 10, 100],
+      ['SPARE PART', 'Example Part Name', 'Example Brand', 5, 50],
     ];
 
     const ws = XLSX.utils.aoa_to_sheet(rows);
-    const wscols = [{ wch: 20 }, { wch: 30 }, { wch: 15 }, { wch: 15 }];
+    const wscols = [{ wch: 20 }, { wch: 30 }, { wch: 20 }, { wch: 15 }, { wch: 15 }];
     ws['!cols'] = wscols;
 
     const wb = XLSX.utils.book_new();
@@ -263,7 +291,7 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
   const formControl = form.control as unknown as Control<CreateLotFormValues>;
 
   return (
-    <Dialog open={true} onOpenChange={(open) => !open && onClose()}>
+    <Dialog open={true} onOpenChange={() => {}}>
       <DialogContent
         showCloseButton={false}
         className="sm:max-w-[80vw] lg:max-w-7xl h-[90vh] flex flex-col p-0 overflow-hidden bg-white shadow-2xl"
@@ -415,6 +443,36 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
                     />
                     <FormField
                       control={formControl}
+                      name="warehouseId"
+                      render={({ field }) => (
+                        <FormItem className="space-y-1.5">
+                          <FormLabel className="text-sm font-medium text-gray-700">
+                            Warehouse
+                          </FormLabel>
+                          <Select
+                            onValueChange={field.onChange}
+                            defaultValue={field.value}
+                            value={field.value}
+                          >
+                            <FormControl>
+                              <SelectTrigger className="h-10">
+                                <SelectValue placeholder="Select Warehouse" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {warehouses.map((w) => (
+                                <SelectItem key={w.id} value={w.id}>
+                                  {w.warehouseName}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={formControl}
                       name="lotNumber"
                       render={({ field }) => (
                         <FormItem className="space-y-1.5">
@@ -471,6 +529,8 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
                           unitPrice: 0,
                           modelId: '',
                           sparePartId: '',
+                          brand: '',
+                          partName: '',
                         })
                       }
                       className="h-9 gap-1.5 bg-gray-50 hover:bg-gray-100 text-gray-700 border-gray-200"
@@ -514,6 +574,8 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
                                         itemType: val as LotItemType,
                                         modelId: '',
                                         sparePartId: '',
+                                        brand: '',
+                                        partName: '',
                                       });
                                     }}
                                     value={field.value}
@@ -565,27 +627,47 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
                                           )}
                                         />
                                       ) : (
-                                        <FormField
-                                          control={formControl}
-                                          name={`items.${index}.sparePartId`}
-                                          render={({ field: spField }) => (
-                                            <Select
-                                              onValueChange={spField.onChange}
-                                              value={spField.value}
-                                            >
-                                              <SelectTrigger className="h-10 text-sm bg-gray-50/50">
-                                                <SelectValue placeholder="Select Part" />
-                                              </SelectTrigger>
-                                              <SelectContent>
-                                                {spareParts.map((p) => (
-                                                  <SelectItem key={p.id} value={p.id}>
-                                                    {p.part_name}
-                                                  </SelectItem>
-                                                ))}
-                                              </SelectContent>
-                                            </Select>
-                                          )}
-                                        />
+                                        <div className="grid grid-cols-2 gap-2">
+                                          <FormField
+                                            control={formControl}
+                                            name={`items.${index}.brand`}
+                                            render={({ field: brandField }) => (
+                                              <FormItem>
+                                                <FormControl>
+                                                  <SearchableSelect
+                                                    value={brandField.value}
+                                                    onValueChange={brandField.onChange}
+                                                    options={brands.map((brand) => ({
+                                                      value: brand.name,
+                                                      label: brand.name,
+                                                      description: brand.description || '',
+                                                    }))}
+                                                    placeholder="Select Brand"
+                                                    emptyText="No brands found."
+                                                    className="h-10 text-sm bg-gray-50/50"
+                                                  />
+                                                </FormControl>
+                                                <FormMessage />
+                                              </FormItem>
+                                            )}
+                                          />
+                                          <FormField
+                                            control={formControl}
+                                            name={`items.${index}.partName`}
+                                            render={({ field: partNameField }) => (
+                                              <FormItem>
+                                                <FormControl>
+                                                  <Input
+                                                    placeholder="Part Name"
+                                                    className="h-10 text-sm bg-gray-50/50"
+                                                    {...partNameField}
+                                                  />
+                                                </FormControl>
+                                                <FormMessage />
+                                              </FormItem>
+                                            )}
+                                          />
+                                        </div>
                                       )}
                                     </>
                                   );
@@ -659,6 +741,8 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
                                   unitPrice: 0,
                                   modelId: '',
                                   sparePartId: '',
+                                  brand: '',
+                                  partName: '',
                                 })
                               }
                             >

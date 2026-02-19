@@ -19,6 +19,11 @@ const data = [
   { month: 'Jun', active: 88 },
 ];
 
+/**
+ * Area chart tracking printer utilization trends over time.
+ * Displays the monthly count of active printers.
+ * Helps in analyzing adoption rates and fleet usage growth.
+ */
 export default function PrinterUtilizationTrend() {
   const [isClient, setIsClient] = useState(false);
 

@@ -19,6 +19,10 @@ interface DeleteEmployeeDialogProps {
   onConfirm: () => void;
 }
 
+/**
+ * Dialog for confirming employee deletion or status change (enable/disable).
+ * Adapts its message and color scheme based on whether the action is enabling or disabling/deleting.
+ */
 export default function DeleteEmployeeDialog({
   open,
   onOpenChange,

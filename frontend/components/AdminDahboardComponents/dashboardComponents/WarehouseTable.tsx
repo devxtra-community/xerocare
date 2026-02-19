@@ -5,6 +5,10 @@ import { getWarehouses, Warehouse } from '@/lib/warehouse';
 
 const ITEMS_PER_PAGE = 5;
 
+/**
+ * Dashboard widget displaying warehouse list and capacity.
+ * Shows location, associated branch, and storage capacity for each warehouse.
+ */
 export default function WarehouseTable() {
   const [page, setPage] = useState(1);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);

@@ -50,6 +50,11 @@ const leaveTypeLabels: Record<LeaveType, string> = {
   [LeaveType.EMERGENCY]: 'Emergency Leave',
 };
 
+/**
+ * Leave Management Table for HR.
+ * Lists all leave applications with details (employee, type, dates, reason).
+ * Supports approval/rejection workflows, filtering by status, and generating leave letters.
+ */
 export default function HRLeaveTable() {
   const [leaves, setLeaves] = useState<LeaveApplication[]>([]);
   const [search, setSearch] = useState('');

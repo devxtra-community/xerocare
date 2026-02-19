@@ -2,7 +2,7 @@ import api from './api';
 
 export interface SparePart {
   id: string;
-  lot_number: string; // Replaces item_code
+  item_code: string; // Matches backend entity
   part_name: string;
   brand: string;
   description?: string;
@@ -12,6 +12,7 @@ export interface SparePart {
   image_url?: string;
   created_at: string;
   updated_at: string;
+  lot_number?: string;
 }
 
 interface ApiResponse<T> {

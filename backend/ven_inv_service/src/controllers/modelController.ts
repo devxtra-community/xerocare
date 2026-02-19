@@ -4,6 +4,9 @@ import { ModelService } from '../services/modelService';
 import { logger } from '../config/logger';
 
 const service = new ModelService();
+/**
+ * Retrieves all models.
+ */
 export const getallModels = async (req: Request, res: Response) => {
   try {
     logger.info('Fetching all models');
@@ -22,6 +25,9 @@ export const getallModels = async (req: Request, res: Response) => {
   }
 };
 
+/**
+ * Adds a new model.
+ */
 export const addModel = async (req: Request, res: Response) => {
   try {
     const modelData = req.body;
@@ -32,6 +38,9 @@ export const addModel = async (req: Request, res: Response) => {
   }
 };
 
+/**
+ * Edits an existing model.
+ */
 export const editModel = async (req: Request, res: Response) => {
   try {
     const id = req.params.id as string;
@@ -46,6 +55,9 @@ export const editModel = async (req: Request, res: Response) => {
   }
 };
 
+/**
+ * Deletes a model, ensuring no foreign key constraints.
+ */
 export const deleteModel = async (req: Request, res: Response) => {
   try {
     const id = req.params.id as string;
@@ -66,6 +78,9 @@ export const deleteModel = async (req: Request, res: Response) => {
   }
 };
 
+/**
+ * Syncs model quantities with product counts.
+ */
 export const syncQuantities = async (req: Request, res: Response) => {
   try {
     await service.syncQuantities();

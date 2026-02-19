@@ -21,6 +21,10 @@ import { format } from 'date-fns';
 import UsageHistoryDialog from './UsageHistoryDialog';
 import ConsolidatedStatementDialog from './ConsolidatedStatementDialog';
 
+/**
+ * Table displaying completed rental and lease collections.
+ * Allows viewing consolidated statements and sending final invoices.
+ */
 export default function CompletedCollectionsTable({ mode }: { mode?: 'RENT' | 'LEASE' }) {
   const [collections, setCollections] = useState<CompletedCollection[]>([]);
   const [loading, setLoading] = useState(true);

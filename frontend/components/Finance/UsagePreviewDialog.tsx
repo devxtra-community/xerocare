@@ -39,6 +39,12 @@ interface UsagePreviewDialogProps {
   };
 }
 
+/**
+ * Preview dialog for usage recordings before they are confirmed.
+ * Displays calculated deltas, excess charges, and meter image for verification.
+ * Modal dialog for previewing usage charges before recording.
+ * Shows checks calculated costs, excess usage, and net payable amount.
+ */
 export default function UsagePreviewDialog({
   isOpen,
   onClose,

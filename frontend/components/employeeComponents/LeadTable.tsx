@@ -20,6 +20,10 @@ interface LeadTableProps {
   onEdit: (lead: Lead) => void;
 }
 
+/**
+ * Table displaying a list of leads.
+ * Shows contact info, source, status, and allows editing or deleting leads.
+ */
 export function LeadTable({ leads, onRefresh, onEdit }: LeadTableProps) {
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
 

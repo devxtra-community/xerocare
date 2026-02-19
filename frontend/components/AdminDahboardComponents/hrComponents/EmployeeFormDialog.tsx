@@ -27,6 +27,11 @@ interface EmployeeFormDialogProps {
   onSubmit: (formData: FormData) => Promise<boolean>;
 }
 
+/**
+ * Form dialog for creating or updating employee details.
+ * Handles extensive form data including personal info, role, job details, and file uploads.
+ * Dynamically shows fields based on selected role (e.g., specific job types for Employee/Finance).
+ */
 export default function EmployeeFormDialog({
   open,
   onOpenChange,

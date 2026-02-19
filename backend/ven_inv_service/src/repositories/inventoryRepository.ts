@@ -6,26 +6,27 @@ export class InventoryRepository {
   private modelRepo = Source.getRepository(Model);
   private productRepo = Source.getRepository(Product);
 
-  // ADMIN — GLOBAL INVENTORY (Model-based with quantity)
+  /**
+   * Retrieves global inventory with optional filtering.
+   */
   async getGlobalInventory(filters?: { product?: string; warehouse?: string; branch?: string }) {
     const query = this.modelRepo
       .createQueryBuilder('model')
       .leftJoin('model.products', 'product', 'product.spare_part_id IS NULL')
       .leftJoin('product.warehouse', 'warehouse')
-      .leftJoin('warehouse.branch', 'branch') // Join branch for filtering
+      .leftJoin('warehouse.branch', 'branch')
       .select([
         'model.id AS id',
         'model.model_no AS model_no',
         'model.model_name AS model_name',
-        'product.name AS product_name', // Add product name
+        'product.name AS product_name',
         'brandRelation.name AS brand',
         'model.description AS description',
         'warehouse.warehouseName AS warehouse_name',
-        'branch.name AS branch_name', // Optional: Select branch name if needed
+        'branch.name AS branch_name',
       ])
       .leftJoin('model.brandRelation', 'brandRelation');
 
-    // Apply Filters
     if (filters?.product) {
       query.andWhere(
         '(LOWER(model.model_name) LIKE :product OR LOWER(model.model_no) LIKE :product OR LOWER(product.name) LIKE :product)',
@@ -59,11 +60,11 @@ export class InventoryRepository {
       .groupBy('model.id')
       .addGroupBy('brandRelation.id')
       .addGroupBy('brandRelation.name')
-      .addGroupBy('product.id') // Group by product to show individual products
+      .addGroupBy('product.id')
       .addGroupBy('product.name')
       .addGroupBy('warehouse.id')
       .addGroupBy('warehouse.warehouseName')
-      .addGroupBy('branch.id') // Group by branch
+      .addGroupBy('branch.id')
       .addGroupBy('branch.name')
       .having('COUNT(product.id) > 0')
       .getRawMany();
@@ -80,7 +81,9 @@ export class InventoryRepository {
     }));
   }
 
-  // MANAGER — BRANCH INVENTORY (Model-based with warehouse breakdown)
+  /**
+   * Retrieves inventory for a specific branch.
+   */
   async getBranchInventory(branchId: string) {
     const result = await this.productRepo
       .createQueryBuilder('product')
@@ -130,7 +133,9 @@ export class InventoryRepository {
     }));
   }
 
-  // WAREHOUSE STAFF — WAREHOUSE INVENTORY
+  /**
+   * Retrieves inventory for a specific warehouse.
+   */
   async getWarehouseInventory(warehouseId: string) {
     const result = await this.productRepo
       .createQueryBuilder('product')
@@ -172,7 +177,9 @@ export class InventoryRepository {
     }));
   }
 
-  // DASHBOARD STATS
+  /**
+   * Calculates inventory statistics.
+   */
   async getInventoryStats(branchId?: string) {
     const query = this.productRepo
       .createQueryBuilder('product')
@@ -196,7 +203,7 @@ export class InventoryRepository {
       totalStock: Number(stats?.totalStock || 0),
       productModels: Number(stats?.productModels || 0),
       totalValue: Number(stats?.totalValue || 0),
-      damagedStock: 0, // Specifically requested to be zero
+      damagedStock: 0,
     };
   }
 }

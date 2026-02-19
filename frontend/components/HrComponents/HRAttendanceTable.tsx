@@ -25,6 +25,14 @@ import HRAttendanceDetailDialog, {
   AttendanceEmployee,
 } from '@/components/HrComponents/HRAttendanceDetailDialog';
 
+/**
+ * Main Attendance Management Table.
+ * Lists employees with their daily attendance status and aggregated metrics.
+ * Features:
+ * - Search by name or ID.
+ * - Filter by Role and Status.
+ * - Drill-down to detailed attendance view.
+ */
 export default function HRAttendanceTable() {
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState('All');

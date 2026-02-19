@@ -20,6 +20,10 @@ interface ApproveQuotationDialogProps {
   onSuccess: () => void;
 }
 
+/**
+ * Dialog for approving a quotation and converting it into a Proforma Contract.
+ * Allows collecting an optional security deposit and specifying payment mode (Cash/Cheque).
+ */
 export function ApproveQuotationDialog({
   invoiceId,
   onClose,

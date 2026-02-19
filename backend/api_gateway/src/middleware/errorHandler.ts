@@ -2,13 +2,21 @@ import { Request, Response, NextFunction } from 'express';
 import { AppError } from '../errors/appError';
 import { logger } from '../config/logger';
 
-export const errorHandler = (err: Error, req: Request, res: Response, next: NextFunction) => {
-  void next;
-  logger.error('Unhandled error', {
+/**
+ * Global error handling middleware.
+ * Logs errors with full context and sends standardized JSON responses.
+ */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export const errorHandler = (err: Error, req: Request, res: Response, _next: NextFunction) => {
+  const statusCode = err instanceof AppError ? err.statusCode : 500;
+
+  logger.error(`✗ ${req.method} ${req.originalUrl} → ${statusCode} ${err.message}`, {
+    method: req.method,
+    url: req.originalUrl,
+    statusCode,
     message: err.message,
     stack: err.stack,
-    path: req.originalUrl,
-    method: req.method,
+    body: req.body,
   });
 
   if (err instanceof AppError) {

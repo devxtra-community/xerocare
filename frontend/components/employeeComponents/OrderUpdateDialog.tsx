@@ -32,6 +32,10 @@ interface OrderUpdateDialogProps {
   onUpdate: (updatedOrder: SaleOrder) => void;
 }
 
+/**
+ * Dialog for updating the status and details of an existing sales order.
+ * Allows modifying customer info, product details, payment status, and order status.
+ */
 export default function OrderUpdateDialog({
   open,
   onOpenChange,

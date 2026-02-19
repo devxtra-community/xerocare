@@ -47,6 +47,7 @@ export interface Lot {
   totalAmount: number;
   status: LotStatus;
   notes?: string;
+  warehouseId?: string;
   items: LotItem[];
   createdAt: string;
   updatedAt: string;
@@ -56,6 +57,8 @@ export interface CreateLotItemData {
   itemType: LotItemType;
   modelId?: string;
   sparePartId?: string;
+  brand?: string;
+  partName?: string;
   quantity: number;
   unitPrice: number;
 }
@@ -71,6 +74,9 @@ export interface CreateLotData {
   certificationCost?: number;
   labourCost?: number;
   notes?: string;
+  branchId?: string;
+  warehouseId?: string;
+  createdBy?: string;
   items: CreateLotItemData[];
 }
 

@@ -9,6 +9,9 @@ export class CustomerController {
     this.customerService = new CustomerService();
   }
 
+  /**
+   * Creates a new customer.
+   */
   createCustomer = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const customer = await this.customerService.createCustomer(req.body);
@@ -21,6 +24,9 @@ export class CustomerController {
     }
   };
 
+  /**
+   * Retrieves all customers.
+   */
   getAllCustomers = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const customers = await this.customerService.getAllCustomers();
@@ -33,6 +39,9 @@ export class CustomerController {
     }
   };
 
+  /**
+   * Retrieves a single customer by ID.
+   */
   getCustomerById = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { id } = req.params;
@@ -49,6 +58,9 @@ export class CustomerController {
     }
   };
 
+  /**
+   * Updates an existing customer.
+   */
   updateCustomer = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { id } = req.params;
@@ -65,6 +77,9 @@ export class CustomerController {
     }
   };
 
+  /**
+   * Soft deletes a customer.
+   */
   deleteCustomer = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { id } = req.params;

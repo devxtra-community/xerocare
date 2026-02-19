@@ -28,6 +28,9 @@ interface JobCountStat {
 export class EmployeeService {
   private employeeRepo = new EmployeeRepository();
 
+  /**
+   * Adds a new employee, validating unique email and role constraints.
+   */
   async addEmployee(payload: {
     first_name: string;
     last_name: string;
@@ -70,22 +73,18 @@ export class EmployeeService {
 
     const roleEnum = (role ?? EmployeeRole.EMPLOYEE) as EmployeeRole;
 
-    // Validate employee_job if provided
     if (employee_job && !Object.values(EmployeeJob).includes(employee_job)) {
       throw new AppError('Invalid employee job', 400);
     }
 
-    // Require employee_job for EMPLOYEE role
     if (roleEnum === EmployeeRole.EMPLOYEE && !employee_job) {
       throw new AppError('Employee job is required for EMPLOYEE role', 400);
     }
 
-    // Validate finance_job if provided
     if (finance_job && !Object.values(FinanceJob).includes(finance_job)) {
       throw new AppError('Invalid finance job', 400);
     }
 
-    // Require finance_job for FINANCE role
     if (roleEnum === EmployeeRole.FINANCE && !finance_job) {
       throw new AppError('Finance job is required for FINANCE role', 400);
     }
@@ -112,7 +111,6 @@ export class EmployeeService {
     const lastDisplayId = await this.employeeRepo.findLatestDisplayId(prefix);
     let nextNum = 1;
     if (lastDisplayId) {
-      // Remove prefix and parse
       const numPart = lastDisplayId.substring(prefix.length);
       if (!isNaN(Number(numPart))) {
         nextNum = Number(numPart) + 1;
@@ -157,6 +155,9 @@ export class EmployeeService {
     return employee;
   }
 
+  /**
+   * Generates a signed URL for the employee's ID proof.
+   */
   async getEmployeeIdProof(employeeId: string) {
     const employee = await this.employeeRepo.findById(employeeId);
 
@@ -176,6 +177,9 @@ export class EmployeeService {
     };
   }
 
+  /**
+   * Retrieves paginated list of employees.
+   */
   async getAllEmployees(page = 1, limit = 20, role?: EmployeeRole, branchId?: string) {
     const skip = (page - 1) * limit;
 
@@ -192,6 +196,9 @@ export class EmployeeService {
     };
   }
 
+  /**
+   * Retrieves a single employee by ID, ensuring they exist.
+   */
   async getEmployeeById(id: string) {
     const employee = await this.employeeRepo.findByIdSafe(id);
 
@@ -202,6 +209,9 @@ export class EmployeeService {
     return employee;
   }
 
+  /**
+   * Retrieves public profile data for an employee.
+   */
   async getPublicEmployeeProfile(id: string) {
     const employee = await this.employeeRepo.findByIdSafe(id);
 
@@ -218,6 +228,9 @@ export class EmployeeService {
     };
   }
 
+  /**
+   * Updates an employee's details, handling file uploads and role/job validation.
+   */
   async updateEmployee(
     id: string,
     payload: {
@@ -289,6 +302,9 @@ export class EmployeeService {
     return updated;
   }
 
+  /**
+   * Soft deletes an employee (sets status to INACTIVE).
+   */
   async deleteEmployee(id: string) {
     const employee = await this.employeeRepo.findById(id);
 
@@ -306,8 +322,10 @@ export class EmployeeService {
     return !!updated;
   }
 
+  /**
+   * Aggregates HR statistics for the dashboard.
+   */
   async getHRStats(branchId?: string) {
-    // If branchId is provided, get stats for that branch only
     const total = branchId
       ? await this.employeeRepo.countByBranch(branchId)
       : await this.employeeRepo.count();
@@ -320,7 +338,6 @@ export class EmployeeService {
       ? await this.employeeRepo.countByStatusAndBranch(EmployeeStatus.INACTIVE, branchId)
       : await this.employeeRepo.countByStatus(EmployeeStatus.INACTIVE);
 
-    // Get counts by role
     const roles = Object.values(EmployeeRole);
     const byRole: Record<string, number> = {};
 
@@ -332,9 +349,6 @@ export class EmployeeService {
 
     const rawGrowthData = await this.employeeRepo.getEmployeeGrowthStats(branchId);
 
-    // Format growth data to ensure all months are present (optional, but good for charts)
-    // For now, returning raw data which `recharts` can handle or frontend can process
-    // Actually, let's map it to ensure consistency with the frontend expectation
     const monthsOrder = [
       'Jan',
       'Feb',
@@ -354,16 +368,6 @@ export class EmployeeService {
     const baseCount = await this.employeeRepo.countBeforeYear(currentYear, branchId);
     let cumulativeCount = baseCount;
 
-    // We need to know the base count before this year to do a true cumulative graph for "Total Employees"
-    // However, if we just want "Growth this year", we can start from 0 or the first month's value.
-    // The previous mock data was 12 -> 88, suggesting a running total.
-    // Ideally, we should get the total count *before* Jan 1st of current year as the starting point.
-    // For simplicity and immediate visual feedback based on "Growth", let's just use the current year's joins cumulatively.
-    // BETTER APPROACH: The user likely wants to see the total number of employees at the end of each month.
-    // So we need the total count of active employees up to that month.
-    // But calculating that historically is complex (checking join dates vs exit dates).
-    // Let's stick to "Cumulative New Joins" for this year for now, effectively showing the "Growth" aspect.
-
     const growthMap = new Map<string, number>();
     rawGrowthData.forEach((item: GrowthStat) => {
       growthMap.set(item.month.trim(), parseInt(item.count, 10));
@@ -377,7 +381,6 @@ export class EmployeeService {
 
     const jobCounts = await this.employeeRepo.getJobTypeCounts(branchId);
 
-    // Map job counts to a clean object
     const byJob: Record<string, number> = {};
     jobCounts.forEach((item: JobCountStat) => {
       if (item.financeJob) {
@@ -385,7 +388,6 @@ export class EmployeeService {
       } else if (item.job) {
         byJob[item.job] = (byJob[item.job] || 0) + parseInt(item.count, 10);
       } else {
-        // Fallback for employees without specific job
         byJob['OTHER'] = (byJob['OTHER'] || 0) + parseInt(item.count, 10);
       }
     });

@@ -94,6 +94,11 @@ const menuItems = [
   },
 ];
 
+/**
+ * Sidebar navigation for the Manager Dashboard.
+ * Provides links to key modules: Products, Brands, Sales, Vendors, Employees, Finance, and Inventory.
+ * Handles user logout functionality.
+ */
 export default function ManagerSidebar() {
   const router = useRouter();
   const pathname = usePathname();

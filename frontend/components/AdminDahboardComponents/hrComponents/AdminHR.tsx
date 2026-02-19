@@ -5,6 +5,11 @@ import HRStatsCards from './HRStatsCards';
 import HRCharts from './HRCharts';
 import EmployeeTable from './EmployeeTable';
 
+/**
+ * Main HR Dashboard component.
+ * Aggregates statistics cards, charts, and table for comprehensive employee management.
+ * Provides a high-level view of HR metrics and access to detailed employee records.
+ */
 export default function AdminHR() {
   return (
     <div className="bg-blue-100 min-h-screen p-3 sm:p-4 md:p-6 space-y-8 sm:space-y-10">

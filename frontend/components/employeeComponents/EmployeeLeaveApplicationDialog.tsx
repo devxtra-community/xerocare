@@ -34,6 +34,10 @@ interface EmployeeLeaveApplicationDialogProps {
   onSuccess: () => void;
 }
 
+/**
+ * Modal dialog for employee leave applications.
+ * Handles form validation and submission for various leave types.
+ */
 export default function EmployeeLeaveApplicationDialog({
   open,
   onOpenChange,

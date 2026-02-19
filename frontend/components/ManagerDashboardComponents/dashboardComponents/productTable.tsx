@@ -12,6 +12,11 @@ import {
 import { useEffect, useState } from 'react';
 import { inventoryService, InventoryItem } from '@/services/inventoryService';
 
+/**
+ * Dashboard table displaying a snapshot of branch inventory.
+ * Lists models, brands, vendors, and their current stock levels.
+ * Provides a quick overview of available products.
+ */
 export default function DashbordTable() {
   const [data, setData] = useState<InventoryItem[]>([]);
 

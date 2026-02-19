@@ -18,6 +18,11 @@ interface VendorTransactionsTableProps {
   loading: boolean;
 }
 
+/**
+ * Table displaying vendor transaction history with pagination.
+ * Shows request details, purchase values, requesting branch, manager info, and status.
+ * Provides a transparency log for all vendor interactions.
+ */
 export default function VendorTransactionsTable({
   requests,
   loading,

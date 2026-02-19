@@ -23,6 +23,10 @@ interface APIError {
   message?: string;
 }
 
+/**
+ * Main login form component supporting multiple authentication methods.
+ * Handles password login, OTP verification, and magic link auth.
+ */
 export function LoginForm({ className, ...props }: React.ComponentProps<'div'>) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');

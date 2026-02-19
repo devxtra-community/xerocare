@@ -47,6 +47,11 @@ interface PricingItem {
   comboSlabRanges?: Array<{ from: string; to: string; rate: string }>;
 }
 
+/**
+ * Comprehensive modal for creating or editing rental/lease contracts.
+ * Handles complex pricing logic, including tiered pricing (slabs) for black & white and color prints.
+ * Supports different contract types (Rent/Lease) and durations.
+ */
 export default function RentFormModal({
   initialData,
   onClose,
@@ -407,7 +412,7 @@ export default function RentFormModal({
       };
       fetchFullModels();
     }
-  }, [initialData]);
+  }, [initialData, form]);
 
   const updateUsageRules = (
     models: (Model & { quantity: number })[],

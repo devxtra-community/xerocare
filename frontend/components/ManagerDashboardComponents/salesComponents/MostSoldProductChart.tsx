@@ -10,6 +10,10 @@ const data = [
   { product: 'Xerox VersaLink', qty: 180 },
 ];
 
+/**
+ * Bar chart displaying the top selling products by quantity.
+ * Helps identifying popular products and demand trends.
+ */
 export default function MostSoldProductChart() {
   return (
     <div className="bg-card rounded-xl p-3 sm:p-4">

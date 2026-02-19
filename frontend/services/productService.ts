@@ -24,6 +24,7 @@ export interface Product {
   imageUrl?: string;
   stock?: number;
   lot_id?: string;
+  lot?: { lotNumber: string; lot_number?: string };
 }
 
 export interface CreateProductDTO {
@@ -66,25 +67,40 @@ export interface BulkCreateResponse {
 }
 
 export const productService = {
+  /**
+   * Retrieves all products.
+   */
   getAllProducts: async (): Promise<Product[]> => {
     const response = await api.get('/i/products');
     return response.data.data;
   },
 
+  /**
+   * Creates a new product.
+   */
   createProduct: async (data: CreateProductDTO | FormData): Promise<Product> => {
     const response = await api.post('/i/products', data);
     return response.data.data;
   },
 
+  /**
+   * Creates multiple products in bulk.
+   */
   bulkCreateProducts: async (rows: BulkProductRow[]): Promise<BulkCreateResponse> => {
     const response = await api.post('/i/products/bulk', { rows });
     return response.data;
   },
 
+  /**
+   * Updates a product.
+   */
   updateProduct: async (id: string, data: Partial<CreateProductDTO> | FormData): Promise<void> => {
     await api.put(`/i/products/${id}`, data);
   },
 
+  /**
+   * Deletes a product.
+   */
   deleteProduct: async (id: string): Promise<void> => {
     await api.delete(`/i/products/${id}`);
   },

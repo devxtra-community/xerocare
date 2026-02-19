@@ -32,6 +32,16 @@ import EmployeeFormDialog from '@/components/AdminDahboardComponents/hrComponent
 import DeleteEmployeeDialog from '@/components/AdminDahboardComponents/hrComponents/DeleteEmployeeDialog';
 import { useRouter } from 'next/navigation';
 
+/**
+ * General Employee Table Component.
+ * Similar to Management Table but focused on viewing and basic actions.
+ * Displays employee list with search, filter, and export options.
+ */
+/**
+ * General Employee View Table.
+ * Lists all employees with search and multi-filter capabilities (Role, Branch).
+ * Supports data export and individual employee actions.
+ */
 export default function HREmployeeTable() {
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState('All');

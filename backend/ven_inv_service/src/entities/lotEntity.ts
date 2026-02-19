@@ -11,6 +11,7 @@ import {
 } from 'typeorm';
 import { Vendor } from './vendorEntity';
 import { LotItem } from './lotItemEntity';
+import { Warehouse } from './warehouseEntity';
 
 export enum LotStatus {
   PENDING = 'PENDING',
@@ -62,6 +63,19 @@ export class Lot {
   @Column({ name: 'labour_cost', type: 'decimal', precision: 12, scale: 2, default: 0 })
   labourCost!: number;
   // -------------
+
+  @Column({ name: 'branch_id', nullable: true })
+  branch_id?: string;
+
+  @Column({ name: 'warehouse_id', nullable: true })
+  warehouse_id?: string;
+
+  @ManyToOne(() => Warehouse)
+  @JoinColumn({ name: 'warehouse_id' })
+  warehouse?: Warehouse;
+
+  @Column({ name: 'created_by', nullable: true })
+  createdBy?: string;
 
   @Column({ type: 'text', nullable: true })
   notes?: string;

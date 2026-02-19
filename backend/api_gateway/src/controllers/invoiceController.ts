@@ -11,6 +11,10 @@ interface AuthenticatedRequest extends Request {
 
 const invoiceAggregationService = new InvoiceAggregationService();
 
+/**
+ * Retrieves all invoices for the authenticated user based on their role.
+ * Admin/Finance see all, Employees see only their branch's invoices.
+ */
 export const getAllInvoices = async (
   req: AuthenticatedRequest,
   res: Response,
@@ -32,6 +36,9 @@ export const getAllInvoices = async (
   }
 };
 
+/**
+ * Retrieves the authenticated user's personal invoices (My Invoices).
+ */
 export const getMyInvoices = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const token = req.headers.authorization?.split(' ')[1] || '';
@@ -45,6 +52,9 @@ export const getMyInvoices = async (req: Request, res: Response, next: NextFunct
   }
 };
 
+/**
+ * Retrieves invoices specific to the user's branch.
+ */
 export const getBranchInvoices = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const token = req.headers.authorization?.split(' ')[1] || '';
@@ -58,6 +68,9 @@ export const getBranchInvoices = async (req: Request, res: Response, next: NextF
   }
 };
 
+/**
+ * Retrieves detailed information for a specific invoice by its ID.
+ */
 export const getInvoiceById = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const invoiceId = req.params.id as string;
@@ -73,10 +86,12 @@ export const getInvoiceById = async (req: Request, res: Response, next: NextFunc
   }
 };
 
+/**
+ * Creates a new invoice/quotation.
+ */
 export const createInvoice = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const token = req.headers.authorization?.split(' ')[1] || '';
-    console.log('API Gateway: Creating invoice with body:', JSON.stringify(req.body, null, 2));
     const invoice = await invoiceAggregationService.createInvoice(req.body, token);
     return res.status(201).json({
       success: true,
@@ -87,6 +102,9 @@ export const createInvoice = async (req: Request, res: Response, next: NextFunct
     next(error);
   }
 };
+/**
+ * Updates an existing quotation.
+ */
 export const updateQuotation = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = req.params.id as string;
@@ -102,13 +120,15 @@ export const updateQuotation = async (req: Request, res: Response, next: NextFun
   }
 };
 
+/**
+ * Approves a quotation by an employee, often adding a deposit.
+ */
 export const approveQuotation = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = req.params.id as string;
     const token = req.headers.authorization?.split(' ')[1] || '';
     const { deposit } = req.body;
 
-    // deposit comes from body: { amount, mode... }
     const invoice = await invoiceAggregationService.approveQuotation(id, deposit, token);
     return res.status(200).json({
       success: true,
@@ -120,12 +140,13 @@ export const approveQuotation = async (req: Request, res: Response, next: NextFu
   }
 };
 
+/**
+ * Employee submits a quotation for Finance approval.
+ */
 export const employeeApprove = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = req.params.id as string;
     const token = req.headers.authorization?.split(' ')[1] || '';
-
-    // Check user context? Service validates token anyway.
 
     const invoice = await invoiceAggregationService.employeeApprove(id, token);
     return res.status(200).json({
@@ -138,6 +159,9 @@ export const employeeApprove = async (req: Request, res: Response, next: NextFun
   }
 };
 
+/**
+ * Finance team approves a quotation, potentially updating items.
+ */
 export const financeApprove = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = req.params.id as string;
@@ -155,6 +179,9 @@ export const financeApprove = async (req: Request, res: Response, next: NextFunc
   }
 };
 
+/**
+ * Finance team rejects a quotation with a reason.
+ */
 export const financeReject = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = req.params.id as string;
@@ -172,6 +199,9 @@ export const financeReject = async (req: Request, res: Response, next: NextFunct
   }
 };
 
+/**
+ * Generates the final settlement invoice for a contract.
+ */
 export const generateFinalInvoice = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const token = req.headers.authorization?.split(' ')[1] || '';
@@ -186,6 +216,9 @@ export const generateFinalInvoice = async (req: Request, res: Response, next: Ne
   }
 };
 
+/**
+ * Creates the invoice for the next month based on an existing contract.
+ */
 export const createNextMonthInvoice = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const token = req.headers.authorization?.split(' ')[1] || '';
@@ -201,6 +234,9 @@ export const createNextMonthInvoice = async (req: Request, res: Response, next: 
   }
 };
 
+/**
+ * Retrieves invoice statistics (totals, counts) for the dashboard.
+ */
 export const getStats = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     const user = req.user;
@@ -218,6 +254,9 @@ export const getStats = async (req: AuthenticatedRequest, res: Response, next: N
   }
 };
 
+/**
+ * Retrieves counts of pending actions (e.g., pending approvals) for sidebar badges.
+ */
 export const getPendingCounts = async (
   req: AuthenticatedRequest,
   res: Response,
@@ -227,11 +266,6 @@ export const getPendingCounts = async (
     const user = req.user;
     if (!user) throw new Error('User not authenticated');
     const token = req.headers.authorization?.split(' ')[1] || '';
-
-    // Only Finance, Manager, Admin should need this?
-    // User prompt implies it's for Sidebar dots. All role-based?
-    // "Sidebar items Rent / Lease / Sale must show a red dot"
-    // Assuming FINANCE role primarily as per goal "Refactor Finance UI".
 
     const branchId = user.branchId;
     if (!branchId) throw new Error('Branch ID missing');
@@ -246,6 +280,9 @@ export const getPendingCounts = async (
   }
 };
 
+/**
+ * Retrieves collection alerts for Finance/Admin.
+ */
 export const getCollectionAlerts = async (
   req: AuthenticatedRequest,
   res: Response,
@@ -257,8 +294,6 @@ export const getCollectionAlerts = async (
     const token = req.headers.authorization?.split(' ')[1] || '';
     const date = req.query.date as string;
 
-    // Authorization: Finance Only (Gateway Route checks this too, but good to have)
-    // assuming service handles logic or passes through
     const alerts = await invoiceAggregationService.getCollectionAlerts(user, token, date);
     return res.status(200).json({
       success: true,
@@ -268,6 +303,9 @@ export const getCollectionAlerts = async (
     next(error);
   }
 };
+/**
+ * Retrieves a global overview of sales performance.
+ */
 export const getGlobalSales = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const token = req.headers.authorization?.split(' ')[1] || '';
@@ -282,6 +320,9 @@ export const getGlobalSales = async (req: Request, res: Response, next: NextFunc
   }
 };
 
+/**
+ * Retrieves total sales figures globally.
+ */
 export const getGlobalSalesTotals = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const token = req.headers.authorization?.split(' ')[1] || '';
@@ -295,6 +336,9 @@ export const getGlobalSalesTotals = async (req: Request, res: Response, next: Ne
   }
 };
 
+/**
+ * Retrieves the history of invoices.
+ */
 export const getInvoiceHistory = async (
   req: AuthenticatedRequest,
   res: Response,
@@ -316,6 +360,9 @@ export const getInvoiceHistory = async (
   }
 };
 
+/**
+ * Retrieves a list of completed collections.
+ */
 export const getCompletedCollections = async (
   req: AuthenticatedRequest,
   res: Response,
@@ -336,6 +383,9 @@ export const getCompletedCollections = async (
   }
 };
 
+/**
+ * Downloads a specific invoice as a PDF.
+ */
 export const downloadInvoice = async (
   req: AuthenticatedRequest,
   res: Response,
@@ -361,6 +411,9 @@ export const downloadInvoice = async (
   }
 };
 
+/**
+ * Sends an invoice via email/notification.
+ */
 export const sendInvoice = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     const user = req.user;
@@ -378,6 +431,9 @@ export const sendInvoice = async (req: AuthenticatedRequest, res: Response, next
   }
 };
 
+/**
+ * Retrieves detailed sales statistics for Admin.
+ */
 export const getAdminSalesStats = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const token = req.headers.authorization?.split(' ')[1] || '';
@@ -391,6 +447,9 @@ export const getAdminSalesStats = async (req: Request, res: Response, next: Next
   }
 };
 
+/**
+ * Retrieves the comprehensive financial report.
+ */
 export const getFinanceReport = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const token = req.headers.authorization?.split(' ')[1] || '';

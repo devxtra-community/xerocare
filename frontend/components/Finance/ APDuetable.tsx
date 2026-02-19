@@ -18,16 +18,21 @@ import { ArrowRight } from 'lucide-react';
 
 const isOverdue = (dueDate: string) => new Date(dueDate) < new Date();
 
-// Helper function for date formatting
-const formatDate = (dateString: string) => {
-  return new Date(dateString).toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  });
-};
-
+/**
+ * Table displaying Accounts Payable (AP) invoices that are due.
+ * Shows vendor details, invoice amounts, status, and overdue indicators.
+ * Highlights overdue invoices and provides quick access to full details.
+ */
 export default function APDueTable() {
+  // Helper function for date formatting
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    });
+  };
+
   const dueInvoices = apInvoices
     .filter((inv) => inv.status !== 'Paid')
     .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime()) // Correct sorting

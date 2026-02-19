@@ -8,6 +8,9 @@ export class LeadController {
     this.leadService = new LeadService();
   }
 
+  /**
+   * Creates a new lead.
+   */
   createLead = async (req: Request, res: Response, next: NextFunction) => {
     try {
       if (!req.user) {
@@ -23,21 +26,19 @@ export class LeadController {
     }
   };
 
+  /**
+   * Retrieves all leads, optionally filtering by branch or deletion status.
+   */
   getAllLeads = async (req: Request, res: Response, next: NextFunction) => {
     try {
       if (!req.user) {
         throw new Error('User not authenticated');
       }
       const includeDeleted = req.query.includeDeleted === 'true';
-
-      // Branch filtering: Admin sees all leads, others see only their branch
-      const branchId = req.user.role === 'ADMIN' ? undefined : req.user.branchId;
-
       const leads = await this.leadService.getAllLeads(
         req.user.userId,
         req.user.role,
         includeDeleted,
-        branchId,
       );
       res.status(200).json({
         success: true,
@@ -48,6 +49,9 @@ export class LeadController {
     }
   };
 
+  /**
+   * Retrieves a single lead by ID.
+   */
   getLeadById = async (req: Request, res: Response, next: NextFunction) => {
     try {
       if (!req.user) {
@@ -67,6 +71,9 @@ export class LeadController {
     }
   };
 
+  /**
+   * Converts a lead into a customer.
+   */
   convertLead = async (req: Request, res: Response, next: NextFunction) => {
     try {
       if (!req.user) {
@@ -87,6 +94,9 @@ export class LeadController {
     }
   };
 
+  /**
+   * Updates an existing lead.
+   */
   updateLead = async (req: Request, res: Response, next: NextFunction) => {
     try {
       if (!req.user) {
@@ -107,6 +117,9 @@ export class LeadController {
     }
   };
 
+  /**
+   * Deletes a lead.
+   */
   deleteLead = async (req: Request, res: Response, next: NextFunction) => {
     try {
       if (!req.user) {

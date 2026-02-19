@@ -25,6 +25,10 @@ interface ConsolidatedStatementDialogProps {
   collection: CompletedCollection;
 }
 
+/**
+ * Modal dialog for viewing a consolidated statement of account.
+ * Shows detailed transaction history including usage, rent, and excess charges.
+ */
 export default function ConsolidatedStatementDialog({
   isOpen,
   onClose,
@@ -33,31 +37,31 @@ export default function ConsolidatedStatementDialog({
   const [loading, setLoading] = useState(true);
   const [history, setHistory] = useState<UsageRecord[]>([]);
 
-  const fetchDetails = React.useCallback(async () => {
-    setLoading(true);
-    try {
-      // Fetch usage history as the primary source of truth for "History"
-      // This aligns with user request to show usage records
-      const usageData = await getUsageHistory(collection.contractId);
-      setHistory(usageData);
-
-      // Also try to fetch summary invoice if available (for future use)
-      if (collection.finalInvoiceId) {
-        await getInvoiceById(collection.finalInvoiceId);
-      }
-    } catch (error) {
-      console.error(error);
-      toast.error('Failed to load statement details');
-    } finally {
-      setLoading(false);
-    }
-  }, [collection.contractId, collection.finalInvoiceId]);
-
   useEffect(() => {
+    const fetchDetails = async () => {
+      setLoading(true);
+      try {
+        // Fetch usage history as the primary source of truth for "History"
+        // This aligns with user request to show usage records
+        const usageData = await getUsageHistory(collection.contractId);
+        setHistory(usageData);
+
+        // Also try to fetch summary invoice if available (for future use)
+        if (collection.finalInvoiceId) {
+          await getInvoiceById(collection.finalInvoiceId);
+        }
+      } catch (error) {
+        console.error(error);
+        toast.error('Failed to load statement details');
+      } finally {
+        setLoading(false);
+      }
+    };
+
     if (isOpen) {
       fetchDetails();
     }
-  }, [isOpen, fetchDetails]);
+  }, [isOpen, collection]);
 
   const handlePrint = () => {
     window.print();

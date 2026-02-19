@@ -51,6 +51,10 @@ interface EmployeeLeaseGraphsProps {
   invoices?: Invoice[];
 }
 
+/**
+ * Analytics charts for employee lease performance.
+ * Displays number of leases generated per month and per day.
+ */
 export default function EmployeeLeaseGraphs({ invoices: propInvoices }: EmployeeLeaseGraphsProps) {
   const [loading, setLoading] = useState(true);
   const [monthlyData, setMonthlyData] = useState<ChartDataItem[]>([]);
