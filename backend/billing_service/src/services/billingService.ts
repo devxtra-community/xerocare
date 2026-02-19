@@ -223,6 +223,10 @@ export class BillingService {
 
     await this.invoiceRepo.save(contract);
 
+    // 5. Emit Product Status Updates (Mark as AVAILABLE/RETURNED)
+    // Pass 'RETURNED' to set product status back to AVAILABLE in inventory
+    await this.emitProductStatusUpdates(contract, 'SYSTEM', 'RETURNED');
+
     return contract;
   }
 
@@ -901,7 +905,11 @@ export class BillingService {
     }
   }
 
-  private async emitProductStatusUpdates(invoice: Invoice, userId: string) {
+  private async emitProductStatusUpdates(
+    invoice: Invoice,
+    userId: string,
+    overrideStatus?: 'SALE' | 'RENT' | 'LEASE' | 'RETURNED',
+  ) {
     if (!invoice.items) return;
 
     for (const item of invoice.items) {
@@ -909,7 +917,7 @@ export class BillingService {
         try {
           await emitProductStatusUpdate({
             productId: item.productId,
-            billType: invoice.saleType,
+            billType: overrideStatus || (invoice.saleType as 'SALE' | 'RENT' | 'LEASE'),
             invoiceId: invoice.id,
             approvedBy: userId,
             approvedAt: invoice.financeApprovedAt || new Date(),
