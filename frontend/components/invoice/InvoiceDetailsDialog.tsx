@@ -17,7 +17,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { FileText, Calendar, IndianRupee, Printer, X, Loader2 } from 'lucide-react';
+import { FileText, Calendar, IndianRupee, Printer, X, Loader2, Mail } from 'lucide-react';
 import { Invoice, getInvoiceById } from '@/lib/invoice';
 import { differenceInMonths, differenceInDays } from 'date-fns';
 import UsageRecordingModal from '@/components/Finance/UsageRecordingModal';
@@ -71,7 +71,6 @@ export function InvoiceDetailsDialog({
   const [completing, setCompleting] = React.useState(false);
   const [isLoading, setIsLoading] = React.useState(false);
   const [isEmailSending, setIsEmailSending] = React.useState(false);
-  const [isWhatsappSending, setIsWhatsappSending] = React.useState(false);
   const [isUsageModalOpen, setIsUsageModalOpen] = React.useState(false);
   const historyRef = React.useRef<HTMLDivElement>(null);
   const scrollContainerRef = React.useRef<HTMLDivElement>(null);
@@ -1169,22 +1168,134 @@ export function InvoiceDetailsDialog({
                 <div className="flex gap-2">
                   <Button
                     variant="outline"
-                    size="icon"
-                    className="h-10 w-10 text-blue-600 border-blue-200 hover:bg-blue-50 rounded-xl"
+                    className="sm:flex-none rounded-xl h-10 px-5 font-bold text-gray-700 border-gray-200 hover:bg-gray-50 hover:text-primary gap-2 transition-all shadow-sm"
                     title="Send via Email"
                     disabled={isLoading || isEmailSending}
                     onClick={async () => {
-                      const email = currentInvoice.customerEmail || prompt('Enter Email Address');
-                      if (!email) return;
+                      const email = currentInvoice.customerEmail;
+                      if (!email) {
+                        toast.error('No email address found for this customer');
+                        return;
+                      }
+
                       setIsEmailSending(true);
                       try {
                         const { sendEmailNotification } = await import('@/lib/invoice');
+
+                        const generateEmailBody = (inv: Invoice) => {
+                          const formatDate = (d: string | undefined) =>
+                            d ? new Date(d).toLocaleDateString() : 'N/A';
+
+                          let itemsHtml = '';
+                          if (inv.items && inv.items.length > 0) {
+                            itemsHtml = `
+                                    <table style="width: 100%; border-collapse: collapse; margin-top: 20px; font-family: Arial, sans-serif;">
+                                      <thead>
+                                        <tr style="background-color: #f3f4f6; text-align: left;">
+                                          <th style="padding: 12px; border-bottom: 2px solid #e5e7eb;">Description</th>
+                                          <th style="padding: 12px; border-bottom: 2px solid #e5e7eb;">Limits</th>
+                                          <th style="padding: 12px; border-bottom: 2px solid #e5e7eb;">Excess Rates</th>
+                                          <th style="padding: 12px; border-bottom: 2px solid #e5e7eb; text-align: center;">Qty</th>
+                                          <th style="padding: 12px; border-bottom: 2px solid #e5e7eb; text-align: right;">Amount</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody>
+                                        ${inv.items
+                                          .map((item) => {
+                                            const limits = [];
+                                            if (item.bwIncludedLimit)
+                                              limits.push(`BW: ${item.bwIncludedLimit}`);
+                                            if (item.colorIncludedLimit)
+                                              limits.push(`CLR: ${item.colorIncludedLimit}`);
+                                            if (item.combinedIncludedLimit)
+                                              limits.push(`CMB: ${item.combinedIncludedLimit}`);
+
+                                            const rates = [];
+                                            if (item.bwExcessRate)
+                                              rates.push(`BW: ₹${item.bwExcessRate}`);
+                                            if (item.colorExcessRate)
+                                              rates.push(`CLR: ₹${item.colorExcessRate}`);
+                                            if (item.combinedExcessRate)
+                                              rates.push(`CMB: ₹${item.combinedExcessRate}`);
+
+                                            return `
+                                            <tr style="border-bottom: 1px solid #e5e7eb;">
+                                              <td style="padding: 12px;">
+                                                <strong>${item.description}</strong>
+                                                ${item.itemType === 'PRICING_RULE' ? '<br/><span style="font-size: 12px; color: #6b7280;">(Pricing Rule)</span>' : ''}
+                                              </td>
+                                              <td style="padding: 12px; font-size: 13px;">
+                                                ${limits.length > 0 ? limits.join('<br/>') : '-'}
+                                              </td>
+                                              <td style="padding: 12px; font-size: 13px;">
+                                                ${rates.length > 0 ? rates.join('<br/>') : '-'}
+                                              </td>
+                                              <td style="padding: 12px; text-align: center;">${item.quantity || 1}</td>
+                                              <td style="padding: 12px; text-align: right;">₹${((item.quantity || 1) * (item.unitPrice || 0)).toLocaleString()}</td>
+                                            </tr>
+                                          `;
+                                          })
+                                          .join('')}
+                                      </tbody>
+                                    </table>
+                                  `;
+                          }
+
+                          let detailsHtml = '';
+                          if (inv.saleType === 'RENT') {
+                            detailsHtml = `
+                               <div style="background-color: #f9fafb; padding: 15px; border-radius: 8px; margin-top: 20px;">
+                                 <h3 style="margin-top: 0; color: #111827;">Rental Details</h3>
+                                 <p style="margin: 5px 0;"><strong>Plan Type:</strong> ${inv.rentType?.replace('_', ' ')}</p>
+                                 <p style="margin: 5px 0;"><strong>Billing Period:</strong> ${inv.rentPeriod}</p>
+                                 <p style="margin: 5px 0;"><strong>Monthly Rent:</strong> ₹${inv.monthlyRent?.toLocaleString()}</p>
+                                 <p style="margin: 5px 0;"><strong>Contract Period:</strong> ${formatDate(inv.effectiveFrom)} - ${formatDate(inv.effectiveTo)}</p>
+                               </div>
+                             `;
+                          } else if (inv.saleType === 'LEASE') {
+                            detailsHtml = `
+                               <div style="background-color: #f9fafb; padding: 15px; border-radius: 8px; margin-top: 20px;">
+                                 <h3 style="margin-top: 0; color: #111827;">Lease Details</h3>
+                                 <p style="margin: 5px 0;"><strong>Lease Type:</strong> ${inv.leaseType}</p>
+                                 <p style="margin: 5px 0;"><strong>Tenure:</strong> ${inv.leaseTenureMonths} Months</p>
+                                 ${inv.monthlyEmiAmount ? `<p style="margin: 5px 0;"><strong>Monthly EMI:</strong> ₹${inv.monthlyEmiAmount.toLocaleString()}</p>` : ''}
+                               </div>
+                             `;
+                          }
+
+                          return `
+                            <div style="font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; color: #374151;">
+                              <div style="text-align: center; margin-bottom: 30px;">
+                                <h1 style="color: #1d4ed8; margin-bottom: 5px;">Quotation #${inv.invoiceNumber}</h1>
+                                <p style="margin: 0; color: #6b7280;">Date: ${formatDate(inv.createdAt)}</p>
+                              </div>
+
+                              <p>Dear <strong>${inv.customerName}</strong>,</p>
+                              <p>Thank you for your interest in XeroCare. Please find below the details of your quotation.</p>
+
+                              ${detailsHtml}
+
+                              ${itemsHtml}
+
+                              <div style="margin-top: 30px; text-align: right;">
+                                <p style="font-size: 18px; margin: 5px 0;">Total Amount: <strong style="color: #1d4ed8;">₹${(inv.totalAmount || 0).toLocaleString()}</strong></p>
+                                ${inv.advanceAmount ? `<p style="margin: 5px 0; color: #059669;">Advance Required: <strong>₹${inv.advanceAmount.toLocaleString()}</strong></p>` : ''}
+                              </div>
+
+                              <div style="margin-top: 40px; border-top: 1px solid #e5e7eb; padding-top: 20px; text-align: center; color: #9ca3af; font-size: 12px;">
+                                <p>This is an electronically generated quotation.</p>
+                                <p>XeroCare</p>
+                              </div>
+                            </div>
+                          `;
+                        };
+
                         await sendEmailNotification(currentInvoice.id, {
                           recipient: email,
-                          subject: `Invoice ${currentInvoice.invoiceNumber} from XeroCare`,
-                          body: `Dear Customer, please find attached your invoice ${currentInvoice.invoiceNumber}.`,
+                          subject: `Quotation ${currentInvoice.invoiceNumber} from XeroCare`,
+                          body: generateEmailBody(currentInvoice),
                         });
-                        toast.success('Email request sent');
+                        toast.success(`Email sent successfully to ${email}`);
                       } catch (e) {
                         toast.error('Failed to send email');
                         console.error(e);
@@ -1196,64 +1307,9 @@ export function InvoiceDetailsDialog({
                     {isEmailSending ? (
                       <Loader2 className="animate-spin h-4 w-4" />
                     ) : (
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        width="18"
-                        height="18"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      >
-                        <rect width="20" height="16" x="2" y="4" rx="2" />
-                        <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
-                      </svg>
+                      <Mail size={16} />
                     )}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="h-10 w-10 text-green-600 border-green-200 hover:bg-green-50 rounded-xl"
-                    title="Send via WhatsApp"
-                    disabled={isLoading || isWhatsappSending}
-                    onClick={async () => {
-                      const phone = currentInvoice.customerPhone || prompt('Enter Phone Number');
-                      if (!phone) return;
-                      setIsWhatsappSending(true);
-                      try {
-                        const { sendWhatsappNotification } = await import('@/lib/invoice');
-                        await sendWhatsappNotification(currentInvoice.id, {
-                          recipient: phone,
-                          body: `Dear Customer, here is your invoice ${currentInvoice.invoiceNumber}.`,
-                        });
-                        toast.success('WhatsApp request sent');
-                      } catch (e) {
-                        toast.error('Failed to send WhatsApp');
-                        console.error(e);
-                      } finally {
-                        setIsWhatsappSending(false);
-                      }
-                    }}
-                  >
-                    {isWhatsappSending ? (
-                      <Loader2 className="animate-spin h-4 w-4" />
-                    ) : (
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        width="18"
-                        height="18"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      >
-                        <path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z" />
-                      </svg>
-                    )}
+                    Email
                   </Button>
                 </div>
               )}

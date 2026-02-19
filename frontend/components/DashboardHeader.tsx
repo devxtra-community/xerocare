@@ -157,6 +157,7 @@ export default function DashboardHeader({ title = 'Dashboard' }: { title?: strin
                 variant="ghost"
                 size="icon"
                 className="text-white hover:bg-card/10 h-8 w-8 sm:h-10 sm:w-10 relative"
+                suppressHydrationWarning
               >
                 <Bell className="h-4 w-4 sm:h-5 sm:w-5" />
                 {unreadCount > 0 && (
@@ -230,6 +231,7 @@ export default function DashboardHeader({ title = 'Dashboard' }: { title?: strin
               <Button
                 variant="ghost"
                 className="flex items-center gap-2 sm:gap-3 pl-2 sm:pl-4 border-l border-white/20 hover:bg-card/5 py-2 px-1 rounded transition-colors h-auto"
+                suppressHydrationWarning
               >
                 <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-full bg-white/20 flex items-center justify-center text-xs sm:text-sm font-medium shrink-0">
                   {user.initial}
