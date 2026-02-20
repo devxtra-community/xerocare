@@ -23,6 +23,7 @@ import RentFormModal from './RentFormModal';
 import UsageRecordingModal from '../Finance/UsageRecordingModal';
 
 import { Badge } from '@/components/ui/badge';
+import Pagination from '@/components/Pagination';
 
 import { InvoiceDetailsDialog } from '@/components/invoice/InvoiceDetailsDialog';
 import { ApproveQuotationDialog } from '@/components/invoice/ApproveQuotationDialog';
@@ -55,6 +56,13 @@ export default function EmployeeLeaseTable({ mode = 'EMPLOYEE' }: EmployeeLeaseT
   const [isUsageModalOpen, setIsUsageModalOpen] = useState(false);
   const [editingUsage] = useState<Invoice | null>(null);
   const [search, setSearch] = useState('');
+
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 10;
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search]);
 
   const fetchInvoices = useCallback(async () => {
     try {
@@ -141,6 +149,10 @@ export default function EmployeeLeaseTable({ mode = 'EMPLOYEE' }: EmployeeLeaseT
     );
   });
 
+  const totalPages = Math.ceil(filteredInvoices.length / ITEMS_PER_PAGE);
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  const paginatedInvoices = filteredInvoices.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+
   const getCleanProductName = (name: string) => {
     // Remove "Black & White - " or "Color - " prefixes
     let clean = name.replace(/^(Black & White - |Color - |Combined - )/i, '');
@@ -167,19 +179,11 @@ export default function EmployeeLeaseTable({ mode = 'EMPLOYEE' }: EmployeeLeaseT
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
-        <div className="relative w-full sm:w-[300px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-          <Input
-            placeholder="Search by invoice # or customer..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-9 h-10 bg-card border-blue-400/60 focus:border-blue-400 focus:ring-4 focus:ring-blue-100 outline-none shadow-sm transition-all w-full"
-          />
-        </div>
+      <div className="flex justify-between items-center">
+        <h2 className="text-xl font-bold text-primary">Lease Management</h2>
         {mode === 'EMPLOYEE' && (
           <Button
-            className="bg-primary text-white gap-2 w-full sm:w-auto mt-2 sm:mt-0 shadow-md hover:shadow-lg transition-all"
+            className="bg-primary text-white gap-2 shadow-md hover:shadow-lg transition-all"
             onClick={openCreateModal}
           >
             <Plus size={16} /> New Lease
@@ -187,8 +191,39 @@ export default function EmployeeLeaseTable({ mode = 'EMPLOYEE' }: EmployeeLeaseT
         )}
       </div>
 
-      <div className="rounded-2xl bg-card shadow-sm overflow-hidden border">
-        <div className="overflow-x-auto">
+      <div className="bg-card rounded-xl p-4 shadow-sm border border-gray-100 flex flex-col md:flex-row gap-4 items-end">
+        <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-4 w-full">
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+              Search Leases
+            </label>
+            <div className="relative">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-400" />
+              <Input
+                placeholder="Search by invoice or customer..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-9 h-9 text-xs"
+              />
+            </div>
+          </div>
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+              Actions
+            </label>
+            <Button
+              variant="outline"
+              onClick={fetchInvoices}
+              className="h-9 text-xs w-full justify-center gap-2 border-gray-200 hover:bg-gray-50"
+            >
+              Refresh Data
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      <div className="rounded-2xl bg-card shadow-sm overflow-hidden border p-4">
+        <div className="overflow-x-auto mb-4">
           <Table className="min-w-[800px] sm:min-w-full">
             <TableHeader>
               <TableRow className="bg-muted/50">
@@ -222,15 +257,15 @@ export default function EmployeeLeaseTable({ mode = 'EMPLOYEE' }: EmployeeLeaseT
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredInvoices.length === 0 ? (
+              {paginatedInvoices.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-12 text-muted-foreground">
+                  <TableCell colSpan={9} className="text-center py-12 text-muted-foreground">
                     <FileText className="h-10 w-10 mx-auto mb-2 opacity-20" />
                     No leases found.
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredInvoices.map((inv, index) => (
+                paginatedInvoices.map((inv, index) => (
                   <TableRow key={inv.id} className={index % 2 !== 0 ? 'bg-blue-50/20' : 'bg-card'}>
                     <TableCell className="text-blue-500 font-bold tracking-tight">
                       {inv.invoiceNumber}
@@ -319,6 +354,9 @@ export default function EmployeeLeaseTable({ mode = 'EMPLOYEE' }: EmployeeLeaseT
             </TableBody>
           </Table>
         </div>
+        {totalPages > 1 && (
+          <Pagination page={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
+        )}
       </div>
 
       {formOpen && (

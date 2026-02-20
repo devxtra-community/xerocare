@@ -71,32 +71,32 @@ export default function MonthlyRevenueAreaChart() {
           <AreaChart data={chartData} margin={{ top: 10, right: 30, left: 10, bottom: 0 }}>
             <defs>
               <linearGradient id="saleGrad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#2563eb" stopOpacity={0.3} />
-                <stop offset="95%" stopColor="#2563eb" stopOpacity={0} />
+                <stop offset="5%" stopColor="var(--chart-blue)" stopOpacity={0.3} />
+                <stop offset="95%" stopColor="var(--chart-blue)" stopOpacity={0} />
               </linearGradient>
               <linearGradient id="rentGrad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.2} />
-                <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                <stop offset="5%" stopColor="var(--chart-blue-light)" stopOpacity={0.2} />
+                <stop offset="95%" stopColor="var(--chart-blue-light)" stopOpacity={0} />
               </linearGradient>
               <linearGradient id="leaseGrad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#93c5fd" stopOpacity={0.15} />
-                <stop offset="95%" stopColor="#93c5fd" stopOpacity={0} />
+                <stop offset="5%" stopColor="var(--chart-blue-lighter)" stopOpacity={0.15} />
+                <stop offset="95%" stopColor="var(--chart-blue-lighter)" stopOpacity={0} />
               </linearGradient>
             </defs>
-            <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="#f1f5f9" />
+            <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="var(--chart-grid)" />
             <XAxis
               dataKey="date"
               axisLine={false}
               tickLine={false}
               tickMargin={12}
-              tick={{ fill: '#94a3b8', fontSize: 10 }}
+              tick={{ fill: 'var(--chart-slate)', fontSize: 10 }}
             />
             <YAxis
-              axisLine={{ stroke: '#f1f5f9' }}
+              axisLine={{ stroke: 'var(--chart-grid)' }}
               tickLine={false}
               tickFormatter={(v) => (v >= 1000 ? `${(v / 1000).toFixed(0)}k` : `${v}`)}
               tickMargin={12}
-              tick={{ fill: '#94a3b8', fontSize: 10 }}
+              tick={{ fill: 'var(--chart-slate)', fontSize: 10 }}
             />
             <Tooltip
               content={({ active, payload, label }) => {
@@ -142,7 +142,7 @@ export default function MonthlyRevenueAreaChart() {
               dataKey="sale"
               name="Sale"
               stackId="1"
-              stroke="#2563eb"
+              stroke="var(--chart-blue)"
               fill="url(#saleGrad)"
               strokeWidth={2}
             />
@@ -151,7 +151,7 @@ export default function MonthlyRevenueAreaChart() {
               dataKey="rent"
               name="Rent"
               stackId="1"
-              stroke="#3b82f6"
+              stroke="var(--chart-blue-light)"
               fill="url(#rentGrad)"
               strokeWidth={2}
             />
@@ -160,7 +160,7 @@ export default function MonthlyRevenueAreaChart() {
               dataKey="lease"
               name="Lease"
               stackId="1"
-              stroke="#93c5fd"
+              stroke="var(--chart-blue-lighter)"
               fill="url(#leaseGrad)"
               strokeWidth={2}
             />

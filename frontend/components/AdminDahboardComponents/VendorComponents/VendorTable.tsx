@@ -11,13 +11,7 @@ import {
 } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Search, Filter, Eye, Edit, Plus, Trash2 } from 'lucide-react';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+import { Search, Eye, Edit, Plus, Trash2 } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -175,45 +169,67 @@ export default function VendorTable({
 
   return (
     <div className="space-y-4">
-      {/* Search and Filters */}
-      <div className="flex flex-col sm:flex-row gap-4 justify-between items-center">
-        <div className="relative w-full sm:w-[300px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-          <Input
-            placeholder="Search vendors..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-9 h-10 bg-card border-blue-400/60 focus:border-blue-400 focus:ring-4 focus:ring-blue-100 outline-none shadow-sm transition-all"
-          />
-        </div>
-        <div className="flex gap-2 w-full sm:w-auto">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" className="gap-2 bg-card">
-                <Filter className="h-4 w-4" />
-                Filter: {filterType}
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => setFilterType('All')}>All Types</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setFilterType('Supplier')}>
-                Supplier
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setFilterType('Distributor')}>
-                Distributor
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setFilterType('Service')}>Service</DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-          <Button
-            className="bg-primary text-white gap-2"
-            onClick={() => {
-              setEditingVendor(null);
-              setFormOpen(true);
-            }}
-          >
-            <Plus size={16} /> Add Vendor
-          </Button>
+      <div className="flex justify-end items-center">
+        <Button
+          className="bg-primary text-white gap-2 shadow-md hover:shadow-lg transition-all"
+          onClick={() => {
+            setEditingVendor(null);
+            setFormOpen(true);
+          }}
+        >
+          <Plus size={16} /> Add Vendor
+        </Button>
+      </div>
+
+      <div className="bg-card rounded-xl p-4 shadow-sm border border-gray-100 flex flex-col md:flex-row gap-4 items-end">
+        <div className="flex-1 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 w-full">
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+              Search Vendors
+            </label>
+            <div className="relative">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-400" />
+              <Input
+                placeholder="Search by name or contact..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-9 h-9 text-xs"
+              />
+            </div>
+          </div>
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+              Filter by Type
+            </label>
+            <Select
+              value={filterType}
+              onValueChange={(val: 'All' | 'Supplier' | 'Distributor' | 'Service') =>
+                setFilterType(val)
+              }
+            >
+              <SelectTrigger className="h-9 text-xs w-full bg-background border-gray-200">
+                <SelectValue placeholder="All Types" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="All">All Types</SelectItem>
+                <SelectItem value="Supplier">Supplier</SelectItem>
+                <SelectItem value="Distributor">Distributor</SelectItem>
+                <SelectItem value="Service">Service</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+              Actions
+            </label>
+            <Button
+              variant="outline"
+              onClick={() => onRefresh()}
+              className="h-9 text-xs w-full justify-center gap-2 border-gray-200 hover:bg-gray-50"
+            >
+              Refresh Data
+            </Button>
+          </div>
         </div>
       </div>
 

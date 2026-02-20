@@ -174,7 +174,7 @@ export default function EmployeeSalesGraphs({ invoices: propInvoices }: Employee
 
   // Primary color variations (Blue shades)
   const salesColor = '#1e40af'; // Blue 800
-  const dailyColor = '#2563eb'; // Blue 600
+  const dailyColor = 'var(--primary)'; // Red 600
 
   useEffect(() => {
     const fetchData = async () => {

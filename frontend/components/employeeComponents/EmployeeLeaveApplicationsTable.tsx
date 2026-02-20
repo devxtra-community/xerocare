@@ -37,6 +37,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import Pagination from '@/components/Pagination';
 
 const leaveTypeLabels: Record<LeaveType, string> = {
   [LeaveType.SICK]: 'Sick Leave',
@@ -59,6 +60,9 @@ export default function EmployeeLeaveApplicationsTable() {
   const [selectedLeave, setSelectedLeave] = useState<LeaveApplication | null>(null);
   const [isCancelling, setIsCancelling] = useState(false);
 
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 10;
+
   const fetchLeaveApplications = useCallback(async () => {
     setIsLoading(true);
     try {
@@ -76,6 +80,10 @@ export default function EmployeeLeaveApplicationsTable() {
   useEffect(() => {
     fetchLeaveApplications();
   }, [fetchLeaveApplications]);
+
+  const totalPages = Math.ceil(leaveApplications.length / ITEMS_PER_PAGE);
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  const paginatedApplications = leaveApplications.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
   const handleCancelClick = (leaveId: string) => {
     setSelectedLeaveId(leaveId);
@@ -153,103 +161,108 @@ export default function EmployeeLeaveApplicationsTable() {
 
   return (
     <>
-      <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
-        <Table>
-          <TableHeader className="bg-muted/50/50">
-            <TableRow>
-              <TableHead className="px-3 py-2 font-bold text-xs uppercase tracking-wider text-primary">
-                Date Range
-              </TableHead>
-              <TableHead className="px-3 py-2 font-bold text-xs uppercase tracking-wider text-primary">
-                Leave Type
-              </TableHead>
-              <TableHead className="px-3 py-2 font-bold text-xs uppercase tracking-wider text-primary">
-                Reason
-              </TableHead>
-              <TableHead className="px-3 py-2 font-bold text-xs uppercase tracking-wider text-primary text-center">
-                Status
-              </TableHead>
-              <TableHead className="px-3 py-2 font-bold text-xs uppercase tracking-wider text-primary">
-                Applied On
-              </TableHead>
-              <TableHead className="px-3 py-2 font-bold text-xs uppercase tracking-wider text-primary text-right">
-                Actions
-              </TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {isLoading ? (
+      <div className="rounded-xl border bg-card shadow-sm overflow-hidden p-4">
+        <div className="overflow-x-auto mb-4">
+          <Table>
+            <TableHeader className="bg-muted/50/50">
               <TableRow>
-                <TableCell colSpan={6} className="h-24 text-center">
-                  <Loader2 className="h-6 w-6 animate-spin mx-auto text-blue-500" />
-                </TableCell>
+                <TableHead className="px-3 py-2 font-bold text-xs uppercase tracking-wider text-primary">
+                  Date Range
+                </TableHead>
+                <TableHead className="px-3 py-2 font-bold text-xs uppercase tracking-wider text-primary">
+                  Leave Type
+                </TableHead>
+                <TableHead className="px-3 py-2 font-bold text-xs uppercase tracking-wider text-primary">
+                  Reason
+                </TableHead>
+                <TableHead className="px-3 py-2 font-bold text-xs uppercase tracking-wider text-primary text-center">
+                  Status
+                </TableHead>
+                <TableHead className="px-3 py-2 font-bold text-xs uppercase tracking-wider text-primary">
+                  Applied On
+                </TableHead>
+                <TableHead className="px-3 py-2 font-bold text-xs uppercase tracking-wider text-primary text-right">
+                  Actions
+                </TableHead>
               </TableRow>
-            ) : leaveApplications.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
-                  No leave applications found. Apply for your first leave!
-                </TableCell>
-              </TableRow>
-            ) : (
-              leaveApplications.map((leave) => (
-                <TableRow key={leave.id} className="hover:bg-muted/50/50 transition-colors">
-                  <TableCell className="px-3 py-2 font-medium">
-                    {formatDate(leave.start_date)} - {formatDate(leave.end_date)}
-                    <span className="text-xs text-muted-foreground block">
-                      ({calculateDays(leave.start_date, leave.end_date)} days)
-                    </span>
+            </TableHeader>
+            <TableBody>
+              {isLoading ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="h-24 text-center">
+                    <Loader2 className="h-6 w-6 animate-spin mx-auto text-blue-500" />
                   </TableCell>
-                  <TableCell className="px-3 py-2">
-                    <span className="text-sm">{leaveTypeLabels[leave.leave_type]}</span>
+                </TableRow>
+              ) : paginatedApplications.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
+                    No leave applications found. Apply for your first leave!
                   </TableCell>
-                  <TableCell className="px-3 py-2 max-w-[250px]">
-                    <span className="text-sm truncate block" title={leave.reason}>
-                      {leave.reason}
-                    </span>
-                  </TableCell>
-                  <TableCell className="px-3 py-2 text-center">
-                    {getStatusBadge(leave.status)}
-                    {leave.status === LeaveStatus.REJECTED && leave.rejection_reason && (
-                      <p
-                        className="text-xs text-red-600 mt-1 truncate max-w-[100px]"
-                        title={leave.rejection_reason}
-                      >
-                        {leave.rejection_reason}
-                      </p>
-                    )}
-                  </TableCell>
-                  <TableCell className="px-3 py-2 text-sm text-muted-foreground">
-                    {formatDate(leave.createdAt)}
-                  </TableCell>
-                  <TableCell className="px-3 py-2 text-right">
-                    <div className="flex justify-end gap-2">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                        onClick={() => handleViewClick(leave)}
-                        title="View Details"
-                      >
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                      {leave.status === LeaveStatus.PENDING && (
+                </TableRow>
+              ) : (
+                paginatedApplications.map((leave) => (
+                  <TableRow key={leave.id} className="hover:bg-muted/50/50 transition-colors">
+                    <TableCell className="px-3 py-2 font-medium">
+                      {formatDate(leave.start_date)} - {formatDate(leave.end_date)}
+                      <span className="text-xs text-muted-foreground block">
+                        ({calculateDays(leave.start_date, leave.end_date)} days)
+                      </span>
+                    </TableCell>
+                    <TableCell className="px-3 py-2">
+                      <span className="text-sm">{leaveTypeLabels[leave.leave_type]}</span>
+                    </TableCell>
+                    <TableCell className="px-3 py-2 max-w-[250px]">
+                      <span className="text-sm truncate block" title={leave.reason}>
+                        {leave.reason}
+                      </span>
+                    </TableCell>
+                    <TableCell className="px-3 py-2 text-center">
+                      {getStatusBadge(leave.status)}
+                      {leave.status === LeaveStatus.REJECTED && leave.rejection_reason && (
+                        <p
+                          className="text-xs text-red-600 mt-1 truncate max-w-[100px]"
+                          title={leave.rejection_reason}
+                        >
+                          {leave.rejection_reason}
+                        </p>
+                      )}
+                    </TableCell>
+                    <TableCell className="px-3 py-2 text-sm text-muted-foreground">
+                      {formatDate(leave.createdAt)}
+                    </TableCell>
+                    <TableCell className="px-3 py-2 text-right">
+                      <div className="flex justify-end gap-2">
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50"
-                          onClick={() => handleCancelClick(leave.id)}
-                          title="Cancel Application"
+                          className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                          onClick={() => handleViewClick(leave)}
+                          title="View Details"
                         >
-                          <X className="h-4 w-4" />
+                          <Eye className="h-4 w-4" />
                         </Button>
-                      )}
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
+                        {leave.status === LeaveStatus.PENDING && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50"
+                            onClick={() => handleCancelClick(leave.id)}
+                            title="Cancel Application"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
+        {totalPages > 1 && (
+          <Pagination page={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
+        )}
       </div>
 
       <AlertDialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>

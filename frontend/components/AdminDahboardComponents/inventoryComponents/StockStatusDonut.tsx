@@ -9,7 +9,7 @@ const data = [
 ];
 
 const COLORS = [
-  '#2563eb', // In Stock - Blue
+  'var(--primary)', // In Stock - Red
   '#93c5fd', // Low Stock - Light Blue
   '#ef4444', // Out of Stock - Red
 ];

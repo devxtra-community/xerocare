@@ -67,7 +67,7 @@
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.23 0 0);
 
-  --primary: oklch(0.42 0.11 250);
+  --primary: #1e3a8a;
   --primary-foreground: oklch(1 0 0);
 
   --secondary: oklch(0.95 0.01 230);
@@ -81,13 +81,13 @@
 
   --border: oklch(0.9 0 0);
   --input: oklch(0.9 0 0);
-  --ring: oklch(0.62 0.18 250);
+  --ring: #1e3a8a;
   --row-mixed: oklch(0.92 0.04 250);
 
-  --sidebar: oklch(0.42 0.11 250);
+  --sidebar: #1e3a8a;
   --sidebar-foreground: oklch(0.98 0 0);
 
-  --sidebar-primary: oklch(0.42 0.11 250);
+  --sidebar-primary: #1e3a8a;
   --sidebar-primary-foreground: oklch(1 0 0);
 
   --sidebar-accent: oklch(0.48 0.12 250);
@@ -112,20 +112,30 @@
   --info: oklch(0.65 0.15 250);
   --info-foreground: oklch(0.3 0.05 250);
 
-  /* Sale Type Colors */
+  /* Sale Type Colors (Legacy fallback or specific overrides) */
   --rent: oklch(0.7 0.15 45);
-  /* Orange (formerly amber/orange) */
+  /* Orange */
   --lease: oklch(0.6 0.15 290);
   /* Purple */
   --sale: oklch(0.65 0.15 250);
   /* Blue */
 
-  --primary-rgb: 37 99 235;
-  /* #2563eb */
-  --primary-light-rgb: 147 197 253;
-  /* #93c5fd */
+  /* Chart & UI Accent Variables */
+  --chart-blue-dark: #1e40af;
+  --chart-blue: #2563eb;
+  --chart-blue-mid: #3b82f6;
+  --chart-blue-soft: #60a5fa;
+  --chart-blue-light: #93c5fd;
+  --chart-blue-lighter: #bfdbfe;
+  --chart-indigo: #1e3a8a;
+  --chart-sky: #e0f2fe;
+  --chart-slate: #94a3b8;
+  --chart-slate-dark: #64748b;
+  --chart-grid: #f1f5f9;
+
+  --primary-rgb: 30 58 138;
+  --primary-light-rgb: 191 219 254;
   --muted-rgb: 229 231 235;
-  /* #e5e7eb */
 }
 
 @layer base {

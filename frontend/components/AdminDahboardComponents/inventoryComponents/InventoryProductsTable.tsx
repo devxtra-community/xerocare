@@ -11,6 +11,13 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Eye, Edit2, Search, FilterX } from 'lucide-react';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import api from '@/lib/api';
 
 interface InventoryItem {
@@ -29,6 +36,11 @@ interface InventoryItem {
   product_cost: number;
   warehouse_name: string;
   branch_name?: string;
+}
+
+interface FilterOption {
+  id: string;
+  name: string;
 }
 
 interface InventoryResponse {
@@ -51,6 +63,12 @@ export default function InventoryProductsTable() {
   const [productFilter, setProductFilter] = useState('');
   const [warehouseFilter, setWarehouseFilter] = useState('');
   const [branchFilter, setBranchFilter] = useState('');
+  const [brandFilter, setBrandFilter] = useState('');
+
+  // Options States
+  const [warehouses, setWarehouses] = useState<FilterOption[]>([]);
+  const [branches, setBranches] = useState<FilterOption[]>([]);
+  const [brands, setBrands] = useState<FilterOption[]>([]);
 
   const ITEMS_PER_PAGE = 10;
 
@@ -58,9 +76,10 @@ export default function InventoryProductsTable() {
     try {
       setLoading(true);
       const params = new URLSearchParams();
-      if (productFilter) params.append('product', productFilter);
-      if (warehouseFilter) params.append('warehouse', warehouseFilter);
-      if (branchFilter) params.append('branch', branchFilter);
+      if (productFilter.trim()) params.append('product', productFilter.trim());
+      if (warehouseFilter && warehouseFilter !== 'all') params.append('warehouse', warehouseFilter);
+      if (branchFilter && branchFilter !== 'all') params.append('branch', branchFilter);
+      if (brandFilter && brandFilter !== 'all') params.append('brand', brandFilter);
 
       const res = await api.get<InventoryResponse>(`/i/inventory?${params.toString()}`);
       if (res.data.success) {
@@ -71,11 +90,71 @@ export default function InventoryProductsTable() {
     } finally {
       setLoading(false);
     }
-  }, [productFilter, warehouseFilter, branchFilter]);
+  }, [productFilter, warehouseFilter, branchFilter, brandFilter]);
+
+  const fetchOptions = React.useCallback(async () => {
+    try {
+      // Fetch warehouses
+      api
+        .get('/i/warehouses')
+        .then((whRes) => {
+          if (whRes.data.success) {
+            setWarehouses(
+              whRes.data.data.map((w: { id: string; warehouseName: string }) => ({
+                id: w.id,
+                name: w.warehouseName,
+              })),
+            );
+          }
+        })
+        .catch((err) => console.error('Failed to fetch warehouses:', err));
+
+      // Fetch branches
+      api
+        .get('/i/branch')
+        .then((brRes) => {
+          if (brRes.data.success) {
+            setBranches(
+              brRes.data.data.map((b: { id: string; name: string }) => ({
+                id: b.id,
+                name: b.name,
+              })),
+            );
+          }
+        })
+        .catch((err) => console.error('Failed to fetch branches:', err));
+
+      // Fetch brands
+      api
+        .get('/i/brands')
+        .then((bndRes) => {
+          if (bndRes.data.success) {
+            setBrands(
+              bndRes.data.data.map((b: { id: string; name: string }) => ({
+                id: b.id,
+                name: b.name,
+              })),
+            );
+          }
+        })
+        .catch((err) => console.error('Failed to fetch brands:', err));
+    } catch (e) {
+      console.error('Failed to initiate filter options fetch:', e);
+    }
+  }, []);
 
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    fetchOptions();
+  }, [fetchOptions]);
+
+  useEffect(() => {
+    // Only fetch data when filters are empty (initial load) or when explicit fetchData is needed.
+    // To prevent redundant calls, we can rely on handleFilter for user-initiated searches.
+    // But since we want the table to reflect initial state, we keep this.
+    if (!productFilter && !warehouseFilter && !branchFilter && !brandFilter) {
+      fetchData();
+    }
+  }, [fetchData]); // Keeping it simple for now, though it might double-trigger on some state changes.
 
   const handleFilter = () => {
     setPage(1);
@@ -84,19 +163,14 @@ export default function InventoryProductsTable() {
 
   const clearFilters = () => {
     setProductFilter('');
-    setWarehouseFilter('');
-    setBranchFilter('');
+    setWarehouseFilter('all');
+    setBranchFilter('all');
+    setBrandFilter('all');
     setPage(1);
-    // Needed to reset data to initial state, triggering useEffect would be one way,
-    // or calling fetchData directly after state updates (which might be async tricky)
-    // For simplicity, we can just reload or call fetchData with empty params.
-    // Ideally use a separate effect for filters or just call fetch.
-    setTimeout(() => {
-      // slight delay to ensure state update or just pass empty manually
-      api.get<InventoryResponse>('/i/inventory').then((res) => {
-        if (res.data.success) setData(res.data.data);
-      });
-    }, 0);
+    // fetchData will be called via useEffect if we keep it reactive,
+    // but better to just call it explicitly after reset if needed.
+    // For now, let's just make it call fetchData.
+    setTimeout(() => fetchData(), 0);
   };
 
   const totalPages = Math.ceil(data.length / ITEMS_PER_PAGE);
@@ -106,8 +180,8 @@ export default function InventoryProductsTable() {
   return (
     <div className="space-y-4">
       {/* Filters Section */}
-      <div className="bg-card rounded-xl p-4 shadow-sm border border-gray-100 flex flex-col md:flex-row gap-4 items-end md:items-center">
-        <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-4 w-full">
+      <div className="bg-card rounded-xl p-4 shadow-sm border border-gray-100 flex flex-col md:flex-row gap-4 items-end">
+        <div className="flex-1 grid grid-cols-1 md:grid-cols-4 gap-4 w-full">
           <div className="space-y-1">
             <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
               Product / Model
@@ -126,23 +200,55 @@ export default function InventoryProductsTable() {
             <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
               Warehouse
             </label>
-            <Input
-              placeholder="Filter by warehouse..."
-              value={warehouseFilter}
-              onChange={(e) => setWarehouseFilter(e.target.value)}
-              className="h-9 text-xs"
-            />
+            <Select value={warehouseFilter || 'all'} onValueChange={setWarehouseFilter}>
+              <SelectTrigger className="h-9 text-xs w-full bg-background border-gray-200">
+                <SelectValue placeholder="All Warehouses" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Warehouses</SelectItem>
+                {warehouses.map((w) => (
+                  <SelectItem key={w.id} value={w.name}>
+                    {w.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <div className="space-y-1">
             <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
               Branch
             </label>
-            <Input
-              placeholder="Filter by branch..."
-              value={branchFilter}
-              onChange={(e) => setBranchFilter(e.target.value)}
-              className="h-9 text-xs"
-            />
+            <Select value={branchFilter || 'all'} onValueChange={setBranchFilter}>
+              <SelectTrigger className="h-9 text-xs w-full bg-background border-gray-200">
+                <SelectValue placeholder="All Branches" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Branches</SelectItem>
+                {branches.map((b) => (
+                  <SelectItem key={b.id} value={b.name}>
+                    {b.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+              Brand
+            </label>
+            <Select value={brandFilter || 'all'} onValueChange={setBrandFilter}>
+              <SelectTrigger className="h-9 text-xs w-full bg-background border-gray-200">
+                <SelectValue placeholder="All Brands" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Brands</SelectItem>
+                {brands.map((b) => (
+                  <SelectItem key={b.id} value={b.name}>
+                    {b.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         </div>
         <div className="flex items-center gap-2 pt-4 md:pt-0">
@@ -170,9 +276,6 @@ export default function InventoryProductsTable() {
           <Table>
             <TableHeader>
               <TableRow className="hover:bg-transparent">
-                <TableHead className="text-xs font-semibold text-primary uppercase px-6">
-                  Model No
-                </TableHead>
                 <TableHead className="text-xs font-semibold text-primary uppercase px-6">
                   Model Name
                 </TableHead>
@@ -218,9 +321,6 @@ export default function InventoryProductsTable() {
                     key={`${item.model_no}-${item.warehouse_name}-${index}`}
                     className={`hover:bg-muted/50/30 transition-colors ${index % 2 ? 'bg-sky-100/60' : ''}`}
                   >
-                    <TableCell className="px-6 py-4 font-medium text-foreground">
-                      {item.model_no}
-                    </TableCell>
                     <TableCell className="px-6 py-4 text-foreground">
                       <div className="font-medium">{item.model_name}</div>
                       {item.description && (

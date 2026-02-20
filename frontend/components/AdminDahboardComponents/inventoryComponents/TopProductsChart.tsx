@@ -58,7 +58,7 @@ export default function TopProductsChart() {
               horizontal={true}
               vertical={false}
               strokeDasharray="3 3"
-              stroke="#f3f4f6"
+              stroke="var(--chart-grid)"
             />
             <XAxis type="number" hide />
             <YAxis
@@ -66,7 +66,7 @@ export default function TopProductsChart() {
               type="category"
               axisLine={false}
               tickLine={false}
-              tick={{ fill: '#4b5563', fontSize: 10, fontWeight: 500 }}
+              tick={{ fill: 'var(--chart-slate-dark)', fontSize: 10, fontWeight: 500 }}
               width={80}
             />
             <Tooltip
@@ -93,7 +93,7 @@ export default function TopProductsChart() {
             />
             <Bar dataKey="stock" radius={[0, 4, 4, 0]}>
               {data.map((entry, index) => (
-                <Cell key={`cell-${index}`} fill="#2563eb" />
+                <Cell key={`cell-${index}`} fill="var(--chart-blue)" />
               ))}
             </Bar>
           </BarChart>

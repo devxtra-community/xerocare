@@ -12,6 +12,7 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import { salesService } from '@/services/salesService';
+import { YearSelector } from '@/components/ui/YearSelector';
 
 interface ChartDataItem {
   date: string;
@@ -23,13 +24,17 @@ interface ChartDataItem {
 
 export default function MonthlyRevenueBarChart() {
   const [isClient, setIsClient] = useState(false);
+  const [selectedYear, setSelectedYear] = useState<number | 'all'>(new Date().getFullYear());
   const [chartData, setChartData] = useState<ChartDataItem[]>([]);
 
   useEffect(() => {
     setIsClient(true);
     const fetchData = async () => {
       try {
-        const sales = await salesService.getBranchSalesOverview('1Y');
+        const sales = await salesService.getBranchSalesOverview(
+          '1Y',
+          selectedYear === 'all' ? undefined : selectedYear,
+        );
 
         const pivotedData = sales.reduce((acc, curr) => {
           const date = new Date(curr.date).toLocaleDateString('en-US', { month: 'short' });
@@ -58,33 +63,36 @@ export default function MonthlyRevenueBarChart() {
       }
     };
     fetchData();
-  }, []);
+  }, [selectedYear]);
 
   if (!isClient) return <div className="h-[320px] w-full bg-white rounded-2xl animate-pulse" />;
 
   return (
     <div className="rounded-2xl bg-white h-[320px] w-full shadow-sm border border-blue-50 flex flex-col p-4">
-      <div className="pb-4">
-        <h4 className="text-sm font-semibold text-gray-800">Monthly Revenue Source</h4>
-        <p className="text-[10px] text-gray-500">Breakdown of revenue by month</p>
+      <div className="flex items-center justify-between pb-4">
+        <div>
+          <h4 className="text-sm font-semibold text-gray-800">Monthly Revenue Source</h4>
+          <p className="text-[10px] text-gray-500">Breakdown of revenue by month</p>
+        </div>
+        <YearSelector selectedYear={selectedYear} onYearChange={setSelectedYear} />
       </div>
       <div className="flex-1 w-full -ml-4">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={chartData} margin={{ top: 10, right: 30, left: 10, bottom: 0 }}>
-            <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="#f1f5f9" />
+            <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="var(--chart-grid)" />
             <XAxis
               dataKey="date"
               axisLine={false}
               tickLine={false}
               tickMargin={12}
-              tick={{ fill: '#94a3b8', fontSize: 10 }}
+              tick={{ fill: 'var(--chart-slate)', fontSize: 10 }}
             />
             <YAxis
-              axisLine={{ stroke: '#f1f5f9' }}
+              axisLine={{ stroke: 'var(--chart-grid)' }}
               tickLine={false}
               tickFormatter={(v) => (v >= 1000 ? `${(v / 1000).toFixed(0)}k` : `${v}`)}
               tickMargin={12}
-              tick={{ fill: '#94a3b8', fontSize: 10 }}
+              tick={{ fill: 'var(--chart-slate)', fontSize: 10 }}
             />
             <Tooltip
               cursor={{ fill: '#f8fafc' }}
@@ -137,9 +145,27 @@ export default function MonthlyRevenueBarChart() {
                 color: '#64748b',
               }}
             />
-            <Bar dataKey="sale" name="Sale" stackId="a" fill="#2563eb" radius={[0, 0, 0, 0]} />
-            <Bar dataKey="rent" name="Rent" stackId="a" fill="#3b82f6" radius={[0, 0, 0, 0]} />
-            <Bar dataKey="lease" name="Lease" stackId="a" fill="#93c5fd" radius={[4, 4, 0, 0]} />
+            <Bar
+              dataKey="sale"
+              name="Sale"
+              stackId="a"
+              fill="var(--chart-blue)"
+              radius={[0, 0, 0, 0]}
+            />
+            <Bar
+              dataKey="rent"
+              name="Rent"
+              stackId="a"
+              fill="var(--chart-blue-light)"
+              radius={[0, 0, 0, 0]}
+            />
+            <Bar
+              dataKey="lease"
+              name="Lease"
+              stackId="a"
+              fill="var(--chart-blue-lighter)"
+              radius={[4, 4, 0, 0]}
+            />
           </BarChart>
         </ResponsiveContainer>
       </div>

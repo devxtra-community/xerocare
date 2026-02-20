@@ -3,13 +3,13 @@ import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import EmployeeSidebar from '@/components/employeeComponents/employeeAppsidebar';
 import DashboardHeader from '@/components/DashboardHeader';
 
-export default function AdminLayout({ children }: { children: React.ReactNode }) {
+export default function EmployeeLayout({ children }: { children: React.ReactNode }) {
   return (
     <SidebarProvider>
       <div className="flex min-h-screen w-full">
         <EmployeeSidebar />
 
-        <SidebarInset className="bg-muted min-h-screen w-full flex flex-col">
+        <SidebarInset className="bg-background min-h-screen w-full flex flex-col">
           <DashboardHeader />
           <div className="flex-1 overflow-auto">{children}</div>
         </SidebarInset>

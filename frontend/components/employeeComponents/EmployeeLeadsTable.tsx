@@ -23,6 +23,7 @@ import {
 import LeadDialog from './LeadDialog';
 import { Lead, getLeads, createLead, updateLead, deleteLead, CreateLeadData } from '@/lib/lead';
 import { toast } from 'sonner';
+import Pagination from '@/components/Pagination';
 
 /**
  * Table displaying leads managed by the employee.
@@ -132,23 +133,49 @@ export default function EmployeeLeadsTable() {
     }
   };
 
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 10;
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, filterType, showDeleted]);
+
+  const totalPages = Math.ceil(filteredLeads.length / ITEMS_PER_PAGE);
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  const paginatedLeads = filteredLeads.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+
   return (
     <div className="space-y-4">
-      <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
-        <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto flex-1">
-          <div className="relative w-full sm:w-[300px]">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-            <Input
-              placeholder="Search leads..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-9 h-10 bg-card border-blue-400/60 focus:border-blue-400 focus:ring-4 focus:ring-blue-100 outline-none shadow-sm transition-all w-full"
-            />
+      <div className="flex justify-between items-center">
+        <h2 className="text-xl font-bold text-primary">Leads Management</h2>
+        <Button onClick={handleAddClick} className="gap-2 bg-primary hover:bg-primary/90">
+          <Plus className="h-4 w-4" /> Add Lead
+        </Button>
+      </div>
+
+      <div className="bg-card rounded-xl p-4 shadow-sm border border-gray-100 flex flex-col md:flex-row gap-4 items-end">
+        <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-4 w-full">
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+              Search Leads
+            </label>
+            <div className="relative">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-400" />
+              <Input
+                placeholder="Search leads..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-9 h-9 text-xs"
+              />
+            </div>
           </div>
-          <div className="w-full sm:w-[150px]">
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+              Filter by Source
+            </label>
             <Select value={filterType} onValueChange={setFilterType}>
-              <SelectTrigger className="h-10 bg-card border-blue-400/60 focus:ring-blue-100 rounded-lg w-full">
-                <SelectValue placeholder="Filter by" />
+              <SelectTrigger className="h-9 text-xs w-full bg-background border-gray-200">
+                <SelectValue placeholder="All Sources" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="All">All Sources</SelectItem>
@@ -158,25 +185,24 @@ export default function EmployeeLeadsTable() {
               </SelectContent>
             </Select>
           </div>
-          <Button
-            variant={showDeleted ? 'destructive' : 'outline'}
-            onClick={() => setShowDeleted(!showDeleted)}
-            className="gap-2"
-          >
-            {showDeleted ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-            {showDeleted ? 'Hide Deleted' : 'Show Deleted'}
-          </Button>
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+              Status Filter
+            </label>
+            <Button
+              variant={showDeleted ? 'destructive' : 'outline'}
+              onClick={() => setShowDeleted(!showDeleted)}
+              className="h-9 text-xs w-full justify-start gap-2"
+            >
+              {showDeleted ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              {showDeleted ? 'Hide Deleted' : 'Show Deleted'}
+            </Button>
+          </div>
         </div>
-        <Button
-          onClick={handleAddClick}
-          className="gap-2 bg-primary hover:bg-primary/90 w-full sm:w-auto mt-2 sm:mt-0"
-        >
-          <Plus className="h-4 w-4" /> Add Lead
-        </Button>
       </div>
 
-      <div className="rounded-2xl bg-card shadow-sm overflow-hidden border">
-        <div className="overflow-x-auto">
+      <div className="rounded-2xl bg-card shadow-sm overflow-hidden border p-4">
+        <div className="overflow-x-auto mb-4">
           <Table className="min-w-[800px] sm:min-w-full">
             <TableHeader>
               <TableRow className="bg-muted/50">
@@ -196,14 +222,14 @@ export default function EmployeeLeadsTable() {
                     Loading...
                   </TableCell>
                 </TableRow>
-              ) : filteredLeads.length === 0 ? (
+              ) : paginatedLeads.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
                     No leads found.
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredLeads.map((lead, index) => (
+                paginatedLeads.map((lead, index) => (
                   <TableRow key={lead._id} className={index % 2 ? 'bg-blue-50/20' : 'bg-card'}>
                     <TableCell className="font-bold text-primary">
                       <div className="flex flex-col">
@@ -293,6 +319,9 @@ export default function EmployeeLeadsTable() {
             </TableBody>
           </Table>
         </div>
+        {totalPages > 1 && (
+          <Pagination page={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
+        )}
       </div>
 
       <LeadDialog

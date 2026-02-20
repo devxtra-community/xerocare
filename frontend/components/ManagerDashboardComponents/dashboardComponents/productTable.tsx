@@ -23,6 +23,8 @@ import {
 import { Search, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
+import Pagination from '@/components/Pagination';
+
 /**
  * Dashboard table displaying a snapshot of branch inventory.
  * Lists models, brands, vendors, and their current stock levels.
@@ -35,6 +37,8 @@ export default function DashbordTable() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedBrand, setSelectedBrand] = useState<string>('all');
   const [selectedVendor, setSelectedVendor] = useState<string>('all');
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 10;
 
   useEffect(() => {
     setMounted(true);
@@ -70,6 +74,11 @@ export default function DashbordTable() {
     fetchData();
   }, []);
 
+  // Reset page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, selectedBrand, selectedVendor]);
+
   // Filtering logic
   const filteredData = data.filter((item) => {
     const matchesSearch =
@@ -82,6 +91,10 @@ export default function DashbordTable() {
 
     return matchesSearch && matchesBrand && matchesVendor;
   });
+
+  const totalPages = Math.ceil(filteredData.length / ITEMS_PER_PAGE);
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  const paginatedData = filteredData.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
   // Extract unique brands and vendors for filters
   const brands = Array.from(new Set(data.map((item) => item.brand))).filter(Boolean);
@@ -98,23 +111,31 @@ export default function DashbordTable() {
   return (
     <div className="space-y-4">
       {/* Search and Filters */}
-      <div className="flex flex-col md:flex-row gap-4 bg-card p-4 rounded-2xl border border-gray-100 shadow-sm">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-          <Input
-            placeholder="Search by model or product name..."
-            className="pl-10 h-10 border-blue-100 focus:border-blue-400 focus:ring-blue-50 bg-white/50"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
-        </div>
+      <div className="bg-card rounded-xl p-4 shadow-sm border border-gray-100 flex flex-col md:flex-row gap-4 items-end">
+        <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-4 w-full">
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+              Search Product
+            </label>
+            <div className="relative">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-400" />
+              <Input
+                placeholder="Search model or product..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9 h-9 text-xs"
+              />
+            </div>
+          </div>
 
-        <div className="flex flex-wrap items-center gap-3">
-          {mounted && (
-            <div className="w-40">
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+              Filter by Brand
+            </label>
+            {mounted && (
               <Select value={selectedBrand} onValueChange={setSelectedBrand}>
-                <SelectTrigger className="h-10 border-blue-100 bg-white/50">
-                  <SelectValue placeholder="Brand" />
+                <SelectTrigger className="h-9 text-xs w-full bg-background border-gray-200">
+                  <SelectValue placeholder="All Brands" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Brands</SelectItem>
@@ -125,14 +146,17 @@ export default function DashbordTable() {
                   ))}
                 </SelectContent>
               </Select>
-            </div>
-          )}
+            )}
+          </div>
 
-          {mounted && (
-            <div className="w-44">
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+              Filter by Vendor
+            </label>
+            {mounted && (
               <Select value={selectedVendor} onValueChange={setSelectedVendor}>
-                <SelectTrigger className="h-10 border-blue-100 bg-white/50">
-                  <SelectValue placeholder="Vendor" />
+                <SelectTrigger className="h-9 text-xs w-full bg-background border-gray-200">
+                  <SelectValue placeholder="All Vendors" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Vendors</SelectItem>
@@ -143,25 +167,27 @@ export default function DashbordTable() {
                   ))}
                 </SelectContent>
               </Select>
-            </div>
-          )}
+            )}
+          </div>
+        </div>
 
+        <div className="flex items-center gap-2 pt-4 md:pt-0">
           {(searchQuery || selectedBrand !== 'all' || selectedVendor !== 'all') && (
             <Button
-              variant="ghost"
               size="sm"
+              variant="outline"
               onClick={resetFilters}
-              className="h-10 px-3 text-slate-500 hover:text-red-500 transition-colors"
+              className="h-9 text-gray-500 border-gray-200 hover:bg-gray-50 text-xs px-3"
+              title="Clear Filters"
             >
-              <X className="h-4 w-4 mr-2" />
-              Clear
+              <X className="h-4 w-4" />
             </Button>
           )}
         </div>
       </div>
 
-      <div className="rounded-2xl bg-card shadow-sm overflow-hidden border border-gray-100">
-        <div className="overflow-x-auto">
+      <div className="rounded-2xl bg-card shadow-sm overflow-hidden border border-gray-100 p-4">
+        <div className="overflow-x-auto mb-4">
           <Table>
             <TableHeader>
               <TableRow>
@@ -184,8 +210,8 @@ export default function DashbordTable() {
                     </div>
                   </TableCell>
                 </TableRow>
-              ) : filteredData.length > 0 ? (
-                filteredData.map((item: InventoryItem, index) => (
+              ) : paginatedData.length > 0 ? (
+                paginatedData.map((item: InventoryItem, index) => (
                   <TableRow
                     key={
                       (item as { id?: string }).id ||
@@ -237,6 +263,9 @@ export default function DashbordTable() {
             </TableBody>
           </Table>
         </div>
+        {totalPages > 1 && (
+          <Pagination page={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
+        )}
       </div>
     </div>
   );

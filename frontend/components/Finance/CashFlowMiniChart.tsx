@@ -45,8 +45,8 @@ export default function CashFlowMiniChart() {
           <AreaChart data={cashFlowData} margin={{ top: 5, right: 10, left: 10, bottom: 0 }}>
             <defs>
               <linearGradient id="colorInflow" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#2563eb" stopOpacity={0.1} />
-                <stop offset="95%" stopColor="#2563eb" stopOpacity={0} />
+                <stop offset="5%" stopColor="var(--primary)" stopOpacity={0.1} />
+                <stop offset="95%" stopColor="var(--primary)" stopOpacity={0} />
               </linearGradient>
               <linearGradient id="colorOutflow" x1="0" y1="0" x2="2" y2="1">
                 <stop offset="5%" stopColor="#60a5fa" stopOpacity={0.1} />
@@ -75,13 +75,13 @@ export default function CashFlowMiniChart() {
                   }}
                 />
               }
-              cursor={{ stroke: '#2563eb', strokeWidth: 1, strokeDasharray: '4 4' }}
+              cursor={{ stroke: 'var(--primary)', strokeWidth: 1, strokeDasharray: '4 4' }}
             />
 
             <Area
               type="monotone"
               dataKey="inflow"
-              stroke="#2563eb"
+              stroke="var(--primary)"
               strokeWidth={2}
               fillOpacity={1}
               fill="url(#colorInflow)"

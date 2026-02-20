@@ -12,7 +12,7 @@ const data = [
 
 const COLORS = [
   '#10b981', // Available - Green
-  '#2563eb', // Rented - Primary Blue
+  'var(--primary)', // Rented - Primary Red
   '#7c3aed', // Leased - Primary Purple-ish
   '#6b7280', // Sold - Gray
   '#ef4444', // Under Service - Red

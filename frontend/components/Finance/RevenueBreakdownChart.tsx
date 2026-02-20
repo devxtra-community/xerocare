@@ -25,7 +25,12 @@ interface MonthlyData {
   lease: number;
 }
 
-export default function RevenueBreakdownChart() {
+interface RevenueBreakdownChartProps {
+  selectedYear?: number | 'all';
+  onYearChange?: (year: number | 'all') => void;
+}
+
+export default function RevenueBreakdownChart({ selectedYear }: RevenueBreakdownChartProps) {
   const [data, setData] = useState<MonthlyData[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -33,7 +38,11 @@ export default function RevenueBreakdownChart() {
     const fetchData = async () => {
       try {
         // Fetch 12 months of data
-        const salesData = await getGlobalSalesOverview('12M');
+        // Fetch 12 months of data for the selected year
+        const salesData = await getGlobalSalesOverview(
+          '1Y',
+          selectedYear === 'all' ? undefined : selectedYear,
+        );
 
         // Initialize all months with zero values
         const monthlyData: Record<string, MonthlyData> = {};
@@ -81,20 +90,20 @@ export default function RevenueBreakdownChart() {
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
           {/* Subtle Grid Lines */}
-          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--chart-grid)" />
 
           <XAxis
             dataKey="month"
             axisLine={false}
             tickLine={false}
-            tick={{ fill: '#64748b', fontSize: 12 }}
+            tick={{ fill: 'var(--chart-slate-dark)', fontSize: 12 }}
             dy={10}
           />
 
           <YAxis
             axisLine={false}
             tickLine={false}
-            tick={{ fill: '#64748b', fontSize: 12 }}
+            tick={{ fill: 'var(--chart-slate-dark)', fontSize: 12 }}
             tickFormatter={(value) => `₹${value / 1000}k`}
           />
 
@@ -121,9 +130,9 @@ export default function RevenueBreakdownChart() {
             name="Rent"
             type="monotone"
             dataKey="rent"
-            stroke="#2563eb"
+            stroke="var(--chart-blue)"
             strokeWidth={2}
-            dot={{ fill: '#2563eb', r: 4 }}
+            dot={{ fill: 'var(--chart-blue)', r: 4 }}
             activeDot={{ r: 6 }}
           />
 
@@ -132,9 +141,9 @@ export default function RevenueBreakdownChart() {
             name="Sale"
             type="monotone"
             dataKey="sale"
-            stroke="#1e40af"
+            stroke="var(--chart-blue-dark)"
             strokeWidth={2}
-            dot={{ fill: '#1e40af', r: 4 }}
+            dot={{ fill: 'var(--chart-blue-dark)', r: 4 }}
             activeDot={{ r: 6 }}
           />
 
@@ -143,9 +152,9 @@ export default function RevenueBreakdownChart() {
             name="Lease"
             type="monotone"
             dataKey="lease"
-            stroke="#60a5fa"
+            stroke="var(--chart-blue-soft)"
             strokeWidth={2}
-            dot={{ fill: '#60a5fa', r: 4 }}
+            dot={{ fill: 'var(--chart-blue-soft)', r: 4 }}
             activeDot={{ r: 6 }}
           />
         </LineChart>

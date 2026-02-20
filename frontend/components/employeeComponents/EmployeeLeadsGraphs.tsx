@@ -107,7 +107,7 @@ export default function EmployeeLeadsGraphs() {
 
   // Source colors (matching the Sales shades for consistency)
   const websiteColor = '#1e40af'; // Blue 800
-  const whatsappColor = '#2563eb'; // Blue 600 (Primary)
+  const whatsappColor = 'var(--primary)'; // Red 600 (Primary)
   const instagramColor = '#60a5fa'; // Blue 400
 
   useEffect(() => {

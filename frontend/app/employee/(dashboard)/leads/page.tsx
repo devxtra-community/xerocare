@@ -88,21 +88,43 @@ export default function LeadsPage() {
           <EmployeeLeadsStats leads={leads} />
 
           <div className="space-y-4">
-            <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
-              <div className="flex items-center gap-4">
-                <h3 className="text-lg sm:text-xl font-bold text-primary">All Leads</h3>
-                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest leading-none">
-                  Total {filteredLeads.length} Leads
-                </p>
+            <div className="flex justify-between items-center">
+              <div className="flex items-center gap-3">
+                <h3 className="text-xl font-bold text-primary">All Leads</h3>
+                <span className="px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-600 text-[10px] font-bold uppercase tracking-wider">
+                  {filteredLeads.length} Total
+                </span>
               </div>
-              <div className="relative w-full sm:w-[350px]">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                <Input
-                  placeholder="Search by name, email or phone..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="pl-10 h-11 bg-card border-border focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all rounded-xl"
-                />
+            </div>
+
+            <div className="bg-card rounded-xl p-4 shadow-sm border border-gray-100 flex flex-col md:flex-row gap-4 items-end">
+              <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4 w-full">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+                    Search Leads
+                  </label>
+                  <div className="relative">
+                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-400" />
+                    <Input
+                      placeholder="Search by name, email or phone..."
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                      className="pl-9 h-9 text-xs"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+                    Actions
+                  </label>
+                  <Button
+                    variant="outline"
+                    onClick={fetchLeads}
+                    className="h-9 text-xs w-full justify-center gap-2 border-gray-200 hover:bg-gray-50"
+                  >
+                    Refresh Data
+                  </Button>
+                </div>
               </div>
             </div>
 

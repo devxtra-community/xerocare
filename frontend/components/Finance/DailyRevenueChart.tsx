@@ -11,9 +11,17 @@ import {
   CartesianGrid,
   Legend,
 } from 'recharts';
-import { getGlobalSalesOverview } from '@/lib/invoice';
-import { Loader2 } from 'lucide-react';
 import { ChartTooltipContent } from '@/components/ui/ChartTooltip';
+import { YearSelector } from '@/components/ui/YearSelector';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { CalendarDays, Loader2 } from 'lucide-react';
+import { getGlobalSalesOverview } from '@/lib/invoice';
 
 interface DailyData {
   day: string;
@@ -22,20 +30,53 @@ interface DailyData {
   lease: number;
 }
 
-export default function DailyRevenueChart() {
+interface DailyRevenueChartProps {
+  selectedYear?: number | 'all';
+  onYearChange?: (year: number | 'all') => void;
+}
+
+export default function DailyRevenueChart({
+  selectedYear: externalYear,
+  onYearChange: onExternalYearChange,
+}: DailyRevenueChartProps) {
   const [data, setData] = useState<DailyData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [internalYear, setInternalYear] = useState<number | 'all'>(new Date().getFullYear());
+
+  const selectedYear = externalYear !== undefined ? externalYear : internalYear;
+  const onYearChange = onExternalYearChange || setInternalYear;
+
+  const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth());
+
+  const months = [
+    'January',
+    'February',
+    'March',
+    'April',
+    'May',
+    'June',
+    'July',
+    'August',
+    'September',
+    'October',
+    'November',
+    'December',
+  ];
 
   useEffect(() => {
     const fetchData = async () => {
+      setLoading(true);
       try {
-        const salesData = await getGlobalSalesOverview('1M');
+        const salesData = await getGlobalSalesOverview(
+          '1Y',
+          selectedYear === 'all' ? undefined : selectedYear,
+        );
 
-        // Get current month details
+        // Get selected month details
         const now = new Date();
-        const currentYear = now.getFullYear();
-        const currentMonth = now.getMonth();
-        const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+        const yearToUse = selectedYear === 'all' ? now.getFullYear() : selectedYear;
+        const monthToUse = selectedMonth;
+        const daysInMonth = new Date(yearToUse, monthToUse + 1, 0).getDate();
 
         // Initialize data for all days of the current month
         const fullMonthData: DailyData[] = Array.from({ length: daysInMonth }, (_, i) => ({
@@ -46,10 +87,10 @@ export default function DailyRevenueChart() {
         }));
 
         // Map fetched data to the correct day
-        salesData.forEach((item) => {
+        salesData.forEach((item: { date: string; saleType: string; totalSales: number }) => {
           const date = new Date(item.date);
-          // Only include data for the current month and year
-          if (date.getMonth() === currentMonth && date.getFullYear() === currentYear) {
+          // Only include data for the selected month and year
+          if (date.getMonth() === monthToUse && date.getFullYear() === yearToUse) {
             const dayIndex = date.getDate() - 1; // 0-based index
             const saleType = item.saleType.toLowerCase() as 'rent' | 'sale' | 'lease';
 
@@ -68,7 +109,7 @@ export default function DailyRevenueChart() {
     };
 
     fetchData();
-  }, []);
+  }, [selectedYear, selectedMonth]);
 
   if (loading) {
     return (
@@ -79,79 +120,114 @@ export default function DailyRevenueChart() {
   }
 
   return (
-    <div className="w-full h-[310px] mt-0">
-      <ResponsiveContainer width="100%" height="100%">
-        <LineChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-
-          <XAxis
-            dataKey="day"
-            axisLine={false}
-            tickLine={false}
-            tick={{ fill: '#64748b', fontSize: 11 }}
-            dy={10}
-            interval="preserveStartEnd"
+    <div className="w-full flex flex-col gap-4">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <CalendarDays className="h-4 w-4 text-primary" />
+          <h3 className="text-sm font-semibold text-gray-800">
+            Daily Revenue ({months[selectedMonth]} {selectedYear === 'all' ? '' : selectedYear})
+          </h3>
+        </div>
+        <div className="flex items-center gap-2">
+          <Select
+            value={selectedMonth.toString()}
+            onValueChange={(v) => setSelectedMonth(parseInt(v, 10))}
+          >
+            <SelectTrigger className="w-[120px] h-8 text-[11px] font-medium bg-background">
+              <SelectValue placeholder="Select Month" />
+            </SelectTrigger>
+            <SelectContent>
+              {months.map((month, idx) => (
+                <SelectItem key={month} value={idx.toString()} className="text-[11px]">
+                  {month}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <YearSelector
+            selectedYear={selectedYear}
+            onYearChange={onYearChange}
+            showAllOption={false}
           />
+        </div>
+      </div>
+      <div className="w-full h-[310px] mt-0">
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--chart-grid)" />
 
-          <YAxis
-            axisLine={false}
-            tickLine={false}
-            tick={{ fill: '#64748b', fontSize: 12 }}
-            tickFormatter={(value) => `₹${value / 1000}k`}
-          />
+            <XAxis
+              dataKey="day"
+              axisLine={false}
+              tickLine={false}
+              tick={{ fill: 'var(--chart-slate-dark)', fontSize: 11 }}
+              dy={10}
+              interval="preserveStartEnd"
+            />
 
-          <Tooltip
-            content={
-              <ChartTooltipContent
-                valueFormatter={(value) => {
-                  const val = Number(value);
-                  return `₹${val >= 1000 ? (val / 1000).toFixed(1) + 'k' : val.toLocaleString()}`;
-                }}
-              />
-            }
-          />
+            <YAxis
+              axisLine={false}
+              tickLine={false}
+              tick={{ fill: 'var(--chart-slate-dark)', fontSize: 12 }}
+              tickFormatter={(value) => `₹${value / 1000}k`}
+            />
 
-          <Legend
-            verticalAlign="top"
-            align="right"
-            iconType="circle"
-            wrapperStyle={{ paddingBottom: '20px', fontSize: '12px', fontWeight: 500 }}
-          />
+            <Tooltip
+              content={
+                <ChartTooltipContent
+                  labelFormatter={(label) =>
+                    `${label} ${months[selectedMonth]} ${selectedYear === 'all' ? '' : selectedYear}`
+                  }
+                  valueFormatter={(value) => {
+                    const val = Number(value);
+                    return `₹${val >= 1000 ? (val / 1000).toFixed(1) + 'k' : val.toLocaleString()}`;
+                  }}
+                />
+              }
+            />
 
-          {/* Rent Line - Primary (Blue 600) */}
-          <Line
-            name="Rent"
-            type="monotone"
-            dataKey="rent"
-            stroke="#2563eb"
-            strokeWidth={2}
-            dot={{ fill: '#2563eb', r: 3 }}
-            activeDot={{ r: 5 }}
-          />
+            <Legend
+              verticalAlign="top"
+              align="right"
+              iconType="circle"
+              wrapperStyle={{ paddingBottom: '20px', fontSize: '12px', fontWeight: 500 }}
+            />
 
-          {/* Sale Line - Navy (Blue 800) */}
-          <Line
-            name="Sale"
-            type="monotone"
-            dataKey="sale"
-            stroke="#1e40af"
-            strokeWidth={2}
-            dot={{ fill: '#1e40af', r: 3 }}
-            activeDot={{ r: 5 }}
-          />
+            {/* Rent Line - Primary (Blue 600) */}
+            <Line
+              name="Rent"
+              type="monotone"
+              dataKey="rent"
+              stroke="var(--chart-blue)"
+              strokeWidth={2}
+              dot={{ fill: 'var(--chart-blue)', r: 3 }}
+              activeDot={{ r: 5 }}
+            />
 
-          {/* Lease Line - Light Blue (Blue 400) */}
-          <Line
-            name="Lease"
-            type="monotone"
-            dataKey="lease"
-            stroke="#60a5fa"
-            strokeWidth={2}
-            dot={{ fill: '#60a5fa', r: 3 }}
-            activeDot={{ r: 5 }}
-          />
-        </LineChart>
-      </ResponsiveContainer>
+            {/* Sale Line - Navy (Blue 800) */}
+            <Line
+              name="Sale"
+              type="monotone"
+              dataKey="sale"
+              stroke="var(--chart-blue-dark)"
+              strokeWidth={2}
+              dot={{ fill: 'var(--chart-blue-dark)', r: 3 }}
+              activeDot={{ r: 5 }}
+            />
+
+            {/* Lease Line - Light Blue (Blue 400) */}
+            <Line
+              name="Lease"
+              type="monotone"
+              dataKey="lease"
+              stroke="var(--chart-blue-soft)"
+              strokeWidth={2}
+              dot={{ fill: 'var(--chart-blue-soft)', r: 3 }}
+              activeDot={{ r: 5 }}
+            />
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
     </div>
   );
 }

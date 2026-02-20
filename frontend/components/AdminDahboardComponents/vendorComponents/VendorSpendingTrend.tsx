@@ -72,8 +72,8 @@ export default function VendorSpendingTrend({ requests }: VendorSpendingTrendPro
           <AreaChart data={data} margin={{ top: 0, left: -25, right: 0, bottom: 0 }}>
             <defs>
               <linearGradient id="spendGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#2563eb" stopOpacity={0.2} />
-                <stop offset="95%" stopColor="#2563eb" stopOpacity={0} />
+                <stop offset="5%" stopColor="var(--primary)" stopOpacity={0.2} />
+                <stop offset="95%" stopColor="var(--primary)" stopOpacity={0} />
               </linearGradient>
             </defs>
             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
@@ -99,7 +99,7 @@ export default function VendorSpendingTrend({ requests }: VendorSpendingTrendPro
             <Area
               type="monotone"
               dataKey="spend"
-              stroke="#2563eb"
+              stroke="var(--primary)"
               strokeWidth={2}
               fillOpacity={1}
               fill="url(#spendGradient)"

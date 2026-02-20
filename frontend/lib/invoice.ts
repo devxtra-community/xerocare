@@ -308,12 +308,17 @@ export const getPendingCounts = async (): Promise<Record<string, number>> => {
 /**
  * Retrieves global sales totals across all branches.
  */
-export const getGlobalSalesTotals = async (): Promise<{
+export const getGlobalSalesTotals = async (
+  year?: number,
+): Promise<{
   totalSales: number;
   salesByType: { saleType: string; total: number }[];
   totalInvoices: number;
 }> => {
-  const response = await api.get('/b/invoices/sales/global-totals');
+  const url = year
+    ? `/b/invoices/sales/global-totals?year=${year}`
+    : '/b/invoices/sales/global-totals';
+  const response = await api.get(url);
   return response.data.data;
 };
 
@@ -323,8 +328,12 @@ export const getGlobalSalesTotals = async (): Promise<{
  */
 export const getGlobalSalesOverview = async (
   period: string = '1M',
+  year?: number,
 ): Promise<{ date: string; saleType: string; totalSales: number }[]> => {
-  const response = await api.get(`/b/invoices/sales/global-overview?period=${period}`);
+  const url = year
+    ? `/b/invoices/sales/global-overview?period=${period}&year=${year}`
+    : `/b/invoices/sales/global-overview?period=${period}`;
+  const response = await api.get(url);
   return response.data.data;
 };
 // Alerts & Collection
@@ -507,8 +516,9 @@ export interface AdminSalesStats {
 /**
  * Retrieves sales statistics specifically for the admin dashboard.
  */
-export const getAdminSalesStats = async (): Promise<AdminSalesStats> => {
-  const response = await api.get('/b/invoices/sales/admin-stats');
+export const getAdminSalesStats = async (year?: number): Promise<AdminSalesStats> => {
+  const url = year ? `/b/invoices/sales/admin-stats?year=${year}` : '/b/invoices/sales/admin-stats';
+  const response = await api.get(url);
   return response.data.data;
 };
 

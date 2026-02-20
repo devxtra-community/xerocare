@@ -1,4 +1,4 @@
-'use client';
+import { useState } from 'react';
 import {
   Table,
   TableBody,
@@ -7,6 +7,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import Pagination from '@/components/Pagination';
 
 const lowStockData = [
   {
@@ -49,13 +50,11 @@ const lowStockData = [
  * Enables quick identification of stock replenishment needs.
  */
 export default function LowStockTable() {
-  // Pagination logic removed as buttons are missing from UI
-  // const [page, setPage] = useState(1);
-  // const ITEMS_PER_PAGE = 5;
-  // const totalPages = Math.ceil(lowStockData.length / ITEMS_PER_PAGE);
-  // const startIndex = (page - 1) * ITEMS_PER_PAGE;
-  // const currentData = lowStockData.slice(startIndex, startIndex + ITEMS_PER_PAGE);
-  const currentData = lowStockData;
+  const [page, setPage] = useState(1);
+  const ITEMS_PER_PAGE = 10;
+  const totalPages = Math.ceil(lowStockData.length / ITEMS_PER_PAGE);
+  const startIndex = (page - 1) * ITEMS_PER_PAGE;
+  const currentData = lowStockData.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
   return (
     <div className="rounded-2xl bg-card p-2 sm:p-3 shadow-sm w-full min-h-[200px] flex flex-col">
@@ -114,6 +113,11 @@ export default function LowStockTable() {
           </TableBody>
         </Table>
       </div>
+      {totalPages > 1 && (
+        <div className="mt-4">
+          <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
+        </div>
+      )}
     </div>
   );
 }

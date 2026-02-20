@@ -23,6 +23,7 @@ import { toast } from 'sonner';
 import { InvoiceDetailsDialog } from '../invoice/InvoiceDetailsDialog';
 import { Eye } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import Pagination from '@/components/Pagination';
 
 interface EmployeeOrdersTableProps {
   mode?: 'EMPLOYEE' | 'FINANCE';
@@ -43,6 +44,13 @@ export default function EmployeeOrdersTable({
   const [filterType, setFilterType] = useState<string>('All');
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
+
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 10;
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, filterType]);
 
   useEffect(() => {
     const fetchInvoices = async () => {
@@ -126,6 +134,10 @@ export default function EmployeeOrdersTable({
     return matchesSearch && matchesFilter;
   });
 
+  const totalPages = Math.ceil(filteredInvoices.length / ITEMS_PER_PAGE);
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  const paginatedInvoices = filteredInvoices.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+
   const handleViewDetails = async (invoiceId: string) => {
     try {
       // If we already have the full invoice details in the list (populated by aggregator), we can use it.
@@ -161,22 +173,33 @@ export default function EmployeeOrdersTable({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
-        <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto flex-1">
-          <div className="relative w-full sm:w-[300px]">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-            <Input
-              placeholder="Search orders..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-9 h-10 bg-card border-blue-400/60 focus:border-blue-400 focus:ring-4 focus:ring-blue-100 outline-none shadow-sm transition-all w-full"
-            />
-          </div>
+      <div className="flex justify-between items-center">
+        <h2 className="text-xl font-bold text-primary">Orders Overview</h2>
+      </div>
 
-          <div className="w-full sm:w-[150px]">
+      <div className="bg-card rounded-xl p-4 shadow-sm border border-gray-100 flex flex-col md:flex-row gap-4 items-end">
+        <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-4 w-full">
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+              Search Orders
+            </label>
+            <div className="relative">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-400" />
+              <Input
+                placeholder="Search by ID, customer..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-9 h-9 text-xs"
+              />
+            </div>
+          </div>
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+              Filter by Type
+            </label>
             <Select value={filterType} onValueChange={setFilterType}>
-              <SelectTrigger className="h-10 bg-card border-blue-400/60 focus:ring-blue-100 rounded-lg w-full">
-                <SelectValue placeholder="Filter by" />
+              <SelectTrigger className="h-9 text-xs w-full bg-background border-gray-200">
+                <SelectValue placeholder="All Types" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="All">All Types</SelectItem>
@@ -186,11 +209,23 @@ export default function EmployeeOrdersTable({
               </SelectContent>
             </Select>
           </div>
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+              Actions
+            </label>
+            <Button
+              variant="outline"
+              onClick={() => window.location.reload()}
+              className="h-9 text-xs w-full justify-center gap-2 border-gray-200 hover:bg-gray-50"
+            >
+              Refresh Data
+            </Button>
+          </div>
         </div>
       </div>
 
-      <div className="rounded-2xl bg-card shadow-sm overflow-hidden border">
-        <div className="overflow-x-auto">
+      <div className="rounded-2xl bg-card shadow-sm overflow-hidden border p-4">
+        <div className="overflow-x-auto mb-4">
           <Table className="min-w-[1000px] sm:min-w-full">
             <TableHeader>
               <TableRow className="bg-muted/50">
@@ -210,17 +245,20 @@ export default function EmployeeOrdersTable({
                 <TableHead className="text-primary font-bold whitespace-nowrap">Payment</TableHead>
                 <TableHead className="text-primary font-bold whitespace-nowrap">Status</TableHead>
                 <TableHead className="text-primary font-bold whitespace-nowrap">Type</TableHead>
+                <TableHead className="text-primary font-bold whitespace-nowrap text-center">
+                  Action
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredInvoices.length === 0 ? (
+              {paginatedInvoices.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={10} className="h-24 text-center text-muted-foreground">
+                  <TableCell colSpan={11} className="h-24 text-center text-muted-foreground">
                     No orders found.
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredInvoices.map((invoice, index) => (
+                paginatedInvoices.map((invoice, index) => (
                   <TableRow
                     key={invoice.id}
                     className={index % 2 !== 0 ? 'bg-blue-50/20' : 'bg-card'}
@@ -307,6 +345,9 @@ export default function EmployeeOrdersTable({
             </TableBody>
           </Table>
         </div>
+        {totalPages > 1 && (
+          <Pagination page={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
+        )}
       </div>
 
       {detailsOpen && selectedInvoice && (

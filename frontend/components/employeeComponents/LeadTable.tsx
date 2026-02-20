@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Edit, Trash2, User, Mail, Phone, Loader2, FileText } from 'lucide-react';
 import { Lead, deleteLead } from '@/lib/lead';
 import { toast } from 'sonner';
+import Pagination from '@/components/Pagination';
 
 interface LeadTableProps {
   leads: Lead[];
@@ -26,6 +27,9 @@ interface LeadTableProps {
  */
 export function LeadTable({ leads, onRefresh, onEdit }: LeadTableProps) {
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
+
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 10;
 
   const handleDelete = async (id: string) => {
     if (!confirm('Are you sure you want to delete this lead?')) return;
@@ -42,9 +46,13 @@ export function LeadTable({ leads, onRefresh, onEdit }: LeadTableProps) {
     }
   };
 
+  const totalPages = Math.ceil(leads.length / ITEMS_PER_PAGE);
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  const paginatedLeads = leads.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+
   return (
-    <div className="rounded-2xl bg-card shadow-sm overflow-hidden border">
-      <div className="overflow-x-auto">
+    <div className="rounded-2xl bg-card shadow-sm overflow-hidden border p-4">
+      <div className="overflow-x-auto mb-4">
         <Table className="min-w-[800px] sm:min-w-full">
           <TableHeader>
             <TableRow className="bg-muted/50">
@@ -58,7 +66,7 @@ export function LeadTable({ leads, onRefresh, onEdit }: LeadTableProps) {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {leads.length === 0 ? (
+            {paginatedLeads.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={5} className="text-center py-12 text-muted-foreground">
                   <FileText className="h-10 w-10 mx-auto mb-2 opacity-20" />
@@ -66,7 +74,7 @@ export function LeadTable({ leads, onRefresh, onEdit }: LeadTableProps) {
                 </TableCell>
               </TableRow>
             ) : (
-              leads.map((lead, index) => (
+              paginatedLeads.map((lead, index) => (
                 <TableRow key={lead._id} className={index % 2 !== 0 ? 'bg-blue-50/20' : 'bg-card'}>
                   <TableCell>
                     <div className="flex flex-col space-y-1">
@@ -146,6 +154,9 @@ export function LeadTable({ leads, onRefresh, onEdit }: LeadTableProps) {
           </TableBody>
         </Table>
       </div>
+      {totalPages > 1 && (
+        <Pagination page={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
+      )}
     </div>
   );
 }

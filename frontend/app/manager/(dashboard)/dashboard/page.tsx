@@ -8,8 +8,11 @@ import { salesService } from '@/services/salesService';
 import BranchSalesChart from '@/components/ManagerDashboardComponents/dashboardComponents/branchsalesChart';
 import RevenuePieChart from '@/components/ManagerDashboardComponents/dashboardComponents/RevenuePieChart';
 import SalaryDistributionChart from '@/components/ManagerDashboardComponents/dashboardComponents/SalaryDistributionChart';
+import DashboardPage from '@/components/DashboardPage';
+import { YearSelector } from '@/components/ui/YearSelector';
 
 export default function Dashboard() {
+  const [selectedYear, setSelectedYear] = useState<number | 'all'>(new Date().getFullYear());
   const [branchName, setBranchName] = useState('Branch');
   const [totalSales, setTotalSales] = useState(0);
   const [saleAmount, setSaleAmount] = useState(0);
@@ -24,7 +27,7 @@ export default function Dashboard() {
         const [, branch, salesData] = await Promise.all([
           inventoryService.getInventoryStats(),
           branchService.getMyBranch(),
-          salesService.getBranchSalesTotals(),
+          salesService.getBranchSalesTotals(selectedYear === 'all' ? undefined : selectedYear),
         ]);
 
         if (branch?.name) setBranchName(branch.name);
@@ -45,7 +48,7 @@ export default function Dashboard() {
       }
     };
     fetchData();
-  }, []);
+  }, [selectedYear]);
 
   const formatToK = (value: number) => {
     if (value >= 1000) {
@@ -55,9 +58,12 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="bg-blue-100 min-h-full p-3 sm:p-4 md:p-6 space-y-6 sm:space-y-8">
+    <DashboardPage>
       <div className="flex flex-col space-y-4 sm:space-y-6">
-        <h3 className="text-xl sm:text-2xl font-bold text-primary">{branchName} Sales</h3>
+        <div className="flex flex-row items-center justify-between">
+          <h3 className="text-xl sm:text-2xl font-bold text-primary">{branchName} Sales</h3>
+          <YearSelector selectedYear={selectedYear} onYearChange={setSelectedYear} />
+        </div>
 
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 md:gap-4">
           <StatCard
@@ -89,7 +95,9 @@ export default function Dashboard() {
           <BranchSalesChart
             period="1W"
             title="Weekly Overview"
-            subtitle="Revenue by day for the last 7 days"
+            subtitle="Revenue by day"
+            selectedYear={selectedYear}
+            onYearChange={setSelectedYear}
           />
         </div>
         <div className="space-y-2">
@@ -97,7 +105,9 @@ export default function Dashboard() {
           <BranchSalesChart
             period="1Y"
             title="Yearly Overview"
-            subtitle="Revenue by month for the current year"
+            subtitle={`Revenue by month for ${selectedYear === 'all' ? 'all time' : selectedYear}`}
+            selectedYear={selectedYear}
+            onYearChange={setSelectedYear}
           />
         </div>
         <div className="space-y-2">
@@ -107,6 +117,6 @@ export default function Dashboard() {
           <RevenuePieChart />
         </div>
       </div>
-    </div>
+    </DashboardPage>
   );
 }

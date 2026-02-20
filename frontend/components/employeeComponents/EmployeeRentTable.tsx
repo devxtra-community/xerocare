@@ -23,6 +23,7 @@ import RentFormModal from './RentFormModal';
 import { Badge } from '@/components/ui/badge';
 import { ApproveQuotationDialog } from '@/components/invoice/ApproveQuotationDialog';
 import { InvoiceDetailsDialog } from '@/components/invoice/InvoiceDetailsDialog';
+import Pagination from '@/components/Pagination';
 
 import { updateQuotation } from '@/lib/invoice'; // Ensure import
 import UsageRecordingModal from '../Finance/UsageRecordingModal';
@@ -64,6 +65,13 @@ export default function EmployeeRentTable({ mode = 'EMPLOYEE' }: EmployeeRentTab
   const [editingUsage] = useState<Invoice | null>(null);
   const [search, setSearch] = useState('');
 
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 10;
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search]);
+
   const fetchInvoices = useCallback(async () => {
     try {
       setLoading(true);
@@ -89,6 +97,17 @@ export default function EmployeeRentTable({ mode = 'EMPLOYEE' }: EmployeeRentTab
   useEffect(() => {
     fetchInvoices();
   }, [fetchInvoices]);
+
+  const filteredInvoices = invoices.filter((inv) =>
+    search
+      ? inv.customerName?.toLowerCase().includes(search.toLowerCase()) ||
+        inv.invoiceNumber?.toLowerCase().includes(search.toLowerCase())
+      : true,
+  );
+
+  const totalPages = Math.ceil(filteredInvoices.length / ITEMS_PER_PAGE);
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  const paginatedInvoices = filteredInvoices.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
   const handleViewDetails = (id: string) => {
     const invoice = invoices.find((i) => i.id === id);
@@ -147,19 +166,11 @@ export default function EmployeeRentTable({ mode = 'EMPLOYEE' }: EmployeeRentTab
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-        <div className="relative flex-1 w-full sm:max-w-xs">
-          <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search customer..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-8"
-          />
-        </div>
+      <div className="flex justify-between items-center">
+        <h2 className="text-xl font-bold text-primary">Rent Management</h2>
         {mode === 'EMPLOYEE' && (
           <Button
-            className="bg-primary text-white gap-2 w-full sm:w-auto shadow-md hover:shadow-lg transition-all"
+            className="bg-primary text-white gap-2 shadow-md hover:shadow-lg transition-all"
             onClick={openCreateModal}
           >
             <Plus size={16} /> New Rent
@@ -167,8 +178,39 @@ export default function EmployeeRentTable({ mode = 'EMPLOYEE' }: EmployeeRentTab
         )}
       </div>
 
-      <div className="rounded-2xl bg-card shadow-sm overflow-hidden border border-slate-100">
-        <div className="overflow-x-auto">
+      <div className="bg-card rounded-xl p-4 shadow-sm border border-gray-100 flex flex-col md:flex-row gap-4 items-end">
+        <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-4 w-full">
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+              Search Agreements
+            </label>
+            <div className="relative">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-400" />
+              <Input
+                placeholder="Search by customer or invoice..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-9 h-9 text-xs"
+              />
+            </div>
+          </div>
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+              Actions
+            </label>
+            <Button
+              variant="outline"
+              onClick={fetchInvoices}
+              className="h-9 text-xs w-full justify-center gap-2 border-gray-200 hover:bg-gray-50"
+            >
+              Refresh Data
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      <div className="rounded-2xl bg-card shadow-sm overflow-hidden border border-slate-100 p-4">
+        <div className="overflow-x-auto mb-4">
           <Table className="min-w-[800px] sm:min-w-full">
             <TableHeader className="bg-muted/50/50">
               <TableRow>
@@ -191,44 +233,37 @@ export default function EmployeeRentTable({ mode = 'EMPLOYEE' }: EmployeeRentTab
                     </div>
                   </TableCell>
                 </TableRow>
-              ) : invoices.length === 0 ? (
+              ) : paginatedInvoices.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={9} className="h-32 text-center text-muted-foreground">
                     No rent agreements found. Create one to get started.
                   </TableCell>
                 </TableRow>
               ) : (
-                invoices
-                  .filter((inv) =>
-                    search
-                      ? inv.customerName?.toLowerCase().includes(search.toLowerCase()) ||
-                        inv.invoiceNumber?.toLowerCase().includes(search.toLowerCase())
-                      : true,
-                  )
-                  .map((inv) => (
-                    <TableRow key={inv.id} className="hover:bg-muted/50/50">
-                      <TableCell className="font-medium text-slate-700">
-                        {inv.invoiceNumber}
-                      </TableCell>
-                      <TableCell className="font-medium">{inv.customerName}</TableCell>
-                      <TableCell className="max-w-[200px]">
-                        <div className="text-xs font-medium text-slate-700 truncate">
-                          {inv.items
-                            ?.map((item) => getCleanProductName(item.description))
-                            .join(', ') || 'No items'}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-xs text-muted-foreground font-medium">
-                        {inv.startDate ? format(new Date(inv.startDate), 'MMM dd, yyyy') : 'N/A'} -{' '}
-                        {inv.endDate ? format(new Date(inv.endDate), 'MMM dd, yyyy') : 'N/A'}
-                      </TableCell>
-                      <TableCell className="font-bold text-slate-700">
-                        ₹{inv.totalAmount?.toLocaleString()}
-                      </TableCell>
-                      <TableCell>
-                        <Badge
-                          variant="secondary"
-                          className={`rounded-full px-3 py-0.5 text-[10px] font-bold tracking-wider shadow-none
+                paginatedInvoices.map((inv) => (
+                  <TableRow key={inv.id} className="hover:bg-muted/50/50">
+                    <TableCell className="font-medium text-slate-700">
+                      {inv.invoiceNumber}
+                    </TableCell>
+                    <TableCell className="font-medium">{inv.customerName}</TableCell>
+                    <TableCell className="max-w-[200px]">
+                      <div className="text-xs font-medium text-slate-700 truncate">
+                        {inv.items
+                          ?.map((item) => getCleanProductName(item.description))
+                          .join(', ') || 'No items'}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-xs text-muted-foreground font-medium">
+                      {inv.startDate ? format(new Date(inv.startDate), 'MMM dd, yyyy') : 'N/A'} -{' '}
+                      {inv.endDate ? format(new Date(inv.endDate), 'MMM dd, yyyy') : 'N/A'}
+                    </TableCell>
+                    <TableCell className="font-bold text-slate-700">
+                      ₹{inv.totalAmount?.toLocaleString()}
+                    </TableCell>
+                    <TableCell>
+                      <Badge
+                        variant="secondary"
+                        className={`rounded-full px-3 py-0.5 text-[10px] font-bold tracking-wider shadow-none
                             ${
                               inv.status === 'PAID' ||
                               inv.status === 'APPROVED' ||
@@ -241,48 +276,52 @@ export default function EmployeeRentTable({ mode = 'EMPLOYEE' }: EmployeeRentTab
                                     : 'bg-slate-100 text-slate-700 hover:bg-slate-100'
                             }
                           `}
+                      >
+                        {inv.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-xs text-muted-foreground font-medium whitespace-nowrap">
+                      {inv.createdAt ? format(new Date(inv.createdAt), 'MMM dd, yyyy') : 'N/A'}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <div className="flex items-center justify-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-primary hover:text-blue-600 hover:bg-blue-50"
+                          onClick={() => handleViewDetails(inv.id)}
+                          title="View Details"
                         >
-                          {inv.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-xs text-muted-foreground font-medium whitespace-nowrap">
-                        {inv.createdAt ? format(new Date(inv.createdAt), 'MMM dd, yyyy') : 'N/A'}
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <div className="flex items-center justify-center gap-1">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-primary hover:text-blue-600 hover:bg-blue-50"
-                            onClick={() => handleViewDetails(inv.id)}
-                            title="View Details"
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
+                          <Eye className="h-4 w-4" />
+                        </Button>
 
-                          {mode === 'EMPLOYEE' && (
-                            <>
-                              {(inv.status === 'DRAFT' || inv.status === 'SENT') && (
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-8 w-8 text-slate-400 hover:text-orange-600 hover:bg-orange-50"
-                                  onClick={() => openEditModal(inv)}
-                                  title="Edit"
-                                >
-                                  <FileText className="h-4 w-4" />
-                                </Button>
-                              )}
-                            </>
-                          )}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
+                        {mode === 'EMPLOYEE' && (
+                          <>
+                            {(inv.status === 'DRAFT' || inv.status === 'SENT') && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-slate-400 hover:text-orange-600 hover:bg-orange-50"
+                                onClick={() => openEditModal(inv)}
+                                title="Edit"
+                              >
+                                <FileText className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
               )}
             </TableBody>
           </Table>
         </div>
+
+        {totalPages > 1 && (
+          <Pagination page={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
+        )}
 
         {formOpen && (
           <RentFormModal

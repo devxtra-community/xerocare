@@ -3,7 +3,7 @@ import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import DashboardHeader from '@/components/DashboardHeader';
 import FinanceSidebar from '@/components/Finance/financeSidebar';
 
-export default function HRLayout({ children }: { children: React.ReactNode }) {
+export default function FinanceLayout({ children }: { children: React.ReactNode }) {
   return (
     <SidebarProvider>
       <div className="flex min-h-screen w-full">

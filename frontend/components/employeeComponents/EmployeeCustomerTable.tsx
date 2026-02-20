@@ -13,8 +13,9 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Customer } from '@/lib/customer';
+import Pagination from '@/components/Pagination';
 import {
+  Customer,
   getCustomers,
   createCustomer,
   updateCustomer,
@@ -59,6 +60,17 @@ export default function EmployeeCustomerTable() {
       c.id.toLowerCase().includes(searchTerm.toLowerCase()),
   );
 
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 10;
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
+
+  const totalPages = Math.ceil(filteredCustomers.length / ITEMS_PER_PAGE);
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  const paginatedCustomers = filteredCustomers.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+
   const handleAddCustomer = () => {
     setSelectedCustomer(null);
     setDialogOpen(true);
@@ -102,8 +114,6 @@ export default function EmployeeCustomerTable() {
         await createCustomer(payload);
         toast.success('Customer created successfully');
       }
-      // fetchCustomers(); // Moved outside to let dialog close first if desired, or keep here.
-      // Dialog closes in FormDialog after await. State update happens here.
       fetchCustomers();
     } catch (error) {
       console.error(error);
@@ -113,44 +123,55 @@ export default function EmployeeCustomerTable() {
 
   return (
     <div className="space-y-4">
-      {/* Search and Filter Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="flex justify-between items-center">
         <div className="flex items-center gap-3">
-          <h3 className="text-lg font-semibold text-primary">All Customers</h3>
-          <span className="px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-600 text-xs font-medium">
+          <h2 className="text-xl font-bold text-primary">Customer Management</h2>
+          <span className="px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-600 text-[10px] font-bold uppercase tracking-wider">
             {customers.length} Total
           </span>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-            <Input
-              placeholder="Search customers..."
-              className="pl-9 h-10 bg-card border-blue-400/60 focus:border-blue-400 focus:ring-4 focus:ring-blue-100 outline-none shadow-sm transition-all w-full md:w-[250px]"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
+        <Button
+          onClick={handleAddCustomer}
+          className="h-10 rounded-lg bg-primary hover:bg-primary/90 text-white shadow-md gap-2"
+        >
+          <Plus className="h-4 w-4" /> Add Customer
+        </Button>
+      </div>
+
+      <div className="bg-card rounded-xl p-4 shadow-sm border border-gray-100 flex flex-col md:flex-row gap-4 items-end">
+        <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4 w-full">
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+              Search Customers
+            </label>
+            <div className="relative">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-400" />
+              <Input
+                placeholder="Search by name or ID..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-9 h-9 text-xs"
+              />
+            </div>
           </div>
-          <Button
-            variant="outline"
-            className="h-10 rounded-lg border-blue-400/60 hover:bg-blue-50 text-primary"
-            onClick={fetchCustomers}
-          >
-            Refresh
-          </Button>
-          <Button
-            onClick={handleAddCustomer}
-            className="h-10 rounded-lg bg-primary hover:bg-primary/90 text-white shadow-md"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Add Customer
-          </Button>
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+              Actions
+            </label>
+            <Button
+              variant="outline"
+              onClick={fetchCustomers}
+              className="h-9 text-xs w-full justify-center gap-2 border-gray-200 hover:bg-gray-50"
+            >
+              Refresh Data
+            </Button>
+          </div>
         </div>
       </div>
 
       {/* Table Container */}
-      <div className="rounded-2xl bg-card shadow-sm overflow-hidden border">
-        <div className="overflow-x-auto">
+      <div className="rounded-2xl bg-card shadow-sm overflow-hidden border p-4">
+        <div className="overflow-x-auto mb-4">
           <Table>
             <TableHeader>
               <TableRow className="bg-muted/50">
@@ -173,14 +194,14 @@ export default function EmployeeCustomerTable() {
                     Loading...
                   </TableCell>
                 </TableRow>
-              ) : filteredCustomers.length === 0 ? (
+              ) : paginatedCustomers.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
                     No customers found.
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredCustomers.map((customer, index) => (
+                paginatedCustomers.map((customer, index) => (
                   <TableRow key={customer.id} className={index % 2 ? 'bg-blue-50/20' : 'bg-card'}>
                     <TableCell>
                       <div className="flex items-center gap-3">
@@ -246,29 +267,9 @@ export default function EmployeeCustomerTable() {
           </Table>
         </div>
 
-        {/* Pagination Footer - Static for now - Matched with Container style */}
-        <div className="p-4 border-t border-gray-100 bg-muted/50/50 flex items-center justify-between">
-          <p className="text-xs text-muted-foreground">
-            Showing 1-{filteredCustomers.length} of {customers.length}
-          </p>
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              disabled
-              className="h-8 text-xs border-blue-200 hover:bg-card hover:text-primary"
-            >
-              Previous
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-8 text-xs border-blue-200 hover:bg-card hover:text-primary"
-            >
-              Next
-            </Button>
-          </div>
-        </div>
+        {totalPages > 1 && (
+          <Pagination page={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
+        )}
       </div>
 
       <CustomerFormDialog

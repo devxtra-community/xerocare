@@ -191,7 +191,7 @@ export default function EmployeeDashboardGraphs() {
                 />
                 <Bar
                   dataKey="value"
-                  fill={chart.type === 'customers' ? '#3b82f6' : '#2563eb'}
+                  fill={chart.type === 'customers' ? 'var(--primary)' : 'var(--primary)'}
                   radius={[4, 4, 0, 0]}
                   barSize={10}
                 />

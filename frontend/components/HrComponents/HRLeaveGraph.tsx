@@ -77,10 +77,10 @@ export default function HRLeaveGraph() {
             <Line
               type="monotone"
               dataKey="leaves"
-              stroke="#2563eb"
+              stroke="var(--primary)"
               strokeWidth={3}
-              dot={{ r: 4, fill: '#2563eb', strokeWidth: 2, stroke: '#fff' }}
-              activeDot={{ r: 6, fill: '#2563eb', strokeWidth: 0 }}
+              dot={{ r: 4, fill: 'var(--primary)', strokeWidth: 2, stroke: '#fff' }}
+              activeDot={{ r: 6, fill: 'var(--primary)', strokeWidth: 0 }}
             />
           </LineChart>
         </ResponsiveContainer>

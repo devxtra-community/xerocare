@@ -63,8 +63,8 @@ export default function InventoryChart() {
           <AreaChart data={data} margin={{ top: 10, left: 0, right: 10, bottom: 0 }}>
             <defs>
               <linearGradient id="stockInGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#2563eb" stopOpacity={0.2} />
-                <stop offset="95%" stopColor="#2563eb" stopOpacity={0} />
+                <stop offset="5%" stopColor="var(--primary)" stopOpacity={0.2} />
+                <stop offset="95%" stopColor="var(--primary)" stopOpacity={0} />
               </linearGradient>
               <linearGradient id="stockOutGradient" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="5%" stopColor="#93c5fd" stopOpacity={0.2} />
@@ -100,7 +100,7 @@ export default function InventoryChart() {
             <Area
               type="monotone"
               dataKey="stockIn"
-              stroke="#2563eb"
+              stroke="var(--primary)"
               strokeWidth={2}
               fillOpacity={1}
               fill="url(#stockInGradient)"

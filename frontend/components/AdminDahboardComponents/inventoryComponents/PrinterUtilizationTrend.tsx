@@ -52,8 +52,8 @@ export default function PrinterUtilizationTrend() {
           >
             <defs>
               <linearGradient id="colorActive" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#2563eb" stopOpacity={0.2} />
-                <stop offset="95%" stopColor="#2563eb" stopOpacity={0} />
+                <stop offset="5%" stopColor="var(--primary)" stopOpacity={0.2} />
+                <stop offset="95%" stopColor="var(--primary)" stopOpacity={0} />
               </linearGradient>
             </defs>
             <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="#f3f4f6" />
@@ -76,7 +76,7 @@ export default function PrinterUtilizationTrend() {
             <Area
               type="monotone"
               dataKey="active"
-              stroke="#2563eb"
+              stroke="var(--primary)"
               fillOpacity={1}
               fill="url(#colorActive)"
               strokeWidth={2}

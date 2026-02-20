@@ -7,28 +7,33 @@ import { Wallet, ArrowUpRight } from 'lucide-react';
 import RevenueBreakdownChart from '@/components/Finance/RevenueBreakdownChart';
 import DailyRevenueChart from '@/components/Finance/DailyRevenueChart';
 import RevenueTable from '@/components/Finance/RevenueTable';
+import { YearSelector } from '@/components/ui/YearSelector';
 
 export default function FinanceDashboard() {
+  const [selectedYear, setSelectedYear] = React.useState<number | 'all'>(new Date().getFullYear());
   return (
     <div className="bg-muted min-h-full p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6">
       {/* HEADER */}
       <header className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-primary">Finance Dashboard</h1>
-          <p className="text-sm text-muted-foreground">
-            {new Date().toLocaleDateString('en-US', {
-              weekday: 'long',
-              month: 'short',
-              day: 'numeric',
-              year: 'numeric',
-            })}{' '}
-            • Performance Overview
-          </p>
+        <div className="flex flex-row items-center justify-between">
+          <div>
+            <h1 className="text-xl sm:text-2xl font-bold text-primary">Finance Dashboard</h1>
+            <p className="text-sm text-muted-foreground">
+              {new Date().toLocaleDateString('en-US', {
+                weekday: 'long',
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric',
+              })}{' '}
+              • Performance Overview
+            </p>
+          </div>
+          <YearSelector selectedYear={selectedYear} onYearChange={setSelectedYear} />
         </div>
       </header>
 
       {/* KPI STRIP */}
-      <KPIStats />
+      <KPIStats selectedYear={selectedYear} />
 
       {/* PRIMARY ANALYTICS */}
       <section className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
@@ -38,7 +43,7 @@ export default function FinanceDashboard() {
             <h3 className="text-base font-bold text-primary">Monthly Revenue</h3>
           </div>
           <div className="p-4">
-            <RevenueBreakdownChart />
+            <RevenueBreakdownChart selectedYear={selectedYear} />
           </div>
         </div>
 
@@ -48,7 +53,7 @@ export default function FinanceDashboard() {
             <h3 className="text-base font-bold text-primary">Daily Revenue</h3>
           </div>
           <div className="p-4">
-            <DailyRevenueChart />
+            <DailyRevenueChart selectedYear={selectedYear} onYearChange={setSelectedYear} />
           </div>
         </div>
       </section>
@@ -64,7 +69,7 @@ export default function FinanceDashboard() {
 import { getGlobalSalesTotals } from '@/lib/invoice';
 import { Loader2 } from 'lucide-react';
 
-function KPIStats() {
+function KPIStats({ selectedYear }: { selectedYear: number | 'all' }) {
   const [loading, setLoading] = React.useState(true);
   const [data, setData] = React.useState({
     totalSales: 0,
@@ -74,7 +79,9 @@ function KPIStats() {
   React.useEffect(() => {
     const fetchData = async () => {
       try {
-        const result = await getGlobalSalesTotals();
+        const result = await getGlobalSalesTotals(
+          selectedYear === 'all' ? undefined : selectedYear,
+        );
         setData(result);
       } catch (error) {
         console.error('Failed to fetch finance stats:', error);
@@ -83,7 +90,7 @@ function KPIStats() {
       }
     };
     fetchData();
-  }, []);
+  }, [selectedYear]);
 
   const formatCurrency = (amount: number) => {
     if (amount >= 1000) {

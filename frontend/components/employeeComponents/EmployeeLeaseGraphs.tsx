@@ -153,7 +153,7 @@ export default function EmployeeLeaseGraphs({ invoices: propInvoices }: Employee
                 content={<ChartTooltipContent />}
                 cursor={{ fill: '#f1f5f9', opacity: 0.4 }}
               />
-              <Bar dataKey="count" fill="#2563eb" radius={[4, 4, 0, 0]} barSize={10} />
+              <Bar dataKey="count" fill="var(--primary)" radius={[4, 4, 0, 0]} barSize={10} />
             </BarChart>
           </ResponsiveContainer>
         </ChartCard>

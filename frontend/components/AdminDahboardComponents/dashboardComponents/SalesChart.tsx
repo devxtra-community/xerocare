@@ -11,6 +11,7 @@ import {
 } from 'recharts';
 import { getGlobalSalesOverview } from '@/lib/invoice';
 import { ChartTooltipContent } from '@/components/ui/ChartTooltip';
+import { YearSelector } from '@/components/ui/YearSelector';
 
 // Utility function to format numbers in compact format (k, M, B)
 function formatCompactNumber(num: number): string {
@@ -33,8 +34,21 @@ interface SalesDataPoint {
   LEASE: number;
 }
 
-export default function SalesChart() {
+interface SalesChartProps {
+  selectedYear?: number | 'all';
+  onYearChange?: (year: number | 'all') => void;
+}
+
+export default function SalesChart({
+  selectedYear: externalYear,
+  onYearChange: onExternalYearChange,
+}: SalesChartProps) {
   const [selectedPeriod, setSelectedPeriod] = useState('1Y');
+  const [internalYear, setInternalYear] = useState<number | 'all'>(new Date().getFullYear());
+
+  const selectedYear = externalYear !== undefined ? externalYear : internalYear;
+  const onYearChange = onExternalYearChange || setInternalYear;
+
   const [isClient, setIsClient] = useState(false);
   const [data, setData] = useState<SalesDataPoint[]>([]);
 
@@ -45,7 +59,10 @@ export default function SalesChart() {
   useEffect(() => {
     const fetchSalesData = async () => {
       try {
-        const trendData = await getGlobalSalesOverview(selectedPeriod);
+        const trendData = await getGlobalSalesOverview(
+          selectedPeriod,
+          selectedYear === 'all' ? undefined : selectedYear,
+        );
 
         // Group by month
         const monthlyMap: Record<string, SalesDataPoint> = {
@@ -93,29 +110,32 @@ export default function SalesChart() {
       }
     };
     fetchSalesData();
-  }, [selectedPeriod]);
+  }, [selectedPeriod, selectedYear]);
 
   return (
     <div className="rounded-2xl bg-card h-[260px] w-full shadow-sm flex flex-col p-3">
       <div className="flex flex-row items-center justify-between pb-2">
         <p className="text-xs text-gray-600 font-medium">
-          Global Sales Overview ({new Date().getFullYear()})
+          Global Sales Overview ({selectedYear === 'all' ? 'All Time' : selectedYear})
         </p>
 
-        <div className="flex gap-1.5 text-[10px]">
-          {['1W', '1M', '3M', '1Y'].map((period) => (
-            <button
-              key={period}
-              onClick={() => setSelectedPeriod(period)}
-              className={`px-2 py-0.5 rounded-md transition-colors ${
-                selectedPeriod === period
-                  ? 'bg-primary text-white font-medium'
-                  : 'text-gray-600 hover:bg-gray-100'
-              }`}
-            >
-              {period}
-            </button>
-          ))}
+        <div className="flex items-center gap-3">
+          <YearSelector selectedYear={selectedYear} onYearChange={onYearChange} />
+          <div className="flex gap-1.5 text-[10px]">
+            {['1W', '1M', '3M', '1Y'].map((period) => (
+              <button
+                key={period}
+                onClick={() => setSelectedPeriod(period)}
+                className={`px-2 py-0.5 rounded-md transition-colors ${
+                  selectedPeriod === period
+                    ? 'bg-primary text-white font-medium'
+                    : 'text-gray-600 hover:bg-gray-100'
+                }`}
+              >
+                {period}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -160,6 +180,9 @@ export default function SalesChart() {
                 content={
                   <ChartTooltipContent
                     showTotal
+                    labelFormatter={(label) =>
+                      `${label} ${selectedYear === 'all' ? '' : selectedYear}`
+                    }
                     valueFormatter={(v) => `${formatCompactNumber(Number(v))} AED`}
                   />
                 }

@@ -41,8 +41,8 @@ export default function EmployeeSalesGraph() {
           >
             <defs>
               <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#2563eb" stopOpacity={0.8} />
-                <stop offset="95%" stopColor="#2563eb" stopOpacity={0} />
+                <stop offset="5%" stopColor="var(--primary)" stopOpacity={0.8} />
+                <stop offset="95%" stopColor="var(--primary)" stopOpacity={0} />
               </linearGradient>
               <linearGradient id="colorRent" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="5%" stopColor="#60a5fa" stopOpacity={0.8} />
@@ -76,7 +76,7 @@ export default function EmployeeSalesGraph() {
               type="monotone"
               dataKey="sales"
               stackId="1"
-              stroke="#2563eb"
+              stroke="var(--primary)"
               fill="url(#colorSales)"
               strokeWidth={2}
             />

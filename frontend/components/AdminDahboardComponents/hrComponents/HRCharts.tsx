@@ -40,7 +40,7 @@ export default function HRCharts() {
             { name: 'HR', value: stats.byRole.HR || 0, color: '#334155' }, // Slate-700
             { name: 'MANAGER', value: stats.byRole.MANAGER || 0, color: '#475569' }, // Slate-600
             { name: 'FINANCE', value: stats.byRole.FINANCE || 0, color: '#0D9488' }, // Teal-600
-            { name: 'EMPLOYEE', value: stats.byRole.EMPLOYEE || 0, color: '#2563EB' }, // Blue-600
+            { name: 'EMPLOYEE', value: stats.byRole.EMPLOYEE || 0, color: 'var(--primary)' }, // Red-600
           ].filter((item) => item.value > 0);
 
           setRoleData(formatted);

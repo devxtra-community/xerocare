@@ -10,6 +10,7 @@ import {
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Eye, Edit2 } from 'lucide-react';
+import Pagination from '@/components/Pagination';
 
 const masterData = [
   {
@@ -72,7 +73,7 @@ const masterData = [
  */
 export default function InventoryMasterTable() {
   const [page, setPage] = useState(1);
-  const ITEMS_PER_PAGE = 5;
+  const ITEMS_PER_PAGE = 10;
   const totalPages = Math.ceil(masterData.length / ITEMS_PER_PAGE);
   const startIndex = (page - 1) * ITEMS_PER_PAGE;
   const currentData = masterData.slice(startIndex, startIndex + ITEMS_PER_PAGE);
@@ -156,24 +157,8 @@ export default function InventoryMasterTable() {
         </Table>
       </div>
 
-      <div className="mt-2 sm:mt-3 flex items-center justify-center gap-1 sm:gap-1.5 text-[10px] sm:text-xs flex-shrink-0">
-        <button
-          onClick={() => setPage((p) => Math.max(1, p - 1))}
-          disabled={page === 1}
-          className="rounded-md border px-1.5 sm:px-2 py-0.5 disabled:opacity-40 hover:bg-muted/50 transition"
-        >
-          &lt;
-        </button>
-        <span className="text-muted-foreground">
-          Page {page} of {totalPages}
-        </span>
-        <button
-          onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-          disabled={page === totalPages}
-          className="rounded-md border px-1.5 sm:px-2 py-0.5 disabled:opacity-40 hover:bg-muted/50 transition"
-        >
-          &gt;
-        </button>
+      <div className="mt-4">
+        <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
       </div>
     </div>
   );

@@ -39,7 +39,7 @@ export const ChartTooltipContent = ({
               <span className="text-[11px] font-bold text-gray-400 uppercase tracking-tighter">
                 {entry.name}:
               </span>
-              <span className="text-[#2563eb] font-bold text-[11px]">
+              <span className="text-[var(--primary)] font-bold text-[11px]">
                 {valueFormatter && entry.value !== undefined
                   ? valueFormatter(entry.value)
                   : entry.value}

@@ -50,12 +50,7 @@ export default function HRAttendanceGraph() {
       <div className="flex-1 w-full min-h-0 pt-4">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={data} margin={{ top: 5, right: 20, left: -20, bottom: 5 }}>
-            <CartesianGrid
-              strokeDasharray="3 3"
-              vertical={false}
-              stroke="#e2e8f0"
-              strokeOpacity={0.5}
-            />
+            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--chart-grid)" />
             <XAxis
               dataKey="day"
               tick={{ fill: '#94a3b8', fontSize: 9, fontWeight: 700 }}
@@ -64,7 +59,7 @@ export default function HRAttendanceGraph() {
               dy={10}
             />
             <YAxis
-              tick={{ fill: '#94a3b8', fontSize: 9, fontWeight: 700 }}
+              tick={{ fill: 'var(--chart-slate)', fontSize: 9, fontWeight: 700 }}
               axisLine={false}
               tickLine={false}
             />
@@ -79,10 +74,10 @@ export default function HRAttendanceGraph() {
             <Line
               type="monotone"
               dataKey="present"
-              stroke="#2563eb"
+              stroke="var(--chart-blue)"
               strokeWidth={3}
-              dot={{ r: 4, fill: '#2563eb', strokeWidth: 2, stroke: '#fff' }}
-              activeDot={{ r: 6, fill: '#2563eb', strokeWidth: 0 }}
+              dot={{ r: 4, fill: 'var(--chart-blue)', strokeWidth: 2, stroke: '#fff' }}
+              activeDot={{ r: 6, fill: 'var(--chart-blue)', strokeWidth: 0 }}
             />
           </LineChart>
         </ResponsiveContainer>

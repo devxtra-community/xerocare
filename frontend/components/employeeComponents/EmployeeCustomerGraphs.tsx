@@ -143,7 +143,7 @@ export default function EmployeeCustomerGraphs() {
               tick={{ fill: '#94a3b8', fontSize: 9, fontWeight: 700 }}
             />
             <Tooltip content={<ChartTooltipContent />} cursor={{ fill: '#f1f5f9', opacity: 0.4 }} />
-            <Bar dataKey="customers" fill="#2563eb" radius={[4, 4, 0, 0]} barSize={10} />
+            <Bar dataKey="customers" fill="var(--primary)" radius={[4, 4, 0, 0]} barSize={10} />
           </BarChart>
         </ResponsiveContainer>
       </ChartCard>
@@ -176,15 +176,15 @@ export default function EmployeeCustomerGraphs() {
             />
             <Tooltip
               content={<ChartTooltipContent />}
-              cursor={{ stroke: '#2563eb', strokeWidth: 1, strokeDasharray: '4 4' }}
+              cursor={{ stroke: 'var(--primary)', strokeWidth: 1, strokeDasharray: '4 4' }}
             />
             <Line
               type="monotone"
               dataKey="customers"
-              stroke="#2563eb"
+              stroke="var(--primary)"
               strokeWidth={2}
-              dot={{ r: 3, fill: '#2563eb', strokeWidth: 2, stroke: '#fff' }}
-              activeDot={{ r: 6, fill: '#2563eb', stroke: '#fff', strokeWidth: 2 }}
+              dot={{ r: 3, fill: 'var(--primary)', strokeWidth: 2, stroke: '#fff' }}
+              activeDot={{ r: 6, fill: 'var(--primary)', stroke: '#fff', strokeWidth: 2 }}
             />
           </LineChart>
         </ResponsiveContainer>

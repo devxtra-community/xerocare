@@ -12,6 +12,8 @@ import SalesChart from '@/components/AdminDahboardComponents/dashboardComponents
 import EmployeePieChart from '@/components/AdminDahboardComponents/dashboardComponents/employeesPiechart';
 import WarehouseTable from '@/components/AdminDahboardComponents/dashboardComponents/WarehouseTable';
 import CategoryPieChart from '@/components/AdminDahboardComponents/dashboardComponents/CategoryPieChart';
+import DashboardPage from '@/components/DashboardPage';
+import { YearSelector } from '@/components/ui/YearSelector';
 
 // Utility function to format numbers in compact format (k, M, B)
 function formatCompactNumber(num: number): string {
@@ -28,6 +30,7 @@ function formatCompactNumber(num: number): string {
 }
 
 export default function Dashboard() {
+  const [selectedYear, setSelectedYear] = useState<number | 'all'>(new Date().getFullYear());
   const [stats, setStats] = useState({
     earnings: '0.00',
     branchCount: '0',
@@ -39,7 +42,9 @@ export default function Dashboard() {
     const fetchStats = async () => {
       // Fetch each stat independently to be resilient
       try {
-        const salesTotalsPromise = getGlobalSalesTotals().catch((err) => {
+        const salesTotalsPromise = getGlobalSalesTotals(
+          selectedYear === 'all' ? undefined : (selectedYear as number),
+        ).catch((err) => {
           console.error('Failed to fetch sales totals:', err);
           return null;
         });
@@ -81,16 +86,15 @@ export default function Dashboard() {
       }
     };
     fetchStats();
-  }, []);
+  }, [selectedYear]);
 
   return (
-    <div className="bg-blue-100 min-h-screen p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6">
-      {/* <h3 className="text-xl sm:text-2xl md:text-2xl font-bold text-primary">
-        Welcome, Riyas!
-      </h3> */}
-
+    <DashboardPage>
       <div className="flex flex-col space-y-3 sm:space-y-4">
-        <h3 className="text-lg sm:text-m font-bold text-primary">Admin Dashboard</h3>
+        <div className="flex flex-row items-center justify-between">
+          <h3 className="text-lg sm:text-m font-bold text-primary">Admin Dashboard</h3>
+          <YearSelector selectedYear={selectedYear} onYearChange={setSelectedYear} />
+        </div>
 
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 md:gap-4">
           <StatCard title="Total Earnings" value={stats.earnings} subtitle="All branches" />
@@ -108,7 +112,7 @@ export default function Dashboard() {
             <h3 className="text-base sm:text-lg md:text-xl font-bold text-primary">
               Sales Overview
             </h3>
-            <SalesChart />
+            <SalesChart selectedYear={selectedYear} onYearChange={setSelectedYear} />
           </div>
         </div>
       </div>
@@ -138,6 +142,6 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
-    </div>
+    </DashboardPage>
   );
 }

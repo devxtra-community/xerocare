@@ -59,7 +59,7 @@ export default function EmployeeLeadsGraph() {
               }}
             />
             <Legend verticalAlign="top" height={36} />
-            <Bar dataKey="website" fill="#2563eb" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="website" fill="var(--primary)" radius={[4, 4, 0, 0]} />
             <Bar dataKey="whatsapp" fill="#60a5fa" radius={[4, 4, 0, 0]} />
             <Bar dataKey="instagram" fill="#93c5fd" radius={[4, 4, 0, 0]} />
           </BarChart>

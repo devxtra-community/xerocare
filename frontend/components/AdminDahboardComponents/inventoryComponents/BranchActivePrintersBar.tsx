@@ -76,7 +76,7 @@ export default function BranchActivePrintersBar() {
             />
             <Bar dataKey="active" radius={[0, 4, 4, 0]}>
               {data.map((entry, index) => (
-                <Cell key={`cell-${index}`} fill="#2563eb" />
+                <Cell key={`cell-${index}`} fill="var(--primary)" />
               ))}
             </Bar>
           </BarChart>

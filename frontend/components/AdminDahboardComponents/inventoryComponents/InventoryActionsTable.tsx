@@ -1,5 +1,4 @@
-'use client';
-
+import { useState } from 'react';
 import {
   Table,
   TableBody,
@@ -8,6 +7,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import Pagination from '@/components/Pagination';
 
 const data = [
   {
@@ -50,8 +50,15 @@ const data = [
  * Monitors operational activities related to inventory assets.
  */
 export default function InventoryActionsTable() {
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 10;
+
+  const totalPages = Math.ceil(data.length / ITEMS_PER_PAGE);
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  const currentData = data.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+
   return (
-    <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
+    <div className="rounded-xl border bg-card shadow-sm overflow-hidden p-4">
       <Table>
         <TableHeader>
           <TableRow className="bg-muted/50/50 hover:bg-muted/50/50">
@@ -64,7 +71,7 @@ export default function InventoryActionsTable() {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {data.map((item, idx) => (
+          {currentData.map((item, idx) => (
             <TableRow
               key={idx}
               className={`hover:bg-muted/50/50 ${idx % 2 !== 0 ? 'bg-blue-50/20' : 'bg-card'}`}
@@ -95,6 +102,11 @@ export default function InventoryActionsTable() {
           ))}
         </TableBody>
       </Table>
+      {totalPages > 1 && (
+        <div className="mt-4">
+          <Pagination page={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
+        </div>
+      )}
     </div>
   );
 }

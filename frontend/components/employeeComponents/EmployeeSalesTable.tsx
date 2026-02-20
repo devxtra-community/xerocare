@@ -39,6 +39,7 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
+import Pagination from '@/components/Pagination';
 import { InvoiceDetailsDialog } from '../invoice/InvoiceDetailsDialog';
 
 interface EmployeeSalesTableProps {
@@ -57,6 +58,13 @@ export default function EmployeeSalesTable({ mode = 'EMPLOYEE' }: EmployeeSalesT
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [search, setSearch] = useState('');
   const [filterType, setFilterType] = useState<string>('All');
+
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 10;
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, filterType]);
 
   // New state for Finance Approval Dialog
 
@@ -111,6 +119,10 @@ export default function EmployeeSalesTable({ mode = 'EMPLOYEE' }: EmployeeSalesT
       return matchesSearch && matchesFilter;
     });
 
+  const totalPages = Math.ceil(filteredInvoices.length / ITEMS_PER_PAGE);
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  const paginatedInvoices = filteredInvoices.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+
   const handleCreate = async (data: CreateInvoicePayload) => {
     try {
       const newInvoice = await createInvoice(data);
@@ -163,32 +175,11 @@ export default function EmployeeSalesTable({ mode = 'EMPLOYEE' }: EmployeeSalesT
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
-        <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto flex-1">
-          <div className="relative w-full sm:w-[300px]">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-            <Input
-              placeholder="Search by invoice #, customer or items..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-9 h-10 bg-card border-blue-400/60 focus:border-blue-400 focus:ring-4 focus:ring-blue-100 outline-none shadow-sm transition-all w-full"
-            />
-          </div>
-          <div className="w-full sm:w-[150px]">
-            <Select value={filterType} onValueChange={setFilterType}>
-              <SelectTrigger className="h-10 bg-card border-blue-400/60 focus:ring-blue-100 rounded-lg w-full">
-                <SelectValue placeholder="Filter by" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="All">All Types</SelectItem>
-                <SelectItem value="SALE">Sale</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
+      <div className="flex justify-between items-center">
+        <h2 className="text-xl font-bold text-primary">Sales Management</h2>
         {mode === 'EMPLOYEE' && (
           <Button
-            className="bg-primary text-white gap-2 w-full sm:w-auto mt-2 sm:mt-0 shadow-md hover:shadow-lg transition-all"
+            className="bg-primary text-white gap-2 shadow-md hover:shadow-lg transition-all"
             onClick={() => {
               setFormOpen(true);
             }}
@@ -198,8 +189,53 @@ export default function EmployeeSalesTable({ mode = 'EMPLOYEE' }: EmployeeSalesT
         )}
       </div>
 
-      <div className="rounded-2xl bg-card shadow-sm overflow-hidden border border-slate-100">
-        <div className="overflow-x-auto">
+      <div className="bg-card rounded-xl p-4 shadow-sm border border-gray-100 flex flex-col md:flex-row gap-4 items-end">
+        <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-4 w-full">
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+              Search Sales
+            </label>
+            <div className="relative">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-400" />
+              <Input
+                placeholder="Search by invoice, customer..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-9 h-9 text-xs"
+              />
+            </div>
+          </div>
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+              Filter by Type
+            </label>
+            <Select value={filterType} onValueChange={setFilterType}>
+              <SelectTrigger className="h-9 text-xs w-full bg-background border-gray-200">
+                <SelectValue placeholder="All Types" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="All">All Types</SelectItem>
+                <SelectItem value="SALE">Sale</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+              Actions
+            </label>
+            <Button
+              variant="outline"
+              onClick={fetchInvoices}
+              className="h-9 text-xs w-full justify-center gap-2 border-gray-200 hover:bg-gray-50"
+            >
+              Refresh Data
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      <div className="rounded-2xl bg-card shadow-sm overflow-hidden border border-slate-100 p-4">
+        <div className="overflow-x-auto mb-4">
           <Table className="min-w-[800px] sm:min-w-full">
             <TableHeader className="bg-muted/50/50">
               <TableRow>
@@ -214,7 +250,7 @@ export default function EmployeeSalesTable({ mode = 'EMPLOYEE' }: EmployeeSalesT
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredInvoices.length === 0 ? (
+              {paginatedInvoices.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={8} className="text-center py-12 text-muted-foreground">
                     <FileText className="h-10 w-10 mx-auto mb-2 opacity-20" />
@@ -222,7 +258,7 @@ export default function EmployeeSalesTable({ mode = 'EMPLOYEE' }: EmployeeSalesT
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredInvoices.map((inv, index) => (
+                paginatedInvoices.map((inv, index) => (
                   <TableRow
                     key={inv.id}
                     className={`${index % 2 ? 'bg-blue-50/10' : 'bg-card'} hover:bg-muted/50 transition-colors`}
@@ -301,6 +337,9 @@ export default function EmployeeSalesTable({ mode = 'EMPLOYEE' }: EmployeeSalesT
             </TableBody>
           </Table>
         </div>
+        {totalPages > 1 && (
+          <Pagination page={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
+        )}
       </div>
 
       {formOpen && <SaleFormModal onClose={() => setFormOpen(false)} onConfirm={handleCreate} />}

@@ -12,6 +12,7 @@ import {
 import { useEffect, useState } from 'react';
 import api from '@/lib/api';
 import { Product } from '@/lib/product';
+import Pagination from '@/components/Pagination';
 
 interface InventoryItem {
   id: string;
@@ -39,21 +40,17 @@ interface InventoryResponse {
 export default function InventoryTable() {
   const [data, setData] = useState<InventoryItem[]>([]);
 
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 10;
+
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // Fetch inventory items, assuming we want to see general stock not just critical
-        // Filtering for critical stock could be done here or via backend query
         const res = await api.get<InventoryResponse>(`/i/inventory?limit=50`);
         if (res.data.success) {
-          // Filter for low stock for this specific "Critical Stock" view if desired,
-          // but usually users want to see everything unless specified.
-          // The mock was "Critical Stock Alerts", so let's filter for quantity < 20 (arbitrary threshold)
-          // or just show all sorted by quantity.
-          // For now showing all to ensure data visibility.
           const allItems = res.data.data;
-          const lowStockItems = allItems.filter((item) => item.quantity < 20); // Example logic
-          setData(lowStockItems.length > 0 ? lowStockItems : allItems); // Fallback to all if no low stock
+          const lowStockItems = allItems.filter((item) => item.quantity < 20);
+          setData(lowStockItems.length > 0 ? lowStockItems : allItems);
         }
       } catch (error) {
         console.error(error);
@@ -62,9 +59,13 @@ export default function InventoryTable() {
     fetchData();
   }, []);
 
+  const totalPages = Math.ceil(data.length / ITEMS_PER_PAGE);
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  const currentData = data.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+
   return (
-    <div className="rounded-2xl border bg-card shadow-sm overflow-hidden">
-      <div className="p-4 border-b bg-muted/50/50">
+    <div className="rounded-2xl border bg-card shadow-sm overflow-hidden p-4">
+      <div className="pb-4 border-b bg-muted/50/50 mb-4">
         <h3 className="font-semibold text-lg">Critical Stock Alerts</h3>
         <p className="text-xs text-muted-foreground">
           Items requiring immediate attention (Stock &lt; 20)
@@ -85,7 +86,7 @@ export default function InventoryTable() {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {data.map((item) => (
+          {currentData.map((item) => (
             <TableRow key={item.id} className="hover:bg-muted/50/50">
               <TableCell className="font-medium text-foreground">{item.product.name}</TableCell>
               <TableCell className="text-gray-600 truncate max-w-[150px]" title={item.warehouseId}>
@@ -113,7 +114,7 @@ export default function InventoryTable() {
               </TableCell>
             </TableRow>
           ))}
-          {data.length === 0 && (
+          {currentData.length === 0 && (
             <TableRow>
               <TableCell colSpan={5} className="text-center py-4 text-muted-foreground">
                 No inventory items found
@@ -122,6 +123,11 @@ export default function InventoryTable() {
           )}
         </TableBody>
       </Table>
+      {totalPages > 1 && (
+        <div className="mt-4">
+          <Pagination page={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
+        </div>
+      )}
     </div>
   );
 }
