@@ -282,7 +282,7 @@ export default function EmployeeOrdersTable({
                       {getTotalQuantity(invoice.items)}
                     </TableCell>
                     <TableCell className="font-bold text-primary whitespace-nowrap">
-                      ₹{invoice.totalAmount.toLocaleString('en-IN')}
+                      QAR {invoice.totalAmount.toLocaleString()}
                     </TableCell>
                     <TableCell>
                       <span

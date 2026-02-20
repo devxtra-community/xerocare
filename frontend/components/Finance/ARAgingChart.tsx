@@ -3,6 +3,7 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import Link from 'next/link';
+import { formatCurrency } from '@/lib/format';
 
 const agingData = [
   { bucket: 'Current', amount: 42000, color: 'bg-emerald-500', percentage: 55 },
@@ -29,13 +30,11 @@ export default function ARAgingChart() {
               <CardTitle className="text-sm font-medium text-muted-foreground uppercase">
                 Receivables Risk
               </CardTitle>
-              <p className="text-2xl font-bold">AED {totalAR.toLocaleString()}</p>
+              <p className="text-2xl font-bold">{formatCurrency(totalAR)}</p>
             </div>
             <div className="text-right">
               <p className="text-xs font-bold text-rose-600">OVERDUE</p>
-              <p className="text-lg font-bold text-slate-700">
-                AED {overdueTotal.toLocaleString()}
-              </p>
+              <p className="text-lg font-bold text-slate-700">{formatCurrency(overdueTotal)}</p>
             </div>
           </div>
         </CardHeader>
@@ -48,7 +47,7 @@ export default function ARAgingChart() {
                   key={item.bucket}
                   style={{ width: `${item.percentage}%` }}
                   className={`${item.color} h-full transition-all hover:opacity-80 cursor-help`}
-                  title={`${item.bucket}: AED ${item.amount.toLocaleString()}`}
+                  title={`${item.bucket}: ${formatCurrency(item.amount)}`}
                 />
               ))}
             </div>
@@ -63,7 +62,7 @@ export default function ARAgingChart() {
                   </div>
                   <div className="flex items-center gap-4">
                     <span className="text-sm font-bold text-foreground tabular-nums">
-                      AED {item.amount.toLocaleString()}
+                      {formatCurrency(item.amount)}
                     </span>
                     <span className="text-xs text-slate-400 w-8 text-right">
                       {item.percentage}%

@@ -33,7 +33,7 @@ export default function EmployeeProfilePage() {
     address: '45, Skyline Apartments, Hitech City, Hyderabad - 500081',
     joiningDate: '15 Jan 2023',
     visaExpire: '12 Jun 2025',
-    salary: '₹85,000 / month',
+    salary: 'QAR 85,000 / month',
     attendance: '94%',
     leaves: '4 / 12',
     performance: 'Excellent',

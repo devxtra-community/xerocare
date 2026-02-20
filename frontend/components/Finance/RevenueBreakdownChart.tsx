@@ -14,6 +14,7 @@ import {
 import { getGlobalSalesOverview } from '@/lib/invoice';
 import { Loader2 } from 'lucide-react';
 import { ChartTooltipContent } from '@/components/ui/ChartTooltip';
+import { formatCompactNumber } from '@/lib/format';
 
 // Month names for display
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -75,7 +76,7 @@ export default function RevenueBreakdownChart({ selectedYear }: RevenueBreakdown
     };
 
     fetchData();
-  }, []);
+  }, [selectedYear]);
 
   if (loading) {
     return (
@@ -104,7 +105,7 @@ export default function RevenueBreakdownChart({ selectedYear }: RevenueBreakdown
             axisLine={false}
             tickLine={false}
             tick={{ fill: 'var(--chart-slate-dark)', fontSize: 12 }}
-            tickFormatter={(value) => `₹${value / 1000}k`}
+            tickFormatter={(value) => `${formatCompactNumber(value)} QAR`}
           />
 
           <Tooltip
@@ -112,7 +113,7 @@ export default function RevenueBreakdownChart({ selectedYear }: RevenueBreakdown
               <ChartTooltipContent
                 valueFormatter={(value) => {
                   const val = Number(value);
-                  return `₹${val >= 1000 ? (val / 1000).toFixed(1) + 'k' : val.toLocaleString()}`;
+                  return `QAR ${formatCompactNumber(val)}`;
                 }}
               />
             }

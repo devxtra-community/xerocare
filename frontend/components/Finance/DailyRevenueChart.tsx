@@ -22,6 +22,7 @@ import {
 } from '@/components/ui/select';
 import { CalendarDays, Loader2 } from 'lucide-react';
 import { getGlobalSalesOverview } from '@/lib/invoice';
+import { formatCompactNumber } from '@/lib/format';
 
 interface DailyData {
   day: string;
@@ -169,7 +170,7 @@ export default function DailyRevenueChart({
               axisLine={false}
               tickLine={false}
               tick={{ fill: 'var(--chart-slate-dark)', fontSize: 12 }}
-              tickFormatter={(value) => `₹${value / 1000}k`}
+              tickFormatter={(value) => `${formatCompactNumber(value)} QAR`}
             />
 
             <Tooltip
@@ -180,7 +181,7 @@ export default function DailyRevenueChart({
                   }
                   valueFormatter={(value) => {
                     const val = Number(value);
-                    return `₹${val >= 1000 ? (val / 1000).toFixed(1) + 'k' : val.toLocaleString()}`;
+                    return `QAR ${formatCompactNumber(val)}`;
                   }}
                 />
               }

@@ -14,20 +14,7 @@ import WarehouseTable from '@/components/AdminDahboardComponents/dashboardCompon
 import CategoryPieChart from '@/components/AdminDahboardComponents/dashboardComponents/CategoryPieChart';
 import DashboardPage from '@/components/DashboardPage';
 import { YearSelector } from '@/components/ui/YearSelector';
-
-// Utility function to format numbers in compact format (k, M, B)
-function formatCompactNumber(num: number): string {
-  if (num >= 1_000_000_000) {
-    return (num / 1_000_000_000).toFixed(1).replace(/\.0$/, '') + 'B';
-  }
-  if (num >= 1_000_000) {
-    return (num / 1_000_000).toFixed(1).replace(/\.0$/, '') + 'M';
-  }
-  if (num >= 1_000) {
-    return (num / 1_000).toFixed(1).replace(/\.0$/, '') + 'k';
-  }
-  return num.toFixed(2);
-}
+import { formatCurrency } from '@/lib/format';
 
 export default function Dashboard() {
   const [selectedYear, setSelectedYear] = useState<number | 'all'>(new Date().getFullYear());
@@ -76,7 +63,7 @@ export default function Dashboard() {
         });
 
         setStats({
-          earnings: `${formatCompactNumber(salesTotals?.totalSales || 0)} AED`,
+          earnings: `${formatCurrency(salesTotals?.totalSales || 0)}`,
           branchCount: (branchesRes?.data?.length || 0).toString(),
           warehouseCount: (warehousesRes?.data?.length || 0).toString(),
           employeeCount: (employeeRes?.data?.employees?.length || 0).toString(),

@@ -161,13 +161,17 @@ const ForexChartContainer = ({
 
 interface EmployeeSalesGraphsProps {
   invoices?: Invoice[];
+  selectedYear?: number | 'all';
 }
 
 /**
  * Analytics charts for employee sales performance.
  * Displays total sales revenue per month and per day.
  */
-export default function EmployeeSalesGraphs({ invoices: propInvoices }: EmployeeSalesGraphsProps) {
+export default function EmployeeSalesGraphs({
+  invoices: propInvoices,
+  selectedYear,
+}: EmployeeSalesGraphsProps) {
   const [loading, setLoading] = useState(true);
   const [monthlyData, setMonthlyData] = useState<SalesChartDataItem[]>([]);
   const [dailyData, setDailyData] = useState<SalesChartDataItem[]>([]);
@@ -183,6 +187,14 @@ export default function EmployeeSalesGraphs({ invoices: propInvoices }: Employee
         if (!invoices) {
           invoices = await getMyInvoices();
         }
+
+        // Apply year filter if selected
+        if (selectedYear && selectedYear !== 'all') {
+          invoices = invoices.filter(
+            (inv) => new Date(inv.createdAt).getFullYear() === selectedYear,
+          );
+        }
+
         // Filter out rejected sales from graphs
         const salesInvoices = invoices.filter(
           (inv) => inv.saleType === 'SALE' && inv.status !== 'REJECTED',
@@ -209,11 +221,13 @@ export default function EmployeeSalesGraphs({ invoices: propInvoices }: Employee
           salesAmount: 0,
         }));
 
-        // Initialize Daily Data (Current Month)
+        // Initialize Daily Data (Current Month or Selected Year's same month)
         const now = new Date();
         const currentMonth = now.getMonth();
-        const currentYear = now.getFullYear();
-        const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+        // Use selected year if available, else current year
+        const targetYear =
+          selectedYear === 'all' || selectedYear === undefined ? now.getFullYear() : selectedYear;
+        const daysInMonth = new Date(targetYear, currentMonth + 1, 0).getDate();
 
         const dData = Array.from({ length: daysInMonth }, (_, i) => ({
           name: (i + 1).toString(),
@@ -226,12 +240,14 @@ export default function EmployeeSalesGraphs({ invoices: propInvoices }: Employee
           const amount = parseFloat(String(inv.totalAmount)) || 0;
 
           // Populate Monthly Data
+          // Note: If 'all' years selected, this aggregates all years into Jan-Dec buckets
           const monthIndex = d.getMonth();
           mData[monthIndex].salesCount++;
           mData[monthIndex].salesAmount += amount;
 
-          // Populate Daily Data (only for current month/year)
-          if (d.getMonth() === currentMonth && d.getFullYear() === currentYear) {
+          // Populate Daily Data (only for target month/year)
+          // We use current month index, but apply it to the target year
+          if (d.getMonth() === currentMonth && d.getFullYear() === targetYear) {
             const dayIndex = d.getDate() - 1;
             if (dData[dayIndex]) {
               dData[dayIndex].salesCount++;
@@ -250,7 +266,7 @@ export default function EmployeeSalesGraphs({ invoices: propInvoices }: Employee
     };
 
     fetchData();
-  }, [propInvoices]);
+  }, [propInvoices, selectedYear]);
 
   if (loading) {
     return (

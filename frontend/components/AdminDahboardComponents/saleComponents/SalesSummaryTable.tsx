@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { getInvoices, Invoice, InvoiceItem } from '@/lib/invoice';
 import { Search } from 'lucide-react';
 import { Input } from '@/components/ui/input';
+import { formatCurrency } from '@/lib/format';
 
 // Removed unused static data
 
@@ -39,11 +40,11 @@ const SalesSummaryTable = () => {
               const date = new Date(inv.createdAt);
 
               // Correct price logic based on sale type
-              let displayPrice = `${item.unitPrice || 0} AED`;
+              let displayPrice = formatCurrency(item.unitPrice || 0);
               if (inv.saleType === 'RENT') {
-                displayPrice = `${inv.monthlyRent || 0} AED/Mo`;
+                displayPrice = `${formatCurrency(inv.monthlyRent || 0)}/Mo`;
               } else if (inv.saleType === 'LEASE') {
-                displayPrice = `${inv.monthlyEmiAmount || inv.monthlyLeaseAmount || 0} AED/Mo`;
+                displayPrice = `${formatCurrency(inv.monthlyEmiAmount || inv.monthlyLeaseAmount || 0)}/Mo`;
               }
 
               return {

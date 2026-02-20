@@ -3,12 +3,15 @@
 import React from 'react';
 import FinanceStats from '@/components/ManagerDashboardComponents/financeComponents/FinanceStats';
 import RevenueSummaryTable from '@/components/ManagerDashboardComponents/financeComponents/RevenueSummaryTable';
+import { YearSelector } from '@/components/ui/YearSelector';
 
 import RevenueVsExpenseChart from '@/components/ManagerDashboardComponents/financeComponents/RevenueVsExpenseChart';
-import RevenueBySourceChart from '@/components/ManagerDashboardComponents/financeComponents/RevenueBySourceChart';
+
 import ProfitChart from '@/components/ManagerDashboardComponents/financeComponents/ProfitChart';
 
 export default function ManagerFinancePage() {
+  const [selectedYear, setSelectedYear] = React.useState<number | 'all'>(new Date().getFullYear());
+
   return (
     <div className="bg-blue-100 min-h-screen p-3 sm:p-4 md:p-6 space-y-6 sm:space-y-8">
       {/* HEADER SECTION */}
@@ -21,16 +24,17 @@ export default function ManagerFinancePage() {
             Analyze revenue streams, track expenses, and manage receivables
           </p>
         </div>
+        <YearSelector selectedYear={selectedYear} onYearChange={setSelectedYear} />
       </div>
 
       {/* STATS SECTION */}
-      <FinanceStats />
+      <FinanceStats selectedYear={selectedYear} />
 
       {/* CHARTS SECTION */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-        <RevenueVsExpenseChart />
-        <RevenueBySourceChart />
-        <ProfitChart />
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+        <RevenueVsExpenseChart selectedYear={selectedYear} />
+
+        <ProfitChart selectedYear={selectedYear} />
       </div>
 
       {/* TABLES SECTION */}
@@ -39,7 +43,7 @@ export default function ManagerFinancePage() {
           <h3 className="text-lg font-bold text-primary uppercase tracking-tighter">
             Revenue Summary
           </h3>
-          <RevenueSummaryTable />
+          <RevenueSummaryTable selectedYear={selectedYear} />
         </div>
       </div>
     </div>

@@ -3,6 +3,7 @@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Clock, Wallet } from 'lucide-react';
 import Link from 'next/link';
+import { formatCurrency } from '@/lib/format';
 
 const apAgingData = [
   { bucket: 'Current', amount: 38000, color: 'bg-indigo-600', percentage: 63 },
@@ -36,7 +37,7 @@ export default function APDueAgingChart() {
           </div>
           <div className="text-right">
             <p className="text-2xl font-black text-foreground tracking-tight">
-              AED {totalAP.toLocaleString()}
+              {formatCurrency(totalAP)}
             </p>
           </div>
         </div>
@@ -60,7 +61,7 @@ export default function APDueAgingChart() {
                 </div>
                 <div className="text-right">
                   <span className="text-sm font-bold text-foreground tabular-nums">
-                    AED {item.amount.toLocaleString()}
+                    {formatCurrency(item.amount)}
                   </span>
                   <span className="text-xs text-slate-400 ml-2">({item.percentage}%)</span>
                 </div>

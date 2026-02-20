@@ -306,6 +306,23 @@ export const getPendingCounts = async (): Promise<Record<string, number>> => {
 };
 
 /**
+ * Retrieves total sales figures for the user's branch.
+ */
+export const getBranchSalesTotals = async (
+  year?: number,
+): Promise<{
+  totalSales: number;
+  salesByType: { saleType: string; total: number }[];
+  totalInvoices: number;
+}> => {
+  const url = year
+    ? `/b/invoices/sales/branch-totals?year=${year}`
+    : '/b/invoices/sales/branch-totals';
+  const response = await api.get(url);
+  return response.data.data;
+};
+
+/**
  * Retrieves global sales totals across all branches.
  */
 export const getGlobalSalesTotals = async (
@@ -569,4 +586,12 @@ export const sendWhatsappNotification = async (
 ): Promise<unknown> => {
   const response = await api.post(`/b/invoices/${id}/notify/whatsapp`, payload);
   return response.data;
+};
+
+/**
+ * Retrieves available years for filtering reports.
+ */
+export const getAvailableYears = async (): Promise<number[]> => {
+  const response = await api.get('/b/invoices/stats/available-years');
+  return response.data.data;
 };

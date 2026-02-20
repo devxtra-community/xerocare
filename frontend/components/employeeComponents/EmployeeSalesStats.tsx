@@ -7,13 +7,17 @@ import { Loader2 } from 'lucide-react';
 
 interface EmployeeSalesStatsProps {
   invoices?: Invoice[];
+  selectedYear?: number | 'all';
 }
 
 /**
  * Statistical summary cards for employee sales metrics.
  * Displays total sales count, sales this month, and total revenue.
  */
-export default function EmployeeSalesStats({ invoices: propInvoices }: EmployeeSalesStatsProps) {
+export default function EmployeeSalesStats({
+  invoices: propInvoices,
+  selectedYear,
+}: EmployeeSalesStatsProps) {
   const [stats, setStats] = useState({
     totalOrders: 0,
     salesCount: 0,
@@ -29,6 +33,12 @@ export default function EmployeeSalesStats({ invoices: propInvoices }: EmployeeS
         let invoices = propInvoices;
         if (!invoices) {
           invoices = await getMyInvoices();
+        }
+
+        if (selectedYear && selectedYear !== 'all') {
+          invoices = invoices.filter(
+            (inv) => new Date(inv.createdAt).getFullYear() === selectedYear,
+          );
         }
 
         const now = new Date();

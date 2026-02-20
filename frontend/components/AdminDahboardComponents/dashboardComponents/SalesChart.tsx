@@ -12,20 +12,7 @@ import {
 import { getGlobalSalesOverview } from '@/lib/invoice';
 import { ChartTooltipContent } from '@/components/ui/ChartTooltip';
 import { YearSelector } from '@/components/ui/YearSelector';
-
-// Utility function to format numbers in compact format (k, M, B)
-function formatCompactNumber(num: number): string {
-  if (num >= 1_000_000_000) {
-    return (num / 1_000_000_000).toFixed(1).replace(/\.0$/, '') + 'B';
-  }
-  if (num >= 1_000_000) {
-    return (num / 1_000_000).toFixed(1).replace(/\.0$/, '') + 'M';
-  }
-  if (num >= 1_000) {
-    return (num / 1_000).toFixed(1).replace(/\.0$/, '') + 'k';
-  }
-  return num.toFixed(0);
-}
+import { formatCompactNumber } from '@/lib/format';
 
 interface SalesDataPoint {
   month: string;
@@ -183,7 +170,7 @@ export default function SalesChart({
                     labelFormatter={(label) =>
                       `${label} ${selectedYear === 'all' ? '' : selectedYear}`
                     }
-                    valueFormatter={(v) => `${formatCompactNumber(Number(v))} AED`}
+                    valueFormatter={(v) => `QAR ${formatCompactNumber(Number(v))}`}
                   />
                 }
               />

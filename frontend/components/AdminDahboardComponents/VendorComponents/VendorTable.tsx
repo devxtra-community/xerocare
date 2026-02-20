@@ -28,6 +28,7 @@ import {
 } from '@/lib/vendor';
 import { toast } from 'sonner';
 import { AxiosError } from 'axios';
+import { formatCurrency } from '@/lib/format';
 import {
   Select,
   SelectContent,
@@ -306,10 +307,10 @@ export default function VendorTable({
                   </TableCell>
                   <TableCell className="text-right">{vendor.totalOrders}</TableCell>
                   <TableCell className="text-right font-medium">
-                    ₹ {vendor.purchaseValue.toLocaleString()}
+                    {formatCurrency(vendor.purchaseValue)}
                   </TableCell>
                   <TableCell className="text-right font-medium text-red-600">
-                    ₹ {vendor.outstandingAmount.toLocaleString()}
+                    {formatCurrency(vendor.outstandingAmount)}
                   </TableCell>
                   <TableCell>
                     <span

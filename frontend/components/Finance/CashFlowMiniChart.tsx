@@ -4,6 +4,7 @@ import React from 'react';
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, CartesianGrid } from 'recharts';
 import { ArrowUpRight, TrendingUp } from 'lucide-react';
 import { ChartTooltipContent } from '@/components/ui/ChartTooltip';
+import { formatCurrency } from '@/lib/format';
 
 const cashFlowData = [
   { month: 'Jan', inflow: 42000, outflow: 31000 },
@@ -29,9 +30,7 @@ export default function CashFlowMiniChart() {
         <div>
           <h3 className="text-sm font-medium text-muted-foreground">Net Cash Position</h3>
           <div className="flex items-center gap-2 mt-1">
-            <span className="text-xl font-bold text-foreground">
-              AED {netPosition.toLocaleString()}
-            </span>
+            <span className="text-xl font-bold text-foreground">{formatCurrency(netPosition)}</span>
             <span className="flex items-center text-xs font-medium text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">
               <ArrowUpRight className="w-3 h-3 mr-0.5" /> +12%
             </span>
@@ -69,9 +68,7 @@ export default function CashFlowMiniChart() {
                 <ChartTooltipContent
                   valueFormatter={(value) => {
                     const val = Number(value);
-                    return `AED ${
-                      val >= 1000 ? (val / 1000).toFixed(1) + 'k' : val.toLocaleString()
-                    }`;
+                    return `QAR ${val >= 1000 ? (val / 1000).toFixed(1) + 'k' : val.toLocaleString()}`;
                   }}
                 />
               }

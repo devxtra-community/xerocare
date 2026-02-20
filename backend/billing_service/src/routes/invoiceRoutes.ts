@@ -29,6 +29,7 @@ import {
   sendConsolidatedInvoice,
   sendEmailNotification,
   sendWhatsappNotification,
+  getAvailableYears,
 } from '../controllers/invoiceController';
 import { authMiddleware } from '../middlewares/authMiddleware';
 import { requireRole } from '../middlewares/roleMiddleware';
@@ -74,6 +75,7 @@ router.put('/:id/approve', authMiddleware, approveQuotation);
 router.get('/my-invoices', authMiddleware, getMyInvoices);
 router.get('/', authMiddleware, getAllInvoices);
 router.get('/stats', authMiddleware, getStats);
+router.get('/stats/available-years', authMiddleware, getAvailableYears);
 router.get(
   '/sales/admin-stats',
   authMiddleware,

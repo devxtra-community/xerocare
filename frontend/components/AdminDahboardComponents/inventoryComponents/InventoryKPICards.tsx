@@ -2,6 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import StatCard from '@/components/StatCard';
 import { inventoryService, InventoryStats } from '@/services/inventoryService';
+import { formatCurrency } from '@/lib/format';
 
 /**
  * Component displaying key inventory performance indicators (KPIs).
@@ -25,16 +26,6 @@ export default function InventoryKPICards() {
     };
     fetchStats();
   }, []);
-
-  const formatCurrency = (value: number) => {
-    if (value >= 1000000) {
-      return `₹ ${(value / 1000000).toFixed(1)}M`;
-    }
-    if (value >= 1000) {
-      return `₹ ${(value / 1000).toFixed(1)}K`;
-    }
-    return `₹ ${value.toLocaleString()}`;
-  };
 
   if (loading) {
     return (

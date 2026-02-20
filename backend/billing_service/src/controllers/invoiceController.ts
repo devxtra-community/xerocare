@@ -388,7 +388,8 @@ export const getBranchSales = async (req: Request, res: Response, next: NextFunc
       throw new AppError('Branch ID not found in user context', 400);
     }
 
-    const result = await reportService.getBranchSales(period, branchId);
+    const year = req.query.year ? parseInt(req.query.year as string, 10) : undefined;
+    const result = await reportService.getBranchSales(period, branchId, year);
     return res.status(200).json({
       success: true,
       data: result,
@@ -410,7 +411,8 @@ export const getBranchSalesTotals = async (req: Request, res: Response, next: Ne
       throw new AppError('Branch ID not found in user context', 400);
     }
 
-    const result = await reportService.getBranchSalesTotals(branchId);
+    const year = req.query.year ? parseInt(req.query.year as string, 10) : undefined;
+    const result = await reportService.getBranchSalesTotals(branchId, year);
     return res.status(200).json({
       success: true,
       data: result,
@@ -434,6 +436,7 @@ export const getPendingCounts = async (req: Request, res: Response, next: NextFu
     return res.status(200).json({
       success: true,
       data: counts,
+      message: 'Pending counts fetched successfully',
     });
   } catch (error) {
     next(error);
@@ -453,6 +456,7 @@ export const getCollectionAlerts = async (req: Request, res: Response, next: Nex
     return res.status(200).json({
       success: true,
       data: alerts,
+      message: 'Collection alerts fetched successfully',
     });
   } catch (error) {
     next(error);
@@ -465,7 +469,8 @@ export const getCollectionAlerts = async (req: Request, res: Response, next: Nex
 export const getGlobalSales = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const period = (req.query.period as string) || '1M';
-    const result = await reportService.getGlobalSales(period);
+    const year = req.query.year ? parseInt(req.query.year as string, 10) : undefined;
+    const result = await reportService.getGlobalSales(period, year);
     return res.status(200).json({
       success: true,
       data: result,
@@ -481,7 +486,8 @@ export const getGlobalSales = async (req: Request, res: Response, next: NextFunc
  */
 export const getGlobalSalesTotals = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const result = await reportService.getGlobalSalesTotals();
+    const year = req.query.year ? parseInt(req.query.year as string, 10) : undefined;
+    const result = await reportService.getGlobalSalesTotals(year);
     return res.status(200).json({
       success: true,
       data: result,
@@ -681,6 +687,22 @@ export const sendWhatsappNotification = async (req: Request, res: Response, next
     return res.status(200).json({
       success: true,
       message: 'WhatsApp notification request sent successfully',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Retrieves available years for filtering reports.
+ */
+export const getAvailableYears = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const years = await reportService.getAvailableYears();
+    return res.status(200).json({
+      success: true,
+      data: years,
+      message: 'Available years fetched successfully',
     });
   } catch (error) {
     next(error);

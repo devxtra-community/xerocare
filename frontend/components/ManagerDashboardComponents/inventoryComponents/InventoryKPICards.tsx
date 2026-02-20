@@ -2,6 +2,7 @@
 import React from 'react';
 import StatCard from '@/components/StatCard';
 import { inventoryService, InventoryStats } from '@/services/inventoryService';
+import { formatCurrency } from '@/lib/format';
 
 /**
  * KPI Cards for Manager Inventory Dashboard.
@@ -27,13 +28,6 @@ export default function InventoryKPICards() {
     };
     fetchStats();
   }, []);
-
-  const formatCurrency = (value: number) => {
-    if (value >= 1000) {
-      return `AED ${(value / 1000).toFixed(1)}k`;
-    }
-    return `AED ${(value || 0).toLocaleString()}`;
-  };
 
   return (
     <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 sm:gap-2 md:gap-4">

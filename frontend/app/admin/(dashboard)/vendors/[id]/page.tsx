@@ -138,7 +138,7 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 sm:gap-2 md:gap-4">
           <StatCard
             title="Total Spend"
-            value={`₹${((vendor.purchaseValue || 0) / 100000).toFixed(1)}L`}
+            value={`QAR ${((vendor.purchaseValue || 0) / 1000).toFixed(1)}k`}
             subtitle="Lifetime Purchase"
           />
           <StatCard
@@ -148,13 +148,13 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
           />
           <StatCard
             title="Outstanding"
-            value={`₹${((vendor.outstandingAmount || 0) / 1000).toFixed(0)}K`}
+            value={`QAR ${((vendor.outstandingAmount || 0) / 1000).toFixed(0)}k`}
             subtitle="Pending Payments"
           />
           <StatCard
             title="Credit Limit"
-            value={`₹${((vendor.creditLimit || 0) / 100000).toFixed(1)}L`}
-            subtitle="Available: ₹4.5L"
+            value={`QAR ${((vendor.creditLimit || 0) / 1000).toFixed(1)}k`}
+            subtitle="Available: QAR 4.5k"
           />
         </div>
 

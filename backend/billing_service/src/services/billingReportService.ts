@@ -38,49 +38,65 @@ export class BillingReportService {
   /**
    * Retrieves sales trend data for a branch.
    */
-  async getBranchSales(period: string, branchId: string) {
-    let days = 30;
-    if (period === '1W') days = 7;
-    else if (period === '1M') days = 30;
-    else if (period === '3M') days = 90;
-    else if (period === '1Y') days = 365;
+  async getBranchSales(period: string, branchId: string, year?: number) {
+    let startDate: Date;
+    let endDate: Date | undefined;
 
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - days);
+    if (year) {
+      startDate = new Date(year, 0, 1);
+      endDate = new Date(year, 11, 31, 23, 59, 59);
+    } else {
+      let days = 30;
+      if (period === '1W') days = 7;
+      else if (period === '1M') days = 30;
+      else if (period === '3M') days = 90;
+      else if (period === '1Y') days = 365;
 
-    const stats = await this.invoiceRepo.getBranchSalesTrend(branchId, startDate);
+      startDate = new Date();
+      startDate.setDate(startDate.getDate() - days);
+    }
+
+    const stats = await this.invoiceRepo.getBranchSalesTrend(branchId, startDate, endDate);
     return stats;
   }
 
   /**
    * Retrieves total sales figures for a branch.
    */
-  async getBranchSalesTotals(branchId: string) {
-    return await this.invoiceRepo.getBranchSalesTotals(branchId);
+  async getBranchSalesTotals(branchId: string, year?: number) {
+    return await this.invoiceRepo.getBranchSalesTotals(branchId, year);
   }
 
   /**
    * Retrieves global sales trend data.
    */
-  async getGlobalSales(period: string) {
-    let days = 30;
-    if (period === '1W') days = 7;
-    else if (period === '1M') days = 30;
-    else if (period === '3M') days = 90;
-    else if (period === '1Y') days = 365;
+  async getGlobalSales(period: string, year?: number) {
+    let startDate: Date;
+    let endDate: Date | undefined;
 
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - days);
+    if (year) {
+      startDate = new Date(year, 0, 1);
+      endDate = new Date(year, 11, 31, 23, 59, 59);
+    } else {
+      let days = 30;
+      if (period === '1W') days = 7;
+      else if (period === '1M') days = 30;
+      else if (period === '3M') days = 90;
+      else if (period === '1Y') days = 365;
 
-    const stats = await this.invoiceRepo.getGlobalSalesTrend(startDate);
+      startDate = new Date();
+      startDate.setDate(startDate.getDate() - days);
+    }
+
+    const stats = await this.invoiceRepo.getGlobalSalesTrend(startDate, endDate);
     return stats;
   }
 
   /**
    * Retrieves global sales total figures.
    */
-  async getGlobalSalesTotals() {
-    return await this.invoiceRepo.getGlobalSalesTotals();
+  async getGlobalSalesTotals(year?: number) {
+    return await this.invoiceRepo.getGlobalSalesTotals(year);
   }
 
   /**
@@ -433,5 +449,11 @@ export class BillingReportService {
     doc.text(`Total Collected: INR ${Number(totalCollected).toFixed(2)}`, amountX, y + 20);
 
     doc.end();
+  }
+  /**
+   * Retrieves distinct years available for filtering.
+   */
+  async getAvailableYears() {
+    return this.invoiceRepo.getAvailableYears();
   }
 }

@@ -34,6 +34,7 @@ import {
 } from 'recharts';
 import { getFinanceReport, FinanceReportItem } from '@/lib/invoice';
 import { getBranches, Branch } from '@/lib/branch';
+import { formatCurrency, formatCompactNumber } from '@/lib/format';
 
 type Finance = {
   id: string;
@@ -174,17 +175,17 @@ export default function FinanceReport() {
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <StatCard
           title="Total Income"
-          value={`₹ ${totalIncome.toLocaleString()}`}
+          value={formatCurrency(totalIncome)}
           subtitle={branchFilter === 'All' ? 'All branches' : branchFilter}
         />
         <StatCard
           title="Total Expense"
-          value={`₹ ${totalExpense.toLocaleString()}`}
+          value={formatCurrency(totalExpense)}
           subtitle={branchFilter === 'All' ? 'All branches' : branchFilter}
         />
         <StatCard
           title="Net Profit"
-          value={`₹ ${netProfit.toLocaleString()}`}
+          value={formatCurrency(netProfit)}
           subtitle="Income - Expense"
         />
         <StatCard title="Avg Margin" value={`${averageMargin}%`} subtitle="Filtered performance" />
@@ -213,7 +214,7 @@ export default function FinanceReport() {
                   axisLine={false}
                   tickLine={false}
                   tick={{ fill: '#64748B', fontSize: 11 }}
-                  tickFormatter={(v) => `₹${v / 1000}k`}
+                  tickFormatter={(v) => `${formatCompactNumber(v)}`}
                 />
                 <Tooltip
                   contentStyle={{
@@ -401,13 +402,13 @@ export default function FinanceReport() {
                   </TableCell>
                   <TableCell className="px-6 py-4 text-slate-600">{f.source}</TableCell>
                   <TableCell className="px-6 py-4 font-medium text-blue-600">
-                    ₹ {f.income.toLocaleString()}
+                    {formatCurrency(f.income)}
                   </TableCell>
                   <TableCell className="px-6 py-4 text-muted-foreground">
-                    ₹ {f.expense.toLocaleString()}
+                    {formatCurrency(f.expense)}
                   </TableCell>
                   <TableCell className="px-6 py-4 font-bold text-primary">
-                    ₹ {f.profit.toLocaleString()}
+                    {formatCurrency(f.profit)}
                   </TableCell>
                   <TableCell className="px-6 py-4">
                     <span

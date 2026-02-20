@@ -7,6 +7,7 @@ import SalesSummaryTable from './SalesSummaryTable';
 import MonthlySalesBarChart from './monthlysalesChart';
 import MostSoldProductChart from './MostSoldProductChart';
 import { getAdminSalesStats, AdminSalesStats } from '@/lib/invoice';
+import { formatCurrency } from '@/lib/format';
 
 /**
  * Admin Sales Dashboard page.
@@ -41,7 +42,7 @@ export default function AdminSalesPage() {
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 sm:gap-2 md:gap-4">
           <StatCard
             title="Total Revenue"
-            value={loading ? '...' : `${(stats?.totalRevenue || 0).toLocaleString()} AED`}
+            value={loading ? '...' : formatCurrency(stats?.totalRevenue || 0)}
             subtitle="Lifetime Sale"
           />
           <StatCard

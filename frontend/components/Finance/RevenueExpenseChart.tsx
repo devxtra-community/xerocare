@@ -12,6 +12,7 @@ import {
   Legend,
 } from 'recharts';
 import { ChartTooltipContent } from '@/components/ui/ChartTooltip';
+import { formatCompactNumber } from '@/lib/format';
 
 const data = [
   { month: 'Jan', revenue: 120000, expense: 85000 },
@@ -41,13 +42,13 @@ export default function RevenueExpenseChart() {
             axisLine={false}
             tickLine={false}
             tick={{ fill: '#64748b', fontSize: 12 }}
-            tickFormatter={(value) => `AED ${value / 1000}k`}
+            tickFormatter={(value) => `${formatCompactNumber(value)}`}
           />
 
           <Tooltip
             content={
               <ChartTooltipContent
-                valueFormatter={(val) => `AED ${Number(val).toLocaleString()}`}
+                valueFormatter={(val) => `QAR ${formatCompactNumber(Number(val))}`}
                 footer={(payload) => {
                   const net = (Number(payload[0]?.value) || 0) - (Number(payload[1]?.value) || 0);
                   return (
@@ -60,7 +61,7 @@ export default function RevenueExpenseChart() {
                           net >= 0 ? 'text-emerald-600' : 'text-rose-600'
                         }`}
                       >
-                        AED {net.toLocaleString()}
+                        {`QAR ${formatCompactNumber(net)}`}
                       </span>
                     </div>
                   );

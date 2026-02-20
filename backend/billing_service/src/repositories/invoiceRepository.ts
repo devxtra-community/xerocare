@@ -252,6 +252,7 @@ export class InvoiceRepository {
   async getBranchSalesTrend(
     branchId: string,
     startDate: Date,
+    endDate?: Date,
   ): Promise<{ date: string; saleType: string; totalSales: number }[]> {
     const query = this.repo
       .createQueryBuilder('invoice')
@@ -268,7 +269,13 @@ export class InvoiceRepository {
           InvoiceStatus.ACTIVE_LEASE,
           InvoiceStatus.APPROVED,
         ],
-      })
+      });
+
+    if (endDate) {
+      query.andWhere('invoice.createdAt <= :endDate', { endDate });
+    }
+
+    query
       .groupBy("TO_CHAR(invoice.createdAt, 'YYYY-MM-DD')")
       .addGroupBy('invoice.saleType')
       .orderBy('date', 'ASC');
@@ -286,6 +293,7 @@ export class InvoiceRepository {
    */
   async getGlobalSalesTrend(
     startDate: Date,
+    endDate?: Date,
   ): Promise<{ date: string; saleType: string; totalSales: number }[]> {
     const query = this.repo
       .createQueryBuilder('invoice')
@@ -302,8 +310,13 @@ export class InvoiceRepository {
           InvoiceStatus.EMPLOYEE_APPROVED,
           InvoiceStatus.APPROVED,
         ],
-      })
-      // Include all types for trend to support tooltip breakdown
+      });
+
+    if (endDate) {
+      query.andWhere('invoice.createdAt <= :endDate', { endDate });
+    }
+
+    query
       .groupBy("TO_CHAR(invoice.createdAt, 'YYYY-MM-DD')")
       .addGroupBy('invoice.saleType')
       .orderBy('date', 'ASC');
@@ -319,12 +332,12 @@ export class InvoiceRepository {
   /**
    * Retrieves global total sales and breakdown by type.
    */
-  async getGlobalSalesTotals(): Promise<{
+  async getGlobalSalesTotals(year?: number): Promise<{
     totalSales: number;
     salesByType: { saleType: string; total: number }[];
     totalInvoices: number;
   }> {
-    const totalResult = await this.repo
+    const totalQuery = this.repo
       .createQueryBuilder('invoice')
       .select('SUM(invoice.totalAmount)', 'totalSales')
       .addSelect('COUNT(*)', 'totalInvoices')
@@ -337,14 +350,18 @@ export class InvoiceRepository {
           InvoiceStatus.EMPLOYEE_APPROVED,
           InvoiceStatus.APPROVED,
         ],
-      })
-      // Include all types that represent a commitment
-      .getRawOne();
+      });
+
+    if (year) {
+      totalQuery.andWhere('EXTRACT(YEAR FROM invoice.createdAt) = :year', { year });
+    }
+
+    const totalResult = await totalQuery.getRawOne();
 
     const totalSales = parseFloat(totalResult?.totalSales) || 0;
     const totalInvoices = parseInt(totalResult?.totalInvoices, 10) || 0;
 
-    const salesByTypeResults = await this.repo
+    const salesByTypeQuery = this.repo
       .createQueryBuilder('invoice')
       .select('invoice.saleType', 'saleType')
       .addSelect('SUM(invoice.totalAmount)', 'total')
@@ -357,9 +374,13 @@ export class InvoiceRepository {
           InvoiceStatus.EMPLOYEE_APPROVED,
           InvoiceStatus.APPROVED,
         ],
-      })
-      .groupBy('invoice.saleType')
-      .getRawMany();
+      });
+
+    if (year) {
+      salesByTypeQuery.andWhere('EXTRACT(YEAR FROM invoice.createdAt) = :year', { year });
+    }
+
+    const salesByTypeResults = await salesByTypeQuery.groupBy('invoice.saleType').getRawMany();
 
     const salesByType = salesByTypeResults.map((r) => ({
       saleType: r.saleType,
@@ -376,12 +397,15 @@ export class InvoiceRepository {
   /**
    * Retrieves branch-specific total sales and breakdown by type.
    */
-  async getBranchSalesTotals(branchId: string): Promise<{
+  async getBranchSalesTotals(
+    branchId: string,
+    year?: number,
+  ): Promise<{
     totalSales: number;
     salesByType: { saleType: string; total: number }[];
     totalInvoices: number;
   }> {
-    const totalResult = await this.repo
+    const totalQuery = this.repo
       .createQueryBuilder('invoice')
       .select('SUM(invoice.totalAmount)', 'totalSales')
       .addSelect('COUNT(*)', 'totalInvoices')
@@ -399,13 +423,18 @@ export class InvoiceRepository {
       .andWhere('(invoice.type != :type OR invoice.saleType IN (:...saleTypes))', {
         type: InvoiceType.PROFORMA,
         saleTypes: ['SALE', 'RENT', 'LEASE'],
-      })
-      .getRawOne();
+      });
+
+    if (year) {
+      totalQuery.andWhere('EXTRACT(YEAR FROM invoice.createdAt) = :year', { year });
+    }
+
+    const totalResult = await totalQuery.getRawOne();
 
     const totalSales = parseFloat(totalResult?.totalSales) || 0;
     const totalInvoices = parseInt(totalResult?.totalInvoices, 10) || 0;
 
-    const salesByTypeResults = await this.repo
+    const salesByTypeQuery = this.repo
       .createQueryBuilder('invoice')
       .select('invoice.saleType', 'saleType')
       .addSelect('SUM(invoice.totalAmount)', 'total')
@@ -423,9 +452,13 @@ export class InvoiceRepository {
       .andWhere('(invoice.type != :type OR invoice.saleType IN (:...saleTypes))', {
         type: InvoiceType.PROFORMA,
         saleTypes: ['SALE', 'RENT', 'LEASE'],
-      })
-      .groupBy('invoice.saleType')
-      .getRawMany();
+      });
+
+    if (year) {
+      salesByTypeQuery.andWhere('EXTRACT(YEAR FROM invoice.createdAt) = :year', { year });
+    }
+
+    const salesByTypeResults = await salesByTypeQuery.groupBy('invoice.saleType').getRawMany();
 
     const salesByType = salesByTypeResults.map((r) => ({
       saleType: r.saleType,
@@ -727,5 +760,17 @@ export class InvoiceRepository {
     }
 
     return qb.getMany();
+  }
+  /**
+   * Retrieves distinct years from invoice creation dates.
+   */
+  async getAvailableYears(): Promise<number[]> {
+    const result = await this.repo
+      .createQueryBuilder('invoice')
+      .select('DISTINCT EXTRACT(YEAR FROM invoice.createdAt)', 'year')
+      .orderBy('year', 'DESC')
+      .getRawMany();
+
+    return result.map((r) => parseInt(r.year, 10)).filter((y) => !isNaN(y));
   }
 }

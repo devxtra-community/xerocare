@@ -14,6 +14,7 @@ import { Loader2, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
+import { formatCurrency } from '@/lib/format';
 
 export default function RevenueTable() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
@@ -142,7 +143,7 @@ export default function RevenueTable() {
                   </TableCell>
                   <TableCell className="text-center">{row.qty}</TableCell>
                   <TableCell className="text-right font-bold text-primary">
-                    ₹{row.amount?.toLocaleString('en-IN')}
+                    {formatCurrency(row.amount || 0)}
                   </TableCell>
                 </TableRow>
               ))

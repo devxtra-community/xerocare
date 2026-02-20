@@ -25,14 +25,36 @@ export function YearSelector({
   endYear = new Date().getFullYear(),
   showAllOption = true,
 }: YearSelectorProps) {
+  const [availableYears, setAvailableYears] = React.useState<number[]>([]);
+
+  React.useEffect(() => {
+    const fetchYears = async () => {
+      try {
+        const { getAvailableYears } = await import('@/lib/invoice');
+        const years = await getAvailableYears();
+        if (years && years.length > 0) {
+          setAvailableYears(years);
+        }
+      } catch (error) {
+        console.error('Failed to fetch available years:', error);
+      }
+    };
+    fetchYears();
+  }, []);
+
   const years = React.useMemo(() => {
     const yearsArr: (number | 'all')[] = [];
     if (showAllOption) yearsArr.push('all');
-    for (let year = endYear; year >= startYear; year--) {
-      yearsArr.push(year);
+
+    if (availableYears.length > 0) {
+      availableYears.forEach((y) => yearsArr.push(y));
+    } else {
+      for (let year = endYear; year >= startYear; year--) {
+        yearsArr.push(year);
+      }
     }
     return yearsArr;
-  }, [startYear, endYear, showAllOption]);
+  }, [startYear, endYear, showAllOption, availableYears]);
 
   return (
     <Select

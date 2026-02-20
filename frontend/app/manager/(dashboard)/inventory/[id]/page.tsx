@@ -113,17 +113,17 @@ export default function ProductDetailPage() {
           />
           <StatCard
             title="Purchase Cost"
-            value={`₹${product.purchaseCost.toLocaleString()}`}
+            value={`QAR ${product.purchaseCost.toLocaleString()}`}
             subtitle="Last Purchase Price"
           />
           <StatCard
             title="Selling Price"
-            value={`₹${product.sellingPrice.toLocaleString()}`}
+            value={`QAR ${product.sellingPrice.toLocaleString()}`}
             subtitle={`Margin: ${product.margin}`}
           />
           <StatCard
             title="Total Value"
-            value={`₹${(product.quantity * product.purchaseCost).toLocaleString()}`}
+            value={`QAR ${(product.quantity * product.purchaseCost).toLocaleString()}`}
             subtitle="Current Inventory Value"
           />
         </div>

@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import StatCard from '@/components/StatCard';
 import { Invoice, getMyInvoices } from '@/lib/invoice';
+import { formatCurrency } from '@/lib/format';
 
 interface EmployeeLeaseStatsProps {
   invoices?: Invoice[];
@@ -66,7 +67,7 @@ export default function EmployeeLeaseStats({ invoices: propInvoices }: EmployeeL
     },
     {
       title: 'Total Revenue from Lease',
-      value: loading ? '...' : `₹${totalRevenue.toLocaleString()}`,
+      value: loading ? '...' : formatCurrency(totalRevenue),
       subtitle: 'Collected revenue',
     },
   ];

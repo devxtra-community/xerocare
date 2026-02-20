@@ -236,7 +236,7 @@ export default function InventoryTable({ mode = 'global', warehouseId }: Invento
                       {item.brand}
                     </TableCell>
                     <TableCell className="px-3 py-1.5 text-right font-bold text-primary text-[12px]">
-                      ₹{(item.product_cost || 0).toLocaleString('en-IN')}
+                      QAR {(item.product_cost || 0).toLocaleString()}
                     </TableCell>
                     <TableCell className="px-3 py-1.5 text-center font-bold text-[12px]">
                       {item.total_qty}

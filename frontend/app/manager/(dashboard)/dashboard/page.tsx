@@ -10,6 +10,7 @@ import RevenuePieChart from '@/components/ManagerDashboardComponents/dashboardCo
 import SalaryDistributionChart from '@/components/ManagerDashboardComponents/dashboardComponents/SalaryDistributionChart';
 import DashboardPage from '@/components/DashboardPage';
 import { YearSelector } from '@/components/ui/YearSelector';
+import { formatCurrency } from '@/lib/format';
 
 export default function Dashboard() {
   const [selectedYear, setSelectedYear] = useState<number | 'all'>(new Date().getFullYear());
@@ -50,13 +51,6 @@ export default function Dashboard() {
     fetchData();
   }, [selectedYear]);
 
-  const formatToK = (value: number) => {
-    if (value >= 1000) {
-      return `₹${(value / 1000).toFixed(1)}k`;
-    }
-    return `₹${value.toLocaleString()}`;
-  };
-
   return (
     <DashboardPage>
       <div className="flex flex-col space-y-4 sm:space-y-6">
@@ -68,22 +62,22 @@ export default function Dashboard() {
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 md:gap-4">
           <StatCard
             title="Total Revenue"
-            value={loading ? '...' : formatToK(totalSales)}
+            value={loading ? '...' : formatCurrency(totalSales)}
             subtitle="All sales, rent, and lease"
           />
           <StatCard
             title="Product Sales"
-            value={loading ? '...' : formatToK(saleAmount)}
+            value={loading ? '...' : formatCurrency(saleAmount)}
             subtitle="Products and spare parts"
           />
           <StatCard
             title="Rent Revenue"
-            value={loading ? '...' : formatToK(rentAmount)}
+            value={loading ? '...' : formatCurrency(rentAmount)}
             subtitle="Rental income"
           />
           <StatCard
             title="Lease Revenue"
-            value={loading ? '...' : formatToK(leaseAmount)}
+            value={loading ? '...' : formatCurrency(leaseAmount)}
             subtitle="Lease income"
           />
         </div>

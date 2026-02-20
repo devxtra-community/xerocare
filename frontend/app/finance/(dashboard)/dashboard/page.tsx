@@ -68,6 +68,7 @@ export default function FinanceDashboard() {
 
 import { getGlobalSalesTotals } from '@/lib/invoice';
 import { Loader2 } from 'lucide-react';
+import { formatCurrency } from '@/lib/format';
 
 function KPIStats({ selectedYear }: { selectedYear: number | 'all' }) {
   const [loading, setLoading] = React.useState(true);
@@ -91,13 +92,6 @@ function KPIStats({ selectedYear }: { selectedYear: number | 'all' }) {
     };
     fetchData();
   }, [selectedYear]);
-
-  const formatCurrency = (amount: number) => {
-    if (amount >= 1000) {
-      return (amount / 1000).toFixed(1) + ' k';
-    }
-    return amount.toLocaleString();
-  };
 
   const getAmountByType = (type: string) => {
     const item = data.salesByType.find((s) => s.saleType === type);

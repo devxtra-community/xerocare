@@ -18,6 +18,7 @@ import { Badge } from '@/components/ui/badge';
 import { useRouter } from 'next/navigation';
 import { getEmployeeById, getEmployeeIdProof, Employee } from '@/lib/employee';
 import { toast } from 'sonner';
+import { formatCurrency } from '@/lib/format';
 
 interface EmployeeProfileProps {
   id: string;
@@ -213,7 +214,7 @@ export default function EmployeeProfile({ id }: EmployeeProfileProps) {
               <DetailRow
                 icon={<CircleDollarSign />}
                 label="Monthly Remuneration"
-                value={`AED ${emp.salary?.toLocaleString() || '0'}`}
+                value={formatCurrency(emp.salary || 0)}
               />
               <DetailRow
                 icon={<Calendar />}

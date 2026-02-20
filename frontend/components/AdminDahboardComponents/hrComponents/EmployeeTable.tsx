@@ -43,6 +43,7 @@ import {
   Employee,
   EmployeeResponse,
 } from '@/lib/employee';
+import { formatCurrency } from '@/lib/format';
 
 /**
  * Table component for listing, filtering, and managing employees.
@@ -302,7 +303,7 @@ export default function EmployeeTable() {
                     <span className="text-xs text-gray-600">{emp.branch?.name || '---'}</span>
                   </TableCell>
                   <TableCell className="px-3 py-4 text-sm font-semibold text-blue-700 tabular-nums">
-                    AED {emp.salary?.toLocaleString() || '0'}
+                    {formatCurrency(emp.salary || 0)}
                   </TableCell>
                   <TableCell className="px-3 py-4">
                     <Badge

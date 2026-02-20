@@ -38,7 +38,7 @@ export default function PayrollPage() {
           role: item.role,
           branchName: item.branch_name,
           department: item.department,
-          salaryPerMonth: `₹ ${parseFloat(item.salary).toLocaleString()}`,
+          salaryPerMonth: `QAR ${parseFloat(item.salary).toLocaleString()}`,
           leaveDays: item.leave_days,
           status: item.status,
           paidDate: item.paid_date ? new Date(item.paid_date).toLocaleDateString() : '-',
