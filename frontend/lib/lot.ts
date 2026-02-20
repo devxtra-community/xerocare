@@ -48,6 +48,7 @@ export interface Lot {
   status: LotStatus;
   notes?: string;
   warehouseId?: string;
+  warehouse_id?: string;
   items: LotItem[];
   createdAt: string;
   updatedAt: string;

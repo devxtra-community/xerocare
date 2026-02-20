@@ -34,6 +34,7 @@ interface BulkSparePartDialogProps {
 }
 
 interface BulkSparePartRow {
+  item_code: string;
   part_name: string;
   brand: string;
   model_id: string;
@@ -44,12 +45,14 @@ interface BulkSparePartRow {
   lot_id?: string;
 }
 
-/** A model option derived from the selected lot's spare part items */
-interface LotModelOption {
+/** A spare part option derived from the selected lot's spare part items */
+interface LotSparePartOption {
+  itemCode: string;
+  partName: string;
+  brand: string;
   modelId: string;
-  modelName: string;
-  modelNo: string;
-  label: string; // "ModelName (ModelNo)"
+  basePrice: number;
+  label: string; // "itemCode - partName"
 }
 
 /**
@@ -73,7 +76,7 @@ export default function BulkSparePartDialog({
   // Lot state
   const [lots, setLots] = useState<Lot[]>([]);
   const [selectedLotId, setSelectedLotId] = useState('');
-  const [lotModelOptions, setLotModelOptions] = useState<LotModelOption[]>([]);
+  const [lotSparePartOptions, setLotSparePartOptions] = useState<LotSparePartOption[]>([]);
 
   const loadDependencies = async () => {
     try {
@@ -95,7 +98,7 @@ export default function BulkSparePartDialog({
       setRows([]);
       setFile(null);
       setSelectedLotId('');
-      setLotModelOptions([]);
+      setLotSparePartOptions([]);
       loadDependencies();
     }
   }, [open]);
@@ -105,36 +108,47 @@ export default function BulkSparePartDialog({
     setSelectedLotId(lotId);
 
     if (!lotId) {
-      setLotModelOptions([]);
+      setLotSparePartOptions([]);
       return;
     }
 
     const lot = lots.find((l) => l.id === lotId);
     if (!lot) return;
 
-    // Collect unique models from spare part items in this lot
-    const modelMap = new Map<string, LotModelOption>();
+    // Collect unique spare parts from spare part items in this lot
+    const sparePartMap = new Map<string, LotSparePartOption>();
     lot.items
-      .filter((item) => item.itemType === LotItemType.SPARE_PART && item.sparePart?.model)
+      .filter((item) => item.itemType === LotItemType.SPARE_PART && item.sparePart)
       .forEach((item) => {
-        const model = item.sparePart!.model!;
-        if (model.id && !modelMap.has(model.id)) {
-          modelMap.set(model.id, {
-            modelId: model.id,
-            modelName: model.model_name,
-            modelNo: model.model_no,
-            label: `${model.model_name} (${model.model_no})`,
+        const sp = item.sparePart!;
+        if (sp.item_code && !sparePartMap.has(sp.item_code)) {
+          sparePartMap.set(sp.item_code, {
+            itemCode: sp.item_code,
+            partName: sp.part_name,
+            brand: sp.brand,
+            modelId: sp.model_id || '',
+            basePrice: item.unitPrice || sp.base_price,
+            label: `${sp.item_code} - ${sp.part_name}`,
           });
         }
       });
 
-    setLotModelOptions(Array.from(modelMap.values()));
+    setLotSparePartOptions(Array.from(sparePartMap.values()));
 
     // Apply the lot_id to all existing rows
-    setRows((prev) => prev.map((r) => ({ ...r, lot_id: lotId })));
+    // Also auto-fill vendor and warehouse from the selected lot if not already set
+    setRows((prev) =>
+      prev.map((r) => ({
+        ...r,
+        lot_id: lotId,
+        vendor_id: r.vendor_id || lot.vendorId || '',
+        warehouse_id: r.warehouse_id || lot.warehouse_id || '',
+      })),
+    );
   };
 
   const createEmptyRow = (): Partial<BulkSparePartRow> => ({
+    item_code: '',
     part_name: '',
     brand: '',
     model_id: '',
@@ -174,34 +188,30 @@ export default function BulkSparePartDialog({
         return '';
       };
 
-      const rawModel = getVal([
-        'model_id',
-        'Model ID',
-        'Model',
-        'Compatible Model',
-        'Select Product from Lot',
-      ]);
+      const rawModel = getVal(['model_id', 'Model ID', 'Model', 'Compatible Model']);
+      let modelId = findIdByName(rawModel, []);
+      if (!modelId && rawModel) {
+        modelId = rawModel;
+      }
+
       const rawVendor = getVal(['vendor_id', 'Vendor ID', 'Vendor']);
       const rawWarehouse = getVal(['warehouse_id', 'Warehouse ID', 'Warehouse']);
 
-      let modelId = findIdByName(rawModel, []);
-      if (!modelId && rawModel) {
-        // Try to match by model name from the "Select Product from Lot" string which is "Name (ModelNo)"
-        const match = rawModel.toString().match(/\(([^)]+)\)/);
-        if (match && match[1]) {
-          // Try matching against lot model options if a lot is already selected
-          const found = lotModelOptions.find(
-            (o) => o.modelNo.toLowerCase() === match[1].toLowerCase(),
-          );
-          if (found) modelId = found.modelId;
+      const rawItemCode = getVal(['item_code', 'Item Code']);
+      let itemCode = rawItemCode;
+      const rawSelect = getVal(['Select Spare Parts from Lot', 'Select Product from Lot']);
+
+      if (!itemCode && rawSelect) {
+        const parts = rawSelect.toString().split(' - ');
+        if (parts.length > 1) {
+          itemCode = parts[0].trim();
         }
-        // Fall back to using the raw value (could be a UUID)
-        if (!modelId) modelId = rawModel;
       }
 
       const lotIdFromExcel = getVal(['lot_id', 'Lot ID', 'Lot', 'lot_number']);
 
       return {
+        item_code: itemCode,
         part_name: getVal(['part_name', 'Item Name', 'Name', 'Part Name']),
         brand: getVal(['brand', 'Brand']),
         model_id: modelId,
@@ -263,7 +273,7 @@ export default function BulkSparePartDialog({
   };
 
   const handleSubmit = async () => {
-    const validRows = rows.filter((r) => r.part_name);
+    const validRows = rows.filter((r) => r.part_name && r.item_code);
 
     if (!selectedLotId && !rows.some((r) => r.lot_id)) {
       toast.error('Please select a Lot before uploading');
@@ -271,7 +281,7 @@ export default function BulkSparePartDialog({
     }
 
     if (validRows.length === 0) {
-      toast.error('Please add at least one valid spare part');
+      toast.error('Please add at least one valid spare part with Item Code and Name');
       return;
     }
 
@@ -370,11 +380,11 @@ export default function BulkSparePartDialog({
           {/* Info: available models from this lot */}
           {selectedLot && (
             <div className="text-xs text-blue-600 font-medium mt-5">
-              {lotModelOptions.length > 0 ? (
+              {lotSparePartOptions.length > 0 ? (
                 <>
-                  ✓ {lotModelOptions.length} model(s) available from this lot:{' '}
+                  ✓ {lotSparePartOptions.length} part(s) available from this lot:{' '}
                   <span className="text-gray-600">
-                    {lotModelOptions.map((o) => o.label).join(', ')}
+                    {lotSparePartOptions.map((o) => o.label).join(', ')}
                   </span>
                 </>
               ) : (
@@ -399,23 +409,33 @@ export default function BulkSparePartDialog({
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[150px]">
+                  <TableHead className="min-w-[180px]">
+                    Item Code <span className="text-red-500">*</span>
+                  </TableHead>
+                  <TableHead className="min-w-[200px]">
                     Part Name <span className="text-red-500">*</span>
                   </TableHead>
-                  <TableHead className="w-[120px]">
+                  <TableHead className="min-w-[150px]">
                     Brand <span className="text-red-500">*</span>
                   </TableHead>
-                  <TableHead className="w-[100px]">Price</TableHead>
-                  <TableHead className="w-[80px]">Qty</TableHead>
-                  <TableHead className="w-[150px]">Vendor</TableHead>
-                  <TableHead className="w-[150px]">Warehouse</TableHead>
-                  <TableHead className="w-[200px]">Select Product from Lot</TableHead>
+                  <TableHead className="min-w-[120px]">Price</TableHead>
+                  <TableHead className="min-w-[100px]">Qty</TableHead>
+                  <TableHead className="min-w-[200px]">Vendor</TableHead>
+                  <TableHead className="min-w-[200px]">Warehouse</TableHead>
+                  <TableHead className="min-w-[300px]">Select Spare Parts from Lot</TableHead>
                   <TableHead className="w-[50px]"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {rows.map((row, i) => (
                   <TableRow key={i}>
+                    <TableCell>
+                      <Input
+                        value={row.item_code}
+                        onChange={(e) => updateRow(i, 'item_code', e.target.value)}
+                        placeholder="Code"
+                      />
+                    </TableCell>
                     <TableCell>
                       <Input
                         value={row.part_name}
@@ -483,24 +503,37 @@ export default function BulkSparePartDialog({
                     <TableCell>
                       {/* Select Product from Lot — shows models from the selected lot */}
                       <Select
-                        value={row.model_id || 'universal'}
-                        onValueChange={(v) => updateRow(i, 'model_id', v === 'universal' ? '' : v)}
+                        value={row.item_code || ''}
+                        onValueChange={(v) => {
+                          const opt = lotSparePartOptions.find((o) => o.itemCode === v);
+                          if (opt) {
+                            updateRow(i, 'item_code', opt.itemCode);
+                            updateRow(i, 'part_name', opt.partName);
+                            updateRow(i, 'brand', opt.brand);
+                            updateRow(i, 'model_id', opt.modelId);
+                            updateRow(i, 'base_price', opt.basePrice);
+                          } else {
+                            updateRow(i, 'item_code', v);
+                          }
+                        }}
                       >
                         <SelectTrigger>
-                          <SelectValue placeholder="Universal" />
+                          <SelectValue placeholder="Select Part" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="universal">Universal (no model)</SelectItem>
-                          {lotModelOptions.length > 0 ? (
-                            lotModelOptions.map((opt) => (
-                              <SelectItem key={opt.modelId} value={opt.modelId}>
+                          <SelectItem value="__none__" disabled>
+                            Select from lot to auto-fill
+                          </SelectItem>
+                          {lotSparePartOptions.length > 0 ? (
+                            lotSparePartOptions.map((opt) => (
+                              <SelectItem key={opt.itemCode} value={opt.itemCode}>
                                 {opt.label}
                               </SelectItem>
                             ))
                           ) : (
                             // Fallback: show a disabled hint if no lot selected
                             <SelectItem value="__none__" disabled>
-                              {selectedLotId ? 'No models in this lot' : 'Select a lot first'}
+                              {selectedLotId ? 'No spare parts in this lot' : 'Select a lot first'}
                             </SelectItem>
                           )}
                         </SelectContent>

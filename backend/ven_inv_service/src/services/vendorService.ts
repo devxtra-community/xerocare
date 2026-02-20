@@ -19,10 +19,13 @@ interface RequestProductsDTO {
   total_amount?: number;
 }
 
+import { EmployeeManagerRepository } from '../repositories/employeeManagerRepository';
+
 export class VendorService {
   constructor(
     private readonly vendorRepo: VendorRepository,
     private readonly requestRepo: VendorRequestRepository,
+    private readonly employeeManagerRepo: EmployeeManagerRepository,
   ) {}
 
   /**
@@ -115,9 +118,21 @@ export class VendorService {
     vendorId: string,
     data: RequestProductsDTO,
     userId: string,
+    email: string,
     branchId?: string,
   ) {
     const vendor = await this.getVendorById(vendorId);
+
+    // Check if the user exists in the employee manager table
+    let manager = await this.employeeManagerRepo.findActiveManager(userId);
+
+    if (!manager) {
+      manager = await this.employeeManagerRepo.save({
+        employee_id: userId,
+        email: email,
+        status: 'ACTIVE',
+      });
+    }
 
     await this.requestRepo.createRequest({
       vendor_id: vendorId,

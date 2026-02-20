@@ -18,6 +18,16 @@ import BulkSparePartDialog from '@/components/ManagerDashboardComponents/sparePa
 import { toast } from 'sonner';
 import { Pencil, Trash2 } from 'lucide-react';
 import EditSparePartDialog from '@/components/ManagerDashboardComponents/spareParts/EditSparePartDialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 export default function SparePartsPage() {
   const [parts, setParts] = useState<SparePartInventoryItem[]>([]);
@@ -26,6 +36,9 @@ export default function SparePartsPage() {
   const [addOpen, setAddOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [selectedPart, setSelectedPart] = useState<SparePartInventoryItem | null>(null);
+
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [partToDelete, setPartToDelete] = useState<{ id: string; name: string } | null>(null);
 
   const loadParts = async () => {
     try {
@@ -40,10 +53,10 @@ export default function SparePartsPage() {
     loadParts();
   }, []);
 
-  const handleDelete = async (id: string, name: string) => {
-    if (!confirm(`Are you sure you want to delete ${name}?`)) return;
+  const confirmDelete = async () => {
+    if (!partToDelete) return;
     try {
-      await sparePartService.deleteSparePart(id);
+      await sparePartService.deleteSparePart(partToDelete.id);
       toast.success('Spare part deleted successfully');
       loadParts();
     } catch (error: unknown) {
@@ -52,6 +65,9 @@ export default function SparePartsPage() {
         (error as { response?: { data?: { message?: string } } })?.response?.data?.message ||
         'Failed to delete spare part';
       toast.error(msg);
+    } finally {
+      setDeleteDialogOpen(false);
+      setPartToDelete(null);
     }
   };
 
@@ -62,9 +78,9 @@ export default function SparePartsPage() {
 
   const filtered = parts.filter(
     (p) =>
-      p.lot_number.toLowerCase().includes(search.toLowerCase()) ||
-      p.part_name.toLowerCase().includes(search.toLowerCase()) ||
-      p.brand.toLowerCase().includes(search.toLowerCase()),
+      (p.lot_number?.toLowerCase() || '').includes(search.toLowerCase()) ||
+      (p.part_name?.toLowerCase() || '').includes(search.toLowerCase()) ||
+      (p.brand?.toLowerCase() || '').includes(search.toLowerCase()),
   );
 
   return (
@@ -128,7 +144,12 @@ export default function SparePartsPage() {
                       <button onClick={() => handleEdit(item)}>
                         <Pencil size={18} />
                       </button>
-                      <button onClick={() => handleDelete(item.id, item.part_name)}>
+                      <button
+                        onClick={() => {
+                          setPartToDelete({ id: item.id, name: item.part_name });
+                          setDeleteDialogOpen(true);
+                        }}
+                      >
                         <Trash2 size={18} className="text-red-500" />
                       </button>
                     </div>
@@ -162,6 +183,27 @@ export default function SparePartsPage() {
           onSuccess={loadParts}
         />
       )}
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the spare part &quot;
+              {partToDelete?.name}&quot;.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setPartToDelete(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              className="bg-red-500 hover:bg-red-600 text-white"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

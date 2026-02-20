@@ -100,6 +100,7 @@ export class VendorController {
         req.params.id as string,
         { products, message, total_amount },
         userId,
+        req.user!.email!,
         branchId,
       );
 

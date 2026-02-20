@@ -65,6 +65,30 @@ export class SparePartService {
       );
     }
 
+    // Determine the warehouse and vendor for the duplicate check
+    // Usually retrieved via lot_id since SpareParts depend on lots for warehouse assignment currently
+    let warehouseId: string | undefined = undefined;
+    let vendorId: string | undefined = undefined;
+    if (data.lot_id) {
+      const lot = await this.lotService.getLotById(data.lot_id);
+      warehouseId = lot?.warehouse_id || undefined;
+      vendorId = lot?.vendorId || undefined;
+    }
+
+    // Check if a part with same code, model and warehouse already exists
+    const existingPart = await this.repo.findExistingSparePart(
+      data.part_name,
+      modelId,
+      warehouseId,
+      vendorId,
+    );
+
+    if (existingPart) {
+      await this.repo.updateStock(existingPart.id, quantity);
+      await deleteCached(`sparepart:${existingPart.id}`);
+      return { success: true, message: 'Existing spare part stock incremented' };
+    }
+
     const sparePart = await this.repo.createMaster({
       item_code: itemCode,
       part_name: data.part_name,

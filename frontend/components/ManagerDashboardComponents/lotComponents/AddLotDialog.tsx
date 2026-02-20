@@ -27,6 +27,7 @@ import { toast } from 'sonner';
 import { LotItemType, lotService, Vendor } from '@/lib/lot';
 import { getAllModels, Model } from '@/lib/model';
 import { getVendors } from '@/lib/vendor';
+import { getAllSpareParts, SparePart } from '@/lib/spare-part';
 import { getUserFromToken } from '@/lib/auth';
 import { brandService, Brand } from '@/services/brandService';
 import { SearchableSelect } from '@/components/ui/searchable-select';
@@ -136,6 +137,8 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [models, setModels] = useState<Model[]>([]);
   const [brands, setBrands] = useState<Brand[]>([]);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [spareParts, setSpareParts] = useState<SparePart[]>([]);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [isUploadMode, setIsUploadMode] = useState(false);
   const [uploadFile, setUploadFile] = useState<File | null>(null);
@@ -177,15 +180,17 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [vData, mData, bData, wData] = await Promise.all([
+        const [vData, mData, bData, spData, wData] = await Promise.all([
           getVendors(),
           getAllModels(),
           brandService.getAllBrands(),
+          getAllSpareParts(),
           getMyBranchWarehouses(),
         ]);
         setVendors(vData.data || []);
         setModels(mData || []);
         setBrands(bData || []);
+        setSpareParts(spData || []);
         setWarehouses(wData.data || []);
       } catch {
         toast.error('Failed to load form data');
@@ -294,9 +299,9 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
     <Dialog open={true} onOpenChange={() => {}}>
       <DialogContent
         showCloseButton={false}
-        className="sm:max-w-[80vw] lg:max-w-7xl h-[90vh] flex flex-col p-0 overflow-hidden bg-white shadow-2xl"
+        className="sm:max-w-[80vw] lg:max-w-7xl h-[96vh] flex flex-col p-0 overflow-hidden bg-white shadow-2xl"
       >
-        <DialogHeader className="px-6 py-4 border-b flex flex-row items-center justify-between space-y-0">
+        <DialogHeader className="px-6 py-3 border-b flex flex-row items-center justify-between space-y-0">
           <div>
             <DialogTitle className="text-xl font-bold">
               {isUploadMode ? 'Upload Lot from Excel' : 'Create New Lot'}
@@ -410,7 +415,7 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
               <div className="flex-1 overflow-hidden grid grid-cols-12 gap-0">
                 {/* Left Section: Main Form & Items (9 cols) */}
                 <div className="col-span-12 lg:col-span-9 flex flex-col h-full overflow-hidden border-r">
-                  <div className="p-6 pb-2 grid grid-cols-1 md:grid-cols-4 gap-6">
+                  <div className="p-4 pb-2 grid grid-cols-1 md:grid-cols-4 gap-4">
                     <FormField
                       control={formControl}
                       name="vendorId"
@@ -419,24 +424,19 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
                           <FormLabel className="text-sm font-medium text-gray-700">
                             Vendor
                           </FormLabel>
-                          <Select
-                            onValueChange={field.onChange}
-                            defaultValue={field.value}
-                            value={field.value}
-                          >
-                            <FormControl>
-                              <SelectTrigger className="h-10">
-                                <SelectValue placeholder="Select Vendor" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {vendors.map((v) => (
-                                <SelectItem key={v.id} value={v.id}>
-                                  {v.name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                          <FormControl>
+                            <SearchableSelect
+                              value={field.value}
+                              onValueChange={field.onChange}
+                              options={vendors.map((v) => ({
+                                value: v.id,
+                                label: `${v.name} (${v.id})`,
+                              }))}
+                              placeholder="Select Vendor"
+                              emptyText="No vendors found."
+                              className="h-10 text-sm"
+                            />
+                          </FormControl>
                           <FormMessage />
                         </FormItem>
                       )}
@@ -514,7 +514,7 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
                     />
                   </div>
 
-                  <div className="flex items-center justify-between px-6 py-4 mt-2">
+                  <div className="flex items-center justify-between px-4 py-2 mt-0">
                     <h3 className="text-base font-bold text-gray-900 flex items-center gap-2">
                       Lot Items
                     </h3>
@@ -539,14 +539,14 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
                     </Button>
                   </div>
 
-                  <div className="flex-1 overflow-hidden px-6 pb-6 pt-0">
+                  <div className="flex-1 overflow-hidden px-4 pb-4 pt-0">
                     <div className="h-full border rounded-lg flex flex-col overflow-hidden bg-gray-50/50">
                       {/* Table Header */}
                       <div className="grid grid-cols-12 gap-4 px-4 py-3 bg-gray-50 border-b text-xs font-bold text-gray-500 uppercase tracking-wider">
                         <div className="col-span-2">Type</div>
-                        <div className="col-span-12 md:col-span-5">Item Details</div>
-                        <div className="col-span-2">Quantity</div>
-                        <div className="col-span-2">Unit Price</div>
+                        <div className="col-span-12 md:col-span-6">Item Details</div>
+                        <div className="col-span-1 text-center">Qty</div>
+                        <div className="col-span-2 text-center">Price</div>
                         <div className="col-span-1 text-center">Action</div>
                       </div>
 
@@ -593,7 +593,7 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
                                 )}
                               />
                             </div>
-                            <div className="col-span-12 md:col-span-5">
+                            <div className="col-span-12 md:col-span-6">
                               <div className="text-xs font-semibold text-gray-500 mb-1.5 md:hidden">
                                 Item Details
                               </div>
@@ -609,64 +609,102 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
                                           control={formControl}
                                           name={`items.${index}.modelId`}
                                           render={({ field: modelField }) => (
-                                            <Select
-                                              onValueChange={modelField.onChange}
-                                              value={modelField.value}
-                                            >
-                                              <SelectTrigger className="h-10 text-sm bg-gray-50/50">
-                                                <SelectValue placeholder="Select Product" />
-                                              </SelectTrigger>
-                                              <SelectContent>
-                                                {models.map((m) => (
-                                                  <SelectItem key={m.id} value={m.id}>
-                                                    {m.model_name}
-                                                  </SelectItem>
-                                                ))}
-                                              </SelectContent>
-                                            </Select>
+                                            <FormItem>
+                                              <FormControl>
+                                                <SearchableSelect
+                                                  value={modelField.value}
+                                                  onValueChange={modelField.onChange}
+                                                  options={models.map((m) => ({
+                                                    value: m.id,
+                                                    label: `${m.model_name} (${m.id})`,
+                                                    description: m.model_no,
+                                                  }))}
+                                                  placeholder="Select Model"
+                                                  emptyText="No Model found."
+                                                  className="h-10 text-sm bg-gray-50/50"
+                                                />
+                                              </FormControl>
+                                              <FormMessage />
+                                            </FormItem>
                                           )}
                                         />
                                       ) : (
-                                        <div className="grid grid-cols-2 gap-2">
-                                          <FormField
-                                            control={formControl}
-                                            name={`items.${index}.brand`}
-                                            render={({ field: brandField }) => (
-                                              <FormItem>
-                                                <FormControl>
-                                                  <SearchableSelect
-                                                    value={brandField.value}
-                                                    onValueChange={brandField.onChange}
-                                                    options={brands.map((brand) => ({
-                                                      value: brand.name,
-                                                      label: brand.name,
-                                                      description: brand.description || '',
-                                                    }))}
-                                                    placeholder="Select Brand"
-                                                    emptyText="No brands found."
-                                                    className="h-10 text-sm bg-gray-50/50"
-                                                  />
-                                                </FormControl>
-                                                <FormMessage />
-                                              </FormItem>
-                                            )}
-                                          />
-                                          <FormField
-                                            control={formControl}
-                                            name={`items.${index}.partName`}
-                                            render={({ field: partNameField }) => (
-                                              <FormItem>
-                                                <FormControl>
-                                                  <Input
-                                                    placeholder="Part Name"
-                                                    className="h-10 text-sm bg-gray-50/50"
-                                                    {...partNameField}
-                                                  />
-                                                </FormControl>
-                                                <FormMessage />
-                                              </FormItem>
-                                            )}
-                                          />
+                                        <div className="grid grid-cols-12 gap-2">
+                                          <div className="col-span-4">
+                                            <FormField
+                                              control={formControl}
+                                              name={`items.${index}.brand`}
+                                              render={({ field: brandField }) => (
+                                                <FormItem>
+                                                  <FormControl>
+                                                    <SearchableSelect
+                                                      value={brandField.value}
+                                                      onValueChange={brandField.onChange}
+                                                      options={brands.map((brand) => ({
+                                                        value: brand.name,
+                                                        label: brand.name,
+                                                        description: brand.description || '',
+                                                      }))}
+                                                      placeholder="Brand"
+                                                      emptyText="No brands."
+                                                      className="h-10 text-sm bg-gray-50/50"
+                                                    />
+                                                  </FormControl>
+                                                  <FormMessage />
+                                                </FormItem>
+                                              )}
+                                            />
+                                          </div>
+                                          <div className="col-span-4">
+                                            <FormField
+                                              control={formControl}
+                                              name={`items.${index}.modelId`} // Reusing modelId for compatible model
+                                              render={({ field: cmField }) => (
+                                                <FormItem>
+                                                  <FormControl>
+                                                    <SearchableSelect
+                                                      value={cmField.value}
+                                                      onValueChange={cmField.onChange}
+                                                      options={[
+                                                        {
+                                                          value: 'universal',
+                                                          label: 'Universal',
+                                                          description: 'Compatible with all',
+                                                        },
+                                                        ...models.map((m) => ({
+                                                          value: m.id,
+                                                          label: m.model_name,
+                                                          description: m.model_no,
+                                                        })),
+                                                      ]}
+                                                      placeholder="Comp. Model"
+                                                      emptyText="No models."
+                                                      className="h-10 text-sm bg-gray-50/50"
+                                                    />
+                                                  </FormControl>
+                                                  <FormMessage />
+                                                </FormItem>
+                                              )}
+                                            />
+                                          </div>
+                                          <div className="col-span-4">
+                                            <FormField
+                                              control={formControl}
+                                              name={`items.${index}.partName`}
+                                              render={({ field: partNameField }) => (
+                                                <FormItem>
+                                                  <FormControl>
+                                                    <Input
+                                                      placeholder="Part Name"
+                                                      className="h-10 text-sm bg-gray-50/50"
+                                                      {...partNameField}
+                                                    />
+                                                  </FormControl>
+                                                  <FormMessage />
+                                                </FormItem>
+                                              )}
+                                            />
+                                          </div>
                                         </div>
                                       )}
                                     </>
@@ -674,7 +712,7 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
                                 }}
                               />
                             </div>
-                            <div className="col-span-6 md:col-span-2">
+                            <div className="col-span-6 md:col-span-1">
                               <div className="text-xs font-semibold text-gray-500 mb-1.5 md:hidden">
                                 Quantity
                               </div>
@@ -685,7 +723,7 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
                                   <Input
                                     type="number"
                                     min="1"
-                                    className="h-10 text-sm bg-gray-50/50"
+                                    className="h-10 text-sm bg-gray-50/50 text-center"
                                     placeholder="Qty"
                                     {...field}
                                   />
@@ -697,7 +735,7 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
                                 Unit Price
                               </div>
                               <div className="relative">
-                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">
+                                <span className="absolute left-1 top-1/2 -translate-y-1/2 text-gray-500 text-xs">
                                   $
                                 </span>
                                 <FormField
@@ -708,8 +746,8 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
                                       type="number"
                                       min="0"
                                       step="0.01"
-                                      className="h-10 text-sm pl-7 bg-gray-50/50"
-                                      placeholder="0.00"
+                                      className="h-10 text-sm pl-4 bg-gray-50/50"
+                                      placeholder="0"
                                       {...field}
                                     />
                                   )}
@@ -807,10 +845,10 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
               </div>
 
               {/* Footer */}
-              <div className="p-6 border-t bg-white flex flex-col sm:flex-row justify-between items-center gap-4 z-10 shrink-0">
+              <div className="px-6 py-2 border-t bg-white flex flex-col sm:flex-row justify-between items-center gap-4 z-10 shrink-0">
                 <div className="flex items-center gap-2">
-                  <span className="text-lg text-gray-600 font-bold">Grand Total:</span>
-                  <span className="text-3xl font-bold tracking-tight text-blue-600">
+                  <span className="text-base text-gray-600 font-bold">Grand Total:</span>
+                  <span className="text-2xl font-bold tracking-tight text-blue-600">
                     $
                     {calculateGrandTotal().toLocaleString(undefined, {
                       minimumFractionDigits: 2,
@@ -830,8 +868,8 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
                   <Button
                     type="submit"
                     disabled={loading}
-                    size="lg"
-                    className="min-w-[140px] bg-blue-700 hover:bg-blue-800 text-white font-semibold"
+                    size="sm"
+                    className="min-w-[120px] bg-blue-700 hover:bg-blue-800 text-white font-semibold"
                   >
                     {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     {loading ? 'Saving...' : 'Save Lot'}
