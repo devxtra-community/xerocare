@@ -32,8 +32,55 @@ export class Model {
   @Column({ type: 'text', nullable: true })
   description!: string;
 
-  @Column({ type: 'numeric', default: 0 })
+  @Column({
+    type: 'numeric',
+    default: 0,
+    transformer: {
+      to: (value: number) => value,
+      from: (value: string) => Number(value),
+    },
+  })
   quantity!: number;
+
+  @Column({
+    type: 'numeric',
+    default: 0,
+    transformer: {
+      to: (value: number) => value,
+      from: (value: string) => Number(value),
+    },
+  })
+  available!: number;
+
+  @Column({
+    type: 'numeric',
+    default: 0,
+    transformer: {
+      to: (value: number) => value,
+      from: (value: string) => Number(value),
+    },
+  })
+  rented!: number;
+
+  @Column({
+    type: 'numeric',
+    default: 0,
+    transformer: {
+      to: (value: number) => value,
+      from: (value: string) => Number(value),
+    },
+  })
+  leased!: number;
+
+  @Column({
+    type: 'numeric',
+    default: 0,
+    transformer: {
+      to: (value: number) => value,
+      from: (value: string) => Number(value),
+    },
+  })
+  sold!: number;
 
   @OneToMany(() => Product, (product) => product.model)
   products!: Product[];

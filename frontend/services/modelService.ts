@@ -18,13 +18,37 @@ export interface CreateModelDTO {
   description: string;
 }
 
+export interface PaginatedResponse<T> {
+  data: T[];
+  page: number;
+  limit: number;
+  total: number;
+}
+
 export const modelService = {
   /**
    * Retrieves all models.
    */
-  getAllModels: async (): Promise<Model[]> => {
-    const response = await api.get('/i/models');
-    return response.data.data;
+  getAllModels: async (params?: {
+    page?: number;
+    limit?: number;
+    search?: string;
+  }): Promise<PaginatedResponse<Model>> => {
+    const response = await api.get('/i/models', { params });
+    const resData = response.data;
+    const coreData = resData.data || resData;
+
+    if (coreData && coreData.page !== undefined) {
+      return coreData as PaginatedResponse<Model>;
+    }
+
+    const dataArray = Array.isArray(coreData) ? coreData : [];
+    return {
+      data: dataArray,
+      page: 1,
+      limit: 10,
+      total: dataArray.length,
+    };
   },
 
   /**

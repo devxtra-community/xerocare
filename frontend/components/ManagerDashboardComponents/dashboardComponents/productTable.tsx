@@ -11,7 +11,11 @@ import {
 
 import { useEffect, useState } from 'react';
 import { inventoryService, InventoryItem } from '@/services/inventoryService';
-import { sparePartService, SparePartInventoryItem } from '@/services/sparePartService';
+import {
+  sparePartService,
+  SparePartInventoryItem,
+  PaginatedResponse,
+} from '@/services/sparePartService';
 import { Input } from '@/components/ui/input';
 import {
   Select,
@@ -56,7 +60,8 @@ export default function DashbordTable() {
           id: `${m.model_id}-${m.warehouse_id}`,
         }));
 
-        const spares = spareParts.map((s: SparePartInventoryItem) => ({
+        const sparesRes = (spareParts as PaginatedResponse<SparePartInventoryItem>).data || [];
+        const spares = sparesRes.map((s: SparePartInventoryItem) => ({
           ...s,
           display_type: 'Spare Part',
           product_name: s.part_name,

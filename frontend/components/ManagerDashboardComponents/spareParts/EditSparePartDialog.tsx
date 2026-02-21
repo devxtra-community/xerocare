@@ -80,7 +80,7 @@ export default function EditSparePartDialog({
           vendorService.getVendors(),
         ]);
 
-        setModels(modelRes || []);
+        setModels(modelRes.data || []);
         const whs = whRes || [];
         setWarehouses(whs);
         const vens = vendorRes || [];
@@ -89,7 +89,7 @@ export default function EditSparePartDialog({
         // Pre-fill logic
         let modelId = '';
         if (product.compatible_model) {
-          const found = (modelRes || []).find(
+          const found = (modelRes.data || []).find(
             (m: Model) => m.model_name === product.compatible_model,
           );
           if (found) modelId = found.id;

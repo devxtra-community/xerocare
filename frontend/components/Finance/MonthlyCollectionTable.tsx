@@ -1,14 +1,18 @@
 'use client';
 
 import React, { useEffect, useState, useCallback } from 'react';
+import { StandardTable } from '@/components/table/StandardTable';
+import { usePagination } from '@/hooks/usePagination';
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { getCollectionAlerts, CollectionAlert } from '@/lib/invoice';
@@ -29,12 +33,16 @@ export default function MonthlyCollectionTable({ mode }: { mode?: 'RENT' | 'LEAS
   const [loading, setLoading] = useState(true);
   const [selectedContract, setSelectedContract] = useState<CollectionAlert | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [confirmSummaryOpen, setConfirmSummaryOpen] = useState(false);
+  const [contractToComplete, setContractToComplete] = useState<CollectionAlert | null>(null);
 
   const [viewingInvoice, setViewingInvoice] = useState<Invoice | null>(null);
   const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [historyContractId, setHistoryContractId] = useState<string>('');
   const [contractItems, setContractItems] = useState<Record<string, string>>({});
+
+  const { page, limit, setPage, setLimit } = usePagination(10);
   // const years = Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 1 + i);
 
   const handleShowHistory = (alert: CollectionAlert) => {
@@ -92,24 +100,26 @@ export default function MonthlyCollectionTable({ mode }: { mode?: 'RENT' | 'LEAS
     setIsModalOpen(true);
   };
 
-  const handleGenerateFinalSummary = async (alert: CollectionAlert) => {
-    if (
-      !confirm(
-        `Are you sure you want to generate the final summary for ${alert.invoiceNumber}? This will mark the contract as COMPLETED.`,
-      )
-    )
-      return;
+  const confirmFinalSummary = (alert: CollectionAlert) => {
+    setContractToComplete(alert);
+    setConfirmSummaryOpen(true);
+  };
+
+  const executeFinalSummary = async () => {
+    if (!contractToComplete) return;
 
     setLoading(true);
+    setConfirmSummaryOpen(false);
     try {
       const { generateConsolidatedFinalInvoice } = await import('@/lib/invoice');
-      await generateConsolidatedFinalInvoice(alert.contractId);
+      await generateConsolidatedFinalInvoice(contractToComplete.contractId);
       toast.success('Final summary generated and contract completed!');
       fetchAlerts();
     } catch (error: unknown) {
       toast.error((error as { message?: string }).message || 'Failed to generate final summary');
     } finally {
       setLoading(false);
+      setContractToComplete(null);
     }
   };
 
@@ -145,146 +155,176 @@ export default function MonthlyCollectionTable({ mode }: { mode?: 'RENT' | 'LEAS
       </div>
 
       <div className="overflow-hidden rounded-lg border border-slate-200">
-        <Table>
-          <TableHeader className="bg-muted/50">
-            <TableRow>
-              <TableHead>INV NUMBER</TableHead>
-              <TableHead>CUSTOMER</TableHead>
-              <TableHead>ITEMS</TableHead>
-              <TableHead className="uppercase">Current Billing Period</TableHead>
-              <TableHead>AMOUNT</TableHead>
-              <TableHead>STATUS</TableHead>
-              <TableHead>HISTORY</TableHead>
-              <TableHead className="text-right">ACTION</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {alerts.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={7} className="h-32 text-center text-slate-500 bg-slate-50/30">
-                  <div className="flex flex-col items-center gap-2">
-                    <FileText className="h-8 w-8 opacity-20" />
-                    <p className="font-medium text-slate-400">No pending collections found</p>
-                  </div>
-                </TableCell>
-              </TableRow>
-            ) : (
-              alerts.map((alert) => (
-                <TableRow key={alert.contractId}>
-                  <TableCell className="font-medium">{alert.invoiceNumber}</TableCell>
-                  <TableCell className="font-medium">
-                    <div className="flex flex-col">
-                      {alert.customerName || 'Unknown Customer'}
-                      <div className="text-xs text-muted-foreground">
-                        {alert.customerPhone || alert.customerId}
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell className="max-w-[200px]">
-                    <div className="text-xs font-medium text-slate-700 truncate">
-                      {contractItems[alert.contractId] || 'Loading...'}
-                    </div>
-                  </TableCell>
-                  {/* Show empty cell for completed contracts to maintain table structure */}
-                  <TableCell className="text-xs text-muted-foreground font-medium">
-                    {alert.contractStatus !== 'COMPLETED' &&
-                    alert.usageData?.billingPeriodStart &&
-                    alert.usageData?.billingPeriodEnd
-                      ? `${format(new Date(alert.usageData.billingPeriodStart), 'MMM dd')} - ${format(new Date(alert.usageData.billingPeriodEnd), 'MMM dd, yyyy')}`
-                      : alert.contractStatus !== 'COMPLETED'
-                        ? 'N/A'
-                        : ''}
-                  </TableCell>
-                  <TableCell className="font-bold text-slate-700">
-                    {(() => {
-                      const isFinalMonth = alert.type === 'SUMMARY_PENDING';
-
-                      if (isFinalMonth) return <span className="text-blue-600">₹0 (Adjusted)</span>;
-
-                      const amount = alert.totalAmount || alert.monthlyRent || 0;
-                      return `₹${Number(amount).toLocaleString()}`;
-                    })()}
-                  </TableCell>
-                  <TableCell>
-                    {alert.type === 'USAGE_PENDING' && (
-                      <Badge
-                        variant="outline"
-                        className="bg-orange-50 text-orange-600 border-orange-200"
-                      >
-                        Usage Pending
-                      </Badge>
-                    )}
-                    {alert.type === 'SUMMARY_PENDING' && (
-                      <Badge variant="outline" className="bg-blue-50 text-blue-600 border-blue-200">
-                        Tenure reached
-                      </Badge>
-                    )}
-                    {alert.type === 'INVOICE_PENDING' && (
-                      <Badge
-                        variant="outline"
-                        className="bg-green-50 text-green-600 border-green-200"
-                      >
-                        Usage Completed
-                      </Badge>
-                    )}
-                    {alert.contractStatus === 'COMPLETED' && (
-                      <Badge
-                        variant="outline"
-                        className="bg-green-50 text-green-600 border-green-200 ml-2"
-                      >
-                        Completed
-                      </Badge>
-                    )}
-                  </TableCell>
-                  <TableCell>
+        <StandardTable
+          columns={[
+            {
+              id: 'inv',
+              header: 'INV NUMBER',
+              accessorKey: 'invoiceNumber' as keyof CollectionAlert,
+              className: 'font-medium uppercase text-[11px] text-primary',
+            },
+            {
+              id: 'customer',
+              header: 'CUSTOMER',
+              className: 'font-semibold uppercase text-[11px] text-primary',
+              cell: (alert: CollectionAlert) => (
+                <div className="flex flex-col">
+                  <span className="font-medium text-[13px]">
+                    {alert.customerName || 'Unknown Customer'}
+                  </span>
+                  <span className="text-[11px] text-muted-foreground">
+                    {alert.customerPhone || alert.customerId}
+                  </span>
+                </div>
+              ),
+            },
+            {
+              id: 'items',
+              header: 'ITEMS',
+              className: 'font-semibold uppercase text-[11px] text-primary max-w-[200px]',
+              cell: (alert: CollectionAlert) => (
+                <div className="text-[12px] font-medium text-slate-700 truncate">
+                  {contractItems[alert.contractId] || 'Loading...'}
+                </div>
+              ),
+            },
+            {
+              id: 'period',
+              header: 'CURRENT BILLING PERIOD',
+              className: 'font-semibold uppercase text-[11px] text-primary',
+              cell: (alert: CollectionAlert) => {
+                if (alert.contractStatus === 'COMPLETED') return '';
+                if (alert.usageData?.billingPeriodStart && alert.usageData?.billingPeriodEnd) {
+                  return `${format(new Date(alert.usageData.billingPeriodStart), 'MMM dd')} - ${format(new Date(alert.usageData.billingPeriodEnd), 'MMM dd, yyyy')}`;
+                }
+                return 'N/A';
+              },
+            },
+            {
+              id: 'amount',
+              header: 'AMOUNT',
+              className: 'font-semibold uppercase text-[11px] text-primary',
+              cell: (alert: CollectionAlert) => {
+                const isFinalMonth = alert.type === 'SUMMARY_PENDING';
+                if (isFinalMonth)
+                  return <span className="text-blue-600 font-bold">₹0 (Adjusted)</span>;
+                const amount = alert.totalAmount || alert.monthlyRent || 0;
+                return (
+                  <span className="font-bold text-slate-700">
+                    ₹{Number(amount).toLocaleString()}
+                  </span>
+                );
+              },
+            },
+            {
+              id: 'status',
+              header: 'STATUS',
+              className: 'font-semibold uppercase text-[11px] text-primary',
+              cell: (alert: CollectionAlert) => (
+                <div className="flex flex-col gap-1 items-start">
+                  {alert.type === 'USAGE_PENDING' && (
+                    <Badge
+                      variant="outline"
+                      className="bg-orange-50 text-orange-600 border-orange-200 uppercase text-[9px] font-bold"
+                    >
+                      Usage Pending
+                    </Badge>
+                  )}
+                  {alert.type === 'SUMMARY_PENDING' && (
+                    <Badge
+                      variant="outline"
+                      className="bg-blue-50 text-blue-600 border-blue-200 uppercase text-[9px] font-bold"
+                    >
+                      Tenure reached
+                    </Badge>
+                  )}
+                  {alert.type === 'INVOICE_PENDING' && (
+                    <Badge
+                      variant="outline"
+                      className="bg-green-50 text-green-600 border-green-200 uppercase text-[9px] font-bold"
+                    >
+                      Usage Completed
+                    </Badge>
+                  )}
+                  {alert.contractStatus === 'COMPLETED' && (
+                    <Badge
+                      variant="outline"
+                      className="bg-green-50 text-green-600 border-green-200 uppercase text-[9px] font-bold mt-1"
+                    >
+                      Completed
+                    </Badge>
+                  )}
+                </div>
+              ),
+            },
+            {
+              id: 'history',
+              header: 'HISTORY',
+              className: 'font-semibold uppercase text-[11px] text-primary',
+              cell: (alert: CollectionAlert) => (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 w-7 p-0 text-blue-600 hover:bg-blue-50"
+                  onClick={() => handleShowHistory(alert)}
+                  title="View History"
+                >
+                  <HistoryIcon className="h-4 w-4" />
+                </Button>
+              ),
+            },
+            {
+              id: 'action',
+              header: 'ACTION',
+              className: 'font-semibold text-[11px] text-primary uppercase text-right',
+              cell: (alert: CollectionAlert) => (
+                <div className="flex justify-end gap-1">
+                  {alert.type === 'USAGE_PENDING' && (
                     <Button
                       size="sm"
-                      variant="ghost"
-                      className="h-7 w-7 p-0 text-blue-600 hover:bg-blue-50"
-                      onClick={() => handleShowHistory(alert)}
+                      onClick={() => handleRecordUsage(alert)}
+                      className="bg-blue-600 hover:bg-blue-700 text-white h-8 px-3 text-[11px] font-medium"
                     >
-                      <HistoryIcon className="h-3.5 w-3.5" />
+                      <PlusCircle className="h-3.5 w-3.5 mr-1.5" />
+                      Record Usage
                     </Button>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    {alert.type === 'USAGE_PENDING' && (
-                      <Button
-                        size="sm"
-                        onClick={() => handleRecordUsage(alert)}
-                        className="bg-blue-600 hover:bg-blue-700 text-white h-7 px-3 text-xs"
-                      >
-                        <PlusCircle className="h-3 w-3 mr-1.5" />
-                        Record Usage
-                      </Button>
-                    )}
-                    {alert.type === 'SUMMARY_PENDING' && (
-                      <Button
-                        size="sm"
-                        variant="destructive"
-                        onClick={() => handleGenerateFinalSummary(alert)}
-                        className="h-7 px-3 text-xs"
-                      >
-                        <FileText className="h-3 w-3 mr-1.5" />
-                        Final Summary
-                      </Button>
-                    )}
-                    {(alert.type === 'INVOICE_PENDING' || alert.type === 'SEND_PENDING') && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleViewDetails(alert)}
-                        className="h-7 px-3 text-xs"
-                      >
-                        <Eye className="h-3 w-3 mr-1.5" />
-                        View
-                      </Button>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
+                  )}
+                  {alert.type === 'SUMMARY_PENDING' && (
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      onClick={() => confirmFinalSummary(alert)}
+                      className="h-8 px-3 text-[11px] font-medium"
+                    >
+                      <FileText className="h-3.5 w-3.5 mr-1.5" />
+                      Final Summary
+                    </Button>
+                  )}
+                  {(alert.type === 'INVOICE_PENDING' || alert.type === 'SEND_PENDING') && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleViewDetails(alert)}
+                      className="h-8 px-3 text-[11px] font-medium"
+                    >
+                      <Eye className="h-3.5 w-3.5 mr-1.5" />
+                      View
+                    </Button>
+                  )}
+                </div>
+              ),
+            },
+          ]}
+          data={alerts.slice((page - 1) * limit, page * limit)}
+          loading={loading}
+          emptyMessage="No pending collections found"
+          keyExtractor={(a) => a.contractId}
+          page={page}
+          limit={limit}
+          total={alerts.length}
+          onPageChange={setPage}
+          onLimitChange={setLimit}
+        />
       </div>
 
       {selectedContract && (
@@ -318,6 +358,28 @@ export default function MonthlyCollectionTable({ mode }: { mode?: 'RENT' | 'LEAS
           alerts.find((a) => a.contractId === historyContractId)?.customerName || 'History'
         }
       />
+
+      <AlertDialog open={confirmSummaryOpen} onOpenChange={setConfirmSummaryOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Generate Final Summary?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to generate the final summary for invoice{' '}
+              <strong>{contractToComplete?.invoiceNumber}</strong>? This action will mark the
+              contract as COMPLETED and a final consolidated statement will be generated.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={executeFinalSummary}
+              className="bg-primary hover:bg-primary/90"
+            >
+              Generate Final Summary
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

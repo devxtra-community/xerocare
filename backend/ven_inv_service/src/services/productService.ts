@@ -78,9 +78,6 @@ export class ProductService {
           );
         }
 
-        await this.model.updateModel(modelDetails.id, {
-          quantity: Number(modelDetails.quantity) + 1,
-        });
         const product = await this.productRepo.addProduct({
           vendor_id: String(row.vendor_id),
           serial_no: row.serial_no,
@@ -96,6 +93,8 @@ export class ProductService {
           max_discount_amount: maxDiscount,
           lot_id: row.lot_id,
         });
+
+        await this.model.syncModelQuantities(modelDetails.id);
 
         await setCached(`product:${product.id}`, product, 3600);
 
@@ -147,9 +146,6 @@ export class ProductService {
       if (!warehouseDetails) {
         throw new AppError('warehouse not found ', 404);
       }
-      await this.model.updateModel(modelDetails.id, {
-        quantity: Number(modelDetails.quantity) + 1,
-      });
       const product = await this.productRepo.addProduct({
         vendor_id: String(data.vendor_id),
         serial_no: data.serial_no,
@@ -166,6 +162,8 @@ export class ProductService {
         imageUrl: data.imageUrl,
         lot_id: data.lot_id,
       });
+
+      await this.model.syncModelQuantities(modelDetails.id);
 
       await setCached(`product:${product.id}`, product, 3600);
 
@@ -187,20 +185,16 @@ export class ProductService {
     if (!product) {
       throw new AppError('Product not found', 404);
     }
-    const modelDetails = await this.model.findbyid(product.model_id);
-    if (modelDetails) {
-      await this.model.updateModel(modelDetails.id, {
-        quantity: Number(modelDetails.quantity) - 1,
-      });
-    }
-
     await deleteCached(`product:${id}`);
 
+    const result = await this.productRepo.deleteProduct(id);
+
     if (product.model_id) {
+      await this.model.syncModelQuantities(product.model_id);
       await this.modelService.syncToRedis(product.model_id);
     }
 
-    return this.productRepo.deleteProduct(id);
+    return result;
   }
 
   /**

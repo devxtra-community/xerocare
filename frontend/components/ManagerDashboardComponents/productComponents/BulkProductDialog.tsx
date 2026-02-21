@@ -57,8 +57,9 @@ export function BulkProductDialog({ open, onClose, onSuccess }: BulkProductDialo
     if (wResult.status === 'fulfilled') setWarehouses(wResult.value);
     else console.error('Failed to load warehouses:', wResult.reason);
 
-    if (lResult.status === 'fulfilled') setLots(lResult.value);
-    else console.error('Failed to load lots:', lResult.reason);
+    if (lResult.status === 'fulfilled') {
+      setLots(lResult.value.data || []);
+    } else console.error('Failed to load lots:', lResult.reason);
 
     // Only show a toast if vendors AND warehouses both failed (truly broken)
     if (vResult.status === 'rejected' && wResult.status === 'rejected') {

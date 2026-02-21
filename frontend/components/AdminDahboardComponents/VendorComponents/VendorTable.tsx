@@ -1,34 +1,24 @@
 'use client';
 
 import React, { useState } from 'react';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { StandardTable } from '@/components/table/StandardTable';
+import { DeleteConfirmDialog } from '@/components/dialogs/DeleteConfirmDialog';
+import { usePagination } from '@/hooks/usePagination';
+import VendorStats from './VendorStats';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Search, Eye, Edit, Plus, Trash2 } from 'lucide-react';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from '@/components/ui/dialog';
+import { Eye, Edit, Trash2 } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useRouter } from 'next/navigation';
 import {
   createVendor,
   updateVendor,
   deleteVendor as apiDeleteVendor,
+  getVendors,
   requestProducts,
 } from '@/lib/vendor';
 import { toast } from 'sonner';
 import { AxiosError } from 'axios';
-import { formatCurrency } from '@/lib/format';
 import {
   Select,
   SelectContent,
@@ -70,37 +60,74 @@ export { type Vendor }; // Export so parent can use it
  * Features search, filtering by type, adding/editing vendors, and requesting products.
  * Displays key metrics like total orders and outstanding amounts for each vendor.
  */
-export default function VendorTable({
-  vendors,
-  loading,
-  onRefresh,
-  basePath = '/admin',
-}: {
-  vendors: Vendor[];
-  loading: boolean;
-  onRefresh: () => void | Promise<void>;
-  basePath?: string;
-}) {
+export default function VendorTable({ basePath = '/admin' }: { basePath?: string }) {
   const router = useRouter();
-  const [search, setSearch] = useState('');
-  const [filterType, setFilterType] = useState<'All' | 'Supplier' | 'Distributor' | 'Service'>(
-    'All',
-  );
+  const [search] = useState('');
+  const [filterType] = useState<'All' | 'Supplier' | 'Distributor' | 'Service'>('All');
+  const [vendors, setVendors] = useState<Vendor[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const { page, limit, total, setPage, setLimit, setTotal } = usePagination(10);
+  const [stats, setStats] = useState({ total: 0, active: 0, newVendors: 0 });
 
   const [formOpen, setFormOpen] = useState(false);
   const [editingVendor, setEditingVendor] = useState<Vendor | null>(null);
   const [deleteVendor, setDeleteVendorTarget] = useState<Vendor | null>(null);
   const [requestVendor, setRequestVendor] = useState<Vendor | null>(null);
 
-  /* Fetched in parent */
+  const fetchVendorsData = async () => {
+    setLoading(true);
+    try {
+      const typeFilter = filterType !== 'All' ? filterType : undefined;
+      const res = await getVendors({ page, limit, search, type: typeFilter });
+      const rawVendors = res.data || [];
 
-  const filteredVendors = vendors.filter((vendor) => {
-    const matchesSearch =
-      vendor.name.toLowerCase().includes(search.toLowerCase()) ||
-      vendor.contactPerson.toLowerCase().includes(search.toLowerCase());
-    const matchesType = filterType === 'All' || vendor.type === filterType;
-    return matchesSearch && matchesType;
-  });
+      const mappedVendors: Vendor[] = rawVendors.map((v: Record<string, unknown>) => ({
+        id: v.id as string,
+        name: v.name as string,
+        type: (v.type as 'Supplier' | 'Distributor' | 'Service') || 'Supplier',
+        contactPerson: (v.contactPerson as string) || 'N/A',
+        phone: (v.phone as string) || 'N/A',
+        email: (v.email as string) || 'N/A',
+        totalOrders: (v.totalOrders as number) || 0,
+        purchaseValue: (v.purchaseValue as number) || 0,
+        outstandingAmount: (v.outstandingAmount as number) || 0,
+        status: v.status === 'ACTIVE' ? 'Active' : 'On Hold',
+      }));
+
+      setVendors(mappedVendors);
+      setTotal(res.total || res.data.length);
+
+      // Keep naive stats based on loaded data, since paginated response might lack global metrics
+      setStats({
+        total: res.total || res.data.length,
+        active: rawVendors.filter((v: Record<string, unknown>) => v.status === 'ACTIVE').length,
+        // Hack: estimating new vendors based on the current page to avoid breaking the stats component
+        newVendors: rawVendors.filter((v: Record<string, unknown>) => {
+          if (!v.createdAt) return false;
+          const created = new Date(v.createdAt as string);
+          return (
+            created.getMonth() === new Date().getMonth() &&
+            created.getFullYear() === new Date().getFullYear()
+          );
+        }).length,
+      });
+    } catch (error) {
+      console.error('Failed to fetch vendors:', error);
+      toast.error('Failed to load vendor data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  React.useEffect(() => {
+    const delayDebounceFn = setTimeout(() => {
+      fetchVendorsData();
+    }, 500);
+    return () => clearTimeout(delayDebounceFn);
+  }, [search, filterType, page, limit]);
+
+  const onRefresh = fetchVendorsData;
 
   const handleSave = async (data: VendorFormData) => {
     try {
@@ -164,220 +191,162 @@ export default function VendorTable({
     }
   };
 
-  if (loading) {
-    return <div className="p-4 text-center">Loading vendors...</div>;
-  }
-
   return (
     <div className="space-y-4">
-      <div className="flex justify-end items-center">
-        <Button
-          className="bg-primary text-white gap-2 shadow-md hover:shadow-lg transition-all"
-          onClick={() => {
-            setEditingVendor(null);
-            setFormOpen(true);
-          }}
-        >
-          <Plus size={16} /> Add Vendor
-        </Button>
-      </div>
+      <VendorStats
+        totalVendors={stats.total}
+        activeVendors={stats.active}
+        newVendors={stats.newVendors}
+      />
 
-      <div className="bg-card rounded-xl p-4 shadow-sm border border-gray-100 flex flex-col md:flex-row gap-4 items-end">
-        <div className="flex-1 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 w-full">
-          <div className="space-y-1">
-            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
-              Search Vendors
-            </label>
-            <div className="relative">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-400" />
-              <Input
-                placeholder="Search by name or contact..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="pl-9 h-9 text-xs"
-              />
-            </div>
-          </div>
-          <div className="space-y-1">
-            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
-              Filter by Type
-            </label>
-            <Select
-              value={filterType}
-              onValueChange={(val: 'All' | 'Supplier' | 'Distributor' | 'Service') =>
-                setFilterType(val)
-              }
-            >
-              <SelectTrigger className="h-9 text-xs w-full bg-background border-gray-200">
-                <SelectValue placeholder="All Types" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="All">All Types</SelectItem>
-                <SelectItem value="Supplier">Supplier</SelectItem>
-                <SelectItem value="Distributor">Distributor</SelectItem>
-                <SelectItem value="Service">Service</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-1">
-            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
-              Actions
-            </label>
-            <Button
-              variant="outline"
-              onClick={() => onRefresh()}
-              className="h-9 text-xs w-full justify-center gap-2 border-gray-200 hover:bg-gray-50"
-            >
-              Refresh Data
-            </Button>
-          </div>
-        </div>
-      </div>
-
-      <div className="rounded-2xl border bg-card overflow-hidden shadow-sm">
-        <Table>
-          <TableHeader className="bg-card border-b border-border">
-            <TableRow>
-              <TableHead className="font-semibold text-[11px] text-primary uppercase">
-                Vendor Name
-              </TableHead>
-              <TableHead className="font-semibold text-[11px] text-primary uppercase">
-                Code
-              </TableHead>
-              <TableHead className="font-semibold text-[11px] text-primary uppercase">
-                Type
-              </TableHead>
-              <TableHead className="font-semibold text-[11px] text-primary uppercase">
-                Contact
-              </TableHead>
-              <TableHead className="font-semibold text-[11px] text-primary uppercase">
-                Details
-              </TableHead>
-              <TableHead className="text-right font-semibold text-[11px] text-primary uppercase">
-                Orders
-              </TableHead>
-              <TableHead className="text-right font-semibold text-[11px] text-primary uppercase">
-                Purchase Value
-              </TableHead>
-              <TableHead className="text-right font-semibold text-[11px] text-primary uppercase">
-                Outstanding
-              </TableHead>
-              <TableHead className="font-semibold text-[11px] text-primary uppercase">
-                Status
-              </TableHead>
-              <TableHead className="text-right font-semibold text-[11px] text-primary uppercase">
-                Actions
-              </TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filteredVendors.length > 0 ? (
-              filteredVendors.map((vendor, index) => (
-                <TableRow
-                  key={vendor.id}
-                  className={`border-b border-gray-100 hover:bg-muted/50/50 ${index % 2 !== 0 ? 'bg-blue-50/20' : 'bg-card'}`}
+      <StandardTable
+        columns={[
+          {
+            id: 'name',
+            header: 'VENDOR NAME',
+            accessorKey: 'name' as keyof Vendor,
+            className: 'font-semibold text-[11px] text-primary uppercase',
+          },
+          {
+            id: 'code',
+            header: 'CODE',
+            cell: (v: Vendor) => `VND-${v.id.substring(0, 4)}`,
+            className: 'font-semibold text-[11px] text-primary uppercase',
+          },
+          {
+            id: 'type',
+            header: 'TYPE',
+            className: 'font-semibold text-[11px] text-primary uppercase',
+            cell: (v: Vendor) => (
+              <span
+                className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                  v.type === 'Supplier'
+                    ? 'bg-blue-100 text-blue-700'
+                    : v.type === 'Distributor'
+                      ? 'bg-purple-100 text-purple-700'
+                      : 'bg-orange-100 text-orange-700'
+                }`}
+              >
+                {v.type}
+              </span>
+            ),
+          },
+          {
+            id: 'contact',
+            header: 'CONTACT',
+            accessorKey: 'contactPerson' as keyof Vendor,
+            className: 'font-semibold text-[11px] text-primary uppercase',
+          },
+          {
+            id: 'details',
+            header: 'DETAILS',
+            className: 'font-semibold text-[11px] text-primary uppercase',
+            cell: (v: Vendor) => (
+              <div className="flex flex-col text-[11px] text-muted-foreground w-max leading-tight gap-1">
+                <span className="font-medium text-slate-800">{v.phone}</span>
+                <span>{v.email}</span>
+              </div>
+            ),
+          },
+          {
+            id: 'orders',
+            header: 'ORDERS',
+            cell: (v: Vendor) => v.totalOrders,
+            className: 'text-right font-semibold text-[11px] text-primary uppercase w-[80px]',
+          },
+          {
+            id: 'purchase',
+            header: 'PURCHASE VALUE',
+            className: 'text-right font-semibold text-[11px] text-primary uppercase w-[120px]',
+            cell: (v: Vendor) => (
+              <span className="font-bold text-primary">₹ {v.purchaseValue.toLocaleString()}</span>
+            ),
+          },
+          {
+            id: 'outstanding',
+            header: 'OUTSTANDING',
+            className: 'text-right font-semibold text-[11px] text-primary uppercase w-[120px]',
+            cell: (v: Vendor) => (
+              <span className="font-bold text-red-600">
+                ₹ {v.outstandingAmount.toLocaleString()}
+              </span>
+            ),
+          },
+          {
+            id: 'status',
+            header: 'STATUS',
+            className: 'font-semibold text-[11px] text-primary uppercase w-[100px]',
+            cell: (v: Vendor) => (
+              <span
+                className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-tight ${
+                  v.status === 'Active'
+                    ? 'bg-green-100 text-green-700'
+                    : 'bg-yellow-100 text-yellow-700'
+                }`}
+              >
+                <span
+                  className={`h-1.5 w-1.5 rounded-full ${v.status === 'Active' ? 'bg-green-600' : 'bg-yellow-600'}`}
+                />
+                {v.status}
+              </span>
+            ),
+          },
+          {
+            id: 'actions',
+            header: 'ACTIONS',
+            className: 'text-right font-semibold text-[11px] text-primary uppercase',
+            cell: (v: Vendor) => (
+              <div className="flex justify-end gap-1">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                  onClick={() => router.push(`${basePath}/vendors/${v.id}`)}
                 >
-                  <TableCell className="font-medium text-primary">{vendor.name}</TableCell>
-                  <TableCell className="text-muted-foreground font-medium">
-                    VND-{vendor.id.substring(0, 4)}
-                  </TableCell>
-                  <TableCell>
-                    <span
-                      className={`px-2 py-1 rounded-full text-xs font-medium ${
-                        vendor.type === 'Supplier'
-                          ? 'bg-blue-100 text-blue-700'
-                          : vendor.type === 'Distributor'
-                            ? 'bg-purple-100 text-purple-700'
-                            : 'bg-orange-100 text-orange-700'
-                      }`}
-                    >
-                      {vendor.type}
-                    </span>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex flex-col">
-                      <span className="text-sm font-medium">{vendor.contactPerson}</span>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex flex-col text-xs text-muted-foreground">
-                      <span>{vendor.phone}</span>
-                      <span>{vendor.email}</span>
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-right">{vendor.totalOrders}</TableCell>
-                  <TableCell className="text-right font-medium">
-                    {formatCurrency(vendor.purchaseValue)}
-                  </TableCell>
-                  <TableCell className="text-right font-medium text-red-600">
-                    {formatCurrency(vendor.outstandingAmount)}
-                  </TableCell>
-                  <TableCell>
-                    <span
-                      className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        vendor.status === 'Active'
-                          ? 'bg-green-100 text-green-700'
-                          : 'bg-yellow-100 text-yellow-700'
-                      }`}
-                    >
-                      <span
-                        className={`h-1.5 w-1.5 rounded-full ${vendor.status === 'Active' ? 'bg-green-600' : 'bg-yellow-600'}`}
-                      ></span>
-                      {vendor.status}
-                    </span>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end gap-2">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                        onClick={() => router.push(`${basePath}/vendors/${vendor.id}`)}
-                      >
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-muted-foreground hover:text-slate-700 hover:bg-slate-100"
-                        onClick={() => {
-                          setEditingVendor(vendor);
-                          setFormOpen(true);
-                        }}
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-indigo-500 hover:text-indigo-700 hover:bg-indigo-50"
-                        title="Request Products"
-                        onClick={() => setRequestVendor(vendor)}
-                      >
-                        <Send className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50"
-                        onClick={() => setDeleteVendorTarget(vendor)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))
-            ) : (
-              <TableRow>
-                <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
-                  No vendors found matching your criteria.
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </div>
+                  <Eye className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-muted-foreground hover:text-slate-700 hover:bg-slate-100"
+                  onClick={() => {
+                    setEditingVendor(v);
+                    setFormOpen(true);
+                  }}
+                >
+                  <Edit className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-indigo-500 hover:text-indigo-700 hover:bg-indigo-50"
+                  title="Request Products"
+                  onClick={() => setRequestVendor(v)}
+                >
+                  <Send className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50"
+                  onClick={() => setDeleteVendorTarget(v)}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            ),
+          },
+        ]}
+        data={vendors}
+        loading={loading}
+        emptyMessage="No vendors found matching your criteria."
+        keyExtractor={(v) => v.id}
+        page={page}
+        limit={limit}
+        total={total}
+        onPageChange={setPage}
+        onLimitChange={setLimit}
+      />
 
       {/* MODALS */}
       <VendorFormModal
@@ -387,10 +356,11 @@ export default function VendorTable({
         onConfirm={handleSave}
       />
 
-      <ConfirmDeleteModal
+      <DeleteConfirmDialog
         open={!!deleteVendor}
-        name={deleteVendor?.name || ''}
-        onCancel={() => setDeleteVendorTarget(null)}
+        onOpenChange={(open) => !open && setDeleteVendorTarget(null)}
+        title="Delete Vendor?"
+        itemName={deleteVendor?.name}
         onConfirm={confirmDelete}
       />
 
@@ -566,51 +536,6 @@ function VendorFormModal({
               {initialData ? 'Update' : 'Confirm'}
             </Button>
           </div>
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-function ConfirmDeleteModal({
-  open,
-  name,
-  onCancel,
-  onConfirm,
-}: {
-  open: boolean;
-  name: string;
-  onCancel: () => void;
-  onConfirm: () => void;
-}) {
-  return (
-    <Dialog open={open} onOpenChange={(val) => !val && onCancel()}>
-      <DialogContent className="sm:max-w-[450px]">
-        <DialogHeader>
-          <div className="flex items-center gap-4 text-red-600 mb-4">
-            <div className="h-12 w-12 rounded-2xl bg-red-50 flex items-center justify-center text-red-600 shadow-sm">
-              <Trash2 className="h-6 w-6" />
-            </div>
-            <DialogTitle className="text-xl font-bold text-primary">Delete Vendor</DialogTitle>
-          </div>
-          <DialogDescription className="text-base text-gray-600 leading-relaxed">
-            Are you sure you want to delete <strong>{name}</strong>?
-          </DialogDescription>
-        </DialogHeader>
-        <div className="flex justify-end items-center gap-6 pt-8">
-          <button
-            type="button"
-            onClick={onCancel}
-            className="text-sm font-bold text-foreground hover:text-gray-600 transition-colors"
-          >
-            Cancel
-          </button>
-          <Button
-            className="h-12 px-8 rounded-xl bg-red-600 text-white hover:bg-red-700 font-bold shadow-lg"
-            onClick={onConfirm}
-          >
-            Delete
-          </Button>
         </div>
       </DialogContent>
     </Dialog>

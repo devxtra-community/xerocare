@@ -29,8 +29,8 @@ export default function SparePartTable({ showActions = true }: SparePartTablePro
   const loadParts = async () => {
     try {
       setLoading(true);
-      const data = await sparePartService.getSpareParts();
-      setParts(data);
+      const res = await sparePartService.getSpareParts();
+      setParts(res.data || []);
     } catch (error) {
       console.error('Failed to load spare parts', error);
     } finally {

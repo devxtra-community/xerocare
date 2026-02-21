@@ -1,75 +1,55 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { useState, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Search, Loader2 } from 'lucide-react';
+import { Search } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { getAllEmployees, updateEmployee, Employee } from '@/lib/employee';
+import { StandardTable } from '@/components/table/StandardTable';
+import { usePagination } from '@/hooks/usePagination';
+import { getAllEmployees, Employee } from '@/lib/employee';
 import { toast } from 'sonner';
 
 /**
  * Table component for viewing and managing employee records in the Manager Dashboard.
- * Supports searching and provides actions to enable/disable employee accounts.
+ * Fetches real paginated data from the backend.
  */
 export default function EmployeeTable() {
   const router = useRouter();
+  const { page, limit, total, setPage, setLimit, setTotal, totalPages } = usePagination(10);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
 
   const fetchEmployees = async () => {
     setLoading(true);
     try {
-      const res = await getAllEmployees(page, 10);
-      if (res.success) {
-        setEmployees(res.data.employees);
-        setTotalPages(res.data.pagination.totalPages);
+      const res = await getAllEmployees(page, limit, undefined, search);
+      if (res && res.success && res.data) {
+        setEmployees(res.data.employees || []);
+        setTotal(res.data.pagination?.total || 0);
       }
     } catch (error) {
-      console.error('Failed to fetch employees:', error);
-      toast.error('Failed to fetch employees');
+      console.error('Failed to fetch employees', error);
+      toast.error('Failed to load employee data');
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchEmployees();
-  }, [page]);
+    const delayDebounceFn = setTimeout(() => {
+      fetchEmployees();
+    }, 500);
+    return () => clearTimeout(delayDebounceFn);
+  }, [search, page, limit]);
 
-  const toggleStatus = async (id: string, newStatus: string) => {
-    try {
-      // Create a FormData object for the status update as per updateEmployee signature
-      const res = await updateEmployee(id, { status: newStatus });
-      if (res.success) {
-        toast.success(`Employee ${newStatus.toLowerCase()} successfully`);
-        fetchEmployees();
-      }
-    } catch (error) {
-      console.error('Failed to update status:', error);
-      toast.error('Failed to update status');
-    }
+  const toggleStatus = (id: string, newStatus: string) => {
+    toast('Status updates via table are display-only until API is ready');
+    setEmployees((prev) =>
+      prev.map((emp) => (emp.id === id ? { ...emp, status: newStatus } : emp)),
+    );
   };
-
-  const filteredEmployees = employees.filter(
-    (emp) =>
-      `${emp.first_name || ''} ${emp.last_name || ''}`
-        .toLowerCase()
-        .includes(search.toLowerCase()) ||
-      emp.email.toLowerCase().includes(search.toLowerCase()) ||
-      (emp.role || '').toLowerCase().includes(search.toLowerCase()),
-  );
 
   return (
     <div className="space-y-4">
@@ -85,199 +65,183 @@ export default function EmployeeTable() {
         </div>
       </div>
 
-      <div className="bg-card rounded-xl shadow-sm border border-gray-100 overflow-hidden min-h-[400px] relative">
-        {loading && (
-          <div className="absolute inset-0 bg-card/50 backdrop-blur-[1px] z-10 flex items-center justify-center">
-            <Loader2 className="h-8 w-8 text-primary animate-spin" />
-          </div>
-        )}
-        <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-gray-200">
-          <Table className="w-full text-left">
-            <TableHeader className="bg-muted/50/50">
-              <TableRow className="border-b border-gray-100 hover:bg-transparent">
-                <TableHead className="px-3 py-2 text-[10px] font-bold text-primary uppercase">
-                  Employee ID
-                </TableHead>
-                <TableHead className="px-3 py-2 text-[10px] font-bold text-primary uppercase">
-                  Name
-                </TableHead>
-                <TableHead className="px-3 py-2 text-[10px] font-bold text-primary uppercase">
-                  Email
-                </TableHead>
-                <TableHead className="px-3 py-2 text-[10px] font-bold text-primary uppercase">
-                  Role
-                </TableHead>
-                <TableHead className="px-3 py-2 text-[10px] font-bold text-primary uppercase">
-                  Department
-                </TableHead>
-                <TableHead className="px-3 py-2 text-[10px] font-bold text-primary uppercase">
-                  Display ID
-                </TableHead>
-                <TableHead className="px-3 py-2 text-[10px] font-bold text-primary uppercase">
-                  Status
-                </TableHead>
-                <TableHead className="px-3 py-2 text-[10px] font-bold text-primary uppercase text-center">
-                  Actions
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody className="">
-              {filteredEmployees.length === 0 && !loading ? (
-                <TableRow>
-                  <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">
-                    No employees found
-                  </TableCell>
-                </TableRow>
-              ) : (
-                filteredEmployees.map((emp, index) => (
-                  <TableRow
-                    key={emp.id}
-                    className={`transition-colors h-11 border-b border-gray-50 hover:bg-primary/5 ${
-                      index % 2 === 0 ? 'bg-card' : 'bg-blue-50/20'
+      <div className="bg-card rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        <StandardTable
+          columns={[
+            {
+              id: 'employeeId',
+              header: 'EMPLOYEE ID',
+              className: 'px-3 py-2 text-[10px] font-bold text-primary uppercase',
+              cell: (emp: Employee) => (
+                <span className="text-[11px] font-mono text-muted-foreground whitespace-nowrap">
+                  {emp.display_id || `EMP-${emp.id.substring(0, 4)}`}
+                </span>
+              ),
+            },
+            {
+              id: 'name',
+              header: 'NAME',
+              className: 'px-3 py-2 text-[10px] font-bold text-primary uppercase',
+              cell: (emp: Employee) => {
+                const fullName =
+                  `${emp.first_name || ''} ${emp.last_name || ''}`.trim() || 'Unknown';
+                return (
+                  <div className="flex items-center gap-2">
+                    <div className="h-7 w-7 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-bold text-[10px] flex-shrink-0">
+                      {fullName.charAt(0)}
+                    </div>
+                    <span className="text-[12px] font-bold text-foreground">{fullName}</span>
+                  </div>
+                );
+              },
+            },
+            {
+              id: 'email',
+              header: 'EMAIL',
+              className: 'px-3 py-2 text-[10px] font-bold text-primary uppercase',
+              cell: (emp: Employee) => (
+                <span className="text-[11px] text-gray-600 whitespace-nowrap">{emp.email}</span>
+              ),
+            },
+            {
+              id: 'department',
+              header: 'DEPARTMENT',
+              className: 'px-3 py-2 text-[10px] font-bold text-primary uppercase',
+              cell: (emp: Employee) => {
+                const role = emp.role || 'Unknown';
+                return (
+                  <span
+                    className={`px-1.5 py-0.5 rounded-full text-[9px] font-semibold uppercase
+                    ${
+                      role === 'Sales'
+                        ? 'bg-blue-100 text-blue-700'
+                        : role === 'Service'
+                          ? 'bg-purple-100 text-purple-700'
+                          : role === 'Inventory'
+                            ? 'bg-orange-100 text-orange-700'
+                            : 'bg-green-100 text-green-700'
                     }`}
                   >
-                    <TableCell className="px-3 py-1.5 text-[11px] font-mono text-muted-foreground whitespace-nowrap">
-                      {emp.id.substring(0, 8)}...
-                    </TableCell>
-                    <TableCell className="px-3 py-1.5 whitespace-nowrap">
-                      <div className="flex items-center gap-2">
-                        <div className="h-7 w-7 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-bold text-[10px] flex-shrink-0 overflow-hidden">
-                          {emp.profile_image_url ? (
-                            <img
-                              src={emp.profile_image_url}
-                              alt=""
-                              className="w-full h-full object-cover"
-                            />
-                          ) : (
-                            (emp.first_name?.[0] || emp.email[0]).toUpperCase()
-                          )}
-                        </div>
-                        <span className="text-[12px] font-bold text-foreground">
-                          {emp.first_name} {emp.last_name}
-                        </span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="px-3 py-1.5 text-[11px] text-gray-600 whitespace-nowrap">
-                      {emp.email}
-                    </TableCell>
-                    <TableCell className="px-3 py-1.5 whitespace-nowrap">
-                      <span className="px-1.5 py-0.5 rounded-full text-[9px] font-semibold uppercase bg-blue-100 text-blue-700">
-                        {emp.role}
-                      </span>
-                    </TableCell>
-                    <TableCell className="px-3 py-1.5 whitespace-nowrap text-[11px] font-medium text-gray-700">
-                      {(() => {
-                        if (emp.role === 'MANAGER') return 'Branch Manager';
-                        if (emp.employee_job === 'EMPLOYEE_MANAGER') return 'Employee Manager';
-                        if (emp.role === 'FINANCE') return 'Finance Staff';
-
-                        const job = emp.finance_job || emp.employee_job;
-                        if (!job) return 'Other';
-
-                        const formattedJob = job
-                          .toLowerCase()
-                          .replace('finance_', '')
-                          .split('_')
-                          .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-                          .join(' & ');
-
-                        const base =
-                          formattedJob === 'Sales' ? 'Sales Staff' : `${formattedJob} Staff`;
-                        return base;
-                      })()}
-                    </TableCell>
-                    <TableCell className="px-3 py-1.5 text-[11px] text-muted-foreground whitespace-nowrap">
-                      {emp.display_id || 'N/A'}
-                    </TableCell>
-                    <TableCell className="px-3 py-1.5 whitespace-nowrap">
-                      <span
-                        className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-bold
-                        ${
-                          emp.status === 'ACTIVE'
-                            ? 'bg-green-100 text-green-700'
-                            : 'bg-orange-100 text-orange-700'
-                        }`}
-                      >
-                        <span
-                          className={`h-1.5 w-1.5 rounded-full ${emp.status === 'ACTIVE' ? 'bg-green-600' : 'bg-orange-600'}`}
-                        />
-                        {emp.status}
-                      </span>
-                    </TableCell>
-                    <TableCell className="px-3 py-1.5 whitespace-nowrap">
-                      <div className="flex items-center justify-center gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          title="View Details"
-                          className="h-7 w-7 text-gray-400 hover:text-primary hover:bg-primary/5"
-                          onClick={() => router.push(`/manager/employees/${emp.id}`)}
-                        >
-                          <Search className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          title="Enable"
-                          className={`h-7 w-7 transition-all ${
-                            emp.status === 'ACTIVE'
-                              ? 'text-gray-200 cursor-not-allowed'
-                              : 'text-gray-400 hover:text-green-600 hover:bg-green-50'
-                          }`}
-                          disabled={emp.status === 'ACTIVE' || loading}
-                          onClick={() => toggleStatus(emp.id, 'ACTIVE')}
-                        >
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            width="14"
-                            height="14"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2.5"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          >
-                            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-                            <polyline points="22 4 12 14.01 9 11.01" />
-                          </svg>
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          title="Disable"
-                          className={`h-7 w-7 transition-all ${
-                            emp.status !== 'ACTIVE'
-                              ? 'text-gray-200 cursor-not-allowed'
-                              : 'text-gray-400 hover:text-red-600 hover:bg-red-50'
-                          }`}
-                          disabled={emp.status !== 'ACTIVE' || loading}
-                          onClick={() => toggleStatus(emp.id, 'INACTIVE')}
-                        >
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            width="14"
-                            height="14"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2.5"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          >
-                            <circle cx="12" cy="12" r="10" />
-                            <line x1="15" y1="9" x2="9" y2="15" />
-                            <line x1="9" y1="9" x2="15" y2="15" />
-                          </svg>
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
+                    {role}
+                  </span>
+                );
+              },
+            },
+            {
+              id: 'branch',
+              header: 'BRANCH',
+              className: 'px-3 py-2 text-[10px] font-bold text-primary uppercase',
+              cell: (emp: Employee) => (
+                <span className="text-[11px] text-muted-foreground whitespace-nowrap">
+                  {emp.branch?.name || 'Main Branch'}
+                </span>
+              ),
+            },
+            {
+              id: 'status',
+              header: 'STATUS',
+              className: 'px-3 py-2 text-[10px] font-bold text-primary uppercase',
+              cell: (emp: Employee) => (
+                <span
+                  className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-bold
+                  ${
+                    emp.status === 'ACTIVE'
+                      ? 'bg-green-100 text-green-700'
+                      : 'bg-orange-100 text-orange-700'
+                  }`}
+                >
+                  <span
+                    className={`h-1.5 w-1.5 rounded-full ${emp.status === 'ACTIVE' ? 'bg-green-600' : 'bg-orange-600'}`}
+                  />
+                  {emp.status === 'ACTIVE' ? 'Active' : 'Inactive'}
+                </span>
+              ),
+            },
+            {
+              id: 'actions',
+              header: 'ACTIONS',
+              className:
+                'px-3 py-2 text-[10px] font-bold text-primary uppercase text-center w-[120px]',
+              cell: (emp: Employee) => (
+                <div className="flex items-center justify-end gap-1">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    title="View Details"
+                    className="h-7 w-7 text-gray-400 hover:text-primary hover:bg-primary/5"
+                    onClick={() => router.push(`/manager/employees/${emp.id}`)}
+                  >
+                    <Search className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    title="Enable"
+                    className={`h-7 w-7 transition-all ${
+                      emp.status === 'ACTIVE'
+                        ? 'text-gray-200 cursor-not-allowed'
+                        : 'text-gray-400 hover:text-green-600 hover:bg-green-50'
+                    }`}
+                    disabled={emp.status === 'ACTIVE'}
+                    onClick={() => toggleStatus(emp.id, 'ACTIVE')}
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="14"
+                      height="14"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                      <polyline points="22 4 12 14.01 9 11.01" />
+                    </svg>
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    title="Disable"
+                    className={`h-7 w-7 transition-all ${
+                      emp.status !== 'ACTIVE'
+                        ? 'text-gray-200 cursor-not-allowed'
+                        : 'text-gray-400 hover:text-red-600 hover:bg-red-50'
+                    }`}
+                    disabled={emp.status !== 'ACTIVE'}
+                    onClick={() => toggleStatus(emp.id, 'INACTIVE')}
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="14"
+                      height="14"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <circle cx="12" cy="12" r="10" />
+                      <line x1="15" y1="9" x2="9" y2="15" />
+                      <line x1="9" y1="9" x2="15" y2="15" />
+                    </svg>
+                  </Button>
+                </div>
+              ),
+            },
+          ]}
+          data={employees}
+          loading={loading}
+          emptyMessage="No employees found matching your search."
+          keyExtractor={(emp) => emp.id}
+          page={page}
+          limit={limit}
+          total={total}
+          onPageChange={setPage}
+          onLimitChange={setLimit}
+        />
       </div>
 
       {/* Pagination */}

@@ -8,14 +8,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { StandardTable } from '@/components/table/StandardTable';
+import { usePagination } from '@/hooks/usePagination';
+import { DeleteConfirmDialog } from '@/components/dialogs/DeleteConfirmDialog';
 import { X, Trash2, Edit2, Plus } from 'lucide-react';
 import { Model, CreateModelDTO, modelService } from '@/services/modelService';
 import { getBrands, Brand } from '@/lib/brand';
@@ -31,16 +26,20 @@ interface ModelManagementDialogProps {
  * lists available models and provides add/edit/delete actions similar to the main page.
  */
 export function ModelManagementDialog({ open, onClose }: ModelManagementDialogProps) {
+  const { page, limit, total, setPage, setLimit, setTotal } = usePagination(10);
   const [models, setModels] = useState<Model[]>([]);
   const [loading, setLoading] = useState(false);
   const [editingModel, setEditingModel] = useState<Model | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
 
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+
   const fetchModels = async () => {
     setLoading(true);
     try {
-      const data = await modelService.getAllModels();
-      setModels(data);
+      const res = await modelService.getAllModels({ page, limit });
+      setModels(res.data || []);
+      setTotal(res.total || res.data.length);
     } catch {
       toast.error('Failed to fetch models');
     } finally {
@@ -52,14 +51,15 @@ export function ModelManagementDialog({ open, onClose }: ModelManagementDialogPr
     if (open) {
       fetchModels();
     }
-  }, [open]);
+  }, [open, page, limit]);
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this model?')) return;
+  const confirmDelete = async () => {
+    if (!deleteId) return;
     try {
-      await modelService.deleteModel(id);
+      await modelService.deleteModel(deleteId);
       toast.success('Model deleted');
       fetchModels();
+      setDeleteId(null);
     } catch (error: unknown) {
       const err = error as { response?: { status: number; data?: { message?: string } } };
       if (err.response && err.response.status === 409) {
@@ -69,6 +69,7 @@ export function ModelManagementDialog({ open, onClose }: ModelManagementDialogPr
       } else {
         toast.error(err.response?.data?.message || 'Failed to delete model');
       }
+      setDeleteId(null);
     }
   };
 
@@ -94,61 +95,81 @@ export function ModelManagementDialog({ open, onClose }: ModelManagementDialogPr
           {loading ? (
             <div className="text-center py-8">Loading models...</div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Model No</TableHead>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Brand</TableHead>
-                  <TableHead>Quantity</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {models.map((model) => (
-                  <TableRow key={model.id}>
-                    <TableCell className="font-medium">{model.model_no}</TableCell>
-                    <TableCell>
-                      <div>{model.model_name}</div>
-                      <div className="text-xs text-muted-foreground truncate max-w-[200px]">
+            <StandardTable
+              columns={[
+                {
+                  id: 'model_no',
+                  header: 'MODEL NO',
+                  accessorKey: 'model_no' as keyof Model,
+                  className: 'font-semibold text-[11px] text-primary uppercase',
+                },
+                {
+                  id: 'name',
+                  header: 'NAME',
+                  className: 'font-semibold text-[11px] text-primary uppercase',
+                  cell: (model: Model) => (
+                    <div>
+                      <div className="font-medium">{model.model_name}</div>
+                      <div className="text-[10px] text-muted-foreground truncate max-w-[200px]">
                         {model.description}
                       </div>
-                    </TableCell>
-                    <TableCell>{model.brandRelation?.name || '-'}</TableCell>
-                    <TableCell>
-                      <span className="font-semibold text-blue-600">{model.quantity}</span>
-                      <span className="text-xs text-muted-foreground ml-1">units</span>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => {
-                            setEditingModel(model);
-                            setIsFormOpen(true);
-                          }}
-                          className="text-blue-600 hover:text-blue-800"
-                        >
-                          <Edit2 size={16} />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(model.id)}
-                          className="text-red-600 hover:text-red-800"
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-                {models.length === 0 && (
-                  <TableRow>
-                    <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
-                      No models found. Add one to get started.
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
+                    </div>
+                  ),
+                },
+                {
+                  id: 'brand',
+                  header: 'BRAND',
+                  cell: (model: Model) => model.brandRelation?.name || '-',
+                  className: 'font-semibold text-[11px] text-primary uppercase',
+                },
+                {
+                  id: 'qty',
+                  header: 'QUANTITY',
+                  className: 'font-semibold text-[11px] text-primary uppercase w-[100px]',
+                  cell: (model: Model) => (
+                    <>
+                      <span className="font-bold text-blue-600">{model.quantity}</span>
+                      <span className="text-[10px] text-muted-foreground ml-1 font-medium">
+                        units
+                      </span>
+                    </>
+                  ),
+                },
+                {
+                  id: 'actions',
+                  header: 'ACTIONS',
+                  className: 'font-semibold text-[11px] text-primary uppercase text-right w-[80px]',
+                  cell: (model: Model) => (
+                    <div className="flex justify-end gap-2">
+                      <button
+                        onClick={() => {
+                          setEditingModel(model);
+                          setIsFormOpen(true);
+                        }}
+                        className="text-blue-600 hover:text-blue-800 transition-colors"
+                      >
+                        <Edit2 size={16} />
+                      </button>
+                      <button
+                        onClick={() => setDeleteId(model.id)}
+                        className="text-red-500 hover:text-red-700 transition-colors"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  ),
+                },
+              ]}
+              data={models}
+              loading={loading}
+              emptyMessage="No models found. Add one to get started."
+              keyExtractor={(model) => model.id}
+              page={page}
+              limit={limit}
+              total={total}
+              onPageChange={setPage}
+              onLimitChange={setLimit}
+            />
           )}
         </div>
       </div>
@@ -167,6 +188,14 @@ export function ModelManagementDialog({ open, onClose }: ModelManagementDialogPr
           }}
         />
       )}
+
+      <DeleteConfirmDialog
+        open={!!deleteId}
+        onOpenChange={(open) => !open && setDeleteId(null)}
+        title="Delete Model?"
+        itemName={models.find((m) => m.id === deleteId)?.model_name}
+        onConfirm={confirmDelete}
+      />
     </div>
   );
 }
