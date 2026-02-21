@@ -68,9 +68,10 @@ export const getAllEmployees = async (
   page: number = 1,
   limit: number = 20,
   role?: string,
+  search?: string,
 ): Promise<{ success: boolean; data: EmployeeResponse }> => {
   const res = await api.get('/e/employee/', {
-    params: { page, limit, role: role === 'All' ? undefined : role },
+    params: { page, limit, role: role === 'All' ? undefined : role, search },
   });
   return res.data;
 };

@@ -13,13 +13,39 @@ export interface SparePartInventoryItem {
   price: number;
 }
 
+export interface PaginatedResponse<T> {
+  data: T[];
+  page: number;
+  limit: number;
+  total: number;
+}
+
 export const sparePartService = {
   /**
-   * Retrieves all spare parts.
+   * Retrieves all spare parts with optional pagination/search.
    */
-  getSpareParts: async (): Promise<SparePartInventoryItem[]> => {
-    const response = await api.get('/i/spare-parts');
-    return response.data.data;
+  getSpareParts: async (params?: {
+    page?: number;
+    limit?: number;
+    search?: string;
+  }): Promise<PaginatedResponse<SparePartInventoryItem>> => {
+    const response = await api.get('/i/spare-parts', { params });
+    const resData = response.data;
+    const coreData = resData.data || resData;
+
+    // Support new paginated backend
+    if (coreData && coreData.page !== undefined) {
+      return coreData as PaginatedResponse<SparePartInventoryItem>;
+    }
+
+    // Fallback if backend still returns array
+    const dataArray = Array.isArray(coreData) ? coreData : [];
+    return {
+      data: dataArray,
+      page: 1,
+      limit: 10,
+      total: dataArray.length,
+    };
   },
 
   /**

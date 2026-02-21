@@ -4,30 +4,15 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Search, Upload } from 'lucide-react';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { StandardTable } from '@/components/table/StandardTable';
+import { usePagination } from '@/hooks/usePagination';
+import { DeleteConfirmDialog } from '@/components/dialogs/DeleteConfirmDialog';
 import { sparePartService, SparePartInventoryItem } from '@/services/sparePartService';
 import AddSparePartDialog from '@/components/ManagerDashboardComponents/spareParts/AddSparePartDialog';
 import BulkSparePartDialog from '@/components/ManagerDashboardComponents/spareParts/BulkSparePartDialog';
 import { toast } from 'sonner';
 import { Pencil, Trash2 } from 'lucide-react';
 import EditSparePartDialog from '@/components/ManagerDashboardComponents/spareParts/EditSparePartDialog';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
 
 export default function SparePartsPage() {
   const [parts, setParts] = useState<SparePartInventoryItem[]>([]);
@@ -40,18 +25,28 @@ export default function SparePartsPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [partToDelete, setPartToDelete] = useState<{ id: string; name: string } | null>(null);
 
+  const { page, limit, total, setPage, setLimit, setTotal } = usePagination(10);
+  const [loading, setLoading] = useState(true);
+
   const loadParts = async () => {
+    setLoading(true);
     try {
-      const data = await sparePartService.getSpareParts();
-      setParts(data);
+      const res = await sparePartService.getSpareParts({ page, limit, search });
+      setParts(res.data || []);
+      setTotal(res.total || res.data.length);
     } catch (error) {
       console.error('Failed to load spare parts', error);
+    } finally {
+      setLoading(false);
     }
   };
 
   useEffect(() => {
-    loadParts();
-  }, []);
+    const delayDebounceFn = setTimeout(() => {
+      loadParts();
+    }, 500);
+    return () => clearTimeout(delayDebounceFn);
+  }, [search, page, limit]);
 
   const confirmDelete = async () => {
     if (!partToDelete) return;
@@ -75,13 +70,6 @@ export default function SparePartsPage() {
     setSelectedPart(part);
     setEditOpen(true);
   };
-
-  const filtered = parts.filter(
-    (p) =>
-      (p.lot_number?.toLowerCase() || '').includes(search.toLowerCase()) ||
-      (p.part_name?.toLowerCase() || '').includes(search.toLowerCase()) ||
-      (p.brand?.toLowerCase() || '').includes(search.toLowerCase()),
-  );
 
   return (
     <div className="bg-blue-100 min-h-screen p-3 sm:p-4 md:p-6 space-y-6">
@@ -113,58 +101,91 @@ export default function SparePartsPage() {
       </div>
 
       <div className="rounded-2xl bg-card shadow-sm overflow-hidden">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="font-bold text-primary">Lot / Order Number</TableHead>
-              <TableHead className="font-bold text-primary">Part Name</TableHead>
-              <TableHead className="font-bold text-primary">Brand</TableHead>
-              <TableHead className="font-bold text-primary">Compatible Model</TableHead>
-              <TableHead className="font-bold text-primary">Warehouse</TableHead>
-              <TableHead className="font-bold text-primary">Vendor</TableHead>
-              <TableHead className="font-bold text-primary">Price</TableHead>
-              <TableHead className="font-bold text-primary">Qty</TableHead>
-              <TableHead className="font-bold text-primary">Action</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filtered.length > 0 ? (
-              filtered.map((item, i) => (
-                <TableRow key={`${item.lot_number}-${i}`} className={i % 2 ? 'bg-sky-100/60' : ''}>
-                  <TableCell className="font-medium">{item.lot_number}</TableCell>
-                  <TableCell>{item.part_name}</TableCell>
-                  <TableCell>{item.brand}</TableCell>
-                  <TableCell>{item.compatible_model || 'Universal'}</TableCell>
-                  <TableCell>{item.warehouse_name}</TableCell>
-                  <TableCell>{item.vendor_name || '-'}</TableCell>
-                  <TableCell>₹{item.price}</TableCell>
-                  <TableCell className="font-bold text-primary">{item.quantity}</TableCell>
-                  <TableCell>
-                    <div className="flex gap-2 text-primary">
-                      <button onClick={() => handleEdit(item)}>
-                        <Pencil size={18} />
-                      </button>
-                      <button
-                        onClick={() => {
-                          setPartToDelete({ id: item.id, name: item.part_name });
-                          setDeleteDialogOpen(true);
-                        }}
-                      >
-                        <Trash2 size={18} className="text-red-500" />
-                      </button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))
-            ) : (
-              <TableRow>
-                <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
-                  No spare parts found. Try adding some.
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
+        <StandardTable
+          columns={[
+            {
+              id: 'lot_number',
+              header: 'LOT / ORDER NUMBER',
+              accessorKey: 'lot_number' as keyof SparePartInventoryItem,
+              className: 'font-semibold text-[11px] text-primary uppercase',
+            },
+            {
+              id: 'part_name',
+              header: 'PART NAME',
+              accessorKey: 'part_name' as keyof SparePartInventoryItem,
+              className: 'font-semibold text-[11px] text-primary uppercase',
+            },
+            {
+              id: 'brand',
+              header: 'BRAND',
+              accessorKey: 'brand' as keyof SparePartInventoryItem,
+              className: 'font-semibold text-[11px] text-primary uppercase',
+            },
+            {
+              id: 'compatible',
+              header: 'COMPATIBLE MODEL',
+              cell: (item: SparePartInventoryItem) => item.compatible_model || 'Universal',
+              className: 'font-semibold text-[11px] text-primary uppercase',
+            },
+            {
+              id: 'warehouse',
+              header: 'WAREHOUSE',
+              accessorKey: 'warehouse_name' as keyof SparePartInventoryItem,
+              className: 'font-semibold text-[11px] text-primary uppercase',
+            },
+            {
+              id: 'vendor',
+              header: 'VENDOR',
+              cell: (item: SparePartInventoryItem) => item.vendor_name || '-',
+              className: 'font-semibold text-[11px] text-primary uppercase',
+            },
+            {
+              id: 'price',
+              header: 'PRICE',
+              cell: (item: SparePartInventoryItem) => `₹${item.price}`,
+              className: 'font-semibold text-[11px] text-primary uppercase',
+            },
+            {
+              id: 'qty',
+              header: 'QTY',
+              cell: (item: SparePartInventoryItem) => item.quantity,
+              className: 'font-bold text-primary text-[11px] uppercase',
+            },
+            {
+              id: 'action',
+              header: 'ACTION',
+              className: 'font-semibold text-[11px] text-primary uppercase text-right w-[80px]',
+              cell: (item: SparePartInventoryItem) => (
+                <div className="flex justify-end gap-2 text-primary">
+                  <button
+                    onClick={() => handleEdit(item)}
+                    className="hover:opacity-70 transition-opacity"
+                  >
+                    <Pencil size={18} />
+                  </button>
+                  <button
+                    onClick={() => {
+                      setPartToDelete({ id: item.id, name: item.part_name });
+                      setDeleteDialogOpen(true);
+                    }}
+                    className="hover:opacity-70 transition-opacity"
+                  >
+                    <Trash2 size={18} className="text-red-500" />
+                  </button>
+                </div>
+              ),
+            },
+          ]}
+          data={parts}
+          loading={loading}
+          emptyMessage="No spare parts found. Try adding some."
+          keyExtractor={(item) => item.id}
+          page={page}
+          limit={limit}
+          total={total}
+          onPageChange={setPage}
+          onLimitChange={setLimit}
+        />
       </div>
 
       {bulkOpen && (
@@ -184,26 +205,13 @@ export default function SparePartsPage() {
         />
       )}
 
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the spare part &quot;
-              {partToDelete?.name}&quot;.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setPartToDelete(null)}>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={confirmDelete}
-              className="bg-red-500 hover:bg-red-600 text-white"
-            >
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <DeleteConfirmDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        title="Delete Spare Part?"
+        itemName={partToDelete?.name}
+        onConfirm={confirmDelete}
+      />
     </div>
   );
 }

@@ -29,9 +29,29 @@ export async function createVendor(data: Partial<Vendor>) {
   return res.data;
 }
 
-export async function getVendors() {
-  const res = await api.get('/i/vendors/');
-  return res.data;
+export interface PaginatedResponse<T> {
+  data: T[];
+  page: number;
+  limit: number;
+  total: number;
+}
+
+export async function getVendors(params?: {
+  page?: number;
+  limit?: number;
+  search?: string;
+  type?: string;
+}) {
+  const res = await api.get('/i/vendors/', { params });
+  if (res.data && res.data.page !== undefined) {
+    return res.data;
+  }
+  return {
+    data: res.data.data || res.data || [],
+    page: 1,
+    limit: 10,
+    total: (res.data.data || res.data || []).length,
+  };
 }
 
 export async function getVendorById(id: string) {

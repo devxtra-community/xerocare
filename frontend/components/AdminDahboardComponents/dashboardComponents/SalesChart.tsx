@@ -10,6 +10,7 @@ import {
   Tooltip,
 } from 'recharts';
 import { getGlobalSalesOverview } from '@/lib/invoice';
+import { StandardChartCard } from '@/components/charts/StandardChartCard';
 
 interface SalesDataPoint {
   month: string;
@@ -124,31 +125,33 @@ export default function SalesChart() {
     fetchSalesData();
   }, [selectedPeriod]);
 
+  const actions = (
+    <div className="flex gap-1.5 text-[10px]">
+      {['1W', '1M', '3M', '1Y'].map((period) => (
+        <button
+          key={period}
+          onClick={() => setSelectedPeriod(period)}
+          className={`px-2 py-0.5 rounded-md transition-colors ${
+            selectedPeriod === period
+              ? 'bg-primary text-white font-medium'
+              : 'text-gray-600 hover:bg-gray-100'
+          }`}
+        >
+          {period}
+        </button>
+      ))}
+    </div>
+  );
+
   return (
-    <div className="rounded-2xl bg-card h-[260px] w-full shadow-sm flex flex-col p-3">
-      <div className="flex flex-row items-center justify-between pb-2">
-        <p className="text-xs text-gray-600 font-medium">
-          Global Sales Overview ({new Date().getFullYear()})
-        </p>
-
-        <div className="flex gap-1.5 text-[10px]">
-          {['1W', '1M', '3M', '1Y'].map((period) => (
-            <button
-              key={period}
-              onClick={() => setSelectedPeriod(period)}
-              className={`px-2 py-0.5 rounded-md transition-colors ${
-                selectedPeriod === period
-                  ? 'bg-primary text-white font-medium'
-                  : 'text-gray-600 hover:bg-gray-100'
-              }`}
-            >
-              {period}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="flex-1 w-full">
+    <StandardChartCard
+      title="Global Sales Overview"
+      description={`Overview for ${new Date().getFullYear()}`}
+      actions={actions}
+      height={260}
+      loading={!isClient || data.length === 0}
+    >
+      <div className="flex-1 w-full h-full">
         {isClient && (
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={data} margin={{ top: 5, left: 0, right: 5, bottom: 0 }}>
@@ -221,6 +224,6 @@ export default function SalesChart() {
           </ResponsiveContainer>
         )}
       </div>
-    </div>
+    </StandardChartCard>
   );
 }

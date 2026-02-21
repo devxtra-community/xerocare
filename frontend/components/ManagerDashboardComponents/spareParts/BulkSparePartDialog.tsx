@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { X, Upload, Save, Trash2, Plus, FileSpreadsheet } from 'lucide-react';
+import { X, Upload, Save, Trash2, Plus, FileSpreadsheet, Loader2 } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -72,6 +72,7 @@ export default function BulkSparePartDialog({
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [file, setFile] = useState<File | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Lot state
   const [lots, setLots] = useState<Lot[]>([]);
@@ -87,7 +88,7 @@ export default function BulkSparePartDialog({
       ]);
       setVendors(v || []);
       setWarehouses(w || []);
-      setLots(l || []);
+      setLots(l.data || []);
     } catch {
       toast.error('Failed to load dependencies');
     }
@@ -285,6 +286,7 @@ export default function BulkSparePartDialog({
       return;
     }
 
+    setIsSubmitting(true);
     try {
       const payload = validRows.map((r) => ({
         ...r,
@@ -309,6 +311,8 @@ export default function BulkSparePartDialog({
     } catch (error) {
       console.error('Bulk upload error:', error);
       toast.error('Bulk upload failed. See console for details.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -571,10 +575,11 @@ export default function BulkSparePartDialog({
             </Button>
             <Button
               onClick={handleSubmit}
-              disabled={rows.length === 0}
+              disabled={rows.length === 0 || isSubmitting}
               className="gap-2 bg-primary text-white"
             >
-              <Save size={16} /> Save All
+              {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+              {isSubmitting ? 'Saving...' : 'Save All'}
             </Button>
           </div>
         </div>

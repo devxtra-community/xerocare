@@ -4,14 +4,8 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Search, Plus } from 'lucide-react';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { usePagination } from '@/hooks/usePagination';
+import { StandardTable } from '@/components/table/StandardTable';
 import StatCard from '@/components/StatCard';
 import { Lot, lotService } from '@/lib/lot';
 import { format } from 'date-fns';
@@ -29,36 +23,46 @@ export default function ManagerLotTable() {
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [selectedLot, setSelectedLot] = useState<Lot | null>(null);
 
+  const { page, limit, total, setPage, setLimit, setTotal } = usePagination(10);
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState({ totalLots: 0, totalAmount: 0 });
+
   const loadLots = async () => {
+    setLoading(true);
     try {
-      const data = await lotService.getAllLots();
-      setLots(data || []);
+      const res = await lotService.getAllLots({ page, limit, search });
+      setLots(res.data || []);
+      setTotal(res.total || res.data.length);
+
+      // Calculate stats based on fetched page (as backend doesn't offer global stats yet)
+      setStats({
+        totalLots: res.total || res.data.length,
+        totalAmount: res.data.reduce((sum, lot) => sum + Number(lot.totalAmount), 0),
+      });
     } catch (error) {
       console.error('Failed to load lots:', error);
+    } finally {
+      setLoading(false);
     }
   };
 
   useEffect(() => {
-    loadLots();
-  }, []);
+    const delayDebounceFn = setTimeout(() => {
+      loadLots();
+    }, 500);
 
-  const filtered = lots.filter(
-    (lot) =>
-      lot.lotNumber?.toLowerCase().includes(search.toLowerCase()) ||
-      lot.vendor?.name?.toLowerCase().includes(search.toLowerCase()),
-  );
-
-  const totalAmount = lots.reduce((sum, lot) => sum + Number(lot.totalAmount), 0);
+    return () => clearTimeout(delayDebounceFn);
+  }, [search, page, limit]);
 
   return (
     <div className="bg-blue-100 min-h-screen p-3 sm:p-4 md:p-6 space-y-8">
       <h3 className="text-xl sm:text-2xl font-bold text-primary">Lot Management</h3>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2">
-        <StatCard title="Total Lots" value={lots.length.toString()} subtitle="All orders" />
+        <StatCard title="Total Lots" value={stats.totalLots.toString()} subtitle="All orders" />
         <StatCard
           title="Total Spending"
-          value={`$${totalAmount.toLocaleString()}`}
+          value={`$${stats.totalAmount.toLocaleString()}`}
           subtitle="Lifetime"
         />
       </div>
@@ -79,57 +83,77 @@ export default function ManagerLotTable() {
         </Button>
       </div>
 
-      <div className="rounded-2xl bg-card shadow-sm overflow-hidden">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              {['LOT NUMBER', 'VENDOR', 'DATE', 'ITEMS', 'TOTAL AMOUNT', 'STATUS', 'ACTION'].map(
-                (h) => (
-                  <TableHead key={h} className="text-[11px] font-semibold text-primary px-4">
-                    {h}
-                  </TableHead>
-                ),
-              )}
-            </TableRow>
-          </TableHeader>
-
-          <TableBody>
-            {filtered.length > 0 ? (
-              filtered.map((lot, i) => (
-                <TableRow key={lot.id} className={i % 2 ? 'bg-sky-100/60' : ''}>
-                  <TableCell className="px-4 font-medium">{lot.lotNumber}</TableCell>
-                  <TableCell className="px-4">{lot.vendor.name}</TableCell>
-                  <TableCell className="px-4">
-                    {format(new Date(lot.purchaseDate), 'MMM dd, yyyy')}
-                  </TableCell>
-                  <TableCell className="px-4">{lot.items.length} items</TableCell>
-                  <TableCell className="px-4 font-semibold">
-                    ${Number(lot.totalAmount).toLocaleString()}
-                  </TableCell>
-                  <TableCell className="px-4">
-                    <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
-                      {lot.status}
-                    </span>
-                  </TableCell>
-                  <TableCell className="px-4">
-                    <button
-                      className="text-primary hover:underline text-sm"
-                      onClick={() => setSelectedLot(lot)}
-                    >
-                      View Details
-                    </button>
-                  </TableCell>
-                </TableRow>
-              ))
-            ) : (
-              <TableRow>
-                <TableCell colSpan={7} className="text-center py-6 text-muted-foreground">
-                  No lots found
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
+      <div className="bg-card rounded-2xl shadow-sm border overflow-hidden">
+        <StandardTable
+          columns={[
+            {
+              id: 'lotNumber',
+              header: 'LOT NUMBER',
+              accessorKey: 'lotNumber' as keyof Lot,
+              className: 'font-semibold text-[11px] text-primary uppercase',
+            },
+            {
+              id: 'vendor',
+              header: 'VENDOR',
+              cell: (lot: Lot) => lot.vendor?.name,
+              className: 'font-semibold text-[11px] text-primary uppercase',
+            },
+            {
+              id: 'date',
+              header: 'DATE',
+              cell: (lot: Lot) => format(new Date(lot.purchaseDate), 'MMM dd, yyyy'),
+              className: 'font-semibold text-[11px] text-primary uppercase',
+            },
+            {
+              id: 'items',
+              header: 'ITEMS',
+              cell: (lot: Lot) => `${lot.items.length} items`,
+              className: 'font-semibold text-[11px] text-primary uppercase',
+            },
+            {
+              id: 'total',
+              header: 'TOTAL AMOUNT',
+              cell: (lot: Lot) => `$${Number(lot.totalAmount).toLocaleString()}`,
+              className: 'font-semibold text-[11px] text-primary uppercase',
+            },
+            {
+              id: 'status',
+              header: 'STATUS',
+              className: 'font-semibold text-[11px] text-primary uppercase',
+              cell: (lot: Lot) => (
+                <span
+                  className={`px-2 py-1 rounded-full text-xs font-medium ${lot.status === 'COMPLETED' ? 'bg-green-100 text-green-700' : lot.status === 'CANCELLED' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}`}
+                >
+                  {lot.status}
+                </span>
+              ),
+            },
+            {
+              id: 'actions',
+              header: 'ACTION',
+              className: 'font-semibold text-[11px] text-primary uppercase text-right',
+              cell: (lot: Lot) => (
+                <div className="text-right">
+                  <button
+                    className="text-primary hover:underline font-medium text-[13px]"
+                    onClick={() => setSelectedLot(lot)}
+                  >
+                    View Details
+                  </button>
+                </div>
+              ),
+            },
+          ]}
+          data={lots}
+          loading={loading}
+          emptyMessage="No lots found matching your search."
+          keyExtractor={(lot) => lot.id}
+          page={page}
+          limit={limit}
+          total={total}
+          onPageChange={setPage}
+          onLimitChange={setLimit}
+        />
       </div>
 
       {addDialogOpen && (

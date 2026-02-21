@@ -82,9 +82,9 @@ export default function AddSparePartDialog({
         brandService.getAllBrands(),
       ]);
       setWarehouses(whRes || []);
-      setModels(modelRes || []);
+      setModels(modelRes.data || []);
       setVendors(vendorRes || []);
-      setLots(lotsRes || []);
+      setLots(lotsRes.data || []);
       setBrands(brandsRes || []);
     } catch (error) {
       console.error('Failed to load dependencies', error);

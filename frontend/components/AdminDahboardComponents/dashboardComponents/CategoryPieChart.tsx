@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { PieChart, Pie, Cell } from 'recharts';
 
 import { getAllProducts, Product } from '@/lib/product';
+import { StandardChartCard } from '@/components/charts/StandardChartCard';
 
 const COLORS = ['#FF6B35', '#004E89', '#00A8E8', '#F7B500', '#E040FB', '#2E7D32'];
 
@@ -47,52 +48,57 @@ export default function CategoryPieChart() {
   }, []);
 
   return (
-    <div className="rounded-2xl bg-card shadow-sm w-full p-4 h-[260px] flex flex-col">
-      <h3 className="text-base font-semibold text-primary mb-3">Brands</h3>
-
-      <div className="relative w-[120px] h-[120px] mx-auto mb-4">
-        {isClient && data.length > 0 ? (
-          <PieChart width={120} height={120}>
-            <Pie
-              data={data}
-              dataKey="value"
-              nameKey="name"
-              cx={60}
-              cy={60}
-              innerRadius={35}
-              outerRadius={56}
-              startAngle={90}
-              endAngle={-270}
-              paddingAngle={3}
-              stroke="#ffffff"
-              strokeWidth={3}
-              isAnimationActive={false}
-            >
-              {data.map((entry, index) => (
-                <Cell key={index} fill={entry.color} />
-              ))}
-            </Pie>
-          </PieChart>
-        ) : (
-          <div className="flex items-center justify-center w-full h-full text-xs text-gray-400">
-            {isClient ? 'No Data' : 'Loading...'}
-          </div>
-        )}
-      </div>
-
-      <div className="w-full space-y-2 overflow-y-auto max-h-[80px]">
-        {data.map((item) => (
-          <div key={item.name} className="flex items-center justify-between text-xs">
-            <div className="flex items-center gap-1.5">
-              <span className="h-2 w-2 rounded-full" style={{ backgroundColor: item.color }} />
-              <span className="font-medium text-foreground truncate max-w-[100px]">
-                {item.name}
-              </span>
+    <StandardChartCard
+      title="Brands"
+      description="Product distribution by brand"
+      height={260}
+      loading={!isClient || data.length === 0}
+    >
+      <div className="flex flex-col h-full">
+        <div className="relative w-[120px] h-[120px] mx-auto mb-4 flex-shrink-0">
+          {isClient && data.length > 0 ? (
+            <PieChart width={120} height={120}>
+              <Pie
+                data={data}
+                dataKey="value"
+                nameKey="name"
+                cx={60}
+                cy={60}
+                innerRadius={35}
+                outerRadius={56}
+                startAngle={90}
+                endAngle={-270}
+                paddingAngle={3}
+                stroke="#ffffff"
+                strokeWidth={3}
+                isAnimationActive={false}
+              >
+                {data.map((entry, index) => (
+                  <Cell key={index} fill={entry.color} />
+                ))}
+              </Pie>
+            </PieChart>
+          ) : (
+            <div className="flex items-center justify-center w-full h-full text-xs text-gray-400">
+              {isClient ? 'No Data' : 'Loading...'}
             </div>
-            <span className="font-semibold text-foreground">{item.value}%</span>
-          </div>
-        ))}
+          )}
+        </div>
+
+        <div className="w-full space-y-2 overflow-y-auto max-h-[80px]">
+          {data.map((item) => (
+            <div key={item.name} className="flex items-center justify-between text-xs">
+              <div className="flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full" style={{ backgroundColor: item.color }} />
+                <span className="font-medium text-foreground truncate max-w-[100px]">
+                  {item.name}
+                </span>
+              </div>
+              <span className="font-semibold text-foreground">{item.value}%</span>
+            </div>
+          ))}
+        </div>
       </div>
-    </div>
+    </StandardChartCard>
   );
 }
