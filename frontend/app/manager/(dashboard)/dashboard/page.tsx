@@ -54,8 +54,15 @@ export default function Dashboard() {
   return (
     <DashboardPage>
       <div className="flex flex-col space-y-4 sm:space-y-6">
-        <div className="flex flex-row items-center justify-between">
-          <h3 className="text-xl sm:text-2xl font-bold text-primary">{branchName} Sales</h3>
+        <div className="flex items-center justify-between">
+          <div className="space-y-1">
+            <h3 className="text-xl sm:text-2xl font-bold text-primary tracking-tight">
+              {branchName} Sales
+            </h3>
+            <p className="text-sm text-muted-foreground font-medium">
+              Performance metrics and seasonal trends
+            </p>
+          </div>
           <YearSelector selectedYear={selectedYear} onYearChange={setSelectedYear} />
         </div>
 

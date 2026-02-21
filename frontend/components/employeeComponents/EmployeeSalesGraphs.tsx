@@ -12,7 +12,6 @@ import {
   LineChart,
   Line,
   ReferenceLine,
-  Brush,
 } from 'recharts';
 
 import { getMyInvoices, Invoice } from '@/lib/invoice';
@@ -44,10 +43,10 @@ const ChartContainer = ({
         <BarChart
           data={data}
           margin={{
-            top: 5,
-            right: 5,
-            left: -30,
-            bottom: 5,
+            top: 10,
+            right: 10,
+            left: -20,
+            bottom: 0,
           }}
         >
           <CartesianGrid
@@ -102,10 +101,10 @@ const ForexChartContainer = ({
           <LineChart
             data={data}
             margin={{
-              top: 5,
+              top: 10,
               right: 10,
               left: -20,
-              bottom: 5,
+              bottom: 0,
             }}
           >
             <CartesianGrid
@@ -151,7 +150,6 @@ const ForexChartContainer = ({
               dot={{ r: 3, fill: color, strokeWidth: 2, stroke: '#fff' }}
               activeDot={{ r: 6, fill: color, stroke: '#fff', strokeWidth: 2 }}
             />
-            <Brush dataKey="name" height={20} stroke="#cbd5e1" fill="#f8fafc" />
           </LineChart>
         </ResponsiveContainer>
       </div>

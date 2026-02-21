@@ -1,3 +1,5 @@
+'use client';
+
 import React, { useState } from 'react';
 import EmployeeSalesStats from '@/components/employeeComponents/EmployeeSalesStats';
 import EmployeeSalesGraphs from '@/components/employeeComponents/EmployeeSalesGraphs';
@@ -12,8 +14,15 @@ export default function EmployeeSalesPage() {
     <ProtectedRoute requiredModules={['sales', 'billing']}>
       <div className="bg-blue-100 min-h-full p-3 sm:p-4 md:p-6 space-y-6 sm:space-y-8">
         <div className="flex flex-col space-y-4 sm:space-y-6">
-          <div className="flex flex-row items-center justify-between">
-            <h3 className="text-xl sm:text-2xl font-bold text-primary">Sales Management</h3>
+          <div className="flex items-center justify-between items-center">
+            <div className="space-y-1">
+              <h3 className="text-xl sm:text-2xl font-bold text-primary tracking-tight">
+                Sales Management
+              </h3>
+              <p className="text-sm text-muted-foreground font-medium">
+                Personal sales performance and daily trends
+              </p>
+            </div>
             <YearSelector selectedYear={selectedYear} onYearChange={setSelectedYear} />
           </div>
           <EmployeeSalesStats selectedYear={selectedYear} />

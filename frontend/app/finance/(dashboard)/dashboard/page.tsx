@@ -14,20 +14,22 @@ export default function FinanceDashboard() {
   return (
     <div className="bg-muted min-h-full p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6">
       {/* HEADER */}
-      <header className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-        <div className="flex flex-row items-center justify-between">
-          <div>
-            <h1 className="text-xl sm:text-2xl font-bold text-primary">Finance Dashboard</h1>
-            <p className="text-sm text-muted-foreground">
-              {new Date().toLocaleDateString('en-US', {
-                weekday: 'long',
-                month: 'short',
-                day: 'numeric',
-                year: 'numeric',
-              })}{' '}
-              • Performance Overview
-            </p>
-          </div>
+      <header className="flex items-center justify-between gap-4">
+        <div>
+          <h1 className="text-xl sm:text-2xl font-bold text-primary tracking-tight">
+            Finance Dashboard
+          </h1>
+          <p className="text-sm text-muted-foreground font-medium">
+            {new Date().toLocaleDateString('en-US', {
+              weekday: 'long',
+              month: 'short',
+              day: 'numeric',
+              year: 'numeric',
+            })}{' '}
+            • Performance Overview
+          </p>
+        </div>
+        <div className="flex items-center gap-3">
           <YearSelector selectedYear={selectedYear} onYearChange={setSelectedYear} />
         </div>
       </header>

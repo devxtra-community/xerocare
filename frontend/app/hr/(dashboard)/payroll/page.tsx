@@ -5,14 +5,17 @@ import HRPayrollStats from '@/components/HrComponents/HRPayrollStats';
 import HRPayrollTable, { PayrollRecord } from '@/components/HrComponents/HRPayrollTable';
 import api from '@/lib/api';
 import { toast } from 'sonner';
+import { YearSelector } from '@/components/ui/YearSelector';
 
 export default function PayrollPage() {
   const [data, setData] = useState<PayrollRecord[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const [selectedYear, setSelectedYear] = useState<number | 'all'>(new Date().getFullYear());
+
   useEffect(() => {
     fetchPayroll();
-  }, []);
+  }, [selectedYear]);
 
   const fetchPayroll = async () => {
     try {
@@ -57,9 +60,16 @@ export default function PayrollPage() {
   return (
     <div className="flex flex-col gap-6 p-6">
       {/* Page Header */}
-      <div className="flex flex-col gap-2">
-        <h1 className="text-2xl font-bold tracking-tight text-primary">Payroll Management</h1>
-        <p className="text-muted-foreground">Manage employee salaries and payroll records</p>
+      <div className="flex items-center justify-between">
+        <div className="space-y-1">
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-primary">
+            Payroll Management
+          </h1>
+          <p className="text-sm text-muted-foreground font-medium">
+            Manage employee salaries and payroll records
+          </p>
+        </div>
+        <YearSelector selectedYear={selectedYear} onYearChange={setSelectedYear} />
       </div>
 
       {/* Stats Cards */}

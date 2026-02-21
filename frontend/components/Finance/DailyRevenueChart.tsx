@@ -114,7 +114,7 @@ export default function DailyRevenueChart({
 
   if (loading) {
     return (
-      <div className="w-full h-[310px] flex items-center justify-center">
+      <div className="w-full h-[300px] flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
       </div>
     );
@@ -125,9 +125,9 @@ export default function DailyRevenueChart({
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <CalendarDays className="h-4 w-4 text-primary" />
-          <h3 className="text-sm font-semibold text-gray-800">
-            Daily Revenue ({months[selectedMonth]} {selectedYear === 'all' ? '' : selectedYear})
-          </h3>
+          <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">
+            Breakdown
+          </span>
         </div>
         <div className="flex items-center gap-2">
           <Select
@@ -152,7 +152,7 @@ export default function DailyRevenueChart({
           />
         </div>
       </div>
-      <div className="w-full h-[310px] mt-0">
+      <div className="w-full h-[300px] mt-0">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--chart-grid)" />

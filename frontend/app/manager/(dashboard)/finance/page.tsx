@@ -15,7 +15,7 @@ export default function ManagerFinancePage() {
   return (
     <div className="bg-blue-100 min-h-screen p-3 sm:p-4 md:p-6 space-y-6 sm:space-y-8">
       {/* HEADER SECTION */}
-      <div className="flex justify-between items-center">
+      <div className="flex items-center justify-between">
         <div className="space-y-1">
           <h2 className="text-xl sm:text-2xl font-bold text-primary tracking-tight">
             Financial Overview
