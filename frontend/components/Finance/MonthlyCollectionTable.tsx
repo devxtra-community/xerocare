@@ -37,8 +37,8 @@ export default function MonthlyCollectionTable({ mode }: { mode?: 'RENT' | 'LEAS
   const [contractItems, setContractItems] = useState<Record<string, string>>({});
   // const years = Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 1 + i);
 
-  const handleShowHistory = (alert: CollectionAlert) => {
-    setHistoryContractId(alert.contractId);
+  const handleShowHistory = (alertItem: CollectionAlert) => {
+    setHistoryContractId(alertItem.contractId);
     setIsHistoryOpen(true);
   };
 
@@ -67,17 +67,17 @@ export default function MonthlyCollectionTable({ mode }: { mode?: 'RENT' | 'LEAS
   useEffect(() => {
     const fetchContractItems = async () => {
       const itemsMap: Record<string, string> = {};
-      for (const alert of alerts) {
+      for (const alertItem of alerts) {
         try {
-          const inv = await getInvoiceById(alert.contractId);
+          const inv = await getInvoiceById(alertItem.contractId);
           const productItems =
             inv.items
               ?.filter((item) => item.itemType === 'PRODUCT')
               .map((item) => item.description)
               .join(', ') || 'No items';
-          itemsMap[alert.contractId] = productItems;
+          itemsMap[alertItem.contractId] = productItems;
         } catch {
-          itemsMap[alert.contractId] = 'N/A';
+          itemsMap[alertItem.contractId] = 'N/A';
         }
       }
       setContractItems(itemsMap);
@@ -87,35 +87,37 @@ export default function MonthlyCollectionTable({ mode }: { mode?: 'RENT' | 'LEAS
     }
   }, [alerts]);
 
-  const handleRecordUsage = (alert: CollectionAlert) => {
-    setSelectedContract(alert);
+  const handleRecordUsage = (alertItem: CollectionAlert) => {
+    setSelectedContract(alertItem);
     setIsModalOpen(true);
   };
 
-  const handleGenerateFinalSummary = async (alert: CollectionAlert) => {
+  const handleGenerateFinalSummary = (alertItem: CollectionAlert) => {
     if (
       !confirm(
-        `Are you sure you want to generate the final summary for ${alert.invoiceNumber}? This will mark the contract as COMPLETED.`,
+        `Are you sure you want to generate the final summary for ${alertItem.invoiceNumber}? This will mark the contract as COMPLETED.`,
       )
     )
       return;
 
     setLoading(true);
-    try {
-      const { generateConsolidatedFinalInvoice } = await import('@/lib/invoice');
-      await generateConsolidatedFinalInvoice(alert.contractId);
-      toast.success('Final summary generated and contract completed!');
-      fetchAlerts();
-    } catch (error: unknown) {
-      toast.error((error as { message?: string }).message || 'Failed to generate final summary');
-    } finally {
-      setLoading(false);
-    }
+    (async () => {
+      try {
+        const { generateConsolidatedFinalInvoice } = await import('@/lib/invoice');
+        await generateConsolidatedFinalInvoice(alertItem.contractId);
+        toast.success('Final summary generated and contract completed!');
+        fetchAlerts();
+      } catch (error: unknown) {
+        toast.error((error as { message?: string }).message || 'Failed to generate final summary');
+      } finally {
+        setLoading(false);
+      }
+    })();
   };
 
-  const handleViewDetails = async (alert: CollectionAlert) => {
+  const handleViewDetails = async (alertItem: CollectionAlert) => {
     try {
-      const targetId = alert.finalInvoiceId || alert.contractId;
+      const targetId = alertItem.finalInvoiceId || alertItem.contractId;
       const inv = await getInvoiceById(targetId);
       setViewingInvoice(inv);
     } catch {
@@ -169,44 +171,44 @@ export default function MonthlyCollectionTable({ mode }: { mode?: 'RENT' | 'LEAS
                 </TableCell>
               </TableRow>
             ) : (
-              alerts.map((alert) => (
-                <TableRow key={alert.contractId}>
-                  <TableCell className="font-medium">{alert.invoiceNumber}</TableCell>
+              alerts.map((alertItem) => (
+                <TableRow key={alertItem.contractId}>
+                  <TableCell className="font-medium">{alertItem.invoiceNumber}</TableCell>
                   <TableCell className="font-medium">
                     <div className="flex flex-col">
-                      {alert.customerName || 'Unknown Customer'}
+                      {alertItem.customerName || 'Unknown Customer'}
                       <div className="text-xs text-muted-foreground">
-                        {alert.customerPhone || alert.customerId}
+                        {alertItem.customerPhone || alertItem.customerId}
                       </div>
                     </div>
                   </TableCell>
                   <TableCell className="max-w-[200px]">
                     <div className="text-xs font-medium text-slate-700 truncate">
-                      {contractItems[alert.contractId] || 'Loading...'}
+                      {contractItems[alertItem.contractId] || 'Loading...'}
                     </div>
                   </TableCell>
                   {/* Show empty cell for completed contracts to maintain table structure */}
                   <TableCell className="text-xs text-muted-foreground font-medium">
-                    {alert.contractStatus !== 'COMPLETED' &&
-                    alert.usageData?.billingPeriodStart &&
-                    alert.usageData?.billingPeriodEnd
-                      ? `${format(new Date(alert.usageData.billingPeriodStart), 'MMM dd')} - ${format(new Date(alert.usageData.billingPeriodEnd), 'MMM dd, yyyy')}`
-                      : alert.contractStatus !== 'COMPLETED'
+                    {alertItem.contractStatus !== 'COMPLETED' &&
+                    alertItem.usageData?.billingPeriodStart &&
+                    alertItem.usageData?.billingPeriodEnd
+                      ? `${format(new Date(alertItem.usageData.billingPeriodStart), 'MMM dd')} - ${format(new Date(alertItem.usageData.billingPeriodEnd), 'MMM dd, yyyy')}`
+                      : alertItem.contractStatus !== 'COMPLETED'
                         ? 'N/A'
                         : ''}
                   </TableCell>
                   <TableCell className="font-bold text-slate-700">
                     {(() => {
-                      const isFinalMonth = alert.type === 'SUMMARY_PENDING';
+                      const isFinalMonth = alertItem.type === 'SUMMARY_PENDING';
 
                       if (isFinalMonth) return <span className="text-blue-600">₹0 (Adjusted)</span>;
 
-                      const amount = alert.totalAmount || alert.monthlyRent || 0;
+                      const amount = alertItem.totalAmount || alertItem.monthlyRent || 0;
                       return `₹${Number(amount).toLocaleString()}`;
                     })()}
                   </TableCell>
                   <TableCell>
-                    {alert.type === 'USAGE_PENDING' && (
+                    {alertItem.type === 'USAGE_PENDING' && (
                       <Badge
                         variant="outline"
                         className="bg-orange-50 text-orange-600 border-orange-200"
@@ -214,12 +216,12 @@ export default function MonthlyCollectionTable({ mode }: { mode?: 'RENT' | 'LEAS
                         Usage Pending
                       </Badge>
                     )}
-                    {alert.type === 'SUMMARY_PENDING' && (
+                    {alertItem.type === 'SUMMARY_PENDING' && (
                       <Badge variant="outline" className="bg-blue-50 text-blue-600 border-blue-200">
                         Tenure reached
                       </Badge>
                     )}
-                    {alert.type === 'INVOICE_PENDING' && (
+                    {alertItem.type === 'INVOICE_PENDING' && (
                       <Badge
                         variant="outline"
                         className="bg-green-50 text-green-600 border-green-200"
@@ -227,7 +229,7 @@ export default function MonthlyCollectionTable({ mode }: { mode?: 'RENT' | 'LEAS
                         Usage Completed
                       </Badge>
                     )}
-                    {alert.contractStatus === 'COMPLETED' && (
+                    {alertItem.contractStatus === 'COMPLETED' && (
                       <Badge
                         variant="outline"
                         className="bg-green-50 text-green-600 border-green-200 ml-2"
@@ -241,38 +243,39 @@ export default function MonthlyCollectionTable({ mode }: { mode?: 'RENT' | 'LEAS
                       size="sm"
                       variant="ghost"
                       className="h-7 w-7 p-0 text-blue-600 hover:bg-blue-50"
-                      onClick={() => handleShowHistory(alert)}
+                      onClick={() => handleShowHistory(alertItem)}
                     >
                       <HistoryIcon className="h-3.5 w-3.5" />
                     </Button>
                   </TableCell>
                   <TableCell className="text-right">
-                    {alert.type === 'USAGE_PENDING' && (
+                    {alertItem.type === 'USAGE_PENDING' && (
                       <Button
                         size="sm"
-                        onClick={() => handleRecordUsage(alert)}
+                        onClick={() => handleRecordUsage(alertItem)}
                         className="bg-blue-600 hover:bg-blue-700 text-white h-7 px-3 text-xs"
                       >
                         <PlusCircle className="h-3 w-3 mr-1.5" />
                         Record Usage
                       </Button>
                     )}
-                    {alert.type === 'SUMMARY_PENDING' && (
+                    {alertItem.type === 'SUMMARY_PENDING' && (
                       <Button
                         size="sm"
                         variant="destructive"
-                        onClick={() => handleGenerateFinalSummary(alert)}
+                        onClick={() => handleGenerateFinalSummary(alertItem)}
                         className="h-7 px-3 text-xs"
                       >
                         <FileText className="h-3 w-3 mr-1.5" />
                         Final Summary
                       </Button>
                     )}
-                    {(alert.type === 'INVOICE_PENDING' || alert.type === 'SEND_PENDING') && (
+                    {(alertItem.type === 'INVOICE_PENDING' ||
+                      alertItem.type === 'SEND_PENDING') && (
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={() => handleViewDetails(alert)}
+                        onClick={() => handleViewDetails(alertItem)}
                         className="h-7 px-3 text-xs"
                       >
                         <Eye className="h-3 w-3 mr-1.5" />

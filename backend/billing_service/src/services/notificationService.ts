@@ -1,6 +1,8 @@
 import { InvoiceRepository } from '../repositories/invoiceRepository';
 import { AppError } from '../errors/appError';
 import { logger } from '../config/logger';
+import { UsageRecord } from '../entities/usageRecordEntity';
+import { InvoiceItem } from '../entities/invoiceItemEntity';
 
 export class NotificationService {
   private invoiceRepo = new InvoiceRepository();
@@ -38,8 +40,7 @@ export class NotificationService {
       let calculatedGrossTotal = 0;
       let calculatedAdvanceAdjusted = 0;
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      history.forEach((record: any) => {
+      history.forEach((record: UsageRecord) => {
         const period = `${new Date(record.billingPeriodStart).toLocaleDateString()} - ${new Date(
           record.billingPeriodEnd,
         ).toLocaleDateString()}`;
@@ -94,6 +95,64 @@ export class NotificationService {
          `;
       }
 
+      let pricingRulesHTML = '';
+      const pricingRules = (contract.items || []).filter(
+        (i: InvoiceItem) => i.itemType === 'PRICING_RULE',
+      );
+      if (pricingRules.length > 0) {
+        let rulesRows = '';
+        pricingRules.forEach((rule: InvoiceItem) => {
+          rulesRows += `
+            <div style="margin-bottom: 15px; padding: 15px; background-color: #f9fafb; border-radius: 8px; border: 1px solid #e5e7eb;">
+              <h4 style="margin: 0 0 10px 0; font-size: 13px; font-weight: 700; color: #111827;">${rule.description}</h4>
+          `;
+
+          if (rule.bwIncludedLimit || rule.colorIncludedLimit) {
+            rulesRows += `<div style="margin-bottom: 10px; font-size: 12px; color: #4b5563;">`;
+            if (rule.bwIncludedLimit)
+              rulesRows += `<span style="margin-right: 15px;"><strong>B/W Included:</strong> ${rule.bwIncludedLimit}</span>`;
+            if (rule.colorIncludedLimit)
+              rulesRows += `<span><strong>Color Included:</strong> ${rule.colorIncludedLimit}</span>`;
+            rulesRows += `</div>`;
+          }
+
+          const renderSlabs = (
+            slabs: Array<{ from: number; to: number; rate: number }>,
+            title: string,
+            excessRate?: number,
+          ) => {
+            if ((!slabs || slabs.length === 0) && !excessRate) return '';
+            let html = `<div style="margin-bottom: 10px;"><strong style="font-size: 11px; text-transform: uppercase; color: #6b7280;">${title} Slabs:</strong><table style="width: 100%; border-collapse: collapse; margin-top: 5px;">`;
+            if (slabs && slabs.length > 0) {
+              slabs.forEach((s) => {
+                html += `<tr><td style="padding: 4px 0; font-size: 12px; color: #374151; border-bottom: 1px solid #f3f4f6;">${s.from} - ${s.to}</td><td style="padding: 4px 0; font-size: 12px; font-weight: 600; text-align: right; color: #111827; border-bottom: 1px solid #f3f4f6;">₹${s.rate}</td></tr>`;
+              });
+              if (excessRate) {
+                const maxTo = Math.max(...slabs.map((s) => Number(s.to) || 0));
+                html += `<tr><td style="padding: 4px 0; font-size: 12px; color: #374151;">> ${maxTo}</td><td style="padding: 4px 0; font-size: 12px; font-weight: 600; text-align: right; color: #111827;">₹${excessRate}</td></tr>`;
+              }
+            } else if (excessRate) {
+              html += `<tr><td style="padding: 4px 0; font-size: 12px; color: #374151;">Base Rate</td><td style="padding: 4px 0; font-size: 12px; font-weight: 600; text-align: right; color: #111827;">₹${excessRate}</td></tr>`;
+            }
+            html += `</table></div>`;
+            return html;
+          };
+
+          rulesRows += renderSlabs(rule.bwSlabRanges || [], 'Black & White', rule.bwExcessRate);
+          rulesRows += renderSlabs(rule.colorSlabRanges || [], 'Color', rule.colorExcessRate);
+          rulesRows += renderSlabs(rule.comboSlabRanges || [], 'Combined', rule.combinedExcessRate);
+
+          rulesRows += `</div>`;
+        });
+
+        pricingRulesHTML = `
+          <div style="margin-bottom: 30px;">
+            <h3 style="margin: 0 0 16px 0; font-size: 14px; font-weight: 800; color: #374151; text-transform: uppercase; letter-spacing: 0.1em; border-bottom: 2px solid #f3f4f6; padding-bottom: 8px;">Pricing Details</h3>
+            ${rulesRows}
+          </div>
+        `;
+      }
+
       const htmlBody = `
       <div style="font-family: 'Inter', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 40px; background-color: #ffffff; color: #1f2937;">
         <div style="text-align: center; margin-bottom: 40px;">
@@ -105,6 +164,8 @@ export class NotificationService {
             <p style="margin: 0; font-size: 16px; line-height: 24px;">Dear <strong>${customerName}</strong>,</p>
             <p style="margin: 8px 0 0 0; font-size: 15px; line-height: 24px; color: #4b5563;">Please find below the consolidated statement for your contract. This summary includes all usage and final settlement details.</p>
         </div>
+
+        ${pricingRulesHTML}
 
         <div style="margin-bottom: 40px;">
             <h3 style="margin: 0 0 16px 0; font-size: 14px; font-weight: 800; color: #374151; text-transform: uppercase; letter-spacing: 0.1em; border-bottom: 2px solid #f3f4f6; padding-bottom: 8px;">Transaction History</h3>

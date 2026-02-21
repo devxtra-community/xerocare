@@ -5,6 +5,8 @@ import { ReportedBy } from '../entities/usageRecordEntity';
 import { InvoiceType } from '../entities/enums/invoiceType';
 import { ContractStatus } from '../entities/enums/contractStatus';
 import { InvoiceStatus } from '../entities/enums/invoiceStatus';
+import { ItemType } from '../entities/enums/itemType';
+import { InvoiceItem } from '../entities/invoiceItemEntity';
 import { NotificationService } from './notificationService';
 import { NotificationPublisher } from '../events/publisher/notificationPublisher';
 import { logger } from '../config/logger';
@@ -111,20 +113,25 @@ export class UsageService {
     const colorA3Delta = payload.colorA3Count - prevColorA3;
 
     // 5. Backend Validations
-    // Rollback Prevention
-    if (bwA4Delta < 0 || bwA3Delta < 0 || colorA4Delta < 0 || colorA3Delta < 0) {
-      throw new AppError(
-        'Meter reading cannot be less than previous reading (Rollback prevented)',
-        400,
-      );
-    }
+    const isSimplifiedLease =
+      contract.saleType === 'LEASE' && contract.leaseType && contract.leaseType !== 'FSM';
 
-    // Zero-Usage Detection (Professional)
-    if (bwA4Delta === 0 && bwA3Delta === 0 && colorA4Delta === 0 && colorA3Delta === 0) {
-      throw new AppError(
-        'No usage detected for this period. Please provide a newer meter reading.',
-        400,
-      );
+    if (!isSimplifiedLease) {
+      // Rollback Prevention
+      if (bwA4Delta < 0 || bwA3Delta < 0 || colorA4Delta < 0 || colorA3Delta < 0) {
+        throw new AppError(
+          'Meter reading cannot be less than previous reading (Rollback prevented)',
+          400,
+        );
+      }
+
+      // Zero-Usage Detection (Professional)
+      if (bwA4Delta === 0 && bwA3Delta === 0 && colorA4Delta === 0 && colorA3Delta === 0) {
+        throw new AppError(
+          'No usage detected for this period. Please provide a newer meter reading.',
+          400,
+        );
+      }
     }
 
     // 6. Normalize Monthly Usage (DELTA BASED)
@@ -337,18 +344,26 @@ export class UsageService {
     }
 
     // 2️⃣ Extract Pricing Rule (InvoiceItem) - More robust detection
-    const pricingRule = contract.items?.find(
+    const pricingRule = (contract.items?.find(
       (i) =>
         i.itemType === 'PRICING_RULE' ||
-        (i.combinedIncludedLimit !== undefined && i.combinedIncludedLimit > 0) ||
-        (i.bwIncludedLimit !== undefined && i.bwIncludedLimit > 0) ||
-        (i.combinedExcessRate !== undefined && i.combinedExcessRate > 0) ||
-        (i.bwExcessRate !== undefined && i.bwExcessRate > 0),
-    );
-
-    if (!pricingRule) {
-      throw new AppError('Pricing rule not found for contract', 400);
-    }
+        (i.itemType === ItemType.PRODUCT &&
+          ((i.combinedIncludedLimit !== undefined && i.combinedIncludedLimit > 0) ||
+            (i.bwIncludedLimit !== undefined && i.bwIncludedLimit > 0) ||
+            (i.combinedExcessRate !== undefined && i.combinedExcessRate > 0) ||
+            (i.bwExcessRate !== undefined && i.bwExcessRate > 0))),
+    ) || {
+      itemType: ItemType.PRICING_RULE,
+      description: 'Default Pricing',
+      initialBwCount: 0,
+      initialColorCount: 0,
+      bwIncludedLimit: 0,
+      colorIncludedLimit: 0,
+      combinedIncludedLimit: 0,
+      bwExcessRate: 0,
+      colorExcessRate: 0,
+      combinedExcessRate: 0,
+    }) as Partial<InvoiceItem>;
 
     // Prepare R2 Base URL
     const R2_BASE_URL =
