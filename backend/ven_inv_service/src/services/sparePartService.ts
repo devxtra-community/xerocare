@@ -61,41 +61,35 @@ export class SparePartService {
     const quantity = data.quantity || 0;
     let lotId = data.lot_id;
     let vendorId = data.vendor_id;
+    let warehouseId = data.warehouse_id;
 
     // If lot_id is missing but lot_number is provided, lookup the lot
     if (!lotId && data.lot_number) {
       const lot = await this.lotService.getLotByNumber(data.lot_number);
       if (lot) {
         lotId = lot.id;
-        // If vendor_id is missing, use the one from the lot
-        if (!vendorId) {
-          vendorId = lot.vendorId;
-        }
+        if (!vendorId) vendorId = lot.vendorId;
+        if (!warehouseId) warehouseId = lot.warehouse_id;
       }
     }
 
-    if (lotId) {
-      // If we don't have an itemCode yet (new part being added),
-      // we might need to be careful with validateAndTrackUsage
-      // however, the lot tracking currently uses item_code.
-      if (itemCode) {
-        await this.lotService.validateAndTrackUsage(
-          lotId,
-          LotItemType.SPARE_PART,
-          itemCode,
-          quantity,
-        );
+    // If lotId is present, ensure we have warehouse/vendor info (often cached/already fetched above)
+    if (lotId && (!warehouseId || !vendorId)) {
+      const lot = await this.lotService.getLotById(lotId);
+      if (lot) {
+        if (!warehouseId) warehouseId = lot.warehouse_id;
+        if (!vendorId) vendorId = lot.vendorId;
       }
     }
 
-    // Determine the warehouse and vendor for the duplicate check
-    // Usually retrieved via lot_id since SpareParts depend on lots for warehouse assignment currently
-    let warehouseId: string | undefined = undefined;
-    let vendorId: string | undefined = undefined;
-    if (data.lot_id) {
-      const lot = await this.lotService.getLotById(data.lot_id);
-      warehouseId = lot?.warehouse_id || undefined;
-      vendorId = lot?.vendorId || undefined;
+    if (lotId && itemCode) {
+      // The lot tracking currently uses item_code.
+      await this.lotService.validateAndTrackUsage(
+        lotId,
+        LotItemType.SPARE_PART,
+        itemCode,
+        quantity,
+      );
     }
 
     // Check if a part with same code, model and warehouse already exists
@@ -121,8 +115,6 @@ export class SparePartService {
       branch_id: branchId,
       quantity: quantity,
       lot_id: lotId,
-      vendor_id: vendorId,
-      warehouse_id: data.warehouse_id,
     });
 
     await setCached(`sparepart:${sparePart.id}`, sparePart, 3600);
