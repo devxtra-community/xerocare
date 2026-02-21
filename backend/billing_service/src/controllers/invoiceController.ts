@@ -424,6 +424,29 @@ export const getBranchSalesTotals = async (req: Request, res: Response, next: Ne
 };
 
 /**
+ * Retrieves comprehensive finance stats (Revenue, Expenses, Profit).
+ */
+export const getBranchFinanceStats = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const branchId = req.user?.branchId;
+
+    if (!branchId) {
+      throw new AppError('Branch ID not found in user context', 400);
+    }
+
+    const year = req.query.year ? parseInt(req.query.year as string, 10) : undefined;
+    const result = await reportService.getBranchFinanceStats(branchId, year);
+    return res.status(200).json({
+      success: true,
+      data: result,
+      message: 'Branch finance stats fetched successfully',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
  * Retrieves counts of pending actions (e.g., pending approvals) for the branch.
  */
 export const getPendingCounts = async (req: Request, res: Response, next: NextFunction) => {
@@ -504,9 +527,13 @@ export const getGlobalSalesTotals = async (req: Request, res: Response, next: Ne
 export const getFinanceReport = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { branchId, saleType, month, year } = req.query;
+    const effectiveBranchId =
+      req.user?.role === 'ADMIN'
+        ? (branchId as string)
+        : (branchId as string) || req.user?.branchId;
 
     const report = await reportService.getFinanceReport({
-      branchId: branchId as string,
+      branchId: effectiveBranchId,
       saleType: saleType as string,
       month: month ? parseInt(month as string, 10) : undefined,
       year: year ? parseInt(year as string, 10) : undefined,

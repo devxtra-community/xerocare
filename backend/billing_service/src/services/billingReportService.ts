@@ -68,6 +68,27 @@ export class BillingReportService {
   }
 
   /**
+   * Retrieves comprehensive finance stats (Revenue, Expenses, Profit).
+   */
+  async getBranchFinanceStats(branchId: string, year?: number) {
+    const [salesTotals, expenseData] = await Promise.all([
+      this.getBranchSalesTotals(branchId, year),
+      this.getLotStatsFromInventory(branchId, year),
+    ]);
+
+    const revenue = salesTotals.totalSales;
+    const expenses = expenseData.totalExpenses;
+    const profit = revenue - expenses;
+
+    return {
+      totalRevenue: revenue,
+      totalExpenses: expenses,
+      netProfit: profit,
+      salesByType: salesTotals.salesByType,
+    };
+  }
+
+  /**
    * Retrieves global sales trend data.
    */
   async getGlobalSales(period: string, year?: number) {
@@ -379,18 +400,68 @@ export class BillingReportService {
     month?: number;
     year?: number;
   }) {
-    const reportData = await this.invoiceRepo.getFinanceReport(filter);
+    const [reportData, expenseStats] = await Promise.all([
+      this.invoiceRepo.getFinanceReport(filter),
+      filter.branchId ? this.getLotStatsFromInventory(filter.branchId, filter.year) : null,
+    ]);
+
+    const monthlyExpenses = new Map<string, number>();
+    if (expenseStats?.monthlyExpenses) {
+      expenseStats.monthlyExpenses.forEach((e: { month: string; total: number }) => {
+        monthlyExpenses.set(e.month, e.total);
+      });
+    }
+
+    const monthsProcessed = new Set<string>();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return reportData.map((item: any) => {
-      const expense = 0;
+      let expense = 0;
+      if (!monthsProcessed.has(item.month)) {
+        expense = monthlyExpenses.get(item.month) || 0;
+        monthsProcessed.add(item.month);
+      }
       const profit = (item.income || 0) - expense;
       return {
         ...item,
         expense,
         profit,
-        profitStatus: 'profit',
+        profitStatus: profit >= 0 ? 'profit' : 'loss',
       };
     });
+  }
+
+  /**
+   * Internal helper to fetch lot stats from the Inventory service.
+   */
+  private async getLotStatsFromInventory(branchId: string, year?: number) {
+    try {
+      const inventoryServiceUrl = process.env.INVENTORY_SERVICE_URL || 'http://localhost:3003';
+      const { sign } = await import('jsonwebtoken');
+      const token = sign(
+        { userId: 'billing_service', role: 'ADMIN', branchId },
+        process.env.ACCESS_SECRET as string,
+        { expiresIn: '1m' },
+      );
+
+      const url = year
+        ? `${inventoryServiceUrl}/lots/stats/summary?year=${year}`
+        : `${inventoryServiceUrl}/lots/stats/summary`;
+
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) return { totalExpenses: 0, monthlyExpenses: [] };
+      const data = await response.json();
+      return data.data;
+    } catch (err) {
+      console.error('Failed to fetch lot stats from inventory service', err);
+      return { totalExpenses: 0, monthlyExpenses: [] };
+    }
   }
 
   /**

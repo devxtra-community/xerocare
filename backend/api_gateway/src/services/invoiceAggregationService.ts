@@ -1243,9 +1243,18 @@ export class InvoiceAggregationService {
     }
   }
 
-  async getFinanceReport(token: string) {
+  async getFinanceReport(token: string, filters: Record<string, unknown> = {}) {
     try {
-      const response = await axios.get(`${BILLING_SERVICE_URL}/invoices/finance/report`, {
+      const params = new URLSearchParams();
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value) params.append(key, String(value));
+      });
+
+      const url = params.toString()
+        ? `${BILLING_SERVICE_URL}/invoices/finance/report?${params.toString()}`
+        : `${BILLING_SERVICE_URL}/invoices/finance/report`;
+
+      const response = await axios.get(url, {
         headers: { Authorization: `Bearer ${token}` },
       });
       return response.data.data;
@@ -1257,6 +1266,26 @@ export class InvoiceAggregationService {
         );
       }
       throw new AppError('Internal Gateway Error during finance report fetch', 500);
+    }
+  }
+
+  async getBranchFinanceStats(token: string, year?: number) {
+    try {
+      const url = year
+        ? `${BILLING_SERVICE_URL}/invoices/sales/branch-finance-stats?year=${year}`
+        : `${BILLING_SERVICE_URL}/invoices/sales/branch-finance-stats`;
+      const response = await axios.get(url, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      return response.data.data;
+    } catch (error: unknown) {
+      if (axios.isAxiosError(error)) {
+        throw new AppError(
+          error.response?.data?.message || 'Failed to fetch branch finance stats',
+          error.response?.status || 500,
+        );
+      }
+      throw new AppError('Internal Gateway Error during finance stats fetch', 500);
     }
   }
 }

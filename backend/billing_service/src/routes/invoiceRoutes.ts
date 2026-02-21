@@ -13,6 +13,7 @@ import {
   getStats,
   getBranchSales,
   getBranchSalesTotals,
+  getBranchFinanceStats,
   getGlobalSales,
   getGlobalSalesTotals,
   getAdminSalesStats,
@@ -84,6 +85,7 @@ router.get(
 ); // Added this route
 router.get('/sales/branch-overview', authMiddleware, getBranchSales);
 router.get('/sales/branch-totals', authMiddleware, getBranchSalesTotals);
+router.get('/sales/branch-finance-stats', authMiddleware, getBranchFinanceStats);
 router.get('/sales/global-overview', authMiddleware, getGlobalSales);
 router.get('/sales/global-totals', authMiddleware, getGlobalSalesTotals);
 router.post(
@@ -142,7 +144,12 @@ router.get(
   requireRole(EmployeeRole.ADMIN, EmployeeRole.FINANCE),
   getInvoiceHistory,
 );
-router.get('/finance/report', authMiddleware, requireRole(EmployeeRole.ADMIN), getFinanceReport);
+router.get(
+  '/finance/report',
+  authMiddleware,
+  requireRole(EmployeeRole.ADMIN, EmployeeRole.MANAGER, EmployeeRole.FINANCE),
+  getFinanceReport,
+);
 router.put(
   '/:id/usage',
   authMiddleware,

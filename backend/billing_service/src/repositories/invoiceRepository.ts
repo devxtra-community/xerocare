@@ -564,40 +564,8 @@ export class InvoiceRepository {
       .select("TO_CHAR(invoice.createdAt, 'YYYY-MM')", 'month')
       .addSelect('invoice.branchId', 'branchId')
       .addSelect('invoice.saleType', 'saleType')
-      .addSelect(
-        `
-        SUM(
-          CASE 
-            WHEN invoice.type = 'FINAL' THEN COALESCE(invoice.totalAmount, 0)
-            WHEN invoice.saleType = 'SALE' AND invoice.status = 'FINANCE_APPROVED' THEN COALESCE(invoice.totalAmount, 0)
-            WHEN invoice.saleType = 'RENT' AND invoice.status = 'FINANCE_APPROVED' THEN COALESCE(invoice.monthlyRent, 0)
-            WHEN invoice.saleType = 'LEASE' AND (invoice.status = 'ACTIVE_LEASE' OR invoice.status = 'FINANCE_APPROVED') THEN 
-              CASE 
-                WHEN invoice.leaseType = 'EMI' THEN COALESCE(invoice.monthlyEmiAmount, 0)
-                ELSE COALESCE(invoice.monthlyLeaseAmount, 0)
-              END
-            ELSE COALESCE(invoice.totalAmount, 0)
-          END
-        )`,
-        'income',
-      )
-      .addSelect(
-        `
-        SUM(
-          CASE 
-            WHEN invoice.type = 'FINAL' THEN COALESCE(invoice.grossAmount, 0)
-            WHEN invoice.saleType = 'SALE' THEN COALESCE(invoice.totalAmount, 0)
-            WHEN invoice.saleType = 'RENT' THEN COALESCE(invoice.monthlyRent, 0)
-            WHEN invoice.saleType = 'LEASE' THEN 
-              CASE 
-                WHEN invoice.leaseType = 'EMI' THEN COALESCE(invoice.monthlyEmiAmount, 0)
-                ELSE COALESCE(invoice.monthlyLeaseAmount, 0)
-              END
-            ELSE COALESCE(invoice.totalAmount, 0)
-          END
-        )`,
-        'grossIncome',
-      )
+      .addSelect('SUM(COALESCE(invoice.totalAmount, 0))', 'income')
+      .addSelect('SUM(COALESCE(invoice.totalAmount, 0))', 'grossIncome')
       .addSelect('COUNT(invoice.id)', 'count')
       .where('invoice.status IN (:...includedStatuses)', {
         includedStatuses: [
@@ -605,6 +573,8 @@ export class InvoiceRepository {
           InvoiceStatus.ACTIVE_LEASE,
           InvoiceStatus.ISSUED,
           InvoiceStatus.PAID,
+          InvoiceStatus.EMPLOYEE_APPROVED,
+          InvoiceStatus.APPROVED,
         ],
       })
       .andWhere(

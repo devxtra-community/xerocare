@@ -130,3 +130,30 @@ export const downloadLotSparePartsExcel = async (
     next(err);
   }
 };
+/**
+ * Retrieves lot statistics (total and monthly spending).
+ */
+export const getLotStats = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const branchId = req.user?.branchId;
+    if (!branchId) {
+      return res.status(400).json({ success: false, message: 'Branch ID missing' });
+    }
+    const year = req.query.year ? parseInt(req.query.year as string, 10) : undefined;
+
+    const [total, monthly] = await Promise.all([
+      lotService.getLotTotals(branchId, year),
+      lotService.getMonthlyLotTotals(branchId, year),
+    ]);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        totalExpenses: total,
+        monthlyExpenses: monthly,
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
