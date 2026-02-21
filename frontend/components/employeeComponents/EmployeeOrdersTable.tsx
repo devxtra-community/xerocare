@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
-import { Search, Loader2 } from 'lucide-react';
+import { Search, Loader2, Eye, Coins } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -21,7 +21,6 @@ import {
 import { getMyInvoices, Invoice, InvoiceItem, getInvoiceById } from '@/lib/invoice';
 import { toast } from 'sonner';
 import { InvoiceDetailsDialog } from '../invoice/InvoiceDetailsDialog';
-import { Eye } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Pagination from '@/components/Pagination';
 
@@ -134,6 +133,8 @@ export default function EmployeeOrdersTable({
     return matchesSearch && matchesFilter;
   });
 
+  const aggregateTotal = filteredInvoices.reduce((sum, inv) => sum + (inv.totalAmount || 0), 0);
+
   const totalPages = Math.ceil(filteredInvoices.length / ITEMS_PER_PAGE);
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
   const paginatedInvoices = filteredInvoices.slice(startIndex, startIndex + ITEMS_PER_PAGE);
@@ -173,8 +174,25 @@ export default function EmployeeOrdersTable({
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-between items-center">
+      <div className="flex justify-between items-center bg-card p-4 rounded-xl border border-slate-100 shadow-sm">
         <h2 className="text-xl font-bold text-primary">Orders Overview</h2>
+        <div className="flex items-center gap-3">
+          <div className="text-right">
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider leading-none mb-1">
+              Total Amount
+            </p>
+            <p className="text-xl font-black text-primary tracking-tight">
+              QAR{' '}
+              {aggregateTotal.toLocaleString(undefined, {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}
+            </p>
+          </div>
+          <div className="h-10 w-10 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600">
+            <Coins size={20} />
+          </div>
+        </div>
       </div>
 
       <div className="bg-card rounded-xl p-4 shadow-sm border border-gray-100 flex flex-col md:flex-row gap-4 items-end">
