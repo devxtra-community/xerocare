@@ -526,17 +526,68 @@ export class BillingReportService {
     doc.text(`Date: ${new Date().toLocaleDateString()}`);
     doc.moveDown();
 
-    const tableTop = 200;
+    let currentY = doc.y;
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const pricingRules = (contract.items || []).filter((i: any) => i.itemType === 'PRICING_RULE');
+    if (pricingRules.length > 0) {
+      doc.font('Helvetica-Bold').fontSize(12).text('Pricing Details:', 50, currentY);
+      currentY += 15;
+      doc.font('Helvetica').fontSize(10);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      pricingRules.forEach((rule: any) => {
+        doc.text(`- ${rule.description}`, 50, currentY);
+        currentY += 15;
+        if (rule.bwIncludedLimit) {
+          doc.text(`  B/W Included: ${rule.bwIncludedLimit}`, 50, currentY);
+          currentY += 15;
+        }
+        if (rule.colorIncludedLimit) {
+          doc.text(`  Color Included: ${rule.colorIncludedLimit}`, 50, currentY);
+          currentY += 15;
+        }
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const renderSlabsPdf = (slabs: any[], title: string, excessRate?: number) => {
+          if ((!slabs || slabs.length === 0) && !excessRate) return;
+          doc.font('Helvetica-Bold').text(`  ${title} Slabs:`, 60, currentY);
+          currentY += 12;
+          doc.font('Helvetica');
+          if (slabs && slabs.length > 0) {
+            slabs.forEach((s) => {
+              doc.text(`    ${s.from} - ${s.to}: INR ${s.rate}`, 60, currentY);
+              currentY += 12;
+            });
+            if (excessRate) {
+              const maxTo = Math.max(...slabs.map((s) => Number(s.to) || 0));
+              doc.text(`    > ${maxTo}: INR ${excessRate}`, 60, currentY);
+              currentY += 12;
+            }
+          } else if (excessRate) {
+            doc.text(`    Base Rate: INR ${excessRate}`, 60, currentY);
+            currentY += 12;
+          }
+        };
+
+        renderSlabsPdf(rule.bwSlabRanges, 'Black & White', rule.bwExcessRate);
+        renderSlabsPdf(rule.colorSlabRanges, 'Color', rule.colorExcessRate);
+        renderSlabsPdf(rule.comboSlabRanges, 'Combined', rule.combinedExcessRate);
+        currentY += 5;
+      });
+      currentY += 10;
+    }
+
+    const tableTop = Math.max(200, currentY + 10);
     const itemCodeX = 50;
     const descriptionX = 150;
     const amountX = 400;
 
-    doc.font('Helvetica-Bold');
+    doc.font('Helvetica-Bold').fontSize(12);
     doc.text('Period', itemCodeX, tableTop);
     doc.text('Invoice #', descriptionX, tableTop);
     doc.text('Amount', amountX, tableTop);
     doc.moveDown();
-    doc.font('Helvetica');
+    doc.font('Helvetica').fontSize(12);
 
     let y = tableTop + 25;
 

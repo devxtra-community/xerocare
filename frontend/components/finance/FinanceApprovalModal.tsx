@@ -148,10 +148,19 @@ export function FinanceApprovalModal({ invoice, onClose, onSuccess }: FinanceApp
         return;
       }
 
+      // For LEASE with leaseType EMI (or no leaseType set), skip deposit and readings
+      if (invoice.saleType === 'LEASE' && invoice.leaseType !== 'FSM') {
+        handleSubmit();
+        return;
+      }
+
       setStep(2);
     } else if (step === 2) {
-      // Validate Deposit if applicable (Mandatory for non-LEASE)
-      if (invoice.saleType !== 'LEASE') {
+      // Validate Deposit for RENT and FSM LEASE
+      if (
+        invoice.saleType === 'RENT' ||
+        (invoice.saleType === 'LEASE' && invoice.leaseType === 'FSM')
+      ) {
         if (!deposit.amount || Number(deposit.amount) <= 0) {
           toast.error('Security Deposit Amount is required.');
           return;
@@ -183,31 +192,37 @@ export function FinanceApprovalModal({ invoice, onClose, onSuccess }: FinanceApp
       return;
     }
 
-    for (const item of itemsToAllocate) {
-      const reading = readings[item.id!];
-      if (!reading || reading.bw === '' || reading.bw === undefined) {
-        toast.error(`Please enter Initial B&W Reading for ${item.description}`);
-        return;
-      }
-
-      if (reading.bwA3 === '' || reading.bwA3 === undefined) {
-        toast.error(`Please enter Initial B&W A3 Reading for ${item.description}`);
-        return;
-      }
-
-      // Check if color reading is required
-      const productId = allocations[item.id!];
-      const productList = availableProducts[item.modelId!] || [];
-      const product = productList.find((p) => p.id === productId);
-
-      if (product?.print_colour !== 'BLACK_WHITE') {
-        if (!reading.color || reading.color === '' || reading.color === undefined) {
-          toast.error(`Please enter Initial Color Reading for ${item.description}`);
+    // Validate readings for RENT and FSM LEASE contracts
+    if (
+      invoice.saleType === 'RENT' ||
+      (invoice.saleType === 'LEASE' && invoice.leaseType === 'FSM')
+    ) {
+      for (const item of itemsToAllocate) {
+        const reading = readings[item.id!];
+        if (!reading || reading.bw === '' || reading.bw === undefined) {
+          toast.error(`Please enter Initial B&W Reading for ${item.description}`);
           return;
         }
-        if (!reading.colorA3 || reading.colorA3 === '' || reading.colorA3 === undefined) {
-          toast.error(`Please enter Initial Color A3 Reading for ${item.description}`);
+
+        if (reading.bwA3 === '' || reading.bwA3 === undefined) {
+          toast.error(`Please enter Initial B&W A3 Reading for ${item.description}`);
           return;
+        }
+
+        // Check if color reading is required
+        const productId = allocations[item.id!];
+        const productList = availableProducts[item.modelId!] || [];
+        const product = productList.find((p) => p.id === productId);
+
+        if (product?.print_colour !== 'BLACK_WHITE') {
+          if (!reading.color || reading.color === '' || reading.color === undefined) {
+            toast.error(`Please enter Initial Color Reading for ${item.description}`);
+            return;
+          }
+          if (!reading.colorA3 || reading.colorA3 === '' || reading.colorA3 === undefined) {
+            toast.error(`Please enter Initial Color A3 Reading for ${item.description}`);
+            return;
+          }
         }
       }
     }
@@ -234,7 +249,7 @@ export function FinanceApprovalModal({ invoice, onClose, onSuccess }: FinanceApp
 
       const payload = {
         deposit:
-          invoice.saleType !== 'LEASE'
+          invoice.saleType === 'RENT'
             ? {
                 amount: Number(deposit.amount || 0),
                 mode: deposit.mode as 'CASH' | 'CHEQUE' | 'UPI' | 'BANK_TRANSFER',
@@ -260,11 +275,16 @@ export function FinanceApprovalModal({ invoice, onClose, onSuccess }: FinanceApp
     }
   };
 
-  const steps = [
-    { id: 1, title: 'Machine Allocation', icon: Box },
-    { id: 2, title: 'Security Deposit', icon: CreditCard },
-    { id: 3, title: 'Initial Readings', icon: Gauge },
-  ];
+  // Non-FSM LEASE (EMI or null): only Machine Allocation
+  // FSM LEASE & RENT: all 3 steps
+  const steps =
+    invoice.saleType === 'LEASE' && invoice.leaseType !== 'FSM'
+      ? [{ id: 1, title: 'Machine Allocation', icon: Box }]
+      : [
+          { id: 1, title: 'Machine Allocation', icon: Box },
+          { id: 2, title: 'Security Deposit', icon: CreditCard },
+          { id: 3, title: 'Initial Readings', icon: Gauge },
+        ];
 
   return (
     <Dialog open={true} onOpenChange={(val) => !val && onClose()}>
@@ -440,14 +460,14 @@ export function FinanceApprovalModal({ invoice, onClose, onSuccess }: FinanceApp
                 </div>
               )}
 
-              {/* Step 2: Deposit */}
-              {step === 2 && (
+              {/* Step 2: Deposit - only for RENT and FSM LEASE */}
+              {step === 2 && (invoice.saleType !== 'LEASE' || invoice.leaseType === 'FSM') && (
                 <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-500">
                   <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
                     <CreditCard className="text-blue-500" /> Security Deposit
                   </h3>
 
-                  {invoice.saleType === 'LEASE' ? (
+                  {invoice.saleType !== 'RENT' ? (
                     <div className="flex flex-col items-center justify-center py-12 text-center space-y-4 bg-slate-50/50 rounded-xl border border-dashed border-slate-200">
                       <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
                         <CheckCircle2 size={32} className="text-green-600" />
@@ -455,12 +475,10 @@ export function FinanceApprovalModal({ invoice, onClose, onSuccess }: FinanceApp
                       <div>
                         <h4 className="font-bold text-slate-700 text-lg">No Deposit Required</h4>
                         <p className="text-sm text-slate-500">
-                          Lease contracts typically do not require a security deposit.
+                          {invoice.saleType === 'LEASE' ? 'Lease' : 'Sale'} contracts typically do
+                          not require a security deposit.
                         </p>
                       </div>
-                      <Button variant="outline" size="sm" onClick={handleNext}>
-                        Proceed to Readings <ArrowRight className="w-4 h-4 ml-2" />
-                      </Button>
                     </div>
                   ) : (
                     <Card className="border-slate-100 shadow-sm">
@@ -551,155 +569,178 @@ export function FinanceApprovalModal({ invoice, onClose, onSuccess }: FinanceApp
                 </div>
               )}
 
-              {/* Step 3: Readings */}
-              {step === 3 && (
+              {/* Step 3: Readings - only for RENT and FSM LEASE */}
+              {step === 3 && (invoice.saleType !== 'LEASE' || invoice.leaseType === 'FSM') && (
                 <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-500">
                   <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
                     <Gauge className="text-blue-500" /> Initial Meter Readings
                   </h3>
-                  <p className="text-sm text-slate-500 mb-4">
-                    Capture the starting meter counts for correct billing.
-                  </p>
 
-                  {getAllocatableItems().map((item) => {
-                    const productId = allocations[item.id!];
-                    const productList = availableProducts[item.modelId!] || [];
-                    const product = productList.find((p) => p.id === productId);
+                  {invoice.saleType === 'SALE' || invoice.saleType === 'LEASE' ? (
+                    <div className="flex flex-col items-center justify-center py-12 text-center space-y-4 bg-slate-50/50 rounded-xl border border-dashed border-slate-200">
+                      <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center">
+                        <Gauge size={32} className="text-blue-600" />
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-slate-700 text-lg">No Readings Required</h4>
+                        <p className="text-sm text-slate-500">
+                          {invoice.saleType === 'LEASE' ? 'Lease' : 'Sale'} contracts do not require
+                          initial CPC meter tracking.
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <p className="text-sm text-slate-500 mb-4">
+                        Capture the starting meter counts for correct billing.
+                      </p>
 
-                    return (
-                      <Card key={item.id} className="border-slate-100 shadow-sm overflow-hidden">
-                        <div className="bg-slate-50 px-4 py-2 border-b border-slate-100 flex justify-between items-center">
-                          <span className="font-bold text-sm text-slate-700">
-                            {item.description}
-                          </span>
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs text-muted-foreground">SN:</span>
-                            <Badge variant="outline" className="font-mono bg-white">
-                              {product?.serial_no}
-                            </Badge>
-                            {product?.print_colour && (
-                              <Badge
-                                variant={
-                                  product.print_colour === 'BLACK_WHITE' ? 'secondary' : 'default'
-                                }
-                                className="text-[10px] h-5"
-                              >
-                                {product.print_colour.replace('_', ' ')}
-                              </Badge>
-                            )}
-                          </div>
-                        </div>
-                        <CardContent className="p-4 space-y-4">
-                          <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                              <Label className="text-xs font-semibold text-slate-600">
-                                B&W Counter (A4)
-                              </Label>
-                              <Input
-                                type="number"
-                                placeholder="0"
-                                value={readings[item.id!]?.bw || ''}
-                                onChange={(e) =>
-                                  setReadings({
-                                    ...readings,
-                                    [item.id!]: {
-                                      ...(readings[item.id!] || {}),
-                                      bw: e.target.value,
-                                    },
-                                  })
-                                }
-                                className="font-mono border-slate-200 focus-visible:ring-slate-400"
-                              />
+                      {getAllocatableItems().map((item) => {
+                        const productId = allocations[item.id!];
+                        const productList = availableProducts[item.modelId!] || [];
+                        const product = productList.find((p) => p.id === productId);
+
+                        return (
+                          <Card
+                            key={item.id}
+                            className="border-slate-100 shadow-sm overflow-hidden"
+                          >
+                            <div className="bg-slate-50 px-4 py-2 border-b border-slate-100 flex justify-between items-center">
+                              <span className="font-bold text-sm text-slate-700">
+                                {item.description}
+                              </span>
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs text-muted-foreground">SN:</span>
+                                <Badge variant="outline" className="font-mono bg-white">
+                                  {product?.serial_no}
+                                </Badge>
+                                {product?.print_colour && (
+                                  <Badge
+                                    variant={
+                                      product.print_colour === 'BLACK_WHITE'
+                                        ? 'secondary'
+                                        : 'default'
+                                    }
+                                    className="text-[10px] h-5"
+                                  >
+                                    {product.print_colour.replace('_', ' ')}
+                                  </Badge>
+                                )}
+                              </div>
                             </div>
-
-                            <div className="space-y-2">
-                              <Label className="text-xs font-semibold text-slate-600">
-                                B&W Counter (A3)
-                              </Label>
-                              <Input
-                                type="number"
-                                placeholder="0"
-                                value={readings[item.id!]?.bwA3 || ''}
-                                onChange={(e) =>
-                                  setReadings({
-                                    ...readings,
-                                    [item.id!]: {
-                                      ...(readings[item.id!] || {}),
-                                      bwA3: e.target.value,
-                                    },
-                                  })
-                                }
-                                className="font-mono border-slate-200 focus-visible:ring-slate-400"
-                              />
-                            </div>
-                          </div>
-
-                          <div className="grid grid-cols-2 gap-4">
-                            {product?.print_colour !== 'BLACK_WHITE' ? (
-                              <>
-                                <div className="space-y-2 animate-in fade-in">
-                                  <Label className="text-xs font-semibold text-blue-600">
-                                    Color Counter (A4)
+                            <CardContent className="p-4 space-y-4">
+                              <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                  <Label className="text-xs font-semibold text-slate-600">
+                                    B&W Counter (A4)
                                   </Label>
                                   <Input
                                     type="number"
                                     placeholder="0"
-                                    value={readings[item.id!]?.color || ''}
+                                    value={readings[item.id!]?.bw || ''}
                                     onChange={(e) =>
                                       setReadings({
                                         ...readings,
                                         [item.id!]: {
                                           ...(readings[item.id!] || {}),
-                                          color: e.target.value,
+                                          bw: e.target.value,
                                         },
                                       })
                                     }
-                                    className="font-mono border-blue-200 focus-visible:ring-blue-400 bg-blue-50/30"
+                                    className="font-mono border-slate-200 focus-visible:ring-slate-400"
                                   />
                                 </div>
 
-                                <div className="space-y-2 animate-in fade-in">
-                                  <Label className="text-xs font-semibold text-blue-600">
-                                    Color Counter (A3)
+                                <div className="space-y-2">
+                                  <Label className="text-xs font-semibold text-slate-600">
+                                    B&W Counter (A3)
                                   </Label>
                                   <Input
                                     type="number"
                                     placeholder="0"
-                                    value={readings[item.id!]?.colorA3 || ''}
+                                    value={readings[item.id!]?.bwA3 || ''}
                                     onChange={(e) =>
                                       setReadings({
                                         ...readings,
                                         [item.id!]: {
                                           ...(readings[item.id!] || {}),
-                                          colorA3: e.target.value,
+                                          bwA3: e.target.value,
                                         },
                                       })
                                     }
-                                    className="font-mono border-blue-200 focus-visible:ring-blue-400 bg-blue-50/30"
+                                    className="font-mono border-slate-200 focus-visible:ring-slate-400"
                                   />
                                 </div>
-                              </>
-                            ) : (
-                              <>
-                                <div className="space-y-2 opacity-30 pointer-events-none select-none">
-                                  <Label className="text-xs font-semibold">
-                                    Color Counter (A4)
-                                  </Label>
-                                  <Input disabled value="N/A" className="bg-slate-100" />
-                                </div>
-                                <div className="space-y-2 opacity-30 pointer-events-none select-none">
-                                  <Label className="text-xs font-semibold">
-                                    Color Counter (A3)
-                                  </Label>
-                                  <Input disabled value="N/A" className="bg-slate-100" />
-                                </div>
-                              </>
-                            )}
-                          </div>
-                        </CardContent>
-                      </Card>
-                    );
-                  })}
+                              </div>
+
+                              <div className="grid grid-cols-2 gap-4">
+                                {product?.print_colour !== 'BLACK_WHITE' ? (
+                                  <>
+                                    <div className="space-y-2 animate-in fade-in">
+                                      <Label className="text-xs font-semibold text-blue-600">
+                                        Color Counter (A4)
+                                      </Label>
+                                      <Input
+                                        type="number"
+                                        placeholder="0"
+                                        value={readings[item.id!]?.color || ''}
+                                        onChange={(e) =>
+                                          setReadings({
+                                            ...readings,
+                                            [item.id!]: {
+                                              ...(readings[item.id!] || {}),
+                                              color: e.target.value,
+                                            },
+                                          })
+                                        }
+                                        className="font-mono border-blue-200 focus-visible:ring-blue-400 bg-blue-50/30"
+                                      />
+                                    </div>
+
+                                    <div className="space-y-2 animate-in fade-in">
+                                      <Label className="text-xs font-semibold text-blue-600">
+                                        Color Counter (A3)
+                                      </Label>
+                                      <Input
+                                        type="number"
+                                        placeholder="0"
+                                        value={readings[item.id!]?.colorA3 || ''}
+                                        onChange={(e) =>
+                                          setReadings({
+                                            ...readings,
+                                            [item.id!]: {
+                                              ...(readings[item.id!] || {}),
+                                              colorA3: e.target.value,
+                                            },
+                                          })
+                                        }
+                                        className="font-mono border-blue-200 focus-visible:ring-blue-400 bg-blue-50/30"
+                                      />
+                                    </div>
+                                  </>
+                                ) : (
+                                  <>
+                                    <div className="space-y-2 opacity-30 pointer-events-none select-none">
+                                      <Label className="text-xs font-semibold">
+                                        Color Counter (A4)
+                                      </Label>
+                                      <Input disabled value="N/A" className="bg-slate-100" />
+                                    </div>
+                                    <div className="space-y-2 opacity-30 pointer-events-none select-none">
+                                      <Label className="text-xs font-semibold">
+                                        Color Counter (A3)
+                                      </Label>
+                                      <Input disabled value="N/A" className="bg-slate-100" />
+                                    </div>
+                                  </>
+                                )}
+                              </div>
+                            </CardContent>
+                          </Card>
+                        );
+                      })}
+                    </>
+                  )}
                 </div>
               )}
             </div>
@@ -720,16 +761,30 @@ export function FinanceApprovalModal({ invoice, onClose, onSuccess }: FinanceApp
                 className={`
                                     min-w-[140px] font-bold shadow-md transition-all
                                     ${
-                                      step === 3
+                                      step === 3 ||
+                                      (invoice.saleType === 'LEASE' &&
+                                        invoice.leaseType !== 'FSM' &&
+                                        step === 1)
                                         ? 'bg-green-600 hover:bg-green-700 shadow-green-200'
                                         : 'bg-blue-600 hover:bg-blue-700 shadow-blue-200'
                                     }
                                 `}
               >
                 {isSubmitting && <Loader2 className="animate-spin mr-2" size={16} />}
-                {step === 3 ? 'Confirm & Approve' : 'Next Step'}
-                {!isSubmitting && step !== 3 && <ArrowRight className="ml-2 w-4 h-4" />}
-                {!isSubmitting && step === 3 && <CheckCircle2 className="ml-2 w-4 h-4" />}
+                {step === 3 ||
+                (invoice.saleType === 'LEASE' && invoice.leaseType !== 'FSM' && step === 1)
+                  ? 'Confirm & Approve'
+                  : 'Next Step'}
+                {!isSubmitting &&
+                  !(
+                    step === 3 ||
+                    (invoice.saleType === 'LEASE' && invoice.leaseType !== 'FSM' && step === 1)
+                  ) && <ArrowRight className="ml-2 w-4 h-4" />}
+                {!isSubmitting &&
+                  (step === 3 ||
+                    (invoice.saleType === 'LEASE' &&
+                      invoice.leaseType !== 'FSM' &&
+                      step === 1)) && <CheckCircle2 className="ml-2 w-4 h-4" />}
               </Button>
             </div>
           </div>

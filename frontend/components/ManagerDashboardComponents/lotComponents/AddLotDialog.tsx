@@ -188,7 +188,7 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
           getMyBranchWarehouses(),
         ]);
         setVendors(vData.data || []);
-        setModels(mData || []);
+        setModels(mData.data || []);
         setBrands(bData || []);
         setSpareParts(spData || []);
         setWarehouses(wData.data || []);

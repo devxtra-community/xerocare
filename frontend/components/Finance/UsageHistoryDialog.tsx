@@ -18,7 +18,14 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { getUsageHistory, UsageRecord, sendMonthlyUsageInvoice } from '@/lib/invoice';
+import {
+  getUsageHistory,
+  UsageRecord,
+  sendMonthlyUsageInvoice,
+  getInvoiceById,
+  Invoice,
+  InvoiceItem,
+} from '@/lib/invoice';
 import { format } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, History, Send, CheckCircle2, Eye, X, Image as ImageIcon } from 'lucide-react';
@@ -46,6 +53,38 @@ export default function UsageHistoryDialog({
   const [loading, setLoading] = useState(true);
   const [sendingId, setSendingId] = useState<string | null>(null);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [contract, setContract] = useState<Invoice | null>(null);
+
+  useEffect(() => {
+    if (isOpen && contractId) {
+      getInvoiceById(contractId).then(setContract).catch(console.error);
+    }
+  }, [isOpen, contractId]);
+
+  const ruleItems = React.useMemo(() => {
+    // contract.pricingItems may exist on the endpoint response even if not strictly typed
+    const allItems = [
+      ...(contract?.items || []),
+      ...((contract as Invoice & { pricingItems?: InvoiceItem[] })?.pricingItems || []),
+    ];
+    if (allItems.length === 0) return { bw: undefined, color: undefined, combo: undefined };
+
+    // Sometimes the pricing rule description is nested differently, or itemType might not be present in pricingItems
+    const isRule = (i: InvoiceItem) =>
+      i.itemType === 'PRICING_RULE' || !i.itemType || !!i.bwSlabRanges || !!i.comboSlabRanges;
+
+    return {
+      bw: allItems.find((i) => isRule(i) && (i.description?.includes('Black') || !!i.bwSlabRanges)),
+      color: allItems.find(
+        (i) => isRule(i) && (i.description?.includes('Color') || !!i.colorSlabRanges),
+      ),
+      combo: allItems.find(
+        (i) => isRule(i) && (i.description?.includes('Combined') || !!i.comboSlabRanges),
+      ),
+    };
+  }, [contract]);
+
+  const isCpc = contract?.rentType?.includes('CPC');
 
   const fetchHistory = React.useCallback(() => {
     if (isOpen && contractId) {
@@ -68,8 +107,8 @@ export default function UsageHistoryDialog({
     setSendingId(record.id);
     try {
       const response = await sendMonthlyUsageInvoice(record.id);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const recipientEmail = (response as any).recipientEmail;
+
+      const recipientEmail = (response as { recipientEmail?: string }).recipientEmail;
 
       if (recipientEmail) {
         toast.success(`Invoice sent successfully to ${recipientEmail}`);
@@ -153,9 +192,21 @@ export default function UsageHistoryDialog({
                   <TableHeader className="bg-slate-900 border-none">
                     <TableRow className="hover:bg-slate-900 border-none">
                       <TableHead className="font-bold text-white py-5 px-6">PERIOD</TableHead>
-                      <TableHead className="font-bold text-white text-right">FREE LIMIT</TableHead>
+                      {!isCpc && (
+                        <>
+                          <TableHead className="font-bold text-white text-right">
+                            FREE LIMIT
+                          </TableHead>
+                        </>
+                      )}
                       <TableHead className="font-bold text-white text-right">TOTAL USAGE</TableHead>
-                      <TableHead className="font-bold text-white text-center">EXCEEDED</TableHead>
+                      {!isCpc ? (
+                        <TableHead className="font-bold text-white text-center">EXCEEDED</TableHead>
+                      ) : (
+                        <TableHead className="font-bold text-white text-right">
+                          RATE APPLIED
+                        </TableHead>
+                      )}
                       <TableHead className="font-bold text-white text-right">AMOUNT</TableHead>
                       <TableHead className="font-bold text-white text-right">RENT</TableHead>
                       <TableHead className="font-bold text-blue-400 text-right">
@@ -185,13 +236,15 @@ export default function UsageHistoryDialog({
                             </span>
                           </div>
                         </TableCell>
-                        <TableCell className="text-right font-bold text-slate-500">
-                          {record.freeLimit === 'No Free Limit' ? (
-                            <span className="text-[10px] text-slate-300 italic">No Limit</span>
-                          ) : (
-                            Number(record.freeLimit).toLocaleString()
-                          )}
-                        </TableCell>
+                        {!isCpc && (
+                          <TableCell className="text-right font-bold text-slate-500">
+                            {record.freeLimit === 'No Free Limit' ? (
+                              <span className="text-[10px] text-slate-300 italic">No Limit</span>
+                            ) : (
+                              Number(record.freeLimit).toLocaleString()
+                            )}
+                          </TableCell>
+                        )}
                         <TableCell className="text-right">
                           <div className="flex flex-col items-end">
                             <span className="font-black text-slate-900 text-sm">
@@ -202,17 +255,61 @@ export default function UsageHistoryDialog({
                             </span>
                           </div>
                         </TableCell>
-                        <TableCell className="text-center">
-                          <Badge
-                            className={`rounded-full px-3 py-1 text-[10px] font-black border-none shadow-sm ${
-                              record.exceededCount > 0
-                                ? 'bg-orange-100 text-orange-700'
-                                : 'bg-emerald-100 text-emerald-700'
-                            }`}
-                          >
-                            {record.exceededCount > 0 ? 'EXCEEDED' : 'WITHIN LIMIT'}
-                          </Badge>
-                        </TableCell>
+                        {!isCpc ? (
+                          <TableCell className="text-center">
+                            <Badge
+                              className={`rounded-full px-3 py-1 text-[10px] font-black border-none shadow-sm ${
+                                record.exceededCount > 0
+                                  ? 'bg-orange-100 text-orange-700'
+                                  : 'bg-emerald-100 text-emerald-700'
+                              }`}
+                            >
+                              {record.exceededCount > 0 ? 'EXCEEDED' : 'WITHIN LIMIT'}
+                            </Badge>
+                          </TableCell>
+                        ) : (
+                          <TableCell className="text-right font-bold text-slate-700">
+                            {(() => {
+                              try {
+                                const total = record.totalUsage;
+                                // Basic logic to find which slab applied
+                                // In CPC, record has bw/color delta. If combo, we use combo rule.
+                                // Since UsageRecord doesn't easily map back to the individual rule used in the table here,
+                                // we calculate a rough blended/applied rate string.
+                                let appliedRateStr = '-';
+                                let slabs: Array<{ from: number; to: number; rate: number }> = [];
+
+                                if (ruleItems.combo) {
+                                  slabs = ruleItems.combo.comboSlabRanges || [];
+                                } else if (ruleItems.color && record.colorA4Delta > 0) {
+                                  slabs = ruleItems.color.colorSlabRanges || [];
+                                } else if (ruleItems.bw) {
+                                  slabs = ruleItems.bw.bwSlabRanges || [];
+                                }
+
+                                if (slabs.length > 0) {
+                                  const sortedSlabs = [...slabs].sort((a, b) => a.from - b.from);
+                                  let applicableRate = sortedSlabs[0]?.rate || 0;
+                                  let applicableRange = `${sortedSlabs[0]?.from || 0}-${sortedSlabs[0]?.to || 0}`;
+
+                                  for (const slab of sortedSlabs) {
+                                    if (total >= slab.from) {
+                                      applicableRate = slab.rate;
+                                      applicableRange =
+                                        slab.to === 9999999
+                                          ? `${slab.from}+`
+                                          : `${slab.from}-${slab.to}`;
+                                    }
+                                  }
+                                  appliedRateStr = `₹${applicableRate} (${applicableRange})`;
+                                }
+                                return appliedRateStr;
+                              } catch {
+                                return 'Slab-based';
+                              }
+                            })()}
+                          </TableCell>
+                        )}
                         <TableCell className="text-right">
                           <span className="font-black text-orange-600 text-sm">
                             {formatCurrency(Number(record.exceededAmount))}

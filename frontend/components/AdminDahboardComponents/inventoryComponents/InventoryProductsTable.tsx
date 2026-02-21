@@ -149,13 +149,8 @@ export default function InventoryProductsTable() {
   }, [fetchOptions]);
 
   useEffect(() => {
-    // Only fetch data when filters are empty (initial load) or when explicit fetchData is needed.
-    // To prevent redundant calls, we can rely on handleFilter for user-initiated searches.
-    // But since we want the table to reflect initial state, we keep this.
-    if (!productFilter && !warehouseFilter && !branchFilter && !brandFilter) {
-      fetchData();
-    }
-  }, [fetchData]); // Keeping it simple for now, though it might double-trigger on some state changes.
+    fetchData();
+  }, [fetchData]);
 
   const handleFilter = () => {
     setPage(1);

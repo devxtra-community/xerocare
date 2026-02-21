@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Search, Plus, X, Trash2, Eye } from 'lucide-react';
+import { Search, Plus, X, Eye } from 'lucide-react';
 import Image from 'next/image';
 import {
   Select,
@@ -14,19 +14,13 @@ import {
 } from '@/components/ui/select';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { lotService, Lot, LotItem } from '@/lib/lot';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import StatCard from '@/components/StatCard';
+import { usePagination } from '@/hooks/usePagination';
+import { StandardTable } from '@/components/table/StandardTable';
+import { DeleteConfirmDialog } from '@/components/dialogs/DeleteConfirmDialog';
 import { BulkProductDialog } from './BulkProductDialog';
 import { productService, Product } from '@/services/productService';
-import { formatCurrency } from '@/lib/format';
 import { modelService, Model } from '@/services/modelService';
 import { commonService, Vendor, Warehouse } from '@/services/commonService';
 import { getBrands, Brand } from '@/lib/brand';
@@ -50,33 +44,38 @@ export default function ManagerProduct() {
   const [loading, setLoading] = useState(true);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
 
-  const fetchProducts = async () => {
+  const { page, limit, total, setPage, setLimit, setTotal } = usePagination(10);
+  const [stats, setStats] = useState({ total: 0, inStock: 0, rented: 0, sold: 0 });
+
+  const fetchProducts = useCallback(async () => {
     try {
       setLoading(true);
-      const data = await productService.getAllProducts();
-      setProducts(data);
+      const res = await productService.getAllProducts({ page, limit, search });
+      setProducts(res.data);
+      setTotal(res.total || res.data.length);
+
+      // Keep naive stats calculation based on loaded data since API might not return global stats
+      setStats({
+        total: res.total || res.data.length,
+        inStock: res.data.filter((p) => p.product_status === 'AVAILABLE').length,
+        rented: res.data.filter((p) => p.product_status === 'RENTED').length,
+        sold: res.data.filter((p) => p.product_status === 'SOLD').length,
+      });
     } catch {
       toast.error('Failed to fetch products');
     } finally {
       setLoading(false);
     }
-  };
+  }, [page, limit, search, setTotal]);
 
   useEffect(() => {
-    fetchProducts();
-  }, []);
+    const delayDebounceFn = setTimeout(() => {
+      fetchProducts();
+    }, 500);
+    return () => clearTimeout(delayDebounceFn);
+  }, [fetchProducts]);
 
-  const filtered = products.filter((p) =>
-    `${p.name} ${p.brand} ${p.serial_no} ${p.model?.model_name || ''}`
-      .toLowerCase()
-      .includes(search.toLowerCase()),
-  );
-
-  const total = products.length;
-  // Stats calculation based on available data
-  const inStock = products.filter((p) => p.product_status === 'AVAILABLE').length;
-  const rented = products.filter((p) => p.product_status === 'RENTED').length;
-  const sold = products.filter((p) => p.product_status === 'SOLD').length;
+  // Stats updated conditionally in fetchProducts
 
   const handleSave = async () => {
     setFormOpen(false);
@@ -103,10 +102,10 @@ export default function ManagerProduct() {
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-        <StatCard title="Total Inventory" value={total.toString()} subtitle="All Items" />
-        <StatCard title="Available" value={inStock.toString()} subtitle="In Warehouse" />
-        <StatCard title="Rented" value={rented.toString()} subtitle="Active Rentals" />
-        <StatCard title="Sold" value={sold.toString()} subtitle="Total Sales" />
+        <StatCard title="Total Inventory" value={stats.total.toString()} subtitle="All Items" />
+        <StatCard title="Available" value={stats.inStock.toString()} subtitle="In Warehouse" />
+        <StatCard title="Rented" value={stats.rented.toString()} subtitle="Active Rentals" />
+        <StatCard title="Sold" value={stats.sold.toString()} subtitle="Total Sales" />
       </div>
 
       <div className="flex items-center justify-between">
@@ -139,113 +138,90 @@ export default function ManagerProduct() {
         </div>
       </div>
 
-      <div className="rounded-2xl bg-card shadow-sm overflow-hidden">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              {[
-                'IMAGE',
-                'PRODUCT',
-                'BRAND',
-                'LOT NUMBER',
-                'SERIAL NO',
-                'PRICE',
-                'PRINT COLOUR',
-                'STATUS',
-                'ACTION',
-              ].map((h) => (
-                <TableHead key={h} className="text-[11px] font-semibold text-primary px-4">
-                  {h}
-                </TableHead>
-              ))}
-            </TableRow>
-          </TableHeader>
-
-          <TableBody>
-            {loading ? (
-              <TableRow>
-                <TableCell colSpan={9} className="text-center py-8">
-                  Loading...
-                </TableCell>
-              </TableRow>
-            ) : filtered.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
-                  No products found.
-                </TableCell>
-              </TableRow>
-            ) : (
-              filtered.map((p, i) => (
-                <TableRow key={p.id} className={i % 2 ? 'bg-sky-100/60' : ''}>
-                  <TableCell className="px-4">
-                    {p.imageUrl ? (
-                      <div className="relative h-8 w-8 rounded overflow-hidden group cursor-pointer">
-                        <Image
-                          src={p.imageUrl}
-                          alt={p.name}
-                          fill
-                          className="object-cover"
-                          unoptimized={true}
-                        />
-                        <div
-                          className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
-                          onClick={() => setPreviewImage(p.imageUrl || null)}
-                        >
-                          <Eye size={14} className="text-white" />
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="h-8 w-8 rounded bg-gray-100 flex items-center justify-center text-xs text-gray-400">
-                        N/A
-                      </div>
-                    )}
-                  </TableCell>
-                  <TableCell className="px-4 font-medium">
-                    {p.name} {p.model?.model_name ? ` - ${p.model.model_name}` : ''}
-                  </TableCell>
-                  <TableCell className="px-4">{p.brand}</TableCell>
-                  <TableCell className="px-4">
-                    {p.lot?.lotNumber || p.lot?.lot_number || '-'}
-                  </TableCell>
-                  <TableCell className="px-4">{p.serial_no}</TableCell>
-                  <TableCell className="px-4">{formatCurrency(p.sale_price)}</TableCell>
-                  <TableCell className="px-4">{p.print_colour}</TableCell>
-                  <TableCell className="px-4">
-                    <span
-                      className={`px-2 py-1 rounded-full text-xs ${
-                        p.product_status === 'AVAILABLE'
-                          ? 'bg-green-100 text-green-700'
-                          : 'bg-yellow-100 text-yellow-700'
-                      }`}
-                    >
-                      {p.product_status}
-                    </span>
-                  </TableCell>
-                  <TableCell className="px-4">
-                    <div className="flex gap-3 text-sm">
-                      <button
-                        className="text-primary hover:underline"
-                        onClick={() => {
-                          setEditing(p);
-                          setFormOpen(true);
-                        }}
-                      >
-                        Update
-                      </button>
-                      <button
-                        className="text-red-600 hover:underline"
-                        onClick={() => setDeleting(p)}
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
+      <StandardTable
+        columns={[
+          {
+            id: 'image',
+            header: 'IMAGE',
+            cell: (p: Product) =>
+              p.imageUrl ? (
+                <div className="relative h-8 w-8 rounded overflow-hidden group cursor-pointer">
+                  <Image
+                    src={p.imageUrl}
+                    alt={p.name}
+                    fill
+                    className="object-cover"
+                    unoptimized={true}
+                  />
+                  <div
+                    className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+                    onClick={() => setPreviewImage(p.imageUrl || null)}
+                  >
+                    <Eye size={14} className="text-white" />
+                  </div>
+                </div>
+              ) : (
+                <div className="h-8 w-8 rounded bg-gray-100 flex items-center justify-center text-xs text-gray-400">
+                  N/A
+                </div>
+              ),
+          },
+          { id: 'name', header: 'PRODUCT', accessorKey: 'name' as keyof Product },
+          { id: 'brand', header: 'BRAND', accessorKey: 'brand' as keyof Product },
+          {
+            id: 'lot',
+            header: 'LOT NUMBER',
+            cell: (p: Product) => p.lot?.lotNumber || p.lot?.lot_number || '-',
+          },
+          { id: 'serial', header: 'SERIAL NO', accessorKey: 'serial_no' as keyof Product },
+          { id: 'price', header: 'PRICE', cell: (p: Product) => `₹${p.sale_price}` },
+          { id: 'color', header: 'PRINT COLOUR', accessorKey: 'print_colour' as keyof Product },
+          {
+            id: 'status',
+            header: 'STATUS',
+            cell: (p: Product) => (
+              <span
+                className={`px-2 py-1 rounded-full text-xs ${
+                  p.product_status === 'AVAILABLE'
+                    ? 'bg-green-100 text-green-700'
+                    : 'bg-yellow-100 text-yellow-700'
+                }`}
+              >
+                {p.product_status}
+              </span>
+            ),
+          },
+          {
+            id: 'actions',
+            header: 'ACTION',
+            cell: (p: Product) => (
+              <div className="flex gap-3 text-sm">
+                <button
+                  className="text-primary hover:underline"
+                  onClick={() => {
+                    setEditing(p);
+                    setFormOpen(true);
+                  }}
+                >
+                  Update
+                </button>
+                <button className="text-red-600 hover:underline" onClick={() => setDeleting(p)}>
+                  Delete
+                </button>
+              </div>
+            ),
+          },
+        ]}
+        data={products}
+        loading={loading}
+        emptyMessage="No products found."
+        keyExtractor={(p) => p.id}
+        page={page}
+        limit={limit}
+        total={total}
+        onPageChange={setPage}
+        onLimitChange={setLimit}
+      />
 
       {formOpen && (
         <ProductFormModal
@@ -255,13 +231,13 @@ export default function ManagerProduct() {
         />
       )}
 
-      {deleting && (
-        <ConfirmDeleteModal
-          name={deleting.name}
-          onCancel={() => setDeleting(null)}
-          onConfirm={confirmDelete}
-        />
-      )}
+      <DeleteConfirmDialog
+        open={!!deleting}
+        onOpenChange={(open) => !open && setDeleting(null)}
+        title="Delete Product?"
+        itemName={deleting?.name}
+        onConfirm={confirmDelete}
+      />
 
       <BulkProductDialog
         open={bulkDialogOpen}
@@ -363,7 +339,7 @@ function ProductFormModal({
         lotService.getAllLots(),
       ]);
 
-      if (mResult.status === 'fulfilled') setModels(mResult.value);
+      if (mResult.status === 'fulfilled') setModels(mResult.value.data || []);
       else console.error('Failed to load models:', mResult.reason);
 
       if (vResult.status === 'fulfilled') setVendors(vResult.value);
@@ -376,7 +352,7 @@ function ProductFormModal({
       else if (bResult.status === 'rejected')
         console.error('Failed to load brands:', bResult.reason);
 
-      if (lResult.status === 'fulfilled') setLots(lResult.value);
+      if (lResult.status === 'fulfilled') setLots(lResult.value.data || []);
       else console.error('Failed to load lots:', lResult.reason);
 
       // Show a toast only if ALL critical dependencies failed
@@ -809,36 +785,6 @@ function Modal({
           </button>
         </div>
         <div className="space-y-4">{children}</div>
-      </div>
-    </div>
-  );
-}
-
-function ConfirmDeleteModal({
-  name,
-  onCancel,
-  onConfirm,
-}: {
-  name: string;
-  onCancel: () => void;
-  onConfirm: () => void;
-}) {
-  return (
-    <div className="fixed inset-0 flex items-center justify-center bg-black/40 z-[60]">
-      <div className="bg-card rounded-2xl p-6 text-center shadow-xl">
-        <Trash2 className="mx-auto text-red-600 mb-2 h-10 w-10" />
-        <p className="text-lg">
-          Delete <b>{name}</b>?
-        </p>
-        <p className="text-sm text-muted-foreground mb-4">This action cannot be undone.</p>
-        <div className="flex justify-center gap-4">
-          <Button variant="outline" onClick={onCancel}>
-            Cancel
-          </Button>
-          <Button className="bg-red-600 text-white" onClick={onConfirm}>
-            Delete
-          </Button>
-        </div>
       </div>
     </div>
   );

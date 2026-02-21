@@ -20,8 +20,8 @@ export function ModelSelect({ onSelect }: ModelSelectProps) {
     const fetchData = async () => {
       setLoading(true);
       try {
-        const data = await getAllModels();
-        setModels(data);
+        const res = await getAllModels();
+        setModels(res.data || []);
       } catch (error) {
         console.error('Failed to fetch models', error);
       } finally {

@@ -274,7 +274,8 @@ export default function RentFormModal({
     if (initialData?.items) {
       const fetchFullModels = async () => {
         try {
-          const allModels = await getAllModels();
+          const res = await getAllModels();
+          const allModels = res.data || [];
           // specific check inside async to satisfy TS
           if (!initialData?.items) return;
 

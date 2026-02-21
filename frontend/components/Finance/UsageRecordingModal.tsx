@@ -23,7 +23,7 @@ import {
 } from '@/lib/invoice';
 import { Product, getProductById } from '@/lib/product';
 import { toast } from 'sonner';
-import { Loader2, Coins, Calendar } from 'lucide-react';
+import { Loader2, Calendar, IndianRupee } from 'lucide-react';
 import { formatCurrency } from '@/lib/format';
 import UsagePreviewDialog from './UsagePreviewDialog';
 import { format } from 'date-fns';
@@ -35,6 +35,12 @@ interface UsageRecordingModalProps {
   customerName: string;
   onSuccess: () => void;
   invoice?: Invoice | null; // Added for editing
+}
+
+interface SlabRange {
+  from: number;
+  to: number;
+  rate: number;
 }
 
 interface RecordedUsageData {
@@ -87,6 +93,15 @@ export default function UsageRecordingModal({
     remarks: '',
   });
   const [file, setFile] = useState<File | null>(null);
+
+  const isSimplifiedLease = contract?.saleType === 'LEASE' && contract?.leaseType !== 'FSM';
+
+  React.useEffect(() => {
+    if (!isOpen) {
+      setShowPreview(false);
+      setRecordedUsageData(null);
+    }
+  }, [isOpen]);
 
   React.useEffect(() => {
     if (editingInvoice) {
@@ -492,10 +507,12 @@ export default function UsageRecordingModal({
     const prevClrA4 = prevUsage ? prevUsage.colorA4Count : calculatedInitialCounts.clrA4;
     const prevClrA3 = prevUsage ? prevUsage.colorA3Count : calculatedInitialCounts.clrA3;
 
-    if (bwA4 > 0 && bwA4 < prevBwA4) errs.bwA4 = `Cannot be less than ${prevBwA4}`;
-    if (bwA3 > 0 && bwA3 < prevBwA3) errs.bwA3 = `Cannot be less than ${prevBwA3}`;
-    if (clrA4 > 0 && clrA4 < prevClrA4) errs.clrA4 = `Cannot be less than ${prevClrA4}`;
-    if (clrA3 > 0 && clrA3 < prevClrA3) errs.clrA3 = `Cannot be less than ${prevClrA3}`;
+    if (!isSimplifiedLease) {
+      if (bwA4 > 0 && bwA4 < prevBwA4) errs.bwA4 = `Cannot be less than ${prevBwA4}`;
+      if (bwA3 > 0 && bwA3 < prevBwA3) errs.bwA3 = `Cannot be less than ${prevBwA3}`;
+      if (clrA4 > 0 && clrA4 < prevClrA4) errs.clrA4 = `Cannot be less than ${prevClrA4}`;
+      if (clrA3 > 0 && clrA3 < prevClrA3) errs.clrA3 = `Cannot be less than ${prevClrA3}`;
+    }
 
     // check zero usage if all are touched or not (maybe just block at submit for zero usage)
     return errs;
@@ -506,6 +523,7 @@ export default function UsageRecordingModal({
     calculatedInitialCounts.bwA4,
     calculatedInitialCounts.clrA3,
     calculatedInitialCounts.clrA4,
+    isSimplifiedLease,
   ]);
 
   const hasErrors = Object.keys(getErrors).length > 0;
@@ -525,19 +543,21 @@ export default function UsageRecordingModal({
     const prevClrA4 = prevUsage ? prevUsage.colorA4Count : ruleItems.color?.initialColorCount || 0;
     const prevClrA3 = prevUsage ? prevUsage.colorA3Count : 0;
 
-    // 1. Rollback Validation
-    if (bwA4 < prevBwA4)
-      errors.push(`BW A4 reading (${bwA4}) cannot be lower than previous (${prevBwA4})`);
-    if (bwA3 < prevBwA3)
-      errors.push(`BW A3 reading (${bwA3}) cannot be lower than previous (${prevBwA3})`);
-    if (clrA4 < prevClrA4)
-      errors.push(`Color A4 reading (${clrA4}) cannot be lower than previous (${prevClrA4})`);
-    if (clrA3 < prevClrA3)
-      errors.push(`Color A3 reading (${clrA3}) cannot be lower than previous (${prevClrA3})`);
+    // 1. Rollback Validation (Only for non-simplified leases)
+    if (!isSimplifiedLease) {
+      if (bwA4 < prevBwA4)
+        errors.push(`BW A4 reading (${bwA4}) cannot be lower than previous (${prevBwA4})`);
+      if (bwA3 < prevBwA3)
+        errors.push(`BW A3 reading (${bwA3}) cannot be lower than previous (${prevBwA3})`);
+      if (clrA4 < prevClrA4)
+        errors.push(`Color A4 reading (${clrA4}) cannot be lower than previous (${prevClrA4})`);
+      if (clrA3 < prevClrA3)
+        errors.push(`Color A3 reading (${clrA3}) cannot be lower than previous (${prevClrA3})`);
 
-    // 2. No Usage Validation (Professional)
-    if (bwA4 === prevBwA4 && bwA3 === prevBwA3 && clrA4 === prevClrA4 && clrA3 === prevClrA3) {
-      errors.push('No usage detected. Meter readings must be higher than previous month.');
+      // 2. No Usage Validation (Professional)
+      if (bwA4 === prevBwA4 && bwA3 === prevBwA3 && clrA4 === prevClrA4 && clrA3 === prevClrA3) {
+        errors.push('No usage detected. Meter readings must be higher than previous month.');
+      }
     }
 
     // 3. Contract Period Validation
@@ -617,7 +637,9 @@ export default function UsageRecordingModal({
         });
 
         setShowPreview(true);
-        onSuccess();
+        // We do *not* call onSuccess() here. Calling it triggers the parent to fetch and remount
+        // the state, which instantly kills the UsagePreviewDialog and flips back to the input form.
+        // onSuccess is deferred to the close callback of the Preview Dialog.
       }
     } catch (error: unknown) {
       const err = error as { message?: string };
@@ -641,7 +663,7 @@ export default function UsageRecordingModal({
 
   return (
     <>
-      <Dialog open={isOpen} onOpenChange={onClose}>
+      <Dialog open={isOpen && !showPreview} onOpenChange={onClose}>
         <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto rounded-[1.5rem] p-6 sm:p-10">
           <DialogHeader>
             <DialogTitle>Record Usage for {customerName}</DialogTitle>
@@ -704,14 +726,16 @@ export default function UsageRecordingModal({
               </div>
             </div>
 
-            {/* Rent Section Display Only */}
+            {/* Rent / EMI Section Display Only */}
             <div className="p-4 rounded-xl bg-blue-50/50 border border-blue-100 space-y-2">
               <h3 className="text-sm font-bold text-blue-700 flex items-center gap-2">
-                <Coins size={16} /> Rent Info
+                <IndianRupee size={16} /> {isSimplifiedLease ? 'EMI Info' : 'Rent Info'}
               </h3>
               <div className="flex justify-between items-center">
                 <span className="text-xs font-semibold text-slate-600">
-                  Monthly Rent (Accrued until contract end)
+                  {isSimplifiedLease
+                    ? 'Monthly EMI Amount'
+                    : 'Monthly Rent (Accrued until contract end)'}
                 </span>
                 <span className="text-sm font-bold text-slate-800">
                   {(() => {
@@ -780,284 +804,637 @@ export default function UsageRecordingModal({
               </div>
             )}
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {isBw && (
-                <div className="space-y-4 p-4 rounded-xl bg-slate-50 border border-slate-100">
-                  <h3 className="text-sm font-bold text-slate-700 border-b pb-2 mb-2 flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-slate-900" />
-                    Black & White Readings
-                  </h3>
-                  {/* BW Inputs */}
-                  <div className="bg-white p-3 rounded-lg border border-slate-200 space-y-3">
-                    <div className="flex justify-between items-center text-xs text-slate-500 pb-2 border-b border-slate-100">
-                      <span>
-                        Free Limit:{' '}
-                        <span className="font-bold text-slate-700">
-                          {Number(ruleItems.bw?.bwIncludedLimit || 0).toLocaleString()}
-                        </span>{' '}
-                        per month
-                      </span>
-                      <span>
-                        Excess Rate:{' '}
-                        <span className="font-bold text-slate-700">
-                          {formatCurrency(Number(ruleItems.bw?.bwExcessRate || 0))}
-                        </span>
-                      </span>
-                    </div>
-
-                    <div className="space-y-2">
-                      <div className="flex justify-between items-end">
-                        <Label className="text-xs font-semibold">A4 Current Reading</Label>
-                        <div className="text-right">
-                          <span className="text-[10px] text-orange-600 block">
-                            {prevUsage ? 'Prev' : 'Initial'}:{' '}
-                            {prevUsage ? prevUsage.bwA4Count : calculatedInitialCounts.bwA4}
-                          </span>
-                          <span className="text-[10px] text-green-600 font-bold block">
-                            Usage:{' '}
-                            {Math.max(
-                              0,
-                              Number(formData.bwA4Count || 0) -
-                                (prevUsage ? prevUsage.bwA4Count : calculatedInitialCounts.bwA4),
-                            )}
-                          </span>
-                        </div>
-                      </div>
-                      <Input
-                        type="number"
-                        value={formData.bwA4Count}
-                        onChange={(e) => setFormData({ ...formData, bwA4Count: e.target.value })}
-                        className={
-                          getErrors.bwA4
-                            ? 'border-red-500 focus-visible:ring-red-500 bg-red-50/50'
-                            : ''
-                        }
-                      />
-                      {getErrors.bwA4 && (
-                        <p className="text-[10px] text-red-500 font-bold animate-pulse">
-                          {getErrors.bwA4}
-                        </p>
-                      )}
-                    </div>
-
-                    <div className="space-y-2">
-                      <div className="flex justify-between items-end">
-                        <Label className="text-xs font-semibold">A3 Current Reading</Label>
-                        <div className="text-right">
-                          <span className="text-[10px] text-orange-600 block">
-                            {prevUsage ? 'Prev' : 'Initial'}:{' '}
-                            {prevUsage ? prevUsage.bwA3Count : calculatedInitialCounts.bwA3}
-                          </span>
-                          <span className="text-[10px] text-green-600 font-bold block">
-                            Usage:{' '}
-                            {Math.max(
-                              0,
-                              Number(formData.bwA3Count || 0) -
-                                (prevUsage ? prevUsage.bwA3Count : calculatedInitialCounts.bwA3),
-                            )}
-                          </span>
-                        </div>
-                      </div>
-                      <Input
-                        type="number"
-                        value={formData.bwA3Count}
-                        onChange={(e) => setFormData({ ...formData, bwA3Count: e.target.value })}
-                        className={
-                          getErrors.bwA3
-                            ? 'border-red-500 focus-visible:ring-red-500 bg-red-50/50'
-                            : ''
-                        }
-                      />
-                      {getErrors.bwA3 && (
-                        <p className="text-[10px] text-red-500 font-bold animate-pulse">
-                          {getErrors.bwA3}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {isColor && (
-                <div className="space-y-4 p-4 rounded-xl bg-rose-50/30 border border-rose-100">
-                  <h3 className="text-sm font-bold text-rose-700 border-b border-rose-100 pb-2 mb-2 flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-rose-500" />
-                    Color Readings
-                  </h3>
-                  {/* Color Inputs */}
-                  <div className="bg-white p-3 rounded-lg border border-rose-100 space-y-3">
-                    <div className="flex justify-between items-center text-xs text-rose-600/80 pb-2 border-b border-rose-50">
-                      <span>
-                        Free Limit:{' '}
-                        <span className="font-bold text-rose-700">
-                          {Number(ruleItems.color?.colorIncludedLimit || 0).toLocaleString()}
-                        </span>{' '}
-                        per month
-                      </span>
-                      <span>
-                        Excess Rate:{' '}
-                        <span className="font-bold text-rose-700">
-                          {formatCurrency(Number(ruleItems.color?.colorExcessRate || 0))}
-                        </span>
-                      </span>
-                    </div>
-
-                    <div className="space-y-2">
-                      <div className="flex justify-between items-end">
-                        <Label className="text-xs font-semibold">A4 Current Reading</Label>
-                        <div className="text-right">
-                          <span className="text-[10px] text-orange-600 block">
-                            {prevUsage ? 'Prev' : 'Initial'}:{' '}
-                            {prevUsage ? prevUsage.colorA4Count : calculatedInitialCounts.clrA4}
-                          </span>
-                          <span className="text-[10px] text-green-600 font-bold block">
-                            Usage:{' '}
-                            {Math.max(
-                              0,
-                              Number(formData.colorA4Count || 0) -
-                                (prevUsage
-                                  ? prevUsage.colorA4Count
-                                  : calculatedInitialCounts.clrA4),
-                            )}
-                          </span>
-                        </div>
-                      </div>
-                      <Input
-                        type="number"
-                        value={formData.colorA4Count}
-                        onChange={(e) => setFormData({ ...formData, colorA4Count: e.target.value })}
-                        className={
-                          getErrors.clrA4
-                            ? 'border-red-500 focus-visible:ring-red-500 bg-red-50/50'
-                            : ''
-                        }
-                      />
-                      {getErrors.clrA4 && (
-                        <p className="text-[10px] text-red-500 font-bold animate-pulse">
-                          {getErrors.clrA4}
-                        </p>
-                      )}
-                    </div>
-
-                    <div className="space-y-2">
-                      <div className="flex justify-between items-end">
-                        <Label className="text-xs font-semibold">A3 Current Reading</Label>
-                        <div className="text-right">
-                          <span className="text-[10px] text-orange-600 block">
-                            {prevUsage ? 'Prev' : 'Initial'}:{' '}
-                            {prevUsage ? prevUsage.colorA3Count : calculatedInitialCounts.clrA3}
-                          </span>
-                          <span className="text-[10px] text-green-600 font-bold block">
-                            Usage:{' '}
-                            {Math.max(
-                              0,
-                              Number(formData.colorA3Count || 0) -
-                                (prevUsage
-                                  ? prevUsage.colorA3Count
-                                  : calculatedInitialCounts.clrA3),
-                            )}
-                          </span>
-                        </div>
-                      </div>
-                      <Input
-                        type="number"
-                        value={formData.colorA3Count}
-                        onChange={(e) => setFormData({ ...formData, colorA3Count: e.target.value })}
-                        className={
-                          getErrors.clrA3
-                            ? 'border-red-500 focus-visible:ring-red-500 bg-red-50/50'
-                            : ''
-                        }
-                      />
-                      {getErrors.clrA3 && (
-                        <p className="text-[10px] text-red-500 font-bold animate-pulse">
-                          {getErrors.clrA3}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Summary Section */}
-            <div className="bg-muted/50 rounded-lg border border-border overflow-hidden">
-              <div className="p-3 border-b border-border bg-slate-100/50 flex justify-between items-center">
-                <span className="text-xs font-bold text-muted-foreground uppercase">
-                  Usage Summary
-                </span>
-              </div>
-              <div className="p-4 space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">
-                      Billing Period
-                    </p>
-                    <p className="text-xs font-semibold text-slate-600">
-                      {formatDate(formData.billingPeriodStart)} to{' '}
-                      {formatDate(formData.billingPeriodEnd)}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Rent Type</p>
-                    <p className="text-xs font-semibold text-slate-600">
-                      {contract?.rentType?.replace('_', ' ') || 'N/A'}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Dynamic Summary Rows */}
+            {/* Readings - only for FSM lease and RENT (not EMI lease) */}
+            {!isSimplifiedLease && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {isBw && (
-                  <div className="pt-2 border-t border-slate-100">
-                    <p className="text-[11px] font-bold text-slate-600 uppercase mb-2">
-                      Black & White
-                    </p>
-                    <div className="space-y-1 text-xs">
-                      <div className="flex justify-between">
-                        <span className="text-slate-500">
-                          Monthly A4 Equivalent (Delta A4 + 2×Delta A3):
-                        </span>
-                        <span className="font-bold">
-                          {(() => {
-                            const prevA4 = prevUsage
-                              ? prevUsage.bwA4Count
-                              : calculatedInitialCounts.bwA4;
-                            const prevA3 = prevUsage
-                              ? prevUsage.bwA3Count
-                              : calculatedInitialCounts.bwA3;
-                            const deltaA4 = Math.max(0, Number(formData.bwA4Count || 0) - prevA4);
-                            const deltaA3 = Math.max(0, Number(formData.bwA3Count || 0) - prevA3);
-                            return (deltaA4 + deltaA3 * 2).toLocaleString();
-                          })()}
-                        </span>
-                      </div>
-                      <div className="flex justify-between text-slate-500">
-                        <span>Excess Rate:</span>
-                        <span className="font-bold">
-                          {(() => {
-                            const isCpc = contract?.rentType?.includes('CPC');
-                            if (isCpc) return 'Slab-based';
-                            return `${formatCurrency(Number(ruleItems.bw?.bwExcessRate || ruleItems.combo?.combinedExcessRate || 0))} / Unit`;
-                          })()}
-                        </span>
-                      </div>
-                      <div className="flex justify-between text-orange-600 font-medium border-t border-slate-100 pt-1 mt-1">
-                        <span>Excess Charge:</span>
+                  <div className="space-y-4 p-4 rounded-xl bg-slate-50 border border-slate-100">
+                    <h3 className="text-sm font-bold text-slate-700 border-b pb-2 mb-2 flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-slate-900" />
+                      Black & White Readings
+                    </h3>
+                    {/* BW Inputs */}
+                    <div className="bg-white p-3 rounded-lg border border-slate-200 space-y-3">
+                      <div className="flex justify-between items-center text-xs text-slate-500 pb-2 border-b border-slate-100">
+                        {contract?.rentType?.includes('CPC') ? (
+                          <span className="invisible">Free Limit: 0</span>
+                        ) : (
+                          <span>
+                            Free Limit:{' '}
+                            <span className="font-bold text-slate-700">
+                              {Number(ruleItems.bw?.bwIncludedLimit || 0).toLocaleString()}
+                            </span>{' '}
+                            per month
+                          </span>
+                        )}
                         <span>
-                          {formatCurrency(
-                            Number(
-                              (() => {
-                                const bwA4 = Number(formData.bwA4Count || 0);
-                                const bwA3 = Number(formData.bwA3Count || 0);
-                                const prevA4 = prevUsage
-                                  ? prevUsage.bwA4Count
-                                  : calculatedInitialCounts.bwA4;
-                                const prevA3 = prevUsage
-                                  ? prevUsage.bwA3Count
-                                  : calculatedInitialCounts.bwA3;
+                          Excess Rate:{' '}
+                          <span className="font-bold text-slate-700">
+                            {(() => {
+                              const isCpc = contract?.rentType?.includes('CPC');
+                              if (isCpc) {
+                                const slabs =
+                                  ruleItems.bw?.bwSlabRanges ||
+                                  ruleItems.combo?.comboSlabRanges ||
+                                  [];
+                                if (slabs.length > 0) {
+                                  return (
+                                    <div className="flex flex-col items-end">
+                                      <span className="text-[10px] uppercase text-slate-400">
+                                        Slabs
+                                      </span>
+                                      {slabs.map((s: SlabRange, i: number) => (
+                                        <span key={i} className="whitespace-nowrap font-mono">
+                                          {s.from}-{s.to}: ₹{s.rate}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  );
+                                }
+                                return 'Slab-based';
+                              }
+                              return `₹${Number(ruleItems.bw?.bwExcessRate || ruleItems.combo?.combinedExcessRate || 0).toFixed(2)}`;
+                            })()}
+                          </span>
+                        </span>
+                      </div>
 
-                                // If it's a combo rule, we use the combo calculation
-                                if (ruleItems.combo) {
+                      <div className="space-y-2">
+                        <div className="flex justify-between items-end">
+                          <Label className="text-xs font-semibold">A4 Current Reading</Label>
+                          <div className="text-right">
+                            <span className="text-[10px] text-orange-600 block">
+                              {prevUsage ? 'Prev' : 'Initial'}:{' '}
+                              {prevUsage ? prevUsage.bwA4Count : calculatedInitialCounts.bwA4}
+                            </span>
+                            <span className="text-[10px] text-green-600 font-bold block">
+                              Usage:{' '}
+                              {Math.max(
+                                0,
+                                Number(formData.bwA4Count || 0) -
+                                  (prevUsage ? prevUsage.bwA4Count : calculatedInitialCounts.bwA4),
+                              )}
+                            </span>
+                          </div>
+                        </div>
+                        <Input
+                          type="number"
+                          value={formData.bwA4Count}
+                          onChange={(e) => setFormData({ ...formData, bwA4Count: e.target.value })}
+                          className={
+                            getErrors.bwA4
+                              ? 'border-red-500 focus-visible:ring-red-500 bg-red-50/50'
+                              : ''
+                          }
+                        />
+                        {getErrors.bwA4 && (
+                          <p className="text-[10px] text-red-500 font-bold animate-pulse">
+                            {getErrors.bwA4}
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="space-y-2">
+                        <div className="flex justify-between items-end">
+                          <Label className="text-xs font-semibold">A3 Current Reading</Label>
+                          <div className="text-right">
+                            <span className="text-[10px] text-orange-600 block">
+                              {prevUsage ? 'Prev' : 'Initial'}:{' '}
+                              {prevUsage ? prevUsage.bwA3Count : calculatedInitialCounts.bwA3}
+                            </span>
+                            <span className="text-[10px] text-green-600 font-bold block">
+                              Usage:{' '}
+                              {Math.max(
+                                0,
+                                Number(formData.bwA3Count || 0) -
+                                  (prevUsage ? prevUsage.bwA3Count : calculatedInitialCounts.bwA3),
+                              )}
+                            </span>
+                          </div>
+                        </div>
+                        <Input
+                          type="number"
+                          value={formData.bwA3Count}
+                          onChange={(e) => setFormData({ ...formData, bwA3Count: e.target.value })}
+                          className={
+                            getErrors.bwA3
+                              ? 'border-red-500 focus-visible:ring-red-500 bg-red-50/50'
+                              : ''
+                          }
+                        />
+                        {getErrors.bwA3 && (
+                          <p className="text-[10px] text-red-500 font-bold animate-pulse">
+                            {getErrors.bwA3}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {isColor && (
+                  <div className="space-y-4 p-4 rounded-xl bg-rose-50/30 border border-rose-100">
+                    <h3 className="text-sm font-bold text-rose-700 border-b border-rose-100 pb-2 mb-2 flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-rose-500" />
+                      Color Readings
+                    </h3>
+                    {/* Color Inputs */}
+                    <div className="bg-white p-3 rounded-lg border border-rose-100 space-y-3">
+                      <div className="flex justify-between items-center text-xs text-rose-600/80 pb-2 border-b border-rose-50">
+                        {contract?.rentType?.includes('CPC') ? (
+                          <span className="invisible">Free Limit: 0</span>
+                        ) : (
+                          <span>
+                            Free Limit:{' '}
+                            <span className="font-bold text-rose-700">
+                              {Number(ruleItems.color?.colorIncludedLimit || 0).toLocaleString()}
+                            </span>{' '}
+                            per month
+                          </span>
+                        )}
+                        <span>
+                          Excess Rate:{' '}
+                          <span className="font-bold text-rose-700">
+                            {(() => {
+                              const isCpc = contract?.rentType?.includes('CPC');
+                              if (isCpc) {
+                                const slabs =
+                                  ruleItems.color?.colorSlabRanges ||
+                                  ruleItems.combo?.comboSlabRanges ||
+                                  [];
+                                if (slabs.length > 0) {
+                                  return (
+                                    <div className="flex flex-col items-end">
+                                      <span className="text-[10px] uppercase text-rose-400">
+                                        Slabs
+                                      </span>
+                                      {slabs.map((s: SlabRange, i: number) => (
+                                        <span key={i} className="whitespace-nowrap font-mono">
+                                          {s.from}-{s.to}: ₹{s.rate}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  );
+                                }
+                                return 'Slab-based';
+                              }
+                              return `₹${Number(ruleItems.color?.colorExcessRate || ruleItems.combo?.combinedExcessRate || 0).toFixed(2)}`;
+                            })()}
+                          </span>
+                        </span>
+                      </div>
+
+                      <div className="space-y-2">
+                        <div className="flex justify-between items-end">
+                          <Label className="text-xs font-semibold">A4 Current Reading</Label>
+                          <div className="text-right">
+                            <span className="text-[10px] text-orange-600 block">
+                              {prevUsage ? 'Prev' : 'Initial'}:{' '}
+                              {prevUsage ? prevUsage.colorA4Count : calculatedInitialCounts.clrA4}
+                            </span>
+                            <span className="text-[10px] text-green-600 font-bold block">
+                              Usage:{' '}
+                              {Math.max(
+                                0,
+                                Number(formData.colorA4Count || 0) -
+                                  (prevUsage
+                                    ? prevUsage.colorA4Count
+                                    : calculatedInitialCounts.clrA4),
+                              )}
+                            </span>
+                          </div>
+                        </div>
+                        <Input
+                          type="number"
+                          value={formData.colorA4Count}
+                          onChange={(e) =>
+                            setFormData({ ...formData, colorA4Count: e.target.value })
+                          }
+                          className={
+                            getErrors.clrA4
+                              ? 'border-red-500 focus-visible:ring-red-500 bg-red-50/50'
+                              : ''
+                          }
+                        />
+                        {getErrors.clrA4 && (
+                          <p className="text-[10px] text-red-500 font-bold animate-pulse">
+                            {getErrors.clrA4}
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="space-y-2">
+                        <div className="flex justify-between items-end">
+                          <Label className="text-xs font-semibold">A3 Current Reading</Label>
+                          <div className="text-right">
+                            <span className="text-[10px] text-orange-600 block">
+                              {prevUsage ? 'Prev' : 'Initial'}:{' '}
+                              {prevUsage ? prevUsage.colorA3Count : calculatedInitialCounts.clrA3}
+                            </span>
+                            <span className="text-[10px] text-green-600 font-bold block">
+                              Usage:{' '}
+                              {Math.max(
+                                0,
+                                Number(formData.colorA3Count || 0) -
+                                  (prevUsage
+                                    ? prevUsage.colorA3Count
+                                    : calculatedInitialCounts.clrA3),
+                              )}
+                            </span>
+                          </div>
+                        </div>
+                        <Input
+                          type="number"
+                          value={formData.colorA3Count}
+                          onChange={(e) =>
+                            setFormData({ ...formData, colorA3Count: e.target.value })
+                          }
+                          className={
+                            getErrors.clrA3
+                              ? 'border-red-500 focus-visible:ring-red-500 bg-red-50/50'
+                              : ''
+                          }
+                        />
+                        {getErrors.clrA3 && (
+                          <p className="text-[10px] text-red-500 font-bold animate-pulse">
+                            {getErrors.clrA3}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Usage Summary - only for FSM lease and RENT (not EMI lease) */}
+            {!isSimplifiedLease && (
+              <div className="bg-muted/50 rounded-lg border border-border overflow-hidden">
+                <div className="p-3 border-b border-border bg-slate-100/50 flex justify-between items-center">
+                  <span className="text-xs font-bold text-muted-foreground uppercase">
+                    Usage Summary
+                  </span>
+                </div>
+                <div className="p-4 space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">
+                        Billing Period
+                      </p>
+                      <p className="text-xs font-semibold text-slate-600">
+                        {formatDate(formData.billingPeriodStart)} to{' '}
+                        {formatDate(formData.billingPeriodEnd)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">
+                        Rent Type
+                      </p>
+                      <p className="text-xs font-semibold text-slate-600">
+                        {contract?.rentType?.replace('_', ' ') || 'N/A'}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Dynamic Summary Rows */}
+                  {ruleItems.combo ? (
+                    <div className="pt-2 border-t border-slate-100">
+                      <p className="text-[11px] font-bold text-purple-600 uppercase mb-2">
+                        Black & White & Color (Combined)
+                      </p>
+                      <div className="space-y-1 text-xs">
+                        <div className="flex justify-between">
+                          <span className="text-slate-500">
+                            Monthly Equivalent (Delta A4 + 2×Delta A3):
+                          </span>
+                          <span className="font-bold">
+                            {(() => {
+                              const prevA4 = prevUsage
+                                ? prevUsage.bwA4Count
+                                : calculatedInitialCounts.bwA4;
+                              const prevA3 = prevUsage
+                                ? prevUsage.bwA3Count
+                                : calculatedInitialCounts.bwA3;
+                              const deltaA4 = Math.max(0, Number(formData.bwA4Count || 0) - prevA4);
+                              const deltaA3 = Math.max(0, Number(formData.bwA3Count || 0) - prevA3);
+
+                              const prevClrA4 = prevUsage
+                                ? prevUsage.colorA4Count
+                                : calculatedInitialCounts.clrA4;
+                              const prevClrA3 = prevUsage
+                                ? prevUsage.colorA3Count
+                                : calculatedInitialCounts.clrA3;
+                              const deltaClrA4 = Math.max(
+                                0,
+                                Number(formData.colorA4Count || 0) - prevClrA4,
+                              );
+                              const deltaClrA3 = Math.max(
+                                0,
+                                Number(formData.colorA3Count || 0) - prevClrA3,
+                              );
+
+                              return (
+                                deltaA4 +
+                                deltaA3 * 2 +
+                                deltaClrA4 +
+                                deltaClrA3 * 2
+                              ).toLocaleString();
+                            })()}
+                          </span>
+                        </div>
+                        <div className="flex justify-between text-slate-500">
+                          <span>Excess Rate:</span>
+                          <span className="font-bold">
+                            {(() => {
+                              const isCpc = contract?.rentType?.includes('CPC');
+                              if (isCpc) {
+                                const slabs = ruleItems.combo?.comboSlabRanges || [];
+                                if (slabs.length > 0) {
+                                  const prevA4 = prevUsage
+                                    ? prevUsage.bwA4Count
+                                    : calculatedInitialCounts.bwA4;
+                                  const prevA3 = prevUsage
+                                    ? prevUsage.bwA3Count
+                                    : calculatedInitialCounts.bwA3;
+                                  const deltaA4 = Math.max(
+                                    0,
+                                    Number(formData.bwA4Count || 0) - prevA4,
+                                  );
+                                  const deltaA3 = Math.max(
+                                    0,
+                                    Number(formData.bwA3Count || 0) - prevA3,
+                                  );
+
+                                  const prevClrA4 = prevUsage
+                                    ? prevUsage.colorA4Count
+                                    : calculatedInitialCounts.clrA4;
+                                  const prevClrA3 = prevUsage
+                                    ? prevUsage.colorA3Count
+                                    : calculatedInitialCounts.clrA3;
+                                  const deltaClrA4 = Math.max(
+                                    0,
+                                    Number(formData.colorA4Count || 0) - prevClrA4,
+                                  );
+                                  const deltaClrA3 = Math.max(
+                                    0,
+                                    Number(formData.colorA3Count || 0) - prevClrA3,
+                                  );
+
+                                  const totalVolume =
+                                    deltaA4 + deltaA3 * 2 + deltaClrA4 + deltaClrA3 * 2;
+
+                                  // Find applicable slab
+                                  const sortedSlabs = [...slabs].sort((a, b) => a.from - b.from);
+                                  let applicableRate = sortedSlabs[0]?.rate || 0;
+                                  let applicableRange = `${sortedSlabs[0]?.from || 0}-${sortedSlabs[0]?.to || 0}`;
+
+                                  for (const slab of sortedSlabs) {
+                                    if (totalVolume >= slab.from) {
+                                      applicableRate = slab.rate;
+                                      applicableRange =
+                                        slab.to === 9999999
+                                          ? `${slab.from}+`
+                                          : `${slab.from}-${slab.to}`;
+                                    }
+                                  }
+                                  return `₹${applicableRate} (${applicableRange} units)`;
+                                }
+                                return 'Slab-based';
+                              }
+                              return `₹${Number(ruleItems.combo?.combinedExcessRate || 0).toFixed(2)} / Unit`;
+                            })()}
+                          </span>
+                        </div>
+                        <div className="flex justify-between text-orange-600 font-medium border-t border-slate-100 pt-1 mt-1">
+                          <span>Excess Charge:</span>
+                          <span>
+                            ₹
+                            {(() => {
+                              const bwA4 = Number(formData.bwA4Count || 0);
+                              const bwA3 = Number(formData.bwA3Count || 0);
+                              const prevA4 = prevUsage
+                                ? prevUsage.bwA4Count
+                                : calculatedInitialCounts.bwA4;
+                              const prevA3 = prevUsage
+                                ? prevUsage.bwA3Count
+                                : calculatedInitialCounts.bwA3;
+
+                              const clrA4 = Number(formData.colorA4Count || 0);
+                              const clrA3 = Number(formData.colorA3Count || 0);
+                              const prevClrA4 = prevUsage
+                                ? prevUsage.colorA4Count
+                                : calculatedInitialCounts.clrA4;
+                              const prevClrA3 = prevUsage
+                                ? prevUsage.colorA3Count
+                                : calculatedInitialCounts.clrA3;
+
+                              return calculateRuleCost(
+                                ruleItems.combo,
+                                bwA4 + clrA4,
+                                bwA3 + clrA3,
+                                prevA4 + prevClrA4,
+                                prevA3 + prevClrA3,
+                                'COMBO',
+                                contract?.rentType,
+                              ).charge.toFixed(2);
+                            })()}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      {isBw && (
+                        <div className="pt-2 border-t border-slate-100">
+                          <p className="text-[11px] font-bold text-slate-600 uppercase mb-2">
+                            Black & White
+                          </p>
+                          <div className="space-y-1 text-xs">
+                            <div className="flex justify-between">
+                              <span className="text-slate-500">
+                                Monthly A4 Equivalent (Delta A4 + 2×Delta A3):
+                              </span>
+                              <span className="font-bold">
+                                {(() => {
+                                  const prevA4 = prevUsage
+                                    ? prevUsage.bwA4Count
+                                    : calculatedInitialCounts.bwA4;
+                                  const prevA3 = prevUsage
+                                    ? prevUsage.bwA3Count
+                                    : calculatedInitialCounts.bwA3;
+                                  const deltaA4 = Math.max(
+                                    0,
+                                    Number(formData.bwA4Count || 0) - prevA4,
+                                  );
+                                  const deltaA3 = Math.max(
+                                    0,
+                                    Number(formData.bwA3Count || 0) - prevA3,
+                                  );
+                                  return (deltaA4 + deltaA3 * 2).toLocaleString();
+                                })()}
+                              </span>
+                            </div>
+                            <div className="flex justify-between text-slate-500">
+                              <span>Excess Rate:</span>
+                              <span className="font-bold">
+                                {(() => {
+                                  const isCpc = contract?.rentType?.includes('CPC');
+                                  if (isCpc) {
+                                    const slabs = ruleItems.bw?.bwSlabRanges || [];
+                                    if (slabs.length > 0) {
+                                      const prevA4 = prevUsage
+                                        ? prevUsage.bwA4Count
+                                        : calculatedInitialCounts.bwA4;
+                                      const prevA3 = prevUsage
+                                        ? prevUsage.bwA3Count
+                                        : calculatedInitialCounts.bwA3;
+                                      const deltaA4 = Math.max(
+                                        0,
+                                        Number(formData.bwA4Count || 0) - prevA4,
+                                      );
+                                      const deltaA3 = Math.max(
+                                        0,
+                                        Number(formData.bwA3Count || 0) - prevA3,
+                                      );
+                                      const totalVolume = deltaA4 + deltaA3 * 2;
+
+                                      // Find applicable slab
+                                      const sortedSlabs = [...slabs].sort(
+                                        (a, b) => a.from - b.from,
+                                      );
+                                      let applicableRate = sortedSlabs[0]?.rate || 0;
+                                      let applicableRange = `${sortedSlabs[0]?.from || 0}-${sortedSlabs[0]?.to || 0}`;
+
+                                      for (const slab of sortedSlabs) {
+                                        if (totalVolume >= slab.from) {
+                                          applicableRate = slab.rate;
+                                          applicableRange =
+                                            slab.to === 9999999
+                                              ? `${slab.from}+`
+                                              : `${slab.from}-${slab.to}`;
+                                        }
+                                      }
+                                      return `₹${applicableRate} (${applicableRange} units)`;
+                                    }
+                                    return 'Slab-based';
+                                  }
+                                  return `₹${Number(ruleItems.bw?.bwExcessRate || 0).toFixed(2)} / Unit`;
+                                })()}
+                              </span>
+                            </div>
+                            <div className="flex justify-between text-orange-600 font-medium border-t border-slate-100 pt-1 mt-1">
+                              <span>Excess Charge:</span>
+                              <span>
+                                ₹
+                                {(() => {
+                                  const bwA4 = Number(formData.bwA4Count || 0);
+                                  const bwA3 = Number(formData.bwA3Count || 0);
+                                  const prevA4 = prevUsage
+                                    ? prevUsage.bwA4Count
+                                    : calculatedInitialCounts.bwA4;
+                                  const prevA3 = prevUsage
+                                    ? prevUsage.bwA3Count
+                                    : calculatedInitialCounts.bwA3;
+
+                                  return calculateRuleCost(
+                                    ruleItems.bw,
+                                    bwA4,
+                                    bwA3,
+                                    prevA4,
+                                    prevA3,
+                                    'BW',
+                                    contract?.rentType,
+                                  ).charge.toFixed(2);
+                                })()}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {isColor && (
+                        <div className="pt-2 border-t border-slate-100">
+                          <p className="text-[11px] font-bold text-rose-600 uppercase mb-2">
+                            Color
+                          </p>
+                          <div className="space-y-1 text-xs">
+                            <div className="flex justify-between">
+                              <span className="text-slate-500">
+                                Monthly A4 Equivalent (Delta A4 + 2×Delta A3):
+                              </span>
+                              <span className="font-bold">
+                                {(() => {
+                                  const prevA4 = prevUsage
+                                    ? prevUsage.colorA4Count
+                                    : calculatedInitialCounts.clrA4;
+                                  const prevA3 = prevUsage
+                                    ? prevUsage.colorA3Count
+                                    : calculatedInitialCounts.clrA3;
+                                  const deltaA4 = Math.max(
+                                    0,
+                                    Number(formData.colorA4Count || 0) - prevA4,
+                                  );
+                                  const deltaA3 = Math.max(
+                                    0,
+                                    Number(formData.colorA3Count || 0) - prevA3,
+                                  );
+                                  return (deltaA4 + deltaA3 * 2).toLocaleString();
+                                })()}
+                              </span>
+                            </div>
+                            <div className="flex justify-between text-slate-500">
+                              <span>Excess Rate:</span>
+                              <span className="font-bold">
+                                {(() => {
+                                  const isCpc = contract?.rentType?.includes('CPC');
+                                  if (isCpc) {
+                                    const slabs = ruleItems.color?.colorSlabRanges || [];
+                                    if (slabs.length > 0) {
+                                      const prevA4 = prevUsage
+                                        ? prevUsage.colorA4Count
+                                        : calculatedInitialCounts.clrA4;
+                                      const prevA3 = prevUsage
+                                        ? prevUsage.colorA3Count
+                                        : calculatedInitialCounts.clrA3;
+                                      const deltaA4 = Math.max(
+                                        0,
+                                        Number(formData.colorA4Count || 0) - prevA4,
+                                      );
+                                      const deltaA3 = Math.max(
+                                        0,
+                                        Number(formData.colorA3Count || 0) - prevA3,
+                                      );
+                                      const totalVolume = deltaA4 + deltaA3 * 2;
+
+                                      // Find applicable slab
+                                      const sortedSlabs = [...slabs].sort(
+                                        (a, b) => a.from - b.from,
+                                      );
+                                      let applicableRate = sortedSlabs[0]?.rate || 0;
+                                      let applicableRange = `${sortedSlabs[0]?.from || 0}-${sortedSlabs[0]?.to || 0}`;
+
+                                      for (const slab of sortedSlabs) {
+                                        if (totalVolume >= slab.from) {
+                                          applicableRate = slab.rate;
+                                          applicableRange =
+                                            slab.to === 9999999
+                                              ? `${slab.from}+`
+                                              : `${slab.from}-${slab.to}`;
+                                        }
+                                      }
+                                      return `₹${applicableRate} (${applicableRange} units)`;
+                                    }
+                                    return 'Slab-based';
+                                  }
+                                  return `₹${Number(ruleItems.color?.colorExcessRate || 0).toFixed(2)} / Unit`;
+                                })()}
+                              </span>
+                            </div>
+                            <div className="flex justify-between text-orange-600 font-medium border-t border-slate-100 pt-1 mt-1">
+                              <span>Excess Charge:</span>
+                              <span>
+                                ₹
+                                {(() => {
                                   const clrA4 = Number(formData.colorA4Count || 0);
                                   const clrA3 = Number(formData.colorA3Count || 0);
                                   const prevClrA4 = prevUsage
@@ -1066,160 +1443,63 @@ export default function UsageRecordingModal({
                                   const prevClrA3 = prevUsage
                                     ? prevUsage.colorA3Count
                                     : calculatedInitialCounts.clrA3;
+
                                   return calculateRuleCost(
-                                    ruleItems.combo,
-                                    bwA4 + clrA4,
-                                    bwA3 + clrA3,
-                                    prevA4 + prevClrA4,
-                                    prevA3 + prevClrA3,
-                                    'COMBO',
+                                    ruleItems.color,
+                                    clrA4,
+                                    clrA3,
+                                    prevClrA4,
+                                    prevClrA3,
+                                    'COLOR',
                                     contract?.rentType,
-                                  ).charge;
-                                }
+                                  ).charge.toFixed(2);
+                                })()}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )}
 
-                                return calculateRuleCost(
-                                  ruleItems.bw,
-                                  bwA4,
-                                  bwA3,
-                                  prevA4,
-                                  prevA3,
-                                  'BW',
-                                  contract?.rentType,
-                                ).charge;
-                              })(),
-                            ),
-                          )}
-                        </span>
-                      </div>
-                    </div>
+                  <div className="pt-2 border-t border-slate-100 flex justify-between items-center mt-2 text-xs">
+                    <span className="text-slate-500">Monthly Rent</span>
+                    <span className="font-bold text-slate-700">
+                      {(() => {
+                        const amount = Number(
+                          contract?.monthlyRent ||
+                            contract?.monthlyLeaseAmount ||
+                            contract?.monthlyEmiAmount ||
+                            0,
+                        );
+
+                        if (isLastMonth) {
+                          const rentToShow = contract?.monthlyRent || 0;
+                          // Always show rent (first month rent is now included)
+                          return `₹${rentToShow.toLocaleString()} (Adv. will be adjusted)`;
+                        }
+
+                        return `₹${amount.toLocaleString()}`;
+                      })()}
+                    </span>
                   </div>
-                )}
 
-                {isColor && (
-                  <div className="pt-2 border-t border-slate-100">
-                    <p className="text-[11px] font-bold text-rose-600 uppercase mb-2">Color</p>
-                    <div className="space-y-1 text-xs">
-                      <div className="flex justify-between">
-                        <span className="text-slate-500">
-                          Monthly A4 Equivalent (Delta A4 + 2×Delta A3):
-                        </span>
-                        <span className="font-bold">
-                          {(() => {
-                            const prevA4 = prevUsage
-                              ? prevUsage.colorA4Count
-                              : calculatedInitialCounts.clrA4;
-                            const prevA3 = prevUsage
-                              ? prevUsage.colorA3Count
-                              : calculatedInitialCounts.clrA3;
-                            const deltaA4 = Math.max(
-                              0,
-                              Number(formData.colorA4Count || 0) - prevA4,
-                            );
-                            const deltaA3 = Math.max(
-                              0,
-                              Number(formData.colorA3Count || 0) - prevA3,
-                            );
-                            return (deltaA4 + deltaA3 * 2).toLocaleString();
-                          })()}
-                        </span>
-                      </div>
-                      <div className="flex justify-between text-slate-500">
-                        <span>Excess Rate:</span>
-                        <span className="font-bold">
-                          {(() => {
-                            const isCpc = contract?.rentType?.includes('CPC');
-                            if (isCpc) return 'Slab-based';
-                            return `${formatCurrency(Number(ruleItems.color?.colorExcessRate || ruleItems.combo?.combinedExcessRate || 0))} / Unit`;
-                          })()}
-                        </span>
-                      </div>
-                      <div className="flex justify-between text-orange-600 font-medium border-t border-slate-100 pt-1 mt-1">
-                        <span>Excess Charge:</span>
-                        <span>
-                          {formatCurrency(
-                            Number(
-                              (() => {
-                                const clrA4 = Number(formData.colorA4Count || 0);
-                                const clrA3 = Number(formData.colorA3Count || 0);
-                                const prevClrA4 = prevUsage
-                                  ? prevUsage.colorA4Count
-                                  : calculatedInitialCounts.clrA4;
-                                const prevClrA3 = prevUsage
-                                  ? prevUsage.colorA3Count
-                                  : calculatedInitialCounts.clrA3;
-
-                                // If it's a combo rule, we use the combo calculation
-                                if (ruleItems.combo) {
-                                  const bwA4 = Number(formData.bwA4Count || 0);
-                                  const bwA3 = Number(formData.bwA3Count || 0);
-                                  const prevBwA4 = prevUsage
-                                    ? prevUsage.bwA4Count
-                                    : calculatedInitialCounts.bwA4;
-                                  const prevBwA3 = prevUsage
-                                    ? prevUsage.bwA3Count
-                                    : calculatedInitialCounts.bwA3;
-                                  return calculateRuleCost(
-                                    ruleItems.combo,
-                                    bwA4 + clrA4,
-                                    bwA3 + clrA3,
-                                    prevBwA4 + prevClrA4,
-                                    prevBwA3 + prevClrA3,
-                                    'COMBO',
-                                    contract?.rentType,
-                                  ).charge;
-                                }
-
-                                return calculateRuleCost(
-                                  ruleItems.color,
-                                  clrA4,
-                                  clrA3,
-                                  prevClrA4,
-                                  prevClrA3,
-                                  'COLOR',
-                                  contract?.rentType,
-                                ).charge;
-                              })(),
-                            ),
-                          )}
-                        </span>
-                      </div>
-                    </div>
+                  <div className="pt-3 border-t-2 border-slate-200 flex justify-between items-center mt-2">
+                    <span className="font-bold text-sm text-slate-800">Grand Total</span>
+                    <span className="font-bold text-lg text-green-600">
+                      ₹{estimatedCost.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    </span>
                   </div>
-                )}
-
-                <div className="pt-2 border-t border-slate-100 flex justify-between items-center mt-2 text-xs">
-                  <span className="text-slate-500">Monthly Rent</span>
-                  <span className="font-bold text-slate-700">
-                    {(() => {
-                      const amount = Number(
-                        contract?.monthlyRent ||
-                          contract?.monthlyLeaseAmount ||
-                          contract?.monthlyEmiAmount ||
-                          0,
-                      );
-
-                      if (isLastMonth) {
-                        const rentToShow = contract?.monthlyRent || 0;
-                        // Always show rent (first month rent is now included)
-                        return `${formatCurrency(rentToShow)} (Adv. will be adjusted)`;
-                      }
-
-                      return formatCurrency(amount);
-                    })()}
-                  </span>
-                </div>
-
-                <div className="pt-3 border-t-2 border-slate-200 flex justify-between items-center mt-2">
-                  <span className="font-bold text-sm text-slate-800">Grand Total</span>
-                  <span className="font-bold text-lg text-green-600">
-                    {formatCurrency(estimatedCost)}
-                  </span>
                 </div>
               </div>
-            </div>
+            )}
 
             <div className="space-y-2">
-              <Label>Meter Image (Required for verification)</Label>
+              <Label>
+                {isSimplifiedLease
+                  ? 'Payment Screenshot (Required for verification)'
+                  : 'Meter Image (Required for verification)'}
+              </Label>
               <Input type="file" accept="image/*" onChange={handleFileChange} />
             </div>
 
@@ -1259,8 +1539,11 @@ export default function UsageRecordingModal({
 
       {showPreview && contract && recordedUsageData && (
         <UsagePreviewDialog
-          isOpen={showPreview}
-          onClose={() => setShowPreview(false)}
+          isOpen={showPreview && isOpen}
+          onClose={() => {
+            onSuccess(); // Execute the deferred parent refresh
+            onClose(); // Then fully dismantle the modal tree
+          }}
           invoice={contract}
           usageData={{
             bwA4Count: recordedUsageData.bwA4Count,

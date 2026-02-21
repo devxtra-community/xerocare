@@ -57,7 +57,7 @@ export class Product {
   @Column({ name: 'spare_part_id', nullable: true })
   spare_part_id?: string;
 
-  @ManyToOne(() => SparePart, { nullable: true })
+  @ManyToOne(() => SparePart, { nullable: true, onDelete: 'SET NULL' })
   @JoinColumn({ name: 'spare_part_id' })
   spare_part?: SparePart;
 

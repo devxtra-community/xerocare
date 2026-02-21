@@ -45,7 +45,7 @@ export class LotItem {
   @Column({ name: 'spare_part_id', type: 'uuid', nullable: true })
   sparePartId?: string;
 
-  @ManyToOne(() => SparePart, { nullable: true })
+  @ManyToOne(() => SparePart, { nullable: true, onDelete: 'SET NULL' })
   @JoinColumn({ name: 'spare_part_id' })
   sparePart?: SparePart;
 

@@ -102,11 +102,8 @@ export default function Dashboard() {
             <h3 className="text-base sm:text-lg md:text-xl font-bold text-primary">Products</h3>
             <ProductsTable />
           </div>
-          <div className="space-y-2">
-            <h3 className="text-base sm:text-lg md:text-xl font-bold text-primary">
-              Sales Overview
-            </h3>
-            <SalesChart selectedYear={selectedYear} onYearChange={setSelectedYear} />
+          <div className="space-y-2 flex flex-col items-stretch h-full">
+            <SalesChart />
           </div>
         </div>
       </div>

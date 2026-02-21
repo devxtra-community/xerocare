@@ -10,8 +10,19 @@ export interface Model {
   };
   description: string;
   quantity: number; // Auto-managed by backend
+  available: number;
+  rented: number;
+  leased: number;
+  sold: number;
   product_name?: string;
   print_colour?: 'BLACK_WHITE' | 'COLOUR' | 'BOTH';
+}
+
+export interface PaginatedResponse<T> {
+  data: T[];
+  page: number;
+  limit: number;
+  total: number;
 }
 
 export interface CreateModelData {
@@ -34,9 +45,26 @@ interface ApiResponse<T> {
   data?: T;
 }
 
-export const getAllModels = async (): Promise<Model[]> => {
-  const response = await api.get<ApiResponse<Model[]>>('/i/models');
-  return response.data.data || [];
+export const getAllModels = async (params?: {
+  page?: number;
+  limit?: number;
+  search?: string;
+}): Promise<PaginatedResponse<Model>> => {
+  const response = await api.get('/i/models', { params });
+  const resData = response.data;
+  const coreData = resData.data || resData;
+
+  if (coreData && typeof coreData === 'object' && 'page' in coreData) {
+    return coreData as PaginatedResponse<Model>;
+  }
+
+  const dataArray = Array.isArray(coreData) ? coreData : [];
+  return {
+    data: dataArray,
+    page: 1,
+    limit: dataArray.length || 10,
+    total: dataArray.length,
+  };
 };
 
 export const addModel = async (data: CreateModelData): Promise<Model> => {

@@ -8,10 +8,15 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import Image from 'next/image';
 
 import { useEffect, useState } from 'react';
 import { inventoryService, InventoryItem } from '@/services/inventoryService';
-import { sparePartService, SparePartInventoryItem } from '@/services/sparePartService';
+import {
+  sparePartService,
+  SparePartInventoryItem,
+  PaginatedResponse,
+} from '@/services/sparePartService';
 import { Input } from '@/components/ui/input';
 import {
   Select,
@@ -56,7 +61,8 @@ export default function DashbordTable() {
           id: `${m.model_id}-${m.warehouse_id}`,
         }));
 
-        const spares = spareParts.map((s: SparePartInventoryItem) => ({
+        const sparesRes = (spareParts as PaginatedResponse<SparePartInventoryItem>).data || [];
+        const spares = sparesRes.map((s: SparePartInventoryItem) => ({
           ...s,
           display_type: 'Spare Part',
           product_name: s.part_name,
@@ -222,9 +228,11 @@ export default function DashbordTable() {
                     <TableCell>
                       <div className="h-10 w-10 rounded-lg bg-gray-50 border border-gray-100 overflow-hidden flex items-center justify-center shadow-sm text-black">
                         {item.image_url ? (
-                          <img
+                          <Image
                             src={item.image_url}
                             alt={item.product_name}
+                            width={40}
+                            height={40}
                             className="h-full w-full object-contain p-1"
                           />
                         ) : (

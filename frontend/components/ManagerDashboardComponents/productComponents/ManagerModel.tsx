@@ -57,8 +57,8 @@ export default function ManagerModel() {
 
   const loadModels = async () => {
     try {
-      const data = await getAllModels();
-      setModels(data);
+      const res = await getAllModels();
+      setModels(res.data || []);
     } catch (error) {
       console.error('Failed to load models:', error);
       toast.error('Failed to load models');
@@ -156,8 +156,21 @@ export default function ManagerModel() {
         <Table>
           <TableHeader>
             <TableRow>
-              {['MODEL NAME', 'MODEL NO', 'BRAND', 'QUANTITY', 'ACTION'].map((h) => (
-                <TableHead key={h} className="text-[11px] font-semibold text-primary px-4">
+              {[
+                'MODEL NAME',
+                'MODEL NO',
+                'BRAND',
+                'TOTAL',
+                'AVAILABLE',
+                'RENTED',
+                'LEASED',
+                'SOLD',
+                'ACTION',
+              ].map((h) => (
+                <TableHead
+                  key={h}
+                  className="text-[11px] font-semibold text-primary px-4 text-center"
+                >
                   {h}
                 </TableHead>
               ))}
@@ -168,14 +181,34 @@ export default function ManagerModel() {
             {filtered.length > 0 ? (
               filtered.map((m, i) => (
                 <TableRow key={m.id} className={i % 2 ? 'bg-sky-100/60' : ''}>
-                  <TableCell className="px-4 font-medium">{m.model_name}</TableCell>
-                  <TableCell className="px-4">{m.model_no}</TableCell>
-                  <TableCell className="px-4">{m.brandRelation?.name || '-'}</TableCell>
-                  <TableCell className="px-4 font-semibold text-blue-600">
-                    {m.quantity} units
+                  <TableCell className="px-4 font-medium text-center">{m.model_name}</TableCell>
+                  <TableCell className="px-4 text-center">{m.model_no}</TableCell>
+                  <TableCell className="px-4 text-center">{m.brandRelation?.name || '-'}</TableCell>
+                  <TableCell className="px-4 font-semibold text-blue-600 text-center">
+                    {m.quantity}
+                  </TableCell>
+                  <TableCell className="px-4 text-center">
+                    <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
+                      {m.available}
+                    </span>
+                  </TableCell>
+                  <TableCell className="px-4 text-center">
+                    <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-700">
+                      {m.rented}
+                    </span>
+                  </TableCell>
+                  <TableCell className="px-4 text-center">
+                    <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-700">
+                      {m.leased}
+                    </span>
+                  </TableCell>
+                  <TableCell className="px-4 text-center">
+                    <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700">
+                      {m.sold}
+                    </span>
                   </TableCell>
                   <TableCell className="px-4">
-                    <div className="flex gap-3 text-sm">
+                    <div className="flex justify-center gap-3 text-sm">
                       <button
                         className="text-primary hover:underline flex items-center gap-1"
                         onClick={() => {
@@ -197,7 +230,7 @@ export default function ManagerModel() {
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={5} className="text-center py-6 text-muted-foreground">
+                <TableCell colSpan={9} className="text-center py-6 text-muted-foreground">
                   No models found
                 </TableCell>
               </TableRow>

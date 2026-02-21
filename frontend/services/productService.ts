@@ -67,13 +67,33 @@ export interface BulkCreateResponse {
   failed: { row: number; error: string }[];
 }
 
+export interface PaginatedResponse<T> {
+  data: T[];
+  page: number;
+  limit: number;
+  total: number;
+}
+
 export const productService = {
   /**
-   * Retrieves all products.
+   * Retrieves all products (paginated).
    */
-  getAllProducts: async (): Promise<Product[]> => {
-    const response = await api.get('/i/products');
-    return response.data.data;
+  getAllProducts: async (params?: {
+    page?: number;
+    limit?: number;
+    search?: string;
+  }): Promise<PaginatedResponse<Product>> => {
+    const response = await api.get('/i/products', { params });
+    // Handle both new paginated response and old array response for safety during migration
+    if (response.data.page !== undefined) {
+      return response.data;
+    }
+    return {
+      data: response.data.data || response.data || [],
+      page: 1,
+      limit: 10,
+      total: (response.data.data || response.data || []).length,
+    };
   },
 
   /**

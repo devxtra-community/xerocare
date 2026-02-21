@@ -2,6 +2,8 @@ import { getRabbitChannel } from '../config/rabbitmq';
 import { ProductStatus } from '../entities/productEntity';
 import { logger } from '../config/logger';
 import { ProductRepository } from '../repositories/productRepository';
+import { ModelRepository } from '../repositories/modelRepository';
+import { ModelService } from '../services/modelService';
 
 /**
  * RabbitMQ Config
@@ -109,6 +111,19 @@ export async function startProductStatusConsumer() {
         productId,
         status: newStatus,
       });
+
+      // Update the model quantity if the product was SOLD, RENTED, or LEASED
+      if (product.model_id) {
+        const modelRepo = new ModelRepository();
+        const modelService = new ModelService();
+
+        // Sync model quantities
+        await modelRepo.syncModelQuantities(product.model_id);
+
+        // Sync the updated quantity to Redis
+        await modelService.syncToRedis(product.model_id);
+        logger.info(`Synced model ${product.model_id} quantities after product status update`);
+      }
 
       /**
        * 5️⃣ ACK only after DB success

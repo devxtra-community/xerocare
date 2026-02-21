@@ -1,63 +1,9 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
-import VendorStats from '@/components/AdminDahboardComponents/VendorComponents/VendorStats';
-import VendorTable, {
-  Vendor as UiVendor,
-} from '@/components/AdminDahboardComponents/VendorComponents/VendorTable';
-import { getVendors, Vendor as ApiVendor } from '@/lib/vendor';
-import { toast } from 'sonner';
+import React from 'react';
+import VendorTable from '@/components/AdminDahboardComponents/VendorComponents/VendorTable';
 
 export default function VendorsPage() {
-  const [loading, setLoading] = useState(true);
-  const [apiVendors, setApiVendors] = useState<ApiVendor[]>([]);
-  const [uiVendors, setUiVendors] = useState<UiVendor[]>([]);
-
-  const fetchVendorsData = async () => {
-    setLoading(true);
-    try {
-      const res = await getVendors();
-      const rawVendors: ApiVendor[] = res.data || [];
-
-      setApiVendors(rawVendors);
-
-      // Map to UI model
-      const mappedVendors: UiVendor[] = rawVendors.map((v) => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const raw = v as any;
-        return {
-          id: v.id,
-          name: v.name,
-          type: raw.type || 'Supplier', // Mock or default
-          contactPerson: raw.contactPerson || 'N/A', // Mock or default
-          phone: v.phone || 'N/A',
-          email: v.email || 'N/A',
-          totalOrders: raw.totalOrders || 0, // Mock
-          purchaseValue: raw.purchaseValue || 0, // Mock
-          outstandingAmount: raw.outstandingAmount || 0, // Mock
-          status: v.status === 'ACTIVE' ? 'Active' : 'On Hold',
-        };
-      });
-
-      setUiVendors(mappedVendors);
-    } catch (error) {
-      console.error('Failed to fetch vendors:', error);
-      toast.error('Failed to load vendor data');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchVendorsData();
-  }, []);
-
-  // Calculate stats
-  const totalVendors = apiVendors.length;
-  const activeVendors = apiVendors.filter((v) => v.status === 'ACTIVE').length;
-  const totalSpending = apiVendors.reduce((acc, v) => acc + (v.purchaseValue || 0), 0);
-  const totalOrders = apiVendors.reduce((acc, v) => acc + (v.totalOrders || 0), 0);
-
   return (
     <div className="p-3 sm:p-4 md:p-6 space-y-8 sm:space-y-10 bg-blue-100 min-h-screen">
       <div className="flex justify-between items-center">
@@ -70,13 +16,7 @@ export default function VendorsPage() {
       </div>
 
       <div className="space-y-4 sm:space-y-6">
-        <VendorStats
-          totalVendors={totalVendors}
-          activeVendors={activeVendors}
-          totalSpending={totalSpending}
-          totalOrders={totalOrders}
-        />
-        <VendorTable vendors={uiVendors} loading={loading} onRefresh={fetchVendorsData} />
+        <VendorTable basePath="/admin" />
       </div>
     </div>
   );

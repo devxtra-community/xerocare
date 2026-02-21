@@ -77,7 +77,7 @@ export default function EmployeeSalesStats({
       }
     };
     fetchStats();
-  }, [propInvoices]);
+  }, [propInvoices, selectedYear]);
 
   const cards = [
     {
