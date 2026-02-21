@@ -884,22 +884,105 @@ export function InvoiceDetailsDialog({
                         </TableCell>
                         <TableCell className="text-xs font-medium text-gray-600 align-top py-3">
                           <div className="flex flex-col gap-1">
-                            {item.bwExcessRate ? (
+                            {item.bwSlabRanges && item.bwSlabRanges.length > 0 ? (
+                              <div className="flex flex-col">
+                                <span className="font-semibold text-gray-500 text-[10px] uppercase">
+                                  BW Slabs
+                                </span>
+                                {item.bwSlabRanges.map(
+                                  (s: { from: number; to: number; rate: number }, i: number) => (
+                                    <span key={i} className="whitespace-nowrap">
+                                      {s.from}-{s.to}: ₹{s.rate}
+                                    </span>
+                                  ),
+                                )}
+                                {item.bwExcessRate && (
+                                  <span className="whitespace-nowrap">
+                                    &gt;{' '}
+                                    {Math.max(
+                                      ...item.bwSlabRanges.map(
+                                        (s: { from: number; to: number; rate: number }) =>
+                                          Number(s.to) || 0,
+                                      ),
+                                    )}
+                                    : ₹{item.bwExcessRate}
+                                  </span>
+                                )}
+                              </div>
+                            ) : item.bwExcessRate ? (
                               <span className="whitespace-nowrap">BW: ₹{item.bwExcessRate}</span>
                             ) : null}
-                            {item.colorExcessRate ? (
-                              <span className="whitespace-nowrap">
+
+                            {item.colorSlabRanges && item.colorSlabRanges.length > 0 ? (
+                              <div className="flex flex-col mt-1">
+                                <span className="font-semibold text-gray-500 text-[10px] uppercase">
+                                  Color Slabs
+                                </span>
+                                {item.colorSlabRanges.map(
+                                  (s: { from: number; to: number; rate: number }, i: number) => (
+                                    <span key={i} className="whitespace-nowrap">
+                                      {s.from}-{s.to}: ₹{s.rate}
+                                    </span>
+                                  ),
+                                )}
+                                {item.colorExcessRate && (
+                                  <span className="whitespace-nowrap">
+                                    &gt;{' '}
+                                    {Math.max(
+                                      ...item.colorSlabRanges.map(
+                                        (s: { from: number; to: number; rate: number }) =>
+                                          Number(s.to) || 0,
+                                      ),
+                                    )}
+                                    : ₹{item.colorExcessRate}
+                                  </span>
+                                )}
+                              </div>
+                            ) : item.colorExcessRate ? (
+                              <span className="whitespace-nowrap mt-1">
                                 CLR: ₹{item.colorExcessRate}
                               </span>
                             ) : null}
-                            {item.combinedExcessRate ? (
-                              <span className="whitespace-nowrap">
+
+                            {item.comboSlabRanges && item.comboSlabRanges.length > 0 ? (
+                              <div className="flex flex-col mt-1">
+                                <span className="font-semibold text-gray-500 text-[10px] uppercase">
+                                  Combo Slabs
+                                </span>
+                                {item.comboSlabRanges.map(
+                                  (s: { from: number; to: number; rate: number }, i: number) => (
+                                    <span key={i} className="whitespace-nowrap">
+                                      {s.from}-{s.to}: ₹{s.rate}
+                                    </span>
+                                  ),
+                                )}
+                                {item.combinedExcessRate && (
+                                  <span className="whitespace-nowrap">
+                                    &gt;{' '}
+                                    {Math.max(
+                                      ...item.comboSlabRanges.map(
+                                        (s: { from: number; to: number; rate: number }) =>
+                                          Number(s.to) || 0,
+                                      ),
+                                    )}
+                                    : ₹{item.combinedExcessRate}
+                                  </span>
+                                )}
+                              </div>
+                            ) : item.combinedExcessRate ? (
+                              <span className="whitespace-nowrap mt-1">
                                 CMB: ₹{item.combinedExcessRate}
                               </span>
                             ) : null}
+
                             {!item.bwExcessRate &&
                               !item.colorExcessRate &&
-                              !item.combinedExcessRate && <span className="text-gray-300">-</span>}
+                              !item.combinedExcessRate &&
+                              (!item.bwSlabRanges || item.bwSlabRanges.length === 0) &&
+                              (!item.colorSlabRanges || item.colorSlabRanges.length === 0) &&
+                              (!item.comboSlabRanges || item.comboSlabRanges.length === 0) && (
+                                <span className="text-gray-300">-</span>
+                              )}
                           </div>
                         </TableCell>
                         <TableCell className="text-center font-bold text-muted-foreground text-sm align-top py-3">
@@ -923,12 +1006,30 @@ export function InvoiceDetailsDialog({
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-5 bg-gray-50/50 rounded-xl border border-gray-100">
               <div className="space-y-1">
                 <p className="text-[10px] font-bold text-gray-400 uppercase">
-                  {mode === 'EMPLOYEE' ? 'Monthly Rent Balance' : 'Monthly Rent'}
+                  {currentInvoice.saleType === 'LEASE'
+                    ? 'Monthly EMI'
+                    : mode === 'EMPLOYEE'
+                      ? 'Monthly Rent Balance'
+                      : 'Monthly Rent'}
                 </p>
                 <p className="text-sm font-bold text-gray-700">
-                  ₹{financialSummary.monthlyRent.toLocaleString()}
+                  ₹
+                  {currentInvoice.saleType === 'LEASE'
+                    ? (currentInvoice.monthlyEmiAmount || 0).toLocaleString()
+                    : financialSummary.monthlyRent.toLocaleString()}
                 </p>
               </div>
+
+              {currentInvoice.saleType === 'LEASE' && (
+                <div className="space-y-1">
+                  <p className="text-[10px] font-bold text-gray-400 uppercase">
+                    Total Lease Amount
+                  </p>
+                  <p className="text-sm font-bold text-gray-700">
+                    ₹{(currentInvoice.totalLeaseAmount || 0).toLocaleString()}
+                  </p>
+                </div>
+              )}
               <div className="space-y-1">
                 <p className="text-[10px] font-bold text-gray-400 uppercase">
                   {mode === 'EMPLOYEE' ? 'Advance Balance' : 'Advance Adj.'}
@@ -1211,23 +1312,61 @@ export function InvoiceDetailsDialog({
                                               limits.push(`CMB: ${item.combinedIncludedLimit}`);
 
                                             const rates = [];
-                                            if (item.bwExcessRate)
+                                            if (item.bwSlabRanges && item.bwSlabRanges.length > 0) {
+                                              rates.push(`<strong>BW Slabs:</strong>`);
+                                              item.bwSlabRanges.forEach((s) =>
+                                                rates.push(`${s.from}-${s.to}: ₹${s.rate}`),
+                                              );
+                                              if (item.bwExcessRate) {
+                                                rates.push(
+                                                  `> ${Math.max(...item.bwSlabRanges.map((s) => Number(s.to) || 0))}: ₹${item.bwExcessRate}`,
+                                                );
+                                              }
+                                            } else if (item.bwExcessRate)
                                               rates.push(`BW: ₹${item.bwExcessRate}`);
-                                            if (item.colorExcessRate)
+
+                                            if (
+                                              item.colorSlabRanges &&
+                                              item.colorSlabRanges.length > 0
+                                            ) {
+                                              rates.push(`<strong>Color Slabs:</strong>`);
+                                              item.colorSlabRanges.forEach((s) =>
+                                                rates.push(`${s.from}-${s.to}: ₹${s.rate}`),
+                                              );
+                                              if (item.colorExcessRate) {
+                                                rates.push(
+                                                  `> ${Math.max(...item.colorSlabRanges.map((s) => Number(s.to) || 0))}: ₹${item.colorExcessRate}`,
+                                                );
+                                              }
+                                            } else if (item.colorExcessRate)
                                               rates.push(`CLR: ₹${item.colorExcessRate}`);
-                                            if (item.combinedExcessRate)
+
+                                            if (
+                                              item.comboSlabRanges &&
+                                              item.comboSlabRanges.length > 0
+                                            ) {
+                                              rates.push(`<strong>Combo Slabs:</strong>`);
+                                              item.comboSlabRanges.forEach((s) =>
+                                                rates.push(`${s.from}-${s.to}: ₹${s.rate}`),
+                                              );
+                                              if (item.combinedExcessRate) {
+                                                rates.push(
+                                                  `> ${Math.max(...item.comboSlabRanges.map((s) => Number(s.to) || 0))}: ₹${item.combinedExcessRate}`,
+                                                );
+                                              }
+                                            } else if (item.combinedExcessRate)
                                               rates.push(`CMB: ₹${item.combinedExcessRate}`);
 
                                             return `
                                             <tr style="border-bottom: 1px solid #e5e7eb;">
-                                              <td style="padding: 12px;">
+                                              <td style="padding: 12px; vertical-align: top;">
                                                 <strong>${item.description}</strong>
                                                 ${item.itemType === 'PRICING_RULE' ? '<br/><span style="font-size: 12px; color: #6b7280;">(Pricing Rule)</span>' : ''}
                                               </td>
-                                              <td style="padding: 12px; font-size: 13px;">
+                                              <td style="padding: 12px; font-size: 13px; vertical-align: top;">
                                                 ${limits.length > 0 ? limits.join('<br/>') : '-'}
                                               </td>
-                                              <td style="padding: 12px; font-size: 13px;">
+                                              <td style="padding: 12px; font-size: 13px; vertical-align: top; line-height: 1.4;">
                                                 ${rates.length > 0 ? rates.join('<br/>') : '-'}
                                               </td>
                                               <td style="padding: 12px; text-align: center;">${item.quantity || 1}</td>
@@ -1259,6 +1398,7 @@ export function InvoiceDetailsDialog({
                                  <p style="margin: 5px 0;"><strong>Lease Type:</strong> ${inv.leaseType}</p>
                                  <p style="margin: 5px 0;"><strong>Tenure:</strong> ${inv.leaseTenureMonths} Months</p>
                                  ${inv.monthlyEmiAmount ? `<p style="margin: 5px 0;"><strong>Monthly EMI:</strong> ₹${inv.monthlyEmiAmount.toLocaleString()}</p>` : ''}
+                                 ${inv.totalLeaseAmount ? `<p style="margin: 5px 0;"><strong>Total Lease Amount:</strong> ₹${inv.totalLeaseAmount.toLocaleString()}</p>` : ''}
                                </div>
                              `;
                           }

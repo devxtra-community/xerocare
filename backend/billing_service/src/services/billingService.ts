@@ -1,6 +1,6 @@
 import { EntityManager } from 'typeorm';
 import { InvoiceRepository } from '../repositories/invoiceRepository';
-import { getRabbitChannel } from '../config/rabbitmq';
+// import { getRabbitChannel } from '../config/rabbitmq';
 import { InvoiceStatus } from '../entities/enums/invoiceStatus';
 import { InvoiceItem } from '../entities/invoiceItemEntity';
 // import { publishInvoiceCreated } from '../events/publisher/billingPublisher';
@@ -225,7 +225,9 @@ export class BillingService {
 
     // 5. Emit Product Status Updates (Mark as AVAILABLE/RETURNED)
     // Pass 'RETURNED' to set product status back to AVAILABLE in inventory
-    await this.emitProductStatusUpdates(contract, 'SYSTEM', 'RETURNED');
+    if (contract.saleType === SaleType.RENT) {
+      await this.emitProductStatusUpdates(contract, 'SYSTEM', 'RETURNED');
+    }
 
     return contract;
   }
@@ -742,7 +744,7 @@ export class BillingService {
       // Final Transition
       if (invoice.saleType === SaleType.SALE) {
         invoice.type = InvoiceType.FINAL;
-        invoice.status = InvoiceStatus.ISSUED;
+        invoice.status = InvoiceStatus.PAID;
       } else {
         // Rent or Lease
         invoice.type = InvoiceType.PROFORMA;
@@ -772,10 +774,10 @@ export class BillingService {
     itemUpdates: ItemUpdate[] | undefined,
     deposit: { amount?: number } | undefined,
   ) {
-    // 1. Ensure Deposit for Non-Lease
-    if (invoice.saleType !== SaleType.LEASE) {
+    // 1. Ensure Deposit for Rent
+    if (invoice.saleType === SaleType.RENT) {
       if (!deposit || !deposit.amount || deposit.amount <= 0) {
-        throw new AppError('Security Deposit is mandatory for Rent and Sale contracts', 400);
+        throw new AppError('Security Deposit is mandatory for Rent contracts', 400);
       }
     }
 
@@ -801,10 +803,12 @@ export class BillingService {
         );
       }
 
-      const bwCount =
-        update?.initialBwCount !== undefined ? update.initialBwCount : item.initialBwCount;
-      if (bwCount === undefined || bwCount === null) {
-        throw new AppError(`Initial B&W reading missing for item: ${item.description}`, 400);
+      if (invoice.saleType !== SaleType.SALE) {
+        const bwCount =
+          update?.initialBwCount !== undefined ? update.initialBwCount : item.initialBwCount;
+        if (bwCount === undefined || bwCount === null) {
+          throw new AppError(`Initial B&W reading missing for item: ${item.description}`, 400);
+        }
       }
     }
   }
@@ -1073,21 +1077,25 @@ export class BillingService {
 
       await queryRunner.commitTransaction();
 
-      if (allocations.length > 0) {
-        try {
-          const channel = await getRabbitChannel();
-          if (channel) {
-            const eventPayload = {
-              contractId: contract.id,
-              allocations: allocations.map((a: ProductAllocation) => ({
-                productId: a.productId,
-                serialNumber: a.serialNumber,
-              })),
-            };
-            channel.sendToQueue('product.returned', Buffer.from(JSON.stringify(eventPayload)));
+      // Emit product status updates AFTER committing the transaction
+      // Only revert to AVAILABLE for RENT contracts (LEASE contracts retain their status)
+      if (contract.saleType === SaleType.RENT && allocations.length > 0) {
+        for (const allocation of allocations) {
+          if (!allocation.productId) continue;
+          try {
+            await emitProductStatusUpdate({
+              productId: allocation.productId,
+              billType: 'RETURNED',
+              invoiceId: contract.id,
+              approvedBy: 'SYSTEM',
+              approvedAt: new Date(),
+            });
+          } catch (e) {
+            logger.error('Failed to emit product status update for allocation', {
+              productId: allocation.productId,
+              error: e,
+            });
           }
-        } catch (e) {
-          logger.error('Failed to emit product.returned event', e);
         }
       }
 
