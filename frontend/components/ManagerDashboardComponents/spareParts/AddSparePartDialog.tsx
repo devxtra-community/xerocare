@@ -187,6 +187,7 @@ export default function AddSparePartDialog({
                     ...formData,
                     lot_id: newLotId,
                     vendor_id: selectedLot?.vendor?.id || '',
+                    warehouse_id: selectedLot?.warehouse_id || selectedLot?.warehouseId || '',
                   });
                   setSelectedLotItemId(''); // Reset lot item when lot changes
                 }}

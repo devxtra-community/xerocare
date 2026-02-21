@@ -251,6 +251,7 @@ export class BillingReportService {
     const collections = [];
 
     for (const contract of completedContracts) {
+      const customerDetails = await this.getCustomerDetails(contract.customerId);
       const finalInvoices = await this.invoiceRepo.findFinalInvoicesByContractId(contract.id);
       const summaryInvoice = finalInvoices.find((inv) => inv.isSummaryInvoice);
 
@@ -318,15 +319,55 @@ export class BillingReportService {
           (contract.type === InvoiceType.FINAL ? contract.invoiceNumber : undefined),
         totalCollected,
         finalAmount,
+        totalAmount: finalAmount, // Add for compatibility with frontend
         grossAmount,
         advanceAdjusted,
+        securityDepositAmount: Number(contract.securityDepositAmount || 0),
+        securityDepositMode: contract.securityDepositMode,
+        securityDepositDate: contract.securityDepositDate,
+        securityDepositBank: contract.securityDepositBank,
+        securityDepositReference: contract.securityDepositReference,
+        advanceAmount: Number(contract.advanceAmount || 0),
         status: summaryInvoice
           ? summaryInvoice.status
           : contract.status || ContractStatus.COMPLETED,
+        customerName: customerDetails?.firstName
+          ? `${customerDetails.firstName} ${customerDetails.lastName || ''}`.trim()
+          : (contract as { customerName?: string }).customerName,
+        customerPhone:
+          customerDetails?.phone || (contract as { customerPhone?: string }).customerPhone,
+        customerEmail:
+          customerDetails?.email || (contract as { customerEmail?: string }).customerEmail,
       });
     }
 
     return collections;
+  }
+
+  private async getCustomerDetails(customerId: string) {
+    try {
+      const crmServiceUrl = process.env.CRM_SERVICE_URL || 'http://localhost:3005';
+      const { sign } = await import('jsonwebtoken');
+      const token = sign(
+        { userId: 'billing_service', role: 'ADMIN' },
+        process.env.ACCESS_SECRET as string,
+        { expiresIn: '1m' },
+      );
+
+      const response = await fetch(`${crmServiceUrl}/customers/${customerId}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) return null;
+      const data = await response.json();
+      return data.data;
+    } catch {
+      return null;
+    }
   }
 
   /**

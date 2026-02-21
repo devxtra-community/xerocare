@@ -115,6 +115,14 @@ export interface UsageRecord {
   colorA3Count: number;
   remarks?: string;
   advanceAdjusted?: number;
+  // Extended pricing details for UI breakdown
+  rentType?: string;
+  bwFreeLimit?: number;
+  colorFreeLimit?: number;
+  combinedFreeLimit?: number;
+  bwExcessRate?: number;
+  colorExcessRate?: number;
+  combinedExcessRate?: number;
 }
 
 /**
@@ -397,7 +405,15 @@ export interface CompletedCollection {
   finalAmount: number;
   grossAmount: number;
   advanceAdjusted: number;
+  totalAmount?: number;
   status: string;
+  securityDepositAmount?: number;
+  securityDepositMode?: string;
+  securityDepositDate?: string;
+  securityDepositBank?: string;
+  securityDepositReference?: string;
+  advanceAmount?: number;
+  customerEmail?: string;
 }
 
 /**

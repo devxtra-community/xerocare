@@ -155,7 +155,10 @@ export default function EmployeeRentTable({ mode = 'EMPLOYEE' }: EmployeeRentTab
       await employeeApproveInvoice(selectedInvoice.id);
       toast.success('Sent for Finance Approval');
       setDetailsOpen(false);
-      fetchInvoices();
+      // Small delay to allow backend/DB to settle or service to recover if restarting
+      setTimeout(() => {
+        fetchInvoices();
+      }, 500);
     } catch (error) {
       console.error(error);
       toast.error('Failed to send for approval');

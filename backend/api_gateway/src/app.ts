@@ -10,6 +10,7 @@ import { httpLogger } from './middleware/httplogger';
 import { logger } from './config/logger';
 import { errorHandler } from './middleware/errorHandler';
 
+import { otpSendLimiter, otpVerifyLimiter, loginLimiter } from './middleware/rateLimitter';
 import {
   globalRateLimiter,
   otpSendLimiter,
@@ -55,6 +56,26 @@ const EMPLOYEE_SERVICE_URL = process.env.EMPLOYEE_SERVICE_URL;
 const VENDOR_INVENTORY_SERVICE_URL = process.env.VENDOR_INVENTORY_SERVICE_URL;
 const BILLING_SERVICE_URL = process.env.BILLING_SERVICE_URL;
 const CRM_SERVICE_URL = process.env.CRM_SERVICE_URL;
+
+const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:3000';
+logger.info(`CORS Configured for origin: ${CLIENT_URL}`);
+
+const app: Express = express();
+app.set('trust proxy', 1);
+
+app.use(
+  cors({
+    origin: CLIENT_URL,
+    credentials: true,
+  }),
+);
+
+// app.use(globalRateLimiter);
+
+(async () => {
+  await startCustomerConsumer();
+  logger.info('Customer Consumer initialized');
+})();
 
 // Specific Rate Limits
 app.post('/e/auth/login', loginLimiter);

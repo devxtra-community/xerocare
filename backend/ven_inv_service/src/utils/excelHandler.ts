@@ -82,6 +82,14 @@ export class ExcelHandler {
       const quantity = Number(row['Quantity']);
       const unitPrice = Number(row['Unit Price']);
 
+      // Parse Model ID or Compatible Model for Spare Parts
+      let modelIdFromExcel = row['model_id']?.toString().trim();
+      if (!modelIdFromExcel && row['Model ID'])
+        modelIdFromExcel = row['Model ID'].toString().trim();
+
+      const compatibleModelName =
+        row['compatible_model']?.toString().trim() || row['Compatible Model']?.toString().trim();
+
       if (!itemTypeRaw && !itemName) continue;
 
       if (!itemTypeRaw || !itemName || isNaN(quantity) || isNaN(unitPrice)) {
@@ -119,20 +127,42 @@ export class ExcelHandler {
         if (itemCode) {
           sparePart = await Source.getRepository(SparePart).findOne({
             where: { item_code: itemCode },
+            relations: { model: true },
           });
         }
 
         if (!sparePart && itemName) {
-          sparePart = await Source.getRepository(SparePart)
+          // Improve lookup to include brand if available to reduce false positives
+          const query = Source.getRepository(SparePart)
             .createQueryBuilder('sp')
-            .where('LOWER(sp.part_name) = LOWER(:name)', { name: itemName })
-            .getOne();
+            .leftJoinAndSelect('sp.model', 'model')
+            .where('LOWER(sp.part_name) = LOWER(:name)', { name: itemName });
+
+          if (brandFromExcel) {
+            query.andWhere('LOWER(sp.brand) = LOWER(:brand)', { brand: brandFromExcel });
+          }
+
+          sparePart = await query.getOne();
         }
 
         if (!sparePart) {
           if (brandFromExcel) {
             itemDto.brand = brandFromExcel;
             itemDto.partName = itemName;
+            // Pass the modelId if found in Excel
+            if (modelIdFromExcel) {
+              itemDto.modelId = modelIdFromExcel;
+            } else if (compatibleModelName && compatibleModelName.toLowerCase() !== 'universal') {
+              // Try to find model by name if ID not provided
+              const model = await Source.getRepository(Model).findOne({
+                where: { model_name: compatibleModelName },
+              });
+              if (model) {
+                itemDto.modelId = model.id;
+              }
+            } else if (compatibleModelName && compatibleModelName.toLowerCase() === 'universal') {
+              itemDto.modelId = 'universal';
+            }
           } else {
             throw new AppError(
               `Spare Part '${itemName}' not found and no Brand provided to create it`,
@@ -280,8 +310,8 @@ export class ExcelHandler {
           lot.warehouse_id || '',
           lot.vendorId,
           'AVAILABLE',
-          '',
-          modelName,
+          '', // serial_no — user fills in
+          '', // name — user fills in (one model can have different product names)
           brandName,
           '',
           item.unitPrice.toString(),
@@ -329,32 +359,42 @@ export class ExcelHandler {
     const rows: (string | number)[][] = [];
 
     rows.push([
+      'item_code',
       'part_name',
       'brand',
-      'Select Product from Lot',
+      'Select Spare Parts from Lot',
+      'compatible_model',
       'model_id',
       'base_price',
       'quantity',
       'lot_id',
+      'warehouse_id',
     ]);
 
     sparePartItems.forEach((item) => {
       const remaining = item.quantity - item.usedQuantity;
+      const itemCode = item.sparePart?.item_code || '';
       const partName = item.sparePart?.part_name || '';
       const brand = item.sparePart?.brand || '';
-      const modelId = item.sparePart?.model_id || '';
-      const modelName = item.model?.model_name || '';
-      const modelNo = item.model?.model_no || '';
-      const selectProductFromLot = modelName ? `${modelName} (${modelNo})` : '';
+      // Use the model linked to the spare part master record (item.sparePart.model),
+      // NOT item.model which is always null for SPARE_PART lot items.
+      const sparePartModel = item.sparePart?.model;
+      const modelId = item.sparePart?.model_id || sparePartModel?.id || '';
+
+      // For spare parts, the 'Select Spare Parts from Lot' column should be the part name itself
+      const selectSparePartFromLot = `${itemCode} - ${partName}`;
 
       rows.push([
+        itemCode,
         partName,
         brand,
-        selectProductFromLot,
+        selectSparePartFromLot,
+        sparePartModel?.model_name || 'Universal', // Use actual model name
         modelId,
         item.unitPrice,
         remaining,
         lot.id,
+        lot.warehouse_id || '',
       ]);
     });
 
@@ -362,12 +402,15 @@ export class ExcelHandler {
     const worksheet = XLSX.utils.aoa_to_sheet(rows);
 
     const wscols = [
+      { wch: 15 }, // item_code
       { wch: 20 },
       { wch: 30 },
       { wch: 40 },
+      { wch: 30 }, // compatible_model
       { wch: 20 },
       { wch: 15 },
       { wch: 12 },
+      { wch: 38 },
       { wch: 38 },
     ];
     worksheet['!cols'] = wscols;

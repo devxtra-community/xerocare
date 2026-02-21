@@ -21,7 +21,7 @@ export const Source = new DataSource({
   ssl: {
     rejectUnauthorized: false,
   },
-  synchronize: false,
+  synchronize: true, // Enabled to fix missing columns (lots.branch_id)
   entities: [
     Vendor,
     Model,

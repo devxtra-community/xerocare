@@ -5,10 +5,14 @@ import { ReportedBy } from '../entities/usageRecordEntity';
 import { InvoiceType } from '../entities/enums/invoiceType';
 import { ContractStatus } from '../entities/enums/contractStatus';
 import { InvoiceStatus } from '../entities/enums/invoiceStatus';
+import { NotificationService } from './notificationService';
+import { NotificationPublisher } from '../events/publisher/notificationPublisher';
+import { logger } from '../config/logger';
 
 export class UsageService {
   private usageRepo = new UsageRepository();
   private invoiceRepo = new InvoiceRepository();
+  private notificationService = new NotificationService();
 
   /**
    * Records usage data (meter readings) for a contract.
@@ -383,66 +387,18 @@ export class UsageService {
       lastColorA4 = record.colorA4Count;
       lastColorA3 = record.colorA3Count;
 
-      // 5️⃣ Calculate Exceeded Count (DELTA BASED)
-      const exceededCount = isCPC ? totalUsage : Math.max(0, totalUsage - freeLimit);
+      // 5️⃣ Use Stored Values (Source of Truth)
+      const exceededCount = Number(record.exceededTotal || 0);
+      const exceededCharge = Number(record.exceededCharge || 0);
+      const monthlyRent = Number(record.monthlyRent || 0);
+      const advanceAdjusted = Number(record.advanceAdjusted || 0);
+      const finalTotal = Number(record.totalCharge || 0);
 
-      // 6️⃣ Determine Rate & Exceeded Charge (RE-CALCULATED ROBUSTLY)
+      // 6️⃣ Determine Rate (Derived for UI only)
       let rate = 0;
-      let exceededCharge = 0;
-
-      if (contract.rentType === 'FIXED_LIMIT') {
-        rate = Number(pricingRule.combinedExcessRate || pricingRule.bwExcessRate || 0);
-        exceededCharge = exceededCount * rate;
-      } else if (contract.rentType === 'FIXED_COMBO') {
-        rate = Number(pricingRule.combinedExcessRate || pricingRule.bwExcessRate || 0);
-        exceededCharge = exceededCount * rate;
-      } else if (contract.rentType === 'CPC' || contract.rentType === 'CPC_COMBO') {
-        const bwCharge = this.calculateSlabCharge(bwA4D + bwA3D * 2, pricingRule.bwSlabRanges);
-        const colorCharge = this.calculateSlabCharge(
-          colorA4D + colorA3D * 2,
-          pricingRule.colorSlabRanges,
-        );
-        const comboCharge = this.calculateSlabCharge(
-          monthlyNormalized,
-          pricingRule.comboSlabRanges,
-        );
-
-        exceededCharge =
-          pricingRule.comboSlabRanges && pricingRule.comboSlabRanges.length > 0
-            ? comboCharge
-            : bwCharge + colorCharge;
-
-        // For rate display in UI
-        if (totalUsage > 0) {
-          rate = exceededCharge / totalUsage;
-        }
+      if (exceededCount > 0) {
+        rate = exceededCharge / exceededCount;
       }
-
-      // 7️⃣ Monthly Rent & Total Calculation (Recalculated Robustly)
-      // Determine if this is the final month based on contract end date
-      let isFinalMonth = false;
-      if (contract.effectiveTo) {
-        const recEnd = new Date(record.billingPeriodEnd).setHours(0, 0, 0, 0);
-        const conEnd = new Date(contract.effectiveTo).setHours(0, 0, 0, 0);
-        isFinalMonth = recEnd === conEnd;
-      }
-
-      const monthlyRent = Number(
-        record.monthlyRent ||
-          contract.monthlyRent ||
-          contract.monthlyLeaseAmount ||
-          contract.monthlyEmiAmount ||
-          0,
-      );
-      let advanceAdjusted = Number(record.advanceAdjusted || 0);
-
-      if (isFinalMonth) {
-        // Last Month: Rent is covered by Advance
-        advanceAdjusted = monthlyRent;
-      }
-
-      // STRICT CHANGE: finalTotal should represent PAYABLE amount (Rent + Excess - Advance)
-      const finalTotal = monthlyRent + exceededCharge - advanceAdjusted;
 
       // 8️⃣ Normalize Meter Image URL
       let meterImageUrl = record.meterImageUrl;
@@ -482,6 +438,14 @@ export class UsageService {
         colorA4Delta: colorA4D,
         colorA3Delta: colorA3D,
         remarks: record.remarks,
+        // Detailed Breakdown for UI "View Details"
+        bwFreeLimit: Number(pricingRule.bwIncludedLimit || 0),
+        colorFreeLimit: Number(pricingRule.colorIncludedLimit || 0),
+        combinedFreeLimit: Number(pricingRule.combinedIncludedLimit || 0),
+        bwExcessRate: Number(pricingRule.bwExcessRate || 0),
+        colorExcessRate: Number(pricingRule.colorExcessRate || 0),
+        combinedExcessRate: Number(pricingRule.combinedExcessRate || 0),
+        rentType: contract.rentType,
       };
     });
 
@@ -500,9 +464,103 @@ export class UsageService {
     // Logic: In a real app, we would generate a PDF here and call email/whatsapp services.
     // As per the plan, we simulate this and update sent timestamps.
 
-    console.log(`[SIMULATION] Sending Monthly Invoice for usage ${usageId}`);
-    console.log(`- Customer Contract: ${usage.contractId}`);
-    console.log(`- Amount: ₹${usage.totalCharge}`);
+    // Fetch Contract for email details
+    const contract = await this.invoiceRepo.findById(usage.contractId);
+    if (!contract) {
+      throw new AppError('Contract not found for this usage record', 404);
+    }
+
+    // --- REPLICATE FREE LIMIT & URL LOGIC ---
+    let freeLimitDisplay = '0';
+    const isCPC = contract.rentType === 'CPC' || contract.rentType === 'CPC_COMBO';
+
+    // Extract Pricing Rule
+    const pricingRule = contract.items?.find(
+      (i) =>
+        i.itemType === 'PRICING_RULE' ||
+        (i.combinedIncludedLimit !== undefined && i.combinedIncludedLimit > 0) ||
+        (i.bwIncludedLimit !== undefined && i.bwIncludedLimit > 0),
+    );
+
+    if (isCPC) {
+      freeLimitDisplay = 'Standard CPC';
+    } else {
+      if (pricingRule) {
+        freeLimitDisplay = Number(
+          pricingRule.combinedIncludedLimit ||
+            (pricingRule.bwIncludedLimit || 0) + (pricingRule.colorIncludedLimit || 0),
+        ).toLocaleString();
+      }
+    }
+
+    // Normalize Image URL
+    const R2_BASE_URL =
+      process.env.R2_PUBLIC_URL || 'https://pub-8bbb88e1d79042349d0bc47ad1f3eb23.r2.dev';
+    let meterImageUrl = usage.meterImageUrl;
+    if (meterImageUrl && !meterImageUrl.startsWith('http')) {
+      if (meterImageUrl.includes('cloudflarestorage.com')) {
+        const parts = meterImageUrl.split('/');
+        const filename = parts[parts.length - 1];
+        meterImageUrl = `${R2_BASE_URL}/${filename}`;
+      } else {
+        meterImageUrl = `${R2_BASE_URL}/${meterImageUrl}`;
+      }
+    }
+
+    // --- FETCH CUSTOMER DETAILS ---
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let customerDetails: any;
+    let customerEmail: string | undefined;
+
+    if (contract.customerId) {
+      customerDetails = await this.getCustomerDetails(contract.customerId);
+      if (customerDetails && customerDetails.email) {
+        customerEmail = customerDetails.email;
+        logger.info(`Fetched email for customer ${contract.customerId}: ${customerEmail}`);
+      } else {
+        logger.warn(`Could not fetch email for customer ${contract.customerId}`);
+      }
+    }
+
+    // Trigger Email Notification via NotificationPublisher (Standardized Pipeline)
+    const customerName = customerDetails?.firstName
+      ? `${customerDetails.firstName} ${customerDetails.lastName || ''}`.trim()
+      : 'Customer';
+
+    // Inject Rules into Usage Object for Email Generation
+    const detailedUsage = {
+      ...usage,
+      freeLimitDisplay,
+      meterImageUrlNormalized: meterImageUrl,
+      // Inject rule details if found
+      bwFreeLimit: Number(pricingRule?.bwIncludedLimit || 0),
+      colorFreeLimit: Number(pricingRule?.colorIncludedLimit || 0),
+      combinedFreeLimit: Number(pricingRule?.combinedIncludedLimit || 0),
+      bwExcessRate: Number(pricingRule?.bwExcessRate || 0),
+      colorExcessRate: Number(pricingRule?.colorExcessRate || 0),
+      combinedExcessRate: Number(pricingRule?.combinedExcessRate || 0),
+      rentType: contract.rentType,
+    };
+
+    const htmlBody = this.generateUsageEmailBody(
+      detailedUsage,
+      customerName,
+      usage.billingPeriodStart,
+      usage.billingPeriodEnd,
+    );
+
+    if (customerEmail) {
+      // Use the robust NotificationPublisher which routes to employee_service (actual sender)
+      await NotificationPublisher.publishEmailRequest({
+        recipient: customerEmail,
+        subject: `Monthly Usage Statement - ${customerName}`,
+        body: htmlBody,
+        invoiceId: contract.id,
+      });
+      logger.info(`Usage Email published for ${customerEmail} via NotificationPublisher`);
+    } else {
+      logger.warn(`Skipping email for ${contract.id}: No customer email found`);
+    }
 
     usage.emailSentAt = new Date();
     usage.whatsappSentAt = new Date();
@@ -513,7 +571,206 @@ export class UsageService {
       success: true,
       emailSentAt: usage.emailSentAt,
       whatsappSentAt: usage.whatsappSentAt,
+      recipientEmail: customerEmail,
     };
+  }
+
+  /**
+   * Helper: Generate HTML Body for Usage Email
+   */
+  private generateUsageEmailBody(
+    usage: {
+      bwA4Delta: number;
+      bwA3Delta: number;
+      colorA4Delta: number;
+      colorA3Delta: number;
+      exceededCharge: number;
+      rentType?: string;
+      bwFreeLimit?: number;
+      colorFreeLimit?: number;
+      combinedFreeLimit?: number;
+      bwExcessRate?: number;
+      colorExcessRate?: number;
+      combinedExcessRate?: number;
+      monthlyRent?: number;
+      advanceAdjusted?: number;
+      totalCharge?: number;
+      meterImageUrlNormalized?: string;
+    },
+    customerName: string,
+    periodStart: Date,
+    periodEnd: Date,
+  ): string {
+    const formatCurrency = (amount: number) =>
+      `₹${Number(amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
+
+    // Re-derive limits/rates for the email (or pass them in if available)
+    // For now, we'll try to use what's in 'usage' if we added it, or we might need to be careful.
+    // The 'usage' object passed here comes from 'recordUsage' or 'sendMonthlyInvoice'.
+    // 'sendMonthlyInvoice' fetches contract, so we can pass pricingRule or similar.
+    // Let's assume 'usage' has the extended props we added to 'getUsageHistory' OR
+    // we need to pass the rule.
+    // Actually, 'usage' in 'sendMonthlyInvoice' is the raw entity.
+    // We should probably fetch the rule in 'sendMonthlyInvoice' and pass it or relevant values.
+
+    // Let's update sendMonthlyInvoice to pass these details.
+    // Assuming usage object has: bwA4Delta, bwA3Delta, colorA4Delta, colorA3Delta
+    // And we need limits/rates.
+
+    // Destructure for cleaner access
+    const { bwA4Delta, bwA3Delta, colorA4Delta, colorA3Delta, exceededCharge } = usage;
+
+    // We need to calculate/show the breakdown.
+    // Since we don't have the rule here cleanly, let's look at how we can get it.
+    // In sendMonthlyInvoice, we have 'contract'. We can find the rule there.
+
+    // Helper to get rule from usage (injected) or passed args.
+    // For now, I will update 'sendMonthlyInvoice' to inject these into 'usage' or a new arg.
+    // Let's assume 'usage' has them.
+
+    const bwTotal = bwA4Delta + bwA3Delta * 2;
+    const colorTotal = colorA4Delta + colorA3Delta * 2;
+
+    // Limits and Rates (handled in valid JS even if undefined)
+    const bwLimit = Number(usage.bwFreeLimit || 0);
+    const colorLimit = Number(usage.colorFreeLimit || 0);
+    const combinedLimit = Number(usage.combinedFreeLimit || 0);
+
+    const bwRate = Number(usage.bwExcessRate || 0);
+    const colorRate = Number(usage.colorExcessRate || 0);
+    const combinedRate = Number(usage.combinedExcessRate || 0);
+
+    // Calculate exceeded for display (approximation based on limits)
+    let bwExceeded = 0;
+    let colorExceeded = 0;
+    let combinedExceeded = 0;
+    let bwAmount = 0;
+    let colorAmount = 0;
+    let combinedAmount = 0;
+
+    const rentType = usage.rentType || 'FIXED_LIMIT'; // Default
+
+    if (rentType === 'FIXED_LIMIT') {
+      bwExceeded = Math.max(0, bwTotal - bwLimit);
+      colorExceeded = Math.max(0, colorTotal - colorLimit);
+      bwAmount = bwExceeded * bwRate;
+      colorAmount = colorExceeded * colorRate;
+    } else if (rentType === 'FIXED_COMBO') {
+      const totalUse = bwTotal + colorTotal;
+      combinedExceeded = Math.max(0, totalUse - combinedLimit);
+      combinedAmount = combinedExceeded * combinedRate;
+    }
+    // CPC logic handled by simplified display or total
+
+    // Construct the rows dynamically based on Rent Type
+    let detailedRows = '';
+
+    if (rentType === 'FIXED_LIMIT') {
+      detailedRows = `
+          <tr>
+            <td style="padding: 10px; border-bottom: 1px solid #edf2f7;">
+              Black & White
+            </td>
+            <td style="padding: 10px; text-align: right; border-bottom: 1px solid #edf2f7;">${bwLimit}</td>
+            <td style="padding: 10px; text-align: right; border-bottom: 1px solid #edf2f7;">${bwTotal}</td>
+             <td style="padding: 10px; text-align: right; border-bottom: 1px solid #edf2f7; color: ${bwExceeded > 0 ? '#e53e3e' : 'inherit'}">${bwExceeded}</td>
+             <td style="padding: 10px; text-align: right; border-bottom: 1px solid #edf2f7;">${formatCurrency(bwRate)}</td>
+             <td style="padding: 10px; text-align: right; border-bottom: 1px solid #edf2f7;">${formatCurrency(bwAmount)}</td>
+          </tr>
+          <tr>
+            <td style="padding: 10px; border-bottom: 1px solid #edf2f7;">
+              Color
+            </td>
+            <td style="padding: 10px; text-align: right; border-bottom: 1px solid #edf2f7;">${colorLimit}</td>
+            <td style="padding: 10px; text-align: right; border-bottom: 1px solid #edf2f7;">${colorTotal}</td>
+             <td style="padding: 10px; text-align: right; border-bottom: 1px solid #edf2f7; color: ${colorExceeded > 0 ? '#e53e3e' : 'inherit'}">${colorExceeded}</td>
+             <td style="padding: 10px; text-align: right; border-bottom: 1px solid #edf2f7;">${formatCurrency(colorRate)}</td>
+             <td style="padding: 10px; text-align: right; border-bottom: 1px solid #edf2f7;">${formatCurrency(colorAmount)}</td>
+          </tr>
+        `;
+    } else if (rentType === 'FIXED_COMBO') {
+      detailedRows = `
+          <tr>
+            <td style="padding: 10px; border-bottom: 1px solid #edf2f7;">
+              Combined (B&W + Color)
+            </td>
+            <td style="padding: 10px; text-align: right; border-bottom: 1px solid #edf2f7;">${combinedLimit}</td>
+            <td style="padding: 10px; text-align: right; border-bottom: 1px solid #edf2f7;">${bwTotal + colorTotal}</td>
+             <td style="padding: 10px; text-align: right; border-bottom: 1px solid #edf2f7; color: ${combinedExceeded > 0 ? '#e53e3e' : 'inherit'}">${combinedExceeded}</td>
+             <td style="padding: 10px; text-align: right; border-bottom: 1px solid #edf2f7;">${formatCurrency(combinedRate)}</td>
+             <td style="padding: 10px; text-align: right; border-bottom: 1px solid #edf2f7;">${formatCurrency(combinedAmount)}</td>
+          </tr>
+        `;
+    } else {
+      // Fallback for CPC or others
+      detailedRows = `
+          <tr>
+            <td style="padding: 10px; border-bottom: 1px solid #edf2f7;">Total Usage</td>
+             <td style="padding: 10px; text-align: right; border-bottom: 1px solid #edf2f7;">-</td>
+            <td style="padding: 10px; text-align: right; border-bottom: 1px solid #edf2f7;">${bwTotal + colorTotal}</td>
+             <td style="padding: 10px; text-align: right; border-bottom: 1px solid #edf2f7;">-</td>
+             <td style="padding: 10px; text-align: right; border-bottom: 1px solid #edf2f7;">-</td>
+             <td style="padding: 10px; text-align: right; border-bottom: 1px solid #edf2f7;">${formatCurrency(exceededCharge)}</td>
+          </tr>
+        `;
+    }
+
+    return `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;">
+        <h2 style="color: #1a202c; text-align: center;">Monthly Usage Statement</h2>
+        <p>Dear <strong>${customerName}</strong>,</p>
+        <p>Here is your usage summary for the period <strong>${new Date(periodStart).toLocaleDateString()}</strong> to <strong>${new Date(periodEnd).toLocaleDateString()}</strong>.</p>
+        
+        <h3 style="margin-top:20px; color: #2d3748; border-bottom: 1px solid #e2e8f0; padding-bottom: 5px;">Usage Breakdown</h3>
+        <table style="width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 14px;">
+          <tr style="background-color: #f7fafc;">
+            <th style="padding: 8px; text-align: left; border-bottom: 2px solid #e2e8f0;">Item</th>
+            <th style="padding: 8px; text-align: right; border-bottom: 2px solid #e2e8f0;">Free Limit</th>
+            <th style="padding: 8px; text-align: right; border-bottom: 2px solid #e2e8f0;">Usage</th>
+            <th style="padding: 8px; text-align: right; border-bottom: 2px solid #e2e8f0;">Exceeded</th>
+            <th style="padding: 8px; text-align: right; border-bottom: 2px solid #e2e8f0;">Excess Rate</th>
+            <th style="padding: 8px; text-align: right; border-bottom: 2px solid #e2e8f0;">Amount</th>
+          </tr>
+          ${detailedRows}
+          <!-- Divider -->
+           <tr>
+            <td colspan="6" style="border-bottom: 1px solid #cbd5e0;"></td>
+          </tr>
+        </table>
+
+        <table style="width: 100%; border-collapse: collapse; margin-top: 20px;">
+          <tr>
+            <td style="padding: 10px; border-bottom: 1px solid #edf2f7;"><strong>Exceeded Charges Total</strong></td>
+            <td style="padding: 10px; text-align: right; border-bottom: 1px solid #edf2f7;"><strong>${formatCurrency(usage.exceededCharge)}</strong></td>
+          </tr>
+          <tr>
+            <td style="padding: 10px; border-bottom: 1px solid #edf2f7;">Monthly Rent</td>
+            <td style="padding: 10px; text-align: right; border-bottom: 1px solid #edf2f7;">${formatCurrency(usage.monthlyRent || 0)}</td>
+          </tr>
+          <tr>
+             <td style="padding: 10px; border-bottom: 1px solid #edf2f7;">Advance Adjusted</td>
+             <td style="padding: 10px; text-align: right; border-bottom: 1px solid #edf2f7; color: #3182ce;">-${formatCurrency(usage.advanceAdjusted || 0)}</td>
+           </tr>
+           <tr style="background-color: #ebf8ff;">
+             <td style="padding: 10px; font-weight: bold; font-size: 16px;">Final Total Payable</td>
+             <td style="padding: 10px; text-align: right; font-weight: bold; color: #2c5282; font-size: 16px;">${formatCurrency(usage.totalCharge || 0)}</td>
+           </tr>
+        </table>
+
+        ${
+          usage.meterImageUrlNormalized
+            ? `<div style="margin-top: 20px; text-align: center;">
+                 <p style="font-size: 12px; color: #718096;">Meter Reading Evidence:</p>
+                 <img src="${usage.meterImageUrlNormalized}" alt="Meter Reading" style="max-width: 100%; border-radius: 4px; border: 1px solid #cbd5e0;" />
+               </div>`
+            : ''
+        }
+
+        <div style="margin-top: 30px; text-align: center; font-size: 12px; color: #718096;">
+          <p>Thank you for choosing XeroCare.</p>
+        </div>
+      </div>
+    `;
   }
 
   /**
@@ -599,5 +856,38 @@ export class UsageService {
 
     await manager.save(summaryInvoice);
     return summaryInvoice;
+  }
+
+  async getCustomerDetails(customerId: string) {
+    try {
+      const crmServiceUrl = process.env.CRM_SERVICE_URL || 'http://localhost:3005';
+
+      // Generate Service Token
+      const { sign } = await import('jsonwebtoken');
+      const token = sign(
+        { userId: 'billing_service', role: 'ADMIN' }, // Use ADMIN or SERVICE role to bypass restrictions
+        process.env.ACCESS_SECRET as string,
+        { expiresIn: '1m' },
+      );
+
+      const response = await fetch(`${crmServiceUrl}/customers/${customerId}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        logger.error(`Failed to fetch customer details for ${customerId}: ${response.statusText}`);
+        return null;
+      }
+
+      const data = await response.json();
+      return data.data; // Assuming response structure { success: true, data: { ... } }
+    } catch (error) {
+      logger.error(`Error fetching customer details for ${customerId}`, error);
+      return null;
+    }
   }
 }

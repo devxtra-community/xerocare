@@ -10,9 +10,12 @@ const router = Router();
 
 import { VendorRequestRepository } from '../repositories/vendorRequestRepository';
 
+import { EmployeeManagerRepository } from '../repositories/employeeManagerRepository';
+
 const vendorRepo = new VendorRepository(Source);
 const requestRepo = new VendorRequestRepository(Source);
-const vendorService = new VendorService(vendorRepo, requestRepo);
+const employeeManagerRepo = new EmployeeManagerRepository();
+const vendorService = new VendorService(vendorRepo, requestRepo, employeeManagerRepo);
 const vendorController = new VendorController(vendorService);
 
 router.post(

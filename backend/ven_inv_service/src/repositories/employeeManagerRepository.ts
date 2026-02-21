@@ -17,4 +17,8 @@ export class EmployeeManagerRepository {
       },
     });
   }
+
+  async save(data: Partial<EmployeeManager>) {
+    return this.repo.save(data);
+  }
 }

@@ -58,6 +58,7 @@ export interface BulkProductRow {
   tax_rate: number;
   print_colour: 'BLACK_WHITE' | 'COLOUR' | 'BOTH';
   max_discount_amount: number;
+  lot_id?: string;
 }
 
 export interface BulkCreateResponse {

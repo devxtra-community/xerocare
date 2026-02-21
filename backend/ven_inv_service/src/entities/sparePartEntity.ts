@@ -10,8 +10,6 @@ import {
 } from 'typeorm';
 import { Model } from './modelEntity';
 import { Branch } from './branchEntity';
-import { Vendor } from './vendorEntity';
-import { Warehouse } from './warehouseEntity';
 import { Lot } from './lotEntity';
 
 @Entity('spare_parts')
@@ -53,22 +51,6 @@ export class SparePart {
   @ManyToOne(() => Lot, { nullable: true })
   @JoinColumn({ name: 'lot_id' })
   lot?: Lot;
-
-  @Column({ name: 'vendor_id', type: 'uuid', nullable: true })
-  @Index()
-  vendor_id?: string;
-
-  @ManyToOne(() => Vendor, { nullable: true })
-  @JoinColumn({ name: 'vendor_id' })
-  vendor?: Vendor;
-
-  @Column({ name: 'warehouse_id', type: 'uuid', nullable: true })
-  @Index()
-  warehouse_id?: string;
-
-  @ManyToOne(() => Warehouse, { nullable: true })
-  @JoinColumn({ name: 'warehouse_id' })
-  warehouse?: Warehouse;
 
   @Column({ name: 'base_price', type: 'decimal', precision: 12, scale: 2, default: 0 })
   base_price!: number;
