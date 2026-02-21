@@ -94,7 +94,7 @@ export default function VendorSpendingTrend({ requests }: VendorSpendingTrendPro
                 fontSize: '10px',
               }}
               cursor={{ stroke: '#e2e8f0', strokeWidth: 1 }}
-              formatter={(value: number) => [`₹${value.toLocaleString()}`, 'Spend']}
+              formatter={(value: number) => [`QAR ${value.toLocaleString()}`, 'Spend']}
             />
             <Area
               type="monotone"

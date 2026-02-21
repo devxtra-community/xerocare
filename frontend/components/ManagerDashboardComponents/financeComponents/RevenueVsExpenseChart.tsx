@@ -108,7 +108,7 @@ export default function RevenueVsExpenseChart({ selectedYear }: RevenueVsExpense
       <div className="h-[320px] w-full">
         {isClient && (
           <ResponsiveContainer width="100%" height="100%">
-            <ComposedChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+            <ComposedChart data={data} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} strokeOpacity={0.2} />
               <XAxis
                 dataKey="month"
@@ -123,6 +123,7 @@ export default function RevenueVsExpenseChart({ selectedYear }: RevenueVsExpense
                 tickFormatter={(val) => `${formatCompactNumber(val)}`}
               />
               <Tooltip
+                formatter={(val: number) => [`QAR ${formatCompactNumber(val)}`]}
                 contentStyle={{
                   borderRadius: '12px',
                   border: 'none',
@@ -151,6 +152,7 @@ export default function RevenueVsExpenseChart({ selectedYear }: RevenueVsExpense
               <Line
                 type="monotone"
                 dataKey="revenue"
+                name="Trend"
                 stroke="#1d4ed8"
                 strokeWidth={2}
                 dot={false}

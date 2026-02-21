@@ -45,7 +45,7 @@ export default function EmployeeRentStats({ invoices }: EmployeeRentStatsProps) 
     },
     {
       title: 'Total Income from Rent',
-      value: `₹${totalIncome.toLocaleString()}`,
+      value: `QAR ${totalIncome.toLocaleString()}`,
       subtitle: 'Collected revenue',
     },
   ];

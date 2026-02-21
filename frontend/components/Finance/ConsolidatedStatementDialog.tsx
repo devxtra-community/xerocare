@@ -18,6 +18,7 @@ import {
   getInvoiceById,
 } from '@/lib/invoice';
 import { toast } from 'sonner';
+import { formatCurrency } from '@/lib/format';
 
 interface ConsolidatedStatementDialogProps {
   isOpen: boolean;
@@ -144,13 +145,13 @@ export default function ConsolidatedStatementDialog({
                               </div>
                             </TableCell>
                             <TableCell className="text-right text-slate-600">
-                              ₹{Number(record.rent || 0).toLocaleString()}
+                              {formatCurrency(Number(record.rent || 0))}
                             </TableCell>
                             <TableCell className="text-right text-orange-600">
-                              ₹{Number(record.exceededAmount || 0).toLocaleString()}
+                              {formatCurrency(Number(record.exceededAmount || 0))}
                             </TableCell>
                             <TableCell className="text-right font-bold text-blue-700">
-                              ₹{Number(record.finalTotal || 0).toLocaleString()}
+                              {formatCurrency(Number(record.finalTotal || 0))}
                             </TableCell>
                           </TableRow>
                         ))}
@@ -166,7 +167,7 @@ export default function ConsolidatedStatementDialog({
                                 <TableCell className="text-right">-</TableCell>
                                 <TableCell className="text-right">-</TableCell>
                                 <TableCell className="text-right font-black text-orange-700">
-                                  ₹{collection.advanceAmount.toLocaleString()}
+                                  {formatCurrency(collection.advanceAmount)}
                                 </TableCell>
                               </TableRow>
                             )
@@ -183,7 +184,7 @@ export default function ConsolidatedStatementDialog({
                                 <TableCell className="text-right">-</TableCell>
                                 <TableCell className="text-right">-</TableCell>
                                 <TableCell className="text-right font-black text-blue-700">
-                                  ₹{collection.securityDepositAmount.toLocaleString()}
+                                  {formatCurrency(collection.securityDepositAmount)}
                                 </TableCell>
                               </TableRow>
                             )
@@ -197,10 +198,12 @@ export default function ConsolidatedStatementDialog({
                             Grand Total
                           </TableCell>
                           <TableCell className="text-right font-black text-2xl text-blue-700 py-4">
-                            ₹
-                            {history
-                              .reduce((sum, record) => sum + Number(record.finalTotal || 0), 0)
-                              .toLocaleString()}
+                            {formatCurrency(
+                              history.reduce(
+                                (sum, record) => sum + Number(record.finalTotal || 0),
+                                0,
+                              ),
+                            )}
                           </TableCell>
                         </TableRow>
                       </>
@@ -227,7 +230,7 @@ export default function ConsolidatedStatementDialog({
                   </div>
                   <div className="flex justify-between items-baseline">
                     <span className="text-2xl font-black text-blue-600">
-                      ₹{collection.securityDepositAmount.toLocaleString()}
+                      {formatCurrency(collection.securityDepositAmount)}
                     </span>
                     <span className="text-xs text-slate-400 font-bold bg-slate-100 px-2 py-0.5 rounded">
                       {collection.securityDepositMode || 'RECORDED'}
@@ -253,10 +256,9 @@ export default function ConsolidatedStatementDialog({
               </span>
               <div className="flex flex-col items-center md:items-end">
                 <span className="text-4xl font-black text-slate-900 leading-none">
-                  ₹
-                  {Number(
+                  {formatCurrency(
                     (collection.grossAmount || 0) - (collection.advanceAdjusted || 0),
-                  ).toLocaleString()}
+                  )}
                 </span>
                 <span className="text-xs font-bold text-slate-500 mt-2 bg-slate-200 px-3 py-1 rounded-full uppercase tracking-tighter">
                   Grand Total Due

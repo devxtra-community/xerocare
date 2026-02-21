@@ -10,7 +10,8 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Invoice } from '@/lib/invoice';
-import { IndianRupee, Calendar, User, Phone, FileText, Image as ImageIcon } from 'lucide-react';
+import { Coins, Calendar, User, Phone, FileText, Image as ImageIcon } from 'lucide-react';
+import { formatCurrency } from '@/lib/format';
 import { format } from 'date-fns';
 import Image from 'next/image';
 
@@ -288,7 +289,7 @@ export default function UsagePreviewDialog({
           {/* Pricing Breakdown */}
           <div className="bg-green-50 rounded-lg border border-green-200 p-4">
             <h3 className="text-sm font-bold text-green-700 uppercase mb-3 flex items-center gap-2">
-              <IndianRupee size={16} />
+              <Coins size={16} />
               Pricing Breakdown
             </h3>
             <div className="space-y-2">
@@ -296,11 +297,7 @@ export default function UsagePreviewDialog({
                 <div className="flex justify-between items-center py-2 border-b border-green-100">
                   <span className="text-slate-700">Monthly Rent</span>
                   <span className="font-semibold text-green-700 flex items-center gap-1">
-                    <IndianRupee size={16} />
-                    {pricing.monthlyRent.toLocaleString('en-IN', {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })}
+                    {formatCurrency(pricing.monthlyRent)}
                   </span>
                 </div>
               )}
@@ -310,15 +307,11 @@ export default function UsagePreviewDialog({
                   <div>
                     <span className="text-slate-700">BW Excess Charges</span>
                     <p className="text-xs text-slate-500">
-                      {pricing.bwExcessUnits} units × ₹{pricing.bwRate}
+                      {pricing.bwExcessUnits} units × {formatCurrency(pricing.bwRate)}
                     </p>
                   </div>
                   <span className="font-semibold text-orange-600 flex items-center gap-1">
-                    <IndianRupee size={16} />
-                    {pricing.bwExcessCost.toLocaleString('en-IN', {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })}
+                    {formatCurrency(pricing.bwExcessCost)}
                   </span>
                 </div>
               )}
@@ -328,15 +321,11 @@ export default function UsagePreviewDialog({
                   <div>
                     <span className="text-slate-700">Color Excess Charges</span>
                     <p className="text-xs text-slate-500">
-                      {pricing.colorExcessUnits} units × ₹{pricing.colorRate}
+                      {pricing.colorExcessUnits} units × {formatCurrency(pricing.colorRate)}
                     </p>
                   </div>
                   <span className="font-semibold text-orange-600 flex items-center gap-1">
-                    <IndianRupee size={16} />
-                    {pricing.colorExcessCost.toLocaleString('en-IN', {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })}
+                    {formatCurrency(pricing.colorExcessCost)}
                   </span>
                 </div>
               )}
@@ -350,11 +339,7 @@ export default function UsagePreviewDialog({
                     </p>
                   </div>
                   <span className="font-semibold text-orange-600 flex items-center gap-1">
-                    <IndianRupee size={16} />
-                    {pricing.additionalCharges.toLocaleString('en-IN', {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })}
+                    {formatCurrency(pricing.additionalCharges)}
                   </span>
                 </div>
               )}
@@ -362,15 +347,9 @@ export default function UsagePreviewDialog({
               <div className="flex justify-between items-center py-2 border-b border-green-100 mt-2">
                 <span className="text-base font-bold text-slate-700">Grand Total (Gross)</span>
                 <span className="text-lg font-bold text-slate-700 flex items-center gap-1">
-                  <IndianRupee size={18} />
-                  {(
-                    pricing.monthlyRent +
-                    pricing.totalExcess +
-                    pricing.additionalCharges
-                  ).toLocaleString('en-IN', {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}
+                  {formatCurrency(
+                    pricing.monthlyRent + pricing.totalExcess + pricing.additionalCharges,
+                  )}
                 </span>
               </div>
 
@@ -378,11 +357,7 @@ export default function UsagePreviewDialog({
                 <div className="flex justify-between items-center py-2 border-b border-green-100">
                   <span className="text-slate-700">Advance (Deduction)</span>
                   <span className="font-semibold text-red-600 flex items-center gap-1">
-                    - <IndianRupee size={16} />
-                    {pricing.advance.toLocaleString('en-IN', {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })}
+                    - {formatCurrency(pricing.advance)}
                   </span>
                 </div>
               )}
@@ -390,11 +365,7 @@ export default function UsagePreviewDialog({
               <div className="flex justify-between items-center py-3 bg-green-100 rounded px-3 mt-2">
                 <span className="text-lg font-bold text-green-800">Net Payable</span>
                 <span className="text-2xl font-bold text-green-700 flex items-center gap-1">
-                  <IndianRupee size={24} />
-                  {pricing.total.toLocaleString('en-IN', {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}
+                  {formatCurrency(pricing.total)}
                 </span>
               </div>
             </div>

@@ -55,14 +55,8 @@ export default function VendorsPage() {
   // Calculate stats
   const totalVendors = apiVendors.length;
   const activeVendors = apiVendors.filter((v) => v.status === 'ACTIVE').length;
-
-  // New vendors (created in current month)
-  const currentMonth = new Date().getMonth();
-  const currentYear = new Date().getFullYear();
-  const newVendors = apiVendors.filter((v) => {
-    const created = new Date(v.createdAt);
-    return created.getMonth() === currentMonth && created.getFullYear() === currentYear;
-  }).length;
+  const totalSpending = apiVendors.reduce((acc, v) => acc + (v.purchaseValue || 0), 0);
+  const totalOrders = apiVendors.reduce((acc, v) => acc + (v.totalOrders || 0), 0);
 
   return (
     <div className="p-3 sm:p-4 md:p-6 space-y-8 sm:space-y-10 bg-blue-100 min-h-screen">
@@ -79,7 +73,8 @@ export default function VendorsPage() {
         <VendorStats
           totalVendors={totalVendors}
           activeVendors={activeVendors}
-          newVendors={newVendors}
+          totalSpending={totalSpending}
+          totalOrders={totalOrders}
         />
         <VendorTable vendors={uiVendors} loading={loading} onRefresh={fetchVendorsData} />
       </div>

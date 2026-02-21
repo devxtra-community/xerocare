@@ -74,7 +74,7 @@ export function ProductSelect({ onSelect }: ProductSelectProps) {
     return {
       value: item.id,
       label: label,
-      description: `${type} • ₹${price.toLocaleString()}`,
+      description: `${type} • QAR ${price.toLocaleString()}`,
       disabled,
     };
   });

@@ -23,7 +23,8 @@ import {
 } from '@/lib/invoice';
 import { Product, getProductById } from '@/lib/product';
 import { toast } from 'sonner';
-import { Loader2, IndianRupee, Calendar } from 'lucide-react';
+import { Loader2, Coins, Calendar } from 'lucide-react';
+import { formatCurrency } from '@/lib/format';
 import UsagePreviewDialog from './UsagePreviewDialog';
 import { format } from 'date-fns';
 
@@ -706,7 +707,7 @@ export default function UsageRecordingModal({
             {/* Rent Section Display Only */}
             <div className="p-4 rounded-xl bg-blue-50/50 border border-blue-100 space-y-2">
               <h3 className="text-sm font-bold text-blue-700 flex items-center gap-2">
-                <IndianRupee size={16} /> Rent Info
+                <Coins size={16} /> Rent Info
               </h3>
               <div className="flex justify-between items-center">
                 <span className="text-xs font-semibold text-slate-600">
@@ -723,8 +724,8 @@ export default function UsageRecordingModal({
                         0,
                     );
 
-                    if (isFinalMonth) return `₹0 (Adjusted from Advance)`;
-                    return `₹${amount.toLocaleString()}`;
+                    if (isFinalMonth) return `${formatCurrency(0)} (Adjusted from Advance)`;
+                    return formatCurrency(amount);
                   })()}
                 </span>
               </div>
@@ -745,32 +746,33 @@ export default function UsageRecordingModal({
                   <div className="flex justify-between">
                     <span>Contract Advance Held:</span>
                     <span className="font-bold">
-                      ₹{Number(contract?.advanceAmount || 0).toLocaleString()}
+                      {formatCurrency(Number(contract?.advanceAmount || 0))}
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span>This Month&apos;s Rent:</span>
                     <span className="font-bold">
-                      ₹{Number(contract?.monthlyRent || 0).toLocaleString()}
+                      {formatCurrency(Number(contract?.monthlyRent || 0))}
                     </span>
                   </div>
                   <div className="border-t border-amber-200/50 my-1"></div>
                   <div className="flex justify-between font-bold text-amber-950">
                     <span>Net Payable Rent:</span>
                     <span>
-                      ₹
-                      {Math.max(
-                        0,
-                        Number(contract?.monthlyRent || 0) - Number(contract?.advanceAmount || 0),
-                      ).toLocaleString()}
+                      {formatCurrency(
+                        Math.max(
+                          0,
+                          Number(contract?.monthlyRent || 0) - Number(contract?.advanceAmount || 0),
+                        ),
+                      )}
                     </span>
                   </div>
                   {Number(contract?.advanceAmount || 0) > Number(contract?.monthlyRent || 0) && (
                     <p className="text-xs text-green-700 mt-1">
-                      * Remaining advance of ₹
-                      {(
-                        Number(contract?.advanceAmount || 0) - Number(contract?.monthlyRent || 0)
-                      ).toLocaleString()}{' '}
+                      * Remaining advance of{' '}
+                      {formatCurrency(
+                        Number(contract?.advanceAmount || 0) - Number(contract?.monthlyRent || 0),
+                      )}{' '}
                       will be refunded or adjusted in final settlement.
                     </p>
                   )}
@@ -798,7 +800,7 @@ export default function UsageRecordingModal({
                       <span>
                         Excess Rate:{' '}
                         <span className="font-bold text-slate-700">
-                          ₹{Number(ruleItems.bw?.bwExcessRate || 0).toFixed(2)}
+                          {formatCurrency(Number(ruleItems.bw?.bwExcessRate || 0))}
                         </span>
                       </span>
                     </div>
@@ -895,7 +897,7 @@ export default function UsageRecordingModal({
                       <span>
                         Excess Rate:{' '}
                         <span className="font-bold text-rose-700">
-                          ₹{Number(ruleItems.color?.colorExcessRate || 0).toFixed(2)}
+                          {formatCurrency(Number(ruleItems.color?.colorExcessRate || 0))}
                         </span>
                       </span>
                     </div>
@@ -1035,55 +1037,58 @@ export default function UsageRecordingModal({
                           {(() => {
                             const isCpc = contract?.rentType?.includes('CPC');
                             if (isCpc) return 'Slab-based';
-                            return `₹${Number(ruleItems.bw?.bwExcessRate || ruleItems.combo?.combinedExcessRate || 0).toFixed(2)} / Unit`;
+                            return `${formatCurrency(Number(ruleItems.bw?.bwExcessRate || ruleItems.combo?.combinedExcessRate || 0))} / Unit`;
                           })()}
                         </span>
                       </div>
                       <div className="flex justify-between text-orange-600 font-medium border-t border-slate-100 pt-1 mt-1">
                         <span>Excess Charge:</span>
                         <span>
-                          ₹
-                          {(() => {
-                            const bwA4 = Number(formData.bwA4Count || 0);
-                            const bwA3 = Number(formData.bwA3Count || 0);
-                            const prevA4 = prevUsage
-                              ? prevUsage.bwA4Count
-                              : calculatedInitialCounts.bwA4;
-                            const prevA3 = prevUsage
-                              ? prevUsage.bwA3Count
-                              : calculatedInitialCounts.bwA3;
+                          {formatCurrency(
+                            Number(
+                              (() => {
+                                const bwA4 = Number(formData.bwA4Count || 0);
+                                const bwA3 = Number(formData.bwA3Count || 0);
+                                const prevA4 = prevUsage
+                                  ? prevUsage.bwA4Count
+                                  : calculatedInitialCounts.bwA4;
+                                const prevA3 = prevUsage
+                                  ? prevUsage.bwA3Count
+                                  : calculatedInitialCounts.bwA3;
 
-                            // If it's a combo rule, we use the combo calculation
-                            if (ruleItems.combo) {
-                              const clrA4 = Number(formData.colorA4Count || 0);
-                              const clrA3 = Number(formData.colorA3Count || 0);
-                              const prevClrA4 = prevUsage
-                                ? prevUsage.colorA4Count
-                                : calculatedInitialCounts.clrA4;
-                              const prevClrA3 = prevUsage
-                                ? prevUsage.colorA3Count
-                                : calculatedInitialCounts.clrA3;
-                              return calculateRuleCost(
-                                ruleItems.combo,
-                                bwA4 + clrA4,
-                                bwA3 + clrA3,
-                                prevA4 + prevClrA4,
-                                prevA3 + prevClrA3,
-                                'COMBO',
-                                contract?.rentType,
-                              ).charge.toFixed(2);
-                            }
+                                // If it's a combo rule, we use the combo calculation
+                                if (ruleItems.combo) {
+                                  const clrA4 = Number(formData.colorA4Count || 0);
+                                  const clrA3 = Number(formData.colorA3Count || 0);
+                                  const prevClrA4 = prevUsage
+                                    ? prevUsage.colorA4Count
+                                    : calculatedInitialCounts.clrA4;
+                                  const prevClrA3 = prevUsage
+                                    ? prevUsage.colorA3Count
+                                    : calculatedInitialCounts.clrA3;
+                                  return calculateRuleCost(
+                                    ruleItems.combo,
+                                    bwA4 + clrA4,
+                                    bwA3 + clrA3,
+                                    prevA4 + prevClrA4,
+                                    prevA3 + prevClrA3,
+                                    'COMBO',
+                                    contract?.rentType,
+                                  ).charge;
+                                }
 
-                            return calculateRuleCost(
-                              ruleItems.bw,
-                              bwA4,
-                              bwA3,
-                              prevA4,
-                              prevA3,
-                              'BW',
-                              contract?.rentType,
-                            ).charge.toFixed(2);
-                          })()}
+                                return calculateRuleCost(
+                                  ruleItems.bw,
+                                  bwA4,
+                                  bwA3,
+                                  prevA4,
+                                  prevA3,
+                                  'BW',
+                                  contract?.rentType,
+                                ).charge;
+                              })(),
+                            ),
+                          )}
                         </span>
                       </div>
                     </div>
@@ -1124,55 +1129,58 @@ export default function UsageRecordingModal({
                           {(() => {
                             const isCpc = contract?.rentType?.includes('CPC');
                             if (isCpc) return 'Slab-based';
-                            return `₹${Number(ruleItems.color?.colorExcessRate || ruleItems.combo?.combinedExcessRate || 0).toFixed(2)} / Unit`;
+                            return `${formatCurrency(Number(ruleItems.color?.colorExcessRate || ruleItems.combo?.combinedExcessRate || 0))} / Unit`;
                           })()}
                         </span>
                       </div>
                       <div className="flex justify-between text-orange-600 font-medium border-t border-slate-100 pt-1 mt-1">
                         <span>Excess Charge:</span>
                         <span>
-                          ₹
-                          {(() => {
-                            const clrA4 = Number(formData.colorA4Count || 0);
-                            const clrA3 = Number(formData.colorA3Count || 0);
-                            const prevClrA4 = prevUsage
-                              ? prevUsage.colorA4Count
-                              : calculatedInitialCounts.clrA4;
-                            const prevClrA3 = prevUsage
-                              ? prevUsage.colorA3Count
-                              : calculatedInitialCounts.clrA3;
+                          {formatCurrency(
+                            Number(
+                              (() => {
+                                const clrA4 = Number(formData.colorA4Count || 0);
+                                const clrA3 = Number(formData.colorA3Count || 0);
+                                const prevClrA4 = prevUsage
+                                  ? prevUsage.colorA4Count
+                                  : calculatedInitialCounts.clrA4;
+                                const prevClrA3 = prevUsage
+                                  ? prevUsage.colorA3Count
+                                  : calculatedInitialCounts.clrA3;
 
-                            // If it's a combo rule, we use the combo calculation
-                            if (ruleItems.combo) {
-                              const bwA4 = Number(formData.bwA4Count || 0);
-                              const bwA3 = Number(formData.bwA3Count || 0);
-                              const prevBwA4 = prevUsage
-                                ? prevUsage.bwA4Count
-                                : calculatedInitialCounts.bwA4;
-                              const prevBwA3 = prevUsage
-                                ? prevUsage.bwA3Count
-                                : calculatedInitialCounts.bwA3;
-                              return calculateRuleCost(
-                                ruleItems.combo,
-                                bwA4 + clrA4,
-                                bwA3 + clrA3,
-                                prevBwA4 + prevClrA4,
-                                prevBwA3 + prevClrA3,
-                                'COMBO',
-                                contract?.rentType,
-                              ).charge.toFixed(2);
-                            }
+                                // If it's a combo rule, we use the combo calculation
+                                if (ruleItems.combo) {
+                                  const bwA4 = Number(formData.bwA4Count || 0);
+                                  const bwA3 = Number(formData.bwA3Count || 0);
+                                  const prevBwA4 = prevUsage
+                                    ? prevUsage.bwA4Count
+                                    : calculatedInitialCounts.bwA4;
+                                  const prevBwA3 = prevUsage
+                                    ? prevUsage.bwA3Count
+                                    : calculatedInitialCounts.bwA3;
+                                  return calculateRuleCost(
+                                    ruleItems.combo,
+                                    bwA4 + clrA4,
+                                    bwA3 + clrA3,
+                                    prevBwA4 + prevClrA4,
+                                    prevBwA3 + prevClrA3,
+                                    'COMBO',
+                                    contract?.rentType,
+                                  ).charge;
+                                }
 
-                            return calculateRuleCost(
-                              ruleItems.color,
-                              clrA4,
-                              clrA3,
-                              prevClrA4,
-                              prevClrA3,
-                              'COLOR',
-                              contract?.rentType,
-                            ).charge.toFixed(2);
-                          })()}
+                                return calculateRuleCost(
+                                  ruleItems.color,
+                                  clrA4,
+                                  clrA3,
+                                  prevClrA4,
+                                  prevClrA3,
+                                  'COLOR',
+                                  contract?.rentType,
+                                ).charge;
+                              })(),
+                            ),
+                          )}
                         </span>
                       </div>
                     </div>
@@ -1193,10 +1201,10 @@ export default function UsageRecordingModal({
                       if (isLastMonth) {
                         const rentToShow = contract?.monthlyRent || 0;
                         // Always show rent (first month rent is now included)
-                        return `₹${rentToShow.toLocaleString()} (Adv. will be adjusted)`;
+                        return `${formatCurrency(rentToShow)} (Adv. will be adjusted)`;
                       }
 
-                      return `₹${amount.toLocaleString()}`;
+                      return formatCurrency(amount);
                     })()}
                   </span>
                 </div>
@@ -1204,7 +1212,7 @@ export default function UsageRecordingModal({
                 <div className="pt-3 border-t-2 border-slate-200 flex justify-between items-center mt-2">
                   <span className="font-bold text-sm text-slate-800">Grand Total</span>
                   <span className="font-bold text-lg text-green-600">
-                    ₹{estimatedCost.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    {formatCurrency(estimatedCost)}
                   </span>
                 </div>
               </div>

@@ -1,3 +1,5 @@
+'use client';
+
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Upload, Search, Pencil, Trash2 } from 'lucide-react';
@@ -139,7 +141,7 @@ export default function SparePartsPage() {
                   <TableCell>{item.compatible_model || 'Universal'}</TableCell>
                   <TableCell>{item.warehouse_name}</TableCell>
                   <TableCell>{item.vendor_name || '-'}</TableCell>
-                  <TableCell>₹{item.price}</TableCell>
+                  <TableCell>QAR {item.price}</TableCell>
                   <TableCell className="font-bold text-primary">{item.quantity}</TableCell>
                   <TableCell>
                     <div className="flex gap-2 text-primary">

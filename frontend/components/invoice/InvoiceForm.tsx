@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { createInvoice, CreateInvoicePayload } from '@/lib/invoice';
 import { CustomerSelect, SelectableCustomer } from './CustomerSelect';
 import { ProductSelect, SelectableItem } from './ProductSelect';
+import { formatCurrency } from '@/lib/format';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Trash2, Receipt, Users, Package, Save, ArrowLeft } from 'lucide-react';
@@ -267,7 +268,7 @@ export default function InvoiceForm() {
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="flex items-center justify-end font-bold text-slate-600">
-                              <span className="text-[10px] mr-1">₹</span>
+                              <span className="text-[10px] mr-1">QAR</span>
                               <Input
                                 type="number"
                                 value={item.unitPrice}
@@ -277,7 +278,7 @@ export default function InvoiceForm() {
                             </div>
                           </TableCell>
                           <TableCell className="text-right pr-6 font-black text-foreground">
-                            ₹{(item.quantity * item.unitPrice).toLocaleString()}
+                            {formatCurrency(item.quantity * item.unitPrice)}
                           </TableCell>
                           <TableCell>
                             <Button
@@ -310,8 +311,7 @@ export default function InvoiceForm() {
                     </div>
                     <div className="text-right">
                       <div className="text-4xl font-black text-foreground tracking-tighter flex items-center gap-2">
-                        <span className="text-xl text-primary font-bold">₹</span>
-                        {calculateTotal().toLocaleString()}
+                        {formatCurrency(calculateTotal())}
                       </div>
                     </div>
                   </div>

@@ -20,6 +20,7 @@ import { toast } from 'sonner';
 import { format } from 'date-fns';
 import UsageHistoryDialog from './UsageHistoryDialog';
 import ConsolidatedStatementDialog from './ConsolidatedStatementDialog';
+import { formatCurrency } from '@/lib/format';
 
 /**
  * Table displaying completed rental and lease collections.
@@ -140,7 +141,7 @@ export default function CompletedCollectionsTable({ mode }: { mode?: 'RENT' | 'L
                     </div>
                   </TableCell>
                   <TableCell className="text-right font-medium text-green-600">
-                    ₹{collection.totalCollected?.toLocaleString('en-IN') || '0'}
+                    {formatCurrency(collection.totalCollected || 0)}
                   </TableCell>
                   <TableCell>
                     <Button

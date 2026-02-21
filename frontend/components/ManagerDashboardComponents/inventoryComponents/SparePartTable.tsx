@@ -11,6 +11,13 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { sparePartService, SparePartInventoryItem } from '@/services/sparePartService';
 import EditSparePartDialog from '@/components/ManagerDashboardComponents/spareParts/EditSparePartDialog';
 import { toast } from 'sonner';
@@ -25,6 +32,16 @@ export default function SparePartTable({ showActions = true }: SparePartTablePro
   const [search, setSearch] = useState('');
   const [selectedPart, setSelectedPart] = useState<SparePartInventoryItem | null>(null);
   const [editOpen, setEditOpen] = useState(false);
+
+  // Filter states
+  const [selectedBrand, setSelectedBrand] = useState<string>('all');
+  const [selectedWarehouse, setSelectedWarehouse] = useState<string>('all');
+  const [selectedVendor, setSelectedVendor] = useState<string>('all');
+
+  // Derived filter options
+  const brands = Array.from(new Set(parts.map((p) => p.brand).filter(Boolean))).sort();
+  const warehouses = Array.from(new Set(parts.map((p) => p.warehouse_name).filter(Boolean))).sort();
+  const vendors = Array.from(new Set(parts.map((p) => p.vendor_name).filter(Boolean))).sort();
 
   const loadParts = async () => {
     try {
@@ -61,24 +78,87 @@ export default function SparePartTable({ showActions = true }: SparePartTablePro
     setEditOpen(true);
   };
 
-  const filtered = parts.filter(
-    (p) =>
+  const filtered = parts.filter((p) => {
+    const matchesSearch =
       (p.lot_number?.toLowerCase() || '').includes(search.toLowerCase()) ||
       (p.part_name?.toLowerCase() || '').includes(search.toLowerCase()) ||
-      (p.brand?.toLowerCase() || '').includes(search.toLowerCase()),
-  );
+      (p.brand?.toLowerCase() || '').includes(search.toLowerCase());
+
+    const matchesBrand = selectedBrand === 'all' || p.brand === selectedBrand;
+    const matchesWarehouse = selectedWarehouse === 'all' || p.warehouse_name === selectedWarehouse;
+    const matchesVendor = selectedVendor === 'all' || p.vendor_name === selectedVendor;
+
+    return matchesSearch && matchesBrand && matchesWarehouse && matchesVendor;
+  });
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div className="relative w-[300px]">
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="relative w-full sm:w-[250px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
           <Input
-            placeholder="Search by code, name or brand..."
+            placeholder="Search parts..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="pl-9 h-10 border-blue-100 focus:border-blue-400 focus:ring-blue-50"
+            className="pl-9 h-9 border-blue-100 focus:border-blue-400 focus:ring-blue-50 text-[12px]"
           />
+        </div>
+
+        <div className="flex items-center gap-3 flex-1 min-w-0">
+          <Select value={selectedBrand} onValueChange={setSelectedBrand}>
+            <SelectTrigger className="w-[130px] h-9 text-[11px] border-blue-50 bg-white/50">
+              <SelectValue placeholder="Brand" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Brands</SelectItem>
+              {brands.map((b) => (
+                <SelectItem key={b} value={b || ''}>
+                  {b}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={selectedWarehouse} onValueChange={setSelectedWarehouse}>
+            <SelectTrigger className="w-[140px] h-9 text-[11px] border-blue-50 bg-white/50">
+              <SelectValue placeholder="Warehouse" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Warehouses</SelectItem>
+              {warehouses.map((w) => (
+                <SelectItem key={w} value={w || ''}>
+                  {w}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={selectedVendor} onValueChange={setSelectedVendor}>
+            <SelectTrigger className="w-[130px] h-9 text-[11px] border-blue-50 bg-white/50">
+              <SelectValue placeholder="Vendor" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Vendors</SelectItem>
+              {vendors.map((v) => (
+                <SelectItem key={v} value={v || ''}>
+                  {v}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          {(selectedBrand !== 'all' || selectedWarehouse !== 'all' || selectedVendor !== 'all') && (
+            <button
+              onClick={() => {
+                setSelectedBrand('all');
+                setSelectedWarehouse('all');
+                setSelectedVendor('all');
+              }}
+              className="text-[11px] text-primary hover:underline font-medium ml-auto"
+            >
+              Reset Filters
+            </button>
+          )}
         </div>
       </div>
 
@@ -150,7 +230,7 @@ export default function SparePartTable({ showActions = true }: SparePartTablePro
                       {item.vendor_name || '-'}
                     </TableCell>
                     <TableCell className="px-3 py-1.5 text-center text-[12px]">
-                      ₹{item.price}
+                      QAR {item.price}
                     </TableCell>
                     <TableCell className="px-3 py-1.5 text-center font-bold text-primary text-[12px]">
                       {item.quantity}

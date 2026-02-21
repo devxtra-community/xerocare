@@ -19,6 +19,7 @@ import { InvoiceDetailsDialog } from '../invoice/InvoiceDetailsDialog';
 import { getInvoiceById, Invoice } from '@/lib/invoice';
 import UsageRecordingModal from './UsageRecordingModal';
 import UsageHistoryDialog from './UsageHistoryDialog';
+import { formatCurrency } from '@/lib/format';
 
 /**
  * Table displaying monthly collection alerts for active contracts.
@@ -199,10 +200,11 @@ export default function MonthlyCollectionTable({ mode }: { mode?: 'RENT' | 'LEAS
                     {(() => {
                       const isFinalMonth = alert.type === 'SUMMARY_PENDING';
 
-                      if (isFinalMonth) return <span className="text-blue-600">₹0 (Adjusted)</span>;
+                      if (isFinalMonth)
+                        return <span className="text-blue-600">QAR 0 (Adjusted)</span>;
 
                       const amount = alert.totalAmount || alert.monthlyRent || 0;
-                      return `₹${Number(amount).toLocaleString()}`;
+                      return formatCurrency(Number(amount));
                     })()}
                   </TableCell>
                   <TableCell>

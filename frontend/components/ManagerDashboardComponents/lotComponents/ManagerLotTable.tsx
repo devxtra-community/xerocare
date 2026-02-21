@@ -17,6 +17,7 @@ import { Lot, lotService } from '@/lib/lot';
 import { format } from 'date-fns';
 import AddLotDialog from './AddLotDialog';
 import LotDetailsDialog from './LotDetailsDialog';
+import { formatCurrency } from '@/lib/format';
 
 /**
  * Manager Lot Management Page.
@@ -56,11 +57,7 @@ export default function ManagerLotTable() {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2">
         <StatCard title="Total Lots" value={lots.length.toString()} subtitle="All orders" />
-        <StatCard
-          title="Total Spending"
-          value={`$${totalAmount.toLocaleString()}`}
-          subtitle="Lifetime"
-        />
+        <StatCard title="Total Spending" value={formatCurrency(totalAmount)} subtitle="Lifetime" />
       </div>
 
       <div className="flex items-center justify-between">
@@ -103,8 +100,8 @@ export default function ManagerLotTable() {
                     {format(new Date(lot.purchaseDate), 'MMM dd, yyyy')}
                   </TableCell>
                   <TableCell className="px-4">{lot.items.length} items</TableCell>
-                  <TableCell className="px-4 font-semibold">
-                    ${Number(lot.totalAmount).toLocaleString()}
+                  <TableCell className="px-4 font-semibold text-primary">
+                    {formatCurrency(Number(lot.totalAmount))}
                   </TableCell>
                   <TableCell className="px-4">
                     <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">

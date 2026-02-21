@@ -259,9 +259,6 @@ export default function VendorTable({
               <TableHead className="text-right font-semibold text-[11px] text-primary uppercase">
                 Purchase Value
               </TableHead>
-              <TableHead className="text-right font-semibold text-[11px] text-primary uppercase">
-                Outstanding
-              </TableHead>
               <TableHead className="font-semibold text-[11px] text-primary uppercase">
                 Status
               </TableHead>
@@ -308,9 +305,6 @@ export default function VendorTable({
                   <TableCell className="text-right">{vendor.totalOrders}</TableCell>
                   <TableCell className="text-right font-medium">
                     {formatCurrency(vendor.purchaseValue)}
-                  </TableCell>
-                  <TableCell className="text-right font-medium text-red-600">
-                    {formatCurrency(vendor.outstandingAmount)}
                   </TableCell>
                   <TableCell>
                     <span
@@ -370,7 +364,7 @@ export default function VendorTable({
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                   No vendors found matching your criteria.
                 </TableCell>
               </TableRow>

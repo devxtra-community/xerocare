@@ -29,6 +29,7 @@ import { useRouter } from 'next/navigation';
 import { createVendor, updateVendor, deleteVendor as apiDeleteVendor } from '@/lib/vendor';
 import { toast } from 'sonner';
 import { AxiosError } from 'axios';
+import { formatCurrency } from '@/lib/format';
 import {
   Select,
   SelectContent,
@@ -266,10 +267,10 @@ export default function VendorTable({
                       {vendor.totalOrders}
                     </TableCell>
                     <TableCell className="text-right font-bold text-primary text-xs">
-                      ₹ {vendor.purchaseValue.toLocaleString()}
+                      {formatCurrency(vendor.purchaseValue)}
                     </TableCell>
                     <TableCell className="text-right font-bold text-red-600 text-xs">
-                      ₹ {vendor.outstandingAmount.toLocaleString()}
+                      {formatCurrency(vendor.outstandingAmount)}
                     </TableCell>
                     <TableCell>
                       <span

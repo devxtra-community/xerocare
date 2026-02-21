@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/table';
 import { purchaseService, Purchase } from '@/services/purchaseService';
 import { toast } from 'sonner';
+import { formatCurrency } from '@/lib/format';
 import AddPurchaseDialog from './AddPurchaseDialog';
 import EditPurchaseDialog from './EditPurchaseDialog';
 import ViewPurchaseDialog from './ViewPurchaseDialog';
@@ -152,7 +153,7 @@ export default function ManagerPurchaseTable() {
                     </div>
                   </TableCell>
                   <TableCell className="px-4">{p.vendor_name}</TableCell>
-                  <TableCell className="px-4">₹{p.total_amount.toLocaleString()}</TableCell>
+                  <TableCell className="px-4">{formatCurrency(p.total_amount)}</TableCell>
                   <TableCell className="px-4">
                     <span
                       className={`px-2 py-1 rounded-full text-xs ${

@@ -331,6 +331,24 @@ export const getBranchSalesTotals = async (
 };
 
 /**
+ * Retrieves comprehensive finance stats (Revenue, Expenses, Profit).
+ */
+export const getBranchFinanceStats = async (
+  year?: number,
+): Promise<{
+  totalRevenue: number;
+  totalExpenses: number;
+  netProfit: number;
+  salesByType: { saleType: string; total: number }[];
+}> => {
+  const url = year
+    ? `/b/invoices/sales/branch-finance-stats?year=${year}`
+    : '/b/invoices/sales/branch-finance-stats';
+  const response = await api.get(url);
+  return response.data.data;
+};
+
+/**
  * Retrieves global sales totals across all branches.
  */
 export const getGlobalSalesTotals = async (
@@ -491,6 +509,7 @@ export interface FinanceReportItem {
   branchId: string;
   profit: number;
   profitStatus: 'profit' | 'loss';
+  count: number;
 }
 
 /**

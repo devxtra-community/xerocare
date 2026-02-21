@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import StatCard from '@/components/StatCard';
-import { salesService } from '@/services/salesService';
+import { getBranchFinanceStats } from '@/lib/invoice';
 import { formatCurrency } from '@/lib/format';
 
 interface FinanceStatsProps {
@@ -26,22 +26,12 @@ export default function FinanceStats({ selectedYear }: FinanceStatsProps) {
     const fetchStats = async () => {
       try {
         setLoading(true);
-        // Using sales totals as a proxy for financial stats for now
-        // Ideally we should have a dedicated finance stats endpoint
-        const salesData = await salesService.getBranchSalesTotals(
-          selectedYear === 'all' ? undefined : selectedYear,
-        );
-
-        // Calculate expenses and profit (mock calculation based on sales for now as placeholder)
-        // In real scenario, fetch actual expense data
-        const revenue = salesData.totalSales;
-        const expenses = revenue * 0.3; // Mock 30% expense
-        const profit = revenue - expenses;
+        const data = await getBranchFinanceStats(selectedYear === 'all' ? undefined : selectedYear);
 
         setStats({
-          totalRevenue: revenue,
-          totalExpenses: expenses,
-          netProfit: profit,
+          totalRevenue: data.totalRevenue,
+          totalExpenses: data.totalExpenses,
+          netProfit: data.netProfit,
         });
       } catch (error) {
         console.error('Failed to fetch finance stats', error);
@@ -63,12 +53,12 @@ export default function FinanceStats({ selectedYear }: FinanceStatsProps) {
       <StatCard
         title="Total Expenses"
         value={loading ? '...' : formatCurrency(stats.totalExpenses)}
-        subtitle="Estimated (30%)"
+        subtitle="Purchase Cost (Lots)"
       />
       <StatCard
         title="Net Profit"
         value={loading ? '...' : formatCurrency(stats.netProfit)}
-        subtitle={`Margin: ${stats.totalRevenue > 0 ? ((stats.netProfit / stats.totalRevenue) * 100).toFixed(1) : 0}%`}
+        subtitle={`Net Margin: ${stats.totalRevenue > 0 ? ((stats.netProfit / stats.totalRevenue) * 100).toFixed(1) : 0}%`}
       />
     </div>
   );

@@ -141,7 +141,7 @@ export default function VendorTransactionsTable({
                     {item.products}
                   </TableCell>
                   <TableCell className="px-4 py-4 text-xs font-bold text-primary">
-                    {item.total_amount ? `₹${item.total_amount.toLocaleString()}` : '-'}
+                    {item.total_amount ? `QAR ${item.total_amount.toLocaleString()}` : '-'}
                   </TableCell>
                   <TableCell className="px-4 py-4 text-xs">
                     <div className="flex items-center gap-1.5 text-blue-700 font-semibold bg-blue-50/50 px-2 py-1 rounded-md w-fit">

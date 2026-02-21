@@ -198,10 +198,10 @@ export default function InventoryTable({ mode = 'global', warehouseId }: Invento
                   Available
                 </TableHead>
                 <TableHead className="text-[10px] font-bold text-primary uppercase py-2 px-3 text-center">
-                  Rented
+                  Rent
                 </TableHead>
                 <TableHead className="text-[10px] font-bold text-primary uppercase py-2 px-3 text-center">
-                  Damaged
+                  Lease
                 </TableHead>
                 <TableHead className="text-[10px] font-bold text-primary uppercase py-2 px-3 text-right pr-4">
                   Actions
@@ -252,8 +252,8 @@ export default function InventoryTable({ mode = 'global', warehouseId }: Invento
                       </span>
                     </TableCell>
                     <TableCell className="px-3 py-1.5 text-center">
-                      <span className="bg-red-100 text-red-700 px-2 py-0.5 rounded-full text-[10px] font-bold">
-                        {item.damaged_qty}
+                      <span className="bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full text-[10px] font-bold">
+                        {item.lease_qty}
                       </span>
                     </TableCell>
                     <TableCell className="px-3 py-1.5 text-right pr-3">

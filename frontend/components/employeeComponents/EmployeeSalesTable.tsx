@@ -3,7 +3,8 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Plus, Search, Loader2, Trash2, Eye, FileText, IndianRupee } from 'lucide-react';
+import { Plus, Search, Loader2, Trash2, Eye, FileText, Coins } from 'lucide-react';
+import { formatCurrency } from '@/lib/format';
 import { toast } from 'sonner';
 import {
   Table,
@@ -282,7 +283,7 @@ export default function EmployeeSalesTable({ mode = 'EMPLOYEE' }: EmployeeSalesT
                       )}
                     </TableCell>
                     <TableCell className="font-semibold text-foreground">
-                      ₹{inv.totalAmount.toLocaleString()}
+                      {formatCurrency(inv.totalAmount)}
                     </TableCell>
                     <TableCell>
                       <Badge
@@ -538,7 +539,7 @@ function SaleFormModal({
         <DialogHeader className="p-6 pb-4 bg-card border-b border-slate-100 shrink-0">
           <div className="flex items-center gap-4">
             <div className="h-12 w-12 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-lg shadow-blue-200">
-              <IndianRupee size={24} />
+              <Coins size={24} />
             </div>
             <div className="space-y-1">
               <DialogTitle className="text-xl font-bold text-slate-800 tracking-tight">
@@ -665,8 +666,8 @@ function SaleFormModal({
                           onChange={(e) => updateItem(index, 'basePrice', e.target.value)}
                           className={`h-9 text-right font-bold pr-1 ${!item.isManual ? 'bg-muted/50 text-muted-foreground' : ''}`}
                         />
-                        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-300">
-                          ₹
+                        <span className="absolute left-1 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">
+                          QAR
                         </span>
                       </div>
                     </div>
@@ -705,7 +706,7 @@ function SaleFormModal({
                         item.maxDiscount > 0 &&
                         item.discount > item.maxDiscount && (
                           <p className="text-[9px] font-bold text-red-500 text-center animate-pulse mt-1">
-                            Max Allowed: ₹{item.maxDiscount}
+                            Max Allowed: {formatCurrency(item.maxDiscount)}
                           </p>
                         )}
                     </div>
@@ -714,7 +715,7 @@ function SaleFormModal({
                     <div className="md:col-span-2 flex flex-col items-end justify-center h-9 mt-auto">
                       <p className="text-[9px] font-bold text-slate-400 uppercase">Net</p>
                       <p className="font-extrabold text-foreground">
-                        ₹{(item.quantity * item.unitPrice).toLocaleString()}
+                        {formatCurrency(item.quantity * item.unitPrice)}
                       </p>
                     </div>
                   </div>
@@ -731,7 +732,7 @@ function SaleFormModal({
               Grand Total
             </p>
             <p className="text-3xl font-black text-primary tracking-tight">
-              ₹{totalAmount.toLocaleString()}
+              {formatCurrency(totalAmount)}
             </p>
           </div>
           <div className="flex gap-4 items-center">

@@ -1140,7 +1140,7 @@ export default function RentFormModal({
                 <div className="grid grid-cols-2 gap-6 pt-4 border-t border-slate-50">
                   <div className="space-y-2">
                     <label className="text-[11px] font-bold text-muted-foreground uppercase">
-                      Monthly Rent (₹)
+                      Monthly Rent (QAR)
                     </label>
                     <Input
                       type="number"
@@ -1154,7 +1154,7 @@ export default function RentFormModal({
                   </div>
                   <div className="space-y-2">
                     <label className="text-[11px] font-bold text-muted-foreground uppercase">
-                      Advance (₹)
+                      Advance (QAR)
                     </label>
                     <Input
                       type="number"
@@ -1241,10 +1241,10 @@ export default function RentFormModal({
                       >
                         <label className="text-[9px] font-bold text-slate-400 uppercase">
                           {item.description.startsWith('Combined')
-                            ? 'Combined Rate (₹)'
+                            ? 'Combined Rate (QAR)'
                             : form.rentType.includes('CPC')
-                              ? 'Rate/Page (₹)'
-                              : 'Excess Rate (₹)'}
+                              ? 'Rate/Page (QAR)'
+                              : 'Excess Rate (QAR)'}
                         </label>
                         <div className="relative">
                           <Input
@@ -1271,8 +1271,8 @@ export default function RentFormModal({
                             }
                             className={`h-9 font-bold pl-6 ${isFixed ? 'text-red-600 bg-red-50/50 border-red-100' : 'text-emerald-700 bg-emerald-50/50 border-emerald-100'}`}
                           />
-                          <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs font-bold opacity-30">
-                            ₹
+                          <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] font-bold opacity-30">
+                            QAR
                           </span>
                         </div>
                       </div>
@@ -1428,8 +1428,8 @@ export default function RentFormModal({
                                   }
                                   className="h-7 text-xs font-bold text-blue-600 pl-4"
                                 />
-                                <span className="absolute left-1.5 top-1/2 -translate-y-1/2 text-[10px] font-bold opacity-30">
-                                  ₹
+                                <span className="absolute left-1 top-1/2 -translate-y-1/2 text-[10px] font-bold opacity-30">
+                                  QAR
                                 </span>
                               </div>
                             </div>

@@ -25,6 +25,7 @@ import {
 } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { FinanceApprovalModal } from '@/components/finance/FinanceApprovalModal';
+import { formatCurrency } from '@/lib/format';
 
 interface FinanceApprovalTableProps {
   saleType?: 'RENT' | 'LEASE' | 'SALE';
@@ -147,9 +148,9 @@ export default function FinanceApprovalTable({ saleType }: FinanceApprovalTableP
                 <TableCell>
                   <Badge variant="outline">{inv.saleType}</Badge>
                 </TableCell>
-                <TableCell className="font-bold">₹{inv.totalAmount.toLocaleString()}</TableCell>
+                <TableCell className="font-bold">{formatCurrency(inv.totalAmount)}</TableCell>
                 <TableCell className="text-blue-600 font-semibold">
-                  {inv.advanceAmount ? `₹${inv.advanceAmount.toLocaleString()}` : '₹0'}
+                  {formatCurrency(inv.advanceAmount || 0)}
                 </TableCell>
                 <TableCell>{new Date(inv.createdAt).toLocaleDateString()}</TableCell>
                 <TableCell>{inv.employeeName || 'Unknown'}</TableCell>

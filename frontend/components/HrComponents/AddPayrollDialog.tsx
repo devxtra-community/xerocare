@@ -56,7 +56,7 @@ export default function AddPayrollDialog({
       if (emp) {
         setFormData((prev) => ({
           ...prev,
-          salaryAmount: emp.salaryPerMonth.replace('₹ ', '').replace(/,/g, ''),
+          salaryAmount: emp.salaryPerMonth.replace('QAR ', '').replace(/,/g, ''),
           department: emp.department,
           role: emp.role,
           branchName: emp.branchName,
@@ -196,7 +196,7 @@ export default function AddPayrollDialog({
 
           <div className="space-y-1.5">
             <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-              Salary Amount (₹)
+              Salary Amount (QAR)
             </label>
             <Input
               name="salaryAmount"

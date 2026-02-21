@@ -12,12 +12,10 @@ import {
   MapPin,
   Building2,
   User,
-  TrendingUp,
   Clock,
 } from 'lucide-react';
 import StatCard from '@/components/StatCard';
 
-import VendorSpendingTrend from '@/components/AdminDahboardComponents/vendorComponents/VendorSpendingTrend';
 import VendorRequestHistory from '@/components/ManagerDashboardComponents/VendorComponents/VendorRequestHistory';
 import { getVendorById, Vendor as ApiVendor } from '@/lib/vendor';
 import { toast } from 'sonner';
@@ -243,20 +241,8 @@ export default function VendorProfilePage() {
                 <Clock className="h-3.5 w-3.5 text-primary" /> Request History
               </h3>
               <div className="flex-1 overflow-auto">
-                <VendorRequestHistory />
+                <VendorRequestHistory vendorName={vendor.name} />
               </div>
-            </div>
-          </div>
-        </div>
-
-        {/* BOTTOM SECTION: ANALYTICS */}
-        <div className="space-y-4">
-          <h3 className="text-sm font-bold text-primary uppercase flex items-center gap-2">
-            <TrendingUp className="h-3.5 w-3.5 text-primary" /> Purchasing Analytics
-          </h3>
-          <div className="bg-card rounded-xl p-6 shadow-sm border border-blue-100/30">
-            <div className="h-[320px]">
-              <VendorSpendingTrend requests={[]} />
             </div>
           </div>
         </div>

@@ -17,7 +17,8 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { FileText, Calendar, IndianRupee, Printer, X, Loader2, Mail } from 'lucide-react';
+import { FileText, Calendar, Coins, Printer, X, Loader2, Mail } from 'lucide-react';
+import { formatCurrency } from '@/lib/format';
 import { Invoice, getInvoiceById } from '@/lib/invoice';
 import { differenceInMonths, differenceInDays } from 'date-fns';
 import UsageRecordingModal from '@/components/Finance/UsageRecordingModal';
@@ -331,9 +332,9 @@ export function InvoiceDetailsDialog({
                     Monthly Rent
                   </p>
                   <div className="flex items-center gap-2 text-gray-700">
-                    <IndianRupee size={14} className="opacity-50" />
+                    <Coins size={14} className="opacity-50" />
                     <p className="text-xs font-bold">
-                      ₹{currentInvoice.monthlyRent.toLocaleString('en-IN')}
+                      {formatCurrency(currentInvoice.monthlyRent)}
                     </p>
                   </div>
                 </div>
@@ -385,7 +386,9 @@ export function InvoiceDetailsDialog({
                                     <span>
                                       {s.from} - {s.to}
                                     </span>
-                                    <span className="font-bold text-gray-800">₹{s.rate}</span>
+                                    <span className="font-bold text-gray-800">
+                                      {formatCurrency(s.rate)}
+                                    </span>
                                   </div>
                                 ))}
                                 {rule.bwExcessRate && (
@@ -395,7 +398,7 @@ export function InvoiceDetailsDialog({
                                       {Math.max(...rule.bwSlabRanges.map((s) => Number(s.to) || 0))}
                                     </span>
                                     <span className="font-bold text-gray-800">
-                                      ₹{rule.bwExcessRate}
+                                      {formatCurrency(rule.bwExcessRate)}
                                     </span>
                                   </div>
                                 )}
@@ -418,7 +421,9 @@ export function InvoiceDetailsDialog({
                                     <span>
                                       {s.from} - {s.to}
                                     </span>
-                                    <span className="font-bold text-gray-800">₹{s.rate}</span>
+                                    <span className="font-bold text-gray-800">
+                                      {formatCurrency(s.rate)}
+                                    </span>
                                   </div>
                                 ))}
                                 {rule.colorExcessRate && (
@@ -430,7 +435,7 @@ export function InvoiceDetailsDialog({
                                       )}
                                     </span>
                                     <span className="font-bold text-gray-800">
-                                      ₹{rule.colorExcessRate}
+                                      {formatCurrency(rule.colorExcessRate)}
                                     </span>
                                   </div>
                                 )}
@@ -453,7 +458,9 @@ export function InvoiceDetailsDialog({
                                     <span>
                                       {s.from} - {s.to}
                                     </span>
-                                    <span className="font-bold text-gray-800">₹{s.rate}</span>
+                                    <span className="font-bold text-gray-800">
+                                      {formatCurrency(s.rate)}
+                                    </span>
                                   </div>
                                 ))}
                                 {rule.combinedExcessRate && (
@@ -465,7 +472,7 @@ export function InvoiceDetailsDialog({
                                       )}
                                     </span>
                                     <span className="font-bold text-gray-800">
-                                      ₹{rule.combinedExcessRate}
+                                      {formatCurrency(rule.combinedExcessRate)}
                                     </span>
                                   </div>
                                 )}
@@ -483,17 +490,19 @@ export function InvoiceDetailsDialog({
                               <div className="mt-1 text-xs grid grid-cols-2 gap-2 opacity-80">
                                 {rule.bwExcessRate && (
                                   <div>
-                                    B/W Rate: <strong>₹{rule.bwExcessRate}</strong>
+                                    B/W Rate: <strong>{formatCurrency(rule.bwExcessRate)}</strong>
                                   </div>
                                 )}
                                 {rule.colorExcessRate && (
                                   <div>
-                                    Color Rate: <strong>₹{rule.colorExcessRate}</strong>
+                                    Color Rate:{' '}
+                                    <strong>{formatCurrency(rule.colorExcessRate)}</strong>
                                   </div>
                                 )}
                                 {rule.combinedExcessRate && (
                                   <div>
-                                    Combined Rate: <strong>₹{rule.combinedExcessRate}</strong>
+                                    Combined Rate:{' '}
+                                    <strong>{formatCurrency(rule.combinedExcessRate)}</strong>
                                   </div>
                                 )}
                               </div>
@@ -527,7 +536,7 @@ export function InvoiceDetailsDialog({
                     Monthly EMI
                   </p>
                   <p className="text-xs font-bold text-gray-700">
-                    ₹{currentInvoice.monthlyEmiAmount.toLocaleString()}
+                    {formatCurrency(currentInvoice.monthlyEmiAmount)}
                   </p>
                 </div>
               )}
@@ -601,7 +610,7 @@ export function InvoiceDetailsDialog({
                       Billing Cycle
                     </p>
                     <div className="flex items-center gap-2 text-gray-600">
-                      <IndianRupee size={14} className="opacity-50" />
+                      <Coins size={14} className="opacity-50" />
                       <p className="text-xs font-bold">
                         Every {currentInvoice.billingCycleInDays || 30} Days
                       </p>
@@ -675,13 +684,10 @@ export function InvoiceDetailsDialog({
                                     {bwExcess.toLocaleString()}
                                   </TableCell>
                                   <TableCell className="text-center font-bold text-gray-500 text-xs">
-                                    ₹{bwExcessRate}
+                                    {formatCurrency(bwExcessRate)}
                                   </TableCell>
                                   <TableCell className="text-right font-bold text-primary text-xs">
-                                    ₹
-                                    {bwExcessAmount.toLocaleString(undefined, {
-                                      minimumFractionDigits: 2,
-                                    })}
+                                    {formatCurrency(bwExcessAmount)}
                                   </TableCell>
                                 </TableRow>
                               );
@@ -722,13 +728,10 @@ export function InvoiceDetailsDialog({
                                     {colorExcess.toLocaleString()}
                                   </TableCell>
                                   <TableCell className="text-center font-bold text-gray-500 text-xs">
-                                    ₹{colorExcessRate}
+                                    {formatCurrency(colorExcessRate)}
                                   </TableCell>
                                   <TableCell className="text-right font-bold text-primary text-xs">
-                                    ₹
-                                    {colorExcessAmount.toLocaleString(undefined, {
-                                      minimumFractionDigits: 2,
-                                    })}
+                                    {formatCurrency(colorExcessAmount)}
                                   </TableCell>
                                 </TableRow>
                               );
@@ -774,13 +777,10 @@ export function InvoiceDetailsDialog({
                                     {comboExcess.toLocaleString()}
                                   </TableCell>
                                   <TableCell className="text-center font-bold text-gray-500 text-xs">
-                                    ₹{comboExcessRate}
+                                    {formatCurrency(comboExcessRate)}
                                   </TableCell>
                                   <TableCell className="text-right font-bold text-primary text-xs">
-                                    ₹
-                                    {comboExcessAmount.toLocaleString(undefined, {
-                                      minimumFractionDigits: 2,
-                                    })}
+                                    {formatCurrency(comboExcessAmount)}
                                   </TableCell>
                                 </TableRow>
                               );
@@ -885,16 +885,16 @@ export function InvoiceDetailsDialog({
                         <TableCell className="text-xs font-medium text-gray-600 align-top py-3">
                           <div className="flex flex-col gap-1">
                             {item.bwExcessRate ? (
-                              <span className="whitespace-nowrap">BW: ₹{item.bwExcessRate}</span>
+                              <span className="whitespace-nowrap">BW: QAR {item.bwExcessRate}</span>
                             ) : null}
                             {item.colorExcessRate ? (
                               <span className="whitespace-nowrap">
-                                CLR: ₹{item.colorExcessRate}
+                                CLR: QAR {item.colorExcessRate}
                               </span>
                             ) : null}
                             {item.combinedExcessRate ? (
                               <span className="whitespace-nowrap">
-                                CMB: ₹{item.combinedExcessRate}
+                                CMB: QAR {item.combinedExcessRate}
                               </span>
                             ) : null}
                             {!item.bwExcessRate &&
@@ -906,7 +906,7 @@ export function InvoiceDetailsDialog({
                           {item.quantity}
                         </TableCell>
                         <TableCell className="text-right font-bold text-foreground text-sm align-top py-3">
-                          ₹{((item.quantity || 0) * (item.unitPrice || 0)).toLocaleString()}
+                          QAR {((item.quantity || 0) * (item.unitPrice || 0)).toLocaleString()}
                         </TableCell>
                       </TableRow>
                     ))}
@@ -926,7 +926,7 @@ export function InvoiceDetailsDialog({
                   {mode === 'EMPLOYEE' ? 'Monthly Rent Balance' : 'Monthly Rent'}
                 </p>
                 <p className="text-sm font-bold text-gray-700">
-                  ₹{financialSummary.monthlyRent.toLocaleString()}
+                  QAR {financialSummary.monthlyRent.toLocaleString()}
                 </p>
               </div>
               <div className="space-y-1">
@@ -934,7 +934,7 @@ export function InvoiceDetailsDialog({
                   {mode === 'EMPLOYEE' ? 'Advance Balance' : 'Advance Adj.'}
                 </p>
                 <p className="text-sm font-bold text-success">
-                  - ₹{financialSummary.advanceAdjusted.toLocaleString()}
+                  - QAR {financialSummary.advanceAdjusted.toLocaleString()}
                 </p>
               </div>
               {mode === 'FINANCE' && (
@@ -943,7 +943,7 @@ export function InvoiceDetailsDialog({
                     <div className="space-y-1">
                       <p className="text-[10px] font-bold text-gray-400 uppercase">Extra Usage</p>
                       <p className="text-sm font-bold text-warning">
-                        + ₹{financialSummary.extraUsage.toLocaleString()}
+                        + QAR {financialSummary.extraUsage.toLocaleString()}
                       </p>
                     </div>
                   )}
@@ -951,7 +951,7 @@ export function InvoiceDetailsDialog({
                     <div className="space-y-1">
                       <p className="text-[10px] font-bold text-gray-400 uppercase">Extra Charges</p>
                       <p className="text-sm font-bold text-orange-600">
-                        + ₹{financialSummary.additionalCharges.toLocaleString()}
+                        + QAR {financialSummary.additionalCharges.toLocaleString()}
                       </p>
                     </div>
                   )}
@@ -962,7 +962,7 @@ export function InvoiceDetailsDialog({
                     <p
                       className={`text-lg font-bold ${financialSummary.pendingBalance > 0 ? 'text-danger' : 'text-success'}`}
                     >
-                      ₹
+                      QAR
                       {financialSummary.pendingBalance.toLocaleString(undefined, {
                         minimumFractionDigits: 2,
                       })}
@@ -1010,7 +1010,7 @@ export function InvoiceDetailsDialog({
                           {hist.invoiceNumber}
                         </TableCell>
                         <TableCell className="text-xs font-bold text-primary text-right">
-                          ₹
+                          QAR
                           {(hist.totalAmount || 0).toLocaleString(undefined, {
                             minimumFractionDigits: 2,
                           })}
@@ -1030,7 +1030,7 @@ export function InvoiceDetailsDialog({
               Grand Total
             </p>
             <p className="text-2xl font-bold text-primary">
-              ₹{grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+              QAR {grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}
             </p>
           </div>
 
@@ -1212,11 +1212,11 @@ export function InvoiceDetailsDialog({
 
                                             const rates = [];
                                             if (item.bwExcessRate)
-                                              rates.push(`BW: ₹${item.bwExcessRate}`);
+                                              rates.push(`BW: QAR ${item.bwExcessRate}`);
                                             if (item.colorExcessRate)
-                                              rates.push(`CLR: ₹${item.colorExcessRate}`);
+                                              rates.push(`CLR: QAR ${item.colorExcessRate}`);
                                             if (item.combinedExcessRate)
-                                              rates.push(`CMB: ₹${item.combinedExcessRate}`);
+                                              rates.push(`CMB: QAR ${item.combinedExcessRate}`);
 
                                             return `
                                             <tr style="border-bottom: 1px solid #e5e7eb;">
@@ -1231,7 +1231,7 @@ export function InvoiceDetailsDialog({
                                                 ${rates.length > 0 ? rates.join('<br/>') : '-'}
                                               </td>
                                               <td style="padding: 12px; text-align: center;">${item.quantity || 1}</td>
-                                              <td style="padding: 12px; text-align: right;">₹${((item.quantity || 1) * (item.unitPrice || 0)).toLocaleString()}</td>
+                                              <td style="padding: 12px; text-align: right;">QAR ${((item.quantity || 1) * (item.unitPrice || 0)).toLocaleString()}</td>
                                             </tr>
                                           `;
                                           })
@@ -1248,7 +1248,7 @@ export function InvoiceDetailsDialog({
                                  <h3 style="margin-top: 0; color: #111827;">Rental Details</h3>
                                  <p style="margin: 5px 0;"><strong>Plan Type:</strong> ${inv.rentType?.replace('_', ' ')}</p>
                                  <p style="margin: 5px 0;"><strong>Billing Period:</strong> ${inv.rentPeriod}</p>
-                                 <p style="margin: 5px 0;"><strong>Monthly Rent:</strong> ₹${inv.monthlyRent?.toLocaleString()}</p>
+                                  <p style="margin: 5px 0;"><strong>Monthly Rent:</strong> QAR ${inv.monthlyRent?.toLocaleString()}</p>
                                  <p style="margin: 5px 0;"><strong>Contract Period:</strong> ${formatDate(inv.effectiveFrom)} - ${formatDate(inv.effectiveTo)}</p>
                                </div>
                              `;
@@ -1258,7 +1258,7 @@ export function InvoiceDetailsDialog({
                                  <h3 style="margin-top: 0; color: #111827;">Lease Details</h3>
                                  <p style="margin: 5px 0;"><strong>Lease Type:</strong> ${inv.leaseType}</p>
                                  <p style="margin: 5px 0;"><strong>Tenure:</strong> ${inv.leaseTenureMonths} Months</p>
-                                 ${inv.monthlyEmiAmount ? `<p style="margin: 5px 0;"><strong>Monthly EMI:</strong> ₹${inv.monthlyEmiAmount.toLocaleString()}</p>` : ''}
+                                  ${inv.monthlyEmiAmount ? `<p style="margin: 5px 0;"><strong>Monthly EMI:</strong> QAR ${inv.monthlyEmiAmount.toLocaleString()}</p>` : ''}
                                </div>
                              `;
                           }
@@ -1278,8 +1278,8 @@ export function InvoiceDetailsDialog({
                               ${itemsHtml}
 
                               <div style="margin-top: 30px; text-align: right;">
-                                <p style="font-size: 18px; margin: 5px 0;">Total Amount: <strong style="color: #1d4ed8;">₹${(inv.totalAmount || 0).toLocaleString()}</strong></p>
-                                ${inv.advanceAmount ? `<p style="margin: 5px 0; color: #059669;">Advance Required: <strong>₹${inv.advanceAmount.toLocaleString()}</strong></p>` : ''}
+                                <p style="font-size: 18px; margin: 5px 0;">Total Amount: <strong style="color: #1d4ed8;">QAR ${(inv.totalAmount || 0).toLocaleString()}</strong></p>
+                                ${inv.advanceAmount ? `<p style="margin: 5px 0; color: #059669;">Advance Required: <strong>QAR ${inv.advanceAmount.toLocaleString()}</strong></p>` : ''}
                               </div>
 
                               <div style="margin-top: 40px; border-top: 1px solid #e5e7eb; padding-top: 20px; text-align: center; color: #9ca3af; font-size: 12px;">

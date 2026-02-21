@@ -24,6 +24,7 @@ import { Badge } from '@/components/ui/badge';
 import { Loader2, History, Send, CheckCircle2, Eye, X, Image as ImageIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
+import { formatCurrency } from '@/lib/format';
 
 interface UsageHistoryDialogProps {
   isOpen: boolean;
@@ -214,24 +215,18 @@ export default function UsageHistoryDialog({
                         </TableCell>
                         <TableCell className="text-right">
                           <span className="font-black text-orange-600 text-sm">
-                            ₹
-                            {Number(record.exceededAmount).toLocaleString(undefined, {
-                              minimumFractionDigits: 2,
-                            })}
+                            {formatCurrency(Number(record.exceededAmount))}
                           </span>
                         </TableCell>
                         <TableCell className="text-right font-bold text-slate-700">
-                          ₹{Number(record.rent).toLocaleString()}
+                          {formatCurrency(Number(record.rent))}
                         </TableCell>
                         <TableCell className="text-right font-bold text-blue-600">
-                          ₹{Number(record.advanceAdjusted || 0).toLocaleString()}
+                          {formatCurrency(Number(record.advanceAdjusted || 0))}
                         </TableCell>
                         <TableCell className="text-right bg-blue-50/30 group-hover:bg-blue-100/50 transition-colors">
                           <span className="font-black text-blue-700 text-base">
-                            ₹
-                            {Number(record.finalTotal).toLocaleString(undefined, {
-                              minimumFractionDigits: 2,
-                            })}
+                            {formatCurrency(Number(record.finalTotal))}
                           </span>
                         </TableCell>
                         <TableCell className="text-center">
@@ -315,8 +310,7 @@ export default function UsageHistoryDialog({
 // --- SUB-COMPONENTS ---
 
 function UsageDetailsModal({ record }: { record: UsageRecord }) {
-  const formatCurrency = (amount: number) =>
-    `₹${Number(amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
+  const localFormatCurrency = (amount: number) => formatCurrency(amount);
 
   const isFixedLimit = record.rentType === 'FIXED_LIMIT';
   const isFxedCombo = record.rentType === 'FIXED_COMBO';
@@ -392,9 +386,9 @@ function UsageDetailsModal({ record }: { record: UsageRecord }) {
                     >
                       {bwExceeded}
                     </TableCell>
-                    <TableCell className="text-right">{formatCurrency(bwRate)}</TableCell>
+                    <TableCell className="text-right">{localFormatCurrency(bwRate)}</TableCell>
                     <TableCell className="text-right">
-                      {formatCurrency(bwExceeded * bwRate)}
+                      {localFormatCurrency(bwExceeded * bwRate)}
                     </TableCell>
                   </TableRow>
                   <TableRow>
@@ -411,9 +405,9 @@ function UsageDetailsModal({ record }: { record: UsageRecord }) {
                     >
                       {colorExceeded}
                     </TableCell>
-                    <TableCell className="text-right">{formatCurrency(colorRate)}</TableCell>
+                    <TableCell className="text-right">{localFormatCurrency(colorRate)}</TableCell>
                     <TableCell className="text-right">
-                      {formatCurrency(colorExceeded * colorRate)}
+                      {localFormatCurrency(colorExceeded * colorRate)}
                     </TableCell>
                   </TableRow>
                 </>
@@ -434,9 +428,9 @@ function UsageDetailsModal({ record }: { record: UsageRecord }) {
                   >
                     {combinedExceeded}
                   </TableCell>
-                  <TableCell className="text-right">{formatCurrency(combinedRate)}</TableCell>
+                  <TableCell className="text-right">{localFormatCurrency(combinedRate)}</TableCell>
                   <TableCell className="text-right">
-                    {formatCurrency(combinedExceeded * combinedRate)}
+                    {localFormatCurrency(combinedExceeded * combinedRate)}
                   </TableCell>
                 </TableRow>
               )}
@@ -447,7 +441,7 @@ function UsageDetailsModal({ record }: { record: UsageRecord }) {
                     Detailed breakdown available for Fixed Limit contracts only.
                     <br />
                     <span className="font-bold mt-2 block">
-                      Total Exceeded Charge: {formatCurrency(record.exceededAmount)}
+                      Total Exceeded Charge: {localFormatCurrency(record.exceededAmount)}
                     </span>
                   </TableCell>
                 </TableRow>

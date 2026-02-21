@@ -3,6 +3,7 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Purchase } from '@/services/purchaseService';
 import { Badge } from '@/components/ui/badge';
+import { formatCurrency } from '@/lib/format';
 
 interface ViewPurchaseDialogProps {
   open: boolean;
@@ -61,7 +62,7 @@ export default function ViewPurchaseDialog({
             <div>
               <p className="text-sm font-medium text-muted-foreground">Total Amount</p>
               <p className="font-bold text-lg text-primary">
-                ₹{purchase.total_amount.toLocaleString()}
+                {formatCurrency(purchase.total_amount)}
               </p>
             </div>
           </div>

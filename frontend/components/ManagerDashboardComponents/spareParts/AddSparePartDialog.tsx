@@ -238,7 +238,7 @@ export default function AddSparePartDialog({
                       return {
                         value: item.id,
                         label: `${item.sparePart!.item_code} - ${item.sparePart!.part_name}`,
-                        description: `Available: ${available} / ${item.quantity} | Price: ₹${item.unitPrice}`,
+                        description: `Available: ${available} / ${item.quantity} | Price: QAR ${item.unitPrice}`,
                       };
                     });
                   })()}

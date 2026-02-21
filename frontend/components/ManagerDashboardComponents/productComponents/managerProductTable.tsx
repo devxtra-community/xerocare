@@ -26,6 +26,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import StatCard from '@/components/StatCard';
 import { BulkProductDialog } from './BulkProductDialog';
 import { productService, Product } from '@/services/productService';
+import { formatCurrency } from '@/lib/format';
 import { modelService, Model } from '@/services/modelService';
 import { commonService, Vendor, Warehouse } from '@/services/commonService';
 import { getBrands, Brand } from '@/lib/brand';
@@ -207,7 +208,7 @@ export default function ManagerProduct() {
                     {p.lot?.lotNumber || p.lot?.lot_number || '-'}
                   </TableCell>
                   <TableCell className="px-4">{p.serial_no}</TableCell>
-                  <TableCell className="px-4">₹{p.sale_price}</TableCell>
+                  <TableCell className="px-4">{formatCurrency(p.sale_price)}</TableCell>
                   <TableCell className="px-4">{p.print_colour}</TableCell>
                   <TableCell className="px-4">
                     <span

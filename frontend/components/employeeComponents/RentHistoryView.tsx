@@ -194,7 +194,7 @@ export default function RentHistoryView({ contractId, isOpen, onClose }: RentHis
                         Monthly Rent
                       </p>
                       <div className="font-bold text-slate-800 text-lg flex items-baseline gap-1">
-                        ₹{contract.monthlyRent?.toLocaleString() || '0'}
+                        QAR {contract.monthlyRent?.toLocaleString() || '0'}
                       </div>
                     </div>
                   </CardContent>
@@ -312,8 +312,8 @@ export default function RentHistoryView({ contractId, isOpen, onClose }: RentHis
                                 </TableCell>
                                 <TableCell className="text-right font-mono text-[11px] text-slate-600">
                                   {usage.monthlyRent
-                                    ? `₹${Number(usage.monthlyRent).toLocaleString()}`
-                                    : '₹0'}
+                                    ? `QAR ${Number(usage.monthlyRent).toLocaleString()}`
+                                    : 'QAR 0'}
                                 </TableCell>
                                 <TableCell className="text-center font-mono text-[11px]">
                                   {totalUsage.toLocaleString()}
@@ -323,13 +323,13 @@ export default function RentHistoryView({ contractId, isOpen, onClose }: RentHis
                                 </TableCell>
                                 <TableCell className="text-right font-mono text-[11px] text-slate-600">
                                   {usage.exceededCharge
-                                    ? `₹${Number(usage.exceededCharge).toLocaleString()}`
+                                    ? `QAR ${Number(usage.exceededCharge).toLocaleString()}`
                                     : '-'}
                                 </TableCell>
                                 <TableCell className="text-right font-bold text-slate-800 text-xs">
                                   {usage.totalCharge
-                                    ? `₹${Number(usage.totalCharge).toLocaleString()}`
-                                    : `₹${(Number(usage.monthlyRent || 0) + Number(usage.exceededCharge || 0)).toLocaleString()}`}
+                                    ? `QAR ${Number(usage.totalCharge).toLocaleString()}`
+                                    : `QAR ${(Number(usage.monthlyRent || 0) + Number(usage.exceededCharge || 0)).toLocaleString()}`}
                                 </TableCell>
                                 <TableCell className="text-center">
                                   {usage.meterImageUrl ? (

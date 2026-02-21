@@ -67,7 +67,7 @@ const ChartContainer = ({
             axisLine={false}
             tickLine={false}
             tick={{ fill: '#94a3b8', fontSize: 9, fontWeight: 700 }}
-            tickFormatter={(val) => `₹${val >= 1000 ? (val / 1000).toFixed(0) + 'k' : val}`}
+            tickFormatter={(val) => `QAR ${val >= 1000 ? (val / 1000).toFixed(0) + 'k' : val}`}
           />
           <Tooltip content={<ChartTooltipContent />} cursor={{ fill: '#f1f5f9', opacity: 0.4 }} />
           <Bar dataKey={dataKeyAmount} fill={color} radius={[4, 4, 0, 0]} barSize={10} />
@@ -125,13 +125,13 @@ const ForexChartContainer = ({
               axisLine={false}
               tickLine={false}
               tick={{ fill: '#64748b', fontSize: 9, fontWeight: 700 }}
-              tickFormatter={(val) => `₹${val >= 1000 ? (val / 1000).toFixed(0) + 'k' : val}`}
+              tickFormatter={(val) => `QAR ${val >= 1000 ? (val / 1000).toFixed(0) + 'k' : val}`}
               domain={['auto', 'auto']}
             />
             <Tooltip
               content={
                 <ChartTooltipContent
-                  valueFormatter={(value) => `₹${Number(value).toLocaleString()}`}
+                  valueFormatter={(value) => `QAR ${Number(value).toLocaleString()}`}
                 />
               }
               cursor={{ stroke: color, strokeWidth: 1, strokeDasharray: '4 4' }}

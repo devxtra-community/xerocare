@@ -28,7 +28,7 @@ export default function MonthlySalesBarChart({ data, title }: MonthlySalesBarCha
               tick={{ fontSize: 11, fill: '#1e3a8a', fontWeight: 500 }}
               axisLine={false}
               tickLine={false}
-              tickFormatter={(value) => `₹${(value / 1000).toFixed(1)}k`}
+              tickFormatter={(value) => `QAR ${(value / 1000).toFixed(1)}k`}
             />
             <Tooltip
               contentStyle={{
@@ -40,7 +40,7 @@ export default function MonthlySalesBarChart({ data, title }: MonthlySalesBarCha
               }}
               labelStyle={{ color: '#1e3a8a', fontWeight: 'bold', marginBottom: '4px' }}
               cursor={{ fill: '#f8fafc' }}
-              formatter={(value: number) => [`₹${value.toLocaleString()}`, 'Amount']}
+              formatter={(value: number) => [`QAR ${value.toLocaleString()}`, 'Amount']}
             />
             <Bar dataKey="value" name={title || 'Amount'} fill="#0D47A1" radius={[4, 4, 0, 0]} />
           </BarChart>

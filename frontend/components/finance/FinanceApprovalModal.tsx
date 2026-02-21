@@ -478,8 +478,8 @@ export function FinanceApprovalModal({ invoice, onClose, onSuccess }: FinanceApp
                           <div className="space-y-2">
                             <Label>Deposit Amount</Label>
                             <div className="relative">
-                              <span className="absolute left-3 top-2.5 text-slate-400 font-bold">
-                                ₹
+                              <span className="absolute left-1 top-2.5 text-slate-400 text-[10px] font-bold">
+                                QAR
                               </span>
                               <Input
                                 type="number"
