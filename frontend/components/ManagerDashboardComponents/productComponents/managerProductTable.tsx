@@ -354,22 +354,36 @@ function ProductFormModal({
 
   useEffect(() => {
     const loadDependencies = async () => {
-      try {
-        const [m, v, w, b, l] = await Promise.all([
-          modelService.getAllModels(),
-          commonService.getAllVendors(),
-          commonService.getWarehousesByBranch(),
-          getBrands(),
-          lotService.getAllLots(),
-        ]);
-        setModels(m);
-        setVendors(v);
-        setWarehouses(w);
-        if (b.success) {
-          setBrands(b.data);
-        }
-        setLots(l);
-      } catch {
+      const [mResult, vResult, wResult, bResult, lResult] = await Promise.allSettled([
+        modelService.getAllModels(),
+        commonService.getAllVendors(),
+        commonService.getWarehousesByBranch(),
+        getBrands(),
+        lotService.getAllLots(),
+      ]);
+
+      if (mResult.status === 'fulfilled') setModels(mResult.value);
+      else console.error('Failed to load models:', mResult.reason);
+
+      if (vResult.status === 'fulfilled') setVendors(vResult.value);
+      else console.error('Failed to load vendors:', vResult.reason);
+
+      if (wResult.status === 'fulfilled') setWarehouses(wResult.value);
+      else console.error('Failed to load warehouses:', wResult.reason);
+
+      if (bResult.status === 'fulfilled' && bResult.value.success) setBrands(bResult.value.data);
+      else if (bResult.status === 'rejected')
+        console.error('Failed to load brands:', bResult.reason);
+
+      if (lResult.status === 'fulfilled') setLots(lResult.value);
+      else console.error('Failed to load lots:', lResult.reason);
+
+      // Show a toast only if ALL critical dependencies failed
+      const criticalFailed =
+        mResult.status === 'rejected' &&
+        vResult.status === 'rejected' &&
+        wResult.status === 'rejected';
+      if (criticalFailed) {
         toast.error('Failed to load form dependencies');
       }
     };

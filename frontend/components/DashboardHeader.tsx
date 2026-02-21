@@ -152,7 +152,7 @@ export default function DashboardHeader({ title = 'Dashboard' }: { title?: strin
         <div className="flex items-center gap-2 sm:gap-4">
           {/* Notifications */}
           <DropdownMenu>
-            <DropdownMenuTrigger asChild>
+            <DropdownMenuTrigger asChild id="notification-trigger">
               <Button
                 variant="ghost"
                 size="icon"
@@ -227,7 +227,7 @@ export default function DashboardHeader({ title = 'Dashboard' }: { title?: strin
 
           {/* User Profile */}
           <DropdownMenu>
-            <DropdownMenuTrigger asChild>
+            <DropdownMenuTrigger asChild id="user-menu-trigger">
               <Button
                 variant="ghost"
                 className="flex items-center gap-2 sm:gap-3 pl-2 sm:pl-4 border-l border-white/20 hover:bg-card/5 py-2 px-1 rounded transition-colors h-auto"

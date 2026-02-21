@@ -2,6 +2,9 @@ import { Source } from '../config/db';
 import { SparePart } from '../entities/sparePartEntity';
 
 import { Product } from '../entities/productEntity';
+import { Lot } from '../entities/lotEntity';
+import { Vendor } from '../entities/vendorEntity';
+import { Warehouse } from '../entities/warehouseEntity';
 
 export class SparePartRepository {
   // Lazy Load Repositories
@@ -76,19 +79,55 @@ export class SparePartRepository {
     return this.masterRepo
       .createQueryBuilder('sp')
       .leftJoin('sp.model', 'model')
+      .leftJoin(Lot, 'lot', 'lot.id::text = sp.lot_id::text')
+      .leftJoin(Vendor, 'vendor', 'vendor.id::text = lot.vendor_id::text')
+      .leftJoin(Warehouse, 'warehouse', 'warehouse.id::text = lot.warehouse_id::text')
       .select([
         'sp.id AS id',
         'sp.item_code AS item_code',
-        'sp.item_code AS lot_number',
+        'lot.lotNumber AS lot_number',
         'sp.part_name AS part_name',
         'sp.brand AS brand',
         'model.model_name AS compatible_model',
+        'warehouse.warehouseName AS warehouse_name',
+        'vendor.name AS vendor_name',
         'sp.quantity AS quantity',
         'sp.base_price AS price',
       ])
       .where('sp.branch_id = :branchId', { branchId })
       .orderBy('sp.created_at', 'DESC')
       .getRawMany();
+  }
+
+  /**
+   * Finds an existing spare part by partName, modelId, vendorId, and warehouseId
+   */
+  async findExistingSparePart(
+    partName: string,
+    modelId: string | undefined,
+    warehouseId: string | undefined,
+    vendorId: string | undefined,
+  ) {
+    const qb = this.masterRepo
+      .createQueryBuilder('sp')
+      .leftJoin(Lot, 'lot', 'lot.id::text = sp.lot_id::text')
+      .where('LOWER(sp.part_name) = LOWER(:partName)', { partName });
+
+    if (modelId) {
+      qb.andWhere('sp.model_id = :modelId', { modelId });
+    } else {
+      qb.andWhere('sp.model_id IS NULL');
+    }
+
+    if (warehouseId) {
+      qb.andWhere('lot.warehouse_id = :warehouseId', { warehouseId });
+    }
+
+    if (vendorId) {
+      qb.andWhere('lot.vendor_id = :vendorId', { vendorId });
+    }
+
+    return qb.getOne();
   }
 
   /**

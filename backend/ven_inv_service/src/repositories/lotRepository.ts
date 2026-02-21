@@ -40,6 +40,8 @@ export class LotRepository {
       lot.certificationCost = data.certificationCost || 0;
       lot.labourCost = data.labourCost || 0;
 
+      const savedLot = await manager.save(Lot, lot);
+
       let itemsTotal = 0;
       const lotItems: LotItem[] = [];
 
@@ -62,19 +64,102 @@ export class LotRepository {
               throw new AppError('Branch ID is required to create new spare parts', 400);
             }
 
-            const sparePart = new SparePart();
-            sparePart.part_name = itemData.partName;
-            sparePart.brand = itemData.brand;
-            sparePart.base_price = itemData.unitPrice;
-            sparePart.quantity = 0;
-            sparePart.branch_id = data.branchId;
+            // Determine model ID for spare part (null/undefined/'universal' means Universal)
+            const spModelId =
+              itemData.modelId && itemData.modelId !== 'universal' ? itemData.modelId : null;
 
-            const timestamp = Date.now();
-            const randomStr = Math.random().toString(36).substring(2, 7).toUpperCase();
-            sparePart.item_code = `SP-${timestamp}-${randomStr}`;
+            const partName = itemData.partName?.trim();
+            const brand = itemData.brand?.trim();
 
-            const savedSparePart = await manager.save(SparePart, sparePart);
-            lotItem.sparePartId = savedSparePart.id;
+            if (!partName || !brand) {
+              throw new AppError('Part Name and Brand are required', 400);
+            }
+
+            // Check if spare part already exists to prevent duplicates
+            // We must now also check model_id match to avoid mixing compatible models
+            const query = manager
+              .getRepository(SparePart)
+              .createQueryBuilder('sparePart')
+              .where('LOWER(sparePart.part_name) = LOWER(:partName)', {
+                partName,
+              })
+              .andWhere('LOWER(sparePart.brand) = LOWER(:brand)', { brand })
+              .andWhere('sparePart.branch_id = :branchId', { branchId: data.branchId });
+
+            if (spModelId) {
+              query.andWhere('sparePart.model_id = :modelId', { modelId: spModelId });
+            } else {
+              query.andWhere('sparePart.model_id IS NULL');
+            }
+
+            let sparePart = await query.getOne();
+
+            // Smart Name Cleaning: If not found, check if user typed "Brand + Name" (e.g., "Dell Beam")
+            if (!sparePart) {
+              const lowerName = partName.toLowerCase();
+              const lowerBrand = brand.toLowerCase();
+
+              if (lowerName.startsWith(lowerBrand)) {
+                const cleanedName = partName.substring(brand.length).trim();
+                if (cleanedName) {
+                  const retryQuery = manager
+                    .getRepository(SparePart)
+                    .createQueryBuilder('sparePart')
+                    .where('LOWER(sparePart.part_name) = LOWER(:partName)', {
+                      partName: cleanedName,
+                    })
+                    .andWhere('LOWER(sparePart.brand) = LOWER(:brand)', { brand })
+                    .andWhere('sparePart.branch_id = :branchId', { branchId: data.branchId });
+
+                  if (spModelId) {
+                    retryQuery.andWhere('sparePart.model_id = :modelId', { modelId: spModelId });
+                  } else {
+                    retryQuery.andWhere('sparePart.model_id IS NULL');
+                  }
+
+                  sparePart = await retryQuery.getOne();
+                }
+              }
+            }
+
+            // Fallback: If not found with specific model, try looking for Universal (NULL model)
+            if (!sparePart && spModelId) {
+              const universalQuery = manager
+                .getRepository(SparePart)
+                .createQueryBuilder('sparePart')
+                .where('LOWER(sparePart.part_name) = LOWER(:partName)', { partName })
+                .andWhere('LOWER(sparePart.brand) = LOWER(:brand)', { brand })
+                .andWhere('sparePart.branch_id = :branchId', { branchId: data.branchId })
+                .andWhere('sparePart.model_id IS NULL');
+
+              sparePart = await universalQuery.getOne();
+            }
+
+            if (!sparePart) {
+              // AUTOMATICALLY CREATE NEW SPARE PART
+              // User requested seamless addition. If not found, create it.
+              sparePart = new SparePart();
+              sparePart.part_name = itemData.partName; // Use original input
+              sparePart.brand = brand;
+              sparePart.branch_id = data.branchId;
+              sparePart.base_price = itemData.unitPrice || 0;
+
+              // Generate Item Code (Required Field)
+              // Format: SP-{TIMESTAMP}-{RANDOM}
+              const timestamp = Date.now().toString(36).toUpperCase();
+              const random = Math.random().toString(36).substring(2, 6).toUpperCase();
+              sparePart.item_code = `SP-${timestamp}-${random}`;
+
+              if (spModelId) {
+                sparePart.model_id = spModelId;
+              }
+
+              sparePart.lot_id = savedLot.id;
+
+              sparePart = await manager.save(SparePart, sparePart);
+            }
+
+            lotItem.sparePartId = sparePart.id;
           } else {
             throw new AppError(
               'Spare Part requires either sparePartId or both brand and partName',
@@ -88,17 +173,17 @@ export class LotRepository {
       }
 
       const costsTotal =
-        Number(lot.transportationCost) +
-        Number(lot.documentationCost) +
-        Number(lot.shippingCost) +
-        Number(lot.groundFieldCost) +
-        Number(lot.certificationCost) +
-        Number(lot.labourCost);
+        Number(savedLot.transportationCost) +
+        Number(savedLot.documentationCost) +
+        Number(savedLot.shippingCost) +
+        Number(savedLot.groundFieldCost) +
+        Number(savedLot.certificationCost) +
+        Number(savedLot.labourCost);
 
-      lot.totalAmount = itemsTotal + costsTotal;
-      lot.items = lotItems;
+      savedLot.totalAmount = itemsTotal + costsTotal;
+      savedLot.items = lotItems;
 
-      return await manager.save(Lot, lot);
+      return await manager.save(Lot, savedLot);
     });
   }
 
