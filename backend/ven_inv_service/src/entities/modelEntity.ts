@@ -22,6 +22,9 @@ export class Model {
   @Column({ type: 'varchar', length: 255 })
   model_name!: string;
 
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  hs_code?: string;
+
   @Column({ type: 'uuid', nullable: true })
   brand_id!: string;
 

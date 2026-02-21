@@ -123,6 +123,12 @@ export function ModelManagementDialog({ open, onClose }: ModelManagementDialogPr
                   className: 'font-semibold text-[11px] text-primary uppercase',
                 },
                 {
+                  id: 'hs_code',
+                  header: 'HS CODE',
+                  cell: (model: Model) => model.hs_code || '-',
+                  className: 'font-semibold text-[11px] text-primary uppercase w-[100px]',
+                },
+                {
                   id: 'qty',
                   header: 'QUANTITY',
                   className: 'font-semibold text-[11px] text-primary uppercase w-[100px]',
@@ -213,6 +219,7 @@ function ModelForm({
     model_no: initialData?.model_no || '',
     model_name: initialData?.model_name || '',
     brand_id: initialData?.brandRelation?.id || '',
+    hs_code: initialData?.hs_code || '',
     description: initialData?.description || '',
   });
   const [brands, setBrands] = useState<Brand[]>([]);
@@ -293,6 +300,14 @@ function ModelForm({
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+            <div className="col-span-2">
+              <label className="block text-sm font-medium mb-1">HS Code</label>
+              <Input
+                value={form.hs_code || ''}
+                onChange={(e) => setForm({ ...form, hs_code: e.target.value })}
+                placeholder="e.g. 84433100"
+              />
             </div>
             <div className="col-span-2">
               <label className="block text-sm font-medium mb-1">Description</label>

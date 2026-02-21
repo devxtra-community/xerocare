@@ -13,6 +13,7 @@ export interface ILead extends Document {
   email?: string;
   phone?: string;
   source?: string;
+  location?: string;
   status: LeadStatus;
   metadata?: Record<string, unknown>;
   customerId?: string;
@@ -31,6 +32,7 @@ const LeadSchema: Schema = new Schema(
     email: { type: String },
     phone: { type: String },
     source: { type: String, default: 'Website' },
+    location: { type: String },
     status: {
       type: String,
       enum: Object.values(LeadStatus),
