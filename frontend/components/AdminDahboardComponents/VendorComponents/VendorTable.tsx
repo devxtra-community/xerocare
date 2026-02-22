@@ -15,6 +15,7 @@ import {
   updateVendor,
   deleteVendor as apiDeleteVendor,
   getVendors,
+  getVendorStats,
   requestProducts,
 } from '@/lib/vendor';
 import { toast } from 'sonner';
@@ -98,19 +99,31 @@ export default function VendorTable({ basePath = '/admin' }: { basePath?: string
       setVendors(mappedVendors);
       setTotal(res.total || res.data.length);
 
-      // Keep naive stats based on loaded data, since paginated response might lack global metrics
-      setStats({
-        total: res.total || res.data.length,
-        active: rawVendors.filter((v: Record<string, unknown>) => v.status === 'ACTIVE').length,
-        totalSpending: rawVendors.reduce(
-          (sum: number, v: Record<string, unknown>) => sum + ((v.purchaseValue as number) || 0),
-          0,
-        ),
-        totalOrders: rawVendors.reduce(
-          (sum: number, v: Record<string, unknown>) => sum + ((v.totalOrders as number) || 0),
-          0,
-        ),
-      });
+      // Fetch global stats if viewing all branches or admin view
+      try {
+        const globalStats = await getVendorStats();
+        setStats({
+          total: globalStats.total,
+          active: globalStats.active,
+          totalSpending: globalStats.totalSpending,
+          totalOrders: globalStats.totalOrders,
+        });
+      } catch (statsErr) {
+        console.error('Failed to fetch global vendor stats:', statsErr);
+        // Fallback to naive stats if backend fails
+        setStats({
+          total: res.total || res.data.length,
+          active: rawVendors.filter((v: Record<string, unknown>) => v.status === 'ACTIVE').length,
+          totalSpending: rawVendors.reduce(
+            (sum: number, v: Record<string, unknown>) => sum + (Number(v.purchaseValue) || 0),
+            0,
+          ),
+          totalOrders: rawVendors.reduce(
+            (sum: number, v: Record<string, unknown>) => sum + (Number(v.totalOrders) || 0),
+            0,
+          ),
+        });
+      }
     } catch (error) {
       console.error('Failed to fetch vendors:', error);
       toast.error('Failed to load vendor data');
@@ -259,7 +272,7 @@ export default function VendorTable({ basePath = '/admin' }: { basePath?: string
             header: 'PURCHASE VALUE',
             className: 'text-right font-semibold text-[11px] text-primary uppercase w-[120px]',
             cell: (v: Vendor) => (
-              <span className="font-bold text-primary">₹ {v.purchaseValue.toLocaleString()}</span>
+              <span className="font-bold text-primary">QAR {v.purchaseValue.toLocaleString()}</span>
             ),
           },
           {
@@ -268,7 +281,7 @@ export default function VendorTable({ basePath = '/admin' }: { basePath?: string
             className: 'text-right font-semibold text-[11px] text-primary uppercase w-[120px]',
             cell: (v: Vendor) => (
               <span className="font-bold text-red-600">
-                ₹ {v.outstandingAmount.toLocaleString()}
+                QAR {v.outstandingAmount.toLocaleString()}
               </span>
             ),
           },

@@ -28,6 +28,7 @@ import {
   Employee,
   EmployeeResponse,
 } from '@/lib/employee';
+
 import EmployeeFormDialog from '@/components/AdminDahboardComponents/hrComponents/EmployeeFormDialog';
 import DeleteEmployeeDialog from '@/components/AdminDahboardComponents/hrComponents/DeleteEmployeeDialog';
 import { useRouter } from 'next/navigation';
@@ -50,7 +51,6 @@ import { useRouter } from 'next/navigation';
 export default function HREmployeeManagementTable() {
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState('All');
-  const [branchFilter, setBranchFilter] = useState('All');
   const router = useRouter();
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [pagination, setPagination] = useState<EmployeeResponse['pagination']>({
@@ -86,11 +86,6 @@ export default function HREmployeeManagementTable() {
     fetchEmployees(1);
   }, [fetchEmployees]);
 
-  // Extract unique branches from the employee list
-  const branches = Array.from(
-    new Set(employees.map((emp) => emp.branch?.name).filter(Boolean)),
-  ) as string[];
-
   const filteredEmployees = employees.filter((emp) => {
     const fullName = `${emp.first_name || ''} ${emp.last_name || ''}`.toLowerCase();
     const matchesSearch =
@@ -99,8 +94,7 @@ export default function HREmployeeManagementTable() {
       emp.display_id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       emp.phone?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesRole = roleFilter === 'All' || emp.role === roleFilter;
-    const matchesBranch = branchFilter === 'All' || emp.branch?.name === branchFilter;
-    return matchesSearch && matchesRole && matchesBranch;
+    return matchesSearch && matchesRole;
   });
 
   const handleAdd = () => {
@@ -168,7 +162,7 @@ export default function HREmployeeManagementTable() {
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          <div className="w-full sm:w-[180px]">
+          <div className="w-full sm:w-[150px]">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
@@ -181,46 +175,40 @@ export default function HREmployeeManagementTable() {
                   </div>
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-40 rounded-xl">
-                <DropdownMenuItem onClick={() => setRoleFilter('All')}>All Roles</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setRoleFilter('MANAGER')}>
-                  Manager
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setRoleFilter('HR')}>HR</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setRoleFilter('EMPLOYEE')}>
-                  Employee
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setRoleFilter('FINANCE')}>
-                  Finance
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-          <div className="w-full sm:w-[180px]">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="outline"
-                  className="w-full h-10 bg-card border-blue-400/60 focus:ring-blue-100 rounded-xl justify-between px-3"
-                >
-                  <div className="flex items-center gap-2 truncate">
-                    <Filter className="h-4 w-4" />
-                    <span className="truncate">Branch: {branchFilter}</span>
-                  </div>
-                </Button>
-              </DropdownMenuTrigger>
               <DropdownMenuContent
                 align="end"
-                className="w-48 rounded-xl max-h-[300px] overflow-y-auto"
+                className="w-40 rounded-xl p-1 bg-white border-slate-200 shadow-xl"
               >
-                <DropdownMenuItem onClick={() => setBranchFilter('All')}>
-                  All Branches
+                <DropdownMenuItem
+                  onClick={() => setRoleFilter('All')}
+                  className="rounded-lg focus:bg-accent focus:text-accent-foreground cursor-pointer px-3 py-2"
+                >
+                  All Roles
                 </DropdownMenuItem>
-                {branches.map((branch) => (
-                  <DropdownMenuItem key={branch} onClick={() => setBranchFilter(branch)}>
-                    {branch}
-                  </DropdownMenuItem>
-                ))}
+                <DropdownMenuItem
+                  onClick={() => setRoleFilter('MANAGER')}
+                  className="rounded-lg focus:bg-accent focus:text-accent-foreground cursor-pointer px-3 py-2"
+                >
+                  Manager
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => setRoleFilter('HR')}
+                  className="rounded-lg focus:bg-accent focus:text-accent-foreground cursor-pointer px-3 py-2"
+                >
+                  HR
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => setRoleFilter('EMPLOYEE')}
+                  className="rounded-lg focus:bg-accent focus:text-accent-foreground cursor-pointer px-3 py-2"
+                >
+                  Employee
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => setRoleFilter('FINANCE')}
+                  className="rounded-lg focus:bg-accent focus:text-accent-foreground cursor-pointer px-3 py-2"
+                >
+                  Finance
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
@@ -245,9 +233,9 @@ export default function HREmployeeManagementTable() {
       </div>
 
       <div className="bg-card rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="overflow-x-auto min-h-[400px]">
+        <div className="overflow-auto max-h-[500px] relative">
           <Table className="w-full text-left">
-            <TableHeader className="bg-muted/50/50">
+            <TableHeader className="bg-muted/50/50 sticky top-0 z-20 shadow-sm">
               <TableRow className="border-b border-gray-100 hover:bg-transparent">
                 <TableHead className="px-3 py-2 text-[10px] font-bold text-primary uppercase">
                   Employee ID
@@ -262,9 +250,6 @@ export default function HREmployeeManagementTable() {
                   Role
                 </TableHead>
                 <TableHead className="px-3 py-2 text-[10px] font-bold text-primary uppercase">
-                  Branch
-                </TableHead>
-                <TableHead className="px-3 py-2 text-[10px] font-bold text-primary uppercase">
                   Status
                 </TableHead>
                 <TableHead className="px-3 py-2 text-[10px] font-bold text-primary uppercase text-center">
@@ -273,7 +258,19 @@ export default function HREmployeeManagementTable() {
               </TableRow>
             </TableHeader>
             <TableBody className="">
-              {!isLoading && filteredEmployees.length === 0 ? (
+              {isLoading ? (
+                <TableRow>
+                  <TableCell
+                    colSpan={6}
+                    className="px-3 py-20 text-center text-muted-foreground text-sm italic"
+                  >
+                    <div className="flex flex-col items-center justify-center gap-2">
+                      <Loader2 className="h-8 w-8 animate-spin text-primary/40" />
+                      <p>Fetching employee records...</p>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ) : !isLoading && filteredEmployees.length === 0 ? (
                 <TableRow>
                   <TableCell
                     colSpan={7}
@@ -320,9 +317,6 @@ export default function HREmployeeManagementTable() {
                       <span className="px-1.5 py-0.5 rounded-full text-[9px] font-semibold uppercase bg-blue-100 text-blue-700">
                         {emp.role}
                       </span>
-                    </TableCell>
-                    <TableCell className="px-3 py-1.5 text-[11px] text-muted-foreground whitespace-nowrap">
-                      {emp.branch?.name || '---'}
                     </TableCell>
                     <TableCell className="px-3 py-1.5 whitespace-nowrap">
                       <span

@@ -19,6 +19,8 @@ export default function FinanceStats({ selectedYear }: FinanceStatsProps) {
   const [stats, setStats] = useState({
     totalRevenue: 0,
     totalExpenses: 0,
+    purchaseExpenses: 0,
+    totalSalaries: 0,
     netProfit: 0,
   });
 
@@ -31,6 +33,8 @@ export default function FinanceStats({ selectedYear }: FinanceStatsProps) {
         setStats({
           totalRevenue: data.totalRevenue,
           totalExpenses: data.totalExpenses,
+          purchaseExpenses: data.purchaseExpenses,
+          totalSalaries: data.totalSalaries,
           netProfit: data.netProfit,
         });
       } catch (error) {
@@ -44,7 +48,7 @@ export default function FinanceStats({ selectedYear }: FinanceStatsProps) {
   }, [selectedYear]);
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 sm:gap-2 md:gap-4">
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-1.5 sm:gap-2 md:gap-4">
       <StatCard
         title="Total Revenue"
         value={loading ? '...' : formatCurrency(stats.totalRevenue)}
@@ -53,7 +57,12 @@ export default function FinanceStats({ selectedYear }: FinanceStatsProps) {
       <StatCard
         title="Total Expenses"
         value={loading ? '...' : formatCurrency(stats.totalExpenses)}
-        subtitle="Purchase Cost (Lots)"
+        subtitle="Purchase Cost + Payroll"
+      />
+      <StatCard
+        title="Payroll Expense"
+        value={loading ? '...' : formatCurrency(stats.totalSalaries)}
+        subtitle="Employee Salaries"
       />
       <StatCard
         title="Net Profit"

@@ -1,8 +1,7 @@
 'use client';
 import { PieChart, Pie, Cell } from 'recharts';
 import { useState, useEffect } from 'react';
-import { getAllEmployees } from '@/lib/employee';
-import { StandardChartCard } from '@/components/charts/StandardChartCard';
+import { getAllEmployees, Employee } from '@/lib/employee';
 
 interface ChartData {
   name: string;
@@ -22,7 +21,7 @@ const COLORS = {
  * Pie chart component displaying employee distribution by department/role.
  * Categorizes employees into groups like Employee, Finance, HR, and Other.
  */
-export default function EmployeePieChart() {
+export default function EmployeePieChart({ selectedYear }: { selectedYear: number | 'all' }) {
   const [isClient, setIsClient] = useState(false);
   const [data, setData] = useState<ChartData[]>([]);
   const [total, setTotal] = useState(0);
@@ -31,14 +30,21 @@ export default function EmployeePieChart() {
     setIsClient(true);
     const fetchData = async () => {
       try {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const res: any = await getAllEmployees();
-        const employees = res.data?.employees || [];
+        const res = await getAllEmployees();
+        let employees = res.data?.employees || [];
+
+        // Filter by year if not 'all'
+        if (selectedYear !== 'all') {
+          employees = employees.filter((emp: Employee) => {
+            const date = new Date(emp.createdAt);
+            return date.getFullYear() === selectedYear;
+          });
+        }
+
         const roleCounts: Record<string, number> = {};
 
         // Count employees by role
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        employees.forEach((emp: any) => {
+        employees.forEach((emp: Employee) => {
           let role = emp.role || 'Other';
           // Normalize role names
           if (role === 'EMPLOYEE') role = 'Employee';
@@ -76,18 +82,17 @@ export default function EmployeePieChart() {
     };
 
     fetchData();
-  }, []);
+  }, [selectedYear]);
 
   return (
-    <StandardChartCard
-      title="Employee Distribution"
-      description="Workforce by department"
-      height={280}
-      loading={!isClient || data.length === 0}
-    >
-      <div className="flex flex-col h-full">
-        <div className="relative w-[100px] h-[100px] mx-auto mb-2 flex-shrink-0">
-          {isClient && (
+    <div className="rounded-2xl bg-card p-2 sm:p-3 shadow-sm w-full h-[280px] flex flex-col">
+      {!isClient || data.length === 0 ? (
+        <div className="flex-1 flex items-center justify-center">
+          <p className="text-sm text-muted-foreground">Loading distribution...</p>
+        </div>
+      ) : (
+        <div className="flex flex-col h-full">
+          <div className="relative w-[100px] h-[100px] mx-auto mb-2 flex-shrink-0">
             <PieChart width={100} height={100}>
               <Pie
                 data={data}
@@ -109,45 +114,45 @@ export default function EmployeePieChart() {
                 ))}
               </Pie>
             </PieChart>
-          )}
 
-          <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-            <p className="text-xl font-bold text-foreground leading-none mt-2 ml-2">{total}</p>
-            <p className="text-[8px] text-foreground leading-tight font-medium ml-2">Total</p>
-          </div>
-        </div>
-
-        <div className="w-full flex-1 overflow-hidden">
-          <div className="grid grid-cols-3 text-[10px] font-semibold text-primary border-b border-border pb-1.5 mb-1.5">
-            <span>Department</span>
-            <span className="text-center">
-              Number Of
-              <br />
-              Employees
-            </span>
-            <span className="text-right">%</span>
+            <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
+              <p className="text-xl font-bold text-foreground leading-none mt-2 ml-2">{total}</p>
+              <p className="text-[8px] text-foreground leading-tight font-medium ml-2">Total</p>
+            </div>
           </div>
 
-          {data.map(
-            (item) =>
-              item.name !== 'No Data' && (
-                <div key={item.name} className="grid grid-cols-3 items-center py-1.5 text-xs">
-                  <div className="flex items-center gap-1.5">
-                    <span
-                      className="h-2 w-2 rounded-full"
-                      style={{ backgroundColor: item.color }}
-                    />
-                    <span className="font-medium text-foreground">{item.name}</span>
+          <div className="w-full flex-1 overflow-hidden">
+            <div className="grid grid-cols-3 text-[10px] font-semibold text-primary border-b border-border pb-1.5 mb-1.5">
+              <span>Department</span>
+              <span className="text-center">
+                Number Of
+                <br />
+                Employees
+              </span>
+              <span className="text-right">%</span>
+            </div>
+
+            {data.map(
+              (item) =>
+                item.name !== 'No Data' && (
+                  <div key={item.name} className="grid grid-cols-3 items-center py-1 text-xs">
+                    <div className="flex items-center gap-1.5">
+                      <span
+                        className="h-2 w-2 rounded-full"
+                        style={{ backgroundColor: item.color }}
+                      />
+                      <span className="font-medium text-foreground">{item.name}</span>
+                    </div>
+                    <span className="text-center font-semibold text-foreground">{item.value}</span>
+                    <span className="text-right font-semibold text-foreground">
+                      {item.percentage}%
+                    </span>
                   </div>
-                  <span className="text-center font-semibold text-foreground">{item.value}</span>
-                  <span className="text-right font-semibold text-foreground">
-                    {item.percentage}%
-                  </span>
-                </div>
-              ),
-          )}
+                ),
+            )}
+          </div>
         </div>
-      </div>
-    </StandardChartCard>
+      )}
+    </div>
   );
 }

@@ -9,6 +9,13 @@ import { StandardTable } from '@/components/table/StandardTable';
 import { usePagination } from '@/hooks/usePagination';
 import { getAllEmployees, Employee } from '@/lib/employee';
 import { toast } from 'sonner';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 /**
  * Table component for viewing and managing employee records in the Manager Dashboard.
@@ -20,11 +27,12 @@ export default function EmployeeTable() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [role, setRole] = useState('All');
 
   const fetchEmployees = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await getAllEmployees(page, limit, undefined, search);
+      const res = await getAllEmployees(page, limit, role, search);
       if (res && res.success && res.data) {
         setEmployees(res.data.employees || []);
         setTotal(res.data.pagination?.total || 0);
@@ -35,7 +43,7 @@ export default function EmployeeTable() {
     } finally {
       setLoading(false);
     }
-  }, [page, limit, search, setTotal]);
+  }, [page, limit, role, search, setTotal]);
 
   useEffect(() => {
     const delayDebounceFn = setTimeout(() => {
@@ -43,6 +51,11 @@ export default function EmployeeTable() {
     }, 500);
     return () => clearTimeout(delayDebounceFn);
   }, [fetchEmployees]);
+
+  // Reset to page 1 when search or filter changes
+  useEffect(() => {
+    setPage(1);
+  }, [search, role, setPage]);
 
   const toggleStatus = (id: string, newStatus: string) => {
     toast('Status updates via table are display-only until API is ready');
@@ -53,7 +66,7 @@ export default function EmployeeTable() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div className="relative w-full max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
           <Input
@@ -62,6 +75,21 @@ export default function EmployeeTable() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
+        </div>
+
+        <div className="w-full sm:w-48">
+          <Select value={role} onValueChange={setRole}>
+            <SelectTrigger className="h-10 bg-card border-blue-400/60 rounded-xl focus:ring-blue-100 shadow-sm">
+              <SelectValue placeholder="Filter by Role" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="All">All Departments</SelectItem>
+              <SelectItem value="MANAGER">Manager</SelectItem>
+              <SelectItem value="HR">HR</SelectItem>
+              <SelectItem value="FINANCE">Finance</SelectItem>
+              <SelectItem value="EMPLOYEE">Employee</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
       </div>
 

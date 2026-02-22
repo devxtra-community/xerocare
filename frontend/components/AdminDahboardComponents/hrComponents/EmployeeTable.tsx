@@ -44,6 +44,8 @@ import {
   EmployeeResponse,
 } from '@/lib/employee';
 import { formatCurrency } from '@/lib/format';
+import { EMPLOYEE_JOB_LABELS, EmployeeJob } from '@/lib/employeeJob';
+import { FINANCE_JOB_LABELS, FinanceJob } from '@/lib/financeJob';
 
 /**
  * Table component for listing, filtering, and managing employees.
@@ -220,6 +222,9 @@ export default function EmployeeTable() {
                 Role
               </TableHead>
               <TableHead className="px-3 py-4 text-xs font-semibold text-primary uppercase tracking-wider">
+                Department
+              </TableHead>
+              <TableHead className="px-3 py-4 text-xs font-semibold text-primary uppercase tracking-wider">
                 Branch
               </TableHead>
               <TableHead className="px-3 py-4 text-xs font-semibold text-primary uppercase tracking-wider">
@@ -298,6 +303,19 @@ export default function EmployeeTable() {
                     >
                       {emp.role}
                     </Badge>
+                  </TableCell>
+                  <TableCell className="px-3 py-4">
+                    <span className="text-xs font-medium text-gray-700">
+                      {emp.role === 'HR'
+                        ? 'HR'
+                        : emp.role === 'MANAGER'
+                          ? 'Management'
+                          : emp.role === 'ADMIN'
+                            ? 'Administration'
+                            : emp.role === 'FINANCE'
+                              ? FINANCE_JOB_LABELS[emp.finance_job as FinanceJob] || 'Finance'
+                              : EMPLOYEE_JOB_LABELS[emp.employee_job as EmployeeJob] || 'Staff'}
+                    </span>
                   </TableCell>
                   <TableCell className="px-3 py-4">
                     <span className="text-xs text-gray-600">{emp.branch?.name || '---'}</span>

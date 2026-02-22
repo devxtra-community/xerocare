@@ -23,7 +23,7 @@ import { ChartTooltipContent } from '@/components/ui/ChartTooltip';
  * Displays employee growth (bar chart) and role distribution (pie chart).
  * Visualizes workforce trends and composition.
  */
-export default function HRCharts() {
+export default function HRCharts({ selectedYear }: { selectedYear: number | 'all' }) {
   const [roleData, setRoleData] = useState<{ name: string; value: number; color: string }[]>([]);
   const [growthData, setGrowthData] = useState<{ month: string; count: number }[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -31,7 +31,7 @@ export default function HRCharts() {
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const response = await getHRStats();
+        const response = await getHRStats(selectedYear);
         if (response.success) {
           const stats = response.data;
 
@@ -55,7 +55,7 @@ export default function HRCharts() {
       }
     };
     fetchStats();
-  }, []);
+  }, [selectedYear]);
 
   if (isLoading) {
     return (
@@ -69,7 +69,9 @@ export default function HRCharts() {
     <div className="flex flex-col lg:flex-row gap-6 mb-6">
       {/* Employee Growth Chart */}
       <div className="flex-1 bg-card p-6 rounded-2xl shadow-sm border-0">
-        <h3 className="text-lg font-semibold text-primary mb-4">Employee Growth (Monthly)</h3>
+        <h3 className="text-lg font-semibold text-primary mb-4">
+          Employee Growth ({selectedYear === 'all' ? 'All Time' : selectedYear})
+        </h3>
         <div className="h-[300px] w-full">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={growthData}>

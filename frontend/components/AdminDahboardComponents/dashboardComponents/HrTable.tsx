@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { getAllEmployees } from '@/lib/employee';
+import { getAllEmployees, Employee } from '@/lib/employee';
 import { toast } from 'sonner';
 
 interface EmployeeDisplay {
@@ -17,7 +17,7 @@ const ITEMS_PER_PAGE = 5;
  * Dashboard widget displaying recent employee additions.
  * Shows a paginated list of employees with their position, start date, and salary.
  */
-export default function HrTable() {
+export default function HrTable({ selectedYear }: { selectedYear: number | 'all' }) {
   const [page, setPage] = useState(1);
   const [employees, setEmployees] = useState<EmployeeDisplay[]>([]);
   const [loading, setLoading] = useState(true);
@@ -25,13 +25,19 @@ export default function HrTable() {
   useEffect(() => {
     const fetchEmployees = async () => {
       try {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const res: any = await getAllEmployees();
+        const res = await getAllEmployees();
         // API returns { success: true, data: { employees: [], pagination: {} } }
-        const employeeList = res.data?.employees || [];
+        let employeeList = res.data?.employees || [];
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const mappedData = employeeList.map((emp: any) => {
+        // Filter by year if not 'all'
+        if (selectedYear !== 'all') {
+          employeeList = employeeList.filter((emp: Employee) => {
+            const date = new Date(emp.createdAt);
+            return date.getFullYear() === selectedYear;
+          });
+        }
+
+        const mappedData = employeeList.map((emp: Employee) => {
           const firstName = emp.first_name || '';
           const lastName = emp.last_name || '';
           const fullName = (firstName + ' ' + lastName).trim() || emp.email || 'Unknown';
@@ -63,7 +69,7 @@ export default function HrTable() {
     };
 
     fetchEmployees();
-  }, []);
+  }, [selectedYear]);
 
   const totalPages = Math.ceil(employees.length / ITEMS_PER_PAGE);
   const startIndex = (page - 1) * ITEMS_PER_PAGE;

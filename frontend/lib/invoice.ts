@@ -338,6 +338,8 @@ export const getBranchFinanceStats = async (
 ): Promise<{
   totalRevenue: number;
   totalExpenses: number;
+  purchaseExpenses: number;
+  totalSalaries: number;
   netProfit: number;
   salesByType: { saleType: string; total: number }[];
 }> => {
@@ -505,6 +507,8 @@ export interface FinanceReportItem {
   month: string;
   income: number;
   expense: number;
+  purchaseExpense?: number;
+  salaryExpense?: number;
   source: 'SALE' | 'LEASE' | 'RENT' | 'All';
   branchId: string;
   profit: number;

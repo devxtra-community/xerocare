@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import StatCard from '@/components/StatCard';
-import { getAllEmployees, Employee } from '@/lib/employee';
+import { getHRStats, HRStats } from '@/lib/employee';
 
 /**
  * Component displaying high-level HR statistics.
@@ -21,24 +21,15 @@ export default function HRStatCards() {
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const response = await getAllEmployees(1, 1000, 'All');
+        const response = await getHRStats();
         if (response.success) {
-          const employees: Employee[] = response.data.employees;
-          const total = employees.length;
-
-          // Count unique roles/departments
-          const uniqueRoles = new Set(employees.map((emp) => emp.role));
-          const departments = uniqueRoles.size;
-
-          // Mock data for active today and on leave (can be replaced with real API data)
-          const activeToday = Math.floor(total * 0.85); // 85% attendance mock
-          const onLeave = Math.floor(total * 0.08); // 8% on leave mock
+          const s: HRStats = response.data;
 
           setStats({
-            totalEmployees: total,
-            activeToday,
-            onLeave,
-            departments,
+            totalEmployees: s.total || 0,
+            activeToday: s.active || 0,
+            onLeave: s.inactive || 0, // Using inactive as proxy for absence in stats
+            departments: Object.keys(s.byRole).length || 0,
           });
         }
       } catch (error) {

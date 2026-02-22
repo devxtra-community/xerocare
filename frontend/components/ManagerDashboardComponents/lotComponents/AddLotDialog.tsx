@@ -33,6 +33,7 @@ import { brandService, Brand } from '@/services/brandService';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { getMyBranchWarehouses, Warehouse } from '@/lib/warehouse';
 import * as XLSX from 'xlsx';
+import { formatCurrency } from '@/lib/format';
 
 // --- Schema Definition ---
 const lotItemSchema = z
@@ -105,14 +106,14 @@ const CostInput = <T extends import('react-hook-form').FieldValues>({
           </div>
           <FormControl>
             <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">
-                $
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-[10px] font-bold">
+                QAR
               </span>
               <Input
                 type="number"
                 min="0"
                 step="0.01"
-                className="h-10 text-sm pl-7 text-right font-medium"
+                className="h-10 text-sm pl-10 text-right font-medium"
                 {...field}
                 value={(field.value as number) || ''}
                 onChange={(e) => field.onChange(e.target.valueAsNumber)}
@@ -735,8 +736,8 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
                                 Unit Price
                               </div>
                               <div className="relative">
-                                <span className="absolute left-1 top-1/2 -translate-y-1/2 text-gray-500 text-xs">
-                                  $
+                                <span className="absolute left-1 top-1/2 -translate-y-1/2 text-gray-500 text-[9px] font-bold">
+                                  QAR
                                 </span>
                                 <FormField
                                   control={formControl}
@@ -746,7 +747,7 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
                                       type="number"
                                       min="0"
                                       step="0.01"
-                                      className="h-10 text-sm pl-4 bg-gray-50/50"
+                                      className="h-10 text-sm pl-8 bg-gray-50/50"
                                       placeholder="0"
                                       {...field}
                                     />
@@ -792,7 +793,7 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
                       <div className="bg-white border-t p-4 text-right flex justify-end items-center gap-2">
                         <span className="text-gray-600 text-sm font-medium">Items Total:</span>
                         <span className="font-bold text-lg text-gray-900">
-                          ${calculateItemsTotal().toFixed(2)}
+                          {formatCurrency(calculateItemsTotal())}
                         </span>
                       </div>
                     </div>
@@ -834,10 +835,7 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
                     <div className="flex justify-between items-center">
                       <span className="text-gray-600 text-sm font-medium">Costs Total:</span>
                       <span className="font-bold text-base text-gray-900">
-                        $
-                        {calculateCostsTotal().toLocaleString(undefined, {
-                          minimumFractionDigits: 2,
-                        })}
+                        {formatCurrency(calculateCostsTotal())}
                       </span>
                     </div>
                   </div>
@@ -849,11 +847,7 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
                 <div className="flex items-center gap-2">
                   <span className="text-base text-gray-600 font-bold">Grand Total:</span>
                   <span className="text-2xl font-bold tracking-tight text-blue-600">
-                    $
-                    {calculateGrandTotal().toLocaleString(undefined, {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })}
+                    {formatCurrency(calculateGrandTotal())}
                   </span>
                 </div>
                 <div className="flex gap-4">

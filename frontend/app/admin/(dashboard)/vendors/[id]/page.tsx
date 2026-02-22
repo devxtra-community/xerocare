@@ -12,12 +12,10 @@ import {
   MapPin,
   Building2,
   User,
-  TrendingUp,
   Clock,
 } from 'lucide-react';
 import StatCard from '@/components/StatCard';
 import VendorTransactionsTable from '@/components/AdminDahboardComponents/vendorComponents/VendorTransactionsTable';
-import VendorSpendingTrend from '@/components/AdminDahboardComponents/vendorComponents/VendorSpendingTrend';
 import { getVendorById, getVendorRequests, Vendor as ApiVendor, VendorRequest } from '@/lib/vendor';
 import { toast } from 'sonner';
 
@@ -135,7 +133,7 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
         </div>
 
         {/* FINANCIAL SUMMARY CARDS */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 sm:gap-2 md:gap-4">
+        <div className="grid grid-cols-2 gap-1.5 sm:gap-2 md:gap-4 max-w-2xl">
           <StatCard
             title="Total Spend"
             value={`QAR ${((vendor.purchaseValue || 0) / 1000).toFixed(1)}k`}
@@ -145,16 +143,6 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
             title="Total Orders"
             value={(vendor.totalOrders || 0).toString()}
             subtitle="Successful Deliveries"
-          />
-          <StatCard
-            title="Outstanding"
-            value={`QAR ${((vendor.outstandingAmount || 0) / 1000).toFixed(0)}k`}
-            subtitle="Pending Payments"
-          />
-          <StatCard
-            title="Credit Limit"
-            value={`QAR ${((vendor.creditLimit || 0) / 1000).toFixed(1)}k`}
-            subtitle="Available: QAR 4.5k"
           />
         </div>
 
@@ -258,18 +246,6 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
               <div className="flex-1 overflow-auto">
                 <VendorTransactionsTable requests={requests} loading={requestsLoading} />
               </div>
-            </div>
-          </div>
-        </div>
-
-        {/* BOTTOM SECTION: ANALYTICS */}
-        <div className="space-y-4">
-          <h3 className="text-sm font-bold text-primary uppercase flex items-center gap-2">
-            <TrendingUp className="h-3.5 w-3.5 text-primary" /> Purchasing Analytics
-          </h3>
-          <div className="bg-card rounded-xl p-6 shadow-sm border border-blue-100/30">
-            <div className="h-[320px]">
-              <VendorSpendingTrend requests={requests} />
             </div>
           </div>
         </div>

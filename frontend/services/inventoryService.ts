@@ -31,8 +31,9 @@ export const inventoryService = {
   /**
    * Retrieves global inventory (Admin).
    */
-  getGlobalInventory: async (): Promise<InventoryItem[]> => {
-    const response = await api.get('/i/inventory');
+  getGlobalInventory: async (year?: number | 'all'): Promise<InventoryItem[]> => {
+    const params = year && year !== 'all' ? { year } : {};
+    const response = await api.get('/i/inventory', { params });
     return response.data.data;
   },
 
@@ -40,8 +41,9 @@ export const inventoryService = {
   /**
    * Retrieves inventory for the current user's branch (Manager).
    */
-  getBranchInventory: async (): Promise<InventoryItem[]> => {
-    const response = await api.get('/i/inventory/branch');
+  getBranchInventory: async (year?: number | 'all'): Promise<InventoryItem[]> => {
+    const params = year && year !== 'all' ? { year } : {};
+    const response = await api.get('/i/inventory/branch', { params });
     return response.data.data;
   },
 
@@ -49,16 +51,22 @@ export const inventoryService = {
   /**
    * Retrieves inventory for a specific warehouse.
    */
-  getWarehouseInventory: async (warehouseId: string): Promise<InventoryItem[]> => {
-    const response = await api.get(`/i/inventory/warehouse`, { params: { warehouseId } });
+  getWarehouseInventory: async (
+    warehouseId: string,
+    year?: number | 'all',
+  ): Promise<InventoryItem[]> => {
+    const params: { warehouseId: string; year?: number } = { warehouseId };
+    if (year && year !== 'all') params.year = year;
+    const response = await api.get(`/i/inventory/warehouse`, { params });
     return response.data.data;
   },
 
   /**
    * Retrieves inventory statistics.
    */
-  getInventoryStats: async (): Promise<InventoryStats> => {
-    const response = await api.get('/i/inventory/stats');
+  getInventoryStats: async (year?: number | 'all'): Promise<InventoryStats> => {
+    const params = year && year !== 'all' ? { year } : {};
+    const response = await api.get('/i/inventory/stats', { params });
     return response.data.data;
   },
 };

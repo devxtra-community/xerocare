@@ -10,14 +10,14 @@ import { Loader2 } from 'lucide-react';
  * Shows total employees, active rate, and department counts.
  * Provides quick insights into workforce size and health.
  */
-export default function HRStatsCards() {
+export default function HRStatsCards({ selectedYear }: { selectedYear: number | 'all' }) {
   const [stats, setStats] = useState<HRStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const response = await getHRStats();
+        const response = await getHRStats(selectedYear);
         if (response.success) {
           setStats(response.data);
         }
@@ -28,7 +28,7 @@ export default function HRStatsCards() {
       }
     };
     fetchStats();
-  }, []);
+  }, [selectedYear]);
 
   if (isLoading) {
     return (
@@ -42,7 +42,7 @@ export default function HRStatsCards() {
     {
       title: 'Total Employees',
       value: stats?.total?.toString() || '0',
-      subtitle: 'Total registered staff',
+      subtitle: `Total as of ${selectedYear === 'all' ? 'All Years' : selectedYear}`,
     },
     {
       title: 'Active / Inactive',

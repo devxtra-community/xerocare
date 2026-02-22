@@ -1,3 +1,4 @@
+'use client';
 import HRStatCards from '@/components/HrComponents/HRStatCards';
 import HREmployeeTable from '@/components/HrComponents/HREmployeeTable';
 import HRAttendanceGraph from '@/components/HrComponents/HRAttendanceGraph';

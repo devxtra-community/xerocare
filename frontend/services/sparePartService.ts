@@ -2,6 +2,7 @@ import api from '@/lib/api';
 
 export interface SparePartInventoryItem {
   id: string; // Added ID
+  item_code: string;
   lot_number: string;
   part_name: string;
   brand: string;
@@ -12,6 +13,8 @@ export interface SparePartInventoryItem {
   status: string;
   price: number;
   image_url?: string;
+  branch_name?: string;
+  branch_id?: string;
 }
 
 export interface PaginatedResponse<T> {
@@ -29,8 +32,12 @@ export const sparePartService = {
     page?: number;
     limit?: number;
     search?: string;
+    branch?: string;
+    year?: number | 'all';
   }): Promise<PaginatedResponse<SparePartInventoryItem>> => {
-    const response = await api.get('/i/spare-parts', { params });
+    const finalParams = { ...params };
+    if (finalParams.year === 'all') delete finalParams.year;
+    const response = await api.get('/i/spare-parts', { params: finalParams });
     const resData = response.data;
     const coreData = resData.data || resData;
 
