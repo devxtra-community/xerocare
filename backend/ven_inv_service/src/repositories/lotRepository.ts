@@ -315,11 +315,12 @@ export class LotRepository {
   /**
    * Calculates total spending on lots for a branch and year.
    */
-  async getLotTotals(branchId: string, year?: number): Promise<number> {
-    const qb = this.repo
-      .createQueryBuilder('lot')
-      .select('SUM(lot.totalAmount)', 'total')
-      .where('lot.branch_id = :branchId', { branchId });
+  async getLotTotals(branchId?: string, year?: number): Promise<number> {
+    const qb = this.repo.createQueryBuilder('lot').select('SUM(lot.totalAmount)', 'total');
+
+    if (branchId && branchId !== 'All') {
+      qb.where('lot.branch_id = :branchId', { branchId });
+    }
 
     if (year) {
       qb.andWhere('EXTRACT(YEAR FROM lot.purchaseDate) = :year', { year });
@@ -333,14 +334,17 @@ export class LotRepository {
    * Returns monthly lot expenses for a branch and year.
    */
   async getMonthlyLotTotals(
-    branchId: string,
+    branchId?: string,
     year?: number,
   ): Promise<{ month: string; total: number }[]> {
     const qb = this.repo
       .createQueryBuilder('lot')
       .select("TO_CHAR(lot.purchaseDate, 'YYYY-MM')", 'month')
-      .addSelect('SUM(lot.totalAmount)', 'total')
-      .where('lot.branch_id = :branchId', { branchId });
+      .addSelect('SUM(lot.totalAmount)', 'total');
+
+    if (branchId && branchId !== 'All') {
+      qb.where('lot.branch_id = :branchId', { branchId });
+    }
 
     if (year) {
       qb.andWhere('EXTRACT(YEAR FROM lot.purchaseDate) = :year', { year });

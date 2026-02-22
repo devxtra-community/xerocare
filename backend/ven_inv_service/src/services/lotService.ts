@@ -101,7 +101,7 @@ export class LotService {
   /**
    * Retrieves total spending on lots for a branch and year.
    */
-  async getLotTotals(branchId: string, year?: number): Promise<number> {
+  async getLotTotals(branchId?: string, year?: number): Promise<number> {
     return await this.lotRepository.getLotTotals(branchId, year);
   }
 
@@ -109,7 +109,7 @@ export class LotService {
    * Returns monthly lot expenses for a branch and year.
    */
   async getMonthlyLotTotals(
-    branch_id: string,
+    branch_id?: string,
     year?: number,
   ): Promise<{ month: string; total: number }[]> {
     return await this.lotRepository.getMonthlyLotTotals(branch_id, year);

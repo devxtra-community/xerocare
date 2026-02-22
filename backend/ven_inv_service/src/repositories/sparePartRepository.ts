@@ -71,10 +71,11 @@ export class SparePartRepository {
     return this.masterRepo.save(part);
   }
 
-  async getInventoryByBranch(branchId: string) {
-    return this.masterRepo
+  async getInventory(branchId?: string, search?: string, year?: number) {
+    const qb = this.masterRepo
       .createQueryBuilder('sp')
       .leftJoin('sp.model', 'model')
+      .leftJoin('sp.branch', 'branch')
       .leftJoin(Lot, 'lot', 'lot.id::text = sp.lot_id::text')
       .leftJoin(Vendor, 'vendor', 'vendor.id::text = lot.vendor_id::text')
       .leftJoin(Warehouse, 'warehouse', 'warehouse.id::text = lot.warehouse_id::text')
@@ -86,14 +87,31 @@ export class SparePartRepository {
         'sp.brand AS brand',
         'model.model_name AS compatible_model',
         'warehouse.warehouseName AS warehouse_name',
+        'branch.name AS branch_name',
         'vendor.name AS vendor_name',
         'sp.quantity AS quantity',
         'sp.base_price AS price',
         'sp.image_url AS image_url',
-      ])
-      .where('sp.branch_id = :branchId', { branchId })
-      .orderBy('sp.created_at', 'DESC')
-      .getRawMany();
+      ]);
+
+    if (year) {
+      qb.andWhere('EXTRACT(YEAR FROM sp.created_at) = :year', { year });
+    }
+
+    if (branchId && branchId !== 'all') {
+      qb.andWhere('sp.branch_id = :branchId', { branchId });
+    }
+
+    if (search) {
+      qb.andWhere(
+        '(LOWER(sp.part_name) LIKE LOWER(:search) OR LOWER(sp.item_code) LIKE LOWER(:search))',
+        {
+          search: `%${search}%`,
+        },
+      );
+    }
+
+    return qb.orderBy('sp.created_at', 'DESC').getRawMany();
   }
 
   /**

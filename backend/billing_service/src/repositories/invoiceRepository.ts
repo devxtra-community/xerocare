@@ -267,6 +267,7 @@ export class InvoiceRepository {
           InvoiceStatus.ISSUED,
           InvoiceStatus.FINANCE_APPROVED,
           InvoiceStatus.ACTIVE_LEASE,
+          InvoiceStatus.EMPLOYEE_APPROVED,
           InvoiceStatus.APPROVED,
         ],
       });
