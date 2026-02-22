@@ -58,9 +58,34 @@ export const createUsageRecord = async (req: Request, res: Response, next: NextF
   }
 };
 
-// Update endpoint removed as per simplified workflow.
-// If editing is required, it must follow the new calculation logic.
-// export const updateUsageRecord = ...
+export const updateUsageRecord = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = req.params.id as string;
+    const {
+      bwA4Count,
+      bwA3Count,
+      colorA4Count,
+      colorA3Count,
+      billingPeriodEnd,
+    } = req.body;
+
+    const result = await usageService.updateUsageRecord(id, {
+      bwA4Count: Number(bwA4Count) || 0,
+      bwA3Count: Number(bwA3Count) || 0,
+      colorA4Count: Number(colorA4Count) || 0,
+      colorA3Count: Number(colorA3Count) || 0,
+      billingPeriodEnd,
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: result,
+      message: 'Usage record updated successfully',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
 
 /**
  * Retrieves the usage history for a specific contract.

@@ -223,10 +223,45 @@ export class BillingService {
 
     await this.invoiceRepo.save(contract);
 
-    // 5. Emit Product Status Updates (Mark as AVAILABLE/RETURNED)
-    // Pass 'RETURNED' to set product status back to AVAILABLE in inventory
-    if (contract.saleType === SaleType.RENT) {
-      await this.emitProductStatusUpdates(contract, 'SYSTEM', 'RETURNED');
+    // 5. Update Product Allocations to RETURNED (Only for RENT, LEASE remains untouched)
+    const allocations = await this.invoiceRepo.manager.find(ProductAllocation, {
+      where: { contractId: contract.id, status: AllocationStatus.ALLOCATED },
+    });
+    
+    console.log(`DEBUG_FINALIZATION: Found ${allocations.length} ALLOCATED allocations for contract ${contract.id}`);
+    console.log(`DEBUG_FINALIZATION: Contract SaleType is ${contract.saleType}`);
+
+    if (contract.saleType === SaleType.RENT && allocations.length > 0) {
+      console.log(`DEBUG_FINALIZATION: Updating ALLOCATED to RETURNED for rent contract ${contract.id}`);
+      const updateResult = await this.invoiceRepo.manager.update(
+        ProductAllocation,
+        { contractId: contract.id, status: AllocationStatus.ALLOCATED },
+        { status: AllocationStatus.RETURNED },
+      );
+      console.log(`DEBUG_FINALIZATION: updateResult = ${JSON.stringify(updateResult)}`);
+    } else {
+      console.log(`DEBUG_FINALIZATION: Skipped update. Condition failed (SaleType=${contract.saleType}, AllocCount=${allocations.length})`);
+    }
+
+    // 6. Emit Product Status Updates (Mark as AVAILABLE/RETURNED)
+    if (contract.saleType === SaleType.RENT && allocations.length > 0) {
+      for (const allocation of allocations) {
+        if (!allocation.productId) continue;
+        try {
+          await emitProductStatusUpdate({
+            productId: allocation.productId,
+            billType: 'RETURNED',
+            invoiceId: contract.id,
+            approvedBy: 'SYSTEM',
+            approvedAt: new Date(),
+          });
+        } catch (e) {
+          logger.error('Failed to emit product status update for allocation', {
+            productId: allocation.productId,
+            error: e,
+          });
+        }
+      }
     }
 
     return contract;
@@ -1063,7 +1098,7 @@ export class BillingService {
         where: { contractId: contract.id, status: AllocationStatus.ALLOCATED },
       });
 
-      if (allocations.length > 0) {
+      if (contract.saleType === SaleType.RENT && allocations.length > 0) {
         await queryRunner.manager.update(
           ProductAllocation,
           { contractId: contract.id, status: AllocationStatus.ALLOCATED },
