@@ -2,7 +2,7 @@ import axios from 'axios';
 import { requestRefresh } from './auth-refresh';
 
 const api = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || '',
+  baseURL: process.env.NEXT_PUBLIC_API_URL,
   withCredentials: true,
 });
 

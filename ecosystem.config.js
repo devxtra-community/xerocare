@@ -39,7 +39,7 @@ module.exports = {
       name: 'frontend',
       cwd: './frontend',
       script: 'pnpm',
-      args: 'dev',
+      args: 'start',
       env: { PORT: 3000 },
     },
   ],
