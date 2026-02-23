@@ -21,6 +21,8 @@ import {
 } from '@/components/ui/table';
 import { toast } from 'sonner';
 import { getAllEmployees, Employee, EmployeeResponse } from '@/lib/employee';
+import { EMPLOYEE_JOB_LABELS, EmployeeJob } from '@/lib/employeeJob';
+import { FINANCE_JOB_LABELS, FinanceJob } from '@/lib/financeJob';
 import HRAttendanceDetailDialog, {
   AttendanceEmployee,
 } from '@/components/HrComponents/HRAttendanceDetailDialog';
@@ -36,6 +38,7 @@ import HRAttendanceDetailDialog, {
 export default function HRAttendanceTable() {
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState('All');
+  const [departmentFilter, setDepartmentFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
   const [employees, setEmployees] = useState<AttendanceEmployee[]>([]);
   const [pagination, setPagination] = useState<EmployeeResponse['pagination']>({
@@ -86,8 +89,23 @@ export default function HRAttendanceTable() {
       emp.display_id?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesRole = roleFilter === 'All' || emp.role === roleFilter;
     const matchesStatus = statusFilter === 'All' || emp.todayStatus === statusFilter;
-    return matchesSearch && matchesRole && matchesStatus;
+    const matchesDepartment = !departmentFilter || getDepartmentDisplay(emp) === departmentFilter;
+    return matchesSearch && matchesRole && matchesStatus && matchesDepartment;
   });
+
+  function getDepartmentDisplay(emp: AttendanceEmployee) {
+    if (emp.role === 'HR') return 'HR';
+    if (emp.role === 'MANAGER') return 'Management';
+    if (emp.role === 'ADMIN') return 'Administration';
+    if (emp.role === 'FINANCE') {
+      return FINANCE_JOB_LABELS[emp.finance_job as FinanceJob] || 'Finance';
+    }
+    return EMPLOYEE_JOB_LABELS[emp.employee_job as EmployeeJob] || 'Staff';
+  }
+
+  const allDepartments = Array.from(
+    new Set(employees.map((emp) => getDepartmentDisplay(emp))),
+  ).sort();
 
   const handleViewDetails = (emp: AttendanceEmployee) => {
     setSelectedEmployee(emp);
@@ -157,6 +175,28 @@ export default function HRAttendanceTable() {
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  className="h-10 bg-card border-blue-400/60 focus:ring-blue-100 rounded-xl justify-between px-3 min-w-[120px]"
+                >
+                  <Filter className="h-4 w-4 mr-2" />
+                  <span className="truncate">Dept: {departmentFilter}</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                align="end"
+                className="rounded-xl w-48 max-h-[300px] overflow-y-auto"
+              >
+                {allDepartments.map((dept) => (
+                  <DropdownMenuItem key={dept} onClick={() => setDepartmentFilter(dept)}>
+                    {dept}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -188,9 +228,6 @@ export default function HRAttendanceTable() {
                 <TableHead className="px-3 py-2 text-xs font-bold text-primary uppercase tracking-wider whitespace-nowrap text-center">
                   Role
                 </TableHead>
-                <TableHead className="px-3 py-2 text-xs font-bold text-primary uppercase tracking-wider whitespace-nowrap">
-                  Branch
-                </TableHead>
                 <TableHead className="px-3 py-2 text-xs font-bold text-primary uppercase tracking-wider whitespace-nowrap text-center">
                   Status
                 </TableHead>
@@ -209,7 +246,7 @@ export default function HRAttendanceTable() {
               {isLoading ? (
                 <TableRow>
                   <TableCell
-                    colSpan={9}
+                    colSpan={8}
                     className="px-3 py-20 text-center text-muted-foreground text-sm italic"
                   >
                     Loading attendance records...
@@ -218,7 +255,7 @@ export default function HRAttendanceTable() {
               ) : filteredEmployees.length === 0 ? (
                 <TableRow>
                   <TableCell
-                    colSpan={9}
+                    colSpan={8}
                     className="px-3 py-20 text-center text-muted-foreground text-sm italic"
                   >
                     No attendance records found
@@ -262,9 +299,6 @@ export default function HRAttendanceTable() {
                       <span className="px-1.5 py-0.5 rounded-full text-[9px] font-semibold uppercase bg-blue-100 text-blue-700">
                         {emp.role}
                       </span>
-                    </TableCell>
-                    <TableCell className="px-3 py-1.5 text-muted-foreground whitespace-nowrap">
-                      {emp.branch?.name || '---'}
                     </TableCell>
                     <TableCell className="px-3 py-1.5 whitespace-nowrap text-center">
                       <span

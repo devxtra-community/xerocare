@@ -7,12 +7,20 @@ import {
   syncQuantities,
 } from '../controllers/modelController';
 
+import { authMiddleware } from '../middlewares/authMiddleware';
+import { roleMiddleware } from '../middlewares/roleMiddleware';
+
 const modelRoute = Router();
 
-modelRoute.get('/', getallModels);
-modelRoute.post('/', addModel);
-modelRoute.put('/:id', editModel);
-modelRoute.delete('/:id', deleteModel);
-modelRoute.post('/sync-quantities', syncQuantities);
+modelRoute.get('/', authMiddleware, getallModels);
+modelRoute.post('/', authMiddleware, roleMiddleware(['ADMIN', 'MANAGER']), addModel);
+modelRoute.put('/:id', authMiddleware, roleMiddleware(['ADMIN', 'MANAGER']), editModel);
+modelRoute.delete('/:id', authMiddleware, roleMiddleware(['ADMIN', 'MANAGER']), deleteModel);
+modelRoute.post(
+  '/sync-quantities',
+  authMiddleware,
+  roleMiddleware(['ADMIN', 'MANAGER']),
+  syncQuantities,
+);
 
 export default modelRoute;

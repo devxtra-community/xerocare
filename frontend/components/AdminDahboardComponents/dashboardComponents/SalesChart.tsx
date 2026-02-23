@@ -11,7 +11,6 @@ import {
 } from 'recharts';
 import { getGlobalSalesOverview } from '@/lib/invoice';
 import { ChartTooltipContent } from '@/components/ui/ChartTooltip';
-import { YearSelector } from '@/components/ui/YearSelector';
 import { formatCompactNumber } from '@/lib/format';
 
 interface SalesDataPoint {
@@ -23,18 +22,10 @@ interface SalesDataPoint {
 
 interface SalesChartProps {
   selectedYear?: number | 'all';
-  onYearChange?: (year: number | 'all') => void;
 }
 
-export default function SalesChart({
-  selectedYear: externalYear,
-  onYearChange: onExternalYearChange,
-}: SalesChartProps) {
+export default function SalesChart({ selectedYear = new Date().getFullYear() }: SalesChartProps) {
   const [selectedPeriod, setSelectedPeriod] = useState('1Y');
-  const [internalYear, setInternalYear] = useState<number | 'all'>(new Date().getFullYear());
-
-  const selectedYear = externalYear !== undefined ? externalYear : internalYear;
-  const onYearChange = onExternalYearChange || setInternalYear;
 
   const [isClient, setIsClient] = useState(false);
   const [data, setData] = useState<SalesDataPoint[]>([]);
@@ -100,14 +91,13 @@ export default function SalesChart({
   }, [selectedPeriod, selectedYear]);
 
   return (
-    <div className="rounded-2xl bg-card h-[260px] w-full shadow-sm flex flex-col p-3">
+    <div className="rounded-2xl bg-card h-[280px] w-full shadow-sm flex flex-col p-3 border border-gray-100">
       <div className="flex flex-row items-center justify-between pb-2">
-        <p className="text-xs text-gray-600 font-medium">
-          Global Sales Overview ({selectedYear === 'all' ? 'All Time' : selectedYear})
-        </p>
+        <h4 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">
+          Revenue Trend ({selectedYear === 'all' ? 'All Years' : selectedYear})
+        </h4>
 
         <div className="flex items-center gap-3">
-          <YearSelector selectedYear={selectedYear} onYearChange={onYearChange} />
           <div className="flex gap-1.5 text-[10px]">
             {['1W', '1M', '3M', '1Y'].map((period) => (
               <button

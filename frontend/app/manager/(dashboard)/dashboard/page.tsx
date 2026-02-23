@@ -112,10 +112,10 @@ export default function Dashboard() {
           />
         </div>
         <div className="space-y-2">
-          <SalaryDistributionChart />
+          <SalaryDistributionChart selectedYear={selectedYear} />
         </div>
         <div className="space-y-2">
-          <RevenuePieChart />
+          <RevenuePieChart selectedYear={selectedYear} />
         </div>
       </div>
     </DashboardPage>

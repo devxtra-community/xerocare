@@ -21,13 +21,17 @@ export function StandardChartCard({
 }: StandardChartCardProps) {
   return (
     <Card className="h-full flex flex-col shadow-sm border-gray-100 dark:border-gray-800">
-      <CardHeader className="pb-4 flex flex-row items-center justify-between border-b border-gray-50/50">
-        <div className="space-y-1">
-          <CardTitle className="text-base font-semibold text-primary">{title}</CardTitle>
-          {description && <CardDescription className="text-xs">{description}</CardDescription>}
-        </div>
-        {actions && <div>{actions}</div>}
-      </CardHeader>
+      {(title || description || actions) && (
+        <CardHeader className="pb-4 flex flex-row items-center justify-between border-b border-gray-50/50">
+          <div className="space-y-1">
+            {title && (
+              <CardTitle className="text-base font-semibold text-primary">{title}</CardTitle>
+            )}
+            {description && <CardDescription className="text-xs">{description}</CardDescription>}
+          </div>
+          {actions && <div>{actions}</div>}
+        </CardHeader>
+      )}
       <CardContent className="pt-6 flex-grow">
         {loading ? (
           <div className="w-full flex items-center justify-center" style={{ height }}>

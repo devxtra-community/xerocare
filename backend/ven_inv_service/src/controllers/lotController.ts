@@ -18,11 +18,17 @@ export const createLot = async (req: Request, res: Response, next: NextFunction)
 };
 
 /**
- * Retrieves all lots.
+ * Retrieves all lots, optionally filtered by the user's branch.
  */
 export const getAllLots = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const lots = await lotService.getAllLots();
+    const branchId = req.user?.branchId;
+    const isAdmin = req.user?.role === 'ADMIN';
+
+    // Admins see all, others only their branch
+    const filteredBranchId = isAdmin ? undefined : branchId;
+
+    const lots = await lotService.getAllLots(filteredBranchId);
     res.status(200).json({ success: true, data: lots });
   } catch (err) {
     next(err);
@@ -154,7 +160,9 @@ export const checkLotNumber = async (req: Request, res: Response, next: NextFunc
 export const getLotStats = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const branchId = req.user?.branchId;
-    if (!branchId) {
+    const isAdmin = req.user?.role === 'ADMIN';
+
+    if (!branchId && !isAdmin) {
       return res.status(400).json({ success: false, message: 'Branch ID missing' });
     }
     const year = req.query.year ? parseInt(req.query.year as string, 10) : undefined;

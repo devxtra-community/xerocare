@@ -45,6 +45,7 @@ export default function EmployeeFormDialog({
     role: 'EMPLOYEE',
     employee_job: '' as EmployeeJob | '',
     finance_job: '' as FinanceJob | '',
+    manager_job: '',
     salary: '',
     expire_date: '',
     status: 'ACTIVE',
@@ -64,7 +65,11 @@ export default function EmployeeFormDialog({
   // Get current user info
   const currentUser = getUserFromToken();
   const isAdmin = currentUser?.role === 'ADMIN';
+  const isHR = currentUser?.role === 'HR';
   const userBranchId = currentUser?.branchId;
+
+  // HR users need branch selection for MANAGER/HR roles
+  const hrNeedsBranchSelect = isHR && (formData.role === 'MANAGER' || formData.role === 'HR');
 
   useEffect(() => {
     const fetchBranches = async () => {
@@ -102,6 +107,7 @@ export default function EmployeeFormDialog({
         role: initialData.role || 'EMPLOYEE',
         employee_job: (initialData as Employee & { employee_job?: EmployeeJob }).employee_job || '',
         finance_job: (initialData as Employee & { finance_job?: FinanceJob }).finance_job || '',
+        manager_job: (initialData as Employee & { manager_job?: string }).manager_job || '',
         salary: initialData.salary?.toString() || '',
         expire_date: initialData.expire_date
           ? new Date(initialData.expire_date).toISOString().split('T')[0]
@@ -119,6 +125,7 @@ export default function EmployeeFormDialog({
         role: 'EMPLOYEE',
         employee_job: '',
         finance_job: '',
+        manager_job: '',
         salary: '',
         expire_date: '',
         status: 'ACTIVE',
@@ -136,7 +143,21 @@ export default function EmployeeFormDialog({
   };
 
   const handleSelectChange = (name: string, value: string) => {
-    setFormData((prev) => ({ ...prev, [name]: value }));
+    if (name === 'role') {
+      // Reset all job/department fields when role changes
+      // If HR switches to MANAGER/HR role, clear branchId so they must pick one
+      const needsBranchSelect = isHR && (value === 'MANAGER' || value === 'HR');
+      setFormData((prev) => ({
+        ...prev,
+        role: value,
+        employee_job: '',
+        finance_job: '',
+        manager_job: '',
+        branchId: needsBranchSelect ? '' : !isAdmin && userBranchId ? userBranchId : prev.branchId,
+      }));
+    } else {
+      setFormData((prev) => ({ ...prev, [name]: value }));
+    }
   };
 
   const handleFileChange = (
@@ -170,6 +191,9 @@ export default function EmployeeFormDialog({
       }
       if (formData.finance_job) {
         data.append('finance_job', formData.finance_job);
+      }
+      if (formData.manager_job) {
+        data.append('manager_job', formData.manager_job);
       }
       data.append('salary', formData.salary);
       if (formData.expire_date) {
@@ -348,6 +372,31 @@ export default function EmployeeFormDialog({
               </div>
             )}
 
+            {/* Manager Department - Only show for MANAGER role */}
+            {formData.role === 'MANAGER' && (
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                  Manager Department *
+                </label>
+                <Select
+                  value={formData.manager_job}
+                  onValueChange={(val) => handleSelectChange('manager_job', val)}
+                >
+                  <SelectTrigger className="h-12 rounded-xl bg-muted/50 border-none shadow-sm focus:ring-2 focus:ring-blue-400">
+                    <SelectValue placeholder="Select department" />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-xl">
+                    <SelectItem value="BRANCH_MANAGER">Branch Manager</SelectItem>
+                    <SelectItem value="SALES_MANAGER">Sales Manager</SelectItem>
+                    <SelectItem value="OPERATIONS_MANAGER">Operations Manager</SelectItem>
+                    <SelectItem value="HR_MANAGER">HR Manager</SelectItem>
+                    <SelectItem value="FINANCE_MANAGER">Finance Manager</SelectItem>
+                    <SelectItem value="SERVICE_MANAGER">Service Manager</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
             <div className="space-y-2">
               <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
                 Salary (AED)
@@ -402,7 +451,7 @@ export default function EmployeeFormDialog({
               <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
                 Assigned Branch
               </label>
-              {isAdmin ? (
+              {isAdmin || hrNeedsBranchSelect ? (
                 <Select
                   value={formData.branchId}
                   onValueChange={(val) => handleSelectChange('branchId', val)}

@@ -71,18 +71,23 @@ export class BillingReportService {
    * Retrieves comprehensive finance stats (Revenue, Expenses, Profit).
    */
   async getBranchFinanceStats(branchId: string, year?: number) {
-    const [salesTotals, expenseData] = await Promise.all([
+    const [salesTotals, expenseData, payrollData] = await Promise.all([
       this.getBranchSalesTotals(branchId, year),
       this.getLotStatsFromInventory(branchId, year),
+      this.getPayrollStatsFromEmployees(branchId, year),
     ]);
 
     const revenue = salesTotals.totalSales;
-    const expenses = expenseData.totalExpenses;
-    const profit = revenue - expenses;
+    const purchaseExpenses = expenseData.totalExpenses;
+    const payrollExpenses = payrollData.totalSalaries;
+    const totalExpenses = purchaseExpenses + payrollExpenses;
+    const profit = revenue - totalExpenses;
 
     return {
       totalRevenue: revenue,
-      totalExpenses: expenses,
+      totalExpenses: totalExpenses,
+      purchaseExpenses: purchaseExpenses,
+      totalSalaries: payrollExpenses,
       netProfit: profit,
       salesByType: salesTotals.salesByType,
     };
@@ -400,45 +405,94 @@ export class BillingReportService {
     month?: number;
     year?: number;
   }) {
-    const [reportData, expenseStats] = await Promise.all([
+    const [reportData, expenseStats, payrollStats] = await Promise.all([
       this.invoiceRepo.getFinanceReport(filter),
-      filter.branchId ? this.getLotStatsFromInventory(filter.branchId, filter.year) : null,
+      this.getLotStatsFromInventory(
+        filter.branchId === 'All' ? undefined : filter.branchId,
+        filter.year,
+      ),
+      this.getPayrollStatsFromEmployees(
+        filter.branchId === 'All' ? undefined : filter.branchId,
+        filter.year,
+      ),
     ]);
 
-    const monthlyExpenses = new Map<string, number>();
+    const monthlyPurchaseExpenses = new Map<string, number>();
     if (expenseStats?.monthlyExpenses) {
       expenseStats.monthlyExpenses.forEach((e: { month: string; total: number }) => {
-        monthlyExpenses.set(e.month, e.total);
+        monthlyPurchaseExpenses.set(e.month, (monthlyPurchaseExpenses.get(e.month) || 0) + e.total);
       });
     }
 
-    const monthsProcessed = new Set<string>();
+    const monthlySalaryExpenses = new Map<string, number>();
+    if (payrollStats?.monthlySalaries) {
+      payrollStats.monthlySalaries.forEach((e: { month: string; total: number }) => {
+        monthlySalaryExpenses.set(e.month, (monthlySalaryExpenses.get(e.month) || 0) + e.total);
+      });
+    }
+
+    // Build a map of invoice data keyed by month
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return reportData.map((item: any) => {
-      let expense = 0;
-      if (!monthsProcessed.has(item.month)) {
-        expense = monthlyExpenses.get(item.month) || 0;
-        monthsProcessed.add(item.month);
+    const invoiceByMonth = new Map<string, any>();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    reportData.forEach((item: any) => {
+      if (!invoiceByMonth.has(item.month)) {
+        invoiceByMonth.set(item.month, { ...item });
+      } else {
+        // Aggregate income and count for same month (multiple saleTypes)
+        const existing = invoiceByMonth.get(item.month);
+        existing.income = (existing.income || 0) + (item.income || 0);
+        existing.count = (existing.count || 0) + (item.count || 0);
+        existing.source = 'All';
       }
-      const profit = (item.income || 0) - expense;
+    });
+
+    // Collect all months from all three data sources
+    const allMonths = new Set<string>([
+      ...invoiceByMonth.keys(),
+      ...monthlyPurchaseExpenses.keys(),
+      ...monthlySalaryExpenses.keys(),
+    ]);
+
+    const branchId = filter.branchId && filter.branchId !== 'All' ? filter.branchId : undefined;
+
+    // Build merged output for every month that has any data
+    const merged = Array.from(allMonths).map((month) => {
+      const invoiceData = invoiceByMonth.get(month);
+      const purchaseExpense = monthlyPurchaseExpenses.get(month) || 0;
+      const salaryExpense = monthlySalaryExpenses.get(month) || 0;
+      const income = invoiceData?.income || 0;
+      const expense = purchaseExpense + salaryExpense;
+      const profit = income - expense;
       return {
-        ...item,
+        month,
+        branchId: invoiceData?.branchId || branchId || null,
+        source: invoiceData?.source || 'All',
+        income,
+        grossIncome: invoiceData?.grossIncome || 0,
+        count: invoiceData?.count || 0,
         expense,
+        purchaseExpense,
+        salaryExpense,
         profit,
         profitStatus: profit >= 0 ? 'profit' : 'loss',
       };
     });
+
+    // Sort by month descending (same as before)
+    merged.sort((a, b) => b.month.localeCompare(a.month));
+    return merged;
   }
 
   /**
    * Internal helper to fetch lot stats from the Inventory service.
    */
-  private async getLotStatsFromInventory(branchId: string, year?: number) {
+  private async getLotStatsFromInventory(branchId?: string, year?: number) {
     try {
       const inventoryServiceUrl = process.env.INVENTORY_SERVICE_URL || 'http://localhost:3003';
       const { sign } = await import('jsonwebtoken');
       const token = sign(
-        { userId: 'billing_service', role: 'ADMIN', branchId },
+        { userId: 'billing_service', role: 'ADMIN', branchId: branchId || undefined },
         process.env.ACCESS_SECRET as string,
         { expiresIn: '1m' },
       );
@@ -461,6 +515,40 @@ export class BillingReportService {
     } catch (err) {
       console.error('Failed to fetch lot stats from inventory service', err);
       return { totalExpenses: 0, monthlyExpenses: [] };
+    }
+  }
+
+  /**
+   * Internal helper to fetch payroll stats from the Employee service.
+   */
+  private async getPayrollStatsFromEmployees(branchId?: string, year?: number) {
+    try {
+      const employeeServiceUrl = process.env.EMPLOYEE_SERVICE_URL || 'http://localhost:3002';
+      const { sign } = await import('jsonwebtoken');
+      const token = sign(
+        { userId: 'billing_service', role: 'ADMIN', branchId: branchId || undefined },
+        process.env.ACCESS_SECRET as string,
+        { expiresIn: '1m' },
+      );
+
+      const url = year
+        ? `${employeeServiceUrl}/payroll/stats?year=${year}`
+        : `${employeeServiceUrl}/payroll/stats`;
+
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) return { totalSalaries: 0, monthlySalaries: [] };
+      const data = await response.json();
+      return data; // Employee service response is direct object
+    } catch (err) {
+      console.error('Failed to fetch payroll stats from employee service', err);
+      return { totalSalaries: 0, monthlySalaries: [] };
     }
   }
 

@@ -9,7 +9,8 @@ export class BrandController {
    */
   createBrand = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const brand = await this.brandService.createBrand(req.body);
+      const branchId = req.user?.branchId;
+      const brand = await this.brandService.createBrand(req.body, branchId);
       res.status(201).json({ success: true, data: brand });
     } catch (error) {
       next(error);
@@ -17,11 +18,15 @@ export class BrandController {
   };
 
   /**
-   * Retrieves all brands.
+   * Retrieves all brands, optionally filtered by branch.
    */
   getAllBrands = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const brands = await this.brandService.getAllBrands();
+      const branchId = req.user?.branchId;
+      const isAdmin = req.user?.role === 'ADMIN';
+      const filteredBranchId = isAdmin ? undefined : branchId;
+
+      const brands = await this.brandService.getAllBrands(filteredBranchId);
       res.json({ success: true, data: brands });
     } catch (error) {
       next(error);
@@ -33,7 +38,15 @@ export class BrandController {
    */
   updateBrand = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const brand = await this.brandService.updateBrand(req.params.id as string, req.body);
+      const branchId = req.user?.branchId;
+      const isAdmin = req.user?.role === 'ADMIN';
+      const filteredBranchId = isAdmin ? undefined : branchId;
+
+      const brand = await this.brandService.updateBrand(
+        req.params.id as string,
+        req.body,
+        filteredBranchId,
+      );
       res.json({ success: true, data: brand });
     } catch (error) {
       next(error);
@@ -45,7 +58,11 @@ export class BrandController {
    */
   deleteBrand = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      await this.brandService.deleteBrand(req.params.id as string);
+      const branchId = req.user?.branchId;
+      const isAdmin = req.user?.role === 'ADMIN';
+      const filteredBranchId = isAdmin ? undefined : branchId;
+
+      await this.brandService.deleteBrand(req.params.id as string, filteredBranchId);
       res.json({ success: true, message: 'Brand deleted successfully' });
     } catch (error) {
       next(error);

@@ -91,6 +91,10 @@ export class EmployeeService {
       throw new AppError('Finance job is required for FINANCE role', 400);
     }
 
+    if ((roleEnum === EmployeeRole.HR || roleEnum === EmployeeRole.MANAGER) && !branchId) {
+      throw new AppError('Branch ID is required for HR and MANAGER roles', 400);
+    }
+
     if (branchId) {
       const branchRepo = Source.getRepository(Branch);
       const branch = await branchRepo.findOne({ where: { branch_id: branchId } });
@@ -182,10 +186,16 @@ export class EmployeeService {
   /**
    * Retrieves paginated list of employees.
    */
-  async getAllEmployees(page = 1, limit = 20, role?: EmployeeRole, branchId?: string) {
+  async getAllEmployees(
+    page = 1,
+    limit = 20,
+    role?: EmployeeRole,
+    branchId?: string,
+    search?: string,
+  ) {
     const skip = (page - 1) * limit;
 
-    const { data, total } = await this.employeeRepo.findAll(skip, limit, role, branchId);
+    const { data, total } = await this.employeeRepo.findAll(skip, limit, role, branchId, search);
 
     return {
       employees: data,
@@ -275,6 +285,16 @@ export class EmployeeService {
       }
     }
 
+    const currentRole = payload.role || employee.role;
+    const currentBranchId = payload.branchId !== undefined ? payload.branchId : employee.branch_id;
+
+    if (
+      (currentRole === EmployeeRole.HR || currentRole === EmployeeRole.MANAGER) &&
+      !currentBranchId
+    ) {
+      throw new AppError('Branch ID is required for HR and MANAGER roles', 400);
+    }
+
     if (payload.branchId) {
       const branchRepo = Source.getRepository(Branch);
       const branch = await branchRepo.findOne({ where: { branch_id: payload.branchId } });
@@ -327,7 +347,7 @@ export class EmployeeService {
   /**
    * Aggregates HR statistics for the dashboard.
    */
-  async getHRStats(branchId?: string) {
+  async getHRStats(branchId?: string, year?: number) {
     const total = branchId
       ? await this.employeeRepo.countByBranch(branchId)
       : await this.employeeRepo.count();
@@ -349,7 +369,7 @@ export class EmployeeService {
         : await this.employeeRepo.countByRole(role as EmployeeRole);
     }
 
-    const rawGrowthData = await this.employeeRepo.getEmployeeGrowthStats(branchId);
+    const rawGrowthData = await this.employeeRepo.getEmployeeGrowthStats(branchId, year);
 
     const monthsOrder = [
       'Jan',
@@ -393,6 +413,7 @@ export class EmployeeService {
       // Determine category (same logic as used in frontend)
       let category = 'OTHER';
       if (item.role === 'MANAGER') category = 'BRANCH_MANAGER';
+      else if (item.role === 'HR') category = 'HR';
       else if (item.job === 'EMPLOYEE_MANAGER') category = 'EMPLOYEE_MANAGER';
       else if (item.role === 'FINANCE') category = 'FINANCE';
       else if (
@@ -419,6 +440,8 @@ export class EmployeeService {
         ].includes(item.financeJob || '')
       )
         category = 'RENT_LEASE_STAFF';
+      else if (['CRM', 'TECHNICIAN', 'DELIVERY'].includes(item.job || ''))
+        category = 'SERVICE_STAFF';
 
       byJob[category] = (byJob[category] || 0) + count;
       bySalary[category] = (bySalary[category] || 0) + salary;
@@ -440,5 +463,13 @@ export class EmployeeService {
       bySalary,
       growthData,
     };
+  }
+
+  /**
+   * Retrieves all branches.
+   */
+  async getAllBranches() {
+    const branchRepo = Source.getRepository(Branch);
+    return branchRepo.find({ order: { name: 'ASC' } });
   }
 }

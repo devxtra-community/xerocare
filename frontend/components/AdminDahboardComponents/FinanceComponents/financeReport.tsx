@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
-import { Search } from 'lucide-react';
+import { Search, Calendar, Building, Layers, FilterX } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -12,6 +12,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import StatCard from '@/components/StatCard';
+import { Button } from '@/components/ui/button';
 import {
   Select,
   SelectContent,
@@ -29,12 +30,12 @@ import {
   CartesianGrid,
   Tooltip,
   Legend,
-  AreaChart,
-  Area,
+  BarChart,
 } from 'recharts';
 import { getFinanceReport, FinanceReportItem } from '@/lib/invoice';
 import { getBranches, Branch } from '@/lib/branch';
 import { formatCurrency, formatCompactNumber } from '@/lib/format';
+import { YearSelector } from '@/components/ui/YearSelector';
 
 type Finance = {
   id: string;
@@ -47,6 +48,7 @@ type Finance = {
   branchId: string;
   branchName?: string;
   count: number;
+  salaryExpense?: number;
 };
 
 /**
@@ -62,6 +64,7 @@ export default function FinanceReport() {
   const [sourceFilter, setSourceFilter] = useState<'All' | 'SALE' | 'LEASE' | 'RENT'>('All');
   const [branchFilter, setBranchFilter] = useState('All');
   const [monthFilter, setMonthFilter] = useState('All');
+  const [selectedYear, setSelectedYear] = useState<number | 'all'>(new Date().getFullYear());
   const [loading, setLoading] = useState(true);
 
   const monthsList = [
@@ -99,6 +102,7 @@ export default function FinanceReport() {
           branchId: branchFilter,
           saleType: sourceFilter,
           month: monthFilter === 'All' ? undefined : parseInt(monthFilter, 10),
+          year: selectedYear === 'all' ? undefined : selectedYear,
         });
 
         // Enrich data with branch names
@@ -107,7 +111,12 @@ export default function FinanceReport() {
           return {
             ...item,
             id: `${item.month}-${item.branchId}-${item.source}-${idx}`,
-            branchName: branch ? branch.name : 'Unknown Branch',
+            branchName:
+              !item.branchId || item.branchId === 'All'
+                ? 'All Branches'
+                : branch
+                  ? branch.name
+                  : 'Unknown Branch',
           } as Finance;
         });
 
@@ -122,7 +131,7 @@ export default function FinanceReport() {
     if (branches.length > 0 || branchFilter === 'All') {
       fetchData();
     }
-  }, [branchFilter, sourceFilter, monthFilter, branches]);
+  }, [branchFilter, sourceFilter, monthFilter, branches, selectedYear]);
 
   // 🔍 Search filter (on already fetched/filtered data)
   const filteredFinance = finance.filter((f) => {
@@ -135,6 +144,10 @@ export default function FinanceReport() {
   // 📊 Stats
   const totalIncome = filteredFinance.reduce((s: number, f: Finance) => s + f.income, 0);
   const totalExpense = filteredFinance.reduce((s: number, f: Finance) => s + f.expense, 0);
+  const totalSalaryExpense = filteredFinance.reduce(
+    (s: number, f: Finance) => s + (f.salaryExpense || 0),
+    0,
+  );
   const netProfit = totalIncome - totalExpense;
 
   // Calculate dynamic chart data from filteredFinance
@@ -158,213 +171,264 @@ export default function FinanceReport() {
       const monthData = filteredFinance.filter((f) => f.month.endsWith(`-${monthNum}`));
       const income = monthData.reduce((s: number, f: Finance) => s + f.income, 0);
       const expense = monthData.reduce((s: number, f: Finance) => s + f.expense, 0);
+      const salaryExpense = monthData.reduce(
+        (s: number, f: Finance) => s + (f.salaryExpense || 0),
+        0,
+      );
       const profit = income - expense;
       const margin = income > 0 ? parseFloat(((profit / income) * 100).toFixed(1)) : 0;
-      return { month: m, income, expense, profit, margin };
+      return { month: m, income, expense, salaryExpense, profit, margin };
     })
     .filter((d) => d.income > 0 || d.expense > 0);
-
-  const averageMargin = totalIncome > 0 ? ((netProfit / totalIncome) * 100).toFixed(1) : '0.0';
 
   return (
     <div className="bg-blue-100 min-h-screen p-4 space-y-8 sm:space-y-10">
       {/* Header */}
-      <h3 className="text-xl sm:text-2xl font-bold text-primary">Financial Report</h3>
+      <div className="flex items-center justify-between">
+        <h3 className="text-xl sm:text-2xl font-bold text-primary">Financial Report</h3>
+        <YearSelector selectedYear={selectedYear} onYearChange={setSelectedYear} />
+      </div>
 
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <StatCard
           title="Total Income"
           value={formatCurrency(totalIncome)}
-          subtitle={branchFilter === 'All' ? 'All branches' : branchFilter}
+          subtitle={`${branchFilter === 'All' ? 'All branches' : branches.find((b) => b.id === branchFilter)?.name || 'Branch'} | ${selectedYear === 'all' ? 'All Years' : selectedYear}`}
         />
         <StatCard
           title="Total Expense"
           value={formatCurrency(totalExpense)}
-          subtitle={branchFilter === 'All' ? 'All branches' : branchFilter}
+          subtitle={`${branchFilter === 'All' ? 'All branches' : branches.find((b) => b.id === branchFilter)?.name || 'Branch'} | ${selectedYear === 'all' ? 'All Years' : selectedYear}`}
         />
         <StatCard
           title="Net Profit"
           value={formatCurrency(netProfit)}
-          subtitle="Income - Expense"
+          subtitle={`Profit in ${selectedYear === 'all' ? 'All Years' : selectedYear}`}
         />
-        <StatCard title="Avg Margin" value={`${averageMargin}%`} subtitle="Filtered performance" />
+        <StatCard
+          title="Payroll Expense"
+          value={formatCurrency(totalSalaryExpense)}
+          subtitle={`Salaries in ${selectedYear === 'all' ? 'All Years' : selectedYear}`}
+        />
       </div>
 
       {/* Monthly Performance Charts */}
       <div className="flex flex-col lg:flex-row gap-6">
         {/* Income vs Expense Chart */}
-        <div className="flex-1 bg-card p-4 rounded-2xl shadow-sm space-y-4 border border-blue-50">
-          <h4 className="text-lg sm:text-xl font-bold text-primary">Income vs Expense (Monthly)</h4>
-          <div className="h-[300px] w-full">
+        <div className="flex-1 bg-card rounded-2xl shadow-sm border border-blue-100 p-4 h-full min-h-[400px]">
+          <h4 className="text-sm font-bold text-primary uppercase mb-6">Income vs Expenses</h4>
+          <div className="h-[320px] w-full">
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart
                 data={dynamicChartData}
-                margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+                margin={{ top: 10, right: 10, left: 10, bottom: 0 }}
               >
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
+                <CartesianGrid strokeDasharray="3 3" vertical={false} strokeOpacity={0.2} />
                 <XAxis
                   dataKey="month"
                   axisLine={false}
                   tickLine={false}
-                  tick={{ fill: '#64748B', fontSize: 11 }}
-                  dy={10}
+                  tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 600 }}
                 />
                 <YAxis
                   axisLine={false}
                   tickLine={false}
-                  tick={{ fill: '#64748B', fontSize: 11 }}
+                  tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 600 }}
                   tickFormatter={(v) => `${formatCompactNumber(v)}`}
                 />
                 <Tooltip
+                  formatter={(val: number) => [`QAR ${formatCompactNumber(val)}`]}
                   contentStyle={{
                     borderRadius: '12px',
                     border: 'none',
                     boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)',
-                    fontSize: '11px',
                   }}
+                  itemStyle={{ fontSize: '10px', fontWeight: 'bold' }}
                 />
-                <Legend iconType="circle" wrapperStyle={{ paddingTop: '20px', fontSize: '11px' }} />
+                <Legend
+                  iconType="circle"
+                  wrapperStyle={{ fontSize: '10px', fontWeight: 'bold', paddingTop: '10px' }}
+                />
                 <Bar
                   dataKey="income"
                   name="Income"
-                  barSize={24}
-                  fill="var(--primary)"
-                  radius={[6, 6, 0, 0]}
+                  barSize={20}
+                  fill="#1d4ed8"
+                  radius={[4, 4, 0, 0]}
                 />
                 <Bar
                   dataKey="expense"
-                  name="Expense"
-                  barSize={24}
+                  name="Purchase Expense"
+                  barSize={20}
                   fill="#93c5fd"
-                  radius={[6, 6, 0, 0]}
+                  radius={[4, 4, 0, 0]}
+                />
+                <Bar
+                  dataKey="salaryExpense"
+                  name="Salary Expense"
+                  barSize={20}
+                  fill="#60a5fa"
+                  radius={[4, 4, 0, 0]}
                 />
                 <Line
                   type="monotone"
-                  dataKey="profit"
-                  name="Profit Trend"
-                  stroke="#2563eb"
-                  strokeWidth={3}
-                  dot={{ r: 5, fill: 'var(--primary)', strokeWidth: 2, stroke: '#fff' }}
+                  dataKey="income"
+                  name="Trend"
+                  stroke="#1d4ed8"
+                  strokeWidth={2}
+                  dot={false}
                 />
               </ComposedChart>
             </ResponsiveContainer>
           </div>
         </div>
 
-        {/* Profit Margin Chart */}
-        <div className="flex-1 bg-card p-4 rounded-2xl shadow-sm space-y-4 border border-blue-50">
-          <h4 className="text-lg sm:text-xl font-bold text-primary">Profit Margin % (Monthly)</h4>
-          <div className="h-[300px] w-full">
+        {/* Profit Trend Chart */}
+        <div className="flex-1 bg-card rounded-2xl shadow-sm border border-blue-100 p-4 h-full min-h-[400px]">
+          <h4 className="text-sm font-bold text-primary uppercase mb-6">Profit Trend</h4>
+          <div className="h-[320px] w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart
+              <BarChart
                 data={dynamicChartData}
-                margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+                margin={{ top: 10, right: 10, left: 10, bottom: 0 }}
               >
-                <defs>
-                  <linearGradient id="colorMargin" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="var(--primary)" stopOpacity={0.2} />
-                    <stop offset="95%" stopColor="var(--primary)" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
+                <CartesianGrid strokeDasharray="3 3" vertical={false} strokeOpacity={0.2} />
                 <XAxis
                   dataKey="month"
                   axisLine={false}
                   tickLine={false}
-                  tick={{ fill: '#64748B', fontSize: 11 }}
-                  dy={10}
+                  tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 600 }}
                 />
                 <YAxis
                   axisLine={false}
                   tickLine={false}
-                  tick={{ fill: '#64748B', fontSize: 11 }}
-                  unit="%"
+                  tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 600 }}
+                  tickFormatter={(val) => `${formatCompactNumber(val)}`}
                 />
                 <Tooltip
-                  formatter={(value: number) => [`${value}%`, 'Profit Margin']}
+                  formatter={(val: number) => [`QAR ${formatCompactNumber(val)}`, 'Net Profit']}
                   contentStyle={{
                     borderRadius: '12px',
                     border: 'none',
                     boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)',
-                    fontSize: '11px',
                   }}
+                  itemStyle={{ fontSize: '10px', fontWeight: 'bold', color: '#1d4ed8' }}
                 />
-                <Legend iconType="circle" wrapperStyle={{ paddingTop: '20px', fontSize: '11px' }} />
-                <Area
-                  type="monotone"
-                  dataKey="margin"
-                  name="Profit Margin"
-                  stroke="#2563eb"
-                  strokeWidth={3}
-                  fillOpacity={1}
-                  fill="url(#colorMargin)"
+                <Bar
+                  dataKey="profit"
+                  name="Net Profit"
+                  fill="#1d4ed8"
+                  radius={[4, 4, 0, 0]}
+                  barSize={30}
                 />
-              </AreaChart>
+              </BarChart>
             </ResponsiveContainer>
           </div>
         </div>
       </div>
 
-      {/* Search + Filter */}
-      <div className="flex flex-wrap gap-4 items-center">
-        <div className="relative w-full sm:w-[280px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-          <Input
-            placeholder="Search report..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-9 h-11 rounded-xl border-blue-400/60 focus:border-blue-400 focus:ring-4 focus:ring-blue-100 bg-card shadow-sm transition-all"
-          />
+      {/* Filters Section */}
+      <div className="bg-card rounded-xl p-4 shadow-sm border border-gray-100 flex flex-col md:flex-row gap-4 items-end">
+        <div className="flex-1 grid grid-cols-1 md:grid-cols-4 gap-4 w-full">
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+              Search Report
+            </label>
+            <div className="relative">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-400" />
+              <Input
+                placeholder="Search report..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-9 h-9 text-xs rounded-lg border-gray-200 focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
+              />
+            </div>
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+              Month
+            </label>
+            <Select value={monthFilter} onValueChange={setMonthFilter}>
+              <SelectTrigger className="h-9 text-xs w-full bg-background border-gray-200 rounded-lg">
+                <div className="flex items-center gap-2">
+                  <Calendar className="h-3.5 w-3.5 text-slate-400" />
+                  <SelectValue placeholder="All Months" />
+                </div>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="All">All Months</SelectItem>
+                {monthsList.map((m) => (
+                  <SelectItem key={m.value} value={m.value.toString()}>
+                    {m.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+              Branch
+            </label>
+            <Select value={branchFilter} onValueChange={setBranchFilter}>
+              <SelectTrigger className="h-9 text-xs w-full bg-background border-gray-200 rounded-lg">
+                <div className="flex items-center gap-2">
+                  <Building className="h-3.5 w-3.5 text-slate-400" />
+                  <SelectValue placeholder="All Branches" />
+                </div>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="All">All Branches</SelectItem>
+                {branches.map((branch) => (
+                  <SelectItem key={branch.id} value={branch.id}>
+                    {branch.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+              Source
+            </label>
+            <Select
+              value={sourceFilter}
+              onValueChange={(val) => setSourceFilter(val as 'All' | 'SALE' | 'LEASE' | 'RENT')}
+            >
+              <SelectTrigger className="h-9 text-xs w-full bg-background border-gray-200 rounded-lg">
+                <div className="flex items-center gap-2">
+                  <Layers className="h-3.5 w-3.5 text-slate-400" />
+                  <SelectValue placeholder="All Sources" />
+                </div>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="All">All Sources</SelectItem>
+                <SelectItem value="SALE">Sale</SelectItem>
+                <SelectItem value="LEASE">Lease</SelectItem>
+                <SelectItem value="RENT">Rent</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
-        <div className="w-[180px]">
-          <Select value={monthFilter} onValueChange={setMonthFilter}>
-            <SelectTrigger className="h-11 bg-card border-blue-400/60 focus:ring-blue-100 rounded-xl shadow-sm">
-              <SelectValue placeholder="All Months" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="All">All Months</SelectItem>
-              {monthsList.map((m) => (
-                <SelectItem key={m.value} value={m.value.toString()}>
-                  {m.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="w-[200px]">
-          <Select value={branchFilter} onValueChange={setBranchFilter}>
-            <SelectTrigger className="h-11 bg-card border-blue-400/60 focus:ring-blue-100 rounded-xl shadow-sm">
-              <SelectValue placeholder="All Branches" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="All">All Branches</SelectItem>
-              {branches.map((branch) => (
-                <SelectItem key={branch.id} value={branch.id}>
-                  {branch.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="w-[150px]">
-          <Select
-            value={sourceFilter}
-            onValueChange={(val) => setSourceFilter(val as 'All' | 'SALE' | 'LEASE' | 'RENT')}
+        <div className="flex items-center gap-2 pt-4 md:pt-0">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => {
+              setSearch('');
+              setMonthFilter('All');
+              setBranchFilter('All');
+              setSourceFilter('All');
+            }}
+            className="h-9 text-gray-500 border-gray-200 hover:bg-gray-50 text-xs px-3 rounded-lg"
+            title="Clear Filters"
           >
-            <SelectTrigger className="h-11 bg-card border-blue-400/60 focus:ring-blue-100 rounded-xl shadow-sm">
-              <SelectValue placeholder="All Sources" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="All">All Sources</SelectItem>
-              <SelectItem value="SALE">Sale</SelectItem>
-              <SelectItem value="LEASE">Lease</SelectItem>
-              <SelectItem value="RENT">Rent</SelectItem>
-            </SelectContent>
-          </Select>
+            <FilterX className="h-4 w-4" />
+          </Button>
         </div>
       </div>
 

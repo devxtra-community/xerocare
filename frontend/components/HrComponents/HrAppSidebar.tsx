@@ -78,7 +78,7 @@ export default function HrAppSidebar() {
   };
 
   return (
-    <Sidebar collapsible="icon" className="border-r-0">
+    <Sidebar collapsible="icon" className="border-none !border-r-0">
       {/* Header */}
       <SidebarHeader className="bg-sidebar">
         <div className="flex items-center gap-3 px-4 py-4">

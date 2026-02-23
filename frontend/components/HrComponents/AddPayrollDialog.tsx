@@ -20,6 +20,9 @@ import {
 import { PayrollRecord } from './HRPayrollTable';
 import api from '@/lib/api';
 import { toast } from 'sonner';
+import { EMPLOYEE_JOB_LABELS, EmployeeJob } from '@/lib/employeeJob';
+import { FINANCE_JOB_LABELS, FinanceJob } from '@/lib/financeJob';
+import { Filter } from 'lucide-react';
 
 interface AddPayrollDialogProps {
   open: boolean;
@@ -48,6 +51,7 @@ export default function AddPayrollDialog({
     role: '',
     branchName: '',
   });
+  const [departmentFilter, setDepartmentFilter] = useState('All');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
@@ -111,6 +115,25 @@ export default function AddPayrollDialog({
     }
   };
 
+  const getDepartmentLabel = (dept: string) => {
+    if (!dept) return 'N/A';
+    if (dept === 'HR') return 'HR';
+    if (dept === 'Management') return 'Management';
+    if (dept === 'Administration') return 'Administration';
+    return (
+      EMPLOYEE_JOB_LABELS[dept as EmployeeJob] || FINANCE_JOB_LABELS[dept as FinanceJob] || dept
+    );
+  };
+
+  const filteredEmployees = employees.filter((emp) => {
+    if (departmentFilter === 'All') return true;
+    return getDepartmentLabel(emp.department) === departmentFilter;
+  });
+
+  const allDepartments = Array.from(
+    new Set(employees.map((emp) => getDepartmentLabel(emp.department))),
+  ).sort();
+
   const resetForm = () => {
     setSelectedEmployeeId('');
     setFormData({
@@ -141,6 +164,28 @@ export default function AddPayrollDialog({
         <form onSubmit={handleSubmit} className="space-y-4 pt-4">
           <div className="space-y-1.5">
             <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+              Filter by Department
+            </label>
+            <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
+              <SelectTrigger className="h-10 rounded-lg bg-card border-blue-400/60 focus:ring-blue-100 shadow-sm transition-all">
+                <div className="flex items-center gap-2">
+                  <Filter className="h-4 w-4 text-blue-400" />
+                  <SelectValue placeholder="All Departments" />
+                </div>
+              </SelectTrigger>
+              <SelectContent className="rounded-xl w-48 max-h-[300px] overflow-y-auto">
+                <SelectItem value="All">All Departments</SelectItem>
+                {allDepartments.map((dept) => (
+                  <SelectItem key={dept} value={dept}>
+                    {dept}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
               Select User
             </label>
             <Select value={selectedEmployeeId} onValueChange={setSelectedEmployeeId}>
@@ -148,11 +193,16 @@ export default function AddPayrollDialog({
                 <SelectValue placeholder="Choose a user..." />
               </SelectTrigger>
               <SelectContent className="rounded-xl">
-                {employees.map((emp) => (
+                {filteredEmployees.map((emp) => (
                   <SelectItem key={emp.id} value={emp.id} className="capitalize">
                     {emp.name} ({emp.email})
                   </SelectItem>
                 ))}
+                {filteredEmployees.length === 0 && (
+                  <div className="p-4 text-center text-xs text-muted-foreground italic">
+                    No employees found in this department
+                  </div>
+                )}
               </SelectContent>
             </Select>
           </div>

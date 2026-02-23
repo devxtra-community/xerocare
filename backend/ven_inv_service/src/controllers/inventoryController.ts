@@ -9,12 +9,18 @@ const service = new InventoryService();
  */
 export const getGlobalInventory = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { product, warehouse, branch } = req.query as {
+    const { product, warehouse, branch, year } = req.query as {
       product?: string;
       warehouse?: string;
       branch?: string;
+      year?: string;
     };
-    const data = await service.getGlobalInventory({ product, warehouse, branch });
+    const data = await service.getGlobalInventory({
+      product,
+      warehouse,
+      branch,
+      year: year ? parseInt(year) : undefined,
+    });
     res.json({ success: true, data });
   } catch (err) {
     next(err);
@@ -30,7 +36,8 @@ export const getBranchInventory = async (req: Request, res: Response, next: Next
     if (!branchId) {
       throw new AppError('Branch ID missing from user token', 400);
     }
-    const data = await service.getBranchInventory(branchId);
+    const { year } = req.query as { year?: string };
+    const data = await service.getBranchInventory(branchId, year ? parseInt(year) : undefined);
     res.json({ success: true, data });
   } catch (err) {
     next(err);
@@ -42,8 +49,11 @@ export const getBranchInventory = async (req: Request, res: Response, next: Next
  */
 export const getWarehouseInventory = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { warehouseId } = req.query as { warehouseId: string };
-    const data = await service.getWarehouseInventory(warehouseId);
+    const { warehouseId, year } = req.query as { warehouseId: string; year?: string };
+    const data = await service.getWarehouseInventory(
+      warehouseId,
+      year ? parseInt(year) : undefined,
+    );
     res.json({ success: true, data });
   } catch (err) {
     next(err);
@@ -56,7 +66,8 @@ export const getWarehouseInventory = async (req: Request, res: Response, next: N
 export const getInventoryStats = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const branchId = req.user?.branchId;
-    const stats = await service.getInventoryStats(branchId);
+    const { year } = req.query as { year?: string };
+    const stats = await service.getInventoryStats(branchId, year ? parseInt(year) : undefined);
     res.json({ success: true, data: stats });
   } catch (err) {
     next(err);

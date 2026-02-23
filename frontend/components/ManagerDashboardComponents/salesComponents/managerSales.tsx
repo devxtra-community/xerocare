@@ -5,6 +5,8 @@ import SalesSummaryTable from './SalesSummaryTable';
 import MonthlySalesBarChart from './monthlysalesChart';
 import { useState, useEffect } from 'react';
 import { salesService } from '@/services/salesService';
+import { YearSelector } from '@/components/ui/YearSelector';
+import { formatCurrency } from '@/lib/format';
 
 /**
  * Manager Sales Dashboard Page.
@@ -12,6 +14,7 @@ import { salesService } from '@/services/salesService';
  * Integrates `SalesSummaryTable`, `MonthlySalesBarChart`, and `MostSoldProductChart` for detailed analytics.
  */
 export default function ManagerSalesPage() {
+  const [selectedYear, setSelectedYear] = useState<number | 'all'>(new Date().getFullYear());
   const [totalSales, setTotalSales] = useState(0);
   const [saleAmount, setSaleAmount] = useState(0);
   const [rentAmount, setRentAmount] = useState(0);
@@ -26,8 +29,11 @@ export default function ManagerSalesPage() {
       try {
         setLoading(true);
         const [salesData, trendData] = await Promise.all([
-          salesService.getBranchSalesTotals(),
-          salesService.getBranchSalesOverview('1Y'),
+          salesService.getBranchSalesTotals(selectedYear === 'all' ? undefined : selectedYear),
+          salesService.getBranchSalesOverview(
+            '1Y',
+            selectedYear === 'all' ? undefined : selectedYear,
+          ),
         ]);
 
         setTotalSales(salesData.totalSales);
@@ -82,27 +88,23 @@ export default function ManagerSalesPage() {
       }
     };
     fetchSalesData();
-  }, []);
-
-  const formatToK = (value: number) => {
-    if (value >= 1000) {
-      return `QAR ${(value / 1000).toFixed(1)}k`;
-    }
-    return `QAR ${value.toLocaleString()}`;
-  };
+  }, [selectedYear]);
 
   return (
     <div className="bg-blue-100 min-h-screen p-3 sm:p-4 md:p-6 space-y-8 sm:space-y-10">
       {/* SALES */}
       <div className="space-y-4 sm:space-y-6">
-        <h3 className="text-xl sm:text-2xl font-bold text-primary">Sales</h3>
+        <div className="flex items-center justify-between">
+          <h3 className="text-xl sm:text-2xl font-bold text-primary">Sales</h3>
+          <YearSelector selectedYear={selectedYear} onYearChange={setSelectedYear} />
+        </div>
 
         {/* SUMMARY CARDS */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 sm:gap-2 md:gap-4">
           <StatCard
             title="Total Revenue"
-            value={loading ? '...' : formatToK(totalSales)}
-            subtitle="All sales, rent & lease"
+            value={loading ? '...' : formatCurrency(totalSales)}
+            subtitle={`${selectedYear === 'all' ? 'Lifetime Revenue' : `Revenue in ${selectedYear}`}`}
           />
           <StatCard
             title="Total Orders"
@@ -111,12 +113,12 @@ export default function ManagerSalesPage() {
           />
           <StatCard
             title="Product Sales"
-            value={loading ? '...' : formatToK(saleAmount)}
+            value={loading ? '...' : formatCurrency(saleAmount)}
             subtitle="Products & spare parts"
           />
           <StatCard
             title="Rent + Lease"
-            value={loading ? '...' : formatToK(rentAmount + leaseAmount)}
+            value={loading ? '...' : formatCurrency(rentAmount + leaseAmount)}
             subtitle="Rental & lease income"
           />
         </div>
@@ -124,7 +126,7 @@ export default function ManagerSalesPage() {
         {/* TABLE */}
         <div className="space-y-4">
           <h3 className="text-lg sm:text-xl font-bold text-primary">Sales Summary</h3>
-          <SalesSummaryTable />
+          <SalesSummaryTable selectedYear={selectedYear} />
         </div>
 
         {/* ANALYTICS */}

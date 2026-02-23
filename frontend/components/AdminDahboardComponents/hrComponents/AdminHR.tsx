@@ -12,6 +12,8 @@ import { YearSelector } from '@/components/ui/YearSelector';
  * Provides a high-level view of HR metrics and access to detailed employee records.
  */
 export default function AdminHR() {
+  const [selectedYear, setSelectedYear] = React.useState<number | 'all'>(new Date().getFullYear());
+
   return (
     <div className="bg-blue-100 min-h-screen p-3 sm:p-4 md:p-6 space-y-8 sm:space-y-10">
       <div className="space-y-4 sm:space-y-6">
@@ -24,15 +26,12 @@ export default function AdminHR() {
               Enterprise-wide employee management and department statistics
             </p>
           </div>
-          <YearSelector
-            selectedYear={new Date().getFullYear()}
-            onYearChange={() => {}} // Initial alignment only, logical connection can follow
-          />
+          <YearSelector selectedYear={selectedYear} onYearChange={setSelectedYear} />
         </div>
 
-        <HRStatsCards />
+        <HRStatsCards selectedYear={selectedYear} />
 
-        <HRCharts />
+        <HRCharts selectedYear={selectedYear} />
 
         <div className="space-y-4">
           <h3 className="text-lg sm:text-xl font-bold text-primary">Employee Management</h3>

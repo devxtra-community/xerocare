@@ -34,7 +34,7 @@ export default function ProductsTable() {
   const currentData = data.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
   return (
-    <div className="rounded-2xl bg-card p-2 sm:p-3 shadow-sm w-full h-[260px] flex flex-col">
+    <div className="rounded-2xl bg-card p-2 sm:p-3 shadow-sm w-full h-[280px] flex flex-col">
       <div className="flex-1 overflow-x-auto">
         <table className="w-full">
           <thead>

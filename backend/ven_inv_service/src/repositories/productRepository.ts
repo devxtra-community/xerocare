@@ -1,6 +1,6 @@
 import { Source } from '../config/db';
 import { Product, ProductStatus } from '../entities/productEntity';
-import { IsNull } from 'typeorm';
+import { IsNull, FindOptionsWhere } from 'typeorm';
 
 export class ProductRepository {
   private repo = Source.getRepository(Product);
@@ -13,12 +13,17 @@ export class ProductRepository {
   }
 
   /**
-   * Retrieves all products not associated with spare parts.
+   * Retrieves all products not associated with spare parts, optionally filtered by branch.
    */
-  async getAllProducts() {
+  async getAllProducts(branchId?: string) {
+    const where: FindOptionsWhere<Product> = { spare_part_id: IsNull() };
+    if (branchId && branchId !== 'All') {
+      where.warehouse = { branchId };
+    }
+
     return this.repo.find({
       relations: { model: true, warehouse: true, lot: true },
-      where: { spare_part_id: IsNull() },
+      where,
     });
   }
 

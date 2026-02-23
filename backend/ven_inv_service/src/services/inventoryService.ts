@@ -6,28 +6,33 @@ export class InventoryService {
   /**
    * Retrieves global inventory with optional filters.
    */
-  getGlobalInventory(filters?: { product?: string; warehouse?: string; branch?: string }) {
+  getGlobalInventory(filters?: {
+    product?: string;
+    warehouse?: string;
+    branch?: string;
+    year?: number;
+  }) {
     return this.repo.getGlobalInventory(filters);
   }
 
   /**
    * Retrieves inventory for a specific branch.
    */
-  getBranchInventory(branchId: string) {
-    return this.repo.getBranchInventory(branchId);
+  getBranchInventory(branchId: string, year?: number) {
+    return this.repo.getBranchInventory(branchId, year);
   }
 
   /**
    * Retrieves inventory for a specific warehouse.
    */
-  getWarehouseInventory(warehouseId: string) {
-    return this.repo.getWarehouseInventory(warehouseId);
+  getWarehouseInventory(warehouseId: string, year?: number) {
+    return this.repo.getWarehouseInventory(warehouseId, year);
   }
 
   /**
    * Retrieves inventory statistics for a branch.
    */
-  getInventoryStats(branchId?: string) {
-    return this.repo.getInventoryStats(branchId);
+  getInventoryStats(branchId?: string, year?: number) {
+    return this.repo.getInventoryStats(branchId, year);
   }
 }

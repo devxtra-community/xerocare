@@ -86,14 +86,12 @@ export const getAllEmployees = async (req: Request, res: Response, next: NextFun
     const page = Number(req.query.page) || 1;
     const limit = Number(req.query.limit) || 20;
     const role = req.query.role as EmployeeRole | undefined;
+    const search = req.query.search as string | undefined;
 
-    // Branch filtering: Admin and HR see all employees, others (MANAGERS) see only their branch
-    const branchId =
-      req.user?.role === EmployeeRole.ADMIN || req.user?.role === EmployeeRole.HR
-        ? undefined
-        : req.user?.branchId;
+    // Branch filtering: Admin see all employees, HR and MANAGERS see only their branch (if assigned)
+    const branchId = req.user?.role === EmployeeRole.ADMIN ? undefined : req.user?.branchId;
 
-    const result = await service.getAllEmployees(page, limit, role, branchId);
+    const result = await service.getAllEmployees(page, limit, role, branchId, search);
     logger.debug('Fetched employees', {
       count: result.employees.length,
       page,
@@ -220,18 +218,47 @@ export const deleteEmployee = async (req: Request, res: Response, next: NextFunc
  */
 export const getHRStats = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    // Branch filtering: Admin and HR see all stats, others (MANAGERS) see only their branch
-    const branchId =
-      req.user?.role === EmployeeRole.ADMIN || req.user?.role === EmployeeRole.HR
-        ? undefined
-        : req.user?.branchId;
+    // Branch filtering: Admin see all stats, HR and MANAGERS see only their branch (if assigned)
+    const branchId = req.user?.role === EmployeeRole.ADMIN ? undefined : req.user?.branchId;
 
-    const stats = await service.getHRStats(branchId);
+    const year = req.query.year ? Number(req.query.year) : undefined;
+
+    const stats = await service.getHRStats(branchId, year);
     logger.info('HR Stats fetched', { keys: Object.keys(stats) });
     return res.json({
       success: true,
       data: stats,
       message: 'HR stats fetched successfully',
+    });
+  } catch (err: unknown) {
+    const error = err as { message: string; statusCode?: number };
+    next(new AppError(error.message, error.statusCode || 500));
+  }
+};
+
+/**
+ * Retrieves all branches.
+ */
+export const getAllBranches = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const isAdmin = req.user?.role === EmployeeRole.ADMIN;
+    const isHR = req.user?.role === EmployeeRole.HR;
+
+    // Admin and HR can see all branches (HR needs this to assign MANAGER/HR roles to any branch)
+    // MANAGER can only see their own branch
+    const branchId = isAdmin || isHR ? undefined : req.user?.branchId;
+
+    let branches = await service.getAllBranches();
+
+    // If restricted to a branch, filter the list
+    if (branchId) {
+      branches = branches.filter((b) => b.branch_id === branchId);
+    }
+
+    return res.json({
+      success: true,
+      data: branches,
+      message: 'Branches fetched successfully',
     });
   } catch (err: unknown) {
     const error = err as { message: string; statusCode?: number };

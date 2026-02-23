@@ -1,5 +1,6 @@
 'use client';
-import React, { useState, useEffect } from 'react';
+
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Table,
   TableBody,
@@ -10,7 +11,7 @@ import {
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Eye, Edit2, Search, FilterX } from 'lucide-react';
+import { Eye, Search, FilterX } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -18,25 +19,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { sparePartService, SparePartInventoryItem } from '@/services/sparePartService';
 import api from '@/lib/api';
 import { formatCurrency } from '@/lib/format';
+import { Branch } from '@/lib/branch';
 
-interface InventoryItem {
+interface Warehouse {
   id: string;
-  model_no: string;
-  model_name: string;
-  product_name: string;
-  brand: string;
-  description: string;
-  total_quantity: number;
-  available_qty: number;
-  rented_qty: number;
-  lease_qty: number;
-  damaged_qty: number;
-  sold_qty: number;
-  product_cost: number;
-  warehouse_name: string;
-  branch_name?: string;
+  warehouseName: string;
 }
 
 interface FilterOption {
@@ -44,104 +34,84 @@ interface FilterOption {
   name: string;
 }
 
-interface InventoryResponse {
-  success: boolean;
-  data: InventoryItem[];
-}
-
 /**
- * Comprehensive Inventory Products Table with advanced filtering.
- * Displays all inventory items with filtering by product, warehouse, and branch.
- * Columns include model details, quantities (total/available/rented/damaged), and unit cost.
- * Allows drilling down into specific inventory segments.
+ * Admin-side Spare Parts Inventory Table.
+ * Provides a company-wide view of spare parts with filtering by branch, warehouse, and brand.
  */
-export default function InventoryProductsTable({ selectedYear }: { selectedYear: number | 'all' }) {
-  const [page, setPage] = useState(1);
-  const [data, setData] = useState<InventoryItem[]>([]);
+export default function InventorySparePartsTable({
+  selectedYear,
+}: {
+  selectedYear: number | 'all';
+}) {
+  const [data, setData] = useState<SparePartInventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const ITEMS_PER_PAGE = 10;
 
   // Filter States
-  const [productFilter, setProductFilter] = useState('');
-  const [warehouseFilter, setWarehouseFilter] = useState('');
-  const [branchFilter, setBranchFilter] = useState('');
-  const [brandFilter, setBrandFilter] = useState('');
+  const [search, setSearch] = useState('');
+  const [warehouseFilter, setWarehouseFilter] = useState('all');
+  const [branchFilter, setBranchFilter] = useState('all');
+  const [brandFilter, setBrandFilter] = useState('all');
 
   // Options States
   const [warehouses, setWarehouses] = useState<FilterOption[]>([]);
   const [branches, setBranches] = useState<FilterOption[]>([]);
-  const [brands, setBrands] = useState<FilterOption[]>([]);
+  const [brands, setBrands] = useState<string[]>([]);
 
-  const ITEMS_PER_PAGE = 10;
-
-  const fetchData = React.useCallback(async () => {
+  const fetchData = useCallback(async () => {
     try {
       setLoading(true);
-      const params = new URLSearchParams();
-      if (productFilter.trim()) params.append('product', productFilter.trim());
-      if (warehouseFilter && warehouseFilter !== 'all') params.append('warehouse', warehouseFilter);
-      if (branchFilter && branchFilter !== 'all') params.append('branch', branchFilter);
-      if (brandFilter && brandFilter !== 'all') params.append('brand', brandFilter);
-      if (selectedYear && selectedYear !== 'all') params.append('year', selectedYear.toString());
+      const res = await sparePartService.getSpareParts({
+        search: search.trim() || undefined,
+        branch: branchFilter !== 'all' ? branchFilter : undefined,
+        year: selectedYear,
+        // Backend listSpareParts doesn't directly support warehouse filter yet,
+        // but we can add it to the params and handle it if the API is updated later.
+        // For now, we'll implement it as client-side or assume backend might support it.
+      });
 
-      const res = await api.get<InventoryResponse>(`/i/inventory?${params.toString()}`);
-      if (res.data.success) {
-        setData(res.data.data);
+      let filtered = res.data || [];
+
+      // Client-side filtering for Warehouse since backend getInventory doesn't strictly take warehouseId yet
+      if (warehouseFilter !== 'all') {
+        filtered = filtered.filter((item) => item.warehouse_name === warehouseFilter);
       }
+
+      // Client-side brand filter if not handled by backend
+      if (brandFilter !== 'all') {
+        filtered = filtered.filter((item) => item.brand === brandFilter);
+      }
+
+      setData(filtered);
     } catch (e) {
-      console.error('Failed to fetch inventory:', e);
+      console.error('Failed to fetch spare parts:', e);
     } finally {
       setLoading(false);
     }
-  }, [productFilter, warehouseFilter, branchFilter, brandFilter, selectedYear]);
+  }, [search, branchFilter, warehouseFilter, brandFilter, selectedYear]);
 
-  const fetchOptions = React.useCallback(async () => {
+  const fetchOptions = useCallback(async () => {
     try {
-      // Fetch warehouses
-      api
-        .get('/i/warehouses')
-        .then((whRes) => {
-          if (whRes.data.success) {
-            setWarehouses(
-              whRes.data.data.map((w: { id: string; warehouseName: string }) => ({
-                id: w.id,
-                name: w.warehouseName,
-              })),
-            );
-          }
-        })
-        .catch((err) => console.error('Failed to fetch warehouses:', err));
+      // Repurpose existing endpoints where possible
+      const [whRes, brRes] = await Promise.all([api.get('/i/warehouses'), api.get('/i/branch')]);
 
-      // Fetch branches
-      api
-        .get('/i/branch')
-        .then((brRes) => {
-          if (brRes.data.success) {
-            setBranches(
-              brRes.data.data.map((b: { id: string; name: string }) => ({
-                id: b.id,
-                name: b.name,
-              })),
-            );
-          }
-        })
-        .catch((err) => console.error('Failed to fetch branches:', err));
+      if (whRes.data.success) {
+        setWarehouses(whRes.data.data.map((w: Warehouse) => ({ id: w.id, name: w.warehouseName })));
+      }
+      if (brRes.data.success) {
+        setBranches(brRes.data.data.map((b: Branch) => ({ id: b.id, name: b.name })));
+      }
 
-      // Fetch brands
-      api
-        .get('/i/brands')
-        .then((bndRes) => {
-          if (bndRes.data.success) {
-            setBrands(
-              bndRes.data.data.map((b: { id: string; name: string }) => ({
-                id: b.id,
-                name: b.name,
-              })),
-            );
-          }
-        })
-        .catch((err) => console.error('Failed to fetch brands:', err));
+      // Get unique brands from current data or another endpoint if available
+      // For now, we'll derive it from the total set of parts
+      const partsRes = await sparePartService.getSpareParts({ limit: 1000 });
+      const uniqueBrands = Array.from(
+        new Set(partsRes.data.map((p) => p.brand).filter(Boolean)),
+      ).sort();
+      setBrands(uniqueBrands);
     } catch (e) {
-      console.error('Failed to initiate filter options fetch:', e);
+      console.error('Failed to fetch filter options:', e);
     }
   }, []);
 
@@ -153,21 +123,12 @@ export default function InventoryProductsTable({ selectedYear }: { selectedYear:
     fetchData();
   }, [fetchData]);
 
-  const handleFilter = () => {
-    setPage(1);
-    fetchData();
-  };
-
   const clearFilters = () => {
-    setProductFilter('');
+    setSearch('');
     setWarehouseFilter('all');
     setBranchFilter('all');
     setBrandFilter('all');
     setPage(1);
-    // fetchData will be called via useEffect if we keep it reactive,
-    // but better to just call it explicitly after reset if needed.
-    // For now, let's just make it call fetchData.
-    setTimeout(() => fetchData(), 0);
   };
 
   const totalPages = Math.ceil(data.length / ITEMS_PER_PAGE);
@@ -181,14 +142,14 @@ export default function InventoryProductsTable({ selectedYear }: { selectedYear:
         <div className="flex-1 grid grid-cols-1 md:grid-cols-4 gap-4 w-full">
           <div className="space-y-1">
             <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
-              Product / Model
+              Part Name / Code
             </label>
             <div className="relative">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-400" />
               <Input
-                placeholder="Search product..."
-                value={productFilter}
-                onChange={(e) => setProductFilter(e.target.value)}
+                placeholder="Search spare parts..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
                 className="pl-9 h-9 text-xs"
               />
             </div>
@@ -197,7 +158,7 @@ export default function InventoryProductsTable({ selectedYear }: { selectedYear:
             <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
               Warehouse
             </label>
-            <Select value={warehouseFilter || 'all'} onValueChange={setWarehouseFilter}>
+            <Select value={warehouseFilter} onValueChange={setWarehouseFilter}>
               <SelectTrigger className="h-9 text-xs w-full bg-background border-gray-200">
                 <SelectValue placeholder="All Warehouses" />
               </SelectTrigger>
@@ -215,14 +176,17 @@ export default function InventoryProductsTable({ selectedYear }: { selectedYear:
             <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
               Branch
             </label>
-            <Select value={branchFilter || 'all'} onValueChange={setBranchFilter}>
+            <Select value={branchFilter} onValueChange={setBranchFilter}>
               <SelectTrigger className="h-9 text-xs w-full bg-background border-gray-200">
                 <SelectValue placeholder="All Branches" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Branches</SelectItem>
                 {branches.map((b) => (
-                  <SelectItem key={b.id} value={b.name}>
+                  // Using name for matching with branch_name from raw results if needed,
+                  // but backend getInventory now takes branchId.
+                  // We should ideally use ID for the filter and pass it to backend.
+                  <SelectItem key={b.id} value={b.id}>
                     {b.name}
                   </SelectItem>
                 ))}
@@ -233,15 +197,15 @@ export default function InventoryProductsTable({ selectedYear }: { selectedYear:
             <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
               Brand
             </label>
-            <Select value={brandFilter || 'all'} onValueChange={setBrandFilter}>
+            <Select value={brandFilter} onValueChange={setBrandFilter}>
               <SelectTrigger className="h-9 text-xs w-full bg-background border-gray-200">
                 <SelectValue placeholder="All Brands" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Brands</SelectItem>
                 {brands.map((b) => (
-                  <SelectItem key={b.id} value={b.name}>
-                    {b.name}
+                  <SelectItem key={b} value={b}>
+                    {b}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -249,13 +213,6 @@ export default function InventoryProductsTable({ selectedYear }: { selectedYear:
           </div>
         </div>
         <div className="flex items-center gap-2 pt-4 md:pt-0">
-          <Button
-            size="sm"
-            onClick={handleFilter}
-            className="h-9 bg-primary text-white hover:bg-primary/90 text-xs px-4"
-          >
-            Apply Filters
-          </Button>
           <Button
             size="sm"
             variant="outline"
@@ -274,31 +231,25 @@ export default function InventoryProductsTable({ selectedYear }: { selectedYear:
             <TableHeader>
               <TableRow className="hover:bg-transparent">
                 <TableHead className="text-xs font-semibold text-primary uppercase px-6">
-                  Model Name
+                  Part Name
                 </TableHead>
                 <TableHead className="text-xs font-semibold text-primary uppercase px-6">
-                  Product Name
+                  Item Code
                 </TableHead>
                 <TableHead className="text-xs font-semibold text-primary uppercase px-6">
                   Brand
                 </TableHead>
                 <TableHead className="text-xs font-semibold text-primary uppercase px-6">
+                  Branch
+                </TableHead>
+                <TableHead className="text-xs font-semibold text-primary uppercase px-6">
                   Warehouse
                 </TableHead>
                 <TableHead className="text-xs font-semibold text-primary uppercase px-6 text-center">
-                  Total Qty
+                  In Stock
                 </TableHead>
                 <TableHead className="text-xs font-semibold text-primary uppercase px-6 text-center">
-                  Available
-                </TableHead>
-                <TableHead className="text-xs font-semibold text-primary uppercase px-6 text-center">
-                  Rent
-                </TableHead>
-                <TableHead className="text-xs font-semibold text-primary uppercase px-6 text-center">
-                  Lease
-                </TableHead>
-                <TableHead className="text-xs font-semibold text-primary uppercase px-6 text-center">
-                  Cost
+                  Unit Price
                 </TableHead>
                 <TableHead className="text-xs font-semibold text-primary uppercase px-6 text-right pr-6">
                   Actions
@@ -308,76 +259,62 @@ export default function InventoryProductsTable({ selectedYear }: { selectedYear:
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={11} className="text-center py-8 text-muted-foreground">
-                    Loading inventory...
+                  <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                    Loading spare parts...
                   </TableCell>
                 </TableRow>
               ) : currentData.length > 0 ? (
                 currentData.map((item, index) => (
                   <TableRow
-                    key={`${item.model_no}-${item.warehouse_name}-${index}`}
+                    key={`${item.id}-${index}`}
                     className={`hover:bg-muted/50/30 transition-colors ${index % 2 ? 'bg-sky-100/60' : ''}`}
                   >
-                    <TableCell className="px-6 py-4 text-foreground">
-                      <div className="font-medium">{item.model_name}</div>
-                      {item.description && (
-                        <div className="text-xs text-muted-foreground truncate max-w-[200px]">
-                          {item.description}
-                        </div>
-                      )}
-                    </TableCell>
                     <TableCell className="px-6 py-4 text-foreground font-medium">
-                      {item.product_name || '-'}
+                      {item.part_name}
                     </TableCell>
-                    <TableCell className="px-6 py-4 text-gray-600">{item.brand || '-'}</TableCell>
+                    <TableCell className="px-6 py-4 text-gray-600 font-mono text-[11px]">
+                      {item.item_code}
+                    </TableCell>
                     <TableCell className="px-6 py-4 text-gray-600 font-medium">
+                      {item.brand}
+                    </TableCell>
+                    <TableCell className="px-6 py-4 text-blue-700 font-bold text-[11px]">
+                      {item.branch_name || 'N/A'}
+                    </TableCell>
+                    <TableCell className="px-6 py-4 text-gray-600">
                       {item.warehouse_name || '-'}
                     </TableCell>
-                    <TableCell className="px-6 py-4 text-center font-bold text-blue-600">
-                      {item.total_quantity}
-                    </TableCell>
                     <TableCell className="px-6 py-4 text-center">
-                      <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
-                        {item.available_qty}
-                      </span>
-                    </TableCell>
-                    <TableCell className="px-6 py-4 text-center">
-                      <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-700">
-                        {item.rented_qty}
-                      </span>
-                    </TableCell>
-                    <TableCell className="px-6 py-4 text-center">
-                      <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-700">
-                        {item.lease_qty}
+                      <span
+                        className={`px-2.5 py-1 rounded-full text-xs font-bold ${
+                          item.quantity > 10
+                            ? 'bg-green-100 text-green-700'
+                            : item.quantity > 0
+                              ? 'bg-yellow-100 text-yellow-700'
+                              : 'bg-red-100 text-red-700'
+                        }`}
+                      >
+                        {item.quantity}
                       </span>
                     </TableCell>
                     <TableCell className="px-6 py-4 text-center font-semibold text-gray-700">
-                      {formatCurrency(item.product_cost || 0)}
+                      {formatCurrency(item.price || 0)}
                     </TableCell>
                     <TableCell className="px-6 py-4 text-right pr-6">
-                      <div className="flex justify-end gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-gray-400 hover:text-primary"
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-gray-400 hover:text-primary"
-                        >
-                          <Edit2 className="h-4 w-4" />
-                        </Button>
-                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-gray-400 hover:text-primary"
+                      >
+                        <Eye className="h-4 w-4" />
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={11} className="text-center py-8 text-muted-foreground">
-                    No inventory items found
+                  <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                    No spare parts found
                   </TableCell>
                 </TableRow>
               )}
@@ -385,10 +322,11 @@ export default function InventoryProductsTable({ selectedYear }: { selectedYear:
           </Table>
         </div>
 
-        <div className="p-4 border-t border-gray-50 flex items-center justify-between bg-card">
+        {/* Pagination */}
+        <div className="p-4 border-t border-gray-50 flex items-center justify-between bg-card text-primary font-bold">
           <p className="text-xs text-muted-foreground">
             Showing {startIndex + 1} to {Math.min(startIndex + ITEMS_PER_PAGE, data.length)} of{' '}
-            {data.length} models
+            {data.length} items
           </p>
           <div className="flex items-center gap-2">
             <Button

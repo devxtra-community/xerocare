@@ -11,9 +11,9 @@ export class ModelService {
   private brandRepository = new BrandRepository(Source);
 
   /**
-   * Creates a new model.
+   * Creates a new model for a specific branch.
    */
-  async createModel(data: Partial<Model>) {
+  async createModel(data: Partial<Model>, branchId?: string) {
     if (!data.brand_id) {
       throw new AppError('Brand is required', 400);
     }
@@ -21,7 +21,7 @@ export class ModelService {
     if (!brand) {
       throw new AppError('Invalid brand selected', 400);
     }
-    const newmodel = this.modelRepository.addModel(data);
+    const newmodel = await this.modelRepository.addModel({ ...data, branch_id: branchId });
     if (!newmodel) {
       throw new AppError('Model creation failed', 404);
     }
@@ -29,27 +29,41 @@ export class ModelService {
   }
 
   /**
-   * Retrieves all models.
+   * Retrieves all models, optionally filtered by branch.
    */
-  async fetchAllModels() {
-    return this.modelRepository.getAllModels();
+  async fetchAllModels(branchId?: string) {
+    return this.modelRepository.getAllModels(branchId);
   }
 
   /**
-   * Modifies an existing model.
+   * Modifies an existing model, ensuring branch ownership.
    */
-  async modifyModel(id: string, data: Partial<Model>) {
-    return this.modelRepository.updateModel(id, data);
-  }
-
-  /**
-   * Removes a model.
-   */
-  async removeModel(id: string) {
+  async modifyModel(id: string, data: Partial<Model>, branchId?: string) {
     const model = await this.modelRepository.findbyid(id);
     if (!model) {
       throw new AppError('Model not found', 404);
     }
+
+    if (branchId && model.branch_id && model.branch_id !== branchId) {
+      throw new AppError('Unauthorized: Model belongs to another branch', 403);
+    }
+
+    return this.modelRepository.updateModel(id, data);
+  }
+
+  /**
+   * Removes a model, ensuring branch ownership.
+   */
+  async removeModel(id: string, branchId?: string) {
+    const model = await this.modelRepository.findbyid(id);
+    if (!model) {
+      throw new AppError('Model not found', 404);
+    }
+
+    if (branchId && model.branch_id && model.branch_id !== branchId) {
+      throw new AppError('Unauthorized: Model belongs to another branch', 403);
+    }
+
     return this.modelRepository.deleteModel(id);
   }
 

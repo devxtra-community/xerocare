@@ -23,7 +23,7 @@ interface SalesRow {
  * Supports searching by product/ID and lists quantity, price (Sale/Rent/Lease), and date.
  * Provides a granular view of sales performance.
  */
-const SalesSummaryTable = () => {
+const SalesSummaryTable = ({ selectedYear }: { selectedYear: number | 'all' }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
   const [salesData, setSalesData] = useState<SalesRow[]>([]);
@@ -34,7 +34,11 @@ const SalesSummaryTable = () => {
         const invoices = await getInvoices();
         // Flatten items and map to table rows
         const sales = invoices
-          .filter((inv: Invoice) => inv.items && inv.items.length > 0 && inv.saleType === 'SALE')
+          .filter((inv: Invoice) => {
+            const date = new Date(inv.createdAt);
+            const matchesYear = selectedYear === 'all' || date.getFullYear() === selectedYear;
+            return inv.items && inv.items.length > 0 && inv.saleType === 'SALE' && matchesYear;
+          })
           .flatMap((inv: Invoice) =>
             (inv.items || []).map((item: InvoiceItem) => {
               const date = new Date(inv.createdAt);
@@ -66,7 +70,7 @@ const SalesSummaryTable = () => {
       }
     };
     fetchSales();
-  }, []);
+  }, [selectedYear]);
 
   const filteredData = salesData.filter((row) =>
     Object.values(row).some((value) =>

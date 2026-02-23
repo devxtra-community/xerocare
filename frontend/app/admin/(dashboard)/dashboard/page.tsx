@@ -99,37 +99,58 @@ export default function Dashboard() {
 
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 sm:gap-6">
           <div className="space-y-2">
-            <h3 className="text-base sm:text-lg md:text-xl font-bold text-primary">Products</h3>
+            <h3 className="text-base sm:text-lg md:text-xl font-bold text-primary tracking-tight">
+              Products
+            </h3>
             <ProductsTable />
           </div>
-          <div className="space-y-2 flex flex-col items-stretch h-full">
-            <SalesChart />
+          <div className="space-y-2">
+            <h3 className="text-base sm:text-lg md:text-xl font-bold text-primary tracking-tight">
+              Global Sales Overview
+            </h3>
+            <SalesChart selectedYear={selectedYear} />
           </div>
         </div>
       </div>
 
-      <div className="flex flex-col space-y-3 sm:space-y-4">
-        <h3 className="text-lg sm:text-xl font-bold text-primary">Human Resources</h3>
+      <div className="flex flex-col space-y-2">
+        <h3 className="text-base sm:text-lg md:text-xl font-bold text-primary tracking-tight">
+          Human Resources
+        </h3>
 
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 sm:gap-6">
-          <div className="xl:col-span-2">
-            <HrTable />
+          <div className="xl:col-span-2 space-y-2">
+            <h4 className="text-sm sm:text-base font-bold text-primary/80 tracking-tight">
+              Recent Employees
+            </h4>
+            <HrTable selectedYear={selectedYear} />
           </div>
-          <div className="xl:col-span-1">
-            <EmployeePieChart />
+          <div className="xl:col-span-1 space-y-2">
+            <h4 className="text-sm sm:text-base font-bold text-primary/80 tracking-tight">
+              Employee Distribution
+            </h4>
+            <EmployeePieChart selectedYear={selectedYear} />
           </div>
         </div>
       </div>
 
-      <div className="flex flex-col space-y-3 sm:space-y-4">
-        <h3 className="text-lg sm:text-xl font-bold text-primary">Warehouse</h3>
+      <div className="flex flex-col space-y-2">
+        <h3 className="text-base sm:text-lg md:text-xl font-bold text-primary tracking-tight">
+          Warehouse
+        </h3>
 
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 sm:gap-6">
-          <div className="xl:col-span-2">
-            <WarehouseTable />
+          <div className="xl:col-span-2 space-y-2">
+            <h4 className="text-sm sm:text-base font-bold text-primary/80 tracking-tight">
+              All Warehouses
+            </h4>
+            <WarehouseTable selectedYear={selectedYear} />
           </div>
-          <div className="xl:col-span-1">
-            <CategoryPieChart />
+          <div className="xl:col-span-1 space-y-2">
+            <h4 className="text-sm sm:text-base font-bold text-primary/80 tracking-tight">
+              Product Distribution
+            </h4>
+            <CategoryPieChart selectedYear={selectedYear} />
           </div>
         </div>
       </div>

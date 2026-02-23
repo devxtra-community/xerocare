@@ -21,11 +21,15 @@ export class VendorController {
   };
 
   /**
-   * Retrieves all active vendors.
+   * Retrieves all active vendors, optionally filtered by branch.
    */
-  getVendors = async (_req: Request, res: Response, next: NextFunction) => {
+  getVendors = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const vendors = await this.vendorService.getAllVendors();
+      const branchId = req.user?.branchId;
+      const isAdmin = req.user?.role === 'ADMIN';
+      const filteredBranchId = isAdmin ? undefined : branchId;
+
+      const vendors = await this.vendorService.getAllVendors(filteredBranchId);
 
       return res.json({
         success: true,
@@ -37,11 +41,18 @@ export class VendorController {
   };
 
   /**
-   * Retrieves a vendor by ID.
+   * Retrieves a vendor by ID, with branch-specific stats.
    */
   getVendorById = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const vendor = await this.vendorService.getVendorById(req.params.id as string);
+      const branchId = req.user?.branchId;
+      const isAdmin = req.user?.role === 'ADMIN';
+      const filteredBranchId = isAdmin ? undefined : branchId;
+
+      const vendor = await this.vendorService.getVendorById(
+        req.params.id as string,
+        filteredBranchId,
+      );
 
       return res.json({
         success: true,
@@ -114,14 +125,40 @@ export class VendorController {
   };
 
   /**
-   * Retrieves all requests made to a vendor.
+   * Retrieves all requests made to a vendor, optionally filtered by branch.
    */
   getVendorRequests = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const requests = await this.vendorService.getVendorRequests(req.params.id as string);
+      const branchId = req.user?.branchId;
+      const isAdmin = req.user?.role === 'ADMIN';
+      const filteredBranchId = isAdmin ? undefined : branchId;
+
+      const requests = await this.vendorService.getVendorRequests(
+        req.params.id as string,
+        filteredBranchId,
+      );
       return res.json({
         success: true,
         data: requests,
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  /**
+   * Retrieves summary statistics for all vendors, optionally filtered by branch.
+   */
+  getStats = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const branchId = req.user?.branchId;
+      const isAdmin = req.user?.role === 'ADMIN';
+      const filteredBranchId = isAdmin ? undefined : branchId;
+
+      const stats = await this.vendorService.getVendorStats(filteredBranchId);
+      return res.json({
+        success: true,
+        data: stats,
       });
     } catch (error) {
       next(error);

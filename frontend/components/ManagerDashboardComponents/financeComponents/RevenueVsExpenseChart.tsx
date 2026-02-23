@@ -23,6 +23,8 @@ interface FinancialData {
   month: string;
   revenue: number;
   expense: number;
+  salaryExpense: number;
+  purchaseExpense: number;
 }
 
 /**
@@ -46,7 +48,10 @@ export default function RevenueVsExpenseChart({ selectedYear }: RevenueVsExpense
         });
 
         // Group by month and aggregate
-        const monthlyData = new Map<string, { revenue: number; expense: number }>();
+        const monthlyData = new Map<
+          string,
+          { revenue: number; expense: number; salary: number; purchase: number }
+        >();
         const months = [
           'Jan',
           'Feb',
@@ -63,27 +68,25 @@ export default function RevenueVsExpenseChart({ selectedYear }: RevenueVsExpense
         ];
 
         // Initialize with 0
-        months.forEach((m) => monthlyData.set(m, { revenue: 0, expense: 0 }));
+        months.forEach((m) =>
+          monthlyData.set(m, { revenue: 0, expense: 0, salary: 0, purchase: 0 }),
+        );
 
         report.forEach((item) => {
-          // Assuming item.month is a date string or recognizable
-          // If item.month is '2024-01-01', we get month index
-          // But backend getFinanceReport might return grouped data?
-          // Let's assume backend returns array of items.
-          // Wait, backend getFinanceReport returns:
-          // { month: string, income: number, expense: number, ... }
-          // month is likely a string.
-          // Let's inspect the backend logic if possible, or assume it returns 'YYYY-MM' or date.
-          // Step 158 showed backend: TO_CHAR(invoice.createdAt, 'YYYY-MM') as month
-          // So it returns '2024-01', '2024-02'.
-
           const monthIndex = new Date(item.month).getMonth();
           const monthName = months[monthIndex];
 
-          const current = monthlyData.get(monthName) || { revenue: 0, expense: 0 };
+          const current = monthlyData.get(monthName) || {
+            revenue: 0,
+            expense: 0,
+            salary: 0,
+            purchase: 0,
+          };
           monthlyData.set(monthName, {
             revenue: current.revenue + Number(item.income || 0),
             expense: current.expense + Number(item.expense || 0),
+            salary: current.salary + Number(item.salaryExpense || 0),
+            purchase: current.purchase + Number(item.purchaseExpense || 0),
           });
         });
 
@@ -91,6 +94,8 @@ export default function RevenueVsExpenseChart({ selectedYear }: RevenueVsExpense
           month,
           revenue: values.revenue,
           expense: values.expense,
+          salaryExpense: values.salary,
+          purchaseExpense: values.purchase,
         }));
 
         setData(formattedData);
@@ -143,9 +148,18 @@ export default function RevenueVsExpenseChart({ selectedYear }: RevenueVsExpense
                 barSize={20}
               />
               <Bar
-                dataKey="expense"
-                name="Expenses"
+                dataKey="purchaseExpense"
+                stackId="expense"
+                name="Purchase Cost"
                 fill="#93c5fd"
+                radius={[0, 0, 0, 0]}
+                barSize={20}
+              />
+              <Bar
+                dataKey="salaryExpense"
+                stackId="expense"
+                name="Salary Expense"
+                fill="#3b82f6"
                 radius={[4, 4, 0, 0]}
                 barSize={20}
               />

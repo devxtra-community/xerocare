@@ -116,7 +116,7 @@ export default function ManagerSidebar() {
   };
 
   return (
-    <Sidebar collapsible="icon" className="border-r-0">
+    <Sidebar collapsible="icon" className="border-none !border-r-0">
       <SidebarHeader className="bg-sidebar">
         <div className="flex items-center gap-3 px-4 py-4">
           <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-card/10">

@@ -6,7 +6,11 @@ import { getHRStats } from '@/lib/employee';
 
 const COLORS = ['#003F7D', '#0284C7', '#0891b2', '#7dd3fc', '#94a3b8', '#CBD5E1'];
 
-export default function SalaryDistributionChart() {
+export default function SalaryDistributionChart({
+  selectedYear,
+}: {
+  selectedYear: number | 'all';
+}) {
   const [isClient, setIsClient] = useState(false);
   const [data, setData] = useState<{ name: string; value: number }[]>([]);
 
@@ -14,7 +18,7 @@ export default function SalaryDistributionChart() {
     setIsClient(true);
     const fetchData = async () => {
       try {
-        const res = await getHRStats();
+        const res = await getHRStats(selectedYear);
         if (res.success && res.data.bySalary) {
           const rawSalary = res.data.bySalary;
           const chartData = [
@@ -22,6 +26,7 @@ export default function SalaryDistributionChart() {
             { name: 'Employee Manager', value: rawSalary.EMPLOYEE_MANAGER || 0 },
             { name: 'Sales Staff', value: rawSalary.SALES_STAFF || 0 },
             { name: 'Rent & Lease Staff', value: rawSalary.RENT_LEASE_STAFF || 0 },
+            { name: 'Service Staff', value: rawSalary.SERVICE_STAFF || 0 },
             { name: 'Finance', value: rawSalary.FINANCE || 0 },
             { name: 'Other', value: rawSalary.OTHER || 0 },
           ].filter((item) => item.value > 0);
@@ -33,7 +38,7 @@ export default function SalaryDistributionChart() {
       }
     };
     fetchData();
-  }, []);
+  }, [selectedYear]);
 
   const total = data.reduce((acc, curr) => acc + curr.value, 0);
 
