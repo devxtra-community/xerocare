@@ -16,8 +16,11 @@ import {
   UsageRecord,
   sendConsolidatedInvoice,
   getInvoiceById,
+  Invoice,
+  InvoiceItem,
 } from '@/lib/invoice';
 import { toast } from 'sonner';
+import { formatCurrency } from '@/lib/format';
 
 interface ConsolidatedStatementDialogProps {
   isOpen: boolean;
@@ -36,6 +39,7 @@ export default function ConsolidatedStatementDialog({
 }: ConsolidatedStatementDialogProps) {
   const [loading, setLoading] = useState(true);
   const [history, setHistory] = useState<UsageRecord[]>([]);
+  const [contract, setContract] = useState<Invoice | null>(null);
 
   useEffect(() => {
     const fetchDetails = async () => {
@@ -46,10 +50,8 @@ export default function ConsolidatedStatementDialog({
         const usageData = await getUsageHistory(collection.contractId);
         setHistory(usageData);
 
-        // Also try to fetch summary invoice if available (for future use)
-        if (collection.finalInvoiceId) {
-          await getInvoiceById(collection.finalInvoiceId);
-        }
+        const contractData = await getInvoiceById(collection.contractId);
+        setContract(contractData);
       } catch (error) {
         console.error(error);
         toast.error('Failed to load statement details');
@@ -65,6 +67,36 @@ export default function ConsolidatedStatementDialog({
 
   const handlePrint = () => {
     window.print();
+  };
+
+  const isCpc = contract?.rentType?.includes('CPC');
+
+  // Calculate applied slab rate for a given total usage count
+  const getAppliedRate = (totalUsage: number): string => {
+    if (!contract?.items) return '-';
+    const allItems = [
+      ...(contract.items || []),
+      ...((contract as Invoice & { pricingItems?: InvoiceItem[] }).pricingItems || []),
+    ];
+    const hasSlabs = (i: InvoiceItem) =>
+      !!i.bwSlabRanges?.length || !!i.colorSlabRanges?.length || !!i.comboSlabRanges?.length;
+    const ruleItem = allItems.find(hasSlabs);
+    if (!ruleItem) return '-';
+
+    const slabs: Array<{ from: number; to: number; rate: number }> =
+      ruleItem.comboSlabRanges || ruleItem.bwSlabRanges || ruleItem.colorSlabRanges || [];
+
+    if (!slabs.length) return '-';
+    const sorted = [...slabs].sort((a, b) => a.from - b.from);
+    let rate = sorted[0].rate;
+    let range = `${sorted[0].from}-${sorted[0].to}`;
+    for (const slab of sorted) {
+      if (totalUsage >= slab.from) {
+        rate = slab.rate;
+        range = slab.to === 9999999 ? `${slab.from}+` : `${slab.from}-${slab.to}`;
+      }
+    }
+    return `₹${rate} (${range})`;
   };
 
   return (
@@ -102,6 +134,162 @@ export default function ConsolidatedStatementDialog({
             </div>
           ) : (
             <div className="space-y-6">
+              {contract && contract.items?.some((i) => i.itemType === 'PRICING_RULE') && (
+                <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm p-6">
+                  <h3 className="font-bold text-slate-700 mb-4">Pricing Rules</h3>
+                  <div className="text-sm space-y-4">
+                    {contract.items
+                      .filter((i) => i.itemType === 'PRICING_RULE')
+                      .map((rule, idx) => (
+                        <div
+                          key={idx}
+                          className="pb-4 border-b border-slate-100 last:pb-0 last:border-0"
+                        >
+                          <span className="font-bold text-slate-800">{rule.description}</span>
+                          {(rule.bwIncludedLimit !== undefined ||
+                            rule.colorIncludedLimit !== undefined) && (
+                            <div className="flex gap-4 text-slate-500 mt-1">
+                              {rule.bwIncludedLimit !== undefined &&
+                                rule.bwIncludedLimit !== null && (
+                                  <span>B/W Included: {rule.bwIncludedLimit}</span>
+                                )}
+                              {rule.colorIncludedLimit !== undefined &&
+                                rule.colorIncludedLimit !== null && (
+                                  <span>Color Included: {rule.colorIncludedLimit}</span>
+                                )}
+                            </div>
+                          )}
+
+                          <div className="flex flex-wrap gap-4 mt-3">
+                            {rule.bwSlabRanges && rule.bwSlabRanges.length > 0 && (
+                              <div className="bg-slate-50 p-3 rounded-lg border border-slate-100 min-w-[200px]">
+                                <p className="text-xs font-bold text-slate-500 uppercase mb-2">
+                                  B&W Slabs
+                                </p>
+                                <div className="space-y-1">
+                                  {rule.bwSlabRanges.map((s, i) => (
+                                    <div key={i} className="flex justify-between text-sm">
+                                      <span className="text-slate-600">
+                                        {s.from} - {s.to}
+                                      </span>
+                                      <span className="font-semibold">₹{s.rate}</span>
+                                    </div>
+                                  ))}
+                                  {rule.bwExcessRate && (
+                                    <div className="flex justify-between border-t border-slate-200 pt-1 mt-1 text-sm">
+                                      <span className="text-slate-600">
+                                        &gt;{' '}
+                                        {Math.max(
+                                          ...rule.bwSlabRanges.map((s) => Number(s.to) || 0),
+                                        )}
+                                      </span>
+                                      <span className="font-semibold">₹{rule.bwExcessRate}</span>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+
+                            {rule.colorSlabRanges && rule.colorSlabRanges.length > 0 && (
+                              <div className="bg-slate-50 p-3 rounded-lg border border-slate-100 min-w-[200px]">
+                                <p className="text-xs font-bold text-slate-500 uppercase mb-2">
+                                  Color Slabs
+                                </p>
+                                <div className="space-y-1">
+                                  {rule.colorSlabRanges.map((s, i) => (
+                                    <div key={i} className="flex justify-between text-sm">
+                                      <span className="text-slate-600">
+                                        {s.from} - {s.to}
+                                      </span>
+                                      <span className="font-semibold">₹{s.rate}</span>
+                                    </div>
+                                  ))}
+                                  {rule.colorExcessRate && (
+                                    <div className="flex justify-between border-t border-slate-200 pt-1 mt-1 text-sm">
+                                      <span className="text-slate-600">
+                                        &gt;{' '}
+                                        {Math.max(
+                                          ...rule.colorSlabRanges.map((s) => Number(s.to) || 0),
+                                        )}
+                                      </span>
+                                      <span className="font-semibold">₹{rule.colorExcessRate}</span>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+
+                            {rule.comboSlabRanges && rule.comboSlabRanges.length > 0 && (
+                              <div className="bg-slate-50 p-3 rounded-lg border border-slate-100 min-w-[200px]">
+                                <p className="text-xs font-bold text-slate-500 uppercase mb-2">
+                                  Combined Slabs
+                                </p>
+                                <div className="space-y-1">
+                                  {rule.comboSlabRanges.map((s, i) => (
+                                    <div key={i} className="flex justify-between text-sm">
+                                      <span className="text-slate-600">
+                                        {s.from} - {s.to}
+                                      </span>
+                                      <span className="font-semibold">₹{s.rate}</span>
+                                    </div>
+                                  ))}
+                                  {rule.combinedExcessRate && (
+                                    <div className="flex justify-between border-t border-slate-200 pt-1 mt-1 text-sm">
+                                      <span className="text-slate-600">
+                                        &gt;{' '}
+                                        {Math.max(
+                                          ...rule.comboSlabRanges.map((s) => Number(s.to) || 0),
+                                        )}
+                                      </span>
+                                      <span className="font-semibold">
+                                        ₹{rule.combinedExcessRate}
+                                      </span>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+
+                            {!rule.bwSlabRanges?.length &&
+                              !rule.colorSlabRanges?.length &&
+                              !rule.comboSlabRanges?.length &&
+                              (rule.bwExcessRate ||
+                                rule.colorExcessRate ||
+                                rule.combinedExcessRate) && (
+                                <div className="flex gap-4 text-sm text-slate-600 bg-slate-50 p-3 rounded-lg border border-slate-100">
+                                  {rule.bwExcessRate !== undefined && (
+                                    <div>
+                                      B/W Rate:{' '}
+                                      <strong className="text-slate-900">
+                                        ₹{rule.bwExcessRate}
+                                      </strong>
+                                    </div>
+                                  )}
+                                  {rule.colorExcessRate !== undefined && (
+                                    <div>
+                                      Color Rate:{' '}
+                                      <strong className="text-slate-900">
+                                        ₹{rule.colorExcessRate}
+                                      </strong>
+                                    </div>
+                                  )}
+                                  {rule.combinedExcessRate !== undefined && (
+                                    <div>
+                                      Combined Rate:{' '}
+                                      <strong className="text-slate-900">
+                                        ₹{rule.combinedExcessRate}
+                                      </strong>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              )}
+
               {/* Transaction Table (Usage History) */}
               <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
                 <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
@@ -111,6 +299,7 @@ export default function ConsolidatedStatementDialog({
                   <TableHeader>
                     <TableRow>
                       <TableHead>Period</TableHead>
+                      {isCpc && <TableHead className="text-right">Rate Applied</TableHead>}
                       <TableHead className="text-right">Usage</TableHead>
                       <TableHead className="text-right">Rent</TableHead>
                       <TableHead className="text-right">Excess</TableHead>
@@ -136,6 +325,11 @@ export default function ConsolidatedStatementDialog({
                                 </span>
                               </div>
                             </TableCell>
+                            {isCpc && (
+                              <TableCell className="text-right font-bold text-indigo-700 text-xs">
+                                {getAppliedRate(record.totalUsage)}
+                              </TableCell>
+                            )}
                             <TableCell className="text-right">
                               <div className="flex flex-col items-end">
                                 <span className="font-medium text-slate-900">
@@ -144,13 +338,13 @@ export default function ConsolidatedStatementDialog({
                               </div>
                             </TableCell>
                             <TableCell className="text-right text-slate-600">
-                              ₹{Number(record.rent || 0).toLocaleString()}
+                              {formatCurrency(Number(record.rent || 0))}
                             </TableCell>
                             <TableCell className="text-right text-orange-600">
-                              ₹{Number(record.exceededAmount || 0).toLocaleString()}
+                              {formatCurrency(Number(record.exceededAmount || 0))}
                             </TableCell>
                             <TableCell className="text-right font-bold text-blue-700">
-                              ₹{Number(record.finalTotal || 0).toLocaleString()}
+                              {formatCurrency(Number(record.finalTotal || 0))}
                             </TableCell>
                           </TableRow>
                         ))}
@@ -162,11 +356,12 @@ export default function ConsolidatedStatementDialog({
                                     Advance Amount (Adjustable)
                                   </span>
                                 </TableCell>
+                                {isCpc && <TableCell className="text-right">-</TableCell>}
                                 <TableCell className="text-right">-</TableCell>
                                 <TableCell className="text-right">-</TableCell>
                                 <TableCell className="text-right">-</TableCell>
                                 <TableCell className="text-right font-black text-orange-700">
-                                  ₹{collection.advanceAmount.toLocaleString()}
+                                  {formatCurrency(collection.advanceAmount)}
                                 </TableCell>
                               </TableRow>
                             )
@@ -179,11 +374,12 @@ export default function ConsolidatedStatementDialog({
                                     Security Deposit (Collected)
                                   </span>
                                 </TableCell>
+                                {isCpc && <TableCell className="text-right">-</TableCell>}
                                 <TableCell className="text-right">-</TableCell>
                                 <TableCell className="text-right">-</TableCell>
                                 <TableCell className="text-right">-</TableCell>
                                 <TableCell className="text-right font-black text-blue-700">
-                                  ₹{collection.securityDepositAmount.toLocaleString()}
+                                  {formatCurrency(collection.securityDepositAmount)}
                                 </TableCell>
                               </TableRow>
                             )
@@ -191,16 +387,18 @@ export default function ConsolidatedStatementDialog({
                         {/* Grand Total Row */}
                         <TableRow className="bg-slate-50 border-t-2 border-slate-200 hover:bg-slate-50">
                           <TableCell
-                            colSpan={4}
+                            colSpan={isCpc ? 5 : 4}
                             className="text-right font-black text-slate-800 uppercase tracking-wider py-4"
                           >
                             Grand Total
                           </TableCell>
                           <TableCell className="text-right font-black text-2xl text-blue-700 py-4">
-                            ₹
-                            {history
-                              .reduce((sum, record) => sum + Number(record.finalTotal || 0), 0)
-                              .toLocaleString()}
+                            {formatCurrency(
+                              history.reduce(
+                                (sum, record) => sum + Number(record.finalTotal || 0),
+                                0,
+                              ),
+                            )}
                           </TableCell>
                         </TableRow>
                       </>
@@ -227,7 +425,7 @@ export default function ConsolidatedStatementDialog({
                   </div>
                   <div className="flex justify-between items-baseline">
                     <span className="text-2xl font-black text-blue-600">
-                      ₹{collection.securityDepositAmount.toLocaleString()}
+                      {formatCurrency(collection.securityDepositAmount)}
                     </span>
                     <span className="text-xs text-slate-400 font-bold bg-slate-100 px-2 py-0.5 rounded">
                       {collection.securityDepositMode || 'RECORDED'}
@@ -253,10 +451,9 @@ export default function ConsolidatedStatementDialog({
               </span>
               <div className="flex flex-col items-center md:items-end">
                 <span className="text-4xl font-black text-slate-900 leading-none">
-                  ₹
-                  {Number(
+                  {formatCurrency(
                     (collection.grossAmount || 0) - (collection.advanceAdjusted || 0),
-                  ).toLocaleString()}
+                  )}
                 </span>
                 <span className="text-xs font-bold text-slate-500 mt-2 bg-slate-200 px-3 py-1 rounded-full uppercase tracking-tighter">
                   Grand Total Due

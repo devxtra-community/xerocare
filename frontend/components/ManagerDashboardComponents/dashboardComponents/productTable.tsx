@@ -8,6 +8,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import Image from 'next/image';
 
 import { useEffect, useState } from 'react';
 import { inventoryService, InventoryItem } from '@/services/inventoryService';
@@ -227,9 +228,11 @@ export default function DashbordTable() {
                     <TableCell>
                       <div className="h-10 w-10 rounded-lg bg-gray-50 border border-gray-100 overflow-hidden flex items-center justify-center shadow-sm text-black">
                         {item.image_url ? (
-                          <img
+                          <Image
                             src={item.image_url}
                             alt={item.product_name}
+                            width={40}
+                            height={40}
                             className="h-full w-full object-contain p-1"
                           />
                         ) : (

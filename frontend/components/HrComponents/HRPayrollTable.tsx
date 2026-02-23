@@ -103,7 +103,7 @@ export default function HRPayrollTable({
     try {
       const payload = {
         employee_id: id,
-        salary_amount: updatedData.salaryPerMonth?.replace('₹ ', '').replace(/,/g, ''),
+        salary_amount: updatedData.salaryPerMonth?.replace('QAR ', '').replace(/,/g, ''),
         status: updatedData.status,
         paid_date: updatedData.paidDate || null,
         leave_days: updatedData.leaveDays,

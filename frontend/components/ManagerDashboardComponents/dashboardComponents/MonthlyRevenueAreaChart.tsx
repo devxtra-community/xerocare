@@ -114,7 +114,7 @@ export default function MonthlyRevenueAreaChart() {
                               className="text-[12px] font-medium"
                               style={{ color: entry.stroke }}
                             >
-                              ₹{entry.value.toLocaleString()}
+                              QAR {entry.value.toLocaleString()}
                             </span>
                           </div>
                         ),

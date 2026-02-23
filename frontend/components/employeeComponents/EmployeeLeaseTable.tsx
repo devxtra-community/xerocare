@@ -24,6 +24,7 @@ import UsageRecordingModal from '../Finance/UsageRecordingModal';
 
 import { Badge } from '@/components/ui/badge';
 import Pagination from '@/components/Pagination';
+import { formatCurrency } from '@/lib/format';
 
 import { InvoiceDetailsDialog } from '@/components/invoice/InvoiceDetailsDialog';
 import { ApproveQuotationDialog } from '@/components/invoice/ApproveQuotationDialog';
@@ -296,7 +297,7 @@ export default function EmployeeLeaseTable({ mode = 'EMPLOYEE' }: EmployeeLeaseT
                       </Badge>
                     </TableCell>
                     <TableCell className="font-bold text-primary">
-                      ₹{inv.totalAmount.toLocaleString()}
+                      {formatCurrency(inv.displayAmount ?? inv.totalAmount ?? 0)}
                     </TableCell>
                     <TableCell>
                       <span

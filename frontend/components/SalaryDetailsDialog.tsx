@@ -82,7 +82,7 @@ export function SalaryDetailsDialog({ open, onOpenChange, payrollId }: SalaryDet
                   Amount Paid
                 </span>
                 <div className="text-lg font-bold text-primary">
-                  ₹ {parseFloat(details.salary).toLocaleString()}
+                  QAR {parseFloat(details.salary).toLocaleString()}
                 </div>
               </div>
               <div className="bg-muted/30 p-4 rounded-xl space-y-1">

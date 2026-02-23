@@ -111,7 +111,7 @@ export default function MonthlyRevenueBarChart() {
                               className="text-[12px] font-medium"
                               style={{ color: entry.color }}
                             >
-                              ₹{entry.value.toLocaleString()}
+                              QAR {entry.value.toLocaleString()}
                             </span>
                           </div>
                         ),
@@ -120,7 +120,7 @@ export default function MonthlyRevenueBarChart() {
                         <div className="flex items-center gap-2">
                           <span className="text-[12px] font-bold text-gray-800">Total:</span>
                           <span className="text-[12px] font-bold text-gray-800">
-                            ₹
+                            QAR
                             {(payload as { value: number }[])
                               .reduce((sum: number, entry) => sum + entry.value, 0)
                               .toLocaleString()}

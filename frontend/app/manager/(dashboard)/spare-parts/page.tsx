@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Upload, Search, Pencil, Trash2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
@@ -26,7 +26,7 @@ export default function SparePartsPage() {
   const [parts, setParts] = useState<SparePartInventoryItem[]>([]);
   const [search, setSearch] = useState('');
 
-  const loadParts = async () => {
+  const loadParts = useCallback(async () => {
     setLoading(true);
     try {
       const res = await sparePartService.getSpareParts({ page, limit, search });
@@ -37,14 +37,14 @@ export default function SparePartsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [page, limit, search, setTotal]);
 
   useEffect(() => {
     const delayDebounceFn = setTimeout(() => {
       loadParts();
     }, 500);
     return () => clearTimeout(delayDebounceFn);
-  }, [search, page, limit]);
+  }, [loadParts]);
 
   const confirmDelete = async () => {
     if (!partToDelete) return;

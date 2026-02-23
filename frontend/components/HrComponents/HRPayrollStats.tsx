@@ -1,6 +1,7 @@
 import StatCard from '@/components/StatCard';
 import { PayrollRecord } from './HRPayrollTable';
 import { Loader2 } from 'lucide-react';
+import { formatCurrency } from '@/lib/format';
 
 /**
  * Component displaying key payroll statistics.
@@ -19,11 +20,11 @@ export default function HRPayrollStats({
 
   const totalPayrollValue = data.reduce((sum, item) => {
     // Remove currency symbol and commas before parsing
-    const value = parseFloat(item.salaryPerMonth.replace('₹ ', '').replace(/,/g, '')) || 0;
+    const value = parseFloat(item.salaryPerMonth.replace('QAR ', '').replace(/,/g, '')) || 0;
     return sum + value;
   }, 0);
 
-  const payrollPerMonth = `₹ ${totalPayrollValue.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+  const payrollPerMonth = formatCurrency(totalPayrollValue);
 
   const uniqueDepartments = new Set(data.map((item) => item.department)).size;
 

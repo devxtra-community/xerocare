@@ -59,7 +59,7 @@ export default function RevenuePieChart() {
                     <div className="bg-white p-3 rounded-xl shadow-lg border border-gray-50">
                       <p className="text-xs font-bold text-gray-700">{item.name}</p>
                       <p className="text-xs text-primary font-medium">
-                        ₹{(item.value ?? 0).toLocaleString()}
+                        QAR {(item.value ?? 0).toLocaleString()}
                       </p>
                     </div>
                   );

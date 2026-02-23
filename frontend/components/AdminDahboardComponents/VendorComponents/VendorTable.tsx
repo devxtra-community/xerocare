@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { StandardTable } from '@/components/table/StandardTable';
 import { DeleteConfirmDialog } from '@/components/dialogs/DeleteConfirmDialog';
 import { usePagination } from '@/hooks/usePagination';
@@ -68,14 +68,14 @@ export default function VendorTable({ basePath = '/admin' }: { basePath?: string
   const [loading, setLoading] = useState(true);
 
   const { page, limit, total, setPage, setLimit, setTotal } = usePagination(10);
-  const [stats, setStats] = useState({ total: 0, active: 0, newVendors: 0 });
+  const [stats, setStats] = useState({ total: 0, active: 0, totalSpending: 0, totalOrders: 0 });
 
   const [formOpen, setFormOpen] = useState(false);
   const [editingVendor, setEditingVendor] = useState<Vendor | null>(null);
   const [deleteVendor, setDeleteVendorTarget] = useState<Vendor | null>(null);
   const [requestVendor, setRequestVendor] = useState<Vendor | null>(null);
 
-  const fetchVendorsData = async () => {
+  const fetchVendorsData = useCallback(async () => {
     setLoading(true);
     try {
       const typeFilter = filterType !== 'All' ? filterType : undefined;
@@ -102,15 +102,14 @@ export default function VendorTable({ basePath = '/admin' }: { basePath?: string
       setStats({
         total: res.total || res.data.length,
         active: rawVendors.filter((v: Record<string, unknown>) => v.status === 'ACTIVE').length,
-        // Hack: estimating new vendors based on the current page to avoid breaking the stats component
-        newVendors: rawVendors.filter((v: Record<string, unknown>) => {
-          if (!v.createdAt) return false;
-          const created = new Date(v.createdAt as string);
-          return (
-            created.getMonth() === new Date().getMonth() &&
-            created.getFullYear() === new Date().getFullYear()
-          );
-        }).length,
+        totalSpending: rawVendors.reduce(
+          (sum: number, v: Record<string, unknown>) => sum + ((v.purchaseValue as number) || 0),
+          0,
+        ),
+        totalOrders: rawVendors.reduce(
+          (sum: number, v: Record<string, unknown>) => sum + ((v.totalOrders as number) || 0),
+          0,
+        ),
       });
     } catch (error) {
       console.error('Failed to fetch vendors:', error);
@@ -118,14 +117,14 @@ export default function VendorTable({ basePath = '/admin' }: { basePath?: string
     } finally {
       setLoading(false);
     }
-  };
+  }, [page, limit, search, filterType, setTotal]);
 
   React.useEffect(() => {
     const delayDebounceFn = setTimeout(() => {
       fetchVendorsData();
     }, 500);
     return () => clearTimeout(delayDebounceFn);
-  }, [search, filterType, page, limit]);
+  }, [fetchVendorsData]);
 
   const onRefresh = fetchVendorsData;
 
@@ -196,7 +195,8 @@ export default function VendorTable({ basePath = '/admin' }: { basePath?: string
       <VendorStats
         totalVendors={stats.total}
         activeVendors={stats.active}
-        newVendors={stats.newVendors}
+        totalSpending={stats.totalSpending}
+        totalOrders={stats.totalOrders}
       />
 
       <StandardTable

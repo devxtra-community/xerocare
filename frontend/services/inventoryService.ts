@@ -13,6 +13,7 @@ export interface InventoryItem {
   total_qty: number;
   available_qty: number;
   rented_qty: number;
+  lease_qty: number;
   damaged_qty: number;
   sold_qty: number;
   product_cost: number;

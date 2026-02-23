@@ -17,7 +17,8 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { FileText, Calendar, IndianRupee, Printer, X, Loader2, Mail } from 'lucide-react';
+import { FileText, Calendar, Coins, Printer, X, Loader2, Mail } from 'lucide-react';
+import { formatCurrency } from '@/lib/format';
 import { Invoice, getInvoiceById } from '@/lib/invoice';
 import { differenceInMonths, differenceInDays } from 'date-fns';
 import UsageRecordingModal from '@/components/Finance/UsageRecordingModal';
@@ -331,9 +332,9 @@ export function InvoiceDetailsDialog({
                     Monthly Rent
                   </p>
                   <div className="flex items-center gap-2 text-gray-700">
-                    <IndianRupee size={14} className="opacity-50" />
+                    <Coins size={14} className="opacity-50" />
                     <p className="text-xs font-bold">
-                      ₹{currentInvoice.monthlyRent.toLocaleString('en-IN')}
+                      {formatCurrency(currentInvoice.monthlyRent)}
                     </p>
                   </div>
                 </div>
@@ -385,7 +386,9 @@ export function InvoiceDetailsDialog({
                                     <span>
                                       {s.from} - {s.to}
                                     </span>
-                                    <span className="font-bold text-gray-800">₹{s.rate}</span>
+                                    <span className="font-bold text-gray-800">
+                                      {formatCurrency(s.rate)}
+                                    </span>
                                   </div>
                                 ))}
                                 {rule.bwExcessRate && (
@@ -395,7 +398,7 @@ export function InvoiceDetailsDialog({
                                       {Math.max(...rule.bwSlabRanges.map((s) => Number(s.to) || 0))}
                                     </span>
                                     <span className="font-bold text-gray-800">
-                                      ₹{rule.bwExcessRate}
+                                      {formatCurrency(rule.bwExcessRate)}
                                     </span>
                                   </div>
                                 )}
@@ -418,7 +421,9 @@ export function InvoiceDetailsDialog({
                                     <span>
                                       {s.from} - {s.to}
                                     </span>
-                                    <span className="font-bold text-gray-800">₹{s.rate}</span>
+                                    <span className="font-bold text-gray-800">
+                                      {formatCurrency(s.rate)}
+                                    </span>
                                   </div>
                                 ))}
                                 {rule.colorExcessRate && (
@@ -430,7 +435,7 @@ export function InvoiceDetailsDialog({
                                       )}
                                     </span>
                                     <span className="font-bold text-gray-800">
-                                      ₹{rule.colorExcessRate}
+                                      {formatCurrency(rule.colorExcessRate)}
                                     </span>
                                   </div>
                                 )}
@@ -453,7 +458,9 @@ export function InvoiceDetailsDialog({
                                     <span>
                                       {s.from} - {s.to}
                                     </span>
-                                    <span className="font-bold text-gray-800">₹{s.rate}</span>
+                                    <span className="font-bold text-gray-800">
+                                      {formatCurrency(s.rate)}
+                                    </span>
                                   </div>
                                 ))}
                                 {rule.combinedExcessRate && (
@@ -465,7 +472,7 @@ export function InvoiceDetailsDialog({
                                       )}
                                     </span>
                                     <span className="font-bold text-gray-800">
-                                      ₹{rule.combinedExcessRate}
+                                      {formatCurrency(rule.combinedExcessRate)}
                                     </span>
                                   </div>
                                 )}
@@ -483,17 +490,19 @@ export function InvoiceDetailsDialog({
                               <div className="mt-1 text-xs grid grid-cols-2 gap-2 opacity-80">
                                 {rule.bwExcessRate && (
                                   <div>
-                                    B/W Rate: <strong>₹{rule.bwExcessRate}</strong>
+                                    B/W Rate: <strong>{formatCurrency(rule.bwExcessRate)}</strong>
                                   </div>
                                 )}
                                 {rule.colorExcessRate && (
                                   <div>
-                                    Color Rate: <strong>₹{rule.colorExcessRate}</strong>
+                                    Color Rate:{' '}
+                                    <strong>{formatCurrency(rule.colorExcessRate)}</strong>
                                   </div>
                                 )}
                                 {rule.combinedExcessRate && (
                                   <div>
-                                    Combined Rate: <strong>₹{rule.combinedExcessRate}</strong>
+                                    Combined Rate:{' '}
+                                    <strong>{formatCurrency(rule.combinedExcessRate)}</strong>
                                   </div>
                                 )}
                               </div>
@@ -527,7 +536,7 @@ export function InvoiceDetailsDialog({
                     Monthly EMI
                   </p>
                   <p className="text-xs font-bold text-gray-700">
-                    ₹{currentInvoice.monthlyEmiAmount.toLocaleString()}
+                    {formatCurrency(currentInvoice.monthlyEmiAmount)}
                   </p>
                 </div>
               )}
@@ -601,7 +610,7 @@ export function InvoiceDetailsDialog({
                       Billing Cycle
                     </p>
                     <div className="flex items-center gap-2 text-gray-600">
-                      <IndianRupee size={14} className="opacity-50" />
+                      <Coins size={14} className="opacity-50" />
                       <p className="text-xs font-bold">
                         Every {currentInvoice.billingCycleInDays || 30} Days
                       </p>
@@ -675,13 +684,10 @@ export function InvoiceDetailsDialog({
                                     {bwExcess.toLocaleString()}
                                   </TableCell>
                                   <TableCell className="text-center font-bold text-gray-500 text-xs">
-                                    ₹{bwExcessRate}
+                                    {formatCurrency(bwExcessRate)}
                                   </TableCell>
                                   <TableCell className="text-right font-bold text-primary text-xs">
-                                    ₹
-                                    {bwExcessAmount.toLocaleString(undefined, {
-                                      minimumFractionDigits: 2,
-                                    })}
+                                    {formatCurrency(bwExcessAmount)}
                                   </TableCell>
                                 </TableRow>
                               );
@@ -722,13 +728,10 @@ export function InvoiceDetailsDialog({
                                     {colorExcess.toLocaleString()}
                                   </TableCell>
                                   <TableCell className="text-center font-bold text-gray-500 text-xs">
-                                    ₹{colorExcessRate}
+                                    {formatCurrency(colorExcessRate)}
                                   </TableCell>
                                   <TableCell className="text-right font-bold text-primary text-xs">
-                                    ₹
-                                    {colorExcessAmount.toLocaleString(undefined, {
-                                      minimumFractionDigits: 2,
-                                    })}
+                                    {formatCurrency(colorExcessAmount)}
                                   </TableCell>
                                 </TableRow>
                               );
@@ -774,13 +777,10 @@ export function InvoiceDetailsDialog({
                                     {comboExcess.toLocaleString()}
                                   </TableCell>
                                   <TableCell className="text-center font-bold text-gray-500 text-xs">
-                                    ₹{comboExcessRate}
+                                    {formatCurrency(comboExcessRate)}
                                   </TableCell>
                                   <TableCell className="text-right font-bold text-primary text-xs">
-                                    ₹
-                                    {comboExcessAmount.toLocaleString(undefined, {
-                                      minimumFractionDigits: 2,
-                                    })}
+                                    {formatCurrency(comboExcessAmount)}
                                   </TableCell>
                                 </TableRow>
                               );
@@ -884,29 +884,112 @@ export function InvoiceDetailsDialog({
                         </TableCell>
                         <TableCell className="text-xs font-medium text-gray-600 align-top py-3">
                           <div className="flex flex-col gap-1">
-                            {item.bwExcessRate ? (
+                            {item.bwSlabRanges && item.bwSlabRanges.length > 0 ? (
+                              <div className="flex flex-col">
+                                <span className="font-semibold text-gray-500 text-[10px] uppercase">
+                                  BW Slabs
+                                </span>
+                                {item.bwSlabRanges.map(
+                                  (s: { from: number; to: number; rate: number }, i: number) => (
+                                    <span key={i} className="whitespace-nowrap">
+                                      {s.from}-{s.to}: ₹{s.rate}
+                                    </span>
+                                  ),
+                                )}
+                                {item.bwExcessRate && (
+                                  <span className="whitespace-nowrap">
+                                    &gt;{' '}
+                                    {Math.max(
+                                      ...item.bwSlabRanges.map(
+                                        (s: { from: number; to: number; rate: number }) =>
+                                          Number(s.to) || 0,
+                                      ),
+                                    )}
+                                    : ₹{item.bwExcessRate}
+                                  </span>
+                                )}
+                              </div>
+                            ) : item.bwExcessRate ? (
                               <span className="whitespace-nowrap">BW: ₹{item.bwExcessRate}</span>
                             ) : null}
-                            {item.colorExcessRate ? (
-                              <span className="whitespace-nowrap">
+
+                            {item.colorSlabRanges && item.colorSlabRanges.length > 0 ? (
+                              <div className="flex flex-col mt-1">
+                                <span className="font-semibold text-gray-500 text-[10px] uppercase">
+                                  Color Slabs
+                                </span>
+                                {item.colorSlabRanges.map(
+                                  (s: { from: number; to: number; rate: number }, i: number) => (
+                                    <span key={i} className="whitespace-nowrap">
+                                      {s.from}-{s.to}: ₹{s.rate}
+                                    </span>
+                                  ),
+                                )}
+                                {item.colorExcessRate && (
+                                  <span className="whitespace-nowrap">
+                                    &gt;{' '}
+                                    {Math.max(
+                                      ...item.colorSlabRanges.map(
+                                        (s: { from: number; to: number; rate: number }) =>
+                                          Number(s.to) || 0,
+                                      ),
+                                    )}
+                                    : ₹{item.colorExcessRate}
+                                  </span>
+                                )}
+                              </div>
+                            ) : item.colorExcessRate ? (
+                              <span className="whitespace-nowrap mt-1">
                                 CLR: ₹{item.colorExcessRate}
                               </span>
                             ) : null}
-                            {item.combinedExcessRate ? (
-                              <span className="whitespace-nowrap">
+
+                            {item.comboSlabRanges && item.comboSlabRanges.length > 0 ? (
+                              <div className="flex flex-col mt-1">
+                                <span className="font-semibold text-gray-500 text-[10px] uppercase">
+                                  Combo Slabs
+                                </span>
+                                {item.comboSlabRanges.map(
+                                  (s: { from: number; to: number; rate: number }, i: number) => (
+                                    <span key={i} className="whitespace-nowrap">
+                                      {s.from}-{s.to}: ₹{s.rate}
+                                    </span>
+                                  ),
+                                )}
+                                {item.combinedExcessRate && (
+                                  <span className="whitespace-nowrap">
+                                    &gt;{' '}
+                                    {Math.max(
+                                      ...item.comboSlabRanges.map(
+                                        (s: { from: number; to: number; rate: number }) =>
+                                          Number(s.to) || 0,
+                                      ),
+                                    )}
+                                    : ₹{item.combinedExcessRate}
+                                  </span>
+                                )}
+                              </div>
+                            ) : item.combinedExcessRate ? (
+                              <span className="whitespace-nowrap mt-1">
                                 CMB: ₹{item.combinedExcessRate}
                               </span>
                             ) : null}
+
                             {!item.bwExcessRate &&
                               !item.colorExcessRate &&
-                              !item.combinedExcessRate && <span className="text-gray-300">-</span>}
+                              !item.combinedExcessRate &&
+                              (!item.bwSlabRanges || item.bwSlabRanges.length === 0) &&
+                              (!item.colorSlabRanges || item.colorSlabRanges.length === 0) &&
+                              (!item.comboSlabRanges || item.comboSlabRanges.length === 0) && (
+                                <span className="text-gray-300">-</span>
+                              )}
                           </div>
                         </TableCell>
                         <TableCell className="text-center font-bold text-muted-foreground text-sm align-top py-3">
                           {item.quantity}
                         </TableCell>
                         <TableCell className="text-right font-bold text-foreground text-sm align-top py-3">
-                          ₹{((item.quantity || 0) * (item.unitPrice || 0)).toLocaleString()}
+                          QAR {((item.quantity || 0) * (item.unitPrice || 0)).toLocaleString()}
                         </TableCell>
                       </TableRow>
                     ))}
@@ -923,18 +1006,36 @@ export function InvoiceDetailsDialog({
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-5 bg-gray-50/50 rounded-xl border border-gray-100">
               <div className="space-y-1">
                 <p className="text-[10px] font-bold text-gray-400 uppercase">
-                  {mode === 'EMPLOYEE' ? 'Monthly Rent Balance' : 'Monthly Rent'}
+                  {currentInvoice.saleType === 'LEASE'
+                    ? 'Monthly EMI'
+                    : mode === 'EMPLOYEE'
+                      ? 'Monthly Rent Balance'
+                      : 'Monthly Rent'}
                 </p>
                 <p className="text-sm font-bold text-gray-700">
-                  ₹{financialSummary.monthlyRent.toLocaleString()}
+                  ₹
+                  {currentInvoice.saleType === 'LEASE'
+                    ? (currentInvoice.monthlyEmiAmount || 0).toLocaleString()
+                    : financialSummary.monthlyRent.toLocaleString()}
                 </p>
               </div>
+
+              {currentInvoice.saleType === 'LEASE' && (
+                <div className="space-y-1">
+                  <p className="text-[10px] font-bold text-gray-400 uppercase">
+                    Total Lease Amount
+                  </p>
+                  <p className="text-sm font-bold text-gray-700">
+                    ₹{(currentInvoice.totalLeaseAmount || 0).toLocaleString()}
+                  </p>
+                </div>
+              )}
               <div className="space-y-1">
                 <p className="text-[10px] font-bold text-gray-400 uppercase">
                   {mode === 'EMPLOYEE' ? 'Advance Balance' : 'Advance Adj.'}
                 </p>
                 <p className="text-sm font-bold text-success">
-                  - ₹{financialSummary.advanceAdjusted.toLocaleString()}
+                  - QAR {financialSummary.advanceAdjusted.toLocaleString()}
                 </p>
               </div>
               {mode === 'FINANCE' && (
@@ -943,7 +1044,7 @@ export function InvoiceDetailsDialog({
                     <div className="space-y-1">
                       <p className="text-[10px] font-bold text-gray-400 uppercase">Extra Usage</p>
                       <p className="text-sm font-bold text-warning">
-                        + ₹{financialSummary.extraUsage.toLocaleString()}
+                        + QAR {financialSummary.extraUsage.toLocaleString()}
                       </p>
                     </div>
                   )}
@@ -951,7 +1052,7 @@ export function InvoiceDetailsDialog({
                     <div className="space-y-1">
                       <p className="text-[10px] font-bold text-gray-400 uppercase">Extra Charges</p>
                       <p className="text-sm font-bold text-orange-600">
-                        + ₹{financialSummary.additionalCharges.toLocaleString()}
+                        + QAR {financialSummary.additionalCharges.toLocaleString()}
                       </p>
                     </div>
                   )}
@@ -962,7 +1063,7 @@ export function InvoiceDetailsDialog({
                     <p
                       className={`text-lg font-bold ${financialSummary.pendingBalance > 0 ? 'text-danger' : 'text-success'}`}
                     >
-                      ₹
+                      QAR
                       {financialSummary.pendingBalance.toLocaleString(undefined, {
                         minimumFractionDigits: 2,
                       })}
@@ -1010,7 +1111,7 @@ export function InvoiceDetailsDialog({
                           {hist.invoiceNumber}
                         </TableCell>
                         <TableCell className="text-xs font-bold text-primary text-right">
-                          ₹
+                          QAR
                           {(hist.totalAmount || 0).toLocaleString(undefined, {
                             minimumFractionDigits: 2,
                           })}
@@ -1030,7 +1131,7 @@ export function InvoiceDetailsDialog({
               Grand Total
             </p>
             <p className="text-2xl font-bold text-primary">
-              ₹{grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+              QAR {grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}
             </p>
           </div>
 
@@ -1211,27 +1312,65 @@ export function InvoiceDetailsDialog({
                                               limits.push(`CMB: ${item.combinedIncludedLimit}`);
 
                                             const rates = [];
-                                            if (item.bwExcessRate)
+                                            if (item.bwSlabRanges && item.bwSlabRanges.length > 0) {
+                                              rates.push(`<strong>BW Slabs:</strong>`);
+                                              item.bwSlabRanges.forEach((s) =>
+                                                rates.push(`${s.from}-${s.to}: ₹${s.rate}`),
+                                              );
+                                              if (item.bwExcessRate) {
+                                                rates.push(
+                                                  `> ${Math.max(...item.bwSlabRanges.map((s) => Number(s.to) || 0))}: ₹${item.bwExcessRate}`,
+                                                );
+                                              }
+                                            } else if (item.bwExcessRate)
                                               rates.push(`BW: ₹${item.bwExcessRate}`);
-                                            if (item.colorExcessRate)
+
+                                            if (
+                                              item.colorSlabRanges &&
+                                              item.colorSlabRanges.length > 0
+                                            ) {
+                                              rates.push(`<strong>Color Slabs:</strong>`);
+                                              item.colorSlabRanges.forEach((s) =>
+                                                rates.push(`${s.from}-${s.to}: ₹${s.rate}`),
+                                              );
+                                              if (item.colorExcessRate) {
+                                                rates.push(
+                                                  `> ${Math.max(...item.colorSlabRanges.map((s) => Number(s.to) || 0))}: ₹${item.colorExcessRate}`,
+                                                );
+                                              }
+                                            } else if (item.colorExcessRate)
                                               rates.push(`CLR: ₹${item.colorExcessRate}`);
-                                            if (item.combinedExcessRate)
+
+                                            if (
+                                              item.comboSlabRanges &&
+                                              item.comboSlabRanges.length > 0
+                                            ) {
+                                              rates.push(`<strong>Combo Slabs:</strong>`);
+                                              item.comboSlabRanges.forEach((s) =>
+                                                rates.push(`${s.from}-${s.to}: ₹${s.rate}`),
+                                              );
+                                              if (item.combinedExcessRate) {
+                                                rates.push(
+                                                  `> ${Math.max(...item.comboSlabRanges.map((s) => Number(s.to) || 0))}: ₹${item.combinedExcessRate}`,
+                                                );
+                                              }
+                                            } else if (item.combinedExcessRate)
                                               rates.push(`CMB: ₹${item.combinedExcessRate}`);
 
                                             return `
                                             <tr style="border-bottom: 1px solid #e5e7eb;">
-                                              <td style="padding: 12px;">
+                                              <td style="padding: 12px; vertical-align: top;">
                                                 <strong>${item.description}</strong>
                                                 ${item.itemType === 'PRICING_RULE' ? '<br/><span style="font-size: 12px; color: #6b7280;">(Pricing Rule)</span>' : ''}
                                               </td>
-                                              <td style="padding: 12px; font-size: 13px;">
+                                              <td style="padding: 12px; font-size: 13px; vertical-align: top;">
                                                 ${limits.length > 0 ? limits.join('<br/>') : '-'}
                                               </td>
-                                              <td style="padding: 12px; font-size: 13px;">
+                                              <td style="padding: 12px; font-size: 13px; vertical-align: top; line-height: 1.4;">
                                                 ${rates.length > 0 ? rates.join('<br/>') : '-'}
                                               </td>
                                               <td style="padding: 12px; text-align: center;">${item.quantity || 1}</td>
-                                              <td style="padding: 12px; text-align: right;">₹${((item.quantity || 1) * (item.unitPrice || 0)).toLocaleString()}</td>
+                                              <td style="padding: 12px; text-align: right;">QAR ${((item.quantity || 1) * (item.unitPrice || 0)).toLocaleString()}</td>
                                             </tr>
                                           `;
                                           })
@@ -1248,7 +1387,7 @@ export function InvoiceDetailsDialog({
                                  <h3 style="margin-top: 0; color: #111827;">Rental Details</h3>
                                  <p style="margin: 5px 0;"><strong>Plan Type:</strong> ${inv.rentType?.replace('_', ' ')}</p>
                                  <p style="margin: 5px 0;"><strong>Billing Period:</strong> ${inv.rentPeriod}</p>
-                                 <p style="margin: 5px 0;"><strong>Monthly Rent:</strong> ₹${inv.monthlyRent?.toLocaleString()}</p>
+                                  <p style="margin: 5px 0;"><strong>Monthly Rent:</strong> QAR ${inv.monthlyRent?.toLocaleString()}</p>
                                  <p style="margin: 5px 0;"><strong>Contract Period:</strong> ${formatDate(inv.effectiveFrom)} - ${formatDate(inv.effectiveTo)}</p>
                                </div>
                              `;
@@ -1259,6 +1398,7 @@ export function InvoiceDetailsDialog({
                                  <p style="margin: 5px 0;"><strong>Lease Type:</strong> ${inv.leaseType}</p>
                                  <p style="margin: 5px 0;"><strong>Tenure:</strong> ${inv.leaseTenureMonths} Months</p>
                                  ${inv.monthlyEmiAmount ? `<p style="margin: 5px 0;"><strong>Monthly EMI:</strong> ₹${inv.monthlyEmiAmount.toLocaleString()}</p>` : ''}
+                                 ${inv.totalLeaseAmount ? `<p style="margin: 5px 0;"><strong>Total Lease Amount:</strong> ₹${inv.totalLeaseAmount.toLocaleString()}</p>` : ''}
                                </div>
                              `;
                           }
@@ -1278,8 +1418,8 @@ export function InvoiceDetailsDialog({
                               ${itemsHtml}
 
                               <div style="margin-top: 30px; text-align: right;">
-                                <p style="font-size: 18px; margin: 5px 0;">Total Amount: <strong style="color: #1d4ed8;">₹${(inv.totalAmount || 0).toLocaleString()}</strong></p>
-                                ${inv.advanceAmount ? `<p style="margin: 5px 0; color: #059669;">Advance Required: <strong>₹${inv.advanceAmount.toLocaleString()}</strong></p>` : ''}
+                                <p style="font-size: 18px; margin: 5px 0;">Total Amount: <strong style="color: #1d4ed8;">QAR ${(inv.totalAmount || 0).toLocaleString()}</strong></p>
+                                ${inv.advanceAmount ? `<p style="margin: 5px 0; color: #059669;">Advance Required: <strong>QAR ${inv.advanceAmount.toLocaleString()}</strong></p>` : ''}
                               </div>
 
                               <div style="margin-top: 40px; border-top: 1px solid #e5e7eb; padding-top: 20px; text-align: center; color: #9ca3af; font-size: 12px;">

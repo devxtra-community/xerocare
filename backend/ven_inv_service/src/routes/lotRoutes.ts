@@ -7,6 +7,7 @@ import {
   uploadLotExcel,
   downloadLotProductsExcel,
   downloadLotSparePartsExcel,
+  getLotStats,
   checkLotNumber,
 } from '../controllers/lotController';
 import { authMiddleware } from '../middlewares/authMiddleware';
@@ -25,5 +26,6 @@ router.get('/:id', getLotById);
 router.get('/:id/export', downloadLotExcel);
 router.get('/:id/export-products', downloadLotProductsExcel);
 router.get('/:id/export-spareparts', downloadLotSparePartsExcel);
+router.get('/stats/summary', getLotStats);
 
 export default router;

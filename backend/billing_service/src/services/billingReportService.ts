@@ -68,6 +68,27 @@ export class BillingReportService {
   }
 
   /**
+   * Retrieves comprehensive finance stats (Revenue, Expenses, Profit).
+   */
+  async getBranchFinanceStats(branchId: string, year?: number) {
+    const [salesTotals, expenseData] = await Promise.all([
+      this.getBranchSalesTotals(branchId, year),
+      this.getLotStatsFromInventory(branchId, year),
+    ]);
+
+    const revenue = salesTotals.totalSales;
+    const expenses = expenseData.totalExpenses;
+    const profit = revenue - expenses;
+
+    return {
+      totalRevenue: revenue,
+      totalExpenses: expenses,
+      netProfit: profit,
+      salesByType: salesTotals.salesByType,
+    };
+  }
+
+  /**
    * Retrieves global sales trend data.
    */
   async getGlobalSales(period: string, year?: number) {
@@ -379,18 +400,68 @@ export class BillingReportService {
     month?: number;
     year?: number;
   }) {
-    const reportData = await this.invoiceRepo.getFinanceReport(filter);
+    const [reportData, expenseStats] = await Promise.all([
+      this.invoiceRepo.getFinanceReport(filter),
+      filter.branchId ? this.getLotStatsFromInventory(filter.branchId, filter.year) : null,
+    ]);
+
+    const monthlyExpenses = new Map<string, number>();
+    if (expenseStats?.monthlyExpenses) {
+      expenseStats.monthlyExpenses.forEach((e: { month: string; total: number }) => {
+        monthlyExpenses.set(e.month, e.total);
+      });
+    }
+
+    const monthsProcessed = new Set<string>();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return reportData.map((item: any) => {
-      const expense = 0;
+      let expense = 0;
+      if (!monthsProcessed.has(item.month)) {
+        expense = monthlyExpenses.get(item.month) || 0;
+        monthsProcessed.add(item.month);
+      }
       const profit = (item.income || 0) - expense;
       return {
         ...item,
         expense,
         profit,
-        profitStatus: 'profit',
+        profitStatus: profit >= 0 ? 'profit' : 'loss',
       };
     });
+  }
+
+  /**
+   * Internal helper to fetch lot stats from the Inventory service.
+   */
+  private async getLotStatsFromInventory(branchId: string, year?: number) {
+    try {
+      const inventoryServiceUrl = process.env.INVENTORY_SERVICE_URL || 'http://localhost:3003';
+      const { sign } = await import('jsonwebtoken');
+      const token = sign(
+        { userId: 'billing_service', role: 'ADMIN', branchId },
+        process.env.ACCESS_SECRET as string,
+        { expiresIn: '1m' },
+      );
+
+      const url = year
+        ? `${inventoryServiceUrl}/lots/stats/summary?year=${year}`
+        : `${inventoryServiceUrl}/lots/stats/summary`;
+
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) return { totalExpenses: 0, monthlyExpenses: [] };
+      const data = await response.json();
+      return data.data;
+    } catch (err) {
+      console.error('Failed to fetch lot stats from inventory service', err);
+      return { totalExpenses: 0, monthlyExpenses: [] };
+    }
   }
 
   /**
@@ -455,17 +526,68 @@ export class BillingReportService {
     doc.text(`Date: ${new Date().toLocaleDateString()}`);
     doc.moveDown();
 
-    const tableTop = 200;
+    let currentY = doc.y;
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const pricingRules = (contract.items || []).filter((i: any) => i.itemType === 'PRICING_RULE');
+    if (pricingRules.length > 0) {
+      doc.font('Helvetica-Bold').fontSize(12).text('Pricing Details:', 50, currentY);
+      currentY += 15;
+      doc.font('Helvetica').fontSize(10);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      pricingRules.forEach((rule: any) => {
+        doc.text(`- ${rule.description}`, 50, currentY);
+        currentY += 15;
+        if (rule.bwIncludedLimit) {
+          doc.text(`  B/W Included: ${rule.bwIncludedLimit}`, 50, currentY);
+          currentY += 15;
+        }
+        if (rule.colorIncludedLimit) {
+          doc.text(`  Color Included: ${rule.colorIncludedLimit}`, 50, currentY);
+          currentY += 15;
+        }
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const renderSlabsPdf = (slabs: any[], title: string, excessRate?: number) => {
+          if ((!slabs || slabs.length === 0) && !excessRate) return;
+          doc.font('Helvetica-Bold').text(`  ${title} Slabs:`, 60, currentY);
+          currentY += 12;
+          doc.font('Helvetica');
+          if (slabs && slabs.length > 0) {
+            slabs.forEach((s) => {
+              doc.text(`    ${s.from} - ${s.to}: INR ${s.rate}`, 60, currentY);
+              currentY += 12;
+            });
+            if (excessRate) {
+              const maxTo = Math.max(...slabs.map((s) => Number(s.to) || 0));
+              doc.text(`    > ${maxTo}: INR ${excessRate}`, 60, currentY);
+              currentY += 12;
+            }
+          } else if (excessRate) {
+            doc.text(`    Base Rate: INR ${excessRate}`, 60, currentY);
+            currentY += 12;
+          }
+        };
+
+        renderSlabsPdf(rule.bwSlabRanges, 'Black & White', rule.bwExcessRate);
+        renderSlabsPdf(rule.colorSlabRanges, 'Color', rule.colorExcessRate);
+        renderSlabsPdf(rule.comboSlabRanges, 'Combined', rule.combinedExcessRate);
+        currentY += 5;
+      });
+      currentY += 10;
+    }
+
+    const tableTop = Math.max(200, currentY + 10);
     const itemCodeX = 50;
     const descriptionX = 150;
     const amountX = 400;
 
-    doc.font('Helvetica-Bold');
+    doc.font('Helvetica-Bold').fontSize(12);
     doc.text('Period', itemCodeX, tableTop);
     doc.text('Invoice #', descriptionX, tableTop);
     doc.text('Amount', amountX, tableTop);
     doc.moveDown();
-    doc.font('Helvetica');
+    doc.font('Helvetica').fontSize(12);
 
     let y = tableTop + 25;
 

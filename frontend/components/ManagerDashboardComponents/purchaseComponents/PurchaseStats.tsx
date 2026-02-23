@@ -22,7 +22,7 @@ export default function PurchaseStats({
     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
       <StatCard
         title="Total Cost"
-        value={`₹${totalCost.toLocaleString()}`}
+        value={`QAR ${totalCost.toLocaleString()}`}
         subtitle="All Purchases"
       />
       <StatCard title="Total Vendors" value={totalVendors.toString()} subtitle="Active Vendors" />

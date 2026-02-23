@@ -99,8 +99,8 @@ export function ApproveQuotationDialog({
                   onChange={(e) => setAmount(e.target.value)}
                   className="pl-6"
                 />
-                <span className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 text-xs">
-                  ₹
+                <span className="absolute left-1 top-1/2 -translate-y-1/2 text-slate-400 text-[10px] font-bold">
+                  QAR
                 </span>
               </div>
             </div>

@@ -14,13 +14,22 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { getVendorRequests } from '@/lib/vendor';
 import { format } from 'date-fns';
 import { FileText, Loader2, Eye } from 'lucide-react';
+import { formatCurrency } from '@/lib/format';
 // import { Button } from '@/components/ui/button';
 
 interface VendorRequest {
   id: string;
   products: string;
   message?: string;
+  total_amount?: number;
   created_at: string;
+  manager?: {
+    name: string;
+  };
+}
+
+interface VendorRequestHistoryProps {
+  vendorName?: string;
 }
 
 /**
@@ -28,7 +37,7 @@ interface VendorRequest {
  * Displays date, requested products, and messages.
  * Allows viewing full details of past requests.
  */
-export default function VendorRequestHistory() {
+export default function VendorRequestHistory({ vendorName }: VendorRequestHistoryProps) {
   const params = useParams();
   const id = params.id as string;
   const [requests, setRequests] = useState<VendorRequest[]>([]);
@@ -82,10 +91,16 @@ export default function VendorRequestHistory() {
                 Date
               </TableHead>
               <TableHead className="text-[10px] font-semibold text-primary uppercase px-4 py-3">
-                Products Requested
+                Manager Name
               </TableHead>
               <TableHead className="text-[10px] font-semibold text-primary uppercase px-4 py-3">
-                Message
+                Vendor Name
+              </TableHead>
+              <TableHead className="text-[10px] font-semibold text-primary uppercase px-4 py-3">
+                Products Requested
+              </TableHead>
+              <TableHead className="text-[10px] font-semibold text-primary uppercase px-4 py-3 text-right">
+                Spended Money
               </TableHead>
             </TableRow>
           </TableHeader>
@@ -101,17 +116,20 @@ export default function VendorRequestHistory() {
                 <TableCell className="px-4 py-3 text-xs font-medium text-foreground whitespace-nowrap">
                   {format(new Date(req.created_at), 'dd MMM yyyy, hh:mm a')}
                 </TableCell>
+                <TableCell className="px-4 py-3 text-xs font-semibold text-primary">
+                  {req.manager?.name || 'Unassigned'}
+                </TableCell>
+                <TableCell className="px-4 py-3 text-xs text-blue-600 font-medium whitespace-nowrap">
+                  {vendorName || 'N/A'}
+                </TableCell>
                 <TableCell
                   className="px-4 py-3 text-xs text-gray-700 max-w-[200px] truncate"
                   title={req.products}
                 >
                   {req.products}
                 </TableCell>
-                <TableCell
-                  className="px-4 py-3 text-xs text-gray-500 italic max-w-[150px] truncate"
-                  title={req.message || ''}
-                >
-                  {req.message || '-'}
+                <TableCell className="px-4 py-3 text-xs text-right font-bold text-slate-700">
+                  {formatCurrency(req.total_amount || 0)}
                 </TableCell>
               </TableRow>
             ))}

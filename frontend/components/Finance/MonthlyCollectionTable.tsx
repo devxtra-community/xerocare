@@ -45,8 +45,8 @@ export default function MonthlyCollectionTable({ mode }: { mode?: 'RENT' | 'LEAS
   const { page, limit, setPage, setLimit } = usePagination(10);
   // const years = Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 1 + i);
 
-  const handleShowHistory = (alert: CollectionAlert) => {
-    setHistoryContractId(alert.contractId);
+  const handleShowHistory = (alertItem: CollectionAlert) => {
+    setHistoryContractId(alertItem.contractId);
     setIsHistoryOpen(true);
   };
 
@@ -75,17 +75,17 @@ export default function MonthlyCollectionTable({ mode }: { mode?: 'RENT' | 'LEAS
   useEffect(() => {
     const fetchContractItems = async () => {
       const itemsMap: Record<string, string> = {};
-      for (const alert of alerts) {
+      for (const alertItem of alerts) {
         try {
-          const inv = await getInvoiceById(alert.contractId);
+          const inv = await getInvoiceById(alertItem.contractId);
           const productItems =
             inv.items
               ?.filter((item) => item.itemType === 'PRODUCT')
               .map((item) => item.description)
               .join(', ') || 'No items';
-          itemsMap[alert.contractId] = productItems;
+          itemsMap[alertItem.contractId] = productItems;
         } catch {
-          itemsMap[alert.contractId] = 'N/A';
+          itemsMap[alertItem.contractId] = 'N/A';
         }
       }
       setContractItems(itemsMap);
@@ -95,21 +95,21 @@ export default function MonthlyCollectionTable({ mode }: { mode?: 'RENT' | 'LEAS
     }
   }, [alerts]);
 
-  const handleRecordUsage = (alert: CollectionAlert) => {
-    setSelectedContract(alert);
+  const handleRecordUsage = (alertItem: CollectionAlert) => {
+    setSelectedContract(alertItem);
     setIsModalOpen(true);
   };
 
-  const confirmFinalSummary = (alert: CollectionAlert) => {
-    setContractToComplete(alert);
+  const handleGenerateFinalSummary = (alertItem: CollectionAlert) => {
+    setContractToComplete(alertItem);
     setConfirmSummaryOpen(true);
   };
 
   const executeFinalSummary = async () => {
     if (!contractToComplete) return;
 
-    setLoading(true);
     setConfirmSummaryOpen(false);
+    setLoading(true);
     try {
       const { generateConsolidatedFinalInvoice } = await import('@/lib/invoice');
       await generateConsolidatedFinalInvoice(contractToComplete.contractId);
@@ -123,9 +123,9 @@ export default function MonthlyCollectionTable({ mode }: { mode?: 'RENT' | 'LEAS
     }
   };
 
-  const handleViewDetails = async (alert: CollectionAlert) => {
+  const handleViewDetails = async (alertItem: CollectionAlert) => {
     try {
-      const targetId = alert.finalInvoiceId || alert.contractId;
+      const targetId = alertItem.finalInvoiceId || alertItem.contractId;
       const inv = await getInvoiceById(targetId);
       setViewingInvoice(inv);
     } catch {
@@ -141,12 +141,161 @@ export default function MonthlyCollectionTable({ mode }: { mode?: 'RENT' | 'LEAS
     );
   }
 
+  // Column configuration for StandardTable
+  const columns = [
+    {
+      id: 'invoiceNumber',
+      header: 'INV NUMBER',
+      accessorKey: 'invoiceNumber' as keyof CollectionAlert,
+    },
+    {
+      id: 'customer',
+      header: 'CUSTOMER',
+      cell: (alertItem: CollectionAlert) => (
+        <div className="flex flex-col">
+          <span className="font-bold text-slate-900">
+            {alertItem.customerName || 'Unknown Customer'}
+          </span>
+          <span className="text-[10px] text-slate-400 font-bold uppercase mt-0.5">
+            {alertItem.customerPhone || alertItem.customerId}
+          </span>
+        </div>
+      ),
+    },
+    {
+      id: 'items',
+      header: 'ITEMS',
+      cell: (alertItem: CollectionAlert) => (
+        <div className="text-xs font-medium text-slate-700 max-w-[200px] truncate">
+          {contractItems[alertItem.contractId] || 'Loading...'}
+        </div>
+      ),
+    },
+    {
+      id: 'period',
+      header: 'BILLING PERIOD',
+      cell: (alertItem: CollectionAlert) => {
+        if (
+          alertItem.contractStatus !== 'COMPLETED' &&
+          alertItem.usageData?.billingPeriodStart &&
+          alertItem.usageData?.billingPeriodEnd
+        ) {
+          return (
+            <div className="text-xs text-slate-600 font-semibold">
+              {format(new Date(alertItem.usageData.billingPeriodStart), 'MMM dd')} -{' '}
+              {format(new Date(alertItem.usageData.billingPeriodEnd), 'MMM dd, yyyy')}
+            </div>
+          );
+        }
+        return <span className="text-xs text-slate-400">N/A</span>;
+      },
+    },
+    {
+      id: 'amount',
+      header: 'AMOUNT',
+      cell: (alertItem: CollectionAlert) => {
+        const isFinalMonth = alertItem.type === 'SUMMARY_PENDING';
+        if (isFinalMonth) return <span className="text-blue-600 font-bold">₹0 (Adjusted)</span>;
+        const amount = alertItem.totalAmount || alertItem.monthlyRent || 0;
+        return <span className="font-bold">₹{Number(amount).toLocaleString()}</span>;
+      },
+    },
+    {
+      id: 'status',
+      header: 'STATUS',
+      cell: (alertItem: CollectionAlert) => (
+        <div className="flex flex-wrap gap-1">
+          {alertItem.type === 'USAGE_PENDING' && (
+            <Badge variant="outline" className="bg-orange-50 text-orange-600 border-orange-200">
+              Usage Pending
+            </Badge>
+          )}
+          {alertItem.type === 'SUMMARY_PENDING' && (
+            <Badge variant="outline" className="bg-blue-50 text-blue-600 border-blue-200">
+              Tenure reached
+            </Badge>
+          )}
+          {alertItem.type === 'INVOICE_PENDING' && (
+            <Badge variant="outline" className="bg-green-50 text-green-600 border-green-200">
+              Usage Completed
+            </Badge>
+          )}
+          {alertItem.contractStatus === 'COMPLETED' && (
+            <Badge variant="outline" className="bg-green-50 text-green-600 border-green-200">
+              Completed
+            </Badge>
+          )}
+        </div>
+      ),
+    },
+    {
+      id: 'history',
+      header: 'HISTORY',
+      cell: (alertItem: CollectionAlert) => (
+        <Button
+          size="sm"
+          variant="ghost"
+          className="h-8 w-8 p-0 text-blue-600 hover:bg-blue-50 rounded-full"
+          onClick={() => handleShowHistory(alertItem)}
+        >
+          <HistoryIcon className="h-4 w-4" />
+        </Button>
+      ),
+    },
+    {
+      id: 'actions',
+      header: 'ACTION',
+      className: 'text-right',
+      cell: (alertItem: CollectionAlert) => (
+        <div className="flex justify-end gap-2">
+          {alertItem.type === 'USAGE_PENDING' && (
+            <Button
+              size="sm"
+              onClick={() => handleRecordUsage(alertItem)}
+              className="bg-blue-600 hover:bg-blue-700 text-white h-8 px-4 text-xs font-bold rounded-xl"
+            >
+              <PlusCircle className="h-3 w-3 mr-2" />
+              Record Usage
+            </Button>
+          )}
+          {alertItem.type === 'SUMMARY_PENDING' && (
+            <Button
+              size="sm"
+              variant="destructive"
+              onClick={() => handleGenerateFinalSummary(alertItem)}
+              className="h-8 px-4 text-xs font-bold rounded-xl"
+            >
+              <FileText className="h-3 w-3 mr-2" />
+              Final Summary
+            </Button>
+          )}
+          {(alertItem.type === 'INVOICE_PENDING' || alertItem.type === 'SEND_PENDING') && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => handleViewDetails(alertItem)}
+              className="h-8 px-4 text-xs font-bold rounded-xl"
+            >
+              <Eye className="h-3 w-3 mr-2" />
+              View
+            </Button>
+          )}
+        </div>
+      ),
+    },
+  ];
+
+  // Client-side pagination logic
+  const paginatedAlerts = alerts.slice((page - 1) * limit, page * limit);
+
   return (
     <>
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
         <div>
-          <h2 className="text-xl font-bold text-slate-800">Monthly Collections</h2>
-          <p className="text-sm text-slate-500">Manage billing and usage for current periods</p>
+          <h2 className="text-2xl font-black text-slate-900 tracking-tight">Monthly Collections</h2>
+          <p className="text-sm text-slate-500 font-medium">
+            Manage billing and usage for active contracts
+          </p>
         </div>
 
         <div className="flex items-center gap-2">
@@ -154,178 +303,18 @@ export default function MonthlyCollectionTable({ mode }: { mode?: 'RENT' | 'LEAS
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-lg border border-slate-200">
-        <StandardTable
-          columns={[
-            {
-              id: 'inv',
-              header: 'INV NUMBER',
-              accessorKey: 'invoiceNumber' as keyof CollectionAlert,
-              className: 'font-medium uppercase text-[11px] text-primary',
-            },
-            {
-              id: 'customer',
-              header: 'CUSTOMER',
-              className: 'font-semibold uppercase text-[11px] text-primary',
-              cell: (alert: CollectionAlert) => (
-                <div className="flex flex-col">
-                  <span className="font-medium text-[13px]">
-                    {alert.customerName || 'Unknown Customer'}
-                  </span>
-                  <span className="text-[11px] text-muted-foreground">
-                    {alert.customerPhone || alert.customerId}
-                  </span>
-                </div>
-              ),
-            },
-            {
-              id: 'items',
-              header: 'ITEMS',
-              className: 'font-semibold uppercase text-[11px] text-primary max-w-[200px]',
-              cell: (alert: CollectionAlert) => (
-                <div className="text-[12px] font-medium text-slate-700 truncate">
-                  {contractItems[alert.contractId] || 'Loading...'}
-                </div>
-              ),
-            },
-            {
-              id: 'period',
-              header: 'CURRENT BILLING PERIOD',
-              className: 'font-semibold uppercase text-[11px] text-primary',
-              cell: (alert: CollectionAlert) => {
-                if (alert.contractStatus === 'COMPLETED') return '';
-                if (alert.usageData?.billingPeriodStart && alert.usageData?.billingPeriodEnd) {
-                  return `${format(new Date(alert.usageData.billingPeriodStart), 'MMM dd')} - ${format(new Date(alert.usageData.billingPeriodEnd), 'MMM dd, yyyy')}`;
-                }
-                return 'N/A';
-              },
-            },
-            {
-              id: 'amount',
-              header: 'AMOUNT',
-              className: 'font-semibold uppercase text-[11px] text-primary',
-              cell: (alert: CollectionAlert) => {
-                const isFinalMonth = alert.type === 'SUMMARY_PENDING';
-                if (isFinalMonth)
-                  return <span className="text-blue-600 font-bold">₹0 (Adjusted)</span>;
-                const amount = alert.totalAmount || alert.monthlyRent || 0;
-                return (
-                  <span className="font-bold text-slate-700">
-                    ₹{Number(amount).toLocaleString()}
-                  </span>
-                );
-              },
-            },
-            {
-              id: 'status',
-              header: 'STATUS',
-              className: 'font-semibold uppercase text-[11px] text-primary',
-              cell: (alert: CollectionAlert) => (
-                <div className="flex flex-col gap-1 items-start">
-                  {alert.type === 'USAGE_PENDING' && (
-                    <Badge
-                      variant="outline"
-                      className="bg-orange-50 text-orange-600 border-orange-200 uppercase text-[9px] font-bold"
-                    >
-                      Usage Pending
-                    </Badge>
-                  )}
-                  {alert.type === 'SUMMARY_PENDING' && (
-                    <Badge
-                      variant="outline"
-                      className="bg-blue-50 text-blue-600 border-blue-200 uppercase text-[9px] font-bold"
-                    >
-                      Tenure reached
-                    </Badge>
-                  )}
-                  {alert.type === 'INVOICE_PENDING' && (
-                    <Badge
-                      variant="outline"
-                      className="bg-green-50 text-green-600 border-green-200 uppercase text-[9px] font-bold"
-                    >
-                      Usage Completed
-                    </Badge>
-                  )}
-                  {alert.contractStatus === 'COMPLETED' && (
-                    <Badge
-                      variant="outline"
-                      className="bg-green-50 text-green-600 border-green-200 uppercase text-[9px] font-bold mt-1"
-                    >
-                      Completed
-                    </Badge>
-                  )}
-                </div>
-              ),
-            },
-            {
-              id: 'history',
-              header: 'HISTORY',
-              className: 'font-semibold uppercase text-[11px] text-primary',
-              cell: (alert: CollectionAlert) => (
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="h-7 w-7 p-0 text-blue-600 hover:bg-blue-50"
-                  onClick={() => handleShowHistory(alert)}
-                  title="View History"
-                >
-                  <HistoryIcon className="h-4 w-4" />
-                </Button>
-              ),
-            },
-            {
-              id: 'action',
-              header: 'ACTION',
-              className: 'font-semibold text-[11px] text-primary uppercase text-right',
-              cell: (alert: CollectionAlert) => (
-                <div className="flex justify-end gap-1">
-                  {alert.type === 'USAGE_PENDING' && (
-                    <Button
-                      size="sm"
-                      onClick={() => handleRecordUsage(alert)}
-                      className="bg-blue-600 hover:bg-blue-700 text-white h-8 px-3 text-[11px] font-medium"
-                    >
-                      <PlusCircle className="h-3.5 w-3.5 mr-1.5" />
-                      Record Usage
-                    </Button>
-                  )}
-                  {alert.type === 'SUMMARY_PENDING' && (
-                    <Button
-                      size="sm"
-                      variant="destructive"
-                      onClick={() => confirmFinalSummary(alert)}
-                      className="h-8 px-3 text-[11px] font-medium"
-                    >
-                      <FileText className="h-3.5 w-3.5 mr-1.5" />
-                      Final Summary
-                    </Button>
-                  )}
-                  {(alert.type === 'INVOICE_PENDING' || alert.type === 'SEND_PENDING') && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handleViewDetails(alert)}
-                      className="h-8 px-3 text-[11px] font-medium"
-                    >
-                      <Eye className="h-3.5 w-3.5 mr-1.5" />
-                      View
-                    </Button>
-                  )}
-                </div>
-              ),
-            },
-          ]}
-          data={alerts.slice((page - 1) * limit, page * limit)}
-          loading={loading}
-          emptyMessage="No pending collections found"
-          keyExtractor={(a) => a.contractId}
-          page={page}
-          limit={limit}
-          total={alerts.length}
-          onPageChange={setPage}
-          onLimitChange={setLimit}
-        />
-      </div>
+      <StandardTable
+        columns={columns}
+        data={paginatedAlerts}
+        loading={loading}
+        emptyMessage="No pending collections found"
+        keyExtractor={(item) => item.contractId}
+        page={page}
+        limit={limit}
+        total={alerts.length}
+        onPageChange={setPage}
+        onLimitChange={setLimit}
+      />
 
       {selectedContract && (
         <UsageRecordingModal

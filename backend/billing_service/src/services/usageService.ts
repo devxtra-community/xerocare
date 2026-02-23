@@ -5,9 +5,14 @@ import { ReportedBy } from '../entities/usageRecordEntity';
 import { InvoiceType } from '../entities/enums/invoiceType';
 import { ContractStatus } from '../entities/enums/contractStatus';
 import { InvoiceStatus } from '../entities/enums/invoiceStatus';
+import { ItemType } from '../entities/enums/itemType';
+import { InvoiceItem } from '../entities/invoiceItemEntity';
 import { NotificationService } from './notificationService';
 import { NotificationPublisher } from '../events/publisher/notificationPublisher';
 import { logger } from '../config/logger';
+import { SaleType } from '../entities/enums/saleType';
+import { ProductAllocation, AllocationStatus } from '../entities/productAllocationEntity';
+import { emitProductStatusUpdate } from '../events/publisher/productStatusEvent';
 
 export class UsageService {
   private usageRepo = new UsageRepository();
@@ -111,20 +116,25 @@ export class UsageService {
     const colorA3Delta = payload.colorA3Count - prevColorA3;
 
     // 5. Backend Validations
-    // Rollback Prevention
-    if (bwA4Delta < 0 || bwA3Delta < 0 || colorA4Delta < 0 || colorA3Delta < 0) {
-      throw new AppError(
-        'Meter reading cannot be less than previous reading (Rollback prevented)',
-        400,
-      );
-    }
+    const isSimplifiedLease =
+      contract.saleType === 'LEASE' && contract.leaseType && contract.leaseType !== 'FSM';
 
-    // Zero-Usage Detection (Professional)
-    if (bwA4Delta === 0 && bwA3Delta === 0 && colorA4Delta === 0 && colorA3Delta === 0) {
-      throw new AppError(
-        'No usage detected for this period. Please provide a newer meter reading.',
-        400,
-      );
+    if (!isSimplifiedLease) {
+      // Rollback Prevention
+      if (bwA4Delta < 0 || bwA3Delta < 0 || colorA4Delta < 0 || colorA3Delta < 0) {
+        throw new AppError(
+          'Meter reading cannot be less than previous reading (Rollback prevented)',
+          400,
+        );
+      }
+
+      // Zero-Usage Detection (Professional)
+      if (bwA4Delta === 0 && bwA3Delta === 0 && colorA4Delta === 0 && colorA3Delta === 0) {
+        throw new AppError(
+          'No usage detected for this period. Please provide a newer meter reading.',
+          400,
+        );
+      }
     }
 
     // 6. Normalize Monthly Usage (DELTA BASED)
@@ -242,6 +252,44 @@ export class UsageService {
 
         await queryRunner.commitTransaction();
 
+        // 🚀 Post-transaction: Handle Product Allocations for RENT Contracts
+        if (contract.saleType === SaleType.RENT) {
+          try {
+            // Find all allocated physical products for this contract
+            const allocations = await this.invoiceRepo.manager.find(ProductAllocation, {
+              where: { contractId: contract.id, status: AllocationStatus.ALLOCATED },
+            });
+
+            if (allocations.length > 0) {
+              // Mark them as RETURNED in Billing Service
+              await this.invoiceRepo.manager.update(
+                ProductAllocation,
+                { contractId: contract.id, status: AllocationStatus.ALLOCATED },
+                { status: AllocationStatus.RETURNED },
+              );
+
+              // Tell Inventory Service to mark them AVAILABLE
+              for (const allocation of allocations) {
+                if (allocation.productId) {
+                  await emitProductStatusUpdate({
+                    productId: allocation.productId,
+                    billType: 'RETURNED',
+                    invoiceId: contract.id,
+                    approvedBy: 'SYSTEM (Final Usage Logged)',
+                    approvedAt: new Date(),
+                  });
+                }
+              }
+            }
+          } catch (allocationError) {
+            // Log the error but don't fail the usage record submission
+            logger.error('Failed to update product allocations after final usage', {
+              contractId: contract.id,
+              error: allocationError,
+            });
+          }
+        }
+
         return usage;
       } catch (error) {
         await queryRunner.rollbackTransaction();
@@ -337,18 +385,26 @@ export class UsageService {
     }
 
     // 2️⃣ Extract Pricing Rule (InvoiceItem) - More robust detection
-    const pricingRule = contract.items?.find(
+    const pricingRule = (contract.items?.find(
       (i) =>
         i.itemType === 'PRICING_RULE' ||
-        (i.combinedIncludedLimit !== undefined && i.combinedIncludedLimit > 0) ||
-        (i.bwIncludedLimit !== undefined && i.bwIncludedLimit > 0) ||
-        (i.combinedExcessRate !== undefined && i.combinedExcessRate > 0) ||
-        (i.bwExcessRate !== undefined && i.bwExcessRate > 0),
-    );
-
-    if (!pricingRule) {
-      throw new AppError('Pricing rule not found for contract', 400);
-    }
+        (i.itemType === ItemType.PRODUCT &&
+          ((i.combinedIncludedLimit !== undefined && i.combinedIncludedLimit > 0) ||
+            (i.bwIncludedLimit !== undefined && i.bwIncludedLimit > 0) ||
+            (i.combinedExcessRate !== undefined && i.combinedExcessRate > 0) ||
+            (i.bwExcessRate !== undefined && i.bwExcessRate > 0))),
+    ) || {
+      itemType: ItemType.PRICING_RULE,
+      description: 'Default Pricing',
+      initialBwCount: 0,
+      initialColorCount: 0,
+      bwIncludedLimit: 0,
+      colorIncludedLimit: 0,
+      combinedIncludedLimit: 0,
+      bwExcessRate: 0,
+      colorExcessRate: 0,
+      combinedExcessRate: 0,
+    }) as Partial<InvoiceItem>;
 
     // Prepare R2 Base URL
     const R2_BASE_URL =
@@ -771,6 +827,118 @@ export class UsageService {
         </div>
       </div>
     `;
+  }
+
+  /**
+   * Updates an existing usage record (meter readings) and recalculates charges.
+   */
+  async updateUsageRecord(
+    id: string,
+    payload: {
+      bwA4Count: number;
+      bwA3Count: number;
+      colorA4Count: number;
+      colorA3Count: number;
+      billingPeriodEnd: string;
+    },
+  ) {
+    const usage = await this.usageRepo.findById(id);
+    if (!usage) {
+      throw new AppError('Usage record not found', 404);
+    }
+
+    const contract = await this.invoiceRepo.findById(usage.contractId);
+    if (!contract) {
+      throw new AppError('Contract not found', 404);
+    }
+
+    const history = await this.usageRepo.getUsageHistory(usage.contractId, 'DESC');
+
+    const sortedHistoryAsc = [...history].sort(
+      (a, b) => new Date(a.billingPeriodStart).getTime() - new Date(b.billingPeriodStart).getTime(),
+    );
+    const currentIndex = sortedHistoryAsc.findIndex((h) => h.id === usage.id);
+
+    const previousRecord = currentIndex > 0 ? sortedHistoryAsc[currentIndex - 1] : null;
+
+    const pricingRules =
+      contract.items?.filter((i) => i.itemType === 'PRICING_RULE' || i.itemType === 'PRODUCT') ||
+      [];
+    const rule = pricingRules[0];
+
+    let prevBwA4 = 0;
+    let prevBwA3 = 0;
+    let prevColorA4 = 0;
+    let prevColorA3 = 0;
+
+    if (previousRecord) {
+      prevBwA4 = previousRecord.bwA4Count;
+      prevBwA3 = previousRecord.bwA3Count;
+      prevColorA4 = previousRecord.colorA4Count;
+      prevColorA3 = previousRecord.colorA3Count;
+    } else {
+      prevBwA4 = rule?.initialBwCount || 0;
+      prevBwA3 = rule?.initialBwA3Count || 0;
+      prevColorA4 = rule?.initialColorCount || 0;
+      prevColorA3 = rule?.initialColorA3Count || 0;
+    }
+
+    const bwA4Delta = Math.max(0, payload.bwA4Count - prevBwA4);
+    const bwA3Delta = Math.max(0, payload.bwA3Count - prevBwA3);
+    const colorA4Delta = Math.max(0, payload.colorA4Count - prevColorA4);
+    const colorA3Delta = Math.max(0, payload.colorA3Count - prevColorA3);
+
+    const monthlyBw = bwA4Delta + bwA3Delta * 2;
+    const monthlyColor = colorA4Delta + colorA3Delta * 2;
+    const monthlyNormalized = monthlyBw + monthlyColor;
+
+    let exceededTotal = 0;
+    let exceededCharge = 0;
+
+    if (rule) {
+      if (contract.rentType === 'FIXED_LIMIT') {
+        const bwExceeded = Math.max(0, monthlyBw - (rule.bwIncludedLimit || 0));
+        const colorExceeded = Math.max(0, monthlyColor - (rule.colorIncludedLimit || 0));
+        exceededTotal = bwExceeded + colorExceeded;
+        const bwCharge = bwExceeded * Number(rule.bwExcessRate || 0);
+        const colorCharge = colorExceeded * Number(rule.colorExcessRate || 0);
+        exceededCharge = bwCharge + colorCharge;
+      } else if (contract.rentType === 'FIXED_COMBO') {
+        const combinedLimit =
+          rule.combinedIncludedLimit ||
+          (rule.bwIncludedLimit || 0) + (rule.colorIncludedLimit || 0);
+        const totalMonthly = monthlyBw + monthlyColor;
+        exceededTotal = Math.max(0, totalMonthly - combinedLimit);
+        exceededCharge = exceededTotal * Number(rule.combinedExcessRate || rule.bwExcessRate || 0);
+      } else if (contract.rentType === 'CPC' || contract.rentType === 'CPC_COMBO') {
+        exceededTotal = monthlyNormalized;
+        const bwCharge = this.calculateSlabCharge(monthlyBw, rule.bwSlabRanges);
+        const colorCharge = this.calculateSlabCharge(monthlyColor, rule.colorSlabRanges);
+        const comboCharge = this.calculateSlabCharge(monthlyNormalized, rule.comboSlabRanges);
+        exceededCharge =
+          rule.comboSlabRanges && rule.comboSlabRanges.length > 0
+            ? comboCharge
+            : bwCharge + colorCharge;
+      }
+    }
+
+    usage.bwA4Count = payload.bwA4Count;
+    usage.bwA3Count = payload.bwA3Count;
+    usage.colorA4Count = payload.colorA4Count;
+    usage.colorA3Count = payload.colorA3Count;
+    usage.billingPeriodEnd = new Date(payload.billingPeriodEnd);
+
+    usage.bwA4Delta = bwA4Delta;
+    usage.bwA3Delta = bwA3Delta;
+    usage.colorA4Delta = colorA4Delta;
+    usage.colorA3Delta = colorA3Delta;
+    usage.exceededCharge = exceededCharge;
+    usage.exceededTotal = exceededTotal;
+
+    usage.totalCharge =
+      Number(usage.monthlyRent) + exceededCharge - Number(usage.advanceAdjusted || 0);
+
+    return this.usageRepo.save(usage);
   }
 
   /**

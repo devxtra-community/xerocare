@@ -24,6 +24,7 @@ import { Badge } from '@/components/ui/badge';
 import { ApproveQuotationDialog } from '@/components/invoice/ApproveQuotationDialog';
 import { InvoiceDetailsDialog } from '@/components/invoice/InvoiceDetailsDialog';
 import Pagination from '@/components/Pagination';
+import { formatCurrency } from '@/lib/format';
 
 import { updateQuotation } from '@/lib/invoice'; // Ensure import
 import UsageRecordingModal from '../Finance/UsageRecordingModal';
@@ -261,7 +262,7 @@ export default function EmployeeRentTable({ mode = 'EMPLOYEE' }: EmployeeRentTab
                       {inv.endDate ? format(new Date(inv.endDate), 'MMM dd, yyyy') : 'N/A'}
                     </TableCell>
                     <TableCell className="font-bold text-slate-700">
-                      ₹{inv.totalAmount?.toLocaleString()}
+                      {formatCurrency(inv.displayAmount ?? inv.totalAmount ?? 0)}
                     </TableCell>
                     <TableCell>
                       <Badge

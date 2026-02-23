@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Search, Plus, X, Eye } from 'lucide-react';
@@ -47,7 +47,7 @@ export default function ManagerProduct() {
   const { page, limit, total, setPage, setLimit, setTotal } = usePagination(10);
   const [stats, setStats] = useState({ total: 0, inStock: 0, rented: 0, sold: 0 });
 
-  const fetchProducts = async () => {
+  const fetchProducts = useCallback(async () => {
     try {
       setLoading(true);
       const res = await productService.getAllProducts({ page, limit, search });
@@ -66,14 +66,14 @@ export default function ManagerProduct() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [page, limit, search, setTotal]);
 
   useEffect(() => {
     const delayDebounceFn = setTimeout(() => {
       fetchProducts();
     }, 500);
     return () => clearTimeout(delayDebounceFn);
-  }, [search, page, limit]);
+  }, [fetchProducts]);
 
   // Stats updated conditionally in fetchProducts
 

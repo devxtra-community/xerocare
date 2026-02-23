@@ -1,17 +1,23 @@
-import React from 'react';
 import StatCard from '@/components/StatCard';
+import { formatCurrency } from '@/lib/format';
 
 export interface VendorStatsProps {
   totalVendors: number;
   activeVendors: number;
-  newVendors: number;
+  totalSpending: number;
+  totalOrders: number;
 }
 
 /**
  * Component displaying summarized vendor statistics.
- * Shows total vendors, active vendors, outstanding payables, and new vendors.
+ * Shows total vendors, active vendors, total spending, and total order count.
  */
-export default function VendorStats({ totalVendors, activeVendors, newVendors }: VendorStatsProps) {
+export default function VendorStats({
+  totalVendors,
+  activeVendors,
+  totalSpending,
+  totalOrders,
+}: VendorStatsProps) {
   return (
     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
       <StatCard
@@ -24,8 +30,16 @@ export default function VendorStats({ totalVendors, activeVendors, newVendors }:
         value={activeVendors.toString()}
         subtitle="Currently active"
       />
-      <StatCard title="Outstanding Payables" value="₹ 0" subtitle="To be paid" />
-      <StatCard title="New Vendors" value={newVendors.toString()} subtitle="Added this month" />
+      <StatCard
+        title="Total Spending Value"
+        value={formatCurrency(totalSpending)}
+        subtitle="Across all purchases"
+      />
+      <StatCard
+        title="Total Order Value"
+        value={totalOrders.toString()}
+        subtitle="Total orders placed"
+      />
     </div>
   );
 }

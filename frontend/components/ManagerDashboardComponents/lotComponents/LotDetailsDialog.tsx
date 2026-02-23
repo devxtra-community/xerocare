@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Lot, LotItemType } from '@/lib/lot';
 import { format } from 'date-fns';
 import api from '@/lib/api'; // Ensure API base URL is accessible
+import { formatCurrency } from '@/lib/format';
 
 interface LotDetailsDialogProps {
   lot: Lot;
@@ -195,10 +196,10 @@ export default function LotDetailsDialog({ lot, onClose }: LotDetailsDialogProps
                         {item.quantity - item.usedQuantity}
                       </TableCell>
                       <TableCell className="text-right">
-                        ${Number(item.unitPrice).toFixed(2)}
+                        {formatCurrency(Number(item.unitPrice))}
                       </TableCell>
                       <TableCell className="text-right font-medium">
-                        ${Number(item.totalPrice).toFixed(2)}
+                        {formatCurrency(Number(item.totalPrice))}
                       </TableCell>
                     </TableRow>
                   ))}
@@ -206,7 +207,8 @@ export default function LotDetailsDialog({ lot, onClose }: LotDetailsDialogProps
               </Table>
             </div>
             <div className="bg-gray-50 border-t p-3 text-right text-sm">
-              Items Total: <span className="font-bold">${itemsTotal.toFixed(2)}</span>
+              Items Total:{' '}
+              <span className="font-bold text-primary">{formatCurrency(itemsTotal)}</span>
             </div>
           </div>
 
@@ -217,12 +219,12 @@ export default function LotDetailsDialog({ lot, onClose }: LotDetailsDialogProps
               {costBreakdown.map((cost) => (
                 <div key={cost.label} className="flex justify-between text-sm">
                   <span className="text-gray-600">{cost.label}</span>
-                  <span className="font-medium">${Number(cost.value || 0).toFixed(2)}</span>
+                  <span className="font-medium">{formatCurrency(Number(cost.value || 0))}</span>
                 </div>
               ))}
               <div className="border-t pt-2 mt-2 flex justify-between font-semibold text-sm">
                 <span>Costs Total</span>
-                <span>${totalCosts.toFixed(2)}</span>
+                <span>{formatCurrency(totalCosts)}</span>
               </div>
 
               <div className="border-t pt-4 mt-4">
@@ -234,8 +236,8 @@ export default function LotDetailsDialog({ lot, onClose }: LotDetailsDialogProps
             </div>
             <div className="bg-blue-50 border-t p-4 flex justify-between items-center">
               <span className="font-bold text-lg text-primary">Grand Total</span>
-              <span className="font-bold text-xl">
-                ${Number(lot.totalAmount).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+              <span className="font-bold text-xl text-primary">
+                {formatCurrency(Number(lot.totalAmount))}
               </span>
             </div>
           </div>

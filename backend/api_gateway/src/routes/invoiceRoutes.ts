@@ -23,6 +23,7 @@ import {
   downloadInvoice,
   sendInvoice,
   getFinanceReport,
+  getBranchFinanceStats,
   sendEmailNotification,
   sendWhatsappNotification,
 } from '../controllers/invoiceController';
@@ -62,7 +63,11 @@ router.get(
   getPendingCounts,
 );
 
-router.get('/finance/report', requireRole(UserRole.ADMIN), getFinanceReport);
+router.get(
+  '/finance/report',
+  requireRole(UserRole.ADMIN, UserRole.MANAGER, UserRole.FINANCE),
+  getFinanceReport,
+);
 
 router.get(
   '/alerts',
@@ -99,6 +104,12 @@ router.get(
 );
 
 router.get('/sales/admin-stats', requireRole(UserRole.ADMIN), getAdminSalesStats);
+
+router.get(
+  '/sales/branch-finance-stats',
+  requireRole(UserRole.ADMIN, UserRole.MANAGER, UserRole.FINANCE),
+  getBranchFinanceStats,
+);
 
 router.put('/:id/approve', requireRole(UserRole.EMPLOYEE), approveQuotation);
 router.post(

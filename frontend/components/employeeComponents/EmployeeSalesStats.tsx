@@ -77,7 +77,7 @@ export default function EmployeeSalesStats({
       }
     };
     fetchStats();
-  }, [propInvoices]);
+  }, [propInvoices, selectedYear]);
 
   const cards = [
     {
@@ -94,7 +94,7 @@ export default function EmployeeSalesStats({
       title: 'Total Sales Amount',
       value: loading
         ? '...'
-        : `₹${
+        : `QAR ${
             stats.totalAmount >= 1000
               ? (stats.totalAmount / 1000).toFixed(1) + ' k'
               : stats.totalAmount.toLocaleString()

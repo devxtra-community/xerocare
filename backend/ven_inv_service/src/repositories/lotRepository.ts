@@ -311,4 +311,49 @@ export class LotRepository {
       },
     });
   }
+
+  /**
+   * Calculates total spending on lots for a branch and year.
+   */
+  async getLotTotals(branchId: string, year?: number): Promise<number> {
+    const qb = this.repo
+      .createQueryBuilder('lot')
+      .select('SUM(lot.totalAmount)', 'total')
+      .where('lot.branch_id = :branchId', { branchId });
+
+    if (year) {
+      qb.andWhere('EXTRACT(YEAR FROM lot.purchaseDate) = :year', { year });
+    }
+
+    const res = await qb.getRawOne();
+    return parseFloat(res?.total) || 0;
+  }
+
+  /**
+   * Returns monthly lot expenses for a branch and year.
+   */
+  async getMonthlyLotTotals(
+    branchId: string,
+    year?: number,
+  ): Promise<{ month: string; total: number }[]> {
+    const qb = this.repo
+      .createQueryBuilder('lot')
+      .select("TO_CHAR(lot.purchaseDate, 'YYYY-MM')", 'month')
+      .addSelect('SUM(lot.totalAmount)', 'total')
+      .where('lot.branch_id = :branchId', { branchId });
+
+    if (year) {
+      qb.andWhere('EXTRACT(YEAR FROM lot.purchaseDate) = :year', { year });
+    }
+
+    const res = await qb
+      .groupBy("TO_CHAR(lot.purchaseDate, 'YYYY-MM')")
+      .orderBy('month', 'ASC')
+      .getRawMany();
+
+    return res.map((r) => ({
+      month: r.month,
+      total: parseFloat(r.total) || 0,
+    }));
+  }
 }

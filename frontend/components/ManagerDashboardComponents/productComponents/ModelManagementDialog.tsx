@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -34,7 +34,7 @@ export function ModelManagementDialog({ open, onClose }: ModelManagementDialogPr
 
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
-  const fetchModels = async () => {
+  const fetchModels = useCallback(async () => {
     setLoading(true);
     try {
       const res = await modelService.getAllModels({ page, limit });
@@ -45,13 +45,13 @@ export function ModelManagementDialog({ open, onClose }: ModelManagementDialogPr
     } finally {
       setLoading(false);
     }
-  };
+  }, [page, limit, setTotal]);
 
   useEffect(() => {
     if (open) {
       fetchModels();
     }
-  }, [open, page, limit]);
+  }, [open, fetchModels]);
 
   const confirmDelete = async () => {
     if (!deleteId) return;

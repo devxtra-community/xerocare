@@ -453,7 +453,8 @@ export const getAdminSalesStats = async (req: Request, res: Response, next: Next
 export const getFinanceReport = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const token = req.headers.authorization?.split(' ')[1] || '';
-    const report = await invoiceAggregationService.getFinanceReport(token);
+    const filters = req.query;
+    const report = await invoiceAggregationService.getFinanceReport(token, filters);
     return res.status(200).json({
       success: true,
       data: report,
@@ -491,6 +492,23 @@ export const sendWhatsappNotification = async (req: Request, res: Response, next
       success: true,
       data: result,
       message: 'WhatsApp notification request sent',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Retrieves comprehensive finance stats (Revenue, Expenses, Profit) for a branch.
+ */
+export const getBranchFinanceStats = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const token = req.headers.authorization?.split(' ')[1] || '';
+    const year = req.query.year ? parseInt(req.query.year as string, 10) : undefined;
+    const stats = await invoiceAggregationService.getBranchFinanceStats(token, year);
+    return res.status(200).json({
+      success: true,
+      data: stats,
     });
   } catch (error) {
     next(error);

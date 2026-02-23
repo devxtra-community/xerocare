@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Search } from 'lucide-react';
@@ -21,7 +21,7 @@ export default function EmployeeTable() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
 
-  const fetchEmployees = async () => {
+  const fetchEmployees = useCallback(async () => {
     setLoading(true);
     try {
       const res = await getAllEmployees(page, limit, undefined, search);
@@ -35,14 +35,14 @@ export default function EmployeeTable() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [page, limit, search, setTotal]);
 
   useEffect(() => {
     const delayDebounceFn = setTimeout(() => {
       fetchEmployees();
     }, 500);
     return () => clearTimeout(delayDebounceFn);
-  }, [search, page, limit]);
+  }, [fetchEmployees]);
 
   const toggleStatus = (id: string, newStatus: string) => {
     toast('Status updates via table are display-only until API is ready');

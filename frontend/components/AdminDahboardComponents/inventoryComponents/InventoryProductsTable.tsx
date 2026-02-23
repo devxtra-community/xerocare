@@ -19,6 +19,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import api from '@/lib/api';
+import { formatCurrency } from '@/lib/format';
 
 interface InventoryItem {
   id: string;
@@ -148,13 +149,8 @@ export default function InventoryProductsTable() {
   }, [fetchOptions]);
 
   useEffect(() => {
-    // Only fetch data when filters are empty (initial load) or when explicit fetchData is needed.
-    // To prevent redundant calls, we can rely on handleFilter for user-initiated searches.
-    // But since we want the table to reflect initial state, we keep this.
-    if (!productFilter && !warehouseFilter && !branchFilter && !brandFilter) {
-      fetchData();
-    }
-  }, [fetchData]); // Keeping it simple for now, though it might double-trigger on some state changes.
+    fetchData();
+  }, [fetchData]);
 
   const handleFilter = () => {
     setPage(1);
@@ -295,10 +291,10 @@ export default function InventoryProductsTable() {
                   Available
                 </TableHead>
                 <TableHead className="text-xs font-semibold text-primary uppercase px-6 text-center">
-                  Rented
+                  Rent
                 </TableHead>
                 <TableHead className="text-xs font-semibold text-primary uppercase px-6 text-center">
-                  Damaged
+                  Lease
                 </TableHead>
                 <TableHead className="text-xs font-semibold text-primary uppercase px-6 text-center">
                   Cost
@@ -346,22 +342,16 @@ export default function InventoryProductsTable() {
                     </TableCell>
                     <TableCell className="px-6 py-4 text-center">
                       <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-700">
-                        {item.rented_qty + item.lease_qty}
+                        {item.rented_qty}
                       </span>
                     </TableCell>
                     <TableCell className="px-6 py-4 text-center">
-                      <span
-                        className={`px-2.5 py-1 rounded-full text-xs font-medium ${
-                          item.damaged_qty > 0
-                            ? 'bg-red-100 text-red-700'
-                            : 'bg-gray-100 text-muted-foreground'
-                        }`}
-                      >
-                        {item.damaged_qty}
+                      <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-700">
+                        {item.lease_qty}
                       </span>
                     </TableCell>
                     <TableCell className="px-6 py-4 text-center font-semibold text-gray-700">
-                      ₹{item.product_cost?.toLocaleString() || '0'}
+                      {formatCurrency(item.product_cost || 0)}
                     </TableCell>
                     <TableCell className="px-6 py-4 text-right pr-6">
                       <div className="flex justify-end gap-1">

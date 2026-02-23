@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Search, Plus } from 'lucide-react';
@@ -27,7 +27,7 @@ export default function ManagerLotTable() {
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({ totalLots: 0, totalAmount: 0 });
 
-  const loadLots = async () => {
+  const loadLots = useCallback(async () => {
     setLoading(true);
     try {
       const res = await lotService.getAllLots({ page, limit, search });
@@ -44,7 +44,7 @@ export default function ManagerLotTable() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [page, limit, search, setTotal]);
 
   useEffect(() => {
     const delayDebounceFn = setTimeout(() => {
@@ -52,7 +52,7 @@ export default function ManagerLotTable() {
     }, 500);
 
     return () => clearTimeout(delayDebounceFn);
-  }, [search, page, limit]);
+  }, [loadLots]);
 
   return (
     <div className="bg-blue-100 min-h-screen p-3 sm:p-4 md:p-6 space-y-8">

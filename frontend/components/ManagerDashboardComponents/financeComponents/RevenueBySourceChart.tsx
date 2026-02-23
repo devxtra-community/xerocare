@@ -45,7 +45,7 @@ export default function RevenueBySourceChart() {
               </Pie>
               <Tooltip
                 content={
-                  <ChartTooltipContent valueFormatter={(val) => `₹${val.toLocaleString()}`} />
+                  <ChartTooltipContent valueFormatter={(val) => `QAR ${val.toLocaleString()}`} />
                 }
               />
               <Legend iconType="circle" wrapperStyle={{ fontSize: '10px', fontWeight: 'bold' }} />

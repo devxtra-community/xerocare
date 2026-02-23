@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   Table,
   TableBody,
@@ -17,43 +17,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Search } from 'lucide-react';
 
-const data = [
-  {
-    date: '2024-03-25',
-    type: 'Sales',
-    count: 12,
-    total: '₹45,200',
-    paid: '₹45,200',
-    pending: '₹0',
-  },
-  {
-    date: '2024-03-24',
-    type: 'Rental',
-    count: 8,
-    total: '₹12,800',
-    paid: '₹8,000',
-    pending: '₹4,800',
-  },
-  {
-    date: '2024-03-24',
-    type: 'Lease',
-    count: 3,
-    total: '₹85,000',
-    paid: '₹40,000',
-    pending: '₹45,000',
-  },
-  {
-    date: '2024-03-23',
-    type: 'Service',
-    count: 15,
-    total: '₹22,500',
-    paid: '₹22,500',
-    pending: '₹0',
-  },
-  { date: '2024-03-22', type: 'Sales', count: 9, total: '₹31,400', paid: '₹31,400', pending: '₹0' },
-];
+import { getFinanceReport, FinanceReportItem } from '@/lib/invoice';
+import { formatCurrency } from '@/lib/format';
+import { Search, Loader2 } from 'lucide-react';
 
 interface RevenueSummaryTableProps {
   selectedYear?: number | 'all';
@@ -65,45 +32,52 @@ interface RevenueSummaryTableProps {
  * Includes search and filtering by date, month, and revenue type.
  */
 export default function RevenueSummaryTable({ selectedYear }: RevenueSummaryTableProps) {
+  const [loading, setLoading] = useState(true);
+  const [data, setData] = useState<FinanceReportItem[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterDate, setFilterDate] = useState('');
   const [filterMonth, setFilterMonth] = useState('all');
   const [filterType, setFilterType] = useState('all');
 
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        const report = await getFinanceReport({
+          year: selectedYear === 'all' ? undefined : selectedYear,
+        });
+        setData(report);
+      } catch (error) {
+        console.error('Failed to fetch finance report', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, [selectedYear]);
+
   const filteredData = useMemo(() => {
-    return data.filter((item) => {
+    return data.filter((item: FinanceReportItem) => {
       // 1. Text Search
       const matchesSearch =
-        item.type.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.date.includes(searchTerm) ||
-        item.total.includes(searchTerm);
+        item.source?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item.month.includes(searchTerm);
 
       if (!matchesSearch) return false;
 
-      // 2. Date Filter
-      if (filterDate && item.date !== filterDate) return false;
-
-      // 3. Month Filter
+      // 2. Month Filter
       if (filterMonth !== 'all') {
-        const itemMonth = new Date(item.date).getMonth().toString();
+        const itemMonth = new Date(item.month).getMonth().toString();
         if (itemMonth !== filterMonth) return false;
       }
 
-      // 4. Type Filter
-      if (filterType !== 'all' && item.type !== filterType) return false;
-
-      // 5. Year Filter (from prop)
-      if (selectedYear && selectedYear !== 'all') {
-        const itemYear = new Date(item.date).getFullYear();
-        if (itemYear !== selectedYear) return false;
-      }
+      // 3. Type Filter
+      if (filterType !== 'all' && item.source !== filterType) return false;
 
       return true;
     });
-  }, [searchTerm, filterDate, filterMonth, filterType, selectedYear]);
+  }, [data, searchTerm, filterMonth, filterType]);
 
-  // Extract unique types for filter dropdown
-  const uniqueTypes = Array.from(new Set(data.map((d) => d.type)));
+  const uniqueTypes = useMemo(() => Array.from(new Set(data.map((d) => d.source))), [data]);
 
   const months = [
     { value: '0', label: 'January' },
@@ -135,16 +109,6 @@ export default function RevenueSummaryTable({ selectedYear }: RevenueSummaryTabl
         </div>
 
         <div className="flex flex-wrap gap-2 w-full md:w-auto">
-          {/* Date Filter */}
-          <div className="relative">
-            <Input
-              type="date"
-              className="h-9 w-[130px] text-xs"
-              value={filterDate}
-              onChange={(e) => setFilterDate(e.target.value)}
-            />
-          </div>
-
           {/* Month Filter */}
           <Select value={filterMonth} onValueChange={setFilterMonth}>
             <SelectTrigger className="h-9 w-[120px] text-xs">
@@ -176,11 +140,10 @@ export default function RevenueSummaryTable({ selectedYear }: RevenueSummaryTabl
           </Select>
 
           {/* Reset Filters */}
-          {(searchTerm || filterDate || filterMonth !== 'all' || filterType !== 'all') && (
+          {(searchTerm || filterMonth !== 'all' || filterType !== 'all') && (
             <button
               onClick={() => {
                 setSearchTerm('');
-                setFilterDate('');
                 setFilterMonth('all');
                 setFilterType('all');
               }}
@@ -197,22 +160,28 @@ export default function RevenueSummaryTable({ selectedYear }: RevenueSummaryTabl
           <TableHeader className="bg-muted/50">
             <TableRow>
               <TableHead className="text-[11px] font-bold text-primary uppercase py-4 px-4">
-                Date
+                Month
               </TableHead>
-              <TableHead className="text-[11px] font-bold text-primary uppercase">
-                Revenue Type
-              </TableHead>
+              <TableHead className="text-[11px] font-bold text-primary uppercase">Type</TableHead>
               <TableHead className="text-[11px] font-bold text-primary uppercase text-center">
-                Invoices
+                Total Orders
               </TableHead>
               <TableHead className="text-[11px] font-bold text-primary uppercase">
-                Total Amount
+                Revenue
               </TableHead>
-              <TableHead className="text-[11px] font-bold text-primary uppercase">Paid</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredData.length > 0 ? (
+            {loading ? (
+              <TableRow>
+                <TableCell colSpan={4} className="text-center py-12">
+                  <div className="flex flex-col items-center gap-2">
+                    <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                    <span className="text-xs text-muted-foreground">Loading report data...</span>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ) : filteredData.length > 0 ? (
               filteredData.map((row, i) => (
                 <TableRow
                   key={i}
@@ -221,34 +190,35 @@ export default function RevenueSummaryTable({ selectedYear }: RevenueSummaryTabl
                   }`}
                 >
                   <TableCell className="text-xs font-medium text-gray-600 px-4">
-                    {row.date}
+                    {row.month}
                   </TableCell>
                   <TableCell>
                     <span
                       className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase
                   ${
-                    row.type === 'Sales'
+                    row.source === 'SALE'
                       ? 'bg-blue-100 text-blue-700'
-                      : row.type === 'Rental'
+                      : row.source === 'RENT'
                         ? 'bg-purple-100 text-purple-700'
-                        : row.type === 'Lease'
+                        : row.source === 'LEASE'
                           ? 'bg-orange-100 text-orange-700'
                           : 'bg-green-100 text-green-700'
                   }`}
                     >
-                      {row.type}
+                      {row.source}
                     </span>
                   </TableCell>
                   <TableCell className="text-xs font-bold text-primary text-center">
                     {row.count}
                   </TableCell>
-                  <TableCell className="text-xs font-bold text-foreground">{row.total}</TableCell>
-                  <TableCell className="text-xs font-bold text-green-600">{row.paid}</TableCell>
+                  <TableCell className="text-xs font-bold text-foreground">
+                    {formatCurrency(row.income)}
+                  </TableCell>
                 </TableRow>
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={5} className="text-center py-8 text-muted-foreground text-xs">
+                <TableCell colSpan={4} className="text-center py-8 text-muted-foreground text-xs">
                   No matching records found
                 </TableCell>
               </TableRow>

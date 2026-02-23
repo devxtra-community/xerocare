@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
-import { Search, Loader2 } from 'lucide-react';
+import { Search, Loader2, Eye, Coins } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -11,17 +11,10 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+
 import { getMyInvoices, Invoice, InvoiceItem, getInvoiceById } from '@/lib/invoice';
 import { toast } from 'sonner';
 import { InvoiceDetailsDialog } from '../invoice/InvoiceDetailsDialog';
-import { Eye } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Pagination from '@/components/Pagination';
 
@@ -41,7 +34,6 @@ export default function EmployeeOrdersTable({
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [filterType, setFilterType] = useState<string>('All');
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
 
@@ -50,7 +42,7 @@ export default function EmployeeOrdersTable({
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [search, filterType]);
+  }, [search]);
 
   useEffect(() => {
     const fetchInvoices = async () => {
@@ -130,9 +122,14 @@ export default function EmployeeOrdersTable({
       inv.invoiceNumber.toLowerCase().includes(search.toLowerCase()) ||
       inv.customerName?.toLowerCase().includes(search.toLowerCase()) ||
       inv.items?.some((item) => item.description.toLowerCase().includes(search.toLowerCase()));
-    const matchesFilter = filterType === 'All' || inv.saleType === filterType;
-    return matchesSearch && matchesFilter;
+
+    return matchesSearch;
   });
+
+  const aggregateTotal = filteredInvoices.reduce(
+    (sum, inv) => sum + (inv.displayAmount ?? inv.totalAmount ?? 0),
+    0,
+  );
 
   const totalPages = Math.ceil(filteredInvoices.length / ITEMS_PER_PAGE);
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
@@ -173,12 +170,29 @@ export default function EmployeeOrdersTable({
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-between items-center">
+      <div className="flex justify-between items-center bg-card p-4 rounded-xl border border-slate-100 shadow-sm">
         <h2 className="text-xl font-bold text-primary">Orders Overview</h2>
+        <div className="flex items-center gap-3">
+          <div className="text-right">
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider leading-none mb-1">
+              Total Amount
+            </p>
+            <p className="text-xl font-black text-primary tracking-tight">
+              QAR{' '}
+              {aggregateTotal.toLocaleString(undefined, {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}
+            </p>
+          </div>
+          <div className="h-10 w-10 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600">
+            <Coins size={20} />
+          </div>
+        </div>
       </div>
 
       <div className="bg-card rounded-xl p-4 shadow-sm border border-gray-100 flex flex-col md:flex-row gap-4 items-end">
-        <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-4 w-full">
+        <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4 w-full">
           <div className="space-y-1">
             <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
               Search Orders
@@ -192,22 +206,6 @@ export default function EmployeeOrdersTable({
                 className="pl-9 h-9 text-xs"
               />
             </div>
-          </div>
-          <div className="space-y-1">
-            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
-              Filter by Type
-            </label>
-            <Select value={filterType} onValueChange={setFilterType}>
-              <SelectTrigger className="h-9 text-xs w-full bg-background border-gray-200">
-                <SelectValue placeholder="All Types" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="All">All Types</SelectItem>
-                <SelectItem value="Sale">Sale</SelectItem>
-                <SelectItem value="Rental">Rental</SelectItem>
-                <SelectItem value="Lease">Lease</SelectItem>
-              </SelectContent>
-            </Select>
           </div>
           <div className="space-y-1">
             <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
@@ -282,7 +280,7 @@ export default function EmployeeOrdersTable({
                       {getTotalQuantity(invoice.items)}
                     </TableCell>
                     <TableCell className="font-bold text-primary whitespace-nowrap">
-                      QAR {invoice.totalAmount.toLocaleString()}
+                      QAR {(invoice.displayAmount ?? invoice.totalAmount ?? 0).toLocaleString()}
                     </TableCell>
                     <TableCell>
                       <span

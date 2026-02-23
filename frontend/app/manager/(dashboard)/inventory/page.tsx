@@ -3,8 +3,6 @@ import React from 'react';
 import InventoryKPICards from '@/components/ManagerDashboardComponents/inventoryComponents/InventoryKPICards';
 import InventoryTable from '@/components/ManagerDashboardComponents/inventoryComponents/InventoryTable';
 import SparePartTable from '@/components/ManagerDashboardComponents/inventoryComponents/SparePartTable';
-import StockByCategoryChart from '@/components/ManagerDashboardComponents/inventoryComponents/StockByCategoryChart';
-import MostMovedProductsChart from '@/components/ManagerDashboardComponents/inventoryComponents/MostMovedProductsChart';
 
 export default function ManagerInventoryPage() {
   return (
@@ -29,23 +27,6 @@ export default function ManagerInventoryPage() {
             <h3 className="text-base sm:text-lg font-bold text-primary">Spare Part Inventory</h3>
             <div className="bg-card rounded-xl shadow-sm border border-gray-100 p-4">
               <SparePartTable />
-            </div>
-          </div>
-        </div>
-
-        {/* ANALYTICS CHARTS - Same Height Grid */}
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 sm:gap-6 items-stretch">
-          <div className="flex flex-col space-y-3">
-            <h4 className="text-base sm:text-lg font-bold text-primary">Most Moved Products</h4>
-            <div className="bg-card rounded-xl p-3 flex-1 flex flex-col min-h-[280px]">
-              <MostMovedProductsChart />
-            </div>
-          </div>
-
-          <div className="flex flex-col space-y-3">
-            <h4 className="text-base sm:text-lg font-bold text-primary">Stock by Category</h4>
-            <div className="bg-card rounded-xl p-3 flex-1 flex flex-col min-h-[280px]">
-              <StockByCategoryChart />
             </div>
           </div>
         </div>

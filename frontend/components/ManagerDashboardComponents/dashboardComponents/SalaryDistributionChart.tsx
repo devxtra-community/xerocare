@@ -43,7 +43,7 @@ export default function SalaryDistributionChart() {
     <div className="rounded-2xl bg-white h-[320px] w-full shadow-sm border border-blue-50 flex flex-col p-4">
       <div className="pb-2">
         <h4 className="text-sm font-semibold text-gray-800">Salary Payroll Distribution</h4>
-        <p className="text-[10px] text-gray-500">Total: ₹{(total / 1000).toFixed(1)}k</p>
+        <p className="text-[10px] text-gray-500">Total: QAR {(total / 1000).toFixed(1)}k</p>
       </div>
       <div className="flex-1 w-full">
         <ResponsiveContainer width="100%" height="100%">
@@ -72,7 +72,7 @@ export default function SalaryDistributionChart() {
                     <div className="bg-white p-3 rounded-xl shadow-lg border border-gray-50">
                       <p className="text-xs font-bold text-gray-700">{item.name}</p>
                       <p className="text-xs text-primary font-medium">
-                        ₹{((item.value as number) / 1000).toFixed(1)}k ({percentage}%)
+                        QAR {((item.value as number) / 1000).toFixed(1)}k ({percentage}%)
                       </p>
                     </div>
                   );
