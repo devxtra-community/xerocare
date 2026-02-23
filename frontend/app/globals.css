@@ -26,6 +26,8 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
   --color-row-mixed: var(--row-mixed);
 
   --radius-lg: var(--radius);
@@ -82,6 +84,8 @@
   --border: oklch(0.9 0 0);
   --input: oklch(0.9 0 0);
   --ring: #1e3a8a;
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.23 0 0);
   --row-mixed: oklch(0.92 0.04 250);
 
   --sidebar: #1e3a8a;
