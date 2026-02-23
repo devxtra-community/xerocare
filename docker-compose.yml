@@ -27,6 +27,10 @@ services:
         condition: service_started
       rabbitmq:
         condition: service_healthy
+    # Fix for Alpine/musl EAI_AGAIN DNS failures on concurrent external lookups
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
     networks:
       - xerocare-network
 
