@@ -285,12 +285,13 @@ export default function EmployeeOrdersTable({
                     <TableCell>
                       <span
                         className={`inline-flex px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide
-                        ${invoice.status === 'APPROVED'
+                        ${
+                          invoice.status === 'APPROVED'
                             ? 'bg-green-100 text-green-600'
                             : invoice.status === 'PENDING'
                               ? 'bg-yellow-100 text-yellow-600'
                               : 'bg-red-100 text-red-600'
-                          }`}
+                        }`}
                       >
                         {invoice.status}
                       </span>
@@ -298,14 +299,15 @@ export default function EmployeeOrdersTable({
                     <TableCell>
                       <span
                         className={`inline-flex px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide
-                        ${invoice.status === 'APPROVED'
+                        ${
+                          invoice.status === 'APPROVED'
                             ? 'bg-green-100 text-green-600'
                             : invoice.status === 'PENDING'
                               ? 'bg-blue-100 text-blue-600'
                               : invoice.status === 'REJECTED'
                                 ? 'bg-red-100 text-red-600'
                                 : 'bg-yellow-100 text-yellow-600'
-                          }`}
+                        }`}
                       >
                         {invoice.status}
                       </span>
@@ -313,12 +315,13 @@ export default function EmployeeOrdersTable({
                     <TableCell>
                       <span
                         className={`inline-flex px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide
-                        ${invoice.saleType === 'SALE'
+                        ${
+                          invoice.saleType === 'SALE'
                             ? 'bg-blue-100 text-blue-600'
                             : invoice.saleType === 'RENT'
                               ? 'bg-orange-100 text-orange-600'
                               : 'bg-purple-100 text-purple-600'
-                          }`}
+                        }`}
                       >
                         {invoice.saleType}
                       </span>
@@ -383,16 +386,16 @@ export default function EmployeeOrdersTable({
           onReject={
             mode === 'FINANCE'
               ? async (reason) => {
-                try {
-                  const { financeRejectInvoice } = await import('@/lib/invoice');
-                  await financeRejectInvoice(selectedInvoice.id, reason);
-                  toast.success('Order Rejected');
-                  setDetailsOpen(false);
-                  window.location.reload();
-                } catch {
-                  toast.error('Failed to reject');
+                  try {
+                    const { financeRejectInvoice } = await import('@/lib/invoice');
+                    await financeRejectInvoice(selectedInvoice.id, reason);
+                    toast.success('Order Rejected');
+                    setDetailsOpen(false);
+                    window.location.reload();
+                  } catch {
+                    toast.error('Failed to reject');
+                  }
                 }
-              }
               : undefined
           }
         />

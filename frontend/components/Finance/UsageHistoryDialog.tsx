@@ -28,7 +28,16 @@ import {
 } from '@/lib/invoice';
 import { format } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, History, Send, CheckCircle2, Eye, X, Image as ImageIcon, Edit } from 'lucide-react';
+import {
+  Loader2,
+  History,
+  Send,
+  CheckCircle2,
+  Eye,
+  X,
+  Image as ImageIcon,
+  Edit,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { formatCurrency } from '@/lib/format';
@@ -261,10 +270,11 @@ export default function UsageHistoryDialog({
                         {!isCpc ? (
                           <TableCell className="text-center">
                             <Badge
-                              className={`rounded-full px-3 py-1 text-[10px] font-black border-none shadow-sm ${record.exceededCount > 0
-                                ? 'bg-orange-100 text-orange-700'
-                                : 'bg-emerald-100 text-emerald-700'
-                                }`}
+                              className={`rounded-full px-3 py-1 text-[10px] font-black border-none shadow-sm ${
+                                record.exceededCount > 0
+                                  ? 'bg-orange-100 text-orange-700'
+                                  : 'bg-emerald-100 text-emerald-700'
+                              }`}
                             >
                               {record.exceededCount > 0 ? 'EXCEEDED' : 'WITHIN LIMIT'}
                             </Badge>
@@ -345,10 +355,11 @@ export default function UsageHistoryDialog({
                             <Button
                               size="sm"
                               variant="ghost"
-                              className={`h-8 w-8 p-0 rounded-full transition-all ${record.emailSentAt
-                                ? 'text-emerald-500 hover:text-emerald-600 hover:bg-emerald-50'
-                                : 'text-blue-500 hover:text-blue-600 hover:bg-blue-50'
-                                }`}
+                              className={`h-8 w-8 p-0 rounded-full transition-all ${
+                                record.emailSentAt
+                                  ? 'text-emerald-500 hover:text-emerald-600 hover:bg-emerald-50'
+                                  : 'text-blue-500 hover:text-blue-600 hover:bg-blue-50'
+                              }`}
                               onClick={() => handleSendInvoice(record)}
                               disabled={sendingId === record.id}
                               title={record.emailSentAt ? 'Resend Invoice' : 'Send Invoice'}

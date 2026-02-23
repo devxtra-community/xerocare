@@ -98,24 +98,25 @@ export class InvoiceRepository {
   /**
    * Helper to map raw displayAmount onto entities.
    */
-  private mapDisplayAmount(entities: Invoice[], raw: any[]): Invoice[] {
+  private mapDisplayAmount(entities: Invoice[], raw: Record<string, unknown>[]): Invoice[] {
     return entities.map((entity) => {
       const rawMatch = raw.find((r) => r.invoice_id === entity.id);
-      const calculatedTotal = parseFloat(rawMatch?.calculatedTotal || '0');
+      const calculatedTotal = parseFloat((rawMatch?.calculatedTotal as string) || '0');
 
       let displayAmount = 0;
       if (entity.type === InvoiceType.FINAL) {
         displayAmount = Number(entity.totalAmount) || 0;
       } else if (entity.saleType === SaleType.LEASE) {
         // Use totalLeaseAmount specifically as stored in DB for LEASE contracts
-        displayAmount = Number(entity.totalLeaseAmount) || Number(entity.totalAmount) || calculatedTotal;
+        displayAmount =
+          Number(entity.totalLeaseAmount) || Number(entity.totalAmount) || calculatedTotal;
       } else if (entity.saleType === SaleType.RENT) {
         displayAmount = calculatedTotal;
       } else {
         displayAmount = Number(entity.totalAmount) || 0;
       }
 
-      (entity as any).displayAmount = displayAmount;
+      (entity as Invoice & { displayAmount?: number }).displayAmount = displayAmount;
       return entity;
     });
   }

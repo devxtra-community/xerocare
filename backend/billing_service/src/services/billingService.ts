@@ -227,12 +227,16 @@ export class BillingService {
     const allocations = await this.invoiceRepo.manager.find(ProductAllocation, {
       where: { contractId: contract.id, status: AllocationStatus.ALLOCATED },
     });
-    
-    console.log(`DEBUG_FINALIZATION: Found ${allocations.length} ALLOCATED allocations for contract ${contract.id}`);
+
+    console.log(
+      `DEBUG_FINALIZATION: Found ${allocations.length} ALLOCATED allocations for contract ${contract.id}`,
+    );
     console.log(`DEBUG_FINALIZATION: Contract SaleType is ${contract.saleType}`);
 
     if (contract.saleType === SaleType.RENT && allocations.length > 0) {
-      console.log(`DEBUG_FINALIZATION: Updating ALLOCATED to RETURNED for rent contract ${contract.id}`);
+      console.log(
+        `DEBUG_FINALIZATION: Updating ALLOCATED to RETURNED for rent contract ${contract.id}`,
+      );
       const updateResult = await this.invoiceRepo.manager.update(
         ProductAllocation,
         { contractId: contract.id, status: AllocationStatus.ALLOCATED },
@@ -240,7 +244,9 @@ export class BillingService {
       );
       console.log(`DEBUG_FINALIZATION: updateResult = ${JSON.stringify(updateResult)}`);
     } else {
-      console.log(`DEBUG_FINALIZATION: Skipped update. Condition failed (SaleType=${contract.saleType}, AllocCount=${allocations.length})`);
+      console.log(
+        `DEBUG_FINALIZATION: Skipped update. Condition failed (SaleType=${contract.saleType}, AllocCount=${allocations.length})`,
+      );
     }
 
     // 6. Emit Product Status Updates (Mark as AVAILABLE/RETURNED)

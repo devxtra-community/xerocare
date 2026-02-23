@@ -102,7 +102,7 @@ export default function EmployeeRentTable({ mode = 'EMPLOYEE' }: EmployeeRentTab
   const filteredInvoices = invoices.filter((inv) =>
     search
       ? inv.customerName?.toLowerCase().includes(search.toLowerCase()) ||
-      inv.invoiceNumber?.toLowerCase().includes(search.toLowerCase())
+        inv.invoiceNumber?.toLowerCase().includes(search.toLowerCase())
       : true,
   );
 
@@ -268,16 +268,17 @@ export default function EmployeeRentTable({ mode = 'EMPLOYEE' }: EmployeeRentTab
                       <Badge
                         variant="secondary"
                         className={`rounded-full px-3 py-0.5 text-[10px] font-bold tracking-wider shadow-none
-                            ${inv.status === 'PAID' ||
-                            inv.status === 'APPROVED' ||
-                            inv.status === 'ISSUED'
-                            ? 'bg-green-100 text-green-700 hover:bg-green-100'
-                            : inv.status === 'SENT'
-                              ? 'bg-blue-100 text-blue-700 hover:bg-blue-100'
-                              : inv.status === 'REJECTED' || inv.status === 'CANCELLED'
-                                ? 'bg-red-100 text-red-700 hover:bg-red-100'
-                                : 'bg-slate-100 text-slate-700 hover:bg-slate-100'
-                          }
+                            ${
+                              inv.status === 'PAID' ||
+                              inv.status === 'APPROVED' ||
+                              inv.status === 'ISSUED'
+                                ? 'bg-green-100 text-green-700 hover:bg-green-100'
+                                : inv.status === 'SENT'
+                                  ? 'bg-blue-100 text-blue-700 hover:bg-blue-100'
+                                  : inv.status === 'REJECTED' || inv.status === 'CANCELLED'
+                                    ? 'bg-red-100 text-red-700 hover:bg-red-100'
+                                    : 'bg-slate-100 text-slate-700 hover:bg-slate-100'
+                            }
                           `}
                       >
                         {inv.status}
@@ -345,36 +346,36 @@ export default function EmployeeRentTable({ mode = 'EMPLOYEE' }: EmployeeRentTab
               mode === 'EMPLOYEE'
                 ? handleSendForApproval
                 : async () => {
-                  // FINANCE Mode Approve
-                  try {
-                    const { financeApproveInvoice } = await import('@/lib/invoice');
-                    await financeApproveInvoice(selectedInvoice.id, {});
-                    toast.success('Rent Agreement Approved');
-                    setDetailsOpen(false);
-                    fetchInvoices();
-                  } catch (err: unknown) {
-                    console.error(err);
-                    const error = err as { response?: { data?: { message?: string } } };
-                    toast.error(error.response?.data?.message || 'Failed to approve');
+                    // FINANCE Mode Approve
+                    try {
+                      const { financeApproveInvoice } = await import('@/lib/invoice');
+                      await financeApproveInvoice(selectedInvoice.id, {});
+                      toast.success('Rent Agreement Approved');
+                      setDetailsOpen(false);
+                      fetchInvoices();
+                    } catch (err: unknown) {
+                      console.error(err);
+                      const error = err as { response?: { data?: { message?: string } } };
+                      toast.error(error.response?.data?.message || 'Failed to approve');
+                    }
                   }
-                }
             }
             // FINANCE Mode Reject
             onReject={
               mode === 'FINANCE'
                 ? async (reason) => {
-                  try {
-                    const { financeRejectInvoice } = await import('@/lib/invoice');
-                    await financeRejectInvoice(selectedInvoice.id, reason);
-                    toast.success('Rent Agreement Rejected');
-                    setDetailsOpen(false);
-                    fetchInvoices();
-                  } catch (err: unknown) {
-                    console.error(err);
-                    const error = err as { response?: { data?: { message?: string } } };
-                    toast.error(error.response?.data?.message || 'Failed to reject');
+                    try {
+                      const { financeRejectInvoice } = await import('@/lib/invoice');
+                      await financeRejectInvoice(selectedInvoice.id, reason);
+                      toast.success('Rent Agreement Rejected');
+                      setDetailsOpen(false);
+                      fetchInvoices();
+                    } catch (err: unknown) {
+                      console.error(err);
+                      const error = err as { response?: { data?: { message?: string } } };
+                      toast.error(error.response?.data?.message || 'Failed to reject');
+                    }
                   }
-                }
                 : undefined
             }
             approveLabel={mode === 'EMPLOYEE' ? 'Send for Finance Approval' : 'Approve'}

@@ -1,9 +1,0 @@
-
-> ven_inv_service@1.0.0 dev /home/riyas/Desktop/xerocare/backend/ven_inv_service
-> nodemon --watch src --exec ts-node src/app.ts
-
-[33m[nodemon] 3.1.11[39m
-[33m[nodemon] to restart at any time, enter `rs`[39m
-[33m[nodemon] watching path(s): src/**/*[39m
-[33m[nodemon] watching extensions: ts,json[39m
-[32m[nodemon] starting `ts-node src/app.ts`[39m

@@ -61,13 +61,7 @@ export const createUsageRecord = async (req: Request, res: Response, next: NextF
 export const updateUsageRecord = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = req.params.id as string;
-    const {
-      bwA4Count,
-      bwA3Count,
-      colorA4Count,
-      colorA3Count,
-      billingPeriodEnd,
-    } = req.body;
+    const { bwA4Count, bwA3Count, colorA4Count, colorA3Count, billingPeriodEnd } = req.body;
 
     const result = await usageService.updateUsageRecord(id, {
       bwA4Count: Number(bwA4Count) || 0,

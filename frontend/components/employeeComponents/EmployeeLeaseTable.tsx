@@ -302,12 +302,13 @@ export default function EmployeeLeaseTable({ mode = 'EMPLOYEE' }: EmployeeLeaseT
                     <TableCell>
                       <span
                         className={`inline-flex px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide
-                        ${inv.status === 'PAID'
+                        ${
+                          inv.status === 'PAID'
                             ? 'bg-green-100 text-green-600'
                             : inv.status === 'PENDING'
                               ? 'bg-yellow-100 text-yellow-600'
                               : 'bg-red-100 text-red-600'
-                          }`}
+                        }`}
                       >
                         {inv.status}
                       </span>
@@ -378,36 +379,36 @@ export default function EmployeeLeaseTable({ mode = 'EMPLOYEE' }: EmployeeLeaseT
             mode === 'EMPLOYEE'
               ? handleSendForApproval
               : async () => {
-                // FINANCE Mode Approve
-                try {
-                  const { financeApproveInvoice } = await import('@/lib/invoice');
-                  await financeApproveInvoice(selectedInvoice.id, {});
-                  toast.success('Lease Agreement Approved');
-                  setDetailsOpen(false);
-                  fetchInvoices();
-                } catch (err: unknown) {
-                  console.error(err);
-                  const error = err as { response?: { data?: { message?: string } } };
-                  toast.error(error.response?.data?.message || 'Failed to approve');
+                  // FINANCE Mode Approve
+                  try {
+                    const { financeApproveInvoice } = await import('@/lib/invoice');
+                    await financeApproveInvoice(selectedInvoice.id, {});
+                    toast.success('Lease Agreement Approved');
+                    setDetailsOpen(false);
+                    fetchInvoices();
+                  } catch (err: unknown) {
+                    console.error(err);
+                    const error = err as { response?: { data?: { message?: string } } };
+                    toast.error(error.response?.data?.message || 'Failed to approve');
+                  }
                 }
-              }
           }
           // FINANCE Mode Reject
           onReject={
             mode === 'FINANCE'
               ? async (reason) => {
-                try {
-                  const { financeRejectInvoice } = await import('@/lib/invoice');
-                  await financeRejectInvoice(selectedInvoice.id, reason);
-                  toast.success('Lease Agreement Rejected');
-                  setDetailsOpen(false);
-                  fetchInvoices();
-                } catch (err: unknown) {
-                  console.error(err);
-                  const error = err as { response?: { data?: { message?: string } } };
-                  toast.error(error.response?.data?.message || 'Failed to reject');
+                  try {
+                    const { financeRejectInvoice } = await import('@/lib/invoice');
+                    await financeRejectInvoice(selectedInvoice.id, reason);
+                    toast.success('Lease Agreement Rejected');
+                    setDetailsOpen(false);
+                    fetchInvoices();
+                  } catch (err: unknown) {
+                    console.error(err);
+                    const error = err as { response?: { data?: { message?: string } } };
+                    toast.error(error.response?.data?.message || 'Failed to reject');
+                  }
                 }
-              }
               : undefined
           }
           approveLabel={mode === 'EMPLOYEE' ? 'Send for Finance Approval' : 'Approve'}

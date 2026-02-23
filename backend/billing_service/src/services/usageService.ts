@@ -840,7 +840,7 @@ export class UsageService {
       colorA4Count: number;
       colorA3Count: number;
       billingPeriodEnd: string;
-    }
+    },
   ) {
     const usage = await this.usageRepo.findById(id);
     if (!usage) {
@@ -853,11 +853,11 @@ export class UsageService {
     }
 
     const history = await this.usageRepo.getUsageHistory(usage.contractId, 'DESC');
-    
+
     const sortedHistoryAsc = [...history].sort(
-      (a, b) => new Date(a.billingPeriodStart).getTime() - new Date(b.billingPeriodStart).getTime()
+      (a, b) => new Date(a.billingPeriodStart).getTime() - new Date(b.billingPeriodStart).getTime(),
     );
-    const currentIndex = sortedHistoryAsc.findIndex(h => h.id === usage.id);
+    const currentIndex = sortedHistoryAsc.findIndex((h) => h.id === usage.id);
 
     const previousRecord = currentIndex > 0 ? sortedHistoryAsc[currentIndex - 1] : null;
 
@@ -915,7 +915,10 @@ export class UsageService {
         const bwCharge = this.calculateSlabCharge(monthlyBw, rule.bwSlabRanges);
         const colorCharge = this.calculateSlabCharge(monthlyColor, rule.colorSlabRanges);
         const comboCharge = this.calculateSlabCharge(monthlyNormalized, rule.comboSlabRanges);
-        exceededCharge = rule.comboSlabRanges && rule.comboSlabRanges.length > 0 ? comboCharge : bwCharge + colorCharge;
+        exceededCharge =
+          rule.comboSlabRanges && rule.comboSlabRanges.length > 0
+            ? comboCharge
+            : bwCharge + colorCharge;
       }
     }
 
@@ -931,8 +934,9 @@ export class UsageService {
     usage.colorA3Delta = colorA3Delta;
     usage.exceededCharge = exceededCharge;
     usage.exceededTotal = exceededTotal;
-    
-    usage.totalCharge = Number(usage.monthlyRent) + exceededCharge - Number(usage.advanceAdjusted || 0);
+
+    usage.totalCharge =
+      Number(usage.monthlyRent) + exceededCharge - Number(usage.advanceAdjusted || 0);
 
     return this.usageRepo.save(usage);
   }
