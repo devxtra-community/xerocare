@@ -1,0 +1,50 @@
+version: '3.8'
+
+services:
+  xerocare-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: xerocare-app
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - '3000' # Frontend
+      - '3001' # API Gateway
+    depends_on:
+      - redis
+      - rabbitmq
+    networks:
+      - xerocare-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: xerocare-redis
+    restart: unless-stopped
+    ports:
+      - '6379'
+    volumes:
+      - redis_data:/data
+    networks:
+      - xerocare-network
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: xerocare-rabbitmq
+    restart: unless-stopped
+    ports:
+      - '5672' # AMQP protocol port
+      - '15672' # HTTP Management UI
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq/mnesia
+    networks:
+      - xerocare-network
+
+networks:
+  xerocare-network:
+    driver: bridge
+
+volumes:
+  redis_data:
+  rabbitmq_data:

@@ -1,0 +1,127 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+} from 'recharts';
+import { getAllEmployees, Employee } from '@/lib/employee';
+import { ChartTooltipContent } from '@/components/ui/ChartTooltip';
+
+interface MonthlyGrowth {
+  month: string;
+  count: number;
+}
+
+/**
+ * Line chart visualizing new employee hiring trends over the months.
+ * Aggregates employee creation dates to show hiring velocity.
+ */
+export default function HRNewEmployeesGraph() {
+  const [data, setData] = useState<MonthlyGrowth[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchGrowthData = async () => {
+      try {
+        const response = await getAllEmployees(1, 1000, 'All');
+        if (response.success) {
+          const employees = response.data.employees;
+
+          const monthlyCounts: Record<string, number> = {};
+          const months = [
+            'Jan',
+            'Feb',
+            'Mar',
+            'Apr',
+            'May',
+            'Jun',
+            'Jul',
+            'Aug',
+            'Sep',
+            'Oct',
+            'Nov',
+            'Dec',
+          ];
+
+          // Pre-fill with last 6 months or current year
+          months.forEach((m) => (monthlyCounts[m] = 0));
+
+          employees.forEach((emp: Employee) => {
+            const date = new Date(emp.createdAt);
+            const monthName = months[date.getMonth()];
+            monthlyCounts[monthName] = (monthlyCounts[monthName] || 0) + 1;
+          });
+
+          const chartData: MonthlyGrowth[] = months.map((month) => ({
+            month,
+            count: monthlyCounts[month],
+          }));
+
+          setData(chartData);
+        }
+      } catch (error) {
+        console.error('Failed to fetch growth data:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchGrowthData();
+  }, []);
+
+  if (isLoading) {
+    return (
+      <div className="bg-card rounded-2xl shadow-sm border-0 p-6 h-[300px]">
+        <div className="h-4 w-32 bg-gray-100 animate-pulse rounded mb-8" />
+        <div className="flex-1 min-h-0 bg-muted/50 animate-pulse rounded-lg" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-card p-5 rounded-2xl shadow-sm border border-blue-100/50 flex flex-col h-[300px] w-full">
+      <h4 className="text-[10px] font-bold text-primary uppercase tracking-[0.2em] mb-8">
+        New Employees per Month
+      </h4>
+      <div className="flex-1 w-full min-h-0">
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart data={data} margin={{ top: 5, right: 20, left: -20, bottom: 5 }}>
+            <CartesianGrid
+              strokeDasharray="3 3"
+              vertical={false}
+              stroke="#e2e8f0"
+              strokeOpacity={0.5}
+            />
+            <XAxis
+              dataKey="month"
+              tick={{ fill: '#94a3b8', fontSize: 9, fontWeight: 700 }}
+              axisLine={false}
+              tickLine={false}
+              dy={10}
+            />
+            <YAxis
+              tick={{ fill: '#94a3b8', fontSize: 9, fontWeight: 700 }}
+              axisLine={false}
+              tickLine={false}
+            />
+            <Tooltip content={<ChartTooltipContent valueFormatter={(val) => `${val} hires`} />} />
+            <Line
+              type="monotone"
+              dataKey="count"
+              stroke="var(--primary)"
+              strokeWidth={3}
+              dot={{ r: 4, fill: 'var(--primary)', strokeWidth: 2, stroke: '#fff' }}
+              activeDot={{ r: 6, fill: 'var(--primary)', strokeWidth: 0 }}
+            />
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
+  );
+}

@@ -1,0 +1,69 @@
+'use client';
+
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import InventoryMasterTable from './InventoryMasterTable';
+import AuditLogTable from './AuditLogTable';
+import WarehouseInventoryTable from './WarehouseInventoryTable';
+import LowStockTable from './LowStockTable';
+
+/**
+ * Container component managing various inventory views via tabs.
+ * Allows switching between Inventory Master, Stock Movement Logs, Warehouse Summaries, and Critical Alerts.
+ * Central hub for accessing different aspects of inventory management.
+ */
+export default function InventoryTables() {
+  return (
+    <div className="w-full bg-card rounded-2xl shadow-sm border p-4 sm:p-6">
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h2 className="text-xl font-bold text-foreground">Inventory Details</h2>
+          <p className="text-sm text-muted-foreground">
+            Manage and track your entire inventory system
+          </p>
+        </div>
+      </div>
+
+      <Tabs defaultValue="master" className="w-full">
+        <TabsList className="mb-4 w-full h-auto flex flex-wrap justify-start gap-2 bg-transparent p-0">
+          <TabsTrigger
+            value="master"
+            className="data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-md border border-border bg-card"
+          >
+            Inventory Master
+          </TabsTrigger>
+          <TabsTrigger
+            value="audit"
+            className="data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-md border border-border bg-card"
+          >
+            Stock Movement Log
+          </TabsTrigger>
+          <TabsTrigger
+            value="warehouse"
+            className="data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-md border border-border bg-card"
+          >
+            Warehouse Summary
+          </TabsTrigger>
+          <TabsTrigger
+            value="lowstock"
+            className="data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-md border border-border bg-card"
+          >
+            Critical Alerts
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="master" className="mt-0">
+          <InventoryMasterTable />
+        </TabsContent>
+        <TabsContent value="audit" className="mt-0">
+          <AuditLogTable />
+        </TabsContent>
+        <TabsContent value="warehouse" className="mt-0">
+          <WarehouseInventoryTable />
+        </TabsContent>
+        <TabsContent value="lowstock" className="mt-0">
+          <LowStockTable />
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}
