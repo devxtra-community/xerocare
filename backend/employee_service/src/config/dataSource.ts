@@ -14,7 +14,7 @@ import { Notification } from '../entities/notificationEntity';
 export const Source = new DataSource({
   // [/] Update `DataSource` configuration
   type: 'postgres',
-  url: process.env.DATABASE_URL,
+  url: process.env.EMPLOYEE_DATABASE_URL,
   ssl: {
     rejectUnauthorized: false,
   },

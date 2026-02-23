@@ -32,7 +32,7 @@ const startServer = async () => {
     await startBranchConsumer();
     logger.info('Database connected');
 
-    const PORT = process.env.PORT;
+    const PORT = process.env.EMPLOYEE_PORT;
     app.listen(PORT, () => {
       logger.info(`Server running on port ${PORT}`);
     });

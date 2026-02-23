@@ -11,7 +11,7 @@ class RedisClient {
     }
 
     try {
-      const redisUrl = process.env.REDIS_URL || 'redis://127.0.0.1:6379';
+      const redisUrl = process.env.REDIS_URL as string;
 
       this.client = createClient({
         url: redisUrl,

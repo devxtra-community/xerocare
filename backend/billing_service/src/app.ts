@@ -50,7 +50,7 @@ const startServer = async () => {
 
     await getRabbitChannel();
     startEmailWorker();
-    const PORT = process.env.PORT || 3004;
+    const PORT = process.env.BILLING_PORT;
 
     app.listen(PORT, () => {
       logger.info(`Billing service running on port ${PORT}`);

@@ -45,7 +45,7 @@ const startServer = async () => {
     // consumeBillingEvents removed as it is legacy
     logger.info('Database connected');
 
-    const PORT = process.env.PORT;
+    const PORT = process.env.VENDOR_PORT;
     app.listen(PORT, () => {
       logger.info(`Server running on port ${PORT}`);
     });

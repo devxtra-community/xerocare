@@ -50,7 +50,7 @@ app.use(globalRateLimiter);
   logger.info('Customer Consumer initialized');
 })();
 
-const PORT = process.env.PORT;
+const PORT = process.env.API_GATEWAY_PORT;
 const EMPLOYEE_SERVICE_URL = process.env.EMPLOYEE_SERVICE_URL;
 const VENDOR_INVENTORY_SERVICE_URL = process.env.VENDOR_INVENTORY_SERVICE_URL;
 const BILLING_SERVICE_URL = process.env.BILLING_SERVICE_URL;
