@@ -15,7 +15,7 @@ import { Textarea } from '@/components/ui/textarea';
 import {
   recordUsage,
   getInvoiceById,
-  updateInvoiceUsage,
+  updateUsageRecord,
   getUsageHistory,
   Invoice,
   InvoiceItem,
@@ -25,7 +25,7 @@ import { Product, getProductById } from '@/lib/product';
 import { toast } from 'sonner';
 import { Loader2, Calendar, IndianRupee } from 'lucide-react';
 import { formatCurrency } from '@/lib/format';
-import UsagePreviewDialog from './UsagePreviewDialog';
+
 import { format } from 'date-fns';
 
 interface UsageRecordingModalProps {
@@ -42,6 +42,18 @@ interface SlabRange {
   to: number;
   rate: number;
 }
+
+const parseSlabs = (ranges: unknown): SlabRange[] => {
+  if (Array.isArray(ranges)) return ranges;
+  if (typeof ranges === 'string') {
+    try {
+      return JSON.parse(ranges);
+    } catch {
+      return [];
+    }
+  }
+  return [];
+};
 
 interface RecordedUsageData {
   bwA4Count: number;
@@ -80,6 +92,7 @@ export default function UsageRecordingModal({
   const [products, setProducts] = useState<Product[]>([]);
   const [estimatedCost, setEstimatedCost] = useState<number>(0);
   const [showPreview, setShowPreview] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [recordedUsageData, setRecordedUsageData] = useState<RecordedUsageData | null>(null);
   const [history, setHistory] = useState<UsageRecord[]>([]);
 
@@ -105,18 +118,23 @@ export default function UsageRecordingModal({
 
   React.useEffect(() => {
     if (editingInvoice) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const inv = editingInvoice as any;
+      const start = (inv.billingPeriodStart || inv.periodStart || '').split('T')[0];
+      const end = (inv.billingPeriodEnd || inv.periodEnd || '').split('T')[0];
+
       setFormData({
-        billingPeriodStart: editingInvoice.billingPeriodStart?.split('T')[0] || '',
-        billingPeriodEnd: editingInvoice.billingPeriodEnd?.split('T')[0] || '',
-        bwA4Count: String(editingInvoice.bwA4Count || 0),
-        bwA3Count: String(editingInvoice.bwA3Count || 0),
-        colorA4Count: String(editingInvoice.colorA4Count || 0),
-        colorA3Count: String(editingInvoice.colorA3Count || 0),
-        remarks: editingInvoice.financeRemarks || '',
+        billingPeriodStart: start,
+        billingPeriodEnd: end,
+        bwA4Count: String(inv.bwA4Count || 0),
+        bwA3Count: String(inv.bwA3Count || 0),
+        colorA4Count: String(inv.colorA4Count || 0),
+        colorA3Count: String(inv.colorA3Count || 0),
+        remarks: inv.financeRemarks || inv.remarks || '',
       });
 
-      if (editingInvoice.referenceContractId) {
-        getInvoiceById(editingInvoice.referenceContractId)
+      if (editingInvoice.referenceContractId || contractId) {
+        getInvoiceById(editingInvoice.referenceContractId || contractId)
           .then(setContract)
           .catch((err) => console.error('Failed to fetch reference contract:', err));
       }
@@ -229,14 +247,22 @@ export default function UsageRecordingModal({
     const combo = contract.items.find((i) => isRule(i) && i.description.includes('Combined'));
 
     // Check for "Merged" items (Product containing pricing fields)
+    const hasSlabs = (ranges: unknown) => parseSlabs(ranges).length > 0;
+
     const mergedBw = contract.items.find(
-      (i) => (i.bwIncludedLimit ?? 0) > 0 || (i.bwExcessRate ?? 0) > 0,
+      (i) => (i.bwIncludedLimit ?? 0) > 0 || (i.bwExcessRate ?? 0) > 0 || hasSlabs(i.bwSlabRanges),
     );
     const mergedColor = contract.items.find(
-      (i) => (i.colorIncludedLimit ?? 0) > 0 || (i.colorExcessRate ?? 0) > 0,
+      (i) =>
+        (i.colorIncludedLimit ?? 0) > 0 ||
+        (i.colorExcessRate ?? 0) > 0 ||
+        hasSlabs(i.colorSlabRanges),
     );
     const mergedCombo = contract.items.find(
-      (i) => (i.combinedIncludedLimit ?? 0) > 0 || (i.combinedExcessRate ?? 0) > 0,
+      (i) =>
+        (i.combinedIncludedLimit ?? 0) > 0 ||
+        (i.combinedExcessRate ?? 0) > 0 ||
+        hasSlabs(i.comboSlabRanges),
     );
 
     // Prioritize separate rules, fallback to merged items
@@ -339,12 +365,13 @@ export default function UsageRecordingModal({
       const totalDeltaEquiv = deltaA4 + deltaA3 * 2;
 
       if (rentType?.includes('CPC')) {
-        const slabs =
+        const slabs = parseSlabs(
           type === 'BW'
             ? ruleItem.bwSlabRanges
             : type === 'COLOR'
               ? ruleItem.colorSlabRanges
-              : ruleItem.comboSlabRanges;
+              : ruleItem.comboSlabRanges,
+        );
         return {
           charge: calculateSlabCharge(totalDeltaEquiv, slabs),
           totalDelta: totalDeltaEquiv,
@@ -587,14 +614,14 @@ export default function UsageRecordingModal({
 
     try {
       if (editingInvoice) {
-        await updateInvoiceUsage(editingInvoice.id, {
+        await updateUsageRecord(editingInvoice.id, {
           bwA4Count: Number(formData.bwA4Count),
           bwA3Count: Number(formData.bwA3Count),
           colorA4Count: Number(formData.colorA4Count),
           colorA3Count: Number(formData.colorA3Count),
           billingPeriodEnd: formData.billingPeriodEnd,
         });
-        toast.success('Invoice usage updated successfully');
+        toast.success('Usage record updated successfully');
         onSuccess();
         onClose();
       } else {
@@ -636,10 +663,12 @@ export default function UsageRecordingModal({
           meterImageUrl: (response as { meterImageUrl?: string })?.meterImageUrl,
         });
 
-        setShowPreview(true);
+        // setShowPreview(true);
         // We do *not* call onSuccess() here. Calling it triggers the parent to fetch and remount
         // the state, which instantly kills the UsagePreviewDialog and flips back to the input form.
         // onSuccess is deferred to the close callback of the Preview Dialog.
+        onSuccess();
+        onClose();
       }
     } catch (error: unknown) {
       const err = error as { message?: string };
@@ -833,10 +862,9 @@ export default function UsageRecordingModal({
                             {(() => {
                               const isCpc = contract?.rentType?.includes('CPC');
                               if (isCpc) {
-                                const slabs =
-                                  ruleItems.bw?.bwSlabRanges ||
-                                  ruleItems.combo?.comboSlabRanges ||
-                                  [];
+                                const slabs = parseSlabs(
+                                  ruleItems.bw?.bwSlabRanges || ruleItems.combo?.comboSlabRanges,
+                                );
                                 if (slabs.length > 0) {
                                   return (
                                     <div className="flex flex-col items-end">
@@ -958,10 +986,10 @@ export default function UsageRecordingModal({
                             {(() => {
                               const isCpc = contract?.rentType?.includes('CPC');
                               if (isCpc) {
-                                const slabs =
+                                const slabs = parseSlabs(
                                   ruleItems.color?.colorSlabRanges ||
-                                  ruleItems.combo?.comboSlabRanges ||
-                                  [];
+                                    ruleItems.combo?.comboSlabRanges,
+                                );
                                 if (slabs.length > 0) {
                                   return (
                                     <div className="flex flex-col items-end">
@@ -1148,7 +1176,7 @@ export default function UsageRecordingModal({
                             {(() => {
                               const isCpc = contract?.rentType?.includes('CPC');
                               if (isCpc) {
-                                const slabs = ruleItems.combo?.comboSlabRanges || [];
+                                const slabs = parseSlabs(ruleItems.combo?.comboSlabRanges);
                                 if (slabs.length > 0) {
                                   const prevA4 = prevUsage
                                     ? prevUsage.bwA4Count
@@ -1280,7 +1308,7 @@ export default function UsageRecordingModal({
                                 {(() => {
                                   const isCpc = contract?.rentType?.includes('CPC');
                                   if (isCpc) {
-                                    const slabs = ruleItems.bw?.bwSlabRanges || [];
+                                    const slabs = parseSlabs(ruleItems.bw?.bwSlabRanges);
                                     if (slabs.length > 0) {
                                       const prevA4 = prevUsage
                                         ? prevUsage.bwA4Count
@@ -1388,7 +1416,7 @@ export default function UsageRecordingModal({
                                 {(() => {
                                   const isCpc = contract?.rentType?.includes('CPC');
                                   if (isCpc) {
-                                    const slabs = ruleItems.color?.colorSlabRanges || [];
+                                    const slabs = parseSlabs(ruleItems.color?.colorSlabRanges);
                                     if (slabs.length > 0) {
                                       const prevA4 = prevUsage
                                         ? prevUsage.colorA4Count
@@ -1537,12 +1565,13 @@ export default function UsageRecordingModal({
         </DialogContent>
       </Dialog>
 
-      {showPreview && contract && recordedUsageData && (
+      {/* {showPreview && contract && recordedUsageData && (
         <UsagePreviewDialog
           isOpen={showPreview && isOpen}
           onClose={() => {
+            setShowPreview(false);
+            onClose(); // Destroy the modal tree first
             onSuccess(); // Execute the deferred parent refresh
-            onClose(); // Then fully dismantle the modal tree
           }}
           invoice={contract}
           usageData={{
@@ -1560,7 +1589,7 @@ export default function UsageRecordingModal({
             remarks: recordedUsageData.remarks,
           }}
         />
-      )}
+      )} */}
     </>
   );
 }

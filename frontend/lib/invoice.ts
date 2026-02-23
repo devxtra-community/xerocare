@@ -88,6 +88,7 @@ export interface Invoice {
   referenceContractId?: string; // Link to PROFORMA contract
   advanceAdjusted?: number;
   grossAmount?: number;
+  displayAmount?: number; // Backend aggregated lifetime total
   invoiceHistory?: Invoice[];
 }
 
@@ -535,11 +536,6 @@ export const getFinanceReport = async (filters: {
   const response = await api.get(`/b/invoices/finance/report?${params.toString()}`);
   return response.data.data;
 };
-/**
- * Updates usage counts and additional charges for an existing invoice.
- * @param invoiceId The ID of the invoice to update
- * @param payload Updated usage and charge details
- */
 export const updateInvoiceUsage = async (
   invoiceId: string,
   payload: {
@@ -557,6 +553,25 @@ export const updateInvoiceUsage = async (
   },
 ): Promise<unknown> => {
   const response = await api.put(`/b/invoices/${invoiceId}/usage`, payload);
+  return response.data;
+};
+
+/**
+ * Updates an actual usage record.
+ * @param usageId The ID of the usage record to update
+ * @param payload Updated usage and charge details
+ */
+export const updateUsageRecord = async (
+  usageId: string,
+  payload: {
+    bwA4Count: number;
+    bwA3Count: number;
+    colorA4Count: number;
+    colorA3Count: number;
+    billingPeriodEnd?: string;
+  },
+): Promise<unknown> => {
+  const response = await api.put(`/b/usage/${usageId}`, payload);
   return response.data;
 };
 

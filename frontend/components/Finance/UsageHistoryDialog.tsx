@@ -28,10 +28,11 @@ import {
 } from '@/lib/invoice';
 import { format } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, History, Send, CheckCircle2, Eye, X, Image as ImageIcon } from 'lucide-react';
+import { Loader2, History, Send, CheckCircle2, Eye, X, Image as ImageIcon, Edit } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { formatCurrency } from '@/lib/format';
+import UsageRecordingModal from './UsageRecordingModal';
 
 interface UsageHistoryDialogProps {
   isOpen: boolean;
@@ -54,6 +55,8 @@ export default function UsageHistoryDialog({
   const [sendingId, setSendingId] = useState<string | null>(null);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [contract, setContract] = useState<Invoice | null>(null);
+  const [editingRecord, setEditingRecord] = useState<UsageRecord | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
   useEffect(() => {
     if (isOpen && contractId) {
@@ -258,11 +261,10 @@ export default function UsageHistoryDialog({
                         {!isCpc ? (
                           <TableCell className="text-center">
                             <Badge
-                              className={`rounded-full px-3 py-1 text-[10px] font-black border-none shadow-sm ${
-                                record.exceededCount > 0
-                                  ? 'bg-orange-100 text-orange-700'
-                                  : 'bg-emerald-100 text-emerald-700'
-                              }`}
+                              className={`rounded-full px-3 py-1 text-[10px] font-black border-none shadow-sm ${record.exceededCount > 0
+                                ? 'bg-orange-100 text-orange-700'
+                                : 'bg-emerald-100 text-emerald-700'
+                                }`}
                             >
                               {record.exceededCount > 0 ? 'EXCEEDED' : 'WITHIN LIMIT'}
                             </Badge>
@@ -343,11 +345,10 @@ export default function UsageHistoryDialog({
                             <Button
                               size="sm"
                               variant="ghost"
-                              className={`h-8 w-8 p-0 rounded-full transition-all ${
-                                record.emailSentAt
-                                  ? 'text-emerald-500 hover:text-emerald-600 hover:bg-emerald-50'
-                                  : 'text-blue-500 hover:text-blue-600 hover:bg-blue-50'
-                              }`}
+                              className={`h-8 w-8 p-0 rounded-full transition-all ${record.emailSentAt
+                                ? 'text-emerald-500 hover:text-emerald-600 hover:bg-emerald-50'
+                                : 'text-blue-500 hover:text-blue-600 hover:bg-blue-50'
+                                }`}
                               onClick={() => handleSendInvoice(record)}
                               disabled={sendingId === record.id}
                               title={record.emailSentAt ? 'Resend Invoice' : 'Send Invoice'}
@@ -360,6 +361,18 @@ export default function UsageHistoryDialog({
                                 <Send className="h-4 w-4" />
                               )}
                             </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-8 w-8 p-0 text-amber-500 hover:text-amber-600 hover:bg-amber-50 rounded-full transition-all"
+                              onClick={() => {
+                                setEditingRecord(record);
+                                setIsEditModalOpen(true);
+                              }}
+                              title="Edit Usage Record"
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
                           </div>
                         </TableCell>
                       </TableRow>
@@ -371,6 +384,23 @@ export default function UsageHistoryDialog({
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Usage Recording Modal in Edit Mode */}
+      {isEditModalOpen && editingRecord && (
+        <UsageRecordingModal
+          isOpen={isEditModalOpen}
+          onClose={() => {
+            setIsEditModalOpen(false);
+            setEditingRecord(null);
+          }}
+          contractId={contractId}
+          customerName={customerName}
+          onSuccess={() => {
+            fetchHistory();
+          }}
+          invoice={editingRecord as unknown as Invoice}
+        />
+      )}
 
       {/* Image Preview Dialog */}
       <Dialog open={!!previewImage} onOpenChange={() => setPreviewImage(null)}>

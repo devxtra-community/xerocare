@@ -3,6 +3,7 @@ import {
   createUsageRecord,
   getUsageHistory,
   sendMonthlyInvoice,
+  updateUsageRecord,
 } from '../controllers/usageController';
 import { authMiddleware } from '../middlewares/authMiddleware';
 import { requireRole } from '../middlewares/roleMiddleware';
@@ -32,8 +33,8 @@ router.post(
   createUsageRecord,
 );
 
-// Update Usage - Removed (Use create/upsert logic or restrict edits)
-// router.put('/:id', authMiddleware, requireRole(EmployeeRole.EMPLOYEE), updateUsageRecord);
+// Update Usage
+router.put('/:id', authMiddleware, requireRole(EmployeeRole.FINANCE), updateUsageRecord);
 
 // Get History
 router.get('/contract/:contractId', authMiddleware, getUsageHistory);

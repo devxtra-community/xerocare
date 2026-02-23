@@ -21,7 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { User, Mail, Phone, Globe, FileText, Save, Loader2 } from 'lucide-react';
+import { User, Mail, Phone, Globe, MapPin, FileText, Save, Loader2 } from 'lucide-react';
 
 interface LeadFormDialogProps {
   open: boolean;
@@ -46,6 +46,7 @@ export function LeadFormDialog({
     email: '',
     phone: '',
     source: '',
+    location: '',
     notes: '',
   });
 
@@ -56,10 +57,11 @@ export function LeadFormDialog({
         email: initialData.email || '',
         phone: initialData.phone || '',
         source: initialData.source || '',
+        location: initialData.location || '',
         notes: (initialData.metadata?.notes as string) || '',
       });
     } else {
-      setFormData({ name: '', email: '', phone: '', source: '', notes: '' });
+      setFormData({ name: '', email: '', phone: '', source: '', location: '', notes: '' });
     }
   }, [initialData, open]);
 
@@ -73,6 +75,7 @@ export function LeadFormDialog({
         email: formData.email || undefined,
         phone: formData.phone || undefined,
         source: formData.source || undefined,
+        location: formData.location || undefined,
         metadata: formData.notes ? { notes: formData.notes } : undefined,
       };
 
@@ -223,6 +226,25 @@ export function LeadFormDialog({
                     )}
                   </div>
                 </div>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label
+                htmlFor="location"
+                className="text-[10px] font-bold text-gray-400 uppercase tracking-wider pl-1"
+              >
+                Location
+              </Label>
+              <div className="relative">
+                <Input
+                  id="location"
+                  value={formData.location || ''}
+                  onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                  className="h-12 rounded-xl border-none bg-muted/50 focus-visible:ring-2 focus-visible:ring-blue-400 pl-10"
+                  placeholder="City, Country"
+                />
+                <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 h-4 w-4" />
               </div>
             </div>
 

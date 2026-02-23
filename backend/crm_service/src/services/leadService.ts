@@ -98,13 +98,19 @@ export class LeadService {
     const name = payload.name || lead.name;
     const email = payload.email || lead.email;
     const phone = payload.phone || lead.phone;
+    // For location, we might receive it in the payload during conversion
+    const location = (payload as { location?: string }).location || lead.location;
 
     if (!name) throw new AppError('Lead name is required', 400);
+    if (!location || location.trim() === '') {
+      throw new AppError('Location is required before converting Lead to Customer', 400);
+    }
 
     const customerData: Partial<Customer> = {
       name,
       email,
       phone,
+      location,
       isActive: true,
     };
 

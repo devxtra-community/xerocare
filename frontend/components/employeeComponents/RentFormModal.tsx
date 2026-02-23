@@ -775,7 +775,9 @@ export default function RentFormModal({
             </div>
             <div className="space-y-1">
               <DialogTitle className="text-xl font-bold text-slate-800 tracking-tight">
-                {initialData ? 'Edit Rent Contract' : 'New Rent Contract'}
+                {initialData
+                  ? `Edit ${form.saleType === 'LEASE' ? 'Lease' : 'Rent'} Contract`
+                  : `New ${form.saleType === 'LEASE' ? 'Lease' : 'Rent'} Contract`}
               </DialogTitle>
               <DialogDescription className="text-xs font-semibold text-slate-400 uppercase tracking-widest">
                 {initialData ? `Inv #${initialData.invoiceNumber}` : 'Quotation Configuration'}
@@ -1041,24 +1043,24 @@ export default function RentFormModal({
 
                   {(form.saleType === 'RENT' ||
                     (form.saleType === 'LEASE' && form.leaseType === 'FSM')) && (
-                    <select
-                      className="w-full h-10 rounded-lg border border-border bg-card px-3 text-sm font-semibold text-indigo-600 focus:ring-2 focus:ring-indigo-100 outline-none"
-                      value={form.rentType}
-                      onChange={(e) => handleRentTypeChange(e.target.value)}
-                    >
-                      <option value="FIXED_LIMIT">Fixed Rent + Individual Limit</option>
-                      {selectedModels.length > 0 && (
-                        // selectedModels.every((p) => p.print_colour === 'BOTH') && (
-                        <option value="FIXED_COMBO">Fixed Rent + Combined Limit</option>
-                      )}
-                      <option value="FIXED_FLAT">Fixed Flat Rent (No Limits)</option>
-                      <option value="CPC">CPC (Individual)</option>
-                      {selectedModels.length > 0 && (
-                        // selectedModels.every((p) => p.print_colour === 'BOTH') && (
-                        <option value="CPC_COMBO">CPC (Combined)</option>
-                      )}
-                    </select>
-                  )}
+                      <select
+                        className="w-full h-10 rounded-lg border border-border bg-card px-3 text-sm font-semibold text-indigo-600 focus:ring-2 focus:ring-indigo-100 outline-none"
+                        value={form.rentType}
+                        onChange={(e) => handleRentTypeChange(e.target.value)}
+                      >
+                        <option value="FIXED_LIMIT">Fixed Rent + Individual Limit</option>
+                        {selectedModels.length > 0 && (
+                          // selectedModels.every((p) => p.print_colour === 'BOTH') && (
+                          <option value="FIXED_COMBO">Fixed Rent + Combined Limit</option>
+                        )}
+                        <option value="FIXED_FLAT">Fixed Flat Rent (No Limits)</option>
+                        <option value="CPC">CPC (Individual)</option>
+                        {selectedModels.length > 0 && (
+                          // selectedModels.every((p) => p.print_colour === 'BOTH') && (
+                          <option value="CPC_COMBO">CPC (Combined)</option>
+                        )}
+                      </select>
+                    )}
                 </div>
               </div>
 
@@ -1175,274 +1177,274 @@ export default function RentFormModal({
           {/* Section 4: Rules (Moved Down) */}
           {(form.saleType === 'RENT' ||
             (form.saleType === 'LEASE' && form.leaseType === 'FSM')) && (
-            <section className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400" /> Usage Rules
-                </h4>
-                {/* Rules are auto-generated from selected products */}
-              </div>
+              <section className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400" /> Usage Rules
+                  </h4>
+                  {/* Rules are auto-generated from selected products */}
+                </div>
 
-              <div className="space-y-3">
-                {form.pricingItems.map((item, index) => (
-                  <div
-                    key={index}
-                    className="grid grid-cols-12 gap-4 p-4 rounded-xl border border-dotted border-border bg-card hover:border-emerald-300 transition-all items-end relative group"
-                  >
-                    <div className="col-span-12 md:col-span-3 space-y-1">
-                      <label className="text-[9px] font-bold text-slate-400 uppercase">
-                        Category
-                      </label>
-                      <div className="text-sm font-bold text-slate-800 break-words py-2">
-                        {item.description}
+                <div className="space-y-3">
+                  {form.pricingItems.map((item, index) => (
+                    <div
+                      key={index}
+                      className="grid grid-cols-12 gap-4 p-4 rounded-xl border border-dotted border-border bg-card hover:border-emerald-300 transition-all items-end relative group"
+                    >
+                      <div className="col-span-12 md:col-span-3 space-y-1">
+                        <label className="text-[9px] font-bold text-slate-400 uppercase">
+                          Category
+                        </label>
+                        <div className="text-sm font-bold text-slate-800 break-words py-2">
+                          {item.description}
+                        </div>
                       </div>
-                    </div>
 
-                    {/* Limit Fields */}
-                    {isFixed && form.rentType !== 'FIXED_FLAT' && (
-                      <div className="col-span-6 md:col-span-3 space-y-1">
-                        {/* Logic to Hide B&W fields if COLOR only, etc - REMOVED, showing all */}
-                        <>
+                      {/* Limit Fields */}
+                      {isFixed && form.rentType !== 'FIXED_FLAT' && (
+                        <div className="col-span-6 md:col-span-3 space-y-1">
+                          {/* Logic to Hide B&W fields if COLOR only, etc - REMOVED, showing all */}
+                          <>
+                            <label className="text-[9px] font-bold text-slate-400 uppercase">
+                              {item.description.startsWith('Combined')
+                                ? 'Combined Limit'
+                                : 'Free Limit'}
+                            </label>
+                            <Input
+                              type="number"
+                              placeholder="0"
+                              value={
+                                (item.description.startsWith('Combined')
+                                  ? item.combinedIncludedLimit
+                                  : item.description.startsWith('Black & White')
+                                    ? item.bwIncludedLimit
+                                    : item.colorIncludedLimit) ?? ''
+                              }
+                              onChange={(e) =>
+                                updatePricingItem(
+                                  index,
+                                  item.description.startsWith('Combined')
+                                    ? 'combinedIncludedLimit'
+                                    : item.description.startsWith('Black & White')
+                                      ? 'bwIncludedLimit'
+                                      : 'colorIncludedLimit',
+                                  handleNumberInput(e.target.value),
+                                )
+                              }
+                              className={`h-9 border-border`}
+                            />
+                          </>
+                        </div>
+                      )}
+
+                      {/* Rate Fields */}
+                      {form.rentType !== 'FIXED_FLAT' && !form.rentType.includes('CPC') && (
+                        <div
+                          className={`col-span-6 ${isFixed ? 'md:col-span-3' : 'md:col-span-4'} space-y-1`}
+                        >
                           <label className="text-[9px] font-bold text-slate-400 uppercase">
                             {item.description.startsWith('Combined')
-                              ? 'Combined Limit'
-                              : 'Free Limit'}
+                              ? 'Combined Rate (QAR)'
+                              : form.rentType.includes('CPC')
+                                ? 'Rate/Page (QAR)'
+                                : 'Excess Rate (QAR)'}
                           </label>
-                          <Input
-                            type="number"
-                            placeholder="0"
-                            value={
-                              (item.description.startsWith('Combined')
-                                ? item.combinedIncludedLimit
-                                : item.description.startsWith('Black & White')
-                                  ? item.bwIncludedLimit
-                                  : item.colorIncludedLimit) ?? ''
-                            }
-                            onChange={(e) =>
-                              updatePricingItem(
-                                index,
-                                item.description.startsWith('Combined')
-                                  ? 'combinedIncludedLimit'
+                          <div className="relative">
+                            <Input
+                              type="number"
+                              step="0.01"
+                              placeholder="0.00"
+                              value={
+                                (item.description.startsWith('Combined')
+                                  ? item.combinedExcessRate
                                   : item.description.startsWith('Black & White')
-                                    ? 'bwIncludedLimit'
-                                    : 'colorIncludedLimit',
-                                handleNumberInput(e.target.value),
-                              )
-                            }
-                            className={`h-9 border-border`}
-                          />
-                        </>
-                      </div>
-                    )}
-
-                    {/* Rate Fields */}
-                    {form.rentType !== 'FIXED_FLAT' && !form.rentType.includes('CPC') && (
-                      <div
-                        className={`col-span-6 ${isFixed ? 'md:col-span-3' : 'md:col-span-4'} space-y-1`}
-                      >
-                        <label className="text-[9px] font-bold text-slate-400 uppercase">
-                          {item.description.startsWith('Combined')
-                            ? 'Combined Rate (QAR)'
-                            : form.rentType.includes('CPC')
-                              ? 'Rate/Page (QAR)'
-                              : 'Excess Rate (QAR)'}
-                        </label>
-                        <div className="relative">
-                          <Input
-                            type="number"
-                            step="0.01"
-                            placeholder="0.00"
-                            value={
-                              (item.description.startsWith('Combined')
-                                ? item.combinedExcessRate
-                                : item.description.startsWith('Black & White')
-                                  ? item.bwExcessRate
-                                  : item.colorExcessRate) ?? ''
-                            }
-                            onChange={(e) =>
-                              updatePricingItem(
-                                index,
-                                item.description.startsWith('Combined')
-                                  ? 'combinedExcessRate'
-                                  : item.description.startsWith('Black & White')
-                                    ? 'bwExcessRate'
-                                    : 'colorExcessRate',
-                                handleNumberInput(e.target.value),
-                              )
-                            }
-                            className={`h-9 font-bold pl-6 ${isFixed ? 'text-red-600 bg-red-50/50 border-red-100' : 'text-emerald-700 bg-emerald-50/50 border-emerald-100'}`}
-                          />
-                          <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] font-bold opacity-30">
-                            QAR
-                          </span>
+                                    ? item.bwExcessRate
+                                    : item.colorExcessRate) ?? ''
+                              }
+                              onChange={(e) =>
+                                updatePricingItem(
+                                  index,
+                                  item.description.startsWith('Combined')
+                                    ? 'combinedExcessRate'
+                                    : item.description.startsWith('Black & White')
+                                      ? 'bwExcessRate'
+                                      : 'colorExcessRate',
+                                  handleNumberInput(e.target.value),
+                                )
+                              }
+                              className={`h-9 font-bold pl-6 ${isFixed ? 'text-red-600 bg-red-50/50 border-red-100' : 'text-emerald-700 bg-emerald-50/50 border-emerald-100'}`}
+                            />
+                            <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] font-bold opacity-30">
+                              QAR
+                            </span>
+                          </div>
                         </div>
+                      )}
+
+                      <div className="col-span-12 md:col-span-2 flex justify-end pb-1">
+                        {/* Delete managed by product removal */}
                       </div>
-                    )}
 
-                    <div className="col-span-12 md:col-span-2 flex justify-end pb-1">
-                      {/* Delete managed by product removal */}
-                    </div>
+                      {/* Slab Rates UI (Only for CPC) */}
+                      {!isFixed && form.rentType !== 'FIXED_FLAT' && (
+                        <div className="col-span-12 mt-3 pl-4 border-l-2 border-slate-100 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">
+                              Slab Rates
+                            </label>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 text-[10px] text-blue-600 hover:text-blue-800 hover:bg-blue-50 px-2"
+                              onClick={() =>
+                                handleAddSlab(
+                                  index,
+                                  item.description.startsWith('Combined')
+                                    ? 'comboSlabRanges'
+                                    : item.description.startsWith('Black')
+                                      ? 'bwSlabRanges'
+                                      : 'colorSlabRanges',
+                                )
+                              }
+                            >
+                              + Add Slab
+                            </Button>
+                          </div>
 
-                    {/* Slab Rates UI (Only for CPC) */}
-                    {!isFixed && form.rentType !== 'FIXED_FLAT' && (
-                      <div className="col-span-12 mt-3 pl-4 border-l-2 border-slate-100 space-y-2">
-                        <div className="flex items-center justify-between">
-                          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">
-                            Slab Rates
-                          </label>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-6 text-[10px] text-blue-600 hover:text-blue-800 hover:bg-blue-50 px-2"
-                            onClick={() =>
-                              handleAddSlab(
-                                index,
-                                item.description.startsWith('Combined')
-                                  ? 'comboSlabRanges'
-                                  : item.description.startsWith('Black')
-                                    ? 'bwSlabRanges'
-                                    : 'colorSlabRanges',
-                              )
-                            }
-                          >
-                            + Add Slab
-                          </Button>
-                        </div>
-
-                        {/* Slab List */}
-                        {(item.description.startsWith('Combined')
-                          ? item.comboSlabRanges
-                          : item.description.startsWith('Black')
-                            ? item.bwSlabRanges
-                            : item.colorSlabRanges
-                        )?.map((slab, sIdx) => {
-                          const slabType = item.description.startsWith('Combined')
-                            ? 'comboSlabRanges'
+                          {/* Slab List */}
+                          {(item.description.startsWith('Combined')
+                            ? item.comboSlabRanges
                             : item.description.startsWith('Black')
-                              ? 'bwSlabRanges'
-                              : 'colorSlabRanges';
-                          return (
-                            <div key={sIdx} className="flex gap-2 items-center">
-                              <div className="grid grid-cols-3 gap-2 flex-1">
-                                <Input
-                                  placeholder="From"
-                                  type="number"
-                                  value={slab.from}
-                                  onChange={(e) =>
-                                    handleUpdateSlab(
-                                      index,
-                                      slabType,
-                                      sIdx,
-                                      'from',
-                                      handleNumberInput(e.target.value),
-                                    )
-                                  }
-                                  className="h-7 text-xs"
-                                />
-                                <Input
-                                  placeholder="To"
-                                  type="number"
-                                  value={slab.to}
-                                  onChange={(e) =>
-                                    handleUpdateSlab(
-                                      index,
-                                      slabType,
-                                      sIdx,
-                                      'to',
-                                      handleNumberInput(e.target.value),
-                                    )
-                                  }
-                                  className="h-7 text-xs"
-                                />
-                                <Input
-                                  placeholder="Rate"
-                                  type="number"
-                                  value={slab.rate}
-                                  onChange={(e) =>
-                                    handleUpdateSlab(
-                                      index,
-                                      slabType,
-                                      sIdx,
-                                      'rate',
-                                      handleNumberInput(e.target.value),
-                                    )
-                                  }
-                                  className="h-7 text-xs font-bold text-blue-600"
-                                />
-                              </div>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-7 w-7 text-red-400 hover:bg-red-50"
-                                onClick={() => handleRemoveSlab(index, slabType, sIdx)}
-                              >
-                                <Trash2 size={12} />
-                              </Button>
-                            </div>
-                          );
-                        })}
-
-                        {(() => {
-                          const currentSlabs =
-                            (item.description.startsWith('Combined')
-                              ? item.comboSlabRanges
+                              ? item.bwSlabRanges
+                              : item.colorSlabRanges
+                          )?.map((slab, sIdx) => {
+                            const slabType = item.description.startsWith('Combined')
+                              ? 'comboSlabRanges'
                               : item.description.startsWith('Black')
-                                ? item.bwSlabRanges
-                                : item.colorSlabRanges) || [];
-
-                          const maxTo =
-                            currentSlabs.length > 0
-                              ? currentSlabs.reduce((max, s) => Math.max(max, Number(s.to) || 0), 0)
-                              : 0;
-
-                          const excessField = item.description.startsWith('Combined')
-                            ? 'combinedExcessRate'
-                            : item.description.startsWith('Black')
-                              ? 'bwExcessRate'
-                              : 'colorExcessRate';
-
-                          return (
-                            <div className="flex gap-2 items-center mt-2 p-2 bg-muted/50/50 rounded border border-slate-100">
-                              <div className="flex-1 text-[10px] font-bold text-muted-foreground uppercase tracking-wide">
-                                {maxTo > 0
-                                  ? `Rate for usage > ${maxTo}`
-                                  : 'Base Rate (Example: > 0)'}
+                                ? 'bwSlabRanges'
+                                : 'colorSlabRanges';
+                            return (
+                              <div key={sIdx} className="flex gap-2 items-center">
+                                <div className="grid grid-cols-3 gap-2 flex-1">
+                                  <Input
+                                    placeholder="From"
+                                    type="number"
+                                    value={slab.from}
+                                    onChange={(e) =>
+                                      handleUpdateSlab(
+                                        index,
+                                        slabType,
+                                        sIdx,
+                                        'from',
+                                        handleNumberInput(e.target.value),
+                                      )
+                                    }
+                                    className="h-7 text-xs"
+                                  />
+                                  <Input
+                                    placeholder="To"
+                                    type="number"
+                                    value={slab.to}
+                                    onChange={(e) =>
+                                      handleUpdateSlab(
+                                        index,
+                                        slabType,
+                                        sIdx,
+                                        'to',
+                                        handleNumberInput(e.target.value),
+                                      )
+                                    }
+                                    className="h-7 text-xs"
+                                  />
+                                  <Input
+                                    placeholder="Rate"
+                                    type="number"
+                                    value={slab.rate}
+                                    onChange={(e) =>
+                                      handleUpdateSlab(
+                                        index,
+                                        slabType,
+                                        sIdx,
+                                        'rate',
+                                        handleNumberInput(e.target.value),
+                                      )
+                                    }
+                                    className="h-7 text-xs font-bold text-blue-600"
+                                  />
+                                </div>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7 text-red-400 hover:bg-red-50"
+                                  onClick={() => handleRemoveSlab(index, slabType, sIdx)}
+                                >
+                                  <Trash2 size={12} />
+                                </Button>
                               </div>
-                              <div className="w-24 relative">
-                                <Input
-                                  placeholder="Rate"
-                                  type="number"
-                                  step="0.01"
-                                  value={
-                                    (item.description.startsWith('Combined')
-                                      ? item.combinedExcessRate
-                                      : item.description.startsWith('Black')
-                                        ? item.bwExcessRate
-                                        : item.colorExcessRate) ?? ''
-                                  }
-                                  onChange={(e) =>
-                                    updatePricingItem(
-                                      index,
-                                      excessField,
-                                      handleNumberInput(e.target.value),
-                                    )
-                                  }
-                                  className="h-7 text-xs font-bold text-blue-600 pl-4"
-                                />
-                                <span className="absolute left-1 top-1/2 -translate-y-1/2 text-[10px] font-bold opacity-30">
-                                  QAR
-                                </span>
+                            );
+                          })}
+
+                          {(() => {
+                            const currentSlabs =
+                              (item.description.startsWith('Combined')
+                                ? item.comboSlabRanges
+                                : item.description.startsWith('Black')
+                                  ? item.bwSlabRanges
+                                  : item.colorSlabRanges) || [];
+
+                            const maxTo =
+                              currentSlabs.length > 0
+                                ? currentSlabs.reduce((max, s) => Math.max(max, Number(s.to) || 0), 0)
+                                : 0;
+
+                            const excessField = item.description.startsWith('Combined')
+                              ? 'combinedExcessRate'
+                              : item.description.startsWith('Black')
+                                ? 'bwExcessRate'
+                                : 'colorExcessRate';
+
+                            return (
+                              <div className="flex gap-2 items-center mt-2 p-2 bg-muted/50/50 rounded border border-slate-100">
+                                <div className="flex-1 text-[10px] font-bold text-muted-foreground uppercase tracking-wide">
+                                  {maxTo > 0
+                                    ? `Rate for usage > ${maxTo}`
+                                    : 'Base Rate (Example: > 0)'}
+                                </div>
+                                <div className="w-24 relative">
+                                  <Input
+                                    placeholder="Rate"
+                                    type="number"
+                                    step="0.01"
+                                    value={
+                                      (item.description.startsWith('Combined')
+                                        ? item.combinedExcessRate
+                                        : item.description.startsWith('Black')
+                                          ? item.bwExcessRate
+                                          : item.colorExcessRate) ?? ''
+                                    }
+                                    onChange={(e) =>
+                                      updatePricingItem(
+                                        index,
+                                        excessField,
+                                        handleNumberInput(e.target.value),
+                                      )
+                                    }
+                                    className="h-7 text-xs font-bold text-blue-600 pl-4"
+                                  />
+                                  <span className="absolute left-1 top-1/2 -translate-y-1/2 text-[10px] font-bold opacity-30">
+                                    QAR
+                                  </span>
+                                </div>
                               </div>
-                            </div>
-                          );
-                        })()}
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </section>
-          )}
+                            );
+                          })()}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
 
           <section className="pt-4 border-t border-slate-100 flex justify-end gap-3">
             <Button variant="ghost" onClick={onClose} className="font-bold text-muted-foreground">

@@ -96,6 +96,31 @@ export class InvoiceRepository {
   }
 
   /**
+   * Helper to map raw displayAmount onto entities.
+   */
+  private mapDisplayAmount(entities: Invoice[], raw: any[]): Invoice[] {
+    return entities.map((entity) => {
+      const rawMatch = raw.find((r) => r.invoice_id === entity.id);
+      const calculatedTotal = parseFloat(rawMatch?.calculatedTotal || '0');
+
+      let displayAmount = 0;
+      if (entity.type === InvoiceType.FINAL) {
+        displayAmount = Number(entity.totalAmount) || 0;
+      } else if (entity.saleType === SaleType.LEASE) {
+        // Use totalLeaseAmount specifically as stored in DB for LEASE contracts
+        displayAmount = Number(entity.totalLeaseAmount) || Number(entity.totalAmount) || calculatedTotal;
+      } else if (entity.saleType === SaleType.RENT) {
+        displayAmount = calculatedTotal;
+      } else {
+        displayAmount = Number(entity.totalAmount) || 0;
+      }
+
+      (entity as any).displayAmount = displayAmount;
+      return entity;
+    });
+  }
+
+  /**
    * Finds all invoices, optionally filtered by branch.
    * Excludes FINAL invoices unless they are direct SALES.
    */
@@ -103,6 +128,12 @@ export class InvoiceRepository {
     const qb = this.repo
       .createQueryBuilder('invoice')
       .leftJoinAndSelect('invoice.items', 'items')
+      .addSelect((subQuery) => {
+        return subQuery
+          .select('COALESCE(SUM(usage.totalCharge), 0)', 'calculatedTotal')
+          .from('usage_records', 'usage')
+          .where('usage.contractId = invoice.id');
+      }, 'calculatedTotal')
       .orderBy('invoice.createdAt', 'DESC');
 
     if (branchId) {
@@ -117,20 +148,28 @@ export class InvoiceRepository {
       }),
     );
 
-    return qb.getMany();
+    const { entities, raw } = await qb.getRawAndEntities();
+    return this.mapDisplayAmount(entities, raw);
   }
 
   /**
    * Finds invoices created by a specific user.
    */
   async findByCreatorId(createdBy: string) {
-    return this.repo.find({
-      where: { createdBy },
-      order: {
-        createdAt: 'DESC',
-      },
-      relations: ['items'],
-    });
+    const qb = this.repo
+      .createQueryBuilder('invoice')
+      .leftJoinAndSelect('invoice.items', 'items')
+      .addSelect((subQuery) => {
+        return subQuery
+          .select('COALESCE(SUM(usage.totalCharge), 0)', 'calculatedTotal')
+          .from('usage_records', 'usage')
+          .where('usage.contractId = invoice.id');
+      }, 'calculatedTotal')
+      .where('invoice.createdBy = :createdBy', { createdBy })
+      .orderBy('invoice.createdAt', 'DESC');
+
+    const { entities, raw } = await qb.getRawAndEntities();
+    return this.mapDisplayAmount(entities, raw);
   }
 
   /**
@@ -140,6 +179,12 @@ export class InvoiceRepository {
     const qb = this.repo
       .createQueryBuilder('invoice')
       .leftJoinAndSelect('invoice.items', 'items')
+      .addSelect((subQuery) => {
+        return subQuery
+          .select('COALESCE(SUM(usage.totalCharge), 0)', 'calculatedTotal')
+          .from('usage_records', 'usage')
+          .where('usage.contractId = invoice.id');
+      }, 'calculatedTotal')
       .where('invoice.branchId = :branchId', { branchId })
       .orderBy('invoice.createdAt', 'DESC');
 
@@ -151,7 +196,8 @@ export class InvoiceRepository {
       }),
     );
 
-    return qb.getMany();
+    const { entities, raw } = await qb.getRawAndEntities();
+    return this.mapDisplayAmount(entities, raw);
   }
 
   /**

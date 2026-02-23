@@ -130,6 +130,24 @@ export const downloadLotSparePartsExcel = async (
     next(err);
   }
 };
+
+/**
+ * Checks if a lot number already exists.
+ */
+export const checkLotNumber = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const lotNumberRaw = req.params.lotNumber;
+    const lotNumber = Array.isArray(lotNumberRaw) ? lotNumberRaw[0] : lotNumberRaw;
+
+    if (!lotNumber) {
+      return res.status(400).json({ success: false, message: 'Lot number is required' });
+    }
+    const lot = await lotService.getLotByNumber(lotNumber);
+    res.status(200).json({ success: true, exists: !!lot });
+  } catch (err) {
+    next(err);
+  }
+};
 /**
  * Retrieves lot statistics (total and monthly spending).
  */

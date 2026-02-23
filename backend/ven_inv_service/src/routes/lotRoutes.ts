@@ -8,6 +8,7 @@ import {
   downloadLotProductsExcel,
   downloadLotSparePartsExcel,
   getLotStats,
+  checkLotNumber,
 } from '../controllers/lotController';
 import { authMiddleware } from '../middlewares/authMiddleware';
 import multer from 'multer';
@@ -20,6 +21,7 @@ router.use(authMiddleware);
 router.post('/', createLot);
 router.post('/upload', upload.single('file'), uploadLotExcel);
 router.get('/', getAllLots);
+router.get('/check-number/:lotNumber', checkLotNumber);
 router.get('/:id', getLotById);
 router.get('/:id/export', downloadLotExcel);
 router.get('/:id/export-products', downloadLotProductsExcel);

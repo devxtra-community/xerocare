@@ -23,6 +23,9 @@ export class Customer {
   @Index()
   phone?: string;
 
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  location!: string | null;
+
   @Column({ default: true })
   isActive!: boolean;
 

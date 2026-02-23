@@ -43,8 +43,8 @@ export function ModelSelect({ onSelect }: ModelSelectProps) {
     return {
       value: model.id,
       label: prefix ? `${prefix} ${model.model_name}` : model.model_name,
-      description: `Model No: ${model.model_no} • Available: ${model.quantity}`,
-      disabled: model.quantity <= 0,
+      description: `Model No: ${model.model_no} • Available: ${model.available}`,
+      disabled: model.available <= 0,
     };
   });
 
