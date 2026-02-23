@@ -19,8 +19,9 @@ export const adminLogin = async (req: Request, res: Response, next: NextFunction
       data: admin,
       success: true,
     });
-  } catch (err: any) {
-    next(new AppError(err.message, err.statusCode || 500));
+  } catch (error: unknown) {
+    const err = error as { message?: string; statusCode?: number };
+    next(new AppError(err.message || 'Internal Server Error', err.statusCode || 500));
   }
 };
 
@@ -34,7 +35,8 @@ export const adminLogout = async (req: Request, res: Response, next: NextFunctio
       success: true,
       isAdmin: true,
     });
-  } catch (err: any) {
-    next(new AppError(err.message, err.statusCode || 500));
+  } catch (error: unknown) {
+    const err = error as { message?: string; statusCode?: number };
+    next(new AppError(err.message || 'Internal Server Error', err.statusCode || 500));
   }
 };

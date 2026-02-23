@@ -13,6 +13,30 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  async rewrites() {
+    return [
+      {
+        source: '/e/:path*',
+        destination: 'http://localhost:3001/e/:path*',
+      },
+      {
+        source: '/i/:path*',
+        destination: 'http://localhost:3001/i/:path*',
+      },
+      {
+        source: '/b/:path*',
+        destination: 'http://localhost:3001/b/:path*',
+      },
+      {
+        source: '/c/:path*',
+        destination: 'http://localhost:3001/c/:path*',
+      },
+      {
+        source: '/health/:path*',
+        destination: 'http://localhost:3001/health/:path*',
+      },
+    ];
+  },
 };
 
 export default nextConfig;

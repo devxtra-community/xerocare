@@ -11,10 +11,11 @@ export const checkRedis = async () => {
     return {
       status: 'UP',
     };
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const err = error as Error;
     return {
       status: 'DOWN',
-      error: error.message,
+      error: err?.message || 'Unknown error',
     };
   }
 };

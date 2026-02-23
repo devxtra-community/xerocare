@@ -1,6 +1,6 @@
 import 'reflect-metadata';
 import express from 'express';
-import cors from 'cors';
+
 import './config/env';
 import { logger } from './config/logger';
 import { errorHandler } from './middleware/errorHandler';
@@ -15,12 +15,6 @@ const app = express();
 
 // Middleware
 app.use(express.json());
-app.use(
-  cors({
-    origin: process.env.CLIENT_URL || 'http://localhost:3000',
-    credentials: true,
-  }),
-);
 app.use(httpLogger);
 
 // Routes
