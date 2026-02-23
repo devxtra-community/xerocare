@@ -6,7 +6,7 @@ import { salesService } from '@/services/salesService';
 
 const COLORS = ['#2563eb', '#3b82f6', '#93c5fd'];
 
-export default function RevenuePieChart() {
+export default function RevenuePieChart({ selectedYear }: { selectedYear: number | 'all' }) {
   const [isClient, setIsClient] = useState(false);
   const [data, setData] = useState<{ name: string; value: number }[]>([]);
 
@@ -14,7 +14,9 @@ export default function RevenuePieChart() {
     setIsClient(true);
     const fetchData = async () => {
       try {
-        const res = await salesService.getBranchSalesTotals();
+        const res = await salesService.getBranchSalesTotals(
+          selectedYear === 'all' ? undefined : selectedYear,
+        );
         const chartData = res.salesByType.map((item) => ({
           name: item.saleType.charAt(0) + item.saleType.slice(1).toLowerCase() + ' Revenue',
           value: item.total,
@@ -25,7 +27,7 @@ export default function RevenuePieChart() {
       }
     };
     fetchData();
-  }, []);
+  }, [selectedYear]);
 
   if (!isClient) return <div className="h-[320px] w-full bg-white rounded-2xl animate-pulse" />;
 

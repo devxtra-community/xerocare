@@ -31,9 +31,9 @@ export default function EmployeesPage() {
   const displayStats = {
     total: stats?.total || 0,
     branchManager: stats?.byRole?.['MANAGER'] || 0,
-    employeeManager: stats?.byJob?.['EMPLOYEE_MANAGER'] || 0,
-    salesStaff: (stats?.byJob?.['SALES'] || 0) + (stats?.byJob?.['FINANCE_SALES'] || 0),
-    rentLeaseStaff:
+    salesRentLeaseStaff:
+      (stats?.byJob?.['SALES'] || 0) +
+      (stats?.byJob?.['FINANCE_SALES'] || 0) +
       (stats?.byJob?.['RENT'] || 0) +
       (stats?.byJob?.['LEASE'] || 0) +
       (stats?.byJob?.['RENT_LEASE'] || 0) +
@@ -41,31 +41,19 @@ export default function EmployeesPage() {
       (stats?.byJob?.['FINANCE_LEASE'] || 0) +
       (stats?.byJob?.['FINANCE_RENT_LEASE'] || 0),
     finance: stats?.byRole?.['FINANCE'] || 0,
-    service:
-      (stats?.byJob?.['TECHNICIAN'] || 0) +
-      (stats?.byJob?.['DELIVERY'] || 0) +
-      (stats?.byJob?.['READING_AGENT'] || 0),
   };
 
   const distributionData = [
     { name: 'Branch Manager', value: displayStats.branchManager, color: '#003F7D' },
-    { name: 'Employee Manager', value: displayStats.employeeManager, color: '#0284C7' },
-    { name: 'Sales Staff', value: displayStats.salesStaff, color: '#0891b2' },
-    { name: 'Rent & Lease Staff', value: displayStats.rentLeaseStaff, color: '#7dd3fc' },
+    { name: 'Sales, Rent & Lease', value: displayStats.salesRentLeaseStaff, color: '#0891b2' },
     { name: 'Finance', value: displayStats.finance, color: '#94a3b8' },
-    { name: 'Service', value: displayStats.service, color: '#9BD0E5' },
     {
       name: 'Other',
       value: Math.max(
         0,
         stats
           ? stats.total -
-              (displayStats.branchManager +
-                displayStats.employeeManager +
-                displayStats.salesStaff +
-                displayStats.rentLeaseStaff +
-                displayStats.finance +
-                displayStats.service)
+              (displayStats.branchManager + displayStats.salesRentLeaseStaff + displayStats.finance)
           : 0,
       ),
       color: '#CBD5E1',

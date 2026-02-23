@@ -31,6 +31,12 @@ router.get(
   vendorController.getVendors,
 );
 router.get(
+  '/stats',
+  authMiddleware,
+  roleMiddleware(['ADMIN', 'MANAGER']),
+  vendorController.getStats,
+);
+router.get(
   '/:id',
   authMiddleware,
   roleMiddleware(['ADMIN', 'HR', 'MANAGER']),

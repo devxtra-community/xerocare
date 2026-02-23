@@ -171,4 +171,37 @@ export class VendorService {
       order: { created_at: 'DESC' },
     });
   }
+
+  /**
+   * Retrieves summary statistics for all vendors.
+   */
+  async getVendorStats() {
+    const total = await this.vendorRepo.count({
+      where: {
+        status: VendorStatus.ACTIVE,
+      },
+    });
+
+    const vendors = await this.vendorRepo.find({
+      where: {
+        status: VendorStatus.ACTIVE,
+      },
+    });
+
+    const active = vendors.length;
+    let totalSpending = 0;
+    let totalOrders = 0;
+
+    vendors.forEach((v) => {
+      totalSpending += Number(v.purchaseValue) || 0;
+      totalOrders += Number(v.totalOrders) || 0;
+    });
+
+    return {
+      total,
+      active,
+      totalSpending,
+      totalOrders,
+    };
+  }
 }

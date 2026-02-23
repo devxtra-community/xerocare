@@ -99,3 +99,8 @@ export async function getVendorRequests(id: string) {
   const res = await api.get(`/i/vendors/${id}/requests`);
   return res.data;
 }
+
+export async function getVendorStats() {
+  const res = await api.get('/i/vendors/stats');
+  return res.data.data;
+}

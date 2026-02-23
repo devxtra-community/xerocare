@@ -49,16 +49,33 @@ export const addSparePart = async (req: Request, res: Response) => {
 };
 
 /**
- * Lists spare parts for the user's branch.
+ * Lists spare parts. Supports branch and search filters.
  */
 export const listSpareParts = async (req: Request, res: Response) => {
   try {
-    const branchId = req.user?.branchId;
-    if (!branchId) {
+    const { branch, search, year } = req.query as {
+      branch?: string;
+      search?: string;
+      year?: string;
+    };
+    const userBranchId = req.user?.branchId;
+    const userRole = req.user?.role;
+
+    // Default to user's branch if not Admin or if not specified
+    let targetBranchId: string | undefined = branch || userBranchId;
+
+    if (userRole === 'ADMIN') {
+      // Admin can view any branch or 'all'
+      targetBranchId = branch === 'all' || !branch ? undefined : branch;
+    } else if (!userBranchId) {
       return res.status(400).json({ success: false, message: 'Branch ID required' });
     }
 
-    const inventory = await service.getInventoryByBranch(branchId);
+    const inventory = await service.getInventory(
+      targetBranchId,
+      search,
+      year ? parseInt(year) : undefined,
+    );
 
     if (!inventory || inventory.length === 0) {
       return res.status(200).json({ success: true, data: [], message: 'No spare parts found' });

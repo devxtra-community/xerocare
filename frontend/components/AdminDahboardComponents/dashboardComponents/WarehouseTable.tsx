@@ -9,7 +9,7 @@ const ITEMS_PER_PAGE = 5;
  * Dashboard widget displaying warehouse list and capacity.
  * Shows location, associated branch, and storage capacity for each warehouse.
  */
-export default function WarehouseTable() {
+export default function WarehouseTable({ selectedYear }: { selectedYear: number | 'all' }) {
   const [page, setPage] = useState(1);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [loading, setLoading] = useState(true);
@@ -17,8 +17,19 @@ export default function WarehouseTable() {
   useEffect(() => {
     const fetchWarehouses = async () => {
       try {
+        setLoading(true);
         const res = await getWarehouses();
-        setWarehouses(res.data);
+        let data = res.data || [];
+
+        // Filter by year if not 'all'
+        if (selectedYear !== 'all') {
+          data = data.filter((w: Warehouse) => {
+            const date = new Date(w.createdAt);
+            return date.getFullYear() === selectedYear;
+          });
+        }
+
+        setWarehouses(data);
       } catch (error) {
         console.error('Failed to fetch warehouses:', error);
       } finally {
@@ -26,14 +37,14 @@ export default function WarehouseTable() {
       }
     };
     fetchWarehouses();
-  }, []);
+  }, [selectedYear]);
 
   const totalPages = Math.ceil(warehouses.length / ITEMS_PER_PAGE) || 1;
   const startIndex = (page - 1) * ITEMS_PER_PAGE;
   const currentData = warehouses.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
   return (
-    <div className="rounded-2xl bg-card p-2 sm:p-3 shadow-sm w-full h-[260px] flex flex-col">
+    <div className="rounded-2xl bg-card p-2 sm:p-3 shadow-sm w-full h-[280px] flex flex-col">
       <div className="flex-1 overflow-x-auto">
         {loading ? (
           <div className="flex items-center justify-center h-full text-xs text-muted-foreground">

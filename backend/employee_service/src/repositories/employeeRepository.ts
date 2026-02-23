@@ -44,22 +44,37 @@ export class EmployeeRepository {
   }
 
   /**
-   * Retrieves paginated employees with optional filtering.
+   * Retrieves paginated employees with optional filtering and search.
    */
-  async findAll(skip = 0, take = 20, role?: EmployeeRole, branchId?: string) {
-    const whereCondition: Record<string, string | EmployeeRole> = role ? { role } : {};
+  async findAll(skip = 0, take = 20, role?: EmployeeRole, branchId?: string, search?: string) {
+    const query = this.repo
+      .createQueryBuilder('employee')
+      .leftJoinAndSelect('employee.branch', 'branch')
+      .where('employee.status != :deleted', { deleted: EmployeeStatus.DELETED });
 
-    if (branchId) {
-      whereCondition.branch_id = branchId;
+    if (role) {
+      query.andWhere('employee.role = :role', { role });
     }
 
-    const [data, total] = await this.repo.findAndCount({
-      where: whereCondition,
-      relations: ['branch'],
-      order: { createdAt: 'DESC' },
-      skip,
-      take,
-    });
+    if (branchId) {
+      query.andWhere('employee.branch_id = :branchId', { branchId });
+    }
+
+    if (search) {
+      query.andWhere(
+        '(LOWER(employee.first_name) LIKE LOWER(:search) OR ' +
+          'LOWER(employee.last_name) LIKE LOWER(:search) OR ' +
+          'LOWER(employee.email) LIKE LOWER(:search) OR ' +
+          'LOWER(employee.display_id) LIKE LOWER(:search))',
+        { search: `%${search}%` },
+      );
+    }
+
+    const [data, total] = await query
+      .orderBy('employee.createdAt', 'DESC')
+      .skip(skip)
+      .take(take)
+      .getManyAndCount();
 
     return { data, total };
   }
@@ -140,14 +155,16 @@ export class EmployeeRepository {
   }
 
   /**
-   * Retrieves employee growth statistics for the current year.
+   * Retrieves employee growth statistics for a specific year.
    */
-  async getEmployeeGrowthStats(branchId?: string) {
+  async getEmployeeGrowthStats(branchId?: string, year?: number) {
+    const targetYear = year || new Date().getFullYear();
     const query = this.repo
       .createQueryBuilder('employee')
       .select("TO_CHAR(employee.createdAt, 'Mon')", 'month')
       .addSelect('COUNT(employee.id)', 'count')
-      .where('EXTRACT(YEAR FROM employee.createdAt) = EXTRACT(YEAR FROM CURRENT_DATE)');
+      .where('EXTRACT(YEAR FROM employee.createdAt) = :year', { year: targetYear })
+      .andWhere('employee.status != :deleted', { deleted: EmployeeStatus.DELETED });
 
     if (branchId) {
       query.andWhere('employee.branch_id = :branchId', { branchId });

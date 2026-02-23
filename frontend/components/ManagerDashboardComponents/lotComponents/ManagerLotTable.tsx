@@ -9,6 +9,7 @@ import { StandardTable } from '@/components/table/StandardTable';
 import StatCard from '@/components/StatCard';
 import { Lot, lotService } from '@/lib/lot';
 import { format } from 'date-fns';
+import { formatCurrency } from '@/lib/format';
 import AddLotDialog from './AddLotDialog';
 import LotDetailsDialog from './LotDetailsDialog';
 
@@ -62,7 +63,7 @@ export default function ManagerLotTable() {
         <StatCard title="Total Lots" value={stats.totalLots.toString()} subtitle="All orders" />
         <StatCard
           title="Total Spending"
-          value={`$${stats.totalAmount.toLocaleString()}`}
+          value={formatCurrency(stats.totalAmount)}
           subtitle="Lifetime"
         />
       </div>
@@ -113,7 +114,7 @@ export default function ManagerLotTable() {
             {
               id: 'total',
               header: 'TOTAL AMOUNT',
-              cell: (lot: Lot) => `$${Number(lot.totalAmount).toLocaleString()}`,
+              cell: (lot: Lot) => formatCurrency(Number(lot.totalAmount)),
               className: 'font-semibold text-[11px] text-primary uppercase',
             },
             {

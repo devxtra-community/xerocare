@@ -7,9 +7,7 @@ interface EmployeeStatsProps {
   stats?: {
     total: number;
     branchManager: number;
-    employeeManager: number;
-    salesStaff: number;
-    rentLeaseStaff: number;
+    salesRentLeaseStaff: number;
     finance: number;
   };
   loading?: boolean;
@@ -17,7 +15,7 @@ interface EmployeeStatsProps {
 
 export default function EmployeeStats({ stats, loading }: EmployeeStatsProps) {
   return (
-    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-1.5 sm:gap-2 md:gap-4">
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-1.5 sm:gap-2 md:gap-4">
       <StatCard
         title="Total Employees"
         value={loading ? '...' : (stats?.total || 0).toString()}
@@ -29,19 +27,9 @@ export default function EmployeeStats({ stats, loading }: EmployeeStatsProps) {
         subtitle="Operations Lead"
       />
       <StatCard
-        title="Employee Manager"
-        value={loading ? '...' : (stats?.employeeManager || 0).toString()}
-        subtitle="Staff Management"
-      />
-      <StatCard
-        title="Sales Staff"
-        value={loading ? '...' : (stats?.salesStaff || 0).toString()}
-        subtitle="Sales Force"
-      />
-      <StatCard
-        title="Rent & Lease Staff"
-        value={loading ? '...' : (stats?.rentLeaseStaff || 0).toString()}
-        subtitle="Service Agents"
+        title="Sale, Rent & Lease"
+        value={loading ? '...' : (stats?.salesRentLeaseStaff || 0).toString()}
+        subtitle="Core Business Team"
       />
       <StatCard
         title="Finance"

@@ -8,6 +8,7 @@ import {
   updateEmployee,
   getHRStats,
   getPublicEmployeeProfile,
+  getAllBranches,
 } from '../controllers/employeeController';
 import { authMiddleware } from '../middleware/authMiddleware';
 import { requireRole } from '../middleware/roleMiddleware';
@@ -31,6 +32,7 @@ employeeRouter.get('/:id/id-proof', authMiddleware, requireRole('ADMIN', 'HR'), 
 
 employeeRouter.get('/stats', requireRole('ADMIN', 'HR', 'MANAGER'), getHRStats);
 
+employeeRouter.get('/branches', requireRole('ADMIN', 'HR', 'MANAGER'), getAllBranches);
 employeeRouter.get('/', requireRole('ADMIN', 'HR', 'MANAGER'), getAllEmployees);
 employeeRouter.get('/public/:id', getPublicEmployeeProfile);
 employeeRouter.get('/:id', requireRole('ADMIN', 'HR', 'MANAGER'), getEmployeeById);

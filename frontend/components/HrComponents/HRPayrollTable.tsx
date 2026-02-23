@@ -13,15 +13,18 @@ import {
 } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Search, Download, Filter, Edit2, Loader2, Plus } from 'lucide-react';
+import { Search, Download, Filter, Edit2, Loader2, Plus, History } from 'lucide-react';
 import UpdatePayrollDialog from './UpdatePayrollDialog';
 import AddPayrollDialog from './AddPayrollDialog';
+import HRPayrollHistoryDialog from './HRPayrollHistoryDialog';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { EMPLOYEE_JOB_LABELS, EmployeeJob } from '@/lib/employeeJob';
+import { FINANCE_JOB_LABELS, FinanceJob } from '@/lib/financeJob';
 
 // Mock data type updated to match real data or mapping
 export type PayrollRecord = {
@@ -86,8 +89,10 @@ export default function HRPayrollTable({
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
   const [roleFilter, setRoleFilter] = useState('All');
+  const [departmentFilter, setDepartmentFilter] = useState('');
   const [isUpdateOpen, setIsUpdateOpen] = useState(false);
   const [isAddOpen, setIsAddOpen] = useState(false);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState<PayrollRecord | null>(null);
 
   const handleEditClick = (record: PayrollRecord) => {
@@ -97,6 +102,11 @@ export default function HRPayrollTable({
 
   const handleAddClick = () => {
     setIsAddOpen(true);
+  };
+
+  const handleHistoryClick = (record: PayrollRecord) => {
+    setSelectedRecord(record);
+    setIsHistoryOpen(true);
   };
 
   const handleUpdateSubmit = async (id: string, updatedData: Partial<PayrollRecord>) => {
@@ -127,14 +137,42 @@ export default function HRPayrollTable({
   };
 
   const filteredData = data.filter((record) => {
+    const getDepartmentLabel = (dept: string) => {
+      if (!dept) return 'N/A';
+      if (dept === 'HR') return 'HR';
+      if (dept === 'Management') return 'Management';
+      if (dept === 'Administration') return 'Administration';
+      return (
+        EMPLOYEE_JOB_LABELS[dept as EmployeeJob] || FINANCE_JOB_LABELS[dept as FinanceJob] || dept
+      );
+    };
+
     const matchesSearch =
       record.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       record.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      record.department.toLowerCase().includes(searchTerm.toLowerCase());
+      getDepartmentLabel(record.department).toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === 'All' || record.status === statusFilter;
     const matchesRole = roleFilter === 'All' || record.role === roleFilter;
-    return matchesSearch && matchesStatus && matchesRole;
+    const matchesDepartment =
+      !departmentFilter || getDepartmentLabel(record.department) === departmentFilter;
+    return matchesSearch && matchesStatus && matchesRole && matchesDepartment;
   });
+
+  const allDepartments = Array.from(
+    new Set(
+      data.map((record) => {
+        if (!record.department) return 'N/A';
+        if (record.department === 'HR') return 'HR';
+        if (record.department === 'Management') return 'Management';
+        if (record.department === 'Administration') return 'Administration';
+        return (
+          EMPLOYEE_JOB_LABELS[record.department as EmployeeJob] ||
+          FINANCE_JOB_LABELS[record.department as FinanceJob] ||
+          record.department
+        );
+      }),
+    ),
+  ).sort();
 
   return (
     <div className="space-y-4">
@@ -238,6 +276,35 @@ export default function HRPayrollTable({
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
+          <div className="w-full sm:w-[150px]">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  className="w-full h-10 bg-card border-blue-400/60 focus:ring-blue-100 rounded-xl justify-between px-3"
+                >
+                  <div className="flex items-center gap-2 truncate">
+                    <Filter className="h-4 w-4" />
+                    <span className="truncate">Dept: {departmentFilter}</span>
+                  </div>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                align="end"
+                className="w-48 rounded-xl p-1 bg-white border-slate-200 shadow-xl max-h-[300px] overflow-y-auto"
+              >
+                {allDepartments.map((dept) => (
+                  <DropdownMenuItem
+                    key={dept}
+                    onClick={() => setDepartmentFilter(dept)}
+                    className="rounded-lg focus:bg-accent focus:text-accent-foreground cursor-pointer px-3 py-2"
+                  >
+                    {dept}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
         <div className="flex items-center gap-2 w-full sm:w-auto">
           <Button
@@ -265,9 +332,6 @@ export default function HRPayrollTable({
               <TableRow className="border-b border-gray-100 hover:bg-transparent">
                 <TableHead className="px-3 py-2 text-xs font-bold text-primary uppercase tracking-wider whitespace-nowrap">
                   Employee Name
-                </TableHead>
-                <TableHead className="px-3 py-2 text-xs font-bold text-primary uppercase tracking-wider whitespace-nowrap">
-                  Branch
                 </TableHead>
                 <TableHead className="px-3 py-2 text-xs font-bold text-primary uppercase tracking-wider whitespace-nowrap">
                   Email
@@ -328,9 +392,6 @@ export default function HRPayrollTable({
                     <TableCell className="px-3 py-1.5 whitespace-nowrap font-medium text-primary capitalize">
                       {record.name}
                     </TableCell>
-                    <TableCell className="px-3 py-1.5 whitespace-nowrap text-muted-foreground text-[10px] uppercase font-bold">
-                      {record.branchName}
-                    </TableCell>
                     <TableCell className="px-3 py-1.5 text-muted-foreground whitespace-nowrap">
                       {record.email}
                     </TableCell>
@@ -340,7 +401,17 @@ export default function HRPayrollTable({
                       </span>
                     </TableCell>
                     <TableCell className="px-3 py-1.5 whitespace-nowrap uppercase text-[10px] font-bold text-primary">
-                      {record.department}
+                      {(() => {
+                        if (!record.department) return 'N/A';
+                        if (record.department === 'HR') return 'HR';
+                        if (record.department === 'Management') return 'Management';
+                        if (record.department === 'Administration') return 'Administration';
+                        return (
+                          EMPLOYEE_JOB_LABELS[record.department as EmployeeJob] ||
+                          FINANCE_JOB_LABELS[record.department as FinanceJob] ||
+                          record.department
+                        );
+                      })()}
                     </TableCell>
                     <TableCell className="px-3 py-1.5 font-medium whitespace-nowrap text-right text-primary">
                       {record.salaryPerMonth}
@@ -366,12 +437,22 @@ export default function HRPayrollTable({
                     <TableCell className="px-3 py-1.5 text-muted-foreground whitespace-nowrap">
                       {record.paidDate}
                     </TableCell>
-                    <TableCell className="px-3 py-1.5 text-right">
+                    <TableCell className="px-3 py-1.5 text-right flex items-center justify-end gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-slate-500 hover:text-primary hover:bg-slate-50"
+                        onClick={() => handleHistoryClick(record)}
+                        title="View Payment History"
+                      >
+                        <History className="h-4 w-4" />
+                      </Button>
                       <Button
                         variant="ghost"
                         size="icon"
                         className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
                         onClick={() => handleEditClick(record)}
+                        title="Update Current Month"
                       >
                         <Edit2 className="h-4 w-4" />
                       </Button>
@@ -396,6 +477,13 @@ export default function HRPayrollTable({
         onOpenChange={setIsAddOpen}
         employees={data}
         onSuccess={onUpdate}
+      />
+
+      <HRPayrollHistoryDialog
+        open={isHistoryOpen}
+        onOpenChange={setIsHistoryOpen}
+        employeeId={selectedRecord?.id || null}
+        employeeName={selectedRecord?.name || null}
       />
     </div>
   );

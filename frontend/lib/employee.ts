@@ -118,8 +118,10 @@ export const getEmployeeIdProof = async (id: string) => {
 /**
  * Retrieves aggregate statistics for the HR dashboard.
  */
-export const getHRStats = async () => {
-  const res = await api.get('/e/employee/stats');
+export const getHRStats = async (year?: number | 'all') => {
+  const params = new URLSearchParams();
+  if (year && year !== 'all') params.append('year', year.toString());
+  const res = await api.get(`/e/employee/stats?${params.toString()}`);
   return res.data;
 };
 
@@ -128,5 +130,13 @@ export const getHRStats = async () => {
  */
 export const getManagersByRole = async () => {
   const res = await api.get('/e/employee?role=MANAGER');
+  return res.data;
+};
+
+/**
+ * Retrieves a list of all branches.
+ */
+export const getAllBranches = async () => {
+  const res = await api.get('/e/employee/branches');
   return res.data;
 };

@@ -9,14 +9,15 @@ import { formatCurrency } from '@/lib/format';
  * Shows total stock count, damaged items, unique model count, and total inventory valuation.
  * Provides a high-level financial and operational summary of inventory.
  */
-export default function InventoryKPICards() {
+export default function InventoryKPICards({ selectedYear }: { selectedYear: number | 'all' }) {
   const [stats, setStats] = useState<InventoryStats | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const data = await inventoryService.getInventoryStats();
+        setLoading(true);
+        const data = await inventoryService.getInventoryStats(selectedYear);
         setStats(data);
       } catch (error) {
         console.error('Failed to fetch inventory stats:', error);
@@ -25,7 +26,7 @@ export default function InventoryKPICards() {
       }
     };
     fetchStats();
-  }, []);
+  }, [selectedYear]);
 
   if (loading) {
     return (
@@ -42,22 +43,22 @@ export default function InventoryKPICards() {
       <StatCard
         title="Product Stock"
         value={stats?.productStock.toLocaleString() || '0'}
-        subtitle="Total printers in inventory"
+        subtitle={`${selectedYear === 'all' ? 'Total' : selectedYear} printers in inventory`}
       />
       <StatCard
         title="Spare Parts Stock"
         value={stats?.spareStock.toLocaleString() || '0'}
-        subtitle="Total spare parts items"
+        subtitle={`${selectedYear === 'all' ? 'Total' : selectedYear} spare parts items`}
       />
       <StatCard
         title="Product Inventory Value"
         value={formatCurrency(stats?.productValue || 0)}
-        subtitle="Total printer valuation"
+        subtitle={`${selectedYear === 'all' ? 'Total' : selectedYear} printer valuation`}
       />
       <StatCard
         title="Spare Parts Value"
         value={formatCurrency(stats?.spareValue || 0)}
-        subtitle="Total spare parts valuation"
+        subtitle={`${selectedYear === 'all' ? 'Total' : selectedYear} spare parts valuation`}
       />
     </div>
   );

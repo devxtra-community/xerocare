@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Input } from '@/components/ui/input';
 import { Search, Pencil, Trash2 } from 'lucide-react';
 import {
@@ -24,9 +24,10 @@ import { toast } from 'sonner';
 
 interface SparePartTableProps {
   showActions?: boolean;
+  selectedYear: number | 'all';
 }
 
-export default function SparePartTable({ showActions = true }: SparePartTableProps) {
+export default function SparePartTable({ showActions = true, selectedYear }: SparePartTableProps) {
   const [parts, setParts] = useState<SparePartInventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -43,21 +44,21 @@ export default function SparePartTable({ showActions = true }: SparePartTablePro
   const warehouses = Array.from(new Set(parts.map((p) => p.warehouse_name).filter(Boolean))).sort();
   const vendors = Array.from(new Set(parts.map((p) => p.vendor_name).filter(Boolean))).sort();
 
-  const loadParts = async () => {
+  const loadParts = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await sparePartService.getSpareParts();
+      const res = await sparePartService.getSpareParts({ year: selectedYear });
       setParts(res.data || []);
     } catch (error) {
       console.error('Failed to load spare parts', error);
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedYear]);
 
   useEffect(() => {
     loadParts();
-  }, []);
+  }, [selectedYear, loadParts]);
 
   const handleDelete = async (id: string, name: string) => {
     if (!confirm(`Are you sure you want to delete ${name}?`)) return;

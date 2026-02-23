@@ -154,7 +154,9 @@ export const checkLotNumber = async (req: Request, res: Response, next: NextFunc
 export const getLotStats = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const branchId = req.user?.branchId;
-    if (!branchId) {
+    const isAdmin = req.user?.role === 'ADMIN';
+
+    if (!branchId && !isAdmin) {
       return res.status(400).json({ success: false, message: 'Branch ID missing' });
     }
     const year = req.query.year ? parseInt(req.query.year as string, 10) : undefined;

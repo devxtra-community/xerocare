@@ -127,4 +127,19 @@ export class VendorController {
       next(error);
     }
   };
+
+  /**
+   * Retrieves summary statistics for all vendors.
+   */
+  getStats = async (_req: Request, res: Response, next: NextFunction) => {
+    try {
+      const stats = await this.vendorService.getVendorStats();
+      return res.json({
+        success: true,
+        data: stats,
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
 }

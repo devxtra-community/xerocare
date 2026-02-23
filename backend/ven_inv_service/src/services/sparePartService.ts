@@ -161,10 +161,10 @@ export class SparePartService {
   }
 
   /**
-   * Retrieves spare parts inventory for a branch.
+   * Retrieves spare parts inventory, optionally filtered by branch and search.
    */
-  async getInventoryByBranch(branchId: string) {
-    return this.repo.getInventoryByBranch(branchId);
+  async getInventory(branchId?: string, search?: string, year?: number) {
+    return this.repo.getInventory(branchId, search, year);
   }
 
   /**

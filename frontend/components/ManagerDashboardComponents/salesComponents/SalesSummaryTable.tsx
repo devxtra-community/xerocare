@@ -26,7 +26,7 @@ import { getBranchInvoices, Invoice } from '@/lib/invoice';
  * Fetches and lists invoices with details like invoice number, customer, sale type, amount, employee, status, and date.
  * Highlights payment status with color-coded badges.
  */
-export default function SalesSummaryTable() {
+export default function SalesSummaryTable({ selectedYear }: { selectedYear: number | 'all' }) {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -38,7 +38,13 @@ export default function SalesSummaryTable() {
       try {
         setLoading(true);
         const data = await getBranchInvoices();
-        setInvoices(data);
+        // Filter by year if not 'all'
+        const filteredByYear = data.filter((inv) => {
+          if (selectedYear === 'all') return true;
+          const date = new Date(inv.createdAt);
+          return date.getFullYear() === selectedYear;
+        });
+        setInvoices(filteredByYear);
       } catch (error) {
         console.error('Failed to fetch branch invoices:', error);
       } finally {
@@ -46,7 +52,7 @@ export default function SalesSummaryTable() {
       }
     };
     fetchInvoices();
-  }, []);
+  }, [selectedYear]);
 
   if (loading) {
     return (

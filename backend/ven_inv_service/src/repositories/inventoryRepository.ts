@@ -10,7 +10,12 @@ export class InventoryRepository {
   /**
    * Retrieves global inventory with optional filtering.
    */
-  async getGlobalInventory(filters?: { product?: string; warehouse?: string; branch?: string }) {
+  async getGlobalInventory(filters?: {
+    product?: string;
+    warehouse?: string;
+    branch?: string;
+    year?: number;
+  }) {
     const query = this.modelRepo
       .createQueryBuilder('model')
       .leftJoin('model.products', 'product')
@@ -27,6 +32,10 @@ export class InventoryRepository {
         'branch.name AS branch_name',
       ])
       .leftJoin('model.brandRelation', 'brandRelation');
+
+    if (filters?.year) {
+      query.andWhere('EXTRACT(YEAR FROM product.created_at) = :year', { year: filters.year });
+    }
 
     if (filters?.product) {
       query.andWhere(
@@ -85,8 +94,8 @@ export class InventoryRepository {
   /**
    * Retrieves inventory for a specific branch.
    */
-  async getBranchInventory(branchId: string) {
-    const result = await this.productRepo
+  async getBranchInventory(branchId: string, year?: number) {
+    const query = this.productRepo
       .createQueryBuilder('product')
       .leftJoin('product.model', 'model')
       .leftJoin('model.brandRelation', 'brandRelation')
@@ -115,7 +124,13 @@ export class InventoryRepository {
         `SUM(CASE WHEN product.product_status = 'SOLD' THEN 1 ELSE 0 END)::int AS sold_qty`,
         'AVG(product.sale_price) AS product_cost',
       ])
-      .where('warehouse.branchId = :branchId', { branchId })
+      .where('warehouse.branchId = :branchId', { branchId });
+
+    if (year) {
+      query.andWhere('EXTRACT(YEAR FROM product.created_at) = :year', { year });
+    }
+
+    const result = await query
       .groupBy('model.id')
       .addGroupBy('model.model_no')
       .addGroupBy('model.model_name')
@@ -156,8 +171,8 @@ export class InventoryRepository {
   /**
    * Retrieves inventory for a specific warehouse.
    */
-  async getWarehouseInventory(warehouseId: string) {
-    const result = await this.productRepo
+  async getWarehouseInventory(warehouseId: string, year?: number) {
+    const query = this.productRepo
       .createQueryBuilder('product')
       .leftJoin('product.model', 'model')
       .leftJoin('model.brandRelation', 'brandRelation')
@@ -175,7 +190,13 @@ export class InventoryRepository {
         `SUM(CASE WHEN product.product_status = 'SOLD' THEN 1 ELSE 0 END)::int AS sold_qty`,
         'AVG(product.sale_price) AS product_cost',
       ])
-      .where('product.warehouse_id = :warehouseId', { warehouseId })
+      .where('product.warehouse_id = :warehouseId', { warehouseId });
+
+    if (year) {
+      query.andWhere('EXTRACT(YEAR FROM product.created_at) = :year', { year });
+    }
+
+    const result = await query
       .groupBy('model.id')
       .addGroupBy('model.model_no')
       .addGroupBy('model.model_name')
@@ -204,7 +225,7 @@ export class InventoryRepository {
   /**
    * Calculates inventory statistics.
    */
-  async getInventoryStats(branchId?: string) {
+  async getInventoryStats(branchId?: string, year?: number) {
     const productQuery = this.productRepo
       .createQueryBuilder('product')
       .select([
@@ -218,6 +239,10 @@ export class InventoryRepository {
         .andWhere('warehouse.branchId = :branchId', { branchId });
     }
 
+    if (year) {
+      productQuery.andWhere('EXTRACT(YEAR FROM product.created_at) = :year', { year });
+    }
+
     const sparePartRepo = Source.getRepository(SparePart);
     const sparePartQuery = sparePartRepo
       .createQueryBuilder('sp')
@@ -228,6 +253,10 @@ export class InventoryRepository {
 
     if (branchId) {
       sparePartQuery.andWhere('sp.branch_id = :branchId', { branchId });
+    }
+
+    if (year) {
+      sparePartQuery.andWhere('EXTRACT(YEAR FROM sp.created_at) = :year', { year });
     }
 
     const [productStats, spareStats] = await Promise.all([

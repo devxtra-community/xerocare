@@ -23,6 +23,7 @@ import { inventoryService, InventoryItem } from '@/services/inventoryService';
 interface InventoryTableProps {
   mode?: 'global' | 'branch' | 'warehouse';
   warehouseId?: string;
+  selectedYear: number | 'all';
 }
 
 /**
@@ -30,7 +31,11 @@ interface InventoryTableProps {
  * Supports viewing inventory globally, by branch, or by warehouse.
  * Displays detailed stock information: Total, Available, Rented, and Damaged quantities along with Model and Brand details.
  */
-export default function InventoryTable({ mode = 'global', warehouseId }: InventoryTableProps) {
+export default function InventoryTable({
+  mode = 'global',
+  warehouseId,
+  selectedYear,
+}: InventoryTableProps) {
   // const router = useRouter();
   const [page, setPage] = useState(1);
   const [data, setData] = useState<InventoryItem[]>([]);
@@ -46,11 +51,11 @@ export default function InventoryTable({ mode = 'global', warehouseId }: Invento
       try {
         let res: InventoryItem[] = [];
         if (mode === 'branch') {
-          res = await inventoryService.getBranchInventory();
+          res = await inventoryService.getBranchInventory(selectedYear);
         } else if (mode === 'warehouse' && warehouseId) {
-          res = await inventoryService.getWarehouseInventory(warehouseId);
+          res = await inventoryService.getWarehouseInventory(warehouseId, selectedYear);
         } else {
-          res = await inventoryService.getGlobalInventory();
+          res = await inventoryService.getGlobalInventory(selectedYear);
         }
         setData(res);
       } catch (error) {
@@ -60,7 +65,7 @@ export default function InventoryTable({ mode = 'global', warehouseId }: Invento
       }
     };
     fetchData();
-  }, [mode, warehouseId]);
+  }, [mode, warehouseId, selectedYear]);
 
   // Filtering logic
   const filteredData = data.filter((item) => {
