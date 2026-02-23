@@ -9,12 +9,24 @@ services:
     restart: unless-stopped
     env_file:
       - .env
+    environment:
+      # Override service URLs to use 127.0.0.1 (same container, pm2 managed)
+      EMPLOYEE_SERVICE_URL: http://127.0.0.1:3002
+      VENDOR_INVENTORY_SERVICE_URL: http://127.0.0.1:3003
+      BILLING_SERVICE_URL: http://127.0.0.1:3004
+      CRM_SERVICE_URL: http://127.0.0.1:3005
+      CLIENT_URL: http://localhost:3000
+      # RabbitMQ and Redis use their compose service hostnames
+      RABBITMQ_URL: amqp://rabbitmq:5672
+      REDIS_URL: redis://redis:6379
     ports:
-      - '3000:3000' # Frontend
+      - '3000:3000' # Frontend (Next.js)
       - '3001:3001' # API Gateway
     depends_on:
-      - redis
-      - rabbitmq
+      redis:
+        condition: service_started
+      rabbitmq:
+        condition: service_healthy
     networks:
       - xerocare-network
 
@@ -40,6 +52,12 @@ services:
       - rabbitmq_data:/var/lib/rabbitmq/mnesia
     networks:
       - xerocare-network
+    healthcheck:
+      test: [ 'CMD', 'rabbitmq-diagnostics', 'ping' ]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
 
 networks:
   xerocare-network:
