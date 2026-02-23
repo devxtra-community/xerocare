@@ -19,24 +19,34 @@ export class ModelRepository {
   }
 
   /**
-   * Retrieves all models with associated product details.
+   * Retrieves all models with associated product details, optionally filtered by branch.
    */
-  async getAllModels() {
-    const rawAndEntities = await this.repo
+  async getAllModels(branchId?: string) {
+    const query = this.repo
       .createQueryBuilder('model')
-      .leftJoinAndSelect('model.brandRelation', 'brandRelation')
+      .leftJoinAndSelect('model.brandRelation', 'brandRelation');
+
+    if (branchId) {
+      query.where('model.branch_id = :branchId', { branchId });
+    }
+
+    const rawAndEntities = await query
       .addSelect((subQuery) => {
         return subQuery
           .select('p.name')
           .from('products', 'p')
+          .innerJoin('warehouses', 'w', 'p.warehouse_id = w.id')
           .where('p.model_id = model.id')
+          .andWhere('w.branch_id = model.branch_id')
           .limit(1);
       }, 'product_name')
       .addSelect((subQuery) => {
         return subQuery
           .select('p.print_colour')
           .from('products', 'p')
+          .innerJoin('warehouses', 'w', 'p.warehouse_id = w.id')
           .where('p.model_id = model.id')
+          .andWhere('w.branch_id = model.branch_id')
           .limit(1);
       }, 'print_colour')
       .orderBy('model.model_name', 'ASC')
@@ -77,11 +87,15 @@ export class ModelRepository {
   }
 
   /**
-   * Counts products associated with a model.
+   * Counts products associated with a model within its branch.
    */
   async countProductsForModel(modelId: string): Promise<number> {
     const result = await Source.query(
-      `SELECT COUNT(*) as count FROM "products" WHERE "model_id" = $1 AND "product_status" = 'AVAILABLE'`,
+      `SELECT COUNT(*) as count 
+       FROM "products" p
+       INNER JOIN "warehouses" w ON p.warehouse_id = w.id
+       INNER JOIN "model" m ON p.model_id = m.id
+       WHERE p.model_id = $1 AND w.branch_id = m.branch_id AND p.product_status = 'AVAILABLE'`,
       [modelId],
     );
     if (!result || result.length === 0) {
@@ -92,7 +106,11 @@ export class ModelRepository {
 
   async findFirstProductForModel(modelId: string) {
     const result = await Source.query(
-      `SELECT brand FROM "products" WHERE "model_id" = $1 LIMIT 1`,
+      `SELECT brand FROM "products" p
+       INNER JOIN "warehouses" w ON p.warehouse_id = w.id
+       INNER JOIN "model" m ON p.model_id = m.id
+       WHERE p.model_id = $1 AND w.branch_id = m.branch_id
+       LIMIT 1`,
       [modelId],
     );
     if (!result || result.length === 0) {
@@ -102,11 +120,15 @@ export class ModelRepository {
   }
 
   /**
-   * Counts available products for a model.
+   * Counts available products for a model within its branch.
    */
   async countAvailableProducts(modelId: string): Promise<number> {
     const result = await Source.query(
-      `SELECT COUNT(*) as count FROM "products" WHERE "model_id" = $1 AND "product_status" = 'AVAILABLE'`,
+      `SELECT COUNT(*) as count 
+       FROM "products" p
+       INNER JOIN "warehouses" w ON p.warehouse_id = w.id
+       INNER JOIN "model" m ON p.model_id = m.id
+       WHERE p.model_id = $1 AND w.branch_id = m.branch_id AND p.product_status = 'AVAILABLE'`,
       [modelId],
     );
     if (!result || result.length === 0) {
@@ -126,8 +148,10 @@ export class ModelRepository {
          SUM(CASE WHEN "product_status" = 'RENTED' THEN 1 ELSE 0 END) as rented,
          SUM(CASE WHEN "product_status" = 'LEASE' THEN 1 ELSE 0 END) as leased,
          SUM(CASE WHEN "product_status" = 'SOLD' THEN 1 ELSE 0 END) as sold
-       FROM "products"
-       WHERE "model_id" = $1`,
+       FROM "products" p
+       INNER JOIN "warehouses" w ON p.warehouse_id = w.id
+       INNER JOIN "model" m ON p.model_id = m.id
+       WHERE p.model_id = $1 AND w.branch_id = m.branch_id`,
       [modelId],
     );
 

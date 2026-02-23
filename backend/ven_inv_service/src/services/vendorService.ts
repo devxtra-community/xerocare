@@ -3,6 +3,8 @@ import { Vendor, VendorStatus } from '../entities/vendorEntity';
 import { AppError } from '../errors/appError';
 import { publishEmailJob } from '../queues/emailPublisher';
 import { VendorRequestRepository } from '../repositories/vendorRequestRepository';
+import { VendorRequest } from '../entities/vendorRequestEntity';
+import { FindOptionsWhere } from 'typeorm';
 
 interface CreateVendorDTO {
   name: string;
@@ -53,22 +55,17 @@ export class VendorService {
   }
 
   /**
-   * Retrieves all active vendors.
+   * Retrieves all active vendors, optionally filtered/aggregated by branch.
    */
-  async getAllVendors(): Promise<Vendor[]> {
-    return this.vendorRepo.find({
-      where: {
-        status: VendorStatus.ACTIVE,
-      },
-      order: { createdAt: 'DESC' },
-    });
+  async getAllVendors(branchId?: string): Promise<Vendor[]> {
+    return this.vendorRepo.findActive(branchId);
   }
 
   /**
-   * Retrieves a vendor by ID.
+   * Retrieves a vendor by ID, optionally with branch-specific stats.
    */
-  async getVendorById(id: string): Promise<Vendor> {
-    const vendor = await this.vendorRepo.findOne({ where: { id } });
+  async getVendorById(id: string, branchId?: string): Promise<Vendor> {
+    const vendor = await this.vendorRepo.findByIdActive(id, branchId);
     if (!vendor) {
       throw new AppError('Vendor not found', 404);
     }
@@ -121,7 +118,7 @@ export class VendorService {
     email: string,
     branchId?: string,
   ) {
-    const vendor = await this.getVendorById(vendorId);
+    const vendor = await this.getVendorById(vendorId, branchId);
 
     // Check if the user exists in the employee manager table
     let manager = await this.employeeManagerRepo.findActiveManager(userId);
@@ -143,6 +140,8 @@ export class VendorService {
       total_amount: data.total_amount,
     });
 
+    // Note: Global vendor stats (totalOrders, purchaseValue) are still updated,
+    // but the UI will display branch-specific ones calculated on the fly.
     vendor.totalOrders = (vendor.totalOrders || 0) + 1;
     if (data.total_amount) {
       const currentPurchaseValue = Number(vendor.purchaseValue) || 0;
@@ -162,32 +161,28 @@ export class VendorService {
   }
 
   /**
-   * Retrieves all product requests for a vendor.
+   * Retrieves all product requests for a vendor, optionally filtered by branch.
    */
-  async getVendorRequests(vendorId: string) {
+  async getVendorRequests(vendorId: string, branchId?: string) {
+    const where: FindOptionsWhere<VendorRequest> = { vendor_id: vendorId };
+    if (branchId) {
+      where.branch_id = branchId;
+    }
+
     return this.requestRepo.find({
-      where: { vendor_id: vendorId },
+      where,
       relations: ['branch', 'manager'],
       order: { created_at: 'DESC' },
     });
   }
 
   /**
-   * Retrieves summary statistics for all vendors.
+   * Retrieves summary statistics for all vendors, optionally filtered by branch.
    */
-  async getVendorStats() {
-    const total = await this.vendorRepo.count({
-      where: {
-        status: VendorStatus.ACTIVE,
-      },
-    });
+  async getVendorStats(branchId?: string) {
+    const vendors = await this.vendorRepo.findActive(branchId);
 
-    const vendors = await this.vendorRepo.find({
-      where: {
-        status: VendorStatus.ACTIVE,
-      },
-    });
-
+    const total = vendors.length;
     const active = vendors.length;
     let totalSpending = 0;
     let totalOrders = 0;

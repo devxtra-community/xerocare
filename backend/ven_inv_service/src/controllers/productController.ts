@@ -79,12 +79,18 @@ export const addproduct = async (req: Request, res: Response, next: NextFunction
 };
 
 /**
- * Retrieves all products.
+ * Retrieves all products, optionally filtered by the user's branch.
  */
 export const getallproducts = async (req: Request, res: Response) => {
   try {
-    logger.info('Fetching all products');
-    const products = await service.getAllProducts();
+    const branchId = req.user?.branchId;
+    const isAdmin = req.user?.role === 'ADMIN';
+
+    // Admins see all, others only their branch
+    const filteredBranchId = isAdmin ? undefined : branchId;
+
+    logger.info(`Fetching products for branch: ${filteredBranchId || 'All'}`);
+    const products = await service.getAllProducts(filteredBranchId);
     logger.info(`Fetched ${products?.length || 0} products`);
 
     if (!products || products.length === 0) {

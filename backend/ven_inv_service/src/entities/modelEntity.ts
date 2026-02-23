@@ -11,7 +11,7 @@ import { Product } from './productEntity';
 import { Brand } from './brandEntity';
 
 @Entity('model')
-@Index(['model_no'], { unique: true })
+@Index(['model_no', 'branch_id'], { unique: true })
 export class Model {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
@@ -84,6 +84,9 @@ export class Model {
     },
   })
   sold!: number;
+
+  @Column({ type: 'uuid', nullable: true })
+  branch_id?: string;
 
   @OneToMany(() => Product, (product) => product.model)
   products!: Product[];

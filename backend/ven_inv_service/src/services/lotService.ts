@@ -42,10 +42,10 @@ export class LotService {
   }
 
   /**
-   * Retrieves all lots.
+   * Retrieves all lots, optionally filtered by branch.
    */
-  async getAllLots(): Promise<Lot[]> {
-    return await this.lotRepository.getAllLots();
+  async getAllLots(branchId?: string): Promise<Lot[]> {
+    return await this.lotRepository.getAllLots(branchId);
   }
 
   /**

@@ -1,4 +1,4 @@
-import { EntityManager } from 'typeorm';
+import { EntityManager, FindOptionsWhere } from 'typeorm';
 import { Source } from '../config/db';
 import { Lot, LotStatus } from '../entities/lotEntity';
 import { LotItem, LotItemType } from '../entities/lotItemEntity';
@@ -250,12 +250,18 @@ export class LotRepository {
   }
 
   /**
-   * Retrieves all lots with relations.
+   * Retrieves all lots with relations, optionally filtered by branch.
    */
-  async getAllLots() {
-    console.log('LotRepository: getAllLots called');
+  async getAllLots(branchId?: string) {
+    console.log('LotRepository: getAllLots called, branchId:', branchId);
     try {
+      const where: FindOptionsWhere<Lot> = {};
+      if (branchId && branchId !== 'All') {
+        where.branch_id = branchId;
+      }
+
       const result = await this.repo.find({
+        where,
         relations: {
           vendor: true,
           warehouse: true, // I should add this!

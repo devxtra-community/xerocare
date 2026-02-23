@@ -198,10 +198,10 @@ export class ProductService {
   }
 
   /**
-   * Retrieves all products.
+   * Retrieves all products, optionally filtered by branch.
    */
-  async getAllProducts() {
-    return this.productRepo.getAllProducts();
+  async getAllProducts(branchId?: string) {
+    return this.productRepo.getAllProducts(branchId);
   }
 
   /**

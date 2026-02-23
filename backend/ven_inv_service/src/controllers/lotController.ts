@@ -18,11 +18,17 @@ export const createLot = async (req: Request, res: Response, next: NextFunction)
 };
 
 /**
- * Retrieves all lots.
+ * Retrieves all lots, optionally filtered by the user's branch.
  */
 export const getAllLots = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const lots = await lotService.getAllLots();
+    const branchId = req.user?.branchId;
+    const isAdmin = req.user?.role === 'ADMIN';
+
+    // Admins see all, others only their branch
+    const filteredBranchId = isAdmin ? undefined : branchId;
+
+    const lots = await lotService.getAllLots(filteredBranchId);
     res.status(200).json({ success: true, data: lots });
   } catch (err) {
     next(err);
