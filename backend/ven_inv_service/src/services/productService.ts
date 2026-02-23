@@ -208,17 +208,19 @@ export class ProductService {
    * Updates a product and clears relevant caches.
    */
   async updateProduct(id: string, data: Partial<Product>) {
-    if (data.max_discount_amount !== undefined || data.sale_price !== undefined) {
-      const currentProduct = await this.productRepo.findOne(id);
-      if (!currentProduct) {
-        throw new AppError('Product not found', 404);
-      }
+    const currentProduct = await this.productRepo.findOne(id);
+    if (!currentProduct) {
+      throw new AppError('Product not found', 404);
+    }
 
+    if (data.max_discount_amount !== undefined || data.sale_price !== undefined) {
       const newSalePrice = data.sale_price ?? currentProduct.sale_price;
       const newMaxDiscount = data.max_discount_amount ?? currentProduct.max_discount_amount;
 
       this.validateDiscount(Number(newSalePrice), Number(newMaxDiscount));
     }
+
+    const oldModelId = currentProduct.model_id;
 
     const updated = await this.productRepo.updateProduct(id, data);
 
@@ -226,7 +228,14 @@ export class ProductService {
 
     const updatedProduct = await this.findOne(id);
     if (updatedProduct && updatedProduct.model_id) {
+      await this.model.syncModelQuantities(updatedProduct.model_id);
       await this.modelService.syncToRedis(updatedProduct.model_id);
+
+      // If the model was changed during update, sync the old model's quantities too
+      if (oldModelId && oldModelId !== updatedProduct.model_id) {
+        await this.model.syncModelQuantities(oldModelId);
+        await this.modelService.syncToRedis(oldModelId);
+      }
     }
 
     return updated;

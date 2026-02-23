@@ -142,6 +142,7 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [isUploadMode, setIsUploadMode] = useState(false);
   const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [isValidatingLot, setIsValidatingLot] = useState(false);
 
   const form = useForm<CreateLotFormValues>({
     resolver: zodResolver(createLotSchema) as Resolver<CreateLotFormValues>,
@@ -198,6 +199,41 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
     };
     fetchData();
   }, []);
+
+  const watchLotNumber = form.watch('lotNumber');
+
+  // Real-time lot number validation
+  useEffect(() => {
+    const checkLotUniqueness = async () => {
+      if (!watchLotNumber || watchLotNumber.trim() === '') {
+        form.clearErrors('lotNumber');
+        return;
+      }
+
+      setIsValidatingLot(true);
+      try {
+        const exists = await lotService.checkLotNumber(watchLotNumber);
+        if (exists) {
+          form.setError('lotNumber', {
+            type: 'manual',
+            message: 'Lot number already exists. Please use a unique number.',
+          });
+        } else {
+          form.clearErrors('lotNumber');
+        }
+      } catch (error) {
+        console.error('Failed to check lot number uniqueness:', error);
+      } finally {
+        setIsValidatingLot(false);
+      }
+    };
+
+    const timeoutId = setTimeout(() => {
+      checkLotUniqueness();
+    }, 500); // 500ms debounce
+
+    return () => clearTimeout(timeoutId);
+  }, [watchLotNumber, form]);
 
   const onSubmit = async (data: CreateLotFormValues) => {
     setLoading(true);
@@ -867,7 +903,7 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
                   </Button>
                   <Button
                     type="submit"
-                    disabled={loading}
+                    disabled={loading || isValidatingLot || !!form.formState.errors.lotNumber}
                     size="sm"
                     className="min-w-[120px] bg-blue-700 hover:bg-blue-800 text-white font-semibold"
                   >

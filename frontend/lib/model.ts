@@ -9,6 +9,7 @@ export interface Model {
     name: string;
   };
   description: string;
+  hs_code?: string;
   quantity: number; // Auto-managed by backend
   available: number;
   rented: number;
@@ -30,6 +31,7 @@ export interface CreateModelData {
   model_name: string;
   brand_id: string;
   description: string;
+  hs_code?: string;
 }
 
 export interface UpdateModelData {
@@ -37,6 +39,7 @@ export interface UpdateModelData {
   model_name?: string;
   brand_id?: string;
   description?: string;
+  hs_code?: string;
 }
 
 interface ApiResponse<T> {

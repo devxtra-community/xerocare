@@ -92,6 +92,7 @@ export default function UsageRecordingModal({
   const [products, setProducts] = useState<Product[]>([]);
   const [estimatedCost, setEstimatedCost] = useState<number>(0);
   const [showPreview, setShowPreview] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [recordedUsageData, setRecordedUsageData] = useState<RecordedUsageData | null>(null);
   const [history, setHistory] = useState<UsageRecord[]>([]);
 
@@ -117,17 +118,19 @@ export default function UsageRecordingModal({
 
   React.useEffect(() => {
     if (editingInvoice) {
-      const start = (editingInvoice.billingPeriodStart || (editingInvoice as any).periodStart || '').split('T')[0];
-      const end = (editingInvoice.billingPeriodEnd || (editingInvoice as any).periodEnd || '').split('T')[0];
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const inv = editingInvoice as any;
+      const start = (inv.billingPeriodStart || inv.periodStart || '').split('T')[0];
+      const end = (inv.billingPeriodEnd || inv.periodEnd || '').split('T')[0];
 
       setFormData({
         billingPeriodStart: start,
         billingPeriodEnd: end,
-        bwA4Count: String(editingInvoice.bwA4Count || (editingInvoice as any).bwA4Count || 0),
-        bwA3Count: String(editingInvoice.bwA3Count || (editingInvoice as any).bwA3Count || 0),
-        colorA4Count: String(editingInvoice.colorA4Count || (editingInvoice as any).colorA4Count || 0),
-        colorA3Count: String(editingInvoice.colorA3Count || (editingInvoice as any).colorA3Count || 0),
-        remarks: editingInvoice.financeRemarks || (editingInvoice as any).remarks || '',
+        bwA4Count: String(inv.bwA4Count || 0),
+        bwA3Count: String(inv.bwA3Count || 0),
+        colorA4Count: String(inv.colorA4Count || 0),
+        colorA3Count: String(inv.colorA3Count || 0),
+        remarks: inv.financeRemarks || inv.remarks || '',
       });
 
       if (editingInvoice.referenceContractId || contractId) {
@@ -250,10 +253,16 @@ export default function UsageRecordingModal({
       (i) => (i.bwIncludedLimit ?? 0) > 0 || (i.bwExcessRate ?? 0) > 0 || hasSlabs(i.bwSlabRanges),
     );
     const mergedColor = contract.items.find(
-      (i) => (i.colorIncludedLimit ?? 0) > 0 || (i.colorExcessRate ?? 0) > 0 || hasSlabs(i.colorSlabRanges),
+      (i) =>
+        (i.colorIncludedLimit ?? 0) > 0 ||
+        (i.colorExcessRate ?? 0) > 0 ||
+        hasSlabs(i.colorSlabRanges),
     );
     const mergedCombo = contract.items.find(
-      (i) => (i.combinedIncludedLimit ?? 0) > 0 || (i.combinedExcessRate ?? 0) > 0 || hasSlabs(i.comboSlabRanges),
+      (i) =>
+        (i.combinedIncludedLimit ?? 0) > 0 ||
+        (i.combinedExcessRate ?? 0) > 0 ||
+        hasSlabs(i.comboSlabRanges),
     );
 
     // Prioritize separate rules, fallback to merged items
@@ -361,7 +370,7 @@ export default function UsageRecordingModal({
             ? ruleItem.bwSlabRanges
             : type === 'COLOR'
               ? ruleItem.colorSlabRanges
-              : ruleItem.comboSlabRanges
+              : ruleItem.comboSlabRanges,
         );
         return {
           charge: calculateSlabCharge(totalDeltaEquiv, slabs),
@@ -763,9 +772,9 @@ export default function UsageRecordingModal({
                     const isFinalMonth = tenure > 0 && history.length + 1 === tenure;
                     const amount = Number(
                       contract?.monthlyRent ||
-                      contract?.monthlyLeaseAmount ||
-                      contract?.monthlyEmiAmount ||
-                      0,
+                        contract?.monthlyLeaseAmount ||
+                        contract?.monthlyEmiAmount ||
+                        0,
                     );
 
                     if (isFinalMonth) return `${formatCurrency(0)} (Adjusted from Advance)`;
@@ -854,8 +863,7 @@ export default function UsageRecordingModal({
                               const isCpc = contract?.rentType?.includes('CPC');
                               if (isCpc) {
                                 const slabs = parseSlabs(
-                                  ruleItems.bw?.bwSlabRanges ||
-                                  ruleItems.combo?.comboSlabRanges
+                                  ruleItems.bw?.bwSlabRanges || ruleItems.combo?.comboSlabRanges,
                                 );
                                 if (slabs.length > 0) {
                                   return (
@@ -892,7 +900,7 @@ export default function UsageRecordingModal({
                               {Math.max(
                                 0,
                                 Number(formData.bwA4Count || 0) -
-                                (prevUsage ? prevUsage.bwA4Count : calculatedInitialCounts.bwA4),
+                                  (prevUsage ? prevUsage.bwA4Count : calculatedInitialCounts.bwA4),
                               )}
                             </span>
                           </div>
@@ -927,7 +935,7 @@ export default function UsageRecordingModal({
                               {Math.max(
                                 0,
                                 Number(formData.bwA3Count || 0) -
-                                (prevUsage ? prevUsage.bwA3Count : calculatedInitialCounts.bwA3),
+                                  (prevUsage ? prevUsage.bwA3Count : calculatedInitialCounts.bwA3),
                               )}
                             </span>
                           </div>
@@ -980,7 +988,7 @@ export default function UsageRecordingModal({
                               if (isCpc) {
                                 const slabs = parseSlabs(
                                   ruleItems.color?.colorSlabRanges ||
-                                  ruleItems.combo?.comboSlabRanges
+                                    ruleItems.combo?.comboSlabRanges,
                                 );
                                 if (slabs.length > 0) {
                                   return (
@@ -1017,9 +1025,9 @@ export default function UsageRecordingModal({
                               {Math.max(
                                 0,
                                 Number(formData.colorA4Count || 0) -
-                                (prevUsage
-                                  ? prevUsage.colorA4Count
-                                  : calculatedInitialCounts.clrA4),
+                                  (prevUsage
+                                    ? prevUsage.colorA4Count
+                                    : calculatedInitialCounts.clrA4),
                               )}
                             </span>
                           </div>
@@ -1056,9 +1064,9 @@ export default function UsageRecordingModal({
                               {Math.max(
                                 0,
                                 Number(formData.colorA3Count || 0) -
-                                (prevUsage
-                                  ? prevUsage.colorA3Count
-                                  : calculatedInitialCounts.clrA3),
+                                  (prevUsage
+                                    ? prevUsage.colorA3Count
+                                    : calculatedInitialCounts.clrA3),
                               )}
                             </span>
                           </div>
@@ -1488,9 +1496,9 @@ export default function UsageRecordingModal({
                       {(() => {
                         const amount = Number(
                           contract?.monthlyRent ||
-                          contract?.monthlyLeaseAmount ||
-                          contract?.monthlyEmiAmount ||
-                          0,
+                            contract?.monthlyLeaseAmount ||
+                            contract?.monthlyEmiAmount ||
+                            0,
                         );
 
                         if (isLastMonth) {

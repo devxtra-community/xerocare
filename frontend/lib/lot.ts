@@ -139,4 +139,11 @@ export const lotService = {
     });
     return response.data.data;
   },
+
+  checkLotNumber: async (lotNumber: string): Promise<boolean> => {
+    const response = await api.get<{ success: boolean; exists: boolean }>(
+      `/i/lots/check-number/${encodeURIComponent(lotNumber)}`,
+    );
+    return response.data.exists;
+  },
 };

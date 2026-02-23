@@ -95,6 +95,29 @@ export function LeadConversionDialog({
 
   if (!lead) return null;
 
+  if (!lead.location || lead.location.trim() === '') {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle className="text-red-600 font-bold">Validation Error</DialogTitle>
+            <DialogDescription className="text-base text-foreground pt-4">
+              Location is required before converting this lead to a customer.
+              <br />
+              <br />
+              Please update the lead details.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => onOpenChange(false)}>
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[425px]">

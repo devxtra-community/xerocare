@@ -6,6 +6,7 @@ export interface Lead {
   email?: string;
   phone?: string;
   source?: string;
+  location?: string;
   status: 'new' | 'contacted' | 'qualified' | 'converted' | 'lost';
   metadata?: Record<string, unknown>;
   customerId?: string;
@@ -23,6 +24,7 @@ export interface CreateLeadData {
   email?: string;
   phone?: string;
   source?: string;
+  location?: string;
   status?: 'new' | 'contacted' | 'qualified' | 'converted' | 'lost';
   metadata?: Record<string, unknown>;
 }
