@@ -29,6 +29,10 @@ export class Customer {
   @Column({ default: true })
   isActive!: boolean;
 
+  @Column({ name: 'branch_id', nullable: true })
+  @Index()
+  branch_id?: string;
+
   @CreateDateColumn()
   createdAt!: Date;
 

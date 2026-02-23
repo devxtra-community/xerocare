@@ -16,7 +16,11 @@ export class LeadController {
       if (!req.user) {
         throw new Error('User not authenticated');
       }
-      const lead = await this.leadService.createLead(req.body, req.user.userId);
+      const data = { ...req.body };
+      if (req.user.role !== 'ADMIN') {
+        data.branch_id = req.user.branchId;
+      }
+      const lead = await this.leadService.createLead(data, req.user.userId);
       res.status(201).json({
         success: true,
         data: lead,
@@ -35,10 +39,12 @@ export class LeadController {
         throw new Error('User not authenticated');
       }
       const includeDeleted = req.query.includeDeleted === 'true';
+      const branchId = req.user.role === 'ADMIN' ? undefined : req.user.branchId;
       const leads = await this.leadService.getAllLeads(
         req.user.userId,
         req.user.role,
         includeDeleted,
+        branchId,
       );
       res.status(200).json({
         success: true,
@@ -62,6 +68,12 @@ export class LeadController {
         req.user.userId,
         req.user.role,
       );
+
+      // Branch isolation check
+      if (req.user.role !== 'ADMIN' && lead.branch_id !== req.user.branchId) {
+        throw new Error('Access denied: Lead belongs to another branch');
+      }
+
       res.status(200).json({
         success: true,
         data: lead,
@@ -79,6 +91,17 @@ export class LeadController {
       if (!req.user) {
         throw new Error('User not authenticated');
       }
+      const lead = await this.leadService.getLeadById(
+        req.params.id as string,
+        req.user.userId,
+        req.user.role,
+      );
+
+      // Branch isolation check
+      if (req.user.role !== 'ADMIN' && lead.branch_id !== req.user.branchId) {
+        throw new Error('Access denied: Cannot convert lead from another branch');
+      }
+
       const customerId = await this.leadService.convertLeadToCustomer(
         req.params.id as string,
         req.user.userId,
@@ -102,7 +125,18 @@ export class LeadController {
       if (!req.user) {
         throw new Error('User not authenticated');
       }
-      const lead = await this.leadService.updateLead(
+      const lead = await this.leadService.getLeadById(
+        req.params.id as string,
+        req.user.userId,
+        req.user.role,
+      );
+
+      // Branch isolation check
+      if (req.user.role !== 'ADMIN' && lead.branch_id !== req.user.branchId) {
+        throw new Error('Access denied: Cannot update lead from another branch');
+      }
+
+      const updatedLead = await this.leadService.updateLead(
         req.params.id as string,
         req.body,
         req.user.userId,
@@ -110,7 +144,7 @@ export class LeadController {
       );
       res.status(200).json({
         success: true,
-        data: lead,
+        data: updatedLead,
       });
     } catch (error) {
       next(error);
@@ -125,6 +159,17 @@ export class LeadController {
       if (!req.user) {
         throw new Error('User not authenticated');
       }
+      const lead = await this.leadService.getLeadById(
+        req.params.id as string,
+        req.user.userId,
+        req.user.role,
+      );
+
+      // Branch isolation check
+      if (req.user.role !== 'ADMIN' && lead.branch_id !== req.user.branchId) {
+        throw new Error('Access denied: Cannot delete lead from another branch');
+      }
+
       await this.leadService.deleteLead(req.params.id as string, req.user.userId, req.user.role);
       res.status(200).json({
         success: true,

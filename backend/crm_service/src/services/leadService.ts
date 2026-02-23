@@ -24,6 +24,7 @@ export class LeadService {
       ...data,
       createdBy: userId,
       assignedTo: userId,
+      branch_id: data.branch_id,
     };
     return await this.leadRepository.createLead(leadData);
   }
@@ -35,8 +36,9 @@ export class LeadService {
     userId: string,
     role: string,
     includeDeleted: boolean = false,
+    branchId?: string,
   ): Promise<ILead[]> {
-    return this.leadRepository.findAllLeads(includeDeleted);
+    return this.leadRepository.findAllLeads(includeDeleted, branchId);
   }
 
   /**
@@ -112,6 +114,7 @@ export class LeadService {
       phone,
       location,
       isActive: true,
+      branch_id: lead.branch_id,
     };
 
     const customer = await this.customerService.createCustomer(customerData);

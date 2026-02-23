@@ -1,5 +1,6 @@
 import { NextFunction, Request, Response } from 'express';
 import { LotService } from '../services/lotService';
+import { AppError } from '../errors/appError';
 
 const lotService = new LotService();
 
@@ -42,6 +43,13 @@ export const getLotById = async (req: Request, res: Response, next: NextFunction
   try {
     const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
     const lot = await lotService.getLotById(id);
+
+    // Branch isolation
+    const isAdmin = req.user?.role === 'ADMIN';
+    if (!isAdmin && lot.branch_id !== req.user?.branchId) {
+      throw new AppError('Access denied: Lot belongs to another branch', 403);
+    }
+
     res.status(200).json({ success: true, data: lot });
   } catch (err) {
     next(err);
@@ -54,6 +62,14 @@ export const getLotById = async (req: Request, res: Response, next: NextFunction
 export const downloadLotExcel = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const lot = await lotService.getLotById(id);
+
+    // Branch isolation
+    const isAdmin = req.user?.role === 'ADMIN';
+    if (!isAdmin && lot.branch_id !== req.user?.branchId) {
+      throw new AppError('Access denied: Cannot download lot from another branch', 403);
+    }
+
     const buffer = await lotService.generateExcel(id);
 
     res.setHeader(

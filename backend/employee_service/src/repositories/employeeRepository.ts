@@ -158,13 +158,15 @@ export class EmployeeRepository {
    * Retrieves employee growth statistics for a specific year.
    */
   async getEmployeeGrowthStats(branchId?: string, year?: number) {
-    const targetYear = year || new Date().getFullYear();
     const query = this.repo
       .createQueryBuilder('employee')
       .select("TO_CHAR(employee.createdAt, 'Mon')", 'month')
       .addSelect('COUNT(employee.id)', 'count')
-      .where('EXTRACT(YEAR FROM employee.createdAt) = :year', { year: targetYear })
       .andWhere('employee.status != :deleted', { deleted: EmployeeStatus.DELETED });
+
+    if (year) {
+      query.andWhere('EXTRACT(YEAR FROM employee.createdAt) = :year', { year });
+    }
 
     if (branchId) {
       query.andWhere('employee.branch_id = :branchId', { branchId });

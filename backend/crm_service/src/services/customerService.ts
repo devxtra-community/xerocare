@@ -24,10 +24,10 @@ export class CustomerService {
   }
 
   /**
-   * Retrieves all customers.
+   * Retrieves all customers, optionally filtered by branch.
    */
-  async getAllCustomers(): Promise<Customer[]> {
-    return this.customerRepository.findAll();
+  async getAllCustomers(branchId?: string): Promise<Customer[]> {
+    return this.customerRepository.findAll(branchId);
   }
 
   /**

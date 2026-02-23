@@ -131,12 +131,18 @@ export const updateproduct = async (req: Request, res: Response, next: NextFunct
       payload.imageUrl = undefined;
     }
 
-    const updated = await service.updateProduct(id, payload);
-
-    if (!updated) {
+    const product = await service.findOne(id);
+    if (!product) {
       throw new AppError('Product not found', 404);
     }
 
+    // Branch isolation
+    const isAdmin = req.user?.role === 'ADMIN';
+    if (!isAdmin && product.warehouse?.branchId !== req.user?.branchId) {
+      throw new AppError('Access denied: Product belongs to another branch', 403);
+    }
+
+    await service.updateProduct(id, payload);
     res.status(200).json({
       success: true,
       message: 'Product updated successfully',
@@ -157,6 +163,17 @@ export const deleteproduct = async (req: Request, res: Response, next: NextFunct
 
     if (typeof id !== 'string') {
       throw new AppError('Invalid product id', 400);
+    }
+
+    const product = await service.findOne(id);
+    if (!product) {
+      throw new AppError('Product not found', 404);
+    }
+
+    // Branch isolation
+    const isAdmin = req.user?.role === 'ADMIN';
+    if (!isAdmin && product.warehouse?.branchId !== req.user?.branchId) {
+      throw new AppError('Access denied: Product belongs to another branch', 403);
     }
 
     await service.deleteProduct(id);
@@ -183,6 +200,13 @@ export const getproductbyid = async (req: Request, res: Response, next: NextFunc
     if (!product) {
       throw new AppError('Product not found', 404);
     }
+
+    // Branch isolation
+    const isAdmin = req.user?.role === 'ADMIN';
+    if (!isAdmin && product.warehouse?.branchId !== req.user?.branchId) {
+      throw new AppError('Access denied: Product belongs to another branch', 403);
+    }
+
     return res.status(200).json({
       success: true,
       data: product,
