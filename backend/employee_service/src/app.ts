@@ -1,7 +1,7 @@
+import './config/env';
 import 'reflect-metadata';
 import express, { urlencoded } from 'express';
 import { Source } from './config/dataSource';
-import './config/env'; // Trigger restart
 import adminRouter from './routes/adminRouter';
 import employeeRouter from './routes/employeeRouter';
 import authRouter from './routes/authRouter';
@@ -32,7 +32,7 @@ const startServer = async () => {
     await startBranchConsumer();
     logger.info('Database connected');
 
-    const PORT = process.env.EMPLOYEE_PORT;
+    const PORT = process.env.EMPLOYEE_PORT || process.env.PORT || 3002;
     app.listen(PORT, () => {
       logger.info(`Server running on port ${PORT}`);
     });
