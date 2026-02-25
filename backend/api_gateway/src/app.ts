@@ -21,7 +21,6 @@ const app: Express = express();
 app.set('trust proxy', 1);
 
 const CLIENT_URL = process.env.CLIENT_URL;
-console.log(CLIENT_URL);
 logger.info(`CORS Configured for origin: ${CLIENT_URL}`);
 
 const allowedOrigins = [CLIENT_URL, 'http://localhost:3000', 'http://127.0.0.1:3000'].filter(
