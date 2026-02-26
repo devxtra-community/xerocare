@@ -5,7 +5,7 @@ module.exports = {
       cwd: './backend/api_gateway',
       script: 'node',
       args: 'dist/app.js',
-      env: { PORT: 3001 },
+      env: { PORT: 3000 },
       autorestart: true,
       watch: false,
     },
@@ -51,7 +51,7 @@ module.exports = {
       // Use the next binary directly – avoids spawning a shell/pnpm wrapper
       script: 'node_modules/next/dist/bin/next',
       args: 'start',
-      env: { PORT: 3000 },
+      env: { PORT: 3006 },
       autorestart: true,
       watch: false,
     },

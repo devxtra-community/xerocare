@@ -95,6 +95,13 @@ app.use('/e', createProxyMiddleware(empProxyOptions));
 app.use('/i', createProxyMiddleware(invProxyOptions));
 app.use('/b', createProxyMiddleware(billProxyOptions));
 app.use('/c', createProxyMiddleware(crmProxyOptions));
+app.use(
+  '/',
+  createProxyMiddleware({
+    target: 'http://localhost:3006',
+    changeOrigin: true,
+  }),
+);
 
 app.use(errorHandler);
 app.listen(PORT, () => {
