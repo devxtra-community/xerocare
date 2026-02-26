@@ -23,7 +23,7 @@ export default function SalaryDistributionChart({
           const rawSalary = res.data.bySalary;
           const chartData = [
             { name: 'Branch Manager', value: rawSalary.BRANCH_MANAGER || 0 },
-            { name: 'Employee Manager', value: rawSalary.EMPLOYEE_MANAGER || 0 },
+            { name: 'Manager', value: rawSalary.MANAGER || 0 },
             { name: 'Sales Staff', value: rawSalary.SALES_STAFF || 0 },
             { name: 'Rent & Lease Staff', value: rawSalary.RENT_LEASE_STAFF || 0 },
             { name: 'Service Staff', value: rawSalary.SERVICE_STAFF || 0 },

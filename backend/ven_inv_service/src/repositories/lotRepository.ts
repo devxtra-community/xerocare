@@ -3,6 +3,7 @@ import { Source } from '../config/db';
 import { Lot, LotStatus } from '../entities/lotEntity';
 import { LotItem, LotItemType } from '../entities/lotItemEntity';
 import { SparePart } from '../entities/sparePartEntity';
+import { Vendor } from '../entities/vendorEntity';
 import { AppError } from '../errors/appError';
 import { CreateLotDto } from '../types/lotTypes';
 
@@ -182,6 +183,14 @@ export class LotRepository {
 
       savedLot.totalAmount = itemsTotal + costsTotal;
       savedLot.items = lotItems;
+
+      // Sync vendor totals
+      const vendor = await manager.findOne(Vendor, { where: { id: data.vendorId } });
+      if (vendor) {
+        vendor.totalOrders = (Number(vendor.totalOrders) || 0) + 1;
+        vendor.purchaseValue = (Number(vendor.purchaseValue) || 0) + savedLot.totalAmount;
+        await manager.save(Vendor, vendor);
+      }
 
       return await manager.save(Lot, savedLot);
     });

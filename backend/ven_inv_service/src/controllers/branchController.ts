@@ -15,7 +15,14 @@ export class BranchController {
   /**
    * Lists all branches.
    */
-  list = async (_req: Request, res: Response) => {
+  list = async (req: Request, res: Response) => {
+    const branchId = req.user?.role === 'ADMIN' ? undefined : req.user?.branchId;
+
+    if (branchId) {
+      const branch = await this.service.getBranchById(branchId);
+      return res.json({ success: true, data: branch ? [branch] : [] });
+    }
+
     const branches = await this.service.getBranches();
     res.json({ success: true, data: branches });
   };
@@ -24,7 +31,16 @@ export class BranchController {
    * Retrieves a branch by ID.
    */
   getById = async (req: Request, res: Response) => {
-    const branch = await this.service.getBranchById(req.params.id as string);
+    const id = req.params.id as string;
+    const branchId = req.user?.role === 'ADMIN' ? undefined : req.user?.branchId;
+
+    if (branchId && branchId !== id) {
+      return res
+        .status(403)
+        .json({ success: false, message: 'Access denied: Cannot access other branch details' });
+    }
+
+    const branch = await this.service.getBranchById(id);
     res.json({ success: true, data: branch });
   };
 

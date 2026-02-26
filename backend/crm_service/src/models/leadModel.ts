@@ -21,6 +21,7 @@ export interface ILead extends Document {
   assignedTo?: string;
   createdBy?: string;
   convertedBy?: string;
+  branch_id?: string;
   isDeleted: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -44,6 +45,7 @@ const LeadSchema: Schema = new Schema(
     assignedTo: { type: String },
     createdBy: { type: String },
     convertedBy: { type: String },
+    branch_id: { type: String, index: true },
     isDeleted: { type: Boolean, default: false },
   },
   { timestamps: true },

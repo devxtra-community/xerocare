@@ -49,6 +49,7 @@ type Finance = {
   branchName?: string;
   count: number;
   salaryExpense?: number;
+  purchaseExpense?: number;
 };
 
 /**
@@ -170,14 +171,29 @@ export default function FinanceReport() {
       const monthNum = (idx + 1).toString().padStart(2, '0');
       const monthData = filteredFinance.filter((f) => f.month.endsWith(`-${monthNum}`));
       const income = monthData.reduce((s: number, f: Finance) => s + f.income, 0);
-      const expense = monthData.reduce((s: number, f: Finance) => s + f.expense, 0);
+      const purchaseExpense = monthData.reduce(
+        (s: number, f: Finance) => s + (f.purchaseExpense || 0),
+        0,
+      );
       const salaryExpense = monthData.reduce(
         (s: number, f: Finance) => s + (f.salaryExpense || 0),
         0,
       );
-      const profit = income - expense;
+      // Re-calculate total expense or use aggregated
+      // Actually f.expense already has purchase + salary from backend.
+      // Let's use the field from the data.
+      const totalExpense = monthData.reduce((s: number, f: Finance) => s + f.expense, 0);
+      const profit = income - totalExpense;
       const margin = income > 0 ? parseFloat(((profit / income) * 100).toFixed(1)) : 0;
-      return { month: m, income, expense, salaryExpense, profit, margin };
+      return {
+        month: m,
+        income,
+        expense: totalExpense,
+        purchaseExpense,
+        salaryExpense,
+        profit,
+        margin,
+      };
     })
     .filter((d) => d.income > 0 || d.expense > 0);
 
@@ -258,7 +274,7 @@ export default function FinanceReport() {
                   radius={[4, 4, 0, 0]}
                 />
                 <Bar
-                  dataKey="expense"
+                  dataKey="purchaseExpense"
                   name="Purchase Expense"
                   barSize={20}
                   fill="#93c5fd"

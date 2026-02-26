@@ -49,6 +49,7 @@
     "reflect-metadata": "^0.2.2",
     "typeorm": "^0.3.28",
     "ua-parser-js": "^2.0.7",
-    "winston": "^3.19.0"
+    "winston": "^3.19.0",
+    "xlsx": "^0.18.5"
   }
 }

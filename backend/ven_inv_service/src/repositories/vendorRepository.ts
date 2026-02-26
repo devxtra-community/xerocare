@@ -27,20 +27,15 @@ export class VendorRepository extends Repository<Vendor> {
     return this.findOne({ where: { name } });
   }
 
-  /**
-   * Finds all active vendors, optionally with branch-specific stats.
-   */
   async findActive(branchId?: string) {
     const vendors = await this.find({
       where: { status: VendorStatus.ACTIVE },
       order: { createdAt: 'DESC' },
     });
 
-    if (!branchId) return vendors;
-
     return Promise.all(
       vendors.map(async (vendor) => {
-        const stats = await this.getBranchStats(vendor.id, branchId);
+        const stats = await this.getVendorTotals(vendor.id, branchId);
         return {
           ...vendor,
           totalOrders: stats.totalOrders,
@@ -58,9 +53,9 @@ export class VendorRepository extends Repository<Vendor> {
       where: { id, status: VendorStatus.ACTIVE },
     });
 
-    if (!vendor || !branchId) return vendor;
+    if (!vendor) return vendor;
 
-    const stats = await this.getBranchStats(vendor.id, branchId);
+    const stats = await this.getVendorTotals(vendor.id, branchId);
     return {
       ...vendor,
       totalOrders: stats.totalOrders,
@@ -69,25 +64,33 @@ export class VendorRepository extends Repository<Vendor> {
   }
 
   /**
-   * Calculates branch-specific statistics for a vendor.
+   * Calculates statistics for a vendor (global or branch-specific).
    */
-  private async getBranchStats(vendorId: string, branchId: string) {
+  private async getVendorTotals(vendorId: string, branchId?: string) {
     const manager = this.manager;
 
     // Get total orders (from vendor requests)
-    const requestCount = await manager
+    const ordersQuery = manager
       .createQueryBuilder('vendor_requests', 'vr')
-      .where('vr.vendor_id = :vendorId', { vendorId })
-      .andWhere('vr.branch_id = :branchId', { branchId })
-      .getCount();
+      .where('vr.vendor_id = :vendorId', { vendorId });
+
+    if (branchId) {
+      ordersQuery.andWhere('vr.branch_id = :branchId', { branchId });
+    }
+
+    const requestCount = await ordersQuery.getCount();
 
     // Get total purchase value (from lots)
-    const lotStats = await manager
+    const lotStatsQuery = manager
       .createQueryBuilder('lots', 'l')
       .select('SUM(l.total_amount)', 'total')
-      .where('l.vendor_id = :vendorId', { vendorId })
-      .andWhere('l.branch_id = :branchId', { branchId })
-      .getRawOne();
+      .where('l.vendor_id = :vendorId', { vendorId });
+
+    if (branchId) {
+      lotStatsQuery.andWhere('l.branch_id = :branchId', { branchId });
+    }
+
+    const lotStats = await lotStatsQuery.getRawOne();
 
     return {
       totalOrders: requestCount || 0,

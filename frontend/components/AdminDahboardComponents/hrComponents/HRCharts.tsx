@@ -70,7 +70,7 @@ export default function HRCharts({ selectedYear }: { selectedYear: number | 'all
       {/* Employee Growth Chart */}
       <div className="flex-1 bg-card p-6 rounded-2xl shadow-sm border-0">
         <h3 className="text-lg font-semibold text-primary mb-4">
-          Employee Growth ({selectedYear === 'all' ? 'All Time' : selectedYear})
+          New Employees ({selectedYear === 'all' ? 'All Time' : selectedYear})
         </h3>
         <div className="h-[300px] w-full">
           <ResponsiveContainer width="100%" height="100%">
