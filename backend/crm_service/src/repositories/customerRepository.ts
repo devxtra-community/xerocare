@@ -22,10 +22,14 @@ export class CustomerRepository {
   }
 
   /**
-   * Retrieves all customers.
+   * Retrieves all customers, optionally filtered by branch.
    */
-  async findAll(): Promise<Customer[]> {
-    return this.repo.find();
+  async findAll(branchId?: string): Promise<Customer[]> {
+    const where: { branch_id?: string } = {};
+    if (branchId) {
+      where.branch_id = branchId;
+    }
+    return this.repo.find({ where });
   }
 
   /**

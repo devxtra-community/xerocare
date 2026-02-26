@@ -24,6 +24,14 @@ export const addEmployee = async (req: Request, res: Response, next: NextFunctio
       branchId,
     } = req.body;
 
+    // Branch isolation: Manager can only add to their own branch
+    const effectiveBranchId =
+      req.user?.role === EmployeeRole.MANAGER ? req.user?.branchId : branchId;
+
+    if (req.user?.role === EmployeeRole.MANAGER && branchId && branchId !== req.user?.branchId) {
+      throw new AppError('Access denied: Cannot add employee to another branch', 403);
+    }
+
     const files = req.files as {
       profile_image?: MulterS3File[];
       id_proof?: MulterS3File[];
@@ -48,7 +56,7 @@ export const addEmployee = async (req: Request, res: Response, next: NextFunctio
       salary: salary ? Number(salary) : null,
       profile_image_url: profileImageUrl,
       id_proof_key: idProofKey,
-      branchId,
+      branchId: effectiveBranchId,
     });
 
     res.status(201).json({
@@ -68,6 +76,12 @@ export const addEmployee = async (req: Request, res: Response, next: NextFunctio
 export const getEmployeeIdProof = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const employeeId = req.params.id as string;
+
+    const employee = await service.getEmployeeById(employeeId);
+    // Security check for managers: can only see employees in their branch
+    if (req.user?.role === EmployeeRole.MANAGER && employee.branch_id !== req.user.branchId) {
+      throw new AppError('Access denied: employee belongs to another branch', 403);
+    }
 
     const result = await service.getEmployeeIdProof(employeeId);
 
@@ -201,6 +215,13 @@ export const updateEmployee = async (req: Request, res: Response, next: NextFunc
  */
 export const deleteEmployee = async (req: Request, res: Response, next: NextFunction) => {
   try {
+    const employee = await service.getEmployeeById(req.params.id as string);
+
+    // Security check for managers: can only delete employees in their branch
+    if (req.user?.role === EmployeeRole.MANAGER && employee.branch_id !== req.user.branchId) {
+      throw new AppError('Access denied: employee belongs to another branch', 403);
+    }
+
     await service.deleteEmployee(req.params.id as string);
 
     return res.json({

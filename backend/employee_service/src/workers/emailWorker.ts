@@ -39,7 +39,9 @@ export const startWorker = async () => {
       }
 
       if (job.type === 'WELCOME') {
+        logger.info(`Sending welcome mail to: ${job.email}`);
         await sendEmployeeWelcomeMail(job.email, job.password);
+        logger.info(`Successfully sent welcome mail to: ${job.email}`);
       }
 
       if (job.type === 'VENDOR_WELCOME') {

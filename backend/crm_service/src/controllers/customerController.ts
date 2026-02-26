@@ -14,7 +14,11 @@ export class CustomerController {
    */
   createCustomer = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const customer = await this.customerService.createCustomer(req.body);
+      const data = { ...req.body };
+      if (req.user?.role !== 'ADMIN') {
+        data.branch_id = req.user?.branchId;
+      }
+      const customer = await this.customerService.createCustomer(data);
       res.status(201).json({
         success: true,
         data: customer,
@@ -29,7 +33,8 @@ export class CustomerController {
    */
   getAllCustomers = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const customers = await this.customerService.getAllCustomers();
+      const branchId = req.user?.role === 'ADMIN' ? undefined : req.user?.branchId;
+      const customers = await this.customerService.getAllCustomers(branchId);
       res.status(200).json({
         success: true,
         data: customers,
@@ -49,6 +54,12 @@ export class CustomerController {
         throw new AppError('Invalid ID', 400);
       }
       const customer = await this.customerService.getCustomerById(id);
+
+      // Branch isolation check
+      if (req.user?.role !== 'ADMIN' && customer.branch_id !== req.user?.branchId) {
+        throw new AppError('Access denied: Customer belongs to another branch', 403);
+      }
+
       res.status(200).json({
         success: true,
         data: customer,
@@ -67,10 +78,17 @@ export class CustomerController {
       if (typeof id !== 'string') {
         throw new AppError('Invalid ID', 400);
       }
-      const customer = await this.customerService.updateCustomer(id, req.body);
+
+      const customer = await this.customerService.getCustomerById(id);
+      // Branch isolation check
+      if (req.user?.role !== 'ADMIN' && customer.branch_id !== req.user?.branchId) {
+        throw new AppError('Access denied: Cannot update customer from another branch', 403);
+      }
+
+      const updatedCustomer = await this.customerService.updateCustomer(id, req.body);
       res.status(200).json({
         success: true,
-        data: customer,
+        data: updatedCustomer,
       });
     } catch (error) {
       next(error);
@@ -86,6 +104,13 @@ export class CustomerController {
       if (typeof id !== 'string') {
         throw new AppError('Invalid ID', 400);
       }
+
+      const customer = await this.customerService.getCustomerById(id);
+      // Branch isolation check
+      if (req.user?.role !== 'ADMIN' && customer.branch_id !== req.user?.branchId) {
+        throw new AppError('Access denied: Cannot delete customer from another branch', 403);
+      }
+
       await this.customerService.deleteCustomer(id);
       res.status(200).json({
         success: true,

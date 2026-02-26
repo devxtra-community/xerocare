@@ -348,6 +348,12 @@ export const getInvoiceById = async (req: Request, res: Response, next: NextFunc
   try {
     const id = req.params.id as string;
     const invoice = await billingService.getInvoiceById(id);
+
+    // Branch isolation: Only Admin can see invoices from any branch
+    if (req.user?.role !== 'ADMIN' && invoice.branchId !== req.user?.branchId) {
+      throw new AppError('Access denied: Invoice belongs to another branch', 403);
+    }
+
     return res.status(200).json({
       success: true,
       data: invoice,
@@ -528,9 +534,11 @@ export const getFinanceReport = async (req: Request, res: Response, next: NextFu
   try {
     const { branchId, saleType, month, year } = req.query;
     const effectiveBranchId =
-      req.user?.role === 'ADMIN'
-        ? (branchId as string)
-        : (branchId as string) || req.user?.branchId;
+      req.user?.role === 'ADMIN' ? (branchId as string) : req.user?.branchId;
+
+    if (!effectiveBranchId && req.user?.role !== 'ADMIN') {
+      throw new AppError('Branch ID required for managers', 400);
+    }
 
     const report = await reportService.getFinanceReport({
       branchId: effectiveBranchId,

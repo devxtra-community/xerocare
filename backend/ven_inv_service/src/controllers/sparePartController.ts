@@ -96,7 +96,21 @@ export const updateSparePart = async (req: Request, res: Response) => {
   try {
     const { id } = req.params as { id: string };
     const branchId = req.user?.branchId;
-    if (!branchId) return res.status(400).json({ success: false, message: 'Branch ID required' });
+    const role = req.user?.role;
+
+    if (!branchId && role !== 'ADMIN')
+      return res.status(400).json({ success: false, message: 'Branch ID required' });
+
+    const sparePart = await service.findById(id);
+    if (!sparePart)
+      return res.status(404).json({ success: false, message: 'Spare part not found' });
+
+    // Branch isolation
+    if (role !== 'ADMIN' && sparePart.branch_id !== branchId) {
+      return res
+        .status(403)
+        .json({ success: false, message: 'Access denied: Spare part belongs to another branch' });
+    }
 
     const result = await service.updateSparePart(id, req.body);
     res.status(200).json(result);
@@ -114,7 +128,21 @@ export const deleteSparePart = async (req: Request, res: Response) => {
   try {
     const { id } = req.params as { id: string };
     const branchId = req.user?.branchId;
-    if (!branchId) return res.status(400).json({ success: false, message: 'Branch ID required' });
+    const role = req.user?.role;
+
+    if (!branchId && role !== 'ADMIN')
+      return res.status(400).json({ success: false, message: 'Branch ID required' });
+
+    const sparePart = await service.findById(id);
+    if (!sparePart)
+      return res.status(404).json({ success: false, message: 'Spare part not found' });
+
+    // Branch isolation
+    if (role !== 'ADMIN' && sparePart.branch_id !== branchId) {
+      return res
+        .status(403)
+        .json({ success: false, message: 'Access denied: Spare part belongs to another branch' });
+    }
 
     const result = await service.deleteSparePart(id);
     res.status(200).json(result);

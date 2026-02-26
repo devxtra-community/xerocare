@@ -7,9 +7,9 @@ import { httpLogger } from './middlewares/httpLogger';
 import healthRouter from './routes/healthRoutes';
 import { Source } from './config/dataSource';
 import { getRabbitChannel } from './config/rabbitmq';
-import { startEmailWorker } from './workers/emailWorker';
 import invoiceRouter from './routes/invoiceRoutes';
 import usageRouter from './routes/usageRoutes';
+import { startEmailWorker } from './workers/emailWorker';
 
 const app = express();
 
@@ -50,7 +50,8 @@ const startServer = async () => {
 
     await getRabbitChannel();
     startEmailWorker();
-    const PORT = process.env.BILLING_PORT;
+    // const PORT = process.env.BILLING_PORT;
+    const PORT = process.env.PORT || 3004;
 
     app.listen(PORT, () => {
       logger.info(`Billing service running on port ${PORT}`);

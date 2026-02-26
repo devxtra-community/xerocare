@@ -36,6 +36,7 @@ import {
 } from '@/lib/branch';
 import { getManagersByRole, Employee } from '@/lib/employee';
 import { toast } from 'sonner';
+import { getUserFromToken } from '@/lib/auth';
 
 type BranchFormData = {
   id?: string;
@@ -69,6 +70,9 @@ export default function BranchReport() {
   const [formOpen, setFormOpen] = useState(false);
   const [editingBranch, setEditingBranch] = useState<Branch | null>(null);
   const [branchToDelete, setBranchToDelete] = useState<Branch | null>(null);
+
+  const user = getUserFromToken();
+  const isAdmin = user?.role === 'ADMIN';
 
   useEffect(() => {
     fetchData();
@@ -217,15 +221,17 @@ export default function BranchReport() {
             />
           </div>
 
-          <Button
-            className="bg-primary text-white gap-2"
-            onClick={() => {
-              setEditingBranch(null);
-              setFormOpen(true);
-            }}
-          >
-            <Plus size={16} /> Add Branch
-          </Button>
+          {isAdmin && (
+            <Button
+              className="bg-primary text-white gap-2"
+              onClick={() => {
+                setEditingBranch(null);
+                setFormOpen(true);
+              }}
+            >
+              <Plus size={16} /> Add Branch
+            </Button>
+          )}
         </div>
 
         {/* TABLE */}
@@ -272,23 +278,25 @@ export default function BranchReport() {
                     </span>
                   </TableCell>
                   <TableCell className="px-4">
-                    <div className="flex gap-3 text-sm">
-                      <button
-                        className="text-primary hover:underline"
-                        onClick={() => {
-                          setEditingBranch(b);
-                          setFormOpen(true);
-                        }}
-                      >
-                        Edit
-                      </button>
-                      <button
-                        className="text-red-600 hover:underline"
-                        onClick={() => setBranchToDelete(b)}
-                      >
-                        Delete
-                      </button>
-                    </div>
+                    {isAdmin && (
+                      <div className="flex gap-3 text-sm">
+                        <button
+                          className="text-primary hover:underline"
+                          onClick={() => {
+                            setEditingBranch(b);
+                            setFormOpen(true);
+                          }}
+                        >
+                          Edit
+                        </button>
+                        <button
+                          className="text-red-600 hover:underline"
+                          onClick={() => setBranchToDelete(b)}
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    )}
                   </TableCell>
                 </TableRow>
               ))}

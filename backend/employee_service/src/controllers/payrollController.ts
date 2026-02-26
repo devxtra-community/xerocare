@@ -58,14 +58,9 @@ export class PayrollController {
 
               const jobLabels: Record<string, string> = {
                 SALES: 'Sales',
-                RENT: 'Rent',
-                LEASE: 'Lease',
                 RENT_LEASE: 'Rent & Lease',
                 CRM: 'CRM',
-                TECHNICIAN: 'Technician / Service',
-                DELIVERY: 'Delivery & Installation',
-                READING_AGENT: 'Meter Reading Agent',
-                EMPLOYEE_MANAGER: 'Employee Manager',
+                MANAGER: 'Manager',
                 FINANCE_SALES: 'Finance - Sales',
                 FINANCE_RENT_LEASE: 'Finance - Rent & Lease',
                 FINANCE_MANAGER: 'Finance Manager',

@@ -9,10 +9,13 @@ export class LeadRepository {
   }
 
   /**
-   * Retrieves all leads, optionally including deleted ones.
+   * Retrieves all leads, optionally filtering by branch or deletion status.
    */
-  async findAllLeads(includeDeleted = false): Promise<ILead[]> {
-    const filter = includeDeleted ? {} : { isDeleted: false };
+  async findAllLeads(includeDeleted = false, branchId?: string): Promise<ILead[]> {
+    const filter: Record<string, unknown> = includeDeleted ? {} : { isDeleted: false };
+    if (branchId) {
+      filter.branch_id = branchId;
+    }
     return await LeadModel.find(filter).sort({ createdAt: -1 });
   }
 

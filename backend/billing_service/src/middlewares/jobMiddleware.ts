@@ -7,10 +7,7 @@ export enum EmployeeJob {
   SALES = 'SALES',
   RENT_LEASE = 'RENT_LEASE',
   CRM = 'CRM',
-  TECHNICIAN = 'TECHNICIAN',
-  DELIVERY = 'DELIVERY',
-  READING_AGENT = 'READING_AGENT',
-  EMPLOYEE_MANAGER = 'EMPLOYEE_MANAGER',
+  MANAGER = 'MANAGER',
 }
 
 // Mirror of backend FinanceJob enum
@@ -42,7 +39,7 @@ export const requireJob = (...allowedJobs: EmployeeJob[]) => {
 
     // Check if employee's job is in allowed list
     if (
-      req.user.employeeJob !== EmployeeJob.EMPLOYEE_MANAGER &&
+      req.user.employeeJob !== EmployeeJob.MANAGER &&
       !allowedJobs.includes(req.user.employeeJob as EmployeeJob)
     ) {
       // Log security event for audit trail
