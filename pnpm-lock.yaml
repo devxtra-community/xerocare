@@ -362,6 +362,9 @@ importers:
       winston:
         specifier: ^3.19.0
         version: 3.19.0
+      xlsx:
+        specifier: ^0.18.5
+        version: 0.18.5
     devDependencies:
       '@types/bcrypt':
         specifier: ^6.0.0
