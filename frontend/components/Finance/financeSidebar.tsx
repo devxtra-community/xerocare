@@ -96,7 +96,7 @@ export default function FinanceSidebar() {
       if (!res?.data.success) {
         toast.error(res?.data.message);
       } else {
-        router.push(res.data.isadmin ? '/admin/login' : '/login');
+        router.push(res.data.isadmin ? '/adminlogin' : '/login');
         toast.success(res.data.message);
       }
     } catch (err) {
