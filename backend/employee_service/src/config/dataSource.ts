@@ -28,7 +28,7 @@ export const Source = new DataSource({
   synchronize: false,
   entities: [Admin, Employee, Auth, Branch, LeaveApplication, Payroll, Notification],
   extra: {
-    max: 10,
+    max: 20,
     connectionTimeoutMillis: 5000,
     keepAlive: true,
   },

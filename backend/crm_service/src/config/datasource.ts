@@ -16,7 +16,7 @@ export const Source = new DataSource({
   logging: false,
   entities: [Customer],
   extra: {
-    max: 10,
+    max: 20,
     ssl: { rejectUnauthorized: false },
     connectionTimeoutMillis: 5000,
     keepAlive: true,

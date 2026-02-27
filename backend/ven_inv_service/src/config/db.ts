@@ -43,7 +43,7 @@ export const Source = new DataSource({
     LotItem,
   ],
   extra: {
-    max: 10,
+    max: 20,
     connectionTimeoutMillis: 5000,
     keepAlive: true,
   },

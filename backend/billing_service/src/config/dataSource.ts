@@ -28,7 +28,7 @@ export const Source = new DataSource({
   logging: false, // Keep disabled in production to avoid clutter
   entities: [Invoice, InvoiceItem, UsageRecord, ProductAllocation],
   extra: {
-    max: 10, // Increase connection pool size
+    max: 20, // Increase connection pool size
     // SSL is required by Neon.
     // rejectUnauthorized: false ensures docker doesn't fail due to missing local root certs.
     ssl: {
