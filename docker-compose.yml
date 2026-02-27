@@ -9,12 +9,22 @@ services:
     restart: unless-stopped
     env_file:
       - .env
+    environment:
+      # RabbitMQ and Redis use their compose service hostnames
+      RABBITMQ_URL: amqp://rabbitmq:5672
+      REDIS_URL: redis://redis:6379
     ports:
-      - '3000:3000' # Frontend
+      - '3000:3000' # Frontend (Next.js)
       - '3001:3001' # API Gateway
     depends_on:
-      - redis
-      - rabbitmq
+      redis:
+        condition: service_started
+      rabbitmq:
+        condition: service_healthy
+    # Fix for Alpine/musl EAI_AGAIN DNS failures on concurrent external lookups
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
     networks:
       - xerocare-network
 
@@ -40,6 +50,12 @@ services:
       - rabbitmq_data:/var/lib/rabbitmq/mnesia
     networks:
       - xerocare-network
+    healthcheck:
+      test: ['CMD', 'rabbitmq-diagnostics', 'ping']
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
 
 networks:
   xerocare-network:

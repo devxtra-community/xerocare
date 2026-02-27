@@ -11,8 +11,9 @@ import { ProductAllocation } from '../entities/productAllocationEntity';
 
 export const Source = new DataSource({
   type: 'postgres',
-  url: process.env.DATABASE_URL,
-  synchronize: true, // TEMPORARY FIX: Enable sync to add missing columns
+  url: process.env.BILLING_DATABASE_URL,
+  synchronize: false,
   logging: false,
   entities: [Invoice, InvoiceItem, UsageRecord, ProductAllocation],
+  extra: { max: 2 },
 });

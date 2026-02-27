@@ -1,6 +1,32 @@
-node_modules
+# Version control
 .git
-dist
+.gitignore
+
+# Local env files (never bake secrets into the image)
+.env
 backend/*/.env
 frontend/.env
-.env
+frontend/.env.local
+frontend/.env.*.local
+
+# Dev tooling / editor
+.husky
+.prettierrc.json
+eslint.config.mjs
+commitlint.config.cjs
+.npmrc.local
+
+# Test / docs
+**/*.test.ts
+**/*.spec.ts
+README.md
+Structured_Findings.md
+
+# OS artifacts
+.DS_Store
+Thumbs.db
+
+# NOTE: node_modules and dist are intentionally NOT excluded here.
+# The builder stage installs & compiles inside Docker, so those dirs
+# only exist inside the container – not in the host context being sent.
+# Excluding them from COPY would break the multi-stage build.
