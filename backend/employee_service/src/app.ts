@@ -1,7 +1,7 @@
 import './config/env';
 import 'reflect-metadata';
 import express, { urlencoded } from 'express';
-import { Source } from './config/dataSource';
+import { connectWithRetry } from './config/dataSource';
 import adminRouter from './routes/adminRouter';
 import employeeRouter from './routes/employeeRouter';
 import authRouter from './routes/authRouter';
@@ -23,14 +23,21 @@ app.use(cookieParser());
 app.use(urlencoded({ extended: true }));
 // CORS is handled by API Gateway - do not set CORS headers here
 
+process.on('uncaughtException', (err) => {
+  logger.error('Uncaught Exception (preventing crash):', err);
+});
+process.on('unhandledRejection', (reason) => {
+  logger.error('Unhandled Rejection (preventing crash):', reason);
+});
+
 const startServer = async () => {
   try {
-    await Source.initialize();
+    logger.info('Starting Employee Service initialization...');
+    await connectWithRetry();
     await getRabbitChannel();
     logger.info('RabbitMQ channel connected');
     await startWorker();
     await startBranchConsumer();
-    logger.info('Database connected');
 
     const PORT = process.env.EMPLOYEE_PORT || process.env.PORT || 3002;
     app.listen(PORT, () => {
@@ -38,8 +45,7 @@ const startServer = async () => {
     });
   } catch (error) {
     console.error('CRITICAL ERROR DURING STARTUP:', error);
-    logger.error('DB connection failed', error);
-    process.exit(1);
+    logger.error('Employee service startup encountered a fatal error', error);
   }
 };
 app.use(httpLogger);

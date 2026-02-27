@@ -5,7 +5,7 @@ import { logger } from './config/logger';
 import { errorHandler } from './middlewares/errorHandler';
 import { httpLogger } from './middlewares/httpLogger';
 import healthRouter from './routes/healthRoutes';
-import { Source } from './config/dataSource';
+import { Source, connectWithRetry } from './config/dataSource';
 import { getRabbitChannel } from './config/rabbitmq';
 import invoiceRouter from './routes/invoiceRoutes';
 import usageRouter from './routes/usageRoutes';
@@ -22,10 +22,24 @@ app.use('/usage', usageRouter);
 
 app.use(errorHandler);
 
+/**
+ * Handle uncaught underlying DB disconnects or generic unhandled errors.
+ * This prevents pm2 from crashing entirely if an idle PG connection drops unexpectedly.
+ */
+process.on('uncaughtException', (err) => {
+  logger.error('Uncaught Exception (preventing crash):', err);
+});
+process.on('unhandledRejection', (reason) => {
+  logger.error('Unhandled Rejection (preventing crash):', reason);
+});
+
 const startServer = async () => {
   try {
-    await Source.initialize();
-    logger.info('Database connected');
+    logger.info('Starting Billing Service initialization...');
+
+    // Attempt DB connection with resilience and backoff
+    // Blocks app startup until successfully connected, but does NOT crash loops
+    await connectWithRetry();
 
     // FIX: Manually add missing enum values if they don't exist (TypeORM sync issue with Enums)
     try {
@@ -50,15 +64,16 @@ const startServer = async () => {
 
     await getRabbitChannel();
     startEmailWorker();
-    // const PORT = process.env.BILLING_PORT;
+
     const PORT = process.env.PORT || 3004;
 
     app.listen(PORT, () => {
       logger.info(`Billing service running on port ${PORT}`);
     });
   } catch (error) {
-    logger.error('Billing service startup failed', error);
-    process.exit(1);
+    logger.error('Billing service startup encountered a fatal error', error);
+    // process.exit(1) is removed intentionally so the service doesn't fall into a crash loop.
+    // Instead, rely on Docker/PM2 health-checks or logging mechanisms.
   }
 };
 

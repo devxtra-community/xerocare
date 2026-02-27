@@ -17,11 +17,8 @@ class RedisClient {
         url: redisUrl,
         socket: {
           reconnectStrategy: (retries) => {
-            if (retries > 10) {
-              logger.error('Redis: Max reconnection attempts reached');
-              return new Error('Max reconnection attempts reached');
-            }
-            return Math.min(retries * 100, 3000);
+            // Infinite exponential backoff instead of failing at 10
+            return Math.min(retries * 2000, 30000);
           },
         },
       });

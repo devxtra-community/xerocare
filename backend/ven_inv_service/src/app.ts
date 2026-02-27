@@ -5,7 +5,7 @@ import vendorRouter from './routes/vendorRoute';
 import { errorHandler } from './middlewares/errorHandler';
 import { logger } from './config/logger';
 import healthRouter from './routes/health';
-import { Source } from './config/db';
+import { connectWithRetry } from './config/db';
 import productRoute from './routes/productRoute';
 import branchRouter from './routes/branchRoutes';
 import warehouseRouter from './routes/warehouseRoutes';
@@ -36,14 +36,21 @@ app.use('/brands', brandRouter);
 app.use('/lots', lotRouter);
 app.use(errorHandler);
 
+process.on('uncaughtException', (err) => {
+  logger.error('Uncaught Exception (preventing crash):', err);
+});
+process.on('unhandledRejection', (reason) => {
+  logger.error('Unhandled Rejection (preventing crash):', reason);
+});
+
 const startServer = async () => {
   try {
-    await Source.initialize();
+    logger.info('Starting Vendor Service initialization...');
+    await connectWithRetry();
     await getRabbitChannel();
     await startEmployeeConsumer();
     await startProductStatusConsumer();
     // consumeBillingEvents removed as it is legacy
-    logger.info('Database connected');
 
     const PORT = process.env.VENDOR_PORT;
     app.listen(PORT, () => {
@@ -51,8 +58,7 @@ const startServer = async () => {
     });
   } catch (error) {
     console.error('CRITICAL ERROR DURING STARTUP:', error);
-    logger.error('DB connection failed', error);
-    process.exit(1);
+    logger.error('Vendor service startup encountered a fatal error', error);
   }
 };
 
