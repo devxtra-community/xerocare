@@ -5,7 +5,7 @@ import { logger } from './config/logger';
 import { errorHandler } from './middlewares/errorHandler';
 import { httpLogger } from './middlewares/httpLogger';
 import healthRouter from './routes/healthRoutes';
-import { Source, connectWithRetry } from './config/dataSource';
+import { connectWithRetry } from './config/dataSource';
 import { getRabbitChannel } from './config/rabbitmq';
 import invoiceRouter from './routes/invoiceRoutes';
 import usageRouter from './routes/usageRoutes';
@@ -40,27 +40,6 @@ const startServer = async () => {
     // Attempt DB connection with resilience and backoff
     // Blocks app startup until successfully connected, but does NOT crash loops
     await connectWithRetry();
-
-    // FIX: Manually add missing enum values if they don't exist (TypeORM sync issue with Enums)
-    try {
-      // Check if type exists first
-      const typeExists = await Source.query(
-        `SELECT 1 FROM pg_type WHERE typname = 'invoice_status_enum'`,
-      );
-      if (typeExists && typeExists.length > 0) {
-        await Source.query(
-          `ALTER TYPE public.invoice_status_enum ADD VALUE IF NOT EXISTS 'EMPLOYEE_APPROVED'`,
-        );
-        await Source.query(
-          `ALTER TYPE public.invoice_status_enum ADD VALUE IF NOT EXISTS 'FINANCE_APPROVED'`,
-        );
-        await Source.query(
-          `ALTER TYPE public.invoice_status_enum ADD VALUE IF NOT EXISTS 'ACTIVE_LEASE'`,
-        );
-      }
-    } catch (err) {
-      console.warn('Enum migration warning (handled):', err);
-    }
 
     await getRabbitChannel();
     startEmailWorker();
