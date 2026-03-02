@@ -197,7 +197,10 @@ export default function MonthlyCollectionTable({ mode }: { mode?: 'RENT' | 'LEAS
       cell: (alertItem: CollectionAlert) => {
         const isFinalMonth = alertItem.type === 'SUMMARY_PENDING';
         if (isFinalMonth) return <span className="text-blue-600 font-bold">QAR 0 (Adjusted)</span>;
-        const amount = alertItem.totalAmount || alertItem.monthlyRent || 0;
+        const isLease = alertItem.saleType === 'LEASE';
+        const amount = isLease
+          ? alertItem.monthlyLeaseAmount || alertItem.monthlyEmiAmount || alertItem.monthlyRent || 0
+          : alertItem.totalAmount || alertItem.monthlyRent || 0;
         return <span className="font-bold">{formatCurrency(amount)}</span>;
       },
     },

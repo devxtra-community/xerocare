@@ -398,6 +398,8 @@ export interface CollectionAlert {
   effectiveFrom?: string;
   effectiveTo?: string;
   monthlyRent?: number;
+  monthlyLeaseAmount?: number;
+  monthlyEmiAmount?: number;
   totalAmount?: number;
   usageData?: {
     bwA4Count: number;

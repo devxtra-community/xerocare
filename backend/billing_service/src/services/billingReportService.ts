@@ -163,6 +163,8 @@ export class BillingReportService {
       effectiveFrom?: Date;
       effectiveTo?: Date;
       monthlyRent?: number;
+      monthlyLeaseAmount?: number;
+      monthlyEmiAmount?: number;
       totalAmount?: number;
       recordedMonths?: number;
       tenure?: number;
@@ -194,6 +196,8 @@ export class BillingReportService {
           effectiveFrom: contract.effectiveFrom,
           effectiveTo: contract.effectiveTo,
           monthlyRent: contract.monthlyRent,
+          monthlyLeaseAmount: contract.monthlyLeaseAmount,
+          monthlyEmiAmount: contract.monthlyEmiAmount,
           recordedMonths: history.length,
           tenure: contract.leaseTenureMonths || 0,
         });
@@ -233,6 +237,8 @@ export class BillingReportService {
         effectiveFrom: contract.effectiveFrom,
         effectiveTo: contract.effectiveTo,
         monthlyRent: contract.monthlyRent,
+        monthlyLeaseAmount: contract.monthlyLeaseAmount,
+        monthlyEmiAmount: contract.monthlyEmiAmount,
         recordedMonths: history.length,
         tenure: contract.leaseTenureMonths || 0,
         usageData: {
@@ -258,6 +264,8 @@ export class BillingReportService {
         effectiveFrom: inv.effectiveFrom,
         effectiveTo: inv.effectiveTo,
         monthlyRent: inv.monthlyRent,
+        monthlyLeaseAmount: inv.monthlyLeaseAmount,
+        monthlyEmiAmount: inv.monthlyEmiAmount,
         totalAmount: inv.totalAmount,
         contractStatus: 'COMPLETED',
         recordedMonths: inv.items?.length || 0,
