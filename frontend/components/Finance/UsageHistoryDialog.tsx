@@ -313,7 +313,7 @@ export default function UsageHistoryDialog({
                                           : `${slab.from}-${slab.to}`;
                                     }
                                   }
-                                  appliedRateStr = `₹${applicableRate} (${applicableRange})`;
+                                  appliedRateStr = `QAR ${applicableRate} (${applicableRange})`;
                                 }
                                 return appliedRateStr;
                               } catch {

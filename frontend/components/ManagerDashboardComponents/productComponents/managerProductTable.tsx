@@ -25,6 +25,7 @@ import { modelService, Model } from '@/services/modelService';
 import { commonService, Vendor, Warehouse } from '@/services/commonService';
 import { getBrands, Brand } from '@/lib/brand';
 import { toast } from 'sonner';
+import { formatCurrency } from '@/lib/format';
 
 // Local interfaces removed in favor of imports from @/lib/lot
 
@@ -174,7 +175,7 @@ export default function ManagerProduct() {
             cell: (p: Product) => p.lot?.lotNumber || p.lot?.lot_number || '-',
           },
           { id: 'serial', header: 'SERIAL NO', accessorKey: 'serial_no' as keyof Product },
-          { id: 'price', header: 'PRICE', cell: (p: Product) => `₹${p.sale_price}` },
+          { id: 'price', header: 'PRICE', cell: (p: Product) => formatCurrency(p.sale_price) },
           { id: 'color', header: 'PRINT COLOUR', accessorKey: 'print_colour' as keyof Product },
           {
             id: 'status',

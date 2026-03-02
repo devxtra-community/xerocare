@@ -658,7 +658,7 @@ export class UsageService {
     periodEnd: Date,
   ): string {
     const formatCurrency = (amount: number) =>
-      `₹${Number(amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
+      `QAR ${Number(amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
 
     // Re-derive limits/rates for the email (or pass them in if available)
     // For now, we'll try to use what's in 'usage' if we added it, or we might need to be careful.

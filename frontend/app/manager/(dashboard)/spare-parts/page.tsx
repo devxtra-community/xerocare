@@ -5,6 +5,7 @@ import { Upload, Search, Pencil, Trash2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { StandardTable } from '@/components/table/StandardTable';
 import { usePagination } from '@/hooks/usePagination';
+import { formatCurrency } from '@/lib/format';
 import { DeleteConfirmDialog } from '@/components/dialogs/DeleteConfirmDialog';
 import { sparePartService, SparePartInventoryItem } from '@/services/sparePartService';
 import AddSparePartDialog from '@/components/ManagerDashboardComponents/spareParts/AddSparePartDialog';
@@ -144,7 +145,7 @@ export default function SparePartsPage() {
             {
               id: 'price',
               header: 'PRICE',
-              cell: (item: SparePartInventoryItem) => `₹${item.price}`,
+              cell: (item: SparePartInventoryItem) => formatCurrency(item.price || 0),
               className: 'font-semibold text-[11px] text-primary uppercase',
             },
             {

@@ -222,6 +222,7 @@ export default function EmployeeRentTable({ mode = 'EMPLOYEE' }: EmployeeRentTab
                 <TableHead className="text-primary font-bold">CUSTOMER</TableHead>
                 <TableHead className="text-primary font-bold">ITEMS</TableHead>
                 <TableHead className="text-primary font-bold uppercase">Contract Period</TableHead>
+                <TableHead className="text-primary font-bold uppercase">Duration</TableHead>
                 <TableHead className="text-primary font-bold">AMOUNT</TableHead>
                 <TableHead className="text-primary font-bold">STATUS</TableHead>
                 <TableHead className="text-primary font-bold">DATE</TableHead>
@@ -261,8 +262,23 @@ export default function EmployeeRentTable({ mode = 'EMPLOYEE' }: EmployeeRentTab
                       {inv.startDate ? format(new Date(inv.startDate), 'MMM dd, yyyy') : 'N/A'} -{' '}
                       {inv.endDate ? format(new Date(inv.endDate), 'MMM dd, yyyy') : 'N/A'}
                     </TableCell>
+                    <TableCell className="text-xs font-bold text-slate-600">
+                      {inv.leaseTenureMonths
+                        ? `${inv.leaseTenureMonths} Mo`
+                        : inv.startDate && inv.endDate
+                          ? (() => {
+                              const start = new Date(inv.startDate);
+                              const end = new Date(inv.endDate);
+                              const months =
+                                (end.getFullYear() - start.getFullYear()) * 12 +
+                                (end.getMonth() - start.getMonth()) +
+                                1;
+                              return months > 0 ? `${months} Mo` : 'N/A';
+                            })()
+                          : 'N/A'}
+                    </TableCell>
                     <TableCell className="font-bold text-slate-700">
-                      {formatCurrency(inv.displayAmount ?? inv.totalAmount ?? 0)}
+                      {formatCurrency(inv.monthlyRent || inv.displayAmount || inv.totalAmount || 0)}
                     </TableCell>
                     <TableCell>
                       <Badge

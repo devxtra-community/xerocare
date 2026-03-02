@@ -193,9 +193,9 @@ export default function EmployeeSalesGraphs({
           );
         }
 
-        // Filter out rejected sales from graphs
+        // Only include finance-approved sales (PROFORMA = finance approved, FINAL = completed)
         const salesInvoices = invoices.filter(
-          (inv) => inv.saleType === 'SALE' && inv.status !== 'REJECTED',
+          (inv) => inv.saleType === 'SALE' && (inv.type === 'PROFORMA' || inv.type === 'FINAL'),
         );
 
         // Initialize Monthly Data
