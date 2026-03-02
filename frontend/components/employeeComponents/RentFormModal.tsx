@@ -1079,25 +1079,37 @@ export default function RentFormModal({
                             setForm({
                               ...form,
                               totalLeaseAmount: handleNumberInput(e.target.value),
+                              // Auto-calculate monthly EMI
+                              monthlyEmiAmount:
+                                e.target.value && form.leaseTenureMonths
+                                  ? String(
+                                      Math.round(
+                                        Number(e.target.value) / Number(form.leaseTenureMonths),
+                                      ),
+                                    )
+                                  : '',
                             })
                           }
                           className="font-bold text-slate-800"
                         />
                       </div>
                       <div className="space-y-2">
-                        <label className="text-[11px] font-bold text-muted-foreground uppercase">
+                        <label className="text-[11px] font-bold text-muted-foreground uppercase flex items-center gap-1">
                           Monthly EMI
+                          <span className="text-[9px] text-green-600 font-bold bg-green-50 px-1.5 rounded-full">
+                            AUTO
+                          </span>
                         </label>
                         <Input
                           type="number"
                           value={form.monthlyEmiAmount}
-                          onChange={(e) =>
-                            setForm({
-                              ...form,
-                              monthlyEmiAmount: handleNumberInput(e.target.value),
-                            })
+                          readOnly
+                          className="font-bold text-slate-800 bg-slate-50 cursor-not-allowed"
+                          placeholder={
+                            form.totalLeaseAmount && form.leaseTenureMonths
+                              ? 'Calculating...'
+                              : 'Enter total & tenure first'
                           }
-                          className="font-bold text-slate-800"
                         />
                       </div>
                     </>

@@ -892,7 +892,7 @@ export function InvoiceDetailsDialog({
                                 {item.bwSlabRanges.map(
                                   (s: { from: number; to: number; rate: number }, i: number) => (
                                     <span key={i} className="whitespace-nowrap">
-                                      {s.from}-{s.to}: ₹{s.rate}
+                                      {s.from}-{s.to}: {formatCurrency(s.rate)}
                                     </span>
                                   ),
                                 )}
@@ -905,12 +905,14 @@ export function InvoiceDetailsDialog({
                                           Number(s.to) || 0,
                                       ),
                                     )}
-                                    : ₹{item.bwExcessRate}
+                                    : {formatCurrency(item.bwExcessRate)}
                                   </span>
                                 )}
                               </div>
                             ) : item.bwExcessRate ? (
-                              <span className="whitespace-nowrap">BW: ₹{item.bwExcessRate}</span>
+                              <span className="whitespace-nowrap">
+                                BW: {formatCurrency(item.bwExcessRate)}
+                              </span>
                             ) : null}
 
                             {item.colorSlabRanges && item.colorSlabRanges.length > 0 ? (
@@ -921,7 +923,7 @@ export function InvoiceDetailsDialog({
                                 {item.colorSlabRanges.map(
                                   (s: { from: number; to: number; rate: number }, i: number) => (
                                     <span key={i} className="whitespace-nowrap">
-                                      {s.from}-{s.to}: ₹{s.rate}
+                                      {s.from}-{s.to}: {formatCurrency(s.rate)}
                                     </span>
                                   ),
                                 )}
@@ -934,13 +936,13 @@ export function InvoiceDetailsDialog({
                                           Number(s.to) || 0,
                                       ),
                                     )}
-                                    : ₹{item.colorExcessRate}
+                                    : {formatCurrency(item.colorExcessRate)}
                                   </span>
                                 )}
                               </div>
                             ) : item.colorExcessRate ? (
                               <span className="whitespace-nowrap mt-1">
-                                CLR: ₹{item.colorExcessRate}
+                                CLR: {formatCurrency(item.colorExcessRate)}
                               </span>
                             ) : null}
 
@@ -952,7 +954,7 @@ export function InvoiceDetailsDialog({
                                 {item.comboSlabRanges.map(
                                   (s: { from: number; to: number; rate: number }, i: number) => (
                                     <span key={i} className="whitespace-nowrap">
-                                      {s.from}-{s.to}: ₹{s.rate}
+                                      {s.from}-{s.to}: {formatCurrency(s.rate)}
                                     </span>
                                   ),
                                 )}
@@ -965,13 +967,13 @@ export function InvoiceDetailsDialog({
                                           Number(s.to) || 0,
                                       ),
                                     )}
-                                    : ₹{item.combinedExcessRate}
+                                    : {formatCurrency(item.combinedExcessRate)}
                                   </span>
                                 )}
                               </div>
                             ) : item.combinedExcessRate ? (
                               <span className="whitespace-nowrap mt-1">
-                                CMB: ₹{item.combinedExcessRate}
+                                CMB: {formatCurrency(item.combinedExcessRate)}
                               </span>
                             ) : null}
 
@@ -1004,21 +1006,22 @@ export function InvoiceDetailsDialog({
               Financial Summary
             </h3>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-5 bg-gray-50/50 rounded-xl border border-gray-100">
-              <div className="space-y-1">
-                <p className="text-[10px] font-bold text-gray-400 uppercase">
-                  {currentInvoice.saleType === 'LEASE'
-                    ? 'Monthly EMI'
-                    : mode === 'EMPLOYEE'
-                      ? 'Monthly Rent Balance'
-                      : 'Monthly Rent'}
-                </p>
-                <p className="text-sm font-bold text-gray-700">
-                  ₹
-                  {currentInvoice.saleType === 'LEASE'
-                    ? (currentInvoice.monthlyEmiAmount || 0).toLocaleString()
-                    : financialSummary.monthlyRent.toLocaleString()}
-                </p>
-              </div>
+              {currentInvoice.saleType !== 'SALE' && (
+                <div className="space-y-1">
+                  <p className="text-[10px] font-bold text-gray-400 uppercase">
+                    {currentInvoice.saleType === 'LEASE'
+                      ? 'Monthly EMI'
+                      : mode === 'EMPLOYEE'
+                        ? 'Monthly Rent Balance'
+                        : 'Monthly Rent'}
+                  </p>
+                  <p className="text-sm font-bold text-gray-700">
+                    {currentInvoice.saleType === 'LEASE'
+                      ? formatCurrency(currentInvoice.monthlyEmiAmount || 0)
+                      : formatCurrency(financialSummary.monthlyRent)}
+                  </p>
+                </div>
+              )}
 
               {currentInvoice.saleType === 'LEASE' && (
                 <div className="space-y-1">
@@ -1026,18 +1029,38 @@ export function InvoiceDetailsDialog({
                     Total Lease Amount
                   </p>
                   <p className="text-sm font-bold text-gray-700">
-                    ₹{(currentInvoice.totalLeaseAmount || 0).toLocaleString()}
+                    {formatCurrency(currentInvoice.totalLeaseAmount || 0)}
                   </p>
                 </div>
               )}
-              <div className="space-y-1">
-                <p className="text-[10px] font-bold text-gray-400 uppercase">
-                  {mode === 'EMPLOYEE' ? 'Advance Balance' : 'Advance Adj.'}
-                </p>
-                <p className="text-sm font-bold text-success">
-                  - QAR {financialSummary.advanceAdjusted.toLocaleString()}
-                </p>
-              </div>
+              {currentInvoice.saleType !== 'SALE' && (
+                <div className="space-y-1">
+                  <p className="text-[10px] font-bold text-gray-400 uppercase">
+                    {mode === 'EMPLOYEE' ? 'Advance Balance' : 'Advance Adj.'}
+                  </p>
+                  <p className="text-sm font-bold text-success">
+                    - QAR {financialSummary.advanceAdjusted.toLocaleString()}
+                  </p>
+                </div>
+              )}
+
+              {currentInvoice.saleType === 'SALE' &&
+              (currentInvoice.discountAmount || currentInvoice.discountPercent) ? (
+                <div className="space-y-1">
+                  <p className="text-[10px] font-bold text-gray-400 uppercase">Discount Amount</p>
+                  <p className="text-sm font-bold text-success">
+                    - QAR{' '}
+                    {(
+                      currentInvoice.discountAmount ||
+                      (currentInvoice.grossAmount || 0) *
+                        ((currentInvoice.discountPercent || 0) / 100)
+                    ).toLocaleString(undefined, {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
+                  </p>
+                </div>
+              ) : null}
               {mode === 'FINANCE' && (
                 <>
                   {financialSummary.extraUsage > 0 && (
@@ -1315,15 +1338,15 @@ export function InvoiceDetailsDialog({
                                             if (item.bwSlabRanges && item.bwSlabRanges.length > 0) {
                                               rates.push(`<strong>BW Slabs:</strong>`);
                                               item.bwSlabRanges.forEach((s) =>
-                                                rates.push(`${s.from}-${s.to}: ₹${s.rate}`),
+                                                rates.push(`${s.from}-${s.to}: QAR ${s.rate}`),
                                               );
                                               if (item.bwExcessRate) {
                                                 rates.push(
-                                                  `> ${Math.max(...item.bwSlabRanges.map((s) => Number(s.to) || 0))}: ₹${item.bwExcessRate}`,
+                                                  `> ${Math.max(...item.bwSlabRanges.map((s) => Number(s.to) || 0))}: QAR ${item.bwExcessRate}`,
                                                 );
                                               }
                                             } else if (item.bwExcessRate)
-                                              rates.push(`BW: ₹${item.bwExcessRate}`);
+                                              rates.push(`BW: QAR ${item.bwExcessRate}`);
 
                                             if (
                                               item.colorSlabRanges &&
@@ -1331,15 +1354,15 @@ export function InvoiceDetailsDialog({
                                             ) {
                                               rates.push(`<strong>Color Slabs:</strong>`);
                                               item.colorSlabRanges.forEach((s) =>
-                                                rates.push(`${s.from}-${s.to}: ₹${s.rate}`),
+                                                rates.push(`${s.from}-${s.to}: QAR ${s.rate}`),
                                               );
                                               if (item.colorExcessRate) {
                                                 rates.push(
-                                                  `> ${Math.max(...item.colorSlabRanges.map((s) => Number(s.to) || 0))}: ₹${item.colorExcessRate}`,
+                                                  `> ${Math.max(...item.colorSlabRanges.map((s) => Number(s.to) || 0))}: QAR ${item.colorExcessRate}`,
                                                 );
                                               }
                                             } else if (item.colorExcessRate)
-                                              rates.push(`CLR: ₹${item.colorExcessRate}`);
+                                              rates.push(`CLR: QAR ${item.colorExcessRate}`);
 
                                             if (
                                               item.comboSlabRanges &&
@@ -1347,15 +1370,15 @@ export function InvoiceDetailsDialog({
                                             ) {
                                               rates.push(`<strong>Combo Slabs:</strong>`);
                                               item.comboSlabRanges.forEach((s) =>
-                                                rates.push(`${s.from}-${s.to}: ₹${s.rate}`),
+                                                rates.push(`${s.from}-${s.to}: QAR ${s.rate}`),
                                               );
                                               if (item.combinedExcessRate) {
                                                 rates.push(
-                                                  `> ${Math.max(...item.comboSlabRanges.map((s) => Number(s.to) || 0))}: ₹${item.combinedExcessRate}`,
+                                                  `> ${Math.max(...item.comboSlabRanges.map((s) => Number(s.to) || 0))}: QAR ${item.combinedExcessRate}`,
                                                 );
                                               }
                                             } else if (item.combinedExcessRate)
-                                              rates.push(`CMB: ₹${item.combinedExcessRate}`);
+                                              rates.push(`CMB: QAR ${item.combinedExcessRate}`);
 
                                             return `
                                             <tr style="border-bottom: 1px solid #e5e7eb;">
@@ -1397,8 +1420,8 @@ export function InvoiceDetailsDialog({
                                  <h3 style="margin-top: 0; color: #111827;">Lease Details</h3>
                                  <p style="margin: 5px 0;"><strong>Lease Type:</strong> ${inv.leaseType}</p>
                                  <p style="margin: 5px 0;"><strong>Tenure:</strong> ${inv.leaseTenureMonths} Months</p>
-                                 ${inv.monthlyEmiAmount ? `<p style="margin: 5px 0;"><strong>Monthly EMI:</strong> ₹${inv.monthlyEmiAmount.toLocaleString()}</p>` : ''}
-                                 ${inv.totalLeaseAmount ? `<p style="margin: 5px 0;"><strong>Total Lease Amount:</strong> ₹${inv.totalLeaseAmount.toLocaleString()}</p>` : ''}
+                                 ${inv.monthlyEmiAmount ? `<p style="margin: 5px 0;"><strong>Monthly EMI:</strong> QAR ${inv.monthlyEmiAmount.toLocaleString()}</p>` : ''}
+                                 ${inv.totalLeaseAmount ? `<p style="margin: 5px 0;"><strong>Total Lease Amount:</strong> QAR ${inv.totalLeaseAmount.toLocaleString()}</p>` : ''}
                                </div>
                              `;
                           }
