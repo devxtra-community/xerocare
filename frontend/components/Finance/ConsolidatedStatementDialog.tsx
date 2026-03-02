@@ -96,7 +96,7 @@ export default function ConsolidatedStatementDialog({
         range = slab.to === 9999999 ? `${slab.from}+` : `${slab.from}-${slab.to}`;
       }
     }
-    return `₹${rate} (${range})`;
+    return `QAR ${rate} (${range})`;
   };
 
   return (
@@ -172,7 +172,7 @@ export default function ConsolidatedStatementDialog({
                                       <span className="text-slate-600">
                                         {s.from} - {s.to}
                                       </span>
-                                      <span className="font-semibold">₹{s.rate}</span>
+                                      <span className="font-semibold">QAR {s.rate}</span>
                                     </div>
                                   ))}
                                   {rule.bwExcessRate && (
@@ -183,7 +183,7 @@ export default function ConsolidatedStatementDialog({
                                           ...rule.bwSlabRanges.map((s) => Number(s.to) || 0),
                                         )}
                                       </span>
-                                      <span className="font-semibold">₹{rule.bwExcessRate}</span>
+                                      <span className="font-semibold">QAR {rule.bwExcessRate}</span>
                                     </div>
                                   )}
                                 </div>
@@ -201,7 +201,7 @@ export default function ConsolidatedStatementDialog({
                                       <span className="text-slate-600">
                                         {s.from} - {s.to}
                                       </span>
-                                      <span className="font-semibold">₹{s.rate}</span>
+                                      <span className="font-semibold">QAR {s.rate}</span>
                                     </div>
                                   ))}
                                   {rule.colorExcessRate && (
@@ -212,7 +212,9 @@ export default function ConsolidatedStatementDialog({
                                           ...rule.colorSlabRanges.map((s) => Number(s.to) || 0),
                                         )}
                                       </span>
-                                      <span className="font-semibold">₹{rule.colorExcessRate}</span>
+                                      <span className="font-semibold">
+                                        QAR {rule.colorExcessRate}
+                                      </span>
                                     </div>
                                   )}
                                 </div>
@@ -230,7 +232,7 @@ export default function ConsolidatedStatementDialog({
                                       <span className="text-slate-600">
                                         {s.from} - {s.to}
                                       </span>
-                                      <span className="font-semibold">₹{s.rate}</span>
+                                      <span className="font-semibold">QAR {s.rate}</span>
                                     </div>
                                   ))}
                                   {rule.combinedExcessRate && (
@@ -242,7 +244,7 @@ export default function ConsolidatedStatementDialog({
                                         )}
                                       </span>
                                       <span className="font-semibold">
-                                        ₹{rule.combinedExcessRate}
+                                        QAR {rule.combinedExcessRate}
                                       </span>
                                     </div>
                                   )}
@@ -261,7 +263,7 @@ export default function ConsolidatedStatementDialog({
                                     <div>
                                       B/W Rate:{' '}
                                       <strong className="text-slate-900">
-                                        ₹{rule.bwExcessRate}
+                                        QAR {rule.bwExcessRate}
                                       </strong>
                                     </div>
                                   )}
@@ -269,7 +271,7 @@ export default function ConsolidatedStatementDialog({
                                     <div>
                                       Color Rate:{' '}
                                       <strong className="text-slate-900">
-                                        ₹{rule.colorExcessRate}
+                                        QAR {rule.colorExcessRate}
                                       </strong>
                                     </div>
                                   )}
@@ -277,7 +279,7 @@ export default function ConsolidatedStatementDialog({
                                     <div>
                                       Combined Rate:{' '}
                                       <strong className="text-slate-900">
-                                        ₹{rule.combinedExcessRate}
+                                        QAR {rule.combinedExcessRate}
                                       </strong>
                                     </div>
                                   )}

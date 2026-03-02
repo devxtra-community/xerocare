@@ -10,7 +10,7 @@ export const globalRateLimiter = rateLimit({
     },
   }),
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 1000, // 1000 requests per window (was 100 — too low for development)
+  max: 10000, // 10000 requests per window (increased for development)
   standardHeaders: true,
   legacyHeaders: false,
   message: {
