@@ -111,7 +111,7 @@ export class InvoiceRepository {
         displayAmount =
           Number(entity.totalLeaseAmount) || Number(entity.totalAmount) || calculatedTotal;
       } else if (entity.saleType === SaleType.RENT) {
-        displayAmount = calculatedTotal;
+        displayAmount = calculatedTotal === 0 ? Number(entity.monthlyRent || 0) : calculatedTotal;
       } else {
         displayAmount = Number(entity.totalAmount) || 0;
       }

@@ -643,16 +643,16 @@ export class BillingReportService {
           doc.font('Helvetica');
           if (slabs && slabs.length > 0) {
             slabs.forEach((s) => {
-              doc.text(`    ${s.from} - ${s.to}: INR ${s.rate}`, 60, currentY);
+              doc.text(`    ${s.from} - ${s.to}: QAR ${s.rate}`, 60, currentY);
               currentY += 12;
             });
             if (excessRate) {
               const maxTo = Math.max(...slabs.map((s) => Number(s.to) || 0));
-              doc.text(`    > ${maxTo}: INR ${excessRate}`, 60, currentY);
+              doc.text(`    > ${maxTo}: QAR ${excessRate}`, 60, currentY);
               currentY += 12;
             }
           } else if (excessRate) {
-            doc.text(`    Base Rate: INR ${excessRate}`, 60, currentY);
+            doc.text(`    Base Rate: QAR ${excessRate}`, 60, currentY);
             currentY += 12;
           }
         };
@@ -688,7 +688,7 @@ export class BillingReportService {
 
       doc.text(period, itemCodeX, y);
       doc.text(inv.invoiceNumber, descriptionX, y);
-      doc.text(`INR ${Number(inv.totalAmount).toFixed(2)}`, amountX, y);
+      doc.text(`QAR ${Number(inv.totalAmount).toFixed(2)}`, amountX, y);
       y += 20;
     });
 
@@ -697,7 +697,7 @@ export class BillingReportService {
     const totalCollected =
       summaryInvoice?.grossAmount ||
       monthlyInvoices.reduce((s, i) => s + Number(i.grossAmount || 0), 0);
-    doc.text(`Total Collected: INR ${Number(totalCollected).toFixed(2)}`, amountX, y + 20);
+    doc.text(`Total Collected: QAR ${Number(totalCollected).toFixed(2)}`, amountX, y + 20);
 
     doc.end();
   }

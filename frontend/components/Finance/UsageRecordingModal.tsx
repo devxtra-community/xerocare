@@ -23,7 +23,7 @@ import {
 } from '@/lib/invoice';
 import { Product, getProductById } from '@/lib/product';
 import { toast } from 'sonner';
-import { Loader2, Calendar, IndianRupee } from 'lucide-react';
+import { Loader2, Calendar, Coins } from 'lucide-react';
 import { formatCurrency } from '@/lib/format';
 
 import { format } from 'date-fns';
@@ -758,7 +758,7 @@ export default function UsageRecordingModal({
             {/* Rent / EMI Section Display Only */}
             <div className="p-4 rounded-xl bg-blue-50/50 border border-blue-100 space-y-2">
               <h3 className="text-sm font-bold text-blue-700 flex items-center gap-2">
-                <IndianRupee size={16} /> {isSimplifiedLease ? 'EMI Info' : 'Rent Info'}
+                <Coins size={16} /> {isSimplifiedLease ? 'EMI Info' : 'Rent Info'}
               </h3>
               <div className="flex justify-between items-center">
                 <span className="text-xs font-semibold text-slate-600">
@@ -881,7 +881,7 @@ export default function UsageRecordingModal({
                                 }
                                 return 'Slab-based';
                               }
-                              return `₹${Number(ruleItems.bw?.bwExcessRate || ruleItems.combo?.combinedExcessRate || 0).toFixed(2)}`;
+                              return `QAR ${Number(ruleItems.bw?.bwExcessRate || ruleItems.combo?.combinedExcessRate || 0).toFixed(2)}`;
                             })()}
                           </span>
                         </span>
@@ -1006,7 +1006,7 @@ export default function UsageRecordingModal({
                                 }
                                 return 'Slab-based';
                               }
-                              return `₹${Number(ruleItems.color?.colorExcessRate || ruleItems.combo?.combinedExcessRate || 0).toFixed(2)}`;
+                              return `QAR ${Number(ruleItems.color?.colorExcessRate || ruleItems.combo?.combinedExcessRate || 0).toFixed(2)}`;
                             })()}
                           </span>
                         </span>
@@ -1229,14 +1229,14 @@ export default function UsageRecordingModal({
                                 }
                                 return 'Slab-based';
                               }
-                              return `₹${Number(ruleItems.combo?.combinedExcessRate || 0).toFixed(2)} / Unit`;
+                              return `QAR ${Number(ruleItems.combo?.combinedExcessRate || 0).toFixed(2)} / Unit`;
                             })()}
                           </span>
                         </div>
                         <div className="flex justify-between text-orange-600 font-medium border-t border-slate-100 pt-1 mt-1">
                           <span>Excess Charge:</span>
                           <span>
-                            ₹
+                            QAR
                             {(() => {
                               const bwA4 = Number(formData.bwA4Count || 0);
                               const bwA3 = Number(formData.bwA3Count || 0);
@@ -1346,14 +1346,14 @@ export default function UsageRecordingModal({
                                     }
                                     return 'Slab-based';
                                   }
-                                  return `₹${Number(ruleItems.bw?.bwExcessRate || 0).toFixed(2)} / Unit`;
+                                  return `QAR ${Number(ruleItems.bw?.bwExcessRate || 0).toFixed(2)} / Unit`;
                                 })()}
                               </span>
                             </div>
                             <div className="flex justify-between text-orange-600 font-medium border-t border-slate-100 pt-1 mt-1">
                               <span>Excess Charge:</span>
                               <span>
-                                ₹
+                                QAR
                                 {(() => {
                                   const bwA4 = Number(formData.bwA4Count || 0);
                                   const bwA3 = Number(formData.bwA3Count || 0);
@@ -1454,14 +1454,14 @@ export default function UsageRecordingModal({
                                     }
                                     return 'Slab-based';
                                   }
-                                  return `₹${Number(ruleItems.color?.colorExcessRate || 0).toFixed(2)} / Unit`;
+                                  return `QAR ${Number(ruleItems.color?.colorExcessRate || 0).toFixed(2)} / Unit`;
                                 })()}
                               </span>
                             </div>
                             <div className="flex justify-between text-orange-600 font-medium border-t border-slate-100 pt-1 mt-1">
                               <span>Excess Charge:</span>
                               <span>
-                                ₹
+                                QAR
                                 {(() => {
                                   const clrA4 = Number(formData.colorA4Count || 0);
                                   const clrA3 = Number(formData.colorA3Count || 0);
@@ -1504,10 +1504,10 @@ export default function UsageRecordingModal({
                         if (isLastMonth) {
                           const rentToShow = contract?.monthlyRent || 0;
                           // Always show rent (first month rent is now included)
-                          return `₹${rentToShow.toLocaleString()} (Adv. will be adjusted)`;
+                          return `QAR ${rentToShow.toLocaleString()} (Adv. will be adjusted)`;
                         }
 
-                        return `₹${amount.toLocaleString()}`;
+                        return `QAR ${amount.toLocaleString()}`;
                       })()}
                     </span>
                   </div>
@@ -1515,7 +1515,7 @@ export default function UsageRecordingModal({
                   <div className="pt-3 border-t-2 border-slate-200 flex justify-between items-center mt-2">
                     <span className="font-bold text-sm text-slate-800">Grand Total</span>
                     <span className="font-bold text-lg text-green-600">
-                      ₹{estimatedCost.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      {formatCurrency(estimatedCost)}
                     </span>
                   </div>
                 </div>

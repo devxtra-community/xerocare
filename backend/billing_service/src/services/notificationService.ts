@@ -34,7 +34,7 @@ export class NotificationService {
 
       // --- HTML Generation Logic (Corrected Field Mapping & Formatting) ---
       const formatCurrency = (amount: number) =>
-        `₹${Number(amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
+        `QAR ${Number(amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
 
       let historyRows = '';
       let calculatedGrossTotal = 0;
@@ -125,14 +125,14 @@ export class NotificationService {
             let html = `<div style="margin-bottom: 10px;"><strong style="font-size: 11px; text-transform: uppercase; color: #6b7280;">${title} Slabs:</strong><table style="width: 100%; border-collapse: collapse; margin-top: 5px;">`;
             if (slabs && slabs.length > 0) {
               slabs.forEach((s) => {
-                html += `<tr><td style="padding: 4px 0; font-size: 12px; color: #374151; border-bottom: 1px solid #f3f4f6;">${s.from} - ${s.to}</td><td style="padding: 4px 0; font-size: 12px; font-weight: 600; text-align: right; color: #111827; border-bottom: 1px solid #f3f4f6;">₹${s.rate}</td></tr>`;
+                html += `<tr><td style="padding: 4px 0; font-size: 12px; color: #374151; border-bottom: 1px solid #f3f4f6;">${s.from} - ${s.to}</td><td style="padding: 4px 0; font-size: 12px; font-weight: 600; text-align: right; color: #111827; border-bottom: 1px solid #f3f4f6;">QAR ${s.rate}</td></tr>`;
               });
               if (excessRate) {
                 const maxTo = Math.max(...slabs.map((s) => Number(s.to) || 0));
-                html += `<tr><td style="padding: 4px 0; font-size: 12px; color: #374151;">> ${maxTo}</td><td style="padding: 4px 0; font-size: 12px; font-weight: 600; text-align: right; color: #111827;">₹${excessRate}</td></tr>`;
+                html += `<tr><td style="padding: 4px 0; font-size: 12px; color: #374151;">> ${maxTo}</td><td style="padding: 4px 0; font-size: 12px; font-weight: 600; text-align: right; color: #111827;">QAR ${excessRate}</td></tr>`;
               }
             } else if (excessRate) {
-              html += `<tr><td style="padding: 4px 0; font-size: 12px; color: #374151;">Base Rate</td><td style="padding: 4px 0; font-size: 12px; font-weight: 600; text-align: right; color: #111827;">₹${excessRate}</td></tr>`;
+              html += `<tr><td style="padding: 4px 0; font-size: 12px; color: #374151;">Base Rate</td><td style="padding: 4px 0; font-size: 12px; font-weight: 600; text-align: right; color: #111827;">QAR ${excessRate}</td></tr>`;
             }
             html += `</table></div>`;
             return html;

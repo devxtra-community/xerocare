@@ -50,6 +50,7 @@ export interface Invoice {
   monthlyRent?: number;
   advanceAmount?: number;
   discountPercent?: number;
+  discountAmount?: number;
   effectiveFrom?: string;
   effectiveTo?: string;
   createdAt: string;
@@ -153,6 +154,7 @@ export interface CreateInvoicePayload {
   monthlyRent?: number;
   advanceAmount?: number;
   discountPercent?: number;
+  discountAmount?: number;
   effectiveFrom?: string;
   effectiveTo?: string;
   pricingItems?: {
