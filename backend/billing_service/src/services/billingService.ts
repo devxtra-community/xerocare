@@ -300,6 +300,7 @@ export class BillingService {
     monthlyRent?: number;
     advanceAmount?: number;
     discountPercent?: number;
+    discountAmount?: number;
     effectiveFrom: string; // From UI usually string
     effectiveTo?: string;
     totalAmount?: number;
@@ -464,14 +465,33 @@ export class BillingService {
       monthlyEmiAmount: payload.monthlyEmiAmount,
       monthlyLeaseAmount: payload.monthlyLeaseAmount,
 
-      totalAmount:
-        payload.saleType === SaleType.LEASE
-          ? Number(payload.advanceAmount || 0)
-          : calculatedTotal == 0
-            ? Number(payload.advanceAmount || 0)
-            : calculatedTotal,
+      totalAmount: 0, // Placeholder
       items: invoiceItems,
     });
+
+    // 3. Finalize Amounts for SALE / LEASE / RENT
+    if (payload.saleType === SaleType.SALE) {
+      const discAmount = Number(payload.discountAmount || 0);
+      const discPercent = Number(payload.discountPercent || 0);
+
+      if (discAmount > 0) {
+        invoice.discountAmount = discAmount;
+        invoice.grossAmount = calculatedTotal; // Frontend sends gross/base prices
+        invoice.totalAmount = calculatedTotal - discAmount;
+      } else {
+        invoice.grossAmount = calculatedTotal;
+        invoice.discountAmount = calculatedTotal * (discPercent / 100);
+        invoice.totalAmount = calculatedTotal - (invoice.discountAmount || 0);
+      }
+    } else if (payload.saleType === SaleType.LEASE) {
+      invoice.totalAmount = Number(payload.advanceAmount || 0);
+    } else {
+      // Rent
+      invoice.totalAmount =
+        calculatedTotal === 0 ? Number(payload.advanceAmount || 0) : calculatedTotal;
+    }
+
+    await this.invoiceRepo.save(invoice);
 
     // Publish event if needed (maybe quotation.created later)
     try {
@@ -494,6 +514,7 @@ export class BillingService {
       monthlyRent?: number;
       advanceAmount?: number;
       discountPercent?: number;
+      discountAmount?: number;
       effectiveFrom?: string;
       effectiveTo?: string;
       billingCycleInDays?: number; // Added for CUSTOM period
@@ -547,6 +568,7 @@ export class BillingService {
     if (payload.monthlyRent !== undefined) invoice.monthlyRent = payload.monthlyRent;
     if (payload.advanceAmount !== undefined) invoice.advanceAmount = payload.advanceAmount;
     if (payload.discountPercent !== undefined) invoice.discountPercent = payload.discountPercent;
+    if (payload.discountAmount !== undefined) invoice.discountAmount = payload.discountAmount;
     if (payload.effectiveFrom) invoice.effectiveFrom = new Date(payload.effectiveFrom);
     if (payload.effectiveTo) invoice.effectiveTo = new Date(payload.effectiveTo);
     if (payload.billingCycleInDays !== undefined) {
@@ -633,10 +655,30 @@ export class BillingService {
     }
 
     // Recalculate Total Amount for Quotation Phase
-    if (invoice.saleType === SaleType.LEASE) {
+    if (invoice.saleType === SaleType.SALE) {
+      let calculatedTotal = 0;
+      if (invoice.items && invoice.items.length > 0) {
+        calculatedTotal = invoice.items.reduce(
+          (sum, item) => sum + Number(item.quantity || 0) * Number(item.unitPrice || 0),
+          0,
+        );
+      }
+      const discAmount = Number(invoice.discountAmount || 0);
+      const discPercent = Number(invoice.discountPercent || 0);
+
+      if (discAmount > 0) {
+        invoice.discountAmount = discAmount;
+        invoice.grossAmount = calculatedTotal;
+        invoice.totalAmount = calculatedTotal - discAmount;
+      } else {
+        invoice.grossAmount = calculatedTotal;
+        invoice.discountAmount = calculatedTotal * (discPercent / 100);
+        invoice.totalAmount = calculatedTotal - (invoice.discountAmount || 0);
+      }
+    } else if (invoice.saleType === SaleType.LEASE) {
       invoice.totalAmount = invoice.advanceAmount || 0;
     } else {
-      // Rent or Sale
+      // Rent
       let calculatedTotal = 0;
       if (invoice.items && invoice.items.length > 0) {
         calculatedTotal = invoice.items.reduce(

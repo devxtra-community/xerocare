@@ -767,16 +767,22 @@ function SaleFormModal({
 
                 setIsSubmitting(true);
                 try {
+                  const totalDiscount = form.items.reduce(
+                    (sum, it) => sum + (it.discount || 0) * it.quantity,
+                    0,
+                  );
+
                   const finalPayload: CreateInvoicePayload = {
                     customerId: form.customerId,
                     saleType: form.saleType,
+                    discountAmount: totalDiscount,
                     items: form.items.map((it) => ({
                       description: it.description,
                       quantity: it.quantity,
-                      // We send the NET unit price to backend as 'unitPrice' usually (unless backed expects discount field)
-                      // Based on previous code, only unitPrice exists in payload.
-                      unitPrice: it.unitPrice,
-                      productId: it.productId, // CRITICAL: Include productId
+                      // We send the GROSS/BASE unit price to backend as 'unitPrice'
+                      // so the line items show the original price, and discount is subtracted in summary.
+                      unitPrice: it.basePrice,
+                      productId: it.productId,
                     })),
                   };
 

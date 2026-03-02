@@ -47,8 +47,10 @@ export default function EmployeeSalesStats({
         const totalOrders = invoices.length;
         const salesInvoices = invoices.filter((inv) => inv.saleType === 'SALE');
 
-        // Filter out rejected sales for stats and graphs
-        const approvedSalesInvoices = salesInvoices.filter((inv) => inv.status !== 'REJECTED');
+        // Only count finance-approved sales (type === PROFORMA means finance approved the quotation)
+        const approvedSalesInvoices = salesInvoices.filter(
+          (inv) => inv.type === 'PROFORMA' || inv.type === 'FINAL',
+        );
         const rejectedSalesInvoices = salesInvoices.filter((inv) => inv.status === 'REJECTED');
 
         const salesCount = approvedSalesInvoices.length;
