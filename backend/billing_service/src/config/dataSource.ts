@@ -11,7 +11,7 @@ import { ProductAllocation } from '../entities/productAllocationEntity';
 
 export const Source = new DataSource({
   type: 'postgres',
-  url: process.env.BILLING_DATABASE_URL,
+  url: process.env.BILLING_DATABASE_URL || process.env.DATABASE_URL,
   synchronize: false,
   logging: false,
   entities: [Invoice, InvoiceItem, UsageRecord, ProductAllocation],
