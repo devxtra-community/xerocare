@@ -52,12 +52,6 @@ async function testLotCreation() {
           unitPrice: 100,
         },
       ],
-      transportationCost: 10,
-      documentationCost: 5,
-      shippingCost: 15,
-      groundFieldCost: 0,
-      certificationCost: 0,
-      labourCost: 0,
     };
 
     const newLot = await lotService.createLot(lotData);

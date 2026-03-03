@@ -12,9 +12,12 @@ export const getallModels = async (req: Request, res: Response) => {
     const branchId = req.user?.branchId;
     const isAdmin = req.user?.role === 'ADMIN';
     const filteredBranchId = isAdmin ? undefined : branchId;
+    const search = req.query.search as string;
 
-    logger.info(`Fetching models for branch: ${filteredBranchId || 'All'}`);
-    const models = await service.fetchAllModels(filteredBranchId);
+    logger.info(
+      `Fetching models for branch: ${filteredBranchId || 'All'} with search: ${search || 'None'}`,
+    );
+    const models = await service.fetchAllModels(filteredBranchId, search);
 
     if (!models || models.length === 0) {
       return res.status(200).json({ message: 'No models found', data: [], success: true });

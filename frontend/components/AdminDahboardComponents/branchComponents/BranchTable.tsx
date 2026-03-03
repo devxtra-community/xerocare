@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Search, Plus, Trash2, X } from 'lucide-react';
+import { Search, Plus, Trash2 } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -45,7 +45,7 @@ type BranchFormData = {
   location: string;
   started_date: string;
   status: 'ACTIVE' | 'INACTIVE';
-  manager_id: string;
+  manager_id?: string | null;
 };
 
 const formatDate = (dateString: string) => {
@@ -70,6 +70,7 @@ export default function BranchReport() {
   const [formOpen, setFormOpen] = useState(false);
   const [editingBranch, setEditingBranch] = useState<Branch | null>(null);
   const [branchToDelete, setBranchToDelete] = useState<Branch | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
   const user = getUserFromToken();
   const isAdmin = user?.role === 'ADMIN';
@@ -97,7 +98,8 @@ export default function BranchReport() {
     }
   };
 
-  const getManagerName = (managerId: string) => {
+  const getManagerName = (managerId?: string | null) => {
+    if (!managerId) return 'Unassigned';
     const manager = managers.find((m) => m.id === managerId);
     return manager ? `${manager.first_name} ${manager.last_name}` : 'Unassigned';
   };
@@ -116,6 +118,7 @@ export default function BranchReport() {
 
   const handleSave = async (data: BranchFormData) => {
     try {
+      setSubmitting(true);
       if (editingBranch) {
         const res = await updateBranch(editingBranch.id, {
           name: data.name,
@@ -152,6 +155,8 @@ export default function BranchReport() {
           ? (error as { response?: { data?: { message?: string } } }).response?.data?.message
           : undefined;
       toast.error(message || 'Failed to save branch');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -310,6 +315,7 @@ export default function BranchReport() {
         <BranchFormModal
           initialData={editingBranch}
           managers={managers}
+          isSubmitting={submitting}
           onClose={() => setFormOpen(false)}
           onConfirm={handleSave}
         />
@@ -330,11 +336,13 @@ export default function BranchReport() {
 function BranchFormModal({
   initialData,
   managers,
+  isSubmitting,
   onClose,
   onConfirm,
 }: {
   initialData: Branch | null;
   managers: Employee[];
+  isSubmitting: boolean;
   onClose: () => void;
   onConfirm: (data: BranchFormData) => void;
 }) {
@@ -362,16 +370,10 @@ function BranchFormModal({
   return (
     <Dialog open={true} onOpenChange={(val) => !val && onClose()}>
       <DialogContent className="sm:max-w-xl">
-        <DialogHeader>
-          <DialogTitle className="text-2xl font-bold text-primary">
+        <DialogHeader className="flex flex-row items-center justify-between pb-2 border-b">
+          <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-primary to-blue-600 bg-clip-text text-transparent">
             {initialData ? 'Update Branch' : 'Add Branch'}
           </DialogTitle>
-          <button
-            onClick={onClose}
-            className="h-7 w-7 flex items-center justify-center rounded-full border text-muted-foreground hover:text-gray-800"
-          >
-            <X size={14} />
-          </button>
         </DialogHeader>
 
         <div className="space-y-4">
@@ -380,6 +382,7 @@ function BranchFormModal({
               placeholder="Full name"
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
+              className="h-11 rounded-xl bg-card border shadow-sm focus-visible:ring-2 focus-visible:ring-primary/20"
             />
           </Field>
 
@@ -400,26 +403,33 @@ function BranchFormModal({
               placeholder="City / Area"
               value={form.location}
               onChange={(e) => setForm({ ...form, location: e.target.value })}
+              className="h-11 rounded-xl bg-card border shadow-sm focus-visible:ring-2 focus-visible:ring-primary/20"
             />
           </Field>
 
           <Field label="Started Date">
             <Input
               type="date"
-              value={form.started_date}
+              value={form.started_date ? form.started_date.split('T')[0] : ''}
               onChange={(e) => setForm({ ...form, started_date: e.target.value })}
+              className="h-11 rounded-xl bg-card border shadow-sm focus-visible:ring-2 focus-visible:ring-primary/20"
             />
           </Field>
 
           <Field label="Assign Manager">
             <Select
-              value={form.manager_id}
-              onValueChange={(value) => setForm({ ...form, manager_id: value })}
+              value={form.manager_id || 'unassigned'}
+              onValueChange={(value) =>
+                setForm({ ...form, manager_id: value === 'unassigned' ? null : value })
+              }
             >
-              <SelectTrigger className="w-full">
+              <SelectTrigger className="w-full h-11 rounded-xl bg-card border shadow-sm">
                 <SelectValue placeholder="Select manager" />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="unassigned" className="text-muted-foreground italic">
+                  Not Assigned
+                </SelectItem>
                 {managers.map((manager) => (
                   <SelectItem
                     key={manager.id}
@@ -440,7 +450,7 @@ function BranchFormModal({
                 setForm({ ...form, status: value as 'ACTIVE' | 'INACTIVE' })
               }
             >
-              <SelectTrigger className="w-full">
+              <SelectTrigger className="w-full h-11 rounded-xl bg-card border shadow-sm">
                 <SelectValue placeholder="Select status" />
               </SelectTrigger>
               <SelectContent>
@@ -462,8 +472,9 @@ function BranchFormModal({
           <Button
             className="rounded-full px-6 bg-primary hover:bg-primary/90 text-white"
             onClick={() => onConfirm(form)}
+            disabled={isSubmitting}
           >
-            Confirm
+            {isSubmitting ? 'Processing...' : 'Confirm'}
           </Button>
         </div>
       </DialogContent>
@@ -519,7 +530,7 @@ function ConfirmDeleteModal({
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="space-y-2">
-      <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+      <label className="text-xs font-semibold text-slate-500 uppercase tracking-tight">
         {label}
       </label>
       {children}

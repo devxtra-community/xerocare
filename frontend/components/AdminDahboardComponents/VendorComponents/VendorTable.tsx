@@ -333,8 +333,8 @@ export default function VendorTable({ basePath = '/admin' }: { basePath?: string
                   variant="ghost"
                   size="icon"
                   className="h-8 w-8 text-indigo-500 hover:text-indigo-700 hover:bg-indigo-50"
-                  title="Request Products"
-                  onClick={() => setRequestVendor(v)}
+                  title="Create RFQ"
+                  onClick={() => router.push(`${basePath}/rfqs`)}
                 >
                   <Send className="h-4 w-4" />
                 </Button>

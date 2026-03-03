@@ -320,3 +320,60 @@ export async function sendEmail(to: string, subject: string, html: string) {
     html,
   });
 }
+
+export async function sendRfqExcelMail(
+  to: string,
+  vendorName: string,
+  rfqNumber: string,
+  excelBuffer: Buffer,
+) {
+  const htmlContent = `
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <style>
+        body { font-family: 'Inter', Segoe UI, Roboto, sans-serif; background-color: #f3f4f6; padding: 20px; color: #374151; }
+        .container { max-width: 600px; margin: auto; background: #fff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .header { background: #004a8d; padding: 30px; text-align: center; color: #fff; }
+        .content { padding: 40px; }
+        .greeting { font-size: 18px; font-weight: 600; margin-bottom: 20px; }
+        .attachment-notice { background: #eff6ff; padding: 16px; border-radius: 8px; margin-bottom: 30px; border-left: 4px solid #3b82f6; }
+        .footer { padding: 20px; text-align: center; border-top: 1px solid #e5e7eb; font-size: 13px; color: #6b7280; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header"><h1>Request for Quotation</h1></div>
+        <div class="content">
+          <div class="greeting">Hello ${vendorName},</div>
+          <p>Please find attached the Request for Quotation (<b>${rfqNumber}</b>) from XeroCare.</p>
+          <div class="attachment-notice">
+            <strong>Action Required:</strong>
+            <p>1. Open the attached Excel file.</p>
+            <p>2. Fill in the pricing, stock status, and delivery details in the designated columns.</p>
+            <p>3. Do NOT modify the model ID or description columns.</p>
+            <p>4. Email this file back to us as soon as possible.</p>
+          </div>
+          <p>Thank you for your partnership.</p>
+        </div>
+        <div class="footer">Team XeroCare</div>
+      </div>
+    </body>
+    </html>
+  `;
+
+  await mailer.sendMail({
+    from: process.env.MAIL_USER,
+    to,
+    subject: `Request for Quotation: ${rfqNumber}`,
+    html: htmlContent,
+    attachments: [
+      {
+        filename: `${rfqNumber}_Items.xlsx`,
+        content: excelBuffer,
+      },
+    ],
+  });
+}

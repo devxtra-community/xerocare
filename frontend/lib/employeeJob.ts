@@ -1,23 +1,26 @@
 export enum EmployeeJob {
   SALES = 'SALES',
-  RENT_LEASE = 'RENT_LEASE',
   CRM = 'CRM',
-  MANAGER = 'MANAGER',
+  RENT = 'RENT',
+  LEASE = 'LEASE',
+  EMPLOYEE_MANAGER = 'EMPLOYEE_MANAGER',
 }
 
 export const EMPLOYEE_JOB_LABELS: Record<EmployeeJob, string> = {
   [EmployeeJob.SALES]: 'Sales',
-  [EmployeeJob.RENT_LEASE]: 'Rent & Lease',
   [EmployeeJob.CRM]: 'CRM',
-  [EmployeeJob.MANAGER]: 'Manager',
+  [EmployeeJob.RENT]: 'Rent',
+  [EmployeeJob.LEASE]: 'Lease',
+  [EmployeeJob.EMPLOYEE_MANAGER]: 'Employee Manager',
 };
 
 // Single source of truth for job-to-module mapping (mirrors backend)
 export const EMPLOYEE_JOB_ACCESS: Record<EmployeeJob, string[]> = {
   [EmployeeJob.SALES]: ['sales', 'billing', 'customers'],
-  [EmployeeJob.RENT_LEASE]: ['rent', 'lease', 'reading', 'billing'],
   [EmployeeJob.CRM]: ['crm', 'customers'],
-  [EmployeeJob.MANAGER]: ['*'], // Access all modules
+  [EmployeeJob.RENT]: ['rent', 'reading', 'billing'],
+  [EmployeeJob.LEASE]: ['lease', 'billing'],
+  [EmployeeJob.EMPLOYEE_MANAGER]: ['*'], // Access all employee modules
 };
 
 // Helper function to check if a job has access to a module

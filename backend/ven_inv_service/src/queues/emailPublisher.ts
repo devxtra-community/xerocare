@@ -7,6 +7,13 @@ export type EmailJob =
       vendorName: string;
       productList: string;
       message: string;
+    }
+  | {
+      type: 'RFQ_SENT';
+      email: string;
+      vendorName: string;
+      rfqNumber: string;
+      excelBuffer: Buffer;
     };
 
 export async function publishEmailJob(job: EmailJob) {

@@ -44,24 +44,6 @@ export class Lot {
   @Column({ type: 'enum', enum: LotStatus, default: LotStatus.COMPLETED })
   status!: LotStatus;
 
-  // --- Costs ---
-  @Column({ name: 'transportation_cost', type: 'decimal', precision: 12, scale: 2, default: 0 })
-  transportationCost!: number;
-
-  @Column({ name: 'documentation_cost', type: 'decimal', precision: 12, scale: 2, default: 0 })
-  documentationCost!: number;
-
-  @Column({ name: 'shipping_cost', type: 'decimal', precision: 12, scale: 2, default: 0 })
-  shippingCost!: number;
-
-  @Column({ name: 'ground_field_cost', type: 'decimal', precision: 12, scale: 2, default: 0 })
-  groundFieldCost!: number;
-
-  @Column({ name: 'certification_cost', type: 'decimal', precision: 12, scale: 2, default: 0 })
-  certificationCost!: number;
-
-  @Column({ name: 'labour_cost', type: 'decimal', precision: 12, scale: 2, default: 0 })
-  labourCost!: number;
   // -------------
 
   @Column({ name: 'branch_id', nullable: true })

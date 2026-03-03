@@ -45,7 +45,6 @@ export default function EmployeeFormDialog({
     role: 'EMPLOYEE',
     employee_job: '' as EmployeeJob | '',
     finance_job: '' as FinanceJob | '',
-    manager_job: '',
     salary: '',
     expire_date: '',
     status: 'ACTIVE',
@@ -107,7 +106,6 @@ export default function EmployeeFormDialog({
         role: initialData.role || 'EMPLOYEE',
         employee_job: (initialData as Employee & { employee_job?: EmployeeJob }).employee_job || '',
         finance_job: (initialData as Employee & { finance_job?: FinanceJob }).finance_job || '',
-        manager_job: (initialData as Employee & { manager_job?: string }).manager_job || '',
         salary: initialData.salary?.toString() || '',
         expire_date: initialData.expire_date
           ? new Date(initialData.expire_date).toISOString().split('T')[0]
@@ -125,7 +123,6 @@ export default function EmployeeFormDialog({
         role: 'EMPLOYEE',
         employee_job: '',
         finance_job: '',
-        manager_job: '',
         salary: '',
         expire_date: '',
         status: 'ACTIVE',
@@ -152,7 +149,6 @@ export default function EmployeeFormDialog({
         role: value,
         employee_job: '',
         finance_job: '',
-        manager_job: '',
         branchId: needsBranchSelect ? '' : !isAdmin && userBranchId ? userBranchId : prev.branchId,
       }));
     } else {
@@ -191,9 +187,6 @@ export default function EmployeeFormDialog({
       }
       if (formData.finance_job) {
         data.append('finance_job', formData.finance_job);
-      }
-      if (formData.manager_job) {
-        data.append('manager_job', formData.manager_job);
       }
       data.append('salary', formData.salary);
       if (formData.expire_date) {
@@ -367,31 +360,6 @@ export default function EmployeeFormDialog({
                         {option.label}
                       </SelectItem>
                     ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-
-            {/* Manager Department - Only show for MANAGER role */}
-            {formData.role === 'MANAGER' && (
-              <div className="space-y-2">
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                  Manager Department *
-                </label>
-                <Select
-                  value={formData.manager_job}
-                  onValueChange={(val) => handleSelectChange('manager_job', val)}
-                >
-                  <SelectTrigger className="h-12 rounded-xl bg-muted/50 border-none shadow-sm focus:ring-2 focus:ring-blue-400">
-                    <SelectValue placeholder="Select department" />
-                  </SelectTrigger>
-                  <SelectContent className="rounded-xl">
-                    <SelectItem value="BRANCH_MANAGER">Branch Manager</SelectItem>
-                    <SelectItem value="SALES_MANAGER">Sales Manager</SelectItem>
-                    <SelectItem value="OPERATIONS_MANAGER">Operations Manager</SelectItem>
-                    <SelectItem value="HR_MANAGER">HR Manager</SelectItem>
-                    <SelectItem value="FINANCE_MANAGER">Finance Manager</SelectItem>
-                    <SelectItem value="SERVICE_MANAGER">Service Manager</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

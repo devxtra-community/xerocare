@@ -42,12 +42,6 @@ async function testLotCreation() {
         quantity: number;
         unitPrice: number;
       }>,
-      transportationCost: 100,
-      documentationCost: 50,
-      shippingCost: 75,
-      groundFieldCost: 0,
-      certificationCost: 0,
-      labourCost: 0,
     };
 
     // Add items based on what's available

@@ -46,12 +46,6 @@ async function testExcelExports() {
         quantity: number;
         unitPrice: number;
       }>,
-      transportationCost: 100,
-      documentationCost: 50,
-      shippingCost: 75,
-      groundFieldCost: 0,
-      certificationCost: 0,
-      labourCost: 0,
     };
 
     if (model) {

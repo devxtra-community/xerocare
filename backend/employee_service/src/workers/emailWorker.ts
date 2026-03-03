@@ -62,6 +62,17 @@ export const startWorker = async () => {
         await sendProductRequestMail(job.email, job.vendorName, job.productList, job.message);
       }
 
+      if (job.type === 'RFQ_SENT') {
+        const { sendRfqExcelMail } = await import('../utils/mailer');
+        // Handle buffer conversion if serialized as JSON
+        const buffer =
+          job.excelBuffer.type === 'Buffer'
+            ? Buffer.from(job.excelBuffer.data)
+            : Buffer.from(job.excelBuffer);
+
+        await sendRfqExcelMail(job.email, job.vendorName, job.rfqNumber, buffer);
+      }
+
       channel.ack(msg);
     } catch (err) {
       logger.error('Email worker failed to process message', err);

@@ -12,6 +12,7 @@ import {
   Printer,
   Settings,
   Award,
+  FileText,
 } from 'lucide-react';
 
 import {
@@ -65,6 +66,11 @@ const menuItems = [
     title: 'Vendors',
     icon: Truck,
     href: '/manager/vendors',
+  },
+  {
+    title: 'RFQs',
+    icon: FileText,
+    href: '/manager/rfqs',
   },
   {
     title: 'Employees',
