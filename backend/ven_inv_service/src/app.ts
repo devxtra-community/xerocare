@@ -52,7 +52,7 @@ const startServer = async () => {
     await startProductStatusConsumer();
     // consumeBillingEvents removed as it is legacy
 
-    const PORT = process.env.VENDOR_PORT;
+    const PORT = process.env.PORT;
     app.listen(PORT, () => {
       logger.info(`Server running on port ${PORT}`);
     });

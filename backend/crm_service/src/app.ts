@@ -40,7 +40,7 @@ const startServer = async () => {
 
     await connectMongo();
 
-    const PORT = process.env.CRM_PORT;
+    const PORT = process.env.PORT;
 
     app.listen(PORT, () => {
       logger.info(`CRM service running on port ${PORT}`);
