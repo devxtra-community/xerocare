@@ -8,12 +8,21 @@ import { InvoiceItem } from '../entities/invoiceItemEntity';
 import { UsageRecord } from '../entities/usageRecordEntity';
 
 import { ProductAllocation } from '../entities/productAllocationEntity';
+import { DeviceMeterReading } from '../entities/deviceMeterReadingEntity';
+import { UsageRecordItem } from '../entities/usageRecordItemEntity';
 
 export const Source = new DataSource({
   type: 'postgres',
   url: process.env.BILLING_DATABASE_URL || process.env.DATABASE_URL,
   synchronize: true,
   logging: false,
-  entities: [Invoice, InvoiceItem, UsageRecord, ProductAllocation],
+  entities: [
+    Invoice,
+    InvoiceItem,
+    UsageRecord,
+    ProductAllocation,
+    DeviceMeterReading,
+    UsageRecordItem,
+  ],
   extra: { max: 2 },
 });

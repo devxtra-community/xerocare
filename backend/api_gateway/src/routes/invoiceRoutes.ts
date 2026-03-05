@@ -29,6 +29,7 @@ import {
   sendEmailNotification,
   sendWhatsappNotification,
   uploadContractConfirmation,
+  replaceDeviceAllocation,
 } from '../controllers/invoiceController';
 import { authMiddleware } from '../middleware/authMiddleware';
 import { requireRole } from '../middleware/roleMiddleware';
@@ -141,6 +142,11 @@ router.post(
 );
 
 router.post('/:id/finance-reject', requireRole(UserRole.ADMIN, UserRole.FINANCE), financeReject);
+router.post(
+  '/allocations/replace',
+  requireRole(UserRole.ADMIN, UserRole.FINANCE),
+  replaceDeviceAllocation,
+);
 router.post(
   '/settlements/generate',
   requireRole(UserRole.ADMIN, UserRole.FINANCE),

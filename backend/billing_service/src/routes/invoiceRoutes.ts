@@ -33,6 +33,7 @@ import {
   sendWhatsappNotification,
   getAvailableYears,
   uploadContractConfirmation,
+  replaceDeviceAllocation,
 } from '../controllers/invoiceController';
 import { uploadMeterImage } from '../middlewares/uploadMiddleware';
 import { authMiddleware } from '../middlewares/authMiddleware';
@@ -137,6 +138,13 @@ router.get(
   authMiddleware,
   requireRole(EmployeeRole.ADMIN, EmployeeRole.FINANCE),
   getCompletedCollections,
+);
+
+router.post(
+  '/allocations/replace',
+  authMiddleware,
+  requireRole(EmployeeRole.ADMIN, EmployeeRole.FINANCE),
+  replaceDeviceAllocation,
 );
 
 router.get(

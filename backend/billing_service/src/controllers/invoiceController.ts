@@ -808,3 +808,20 @@ export const getAvailableYears = async (req: Request, res: Response, next: NextF
     next(error);
   }
 };
+
+/**
+ * Replace a device allocation for a contract.
+ */
+export const replaceDeviceAllocation = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const payload = req.body;
+    const result = await billingService.replaceDeviceAllocation(payload);
+    return res.status(200).json({
+      success: true,
+      data: result,
+      message: 'Device replaced successfully',
+    });
+  } catch (error) {
+    next(error);
+  }
+};

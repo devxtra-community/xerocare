@@ -22,6 +22,8 @@ import { formatCurrency } from '@/lib/format';
 import { Invoice, getInvoiceById } from '@/lib/invoice';
 import { differenceInMonths, differenceInDays } from 'date-fns';
 import UsageRecordingModal from '@/components/Finance/UsageRecordingModal';
+import ReplaceDeviceModal from '@/components/Finance/ReplaceDeviceModal';
+import { RefreshCw } from 'lucide-react';
 
 interface InvoiceDetailsDialogProps {
   invoice: Invoice;
@@ -73,6 +75,12 @@ export function InvoiceDetailsDialog({
   const [isLoading, setIsLoading] = React.useState(false);
   const [isEmailSending, setIsEmailSending] = React.useState(false);
   const [isUsageModalOpen, setIsUsageModalOpen] = React.useState(false);
+  const [isReplaceModalOpen, setIsReplaceModalOpen] = React.useState(false);
+  const [replacingAllocation, setReplacingAllocation] = React.useState<{
+    allocationId: string;
+    serialNumber: string;
+  } | null>(null);
+
   const historyRef = React.useRef<HTMLDivElement>(null);
   const scrollContainerRef = React.useRef<HTMLDivElement>(null);
 
@@ -795,6 +803,93 @@ export function InvoiceDetailsDialog({
               </>
             )}
 
+          {/* Allocated Devices Section for Rent/Lease */}
+          {(currentInvoice.saleType === 'RENT' || currentInvoice.saleType === 'LEASE') &&
+            currentInvoice.productAllocations &&
+            currentInvoice.productAllocations.length > 0 && (
+              <div className="space-y-4 pb-6 border-b border-gray-100 mb-6">
+                <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                  Allocated Equipment
+                </h3>
+                <div className="rounded-xl border border-gray-100 overflow-hidden">
+                  <Table>
+                    <TableHeader className="bg-muted/50/80">
+                      <TableRow className="hover:bg-transparent border-gray-100">
+                        <TableHead className="text-[10px] font-bold text-gray-400 h-10">
+                          MODEL/PRODUCT
+                        </TableHead>
+                        <TableHead className="text-[10px] font-bold text-gray-400 h-10">
+                          SERIAL NUMBER
+                        </TableHead>
+                        <TableHead className="text-[10px] font-bold text-gray-400 h-10">
+                          STATUS
+                        </TableHead>
+                        <TableHead className="text-[10px] font-bold text-gray-400 text-right h-10">
+                          ACTIONS
+                        </TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {currentInvoice.productAllocations.map((alloc) => {
+                        // Find matching item description
+                        const item = currentInvoice.items?.find(
+                          (i) => i.modelId === alloc.modelId || i.productId === alloc.productId,
+                        );
+                        const isReplaced =
+                          alloc.status === 'REPLACED' || alloc.status === 'RETURNED';
+
+                        return (
+                          <TableRow
+                            key={alloc.id}
+                            className={`border-gray-50 ${isReplaced ? 'bg-gray-50/50 opacity-70' : ''}`}
+                          >
+                            <TableCell className="py-3 font-medium text-sm text-gray-700">
+                              {item ? getCleanProductName(item.description) : 'Equipment'}
+                            </TableCell>
+                            <TableCell className="py-3 font-bold text-[13px] text-gray-900">
+                              {alloc.serialNumber}
+                            </TableCell>
+                            <TableCell className="py-3 text-xs">
+                              <Badge
+                                variant={isReplaced ? 'outline' : 'default'}
+                                className={
+                                  isReplaced
+                                    ? 'text-gray-500 bg-gray-100'
+                                    : 'bg-emerald-100/50 text-emerald-700 hover:bg-emerald-100 border-emerald-200'
+                                }
+                              >
+                                {alloc.status}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="py-3 text-right">
+                              {mode === 'FINANCE' && alloc.status === 'ALLOCATED' && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-8 px-3 text-xs font-bold text-blue-600 border-blue-200 hover:bg-blue-50"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setReplacingAllocation({
+                                      allocationId: alloc.id,
+                                      serialNumber: alloc.serialNumber,
+                                    });
+                                    setIsReplaceModalOpen(true);
+                                  }}
+                                >
+                                  <RefreshCw size={14} className="mr-1.5" />
+                                  Replace
+                                </Button>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
+            )}
+
           <div className="space-y-4">
             <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
               Order Items
@@ -1491,6 +1586,22 @@ export function InvoiceDetailsDialog({
         }}
         invoice={undefined}
       />
+
+      {replacingAllocation && (
+        <ReplaceDeviceModal
+          isOpen={isReplaceModalOpen}
+          onClose={() => {
+            setIsReplaceModalOpen(false);
+            setReplacingAllocation(null);
+          }}
+          contractId={currentInvoice.referenceContractId || currentInvoice.id}
+          allocationId={replacingAllocation.allocationId}
+          oldSerialNumber={replacingAllocation.serialNumber}
+          onSuccess={() => {
+            handleSelectInvoice(currentInvoice.id); // Refresh current view
+          }}
+        />
+      )}
     </Dialog>
   );
 }

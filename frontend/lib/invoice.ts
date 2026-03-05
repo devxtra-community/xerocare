@@ -239,6 +239,24 @@ export const updateQuotation = async (
 };
 
 /**
+ * Replaces a device allocation mid-contract.
+ */
+export const replaceDeviceAllocation = async (payload: {
+  contractId: string;
+  oldAllocationId: string;
+  newSerialNumber: string;
+  replacementDate: string;
+  replacementReason: string;
+  currentBwA4?: number;
+  currentBwA3?: number;
+  currentColorA4?: number;
+  currentColorA3?: number;
+}): Promise<void> => {
+  const response = await api.post(`/b/invoices/allocations/replace`, payload);
+  return response.data.data;
+};
+
+/**
  * Approves a quotation and handles security deposit recording.
  * @param invoiceId The ID of the quotation to approve
  * @param deposit Optional deposit information

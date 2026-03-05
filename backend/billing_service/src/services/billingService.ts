@@ -17,6 +17,7 @@ import { InvoiceType } from '../entities/enums/invoiceType';
 import { emitProductStatusUpdate } from '../events/publisher/productStatusEvent';
 import { ContractStatus } from '../entities/enums/contractStatus';
 import { ProductAllocation, AllocationStatus } from '../entities/productAllocationEntity';
+import { DeviceMeterReading, ReadingSource } from '../entities/deviceMeterReadingEntity';
 
 const appendOpenEndedSlab = <T extends { from: number; to: number; rate: number }>(
   ranges: T[] | undefined,
@@ -1516,5 +1517,139 @@ export class BillingService {
       body: fullBody,
       invoiceId: contract.id,
     });
+  }
+
+  /**
+   * Replaces a device allocation mid-contract, effectively splitting the allocation timeline
+   * and tracking meter readings correctly so usage is calculated per-allocation window.
+   */
+  async replaceDeviceAllocation(payload: {
+    allocationId: string;
+    replacementTimestamp: string;
+    oldMeter: { bwA4?: number; bwA3?: number; colorA4?: number; colorA3?: number };
+    newProductId: string;
+    newSerialNumber: string;
+    newInitialMeter: { bwA4?: number; bwA3?: number; colorA4?: number; colorA3?: number };
+    reason?: string;
+  }) {
+    const queryRunner = this.invoiceRepo.manager.connection.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      const {
+        allocationId,
+        replacementTimestamp,
+        oldMeter,
+        newProductId,
+        newSerialNumber,
+        newInitialMeter,
+        reason,
+      } = payload;
+
+      const oldAllocation = await queryRunner.manager.findOne(ProductAllocation, {
+        where: { id: allocationId, status: AllocationStatus.ALLOCATED },
+      });
+
+      if (!oldAllocation) {
+        throw new AppError('Active product allocation not found', 404);
+      }
+
+      const ts = new Date(replacementTimestamp);
+
+      // 1. Close old allocation
+      oldAllocation.endTimestamp = ts;
+      oldAllocation.status = AllocationStatus.REPLACED;
+      oldAllocation.replacementReason = reason;
+      oldAllocation.currentBwA4 =
+        oldMeter.bwA4 !== undefined ? oldMeter.bwA4 : oldAllocation.currentBwA4;
+      oldAllocation.currentBwA3 =
+        oldMeter.bwA3 !== undefined ? oldMeter.bwA3 : oldAllocation.currentBwA3;
+      oldAllocation.currentColorA4 =
+        oldMeter.colorA4 !== undefined ? oldMeter.colorA4 : oldAllocation.currentColorA4;
+      oldAllocation.currentColorA3 =
+        oldMeter.colorA3 !== undefined ? oldMeter.colorA3 : oldAllocation.currentColorA3;
+      await queryRunner.manager.save(ProductAllocation, oldAllocation);
+
+      // 2. Record final meter reading for old device
+      const oldReading = queryRunner.manager.create(DeviceMeterReading, {
+        serialNumber: oldAllocation.serialNumber,
+        timestamp: ts,
+        bwA4: oldMeter.bwA4 || 0,
+        bwA3: oldMeter.bwA3 || 0,
+        colorA4: oldMeter.colorA4 || 0,
+        colorA3: oldMeter.colorA3 || 0,
+        source: ReadingSource.MANUAL, // ReadingSource enum handles this
+        invoiceId: oldAllocation.contractId,
+      });
+      await queryRunner.manager.save(DeviceMeterReading, oldReading);
+
+      // 3. Create new allocation
+      const newAllocation = queryRunner.manager.create(ProductAllocation, {
+        contractId: oldAllocation.contractId,
+        modelId: oldAllocation.modelId,
+        productId: newProductId,
+        serialNumber: newSerialNumber,
+        status: AllocationStatus.ALLOCATED,
+        startTimestamp: ts,
+        initialBwA4: newInitialMeter.bwA4 || 0,
+        initialBwA3: newInitialMeter.bwA3 || 0,
+        initialColorA4: newInitialMeter.colorA4 || 0,
+        initialColorA3: newInitialMeter.colorA3 || 0,
+        currentBwA4: newInitialMeter.bwA4 || 0,
+        currentBwA3: newInitialMeter.bwA3 || 0,
+        currentColorA4: newInitialMeter.colorA4 || 0,
+        currentColorA3: newInitialMeter.colorA3 || 0,
+        replacementOfAllocationId: oldAllocation.id,
+      });
+      await queryRunner.manager.save(ProductAllocation, newAllocation);
+
+      // 4. Record initial meter reading for new device
+      const newReading = queryRunner.manager.create(DeviceMeterReading, {
+        serialNumber: newSerialNumber,
+        timestamp: ts,
+        bwA4: newInitialMeter.bwA4 || 0,
+        bwA3: newInitialMeter.bwA3 || 0,
+        colorA4: newInitialMeter.colorA4 || 0,
+        colorA3: newInitialMeter.colorA3 || 0,
+        source: ReadingSource.MANUAL,
+        invoiceId: oldAllocation.contractId,
+      });
+      await queryRunner.manager.save(DeviceMeterReading, newReading);
+
+      // Fetch invoice for billType
+      const invoice = await queryRunner.manager.findOne(Invoice, {
+        where: { id: oldAllocation.contractId },
+      });
+
+      await queryRunner.commitTransaction();
+
+      // Emit events to update inventory status (Return old, Allocate new)
+      if (oldAllocation.productId) {
+        emitProductStatusUpdate({
+          productId: oldAllocation.productId,
+          billType: 'RETURNED',
+          invoiceId: oldAllocation.contractId,
+          approvedBy: 'SYSTEM',
+          approvedAt: ts,
+        }).catch((err) => logger.error('Failed to emitRETURNED event', err));
+      }
+      if (newAllocation.productId) {
+        emitProductStatusUpdate({
+          productId: newAllocation.productId,
+          billType: invoice?.saleType === 'LEASE' ? 'LEASE' : 'RENT',
+          invoiceId: newAllocation.contractId,
+          approvedBy: 'SYSTEM',
+          approvedAt: ts,
+        }).catch((err) => logger.error('Failed to emit LEASE event', err));
+      }
+
+      return newAllocation;
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      throw error;
+    } finally {
+      await queryRunner.release();
+    }
   }
 }

@@ -565,3 +565,17 @@ export const getBranchFinanceStats = async (req: Request, res: Response, next: N
     next(error);
   }
 };
+
+/**
+ * Replace a device allocation for a contract.
+ */
+export const replaceDeviceAllocation = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const payload = req.body;
+    const token = req.headers.authorization?.split(' ')[1] || '';
+    const result = await invoiceAggregationService.replaceDeviceAllocation(payload, token);
+    return res.status(200).json(result);
+  } catch (error) {
+    next(error);
+  }
+};

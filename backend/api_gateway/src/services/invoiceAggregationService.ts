@@ -1360,4 +1360,25 @@ export class InvoiceAggregationService {
       throw new AppError('Internal Gateway Error during finance stats fetch', 500);
     }
   }
+
+  async replaceDeviceAllocation(payload: unknown, token: string) {
+    try {
+      const response = await axios.post(
+        `${BILLING_SERVICE_URL}/invoices/allocations/replace`,
+        payload,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
+      return response.data.data;
+    } catch (error: unknown) {
+      if (axios.isAxiosError(error)) {
+        throw new AppError(
+          error.response?.data?.message || 'Failed to replace device allocation',
+          error.response?.status || 500,
+        );
+      }
+      throw new AppError('Internal Gateway Error during device replacement', 500);
+    }
+  }
 }
