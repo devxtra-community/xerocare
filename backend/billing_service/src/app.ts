@@ -26,47 +26,6 @@ const startServer = async () => {
   try {
     await Source.initialize();
     logger.info('Database connected');
-
-    // FIX: Manually add missing enum values if they don't exist (TypeORM sync issue with Enums)
-    try {
-      // Invoice Status
-      const typeExists = await Source.query(
-        `SELECT 1 FROM pg_type WHERE typname = 'invoice_status_enum'`,
-      );
-      if (typeExists && typeExists.length > 0) {
-        await Source.query(
-          `ALTER TYPE public.invoice_status_enum ADD VALUE IF NOT EXISTS 'EMPLOYEE_APPROVED'`,
-        );
-        await Source.query(
-          `ALTER TYPE public.invoice_status_enum ADD VALUE IF NOT EXISTS 'FINANCE_APPROVED'`,
-        );
-        await Source.query(
-          `ALTER TYPE public.invoice_status_enum ADD VALUE IF NOT EXISTS 'ACTIVE_LEASE'`,
-        );
-      }
-
-      // Contract Status
-      const contractTypeExists = await Source.query(
-        `SELECT 1 FROM pg_type WHERE typname = 'invoice_contractstatus_enum'`,
-      );
-      if (contractTypeExists && contractTypeExists.length > 0) {
-        await Source.query(
-          `ALTER TYPE public.invoice_contractstatus_enum ADD VALUE IF NOT EXISTS 'PENDING_CONFIRMATION'`,
-        );
-      }
-    } catch (err) {
-      console.warn('Enum migration warning (handled):', err);
-    }
-
-    // Add missing columns that TypeORM might fail to sync
-    try {
-      await Source.query(
-        `ALTER TABLE "invoices" ADD COLUMN IF NOT EXISTS "contractConfirmationUrl" character varying`,
-      );
-    } catch (err) {
-      console.warn('Column migration warning (handled):', err);
-    }
-
     await getRabbitChannel();
     startEmailWorker();
     // const PORT = process.env.BILLING_PORT;
