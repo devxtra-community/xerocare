@@ -17,11 +17,11 @@ import { LotItem } from '../entities/lotItemEntity';
 
 export const Source = new DataSource({
   type: 'postgres',
-  url: process.env.DATABASE_URL,
+  url: process.env.VENDOR_DATABASE_URL || process.env.DATABASE_URL,
   ssl: {
     rejectUnauthorized: false,
   },
-  synchronize: false, // Enabled to fix missing columns (lots.branch_id)
+  synchronize: true, // Enabled to fix missing columns (lots.branch_id)
   entities: [
     Vendor,
     Model,

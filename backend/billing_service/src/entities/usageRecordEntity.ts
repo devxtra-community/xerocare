@@ -73,6 +73,15 @@ export class UsageRecord {
   @Column('decimal', { precision: 10, scale: 2, default: 0 })
   totalCharge!: number;
 
+  @Column({ type: 'int', default: 0 })
+  discountBwCopies!: number;
+
+  @Column({ type: 'int', default: 0 })
+  discountColorCopies!: number;
+
+  @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
+  discountAmount!: number;
+
   @Column({
     type: 'enum',
     enum: ReportedBy,

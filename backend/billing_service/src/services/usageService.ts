@@ -30,6 +30,9 @@ export class UsageService {
     bwA3Count: number;
     colorA4Count: number;
     colorA3Count: number;
+    discountBwCopies?: number;
+    discountColorCopies?: number;
+    discountAmount?: number;
 
     meterImageUrl?: string;
     reportedBy?: 'CUSTOMER' | 'EMPLOYEE';
@@ -102,11 +105,21 @@ export class UsageService {
       prevColorA4 = previousRecord.colorA4Count;
       prevColorA3 = previousRecord.colorA3Count;
     } else {
-      // First Month Logic: Use initial counts from contract items
-      prevBwA4 = rule?.initialBwCount || 0;
-      prevBwA3 = 0; // Assuming initial counts are A4 equivalent or A4 only
-      prevColorA4 = rule?.initialColorCount || 0;
+      // First Month Logic: Aggregate initial counts from all PRODUCT items
+      prevBwA4 = 0;
+      prevBwA3 = 0;
+      prevColorA4 = 0;
       prevColorA3 = 0;
+      if (contract.items) {
+        for (const item of contract.items) {
+          if (item.itemType === 'PRODUCT' || item.productId) {
+            prevBwA4 += item.initialBwCount || 0;
+            prevBwA3 += item.initialBwA3Count || 0;
+            prevColorA4 += item.initialColorCount || 0;
+            prevColorA3 += item.initialColorA3Count || 0;
+          }
+        }
+      }
     }
 
     // 4. Calculate Deltas (Monthly Consumption)
@@ -138,8 +151,9 @@ export class UsageService {
     }
 
     // 6. Normalize Monthly Usage (DELTA BASED)
-    const monthlyBw = bwA4Delta + bwA3Delta * 2;
-    const monthlyColor = colorA4Delta + colorA3Delta * 2;
+    // We calculate based on full usage; discount is applied to the charge later.
+    const monthlyBw = Math.max(0, bwA4Delta + bwA3Delta * 2);
+    const monthlyColor = Math.max(0, colorA4Delta + colorA3Delta * 2);
     const monthlyNormalized = monthlyBw + monthlyColor;
 
     // 7. Calculate Exceeded & Charges (BACKEND SOURCE OF TRUTH)
@@ -163,7 +177,11 @@ export class UsageService {
         exceededTotal = Math.max(0, totalMonthly - combinedLimit);
         exceededCharge = exceededTotal * Number(rule.combinedExcessRate || rule.bwExcessRate || 0);
       } else if (contract.rentType === 'CPC' || contract.rentType === 'CPC_COMBO') {
-        exceededTotal = monthlyNormalized;
+        // For exceeded total count, we show the net (after discount) copies
+        exceededTotal = Math.max(
+          0,
+          monthlyNormalized - (payload.discountBwCopies || 0) - (payload.discountColorCopies || 0),
+        );
         const bwCharge = this.calculateSlabCharge(monthlyBw, rule.bwSlabRanges);
         const colorCharge = this.calculateSlabCharge(monthlyColor, rule.colorSlabRanges);
         const comboCharge = this.calculateSlabCharge(monthlyNormalized, rule.comboSlabRanges);
@@ -174,6 +192,10 @@ export class UsageService {
             ? comboCharge
             : bwCharge + colorCharge;
       }
+    }
+
+    if (payload.discountAmount && payload.discountAmount > 0) {
+      exceededCharge = Math.max(0, exceededCharge - payload.discountAmount);
     }
 
     // 8. Determine Rent & Final Month Logic
@@ -247,6 +269,9 @@ export class UsageService {
           advanceAdjusted, // Store Advance Used
           totalCharge: monthlyRent + exceededCharge - advanceAdjusted, // Store ACTUAL PAYABLE charge
           exceededTotal,
+          discountBwCopies: payload.discountBwCopies || 0,
+          discountColorCopies: payload.discountColorCopies || 0,
+          discountAmount: payload.discountAmount || 0,
         });
         await queryRunner.manager.save(usage);
 
@@ -321,6 +346,9 @@ export class UsageService {
         monthlyRent,
         totalCharge,
         exceededTotal,
+        discountBwCopies: payload.discountBwCopies || 0,
+        discountColorCopies: payload.discountColorCopies || 0,
+        discountAmount: payload.discountAmount || 0,
       });
       await this.usageRepo.save(usage);
 
@@ -330,28 +358,25 @@ export class UsageService {
     }
   }
 
-  // Helper: Slab Calculation (Progressive)
+  // Helper: Slab Calculation (Flat-rate)
+  // Whichever slab the total count falls into, that rate applies to ALL copies.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private calculateSlabCharge(count: number, slabs: any[] | undefined): number {
     if (!slabs || !Array.isArray(slabs) || slabs.length === 0) return 0;
+    if (count <= 0) return 0;
 
     // Sort slabs by 'from'
     const sortedSlabs = [...slabs].sort((a, b) => a.from - b.from);
-    let remaining = count;
-    let totalCharge = 0;
 
+    // Find the applicable slab
+    let applicableRate = sortedSlabs[0].rate;
     for (const slab of sortedSlabs) {
-      if (remaining <= 0) break;
-
-      const slabSize = slab.to - slab.from + 1; // e.g. 0-999 is 1000 units
-      // Adjust if 'to' is infinite or very large? Usually 'to' matches next 'from'.
-      // If we assume standard ranges:
-      const applicable = Math.min(remaining, slabSize);
-      totalCharge += applicable * Number(slab.rate);
-      remaining -= applicable;
+      if (count >= slab.from) {
+        applicableRate = slab.rate;
+      }
     }
 
-    return totalCharge;
+    return count * Number(applicableRate);
   }
 
   // Helper: Next Period
@@ -652,6 +677,9 @@ export class UsageService {
       advanceAdjusted?: number;
       totalCharge?: number;
       meterImageUrlNormalized?: string;
+      discountAmount?: number;
+      discountBwCopies?: number;
+      discountColorCopies?: number;
     },
     customerName: string,
     periodStart: Date,
@@ -796,6 +824,22 @@ export class UsageService {
 
         <table style="width: 100%; border-collapse: collapse; margin-top: 20px;">
           <tr>
+            <td style="padding: 10px; border-bottom: 1px solid #edf2f7;">Exceeded Charges</td>
+            <td style="padding: 10px; text-align: right; border-bottom: 1px solid #edf2f7;">${formatCurrency(Number(usage.exceededCharge || 0) + Number(usage.discountAmount || 0))}</td>
+          </tr>
+          ${
+            usage.discountAmount && usage.discountAmount > 0
+              ? `
+          <tr>
+            <td style="padding: 10px; border-bottom: 1px solid #edf2f7; color: #702459;">
+              Discount Applied ${usage.discountBwCopies || usage.discountColorCopies ? `(${Number(usage.discountBwCopies || 0) + Number(usage.discountColorCopies || 0)} copies)` : ''}
+            </td>
+            <td style="padding: 10px; text-align: right; border-bottom: 1px solid #edf2f7; color: #702459;">-${formatCurrency(usage.discountAmount)}</td>
+          </tr>
+          `
+              : ''
+          }
+          <tr>
             <td style="padding: 10px; border-bottom: 1px solid #edf2f7;"><strong>Exceeded Charges Total</strong></td>
             <td style="padding: 10px; text-align: right; border-bottom: 1px solid #edf2f7;"><strong>${formatCurrency(usage.exceededCharge)}</strong></td>
           </tr>
@@ -840,6 +884,9 @@ export class UsageService {
       colorA4Count: number;
       colorA3Count: number;
       billingPeriodEnd: string;
+      discountBwCopies?: number;
+      discountColorCopies?: number;
+      discountAmount?: number;
     },
   ) {
     const usage = await this.usageRepo.findById(id);
@@ -877,10 +924,20 @@ export class UsageService {
       prevColorA4 = previousRecord.colorA4Count;
       prevColorA3 = previousRecord.colorA3Count;
     } else {
-      prevBwA4 = rule?.initialBwCount || 0;
-      prevBwA3 = rule?.initialBwA3Count || 0;
-      prevColorA4 = rule?.initialColorCount || 0;
-      prevColorA3 = rule?.initialColorA3Count || 0;
+      prevBwA4 = 0;
+      prevBwA3 = 0;
+      prevColorA4 = 0;
+      prevColorA3 = 0;
+      if (contract.items) {
+        for (const item of contract.items) {
+          if (item.itemType === 'PRODUCT' || item.productId) {
+            prevBwA4 += item.initialBwCount || 0;
+            prevBwA3 += item.initialBwA3Count || 0;
+            prevColorA4 += item.initialColorCount || 0;
+            prevColorA3 += item.initialColorA3Count || 0;
+          }
+        }
+      }
     }
 
     const bwA4Delta = Math.max(0, payload.bwA4Count - prevBwA4);
@@ -888,8 +945,12 @@ export class UsageService {
     const colorA4Delta = Math.max(0, payload.colorA4Count - prevColorA4);
     const colorA3Delta = Math.max(0, payload.colorA3Count - prevColorA3);
 
-    const monthlyBw = bwA4Delta + bwA3Delta * 2;
-    const monthlyColor = colorA4Delta + colorA3Delta * 2;
+    const discountBw = payload.discountBwCopies ?? usage.discountBwCopies ?? 0;
+    const discountColor = payload.discountColorCopies ?? usage.discountColorCopies ?? 0;
+    const discountAmt = payload.discountAmount ?? usage.discountAmount ?? 0;
+
+    const monthlyBw = Math.max(0, bwA4Delta + bwA3Delta * 2);
+    const monthlyColor = Math.max(0, colorA4Delta + colorA3Delta * 2);
     const monthlyNormalized = monthlyBw + monthlyColor;
 
     let exceededTotal = 0;
@@ -911,7 +972,7 @@ export class UsageService {
         exceededTotal = Math.max(0, totalMonthly - combinedLimit);
         exceededCharge = exceededTotal * Number(rule.combinedExcessRate || rule.bwExcessRate || 0);
       } else if (contract.rentType === 'CPC' || contract.rentType === 'CPC_COMBO') {
-        exceededTotal = monthlyNormalized;
+        exceededTotal = Math.max(0, monthlyNormalized - discountBw - discountColor);
         const bwCharge = this.calculateSlabCharge(monthlyBw, rule.bwSlabRanges);
         const colorCharge = this.calculateSlabCharge(monthlyColor, rule.colorSlabRanges);
         const comboCharge = this.calculateSlabCharge(monthlyNormalized, rule.comboSlabRanges);
@@ -920,6 +981,10 @@ export class UsageService {
             ? comboCharge
             : bwCharge + colorCharge;
       }
+    }
+
+    if (discountAmt > 0) {
+      exceededCharge = Math.max(0, exceededCharge - discountAmt);
     }
 
     usage.bwA4Count = payload.bwA4Count;
@@ -934,6 +999,10 @@ export class UsageService {
     usage.colorA3Delta = colorA3Delta;
     usage.exceededCharge = exceededCharge;
     usage.exceededTotal = exceededTotal;
+
+    usage.discountBwCopies = discountBw;
+    usage.discountColorCopies = discountColor;
+    usage.discountAmount = discountAmt;
 
     usage.totalCharge =
       Number(usage.monthlyRent) + exceededCharge - Number(usage.advanceAdjusted || 0);

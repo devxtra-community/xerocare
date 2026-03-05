@@ -4,7 +4,8 @@ import {
   updateQuotation,
   approveQuotation,
   employeeApprove,
-  financeApprove,
+  allocateMachines,
+  activateContract,
   financeReject,
   generateFinalInvoice,
   getAllInvoices,
@@ -31,7 +32,9 @@ import {
   sendEmailNotification,
   sendWhatsappNotification,
   getAvailableYears,
+  uploadContractConfirmation,
 } from '../controllers/invoiceController';
+import { uploadMeterImage } from '../middlewares/uploadMiddleware';
 import { authMiddleware } from '../middlewares/authMiddleware';
 import { requireRole } from '../middlewares/roleMiddleware';
 import { EmployeeRole } from '../constants/employeeRole';
@@ -54,10 +57,24 @@ router.post(
   employeeApprove,
 );
 router.post(
-  '/:id/finance-approve',
+  '/:id/allocate-machines',
   authMiddleware,
-  // requireRole(FinanceRole.FINANCE), // Ensure generic roles or specific Finance Role check
-  financeApprove,
+  // requireRole(FinanceRole.FINANCE),
+  allocateMachines,
+);
+
+router.post(
+  '/:id/activate-contract',
+  authMiddleware,
+  // requireRole(FinanceRole.FINANCE),
+  activateContract,
+);
+
+router.post(
+  '/:id/upload-confirmation',
+  authMiddleware,
+  uploadMeterImage.single('file'),
+  uploadContractConfirmation,
 );
 
 router.post(

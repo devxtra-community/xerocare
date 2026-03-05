@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import multer from 'multer';
 import {
   createInvoice,
   getAllInvoices,
@@ -7,7 +8,8 @@ import {
   getStats,
   approveQuotation,
   employeeApprove,
-  financeApprove,
+  allocateMachines,
+  activateContract,
   financeReject,
   generateFinalInvoice,
   updateQuotation,
@@ -26,12 +28,14 @@ import {
   getBranchFinanceStats,
   sendEmailNotification,
   sendWhatsappNotification,
+  uploadContractConfirmation,
 } from '../controllers/invoiceController';
 import { authMiddleware } from '../middleware/authMiddleware';
 import { requireRole } from '../middleware/roleMiddleware';
 import { UserRole } from '../constants/userRole';
 
 const router = Router();
+const upload = multer({ storage: multer.memoryStorage() });
 
 router.use(authMiddleware);
 
@@ -117,7 +121,25 @@ router.post(
   requireRole(UserRole.EMPLOYEE, UserRole.MANAGER),
   employeeApprove,
 );
-router.post('/:id/finance-approve', requireRole(UserRole.ADMIN, UserRole.FINANCE), financeApprove);
+router.post(
+  '/:id/allocate-machines',
+  requireRole(UserRole.ADMIN, UserRole.FINANCE),
+  allocateMachines,
+);
+router.post(
+  '/:id/activate-contract',
+  authMiddleware,
+  // requireRole(FinanceRole.FINANCE),
+  activateContract,
+);
+
+router.post(
+  '/:id/upload-confirmation',
+  authMiddleware,
+  upload.single('file'),
+  uploadContractConfirmation,
+);
+
 router.post('/:id/finance-reject', requireRole(UserRole.ADMIN, UserRole.FINANCE), financeReject);
 router.post(
   '/settlements/generate',

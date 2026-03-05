@@ -6,7 +6,7 @@ import { Customer } from '../entities/customerEntity';
 export const Source = new DataSource({
   type: 'postgres',
   url: process.env.CRM_DATABASE_URL || process.env.DATABASE_URL,
-  synchronize: false,
+  synchronize: true,
   logging: false,
   entities: [Customer],
   extra: { max: 2 },

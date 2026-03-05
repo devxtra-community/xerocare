@@ -35,7 +35,9 @@ export interface Invoice {
   createdBy: string;
   totalAmount: number;
   status: string;
-  contractStatus?: 'ACTIVE' | 'COMPLETED' | 'CANCELLED';
+  contractStatus?: 'PENDING_CONFIRMATION' | 'ACTIVE' | 'COMPLETED' | 'CANCELLED';
+  contractConfirmationUrl?: string;
+  emailSentAt?: string;
   type?: 'QUOTATION' | 'PROFORMA' | 'FINAL';
   saleType: string;
   rentType?: 'FIXED_LIMIT' | 'FIXED_COMBO' | 'FIXED_FLAT' | 'CPC' | 'CPC_COMBO';
@@ -91,6 +93,13 @@ export interface Invoice {
   grossAmount?: number;
   displayAmount?: number; // Backend aggregated lifetime total
   invoiceHistory?: Invoice[];
+  productAllocations?: Array<{
+    id: string;
+    productId: string;
+    modelId: string;
+    serialNumber: string;
+    status: string;
+  }>;
 }
 
 export interface UsageRecord {
@@ -248,6 +257,17 @@ export const approveQuotation = async (
 };
 
 /**
+ * Approves an invoice from finance perspective.
+ */
+export const financeApproveInvoice = async (
+  invoiceId: string,
+  payload?: Record<string, unknown>,
+): Promise<Invoice> => {
+  const response = await api.put(`/b/invoices/${invoiceId}/approve`, payload);
+  return response.data.data;
+};
+
+/**
  * Marks an invoice as approved by the employee.
  */
 export const employeeApproveInvoice = async (id: string): Promise<Invoice> => {
@@ -256,13 +276,47 @@ export const employeeApproveInvoice = async (id: string): Promise<Invoice> => {
 };
 
 /**
- * Performs final finance approval for an invoice, including initial meter readings.
+ * Step 1: Finance allocates machines.
  * @param id The ID of the invoice
- * @param payload Approval data including deposit and item updates
+ * @param payload Allocation data
  */
-export const financeApproveInvoice = async (
+export const allocateMachinesInvoice = async (
   id: string,
   payload: {
+    itemUpdates?: {
+      id: string;
+      productId: string;
+    }[];
+  },
+): Promise<Invoice> => {
+  const response = await api.post(`/b/invoices/${id}/allocate-machines`, payload);
+  return response.data.data;
+};
+
+export const uploadContractConfirmationInvoice = async (
+  id: string,
+  file: File,
+): Promise<{ url: string }> => {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const response = await api.post(`/b/invoices/${id}/upload-confirmation`, formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  });
+  return response.data.data;
+};
+
+/**
+ * Step 2: Finance activates the contract after confirmation document is uploaded.
+ * @param id The ID of the invoice
+ * @param payload Activation data including confirmation URL, deposit and initial readings
+ */
+export const activateContractInvoice = async (
+  id: string,
+  payload: {
+    contractConfirmationUrl: string;
     deposit?: {
       amount: number;
       mode: 'CASH' | 'CHEQUE' | 'UPI' | 'BANK_TRANSFER';
@@ -271,7 +325,6 @@ export const financeApproveInvoice = async (
     };
     itemUpdates?: {
       id: string;
-      productId: string;
       initialBwCount?: number;
       initialBwA3Count?: number;
       initialColorCount?: number;
@@ -279,7 +332,7 @@ export const financeApproveInvoice = async (
     }[];
   },
 ): Promise<Invoice> => {
-  const response = await api.post(`/b/invoices/${id}/finance-approve`, payload);
+  const response = await api.post(`/b/invoices/${id}/activate-contract`, payload);
   return response.data.data;
 };
 
@@ -571,6 +624,9 @@ export const updateUsageRecord = async (
     colorA4Count: number;
     colorA3Count: number;
     billingPeriodEnd?: string;
+    discountAmount?: number;
+    discountBwCopies?: number;
+    discountColorCopies?: number;
   },
 ): Promise<unknown> => {
   const response = await api.put(`/b/usage/${usageId}`, payload);

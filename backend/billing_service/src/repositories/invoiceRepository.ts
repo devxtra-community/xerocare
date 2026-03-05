@@ -91,7 +91,7 @@ export class InvoiceRepository {
   findById(id: string) {
     return this.repo.findOne({
       where: { id },
-      relations: ['items'],
+      relations: ['items', 'productAllocations'],
     });
   }
 
@@ -129,6 +129,7 @@ export class InvoiceRepository {
     const qb = this.repo
       .createQueryBuilder('invoice')
       .leftJoinAndSelect('invoice.items', 'items')
+      .leftJoinAndSelect('invoice.productAllocations', 'productAllocations')
       .addSelect((subQuery) => {
         return subQuery
           .select('COALESCE(SUM(usage.totalCharge), 0)', 'calculatedTotal')
@@ -160,6 +161,7 @@ export class InvoiceRepository {
     const qb = this.repo
       .createQueryBuilder('invoice')
       .leftJoinAndSelect('invoice.items', 'items')
+      .leftJoinAndSelect('invoice.productAllocations', 'productAllocations')
       .addSelect((subQuery) => {
         return subQuery
           .select('COALESCE(SUM(usage.totalCharge), 0)', 'calculatedTotal')
@@ -180,6 +182,7 @@ export class InvoiceRepository {
     const qb = this.repo
       .createQueryBuilder('invoice')
       .leftJoinAndSelect('invoice.items', 'items')
+      .leftJoinAndSelect('invoice.productAllocations', 'productAllocations')
       .addSelect((subQuery) => {
         return subQuery
           .select('COALESCE(SUM(usage.totalCharge), 0)', 'calculatedTotal')
@@ -566,7 +569,10 @@ export class InvoiceRepository {
    * Finds completed contracts.
    */
   async findCompletedContracts(branchId?: string) {
-    const qb = this.repo.createQueryBuilder('invoice').leftJoinAndSelect('invoice.items', 'items');
+    const qb = this.repo
+      .createQueryBuilder('invoice')
+      .leftJoinAndSelect('invoice.items', 'items')
+      .leftJoinAndSelect('invoice.productAllocations', 'productAllocations');
 
     qb.where('invoice.contractStatus = :completed', { completed: ContractStatus.COMPLETED });
 
@@ -758,6 +764,7 @@ export class InvoiceRepository {
     const qb = this.repo
       .createQueryBuilder('invoice')
       .leftJoinAndSelect('invoice.items', 'items')
+      .leftJoinAndSelect('invoice.productAllocations', 'productAllocations')
       .where('invoice.branchId = :branchId', { branchId })
       .andWhere('(invoice.type = :proforma OR invoice.type = :final)', {
         proforma: InvoiceType.PROFORMA,

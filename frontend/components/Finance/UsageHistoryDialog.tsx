@@ -28,16 +28,7 @@ import {
 } from '@/lib/invoice';
 import { format } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
-import {
-  Loader2,
-  History,
-  Send,
-  CheckCircle2,
-  Eye,
-  X,
-  Image as ImageIcon,
-  Edit,
-} from 'lucide-react';
+import { Loader2, History, Send, Mail, Eye, X, Image as ImageIcon, Edit } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { formatCurrency } from '@/lib/format';
@@ -367,7 +358,7 @@ export default function UsageHistoryDialog({
                               {sendingId === record.id ? (
                                 <Loader2 className="h-4 w-4 animate-spin" />
                               ) : record.emailSentAt ? (
-                                <CheckCircle2 className="h-4 w-4" />
+                                <Mail className="h-4 w-4" />
                               ) : (
                                 <Send className="h-4 w-4" />
                               )}

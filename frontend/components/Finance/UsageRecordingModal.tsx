@@ -103,6 +103,10 @@ export default function UsageRecordingModal({
     bwA3Count: '',
     colorA4Count: '',
     colorA3Count: '',
+    discountType: 'NONE' as 'NONE' | 'AMOUNT' | 'COPIES',
+    discountAmount: '',
+    discountBwCopies: '',
+    discountColorCopies: '',
     remarks: '',
   });
   const [file, setFile] = useState<File | null>(null);
@@ -130,6 +134,10 @@ export default function UsageRecordingModal({
         bwA3Count: String(inv.bwA3Count || 0),
         colorA4Count: String(inv.colorA4Count || 0),
         colorA3Count: String(inv.colorA3Count || 0),
+        discountType: 'NONE',
+        discountAmount: '',
+        discountBwCopies: '',
+        discountColorCopies: '',
         remarks: inv.financeRemarks || inv.remarks || '',
       });
 
@@ -280,19 +288,31 @@ export default function UsageRecordingModal({
   }, [ruleItems, products]);
 
   const isBw = React.useMemo(() => {
-    // Check rules first
-    if (ruleItems.bw || ruleItems.combo) return true;
-    // Fallback to product capabilities
+    // For combo contracts, input is shown inside the combo block — not separately
+    if (ruleItems.combo) return false;
+    if (ruleItems.bw) return true;
     if (products.some((p) => p.print_colour === 'BLACK_WHITE' || p.print_colour === 'BOTH'))
       return true;
-    // Last resort: if no rules and no color product, but we have a contract, default to B/W
     return !isColorDetected && !!contract;
   }, [ruleItems, products, isColorDetected, contract]);
 
   const isColor = React.useMemo(() => {
-    // Check rules first
+    // For combo contracts, color input is merged into the combo block
+    if (ruleItems.combo) return false;
+    if (ruleItems.color) return true;
+    return products.some((p) => p.print_colour === 'COLOUR' || p.print_colour === 'BOTH');
+  }, [ruleItems, products]);
+
+  // For reading panels: show BW/Color panels whenever any rule requires those readings
+  const showBwReading = React.useMemo(() => {
+    if (ruleItems.bw || ruleItems.combo) return true;
+    if (products.some((p) => p.print_colour === 'BLACK_WHITE' || p.print_colour === 'BOTH'))
+      return true;
+    return !isColorDetected && !!contract;
+  }, [ruleItems, products, isColorDetected, contract]);
+
+  const showColorReading = React.useMemo(() => {
     if (ruleItems.color || ruleItems.combo) return true;
-    // Fallback to product capabilities
     return products.some((p) => p.print_colour === 'COLOUR' || p.print_colour === 'BOTH');
   }, [ruleItems, products]);
 
@@ -333,17 +353,16 @@ export default function UsageRecordingModal({
       slabs: Array<{ from: number; to: number; rate: number }> | undefined,
     ): number => {
       if (!slabs || !Array.isArray(slabs) || slabs.length === 0) return 0;
+      if (count <= 0) return 0;
       const sortedSlabs = [...slabs].sort((a, b) => a.from - b.from);
-      let remaining = count;
-      let totalCharge = 0;
+      // Flat-rate model: find whichever slab the count falls into, apply that rate to ALL copies
+      let applicableRate = sortedSlabs[0]?.rate || 0;
       for (const slab of sortedSlabs) {
-        if (remaining <= 0) break;
-        const slabSize = slab.to - slab.from + 1;
-        const applicable = Math.min(remaining, slabSize);
-        totalCharge += applicable * Number(slab.rate);
-        remaining -= applicable;
+        if (count >= slab.from) {
+          applicableRate = slab.rate;
+        }
       }
-      return totalCharge;
+      return count * Number(applicableRate);
     },
     [],
   );
@@ -357,12 +376,31 @@ export default function UsageRecordingModal({
       prevA3: number,
       type: 'BW' | 'COLOR' | 'COMBO',
       rentType?: string,
+      discountCopies: number = 0,
+      // For COMBO: pass color counts separately to avoid cross-contamination with BW prev
+      colorCountA4?: number,
+      colorCountA3?: number,
+      prevColorA4?: number,
+      prevColorA3?: number,
     ) => {
       if (!ruleItem) return { charge: 0, totalDelta: 0, limit: 0, rate: 0 };
 
-      const deltaA4 = Math.max(0, countA4 - prevA4);
-      const deltaA3 = Math.max(0, countA3 - prevA3);
-      const totalDeltaEquiv = deltaA4 + deltaA3 * 2;
+      let totalDeltaEquiv: number;
+      if (type === 'COMBO' && colorCountA4 !== undefined) {
+        // Compute BW and Color deltas independently to avoid cross-contamination
+        const bwDeltaA4 = Math.max(0, countA4 - prevA4);
+        const bwDeltaA3 = Math.max(0, countA3 - prevA3);
+        const clrDeltaA4 = Math.max(0, (colorCountA4 || 0) - (prevColorA4 || 0));
+        const clrDeltaA3 = Math.max(0, (colorCountA3 || 0) - (prevColorA3 || 0));
+        totalDeltaEquiv = Math.max(
+          0,
+          bwDeltaA4 + bwDeltaA3 * 2 + clrDeltaA4 + clrDeltaA3 * 2 - discountCopies,
+        );
+      } else {
+        const deltaA4 = Math.max(0, countA4 - prevA4);
+        const deltaA3 = Math.max(0, countA3 - prevA3);
+        totalDeltaEquiv = Math.max(0, deltaA4 + deltaA3 * 2 - discountCopies);
+      }
 
       if (rentType?.includes('CPC')) {
         const slabs = parseSlabs(
@@ -440,12 +478,19 @@ export default function UsageRecordingModal({
     if (ruleItems.combo) {
       const breakdown = calculateRuleCost(
         ruleItems.combo,
-        bwA4 + clrA4,
-        bwA3 + clrA3,
-        prevBwA4 + prevClrA4,
-        prevBwA3 + prevClrA3,
+        bwA4, // BW A4 only
+        bwA3, // BW A3 only
+        prevBwA4,
+        prevBwA3,
         'COMBO',
         contract.rentType,
+        formData.discountType === 'COPIES'
+          ? Number(formData.discountBwCopies || 0) + Number(formData.discountColorCopies || 0)
+          : 0,
+        clrA4, // Color A4 separately
+        clrA3, // Color A3 separately
+        prevClrA4, // Prev color A4
+        prevClrA3, // Prev color A3
       );
       totalAmount += breakdown.charge;
     } else {
@@ -458,6 +503,7 @@ export default function UsageRecordingModal({
           prevBwA3,
           'BW',
           contract.rentType,
+          formData.discountType === 'COPIES' ? Number(formData.discountBwCopies || 0) : 0,
         );
         totalAmount += breakdown.charge;
       }
@@ -470,9 +516,14 @@ export default function UsageRecordingModal({
           prevClrA3,
           'COLOR',
           contract.rentType,
+          formData.discountType === 'COPIES' ? Number(formData.discountColorCopies || 0) : 0,
         );
         totalAmount += breakdown.charge;
       }
+    }
+
+    if (formData.discountType === 'AMOUNT') {
+      totalAmount = Math.max(0, totalAmount - Number(formData.discountAmount || 0));
     }
 
     const finalVal = Math.round((totalAmount + Number.EPSILON) * 100) / 100;
@@ -614,12 +665,53 @@ export default function UsageRecordingModal({
 
     try {
       if (editingInvoice) {
+        const discountCopies =
+          formData.discountType === 'COPIES'
+            ? Number(formData.discountBwCopies || 0) + Number(formData.discountColorCopies || 0)
+            : 0;
+        let calculatedDiscountAmount =
+          formData.discountType === 'AMOUNT' ? Number(formData.discountAmount || 0) : 0;
+
+        if (formData.discountType === 'COPIES' && discountCopies > 0) {
+          // Find the applicable slab rate for the current volume to calculate the QAR equivalent
+          const slabs = parseSlabs(
+            ruleItems.combo?.comboSlabRanges ||
+              ruleItems.bw?.bwSlabRanges ||
+              ruleItems.color?.colorSlabRanges,
+          );
+          let rate = 0;
+          if (slabs.length > 0) {
+            const sortedSlabs = [...slabs].sort((a, b) => a.from - b.from);
+            rate = sortedSlabs[0]?.rate || 0;
+            const totalCopies =
+              Number(formData.bwA4Count || 0) +
+              Number(formData.colorA4Count || 0) +
+              (Number(formData.bwA3Count || 0) + Number(formData.colorA3Count || 0)) * 2;
+            for (const s of sortedSlabs) {
+              if (totalCopies >= s.from) rate = Number(s.rate);
+            }
+          } else {
+            rate = Number(
+              ruleItems.combo?.combinedExcessRate ||
+                ruleItems.bw?.bwExcessRate ||
+                ruleItems.color?.colorExcessRate ||
+                0,
+            );
+          }
+          calculatedDiscountAmount = discountCopies * rate;
+        }
+
         await updateUsageRecord(editingInvoice.id, {
           bwA4Count: Number(formData.bwA4Count),
           bwA3Count: Number(formData.bwA3Count),
           colorA4Count: Number(formData.colorA4Count),
           colorA3Count: Number(formData.colorA3Count),
           billingPeriodEnd: formData.billingPeriodEnd,
+          discountAmount: calculatedDiscountAmount,
+          discountBwCopies:
+            formData.discountType === 'COPIES' ? Number(formData.discountBwCopies) : 0,
+          discountColorCopies:
+            formData.discountType === 'COPIES' ? Number(formData.discountColorCopies) : 0,
         });
         toast.success('Usage record updated successfully');
         onSuccess();
@@ -633,6 +725,48 @@ export default function UsageRecordingModal({
         payload.append('bwA3Count', String(formData.bwA3Count));
         payload.append('colorA4Count', String(formData.colorA4Count));
         payload.append('colorA3Count', String(formData.colorA3Count)); // FIXED: was sending colorA4Count
+        const discountCopies =
+          formData.discountType === 'COPIES'
+            ? Number(formData.discountBwCopies || 0) + Number(formData.discountColorCopies || 0)
+            : 0;
+        let calculatedDiscountAmount =
+          formData.discountType === 'AMOUNT' ? Number(formData.discountAmount || 0) : 0;
+
+        if (formData.discountType === 'COPIES' && discountCopies > 0) {
+          const slabs = parseSlabs(
+            ruleItems.combo?.comboSlabRanges ||
+              ruleItems.bw?.bwSlabRanges ||
+              ruleItems.color?.colorSlabRanges,
+          );
+          let rate = 0;
+          if (slabs.length > 0) {
+            const sortedSlabs = [...slabs].sort((a, b) => a.from - b.from);
+            rate = sortedSlabs[0]?.rate || 0;
+            const totalCopies =
+              Number(formData.bwA4Count || 0) +
+              Number(formData.colorA4Count || 0) +
+              (Number(formData.bwA3Count || 0) + Number(formData.colorA3Count || 0)) * 2;
+            for (const s of sortedSlabs) {
+              if (totalCopies >= s.from) rate = Number(s.rate);
+            }
+          } else {
+            rate = Number(
+              ruleItems.combo?.combinedExcessRate ||
+                ruleItems.bw?.bwExcessRate ||
+                ruleItems.color?.colorExcessRate ||
+                0,
+            );
+          }
+          calculatedDiscountAmount = discountCopies * rate;
+        }
+
+        if (calculatedDiscountAmount > 0) {
+          payload.append('discountAmount', String(calculatedDiscountAmount));
+        }
+        if (formData.discountType === 'COPIES') {
+          payload.append('discountBwCopies', String(formData.discountBwCopies || 0));
+          payload.append('discountColorCopies', String(formData.discountColorCopies || 0));
+        }
         payload.append('remarks', formData.remarks);
         payload.append('reportedBy', 'EMPLOYEE');
 
@@ -836,7 +970,7 @@ export default function UsageRecordingModal({
             {/* Readings - only for FSM lease and RENT (not EMI lease) */}
             {!isSimplifiedLease && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {isBw && (
+                {showBwReading && (
                   <div className="space-y-4 p-4 rounded-xl bg-slate-50 border border-slate-100">
                     <h3 className="text-sm font-bold text-slate-700 border-b pb-2 mb-2 flex items-center gap-2">
                       <span className="w-2 h-2 rounded-full bg-slate-900" />
@@ -960,7 +1094,7 @@ export default function UsageRecordingModal({
                   </div>
                 )}
 
-                {isColor && (
+                {showColorReading && (
                   <div className="space-y-4 p-4 rounded-xl bg-rose-50/30 border border-rose-100">
                     <h3 className="text-sm font-bold text-rose-700 border-b border-rose-100 pb-2 mb-2 flex items-center gap-2">
                       <span className="w-2 h-2 rounded-full bg-rose-500" />
@@ -1090,6 +1224,103 @@ export default function UsageRecordingModal({
                         )}
                       </div>
                     </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Discount Options Section */}
+            {!isSimplifiedLease && (
+              <div className="space-y-4 p-4 rounded-xl bg-slate-50 border border-slate-200">
+                <h3 className="text-sm font-bold text-slate-700 pb-2 border-b flex items-center gap-2">
+                  🎁 Apply Discount (Optional)
+                </h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Discount Type</Label>
+                    <select
+                      className="w-full p-2 border border-slate-300 rounded-md"
+                      value={formData.discountType}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          discountType: e.target.value as 'NONE' | 'AMOUNT' | 'COPIES',
+                        })
+                      }
+                    >
+                      <option value="NONE">None</option>
+                      <option value="AMOUNT">By Amount (QAR)</option>
+                      <option value="COPIES">By Copies (A4 Equivalent)</option>
+                    </select>
+                  </div>
+                  {formData.discountType === 'AMOUNT' && (
+                    <div className="space-y-2">
+                      <Label>Discount Amount (QAR)</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        value={formData.discountAmount}
+                        onChange={(e) =>
+                          setFormData({ ...formData, discountAmount: e.target.value })
+                        }
+                        placeholder="e.g. 50"
+                      />
+                    </div>
+                  )}
+                </div>
+                {formData.discountType === 'COPIES' && (
+                  <div className="grid grid-cols-2 gap-4">
+                    {ruleItems.combo ? (
+                      // COMBO: single combined discount input
+                      <div className="space-y-2 col-span-2">
+                        <Label>Total Copies Discount (A4 Equivalent)</Label>
+                        <Input
+                          type="number"
+                          min="0"
+                          value={formData.discountBwCopies}
+                          onChange={(e) =>
+                            setFormData({
+                              ...formData,
+                              discountBwCopies: e.target.value,
+                              discountColorCopies: '0',
+                            })
+                          }
+                          placeholder="e.g. 500"
+                        />
+                      </div>
+                    ) : (
+                      <>
+                        {isBw && (
+                          <div className="space-y-2">
+                            <Label>B&W Copies Discount</Label>
+                            <Input
+                              type="number"
+                              min="0"
+                              value={formData.discountBwCopies}
+                              onChange={(e) =>
+                                setFormData({ ...formData, discountBwCopies: e.target.value })
+                              }
+                              placeholder="e.g. 500"
+                            />
+                          </div>
+                        )}
+                        {/* Only show color discount if there is an actual color rule */}
+                        {ruleItems.color && (
+                          <div className="space-y-2">
+                            <Label>Color Copies Discount</Label>
+                            <Input
+                              type="number"
+                              min="0"
+                              value={formData.discountColorCopies}
+                              onChange={(e) =>
+                                setFormData({ ...formData, discountColorCopies: e.target.value })
+                              }
+                              placeholder="e.g. 100"
+                            />
+                          </div>
+                        )}
+                      </>
+                    )}
                   </div>
                 )}
               </div>
@@ -1258,12 +1489,17 @@ export default function UsageRecordingModal({
 
                               return calculateRuleCost(
                                 ruleItems.combo,
-                                bwA4 + clrA4,
-                                bwA3 + clrA3,
-                                prevA4 + prevClrA4,
-                                prevA3 + prevClrA3,
+                                bwA4,
+                                bwA3,
+                                prevA4,
+                                prevA3,
                                 'COMBO',
                                 contract?.rentType,
+                                0,
+                                clrA4,
+                                clrA3,
+                                prevClrA4,
+                                prevClrA3,
                               ).charge.toFixed(2);
                             })()}
                           </span>
@@ -1511,6 +1747,51 @@ export default function UsageRecordingModal({
                       })()}
                     </span>
                   </div>
+
+                  {/* Discount row */}
+                  {formData.discountType !== 'NONE' && (
+                    <div className="pt-1 flex justify-between items-center text-xs text-purple-700">
+                      <span className="font-medium">Discount Applied</span>
+                      <span className="font-bold">
+                        {formData.discountType === 'AMOUNT'
+                          ? `- QAR ${Number(formData.discountAmount || 0).toLocaleString()}`
+                          : (() => {
+                              const discountCopies =
+                                Number(formData.discountBwCopies || 0) +
+                                Number(formData.discountColorCopies || 0);
+                              // Find the applicable slab rate for the current volume
+                              const slabs = parseSlabs(
+                                ruleItems.combo?.comboSlabRanges ||
+                                  ruleItems.bw?.bwSlabRanges ||
+                                  ruleItems.color?.colorSlabRanges,
+                              );
+                              let rate = 0;
+                              if (slabs.length > 0) {
+                                const sortedSlabs = [...slabs].sort((a, b) => a.from - b.from);
+                                rate = sortedSlabs[0]?.rate || 0;
+                                const totalCopies =
+                                  Number(formData.bwA4Count || 0) +
+                                  Number(formData.colorA4Count || 0) +
+                                  (Number(formData.bwA3Count || 0) +
+                                    Number(formData.colorA3Count || 0)) *
+                                    2;
+                                for (const s of sortedSlabs) {
+                                  if (totalCopies >= s.from) rate = Number(s.rate);
+                                }
+                              } else {
+                                rate = Number(
+                                  ruleItems.combo?.combinedExcessRate ||
+                                    ruleItems.bw?.bwExcessRate ||
+                                    ruleItems.color?.colorExcessRate ||
+                                    0,
+                                );
+                              }
+                              const qarEquiv = discountCopies * rate;
+                              return `${discountCopies} copies (- QAR ${qarEquiv.toLocaleString(undefined, { maximumFractionDigits: 2 })})`;
+                            })()}
+                      </span>
+                    </div>
+                  )}
 
                   <div className="pt-3 border-t-2 border-slate-200 flex justify-between items-center mt-2">
                     <span className="font-bold text-sm text-slate-800">Grand Total</span>

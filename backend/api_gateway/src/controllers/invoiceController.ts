@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import { AppError } from '../errors/appError';
 import { InvoiceAggregationService } from '../services/invoiceAggregationService';
 
 interface AuthenticatedRequest extends Request {
@@ -160,20 +161,70 @@ export const employeeApprove = async (req: Request, res: Response, next: NextFun
 };
 
 /**
- * Finance team approves a quotation, potentially updating items.
+ * Finance team allocates machines (Step 1).
  */
-export const financeApprove = async (req: Request, res: Response, next: NextFunction) => {
+export const allocateMachines = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = req.params.id as string;
     const token = req.headers.authorization?.split(' ')[1] || '';
-    const { deposit, itemUpdates } = req.body;
+    const { itemUpdates } = req.body;
 
-    const invoice = await invoiceAggregationService.financeApprove(id, token, deposit, itemUpdates);
+    const invoice = await invoiceAggregationService.allocateMachines(id, token, itemUpdates);
     return res.status(200).json({
       success: true,
       data: invoice,
-      message: 'Finance approved successfully',
+      message: 'Machines allocated successfully',
     });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Finance team activates the contract (Step 2).
+ */
+export const activateContract = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = req.params.id as string;
+    const token = req.headers.authorization?.split(' ')[1] || '';
+    const { contractConfirmationUrl, deposit, itemUpdates } = req.body;
+
+    const invoice = await invoiceAggregationService.activateContract(
+      id,
+      token,
+      contractConfirmationUrl,
+      deposit,
+      itemUpdates,
+    );
+    return res.status(200).json({
+      success: true,
+      data: invoice,
+      message: 'Contract activated successfully',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Upload contract confirmation document.
+ */
+export const uploadContractConfirmation = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const id = req.params.id as string;
+    const token = req.headers.authorization?.split(' ')[1] || '';
+    const file = req.file;
+
+    if (!file) {
+      throw new AppError('No file uploaded', 400);
+    }
+
+    const response = await invoiceAggregationService.uploadContractConfirmation(id, token, file);
+    return res.status(200).json(response);
   } catch (error) {
     next(error);
   }

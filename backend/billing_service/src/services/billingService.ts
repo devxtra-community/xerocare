@@ -1,4 +1,3 @@
-import { EntityManager } from 'typeorm';
 import { InvoiceRepository } from '../repositories/invoiceRepository';
 // import { getRabbitChannel } from '../config/rabbitmq';
 import { InvoiceStatus } from '../entities/enums/invoiceStatus';
@@ -19,14 +18,23 @@ import { emitProductStatusUpdate } from '../events/publisher/productStatusEvent'
 import { ContractStatus } from '../entities/enums/contractStatus';
 import { ProductAllocation, AllocationStatus } from '../entities/productAllocationEntity';
 
-interface ItemUpdate {
-  id: string;
-  productId?: string;
-  initialBwCount?: number;
-  initialColorCount?: number;
-  initialBwA3Count?: number;
-  initialColorA3Count?: number;
-}
+const appendOpenEndedSlab = <T extends { from: number; to: number; rate: number }>(
+  ranges: T[] | undefined,
+  excessRate: number | undefined,
+): T[] | undefined => {
+  if (
+    !ranges ||
+    !Array.isArray(ranges) ||
+    ranges.length === 0 ||
+    excessRate === undefined ||
+    excessRate === null
+  ) {
+    return ranges;
+  }
+  const maxTo = Math.max(...ranges.map((r) => Number(r.to) || 0));
+  if (maxTo >= 999999) return ranges;
+  return [...ranges, { from: maxTo + 1, to: 9999999, rate: Number(excessRate) } as T];
+};
 
 export class BillingService {
   private invoiceRepo = new InvoiceRepository();
@@ -390,9 +398,12 @@ export class BillingService {
         invItem.bwExcessRate = item.bwExcessRate;
         invItem.colorExcessRate = item.colorExcessRate;
         invItem.combinedExcessRate = item.combinedExcessRate;
-        invItem.bwSlabRanges = item.bwSlabRanges;
-        invItem.colorSlabRanges = item.colorSlabRanges;
-        invItem.comboSlabRanges = item.comboSlabRanges;
+        invItem.bwSlabRanges = appendOpenEndedSlab(item.bwSlabRanges, item.bwExcessRate);
+        invItem.colorSlabRanges = appendOpenEndedSlab(item.colorSlabRanges, item.colorExcessRate);
+        invItem.comboSlabRanges = appendOpenEndedSlab(
+          item.comboSlabRanges,
+          item.combinedExcessRate,
+        );
 
         logger.info(
           `Created invoice item (cons): Desc=${invItem.description} Model=${invItem.modelId} BWLimit=${invItem.bwIncludedLimit} ColorLimit=${invItem.colorIncludedLimit} BWExcess=${invItem.bwExcessRate}`,
@@ -425,9 +436,15 @@ export class BillingService {
         invoiceItem.colorExcessRate = item.colorExcessRate;
         invoiceItem.combinedExcessRate = item.combinedExcessRate;
 
-        invoiceItem.bwSlabRanges = item.bwSlabRanges;
-        invoiceItem.colorSlabRanges = item.colorSlabRanges;
-        invoiceItem.comboSlabRanges = item.comboSlabRanges;
+        invoiceItem.bwSlabRanges = appendOpenEndedSlab(item.bwSlabRanges, item.bwExcessRate);
+        invoiceItem.colorSlabRanges = appendOpenEndedSlab(
+          item.colorSlabRanges,
+          item.colorExcessRate,
+        );
+        invoiceItem.comboSlabRanges = appendOpenEndedSlab(
+          item.comboSlabRanges,
+          item.combinedExcessRate,
+        );
 
         return invoiceItem;
       });
@@ -618,9 +635,12 @@ export class BillingService {
         invItem.bwExcessRate = item.bwExcessRate;
         invItem.colorExcessRate = item.colorExcessRate;
         invItem.combinedExcessRate = item.combinedExcessRate;
-        invItem.bwSlabRanges = item.bwSlabRanges;
-        invItem.colorSlabRanges = item.colorSlabRanges;
-        invItem.comboSlabRanges = item.comboSlabRanges;
+        invItem.bwSlabRanges = appendOpenEndedSlab(item.bwSlabRanges, item.bwExcessRate);
+        invItem.colorSlabRanges = appendOpenEndedSlab(item.colorSlabRanges, item.colorExcessRate);
+        invItem.comboSlabRanges = appendOpenEndedSlab(
+          item.comboSlabRanges,
+          item.combinedExcessRate,
+        );
 
         return invItem;
       });
@@ -639,9 +659,15 @@ export class BillingService {
         invoiceItem.bwExcessRate = item.bwExcessRate;
         invoiceItem.colorExcessRate = item.colorExcessRate;
         invoiceItem.combinedExcessRate = item.combinedExcessRate;
-        invoiceItem.bwSlabRanges = item.bwSlabRanges;
-        invoiceItem.colorSlabRanges = item.colorSlabRanges;
-        invoiceItem.comboSlabRanges = item.comboSlabRanges;
+        invoiceItem.bwSlabRanges = appendOpenEndedSlab(item.bwSlabRanges, item.bwExcessRate);
+        invoiceItem.colorSlabRanges = appendOpenEndedSlab(
+          item.colorSlabRanges,
+          item.colorExcessRate,
+        );
+        invoiceItem.comboSlabRanges = appendOpenEndedSlab(
+          item.comboSlabRanges,
+          item.combinedExcessRate,
+        );
         return invoiceItem;
       });
       newInvoiceItems.push(...ruleItems);
@@ -768,12 +794,123 @@ export class BillingService {
   }
 
   /**
-   * Finance approves the quotation, finalizing it for contract creation.
+   * Step 1: Finance allocates machines for the quotation.
+   * Finalizes as a PROFORMA contract pending customer confirmation.
    */
-  async financeApprove(
+  async allocateMachines(
     id: string,
     userId: string,
     token: string,
+    itemUpdates?: { id: string; productId: string }[],
+  ) {
+    const queryRunner = this.invoiceRepo.manager.connection.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      const invoice = await queryRunner.manager.findOne(Invoice, {
+        where: { id },
+        relations: ['items'],
+      });
+
+      if (!invoice) throw new AppError('Quotation not found', 404);
+      if (invoice.status !== InvoiceStatus.EMPLOYEE_APPROVED) {
+        throw new AppError('Only Employee Approved quotations can be allocated by Finance', 400);
+      }
+
+      // Check that all machines are allocated
+      const productItems = invoice.items.filter(
+        (item) => item.itemType === 'PRODUCT' && item.modelId,
+      );
+      const updatesMap = new Map<string, { id: string; productId: string }>();
+      if (itemUpdates) itemUpdates.forEach((u) => updatesMap.set(String(u.id).toLowerCase(), u));
+
+      for (const item of productItems) {
+        const update = updatesMap.get(String(item.id).toLowerCase());
+        const isAllocated = !!(item.productId || update?.productId);
+        if (!isAllocated) {
+          throw new AppError(
+            `Machine allocation (Serial Number) is required for: ${item.description}`,
+            400,
+          );
+        }
+      }
+
+      if (itemUpdates && itemUpdates.length > 0) {
+        const inventoryServiceUrl = process.env.INVENTORY_SERVICE_URL || 'http://localhost:3003';
+        for (const update of itemUpdates) {
+          const item = invoice.items.find((i) => i.id === update.id);
+          if (item && update.productId) {
+            let product;
+            try {
+              const response = await fetch(`${inventoryServiceUrl}/products/${update.productId}`, {
+                headers: { Authorization: token, 'Content-Type': 'application/json' },
+              });
+              if (!response.ok) throw new Error(response.statusText);
+              const data = await response.json();
+              product = data.data;
+            } catch (error) {
+              logger.error(`Product validation failed: ${update.productId}`, error);
+              throw new AppError(`Failed to validate product ${update.productId}`, 500);
+            }
+
+            if (!product) throw new AppError(`Product ${update.productId} not found`, 404);
+
+            item.productId = update.productId;
+
+            // Create basic allocation record without meter readings yet
+            await queryRunner.manager.insert(ProductAllocation, {
+              contractId: invoice.id,
+              modelId: item.modelId,
+              productId: update.productId,
+              serialNumber: product.serial_no || 'Unknown',
+              status: AllocationStatus.ALLOCATED,
+              initialBwA4: 0,
+              initialBwA3: 0,
+              initialColorA4: 0,
+              initialColorA3: 0,
+              currentBwA4: 0,
+              currentBwA3: 0,
+              currentColorA4: 0,
+              currentColorA3: 0,
+            });
+          }
+        }
+      }
+
+      invoice.status = InvoiceStatus.FINANCE_APPROVED;
+      invoice.type = InvoiceType.PROFORMA;
+      invoice.contractStatus = ContractStatus.PENDING_CONFIRMATION;
+
+      // We don't record financeApprovedAt until the contract is fully activated in Step 2,
+      // but we record who drafted the allocation.
+      invoice.financeApprovedBy = userId;
+
+      const savedInvoice = await queryRunner.manager.save(invoice);
+      await queryRunner.commitTransaction();
+
+      // Emit status update as "ALLOCATED" to reserve stock in inventory
+      // We can use the existing saleType but understand it's pre-active
+      this.emitProductStatusUpdates(savedInvoice, userId);
+
+      return savedInvoice;
+    } catch (err) {
+      await queryRunner.rollbackTransaction();
+      throw err;
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  /**
+   * Step 2: Customer confirmed the contract. Upload confirmation, record deposit & readings.
+   * Activates the Contract.
+   */
+  async activateContract(
+    id: string,
+    userId: string,
+    token: string,
+    contractConfirmationUrl: string,
     deposit?: {
       amount: number;
       mode: SecurityDepositMode;
@@ -782,7 +919,6 @@ export class BillingService {
     },
     itemUpdates?: {
       id: string;
-      productId: string;
       initialBwCount?: number;
       initialBwA3Count?: number;
       initialColorCount?: number;
@@ -800,18 +936,15 @@ export class BillingService {
       });
 
       if (!invoice) throw new AppError('Quotation not found', 404);
-      if (invoice.status !== InvoiceStatus.EMPLOYEE_APPROVED) {
-        throw new AppError('Only Employee Approved quotations can be finalized by Finance', 400);
+      if (invoice.contractStatus !== ContractStatus.PENDING_CONFIRMATION) {
+        throw new AppError('Contract is not pending confirmation', 400);
       }
 
-      await this.validateAllocations(invoice, itemUpdates, deposit);
+      invoice.contractConfirmationUrl = contractConfirmationUrl;
 
-      if (itemUpdates && itemUpdates.length > 0) {
-        await this.processItemUpdates(queryRunner.manager, invoice, itemUpdates, token);
-      }
+      // 1. Deposit is optional — record it if provided, but don't block activation
 
-      // Security Deposit
-      if (deposit) {
+      if (deposit && deposit.amount > 0) {
         invoice.securityDepositAmount = deposit.amount;
         invoice.securityDepositMode = deposit.mode;
         invoice.securityDepositReference = deposit.reference;
@@ -820,17 +953,79 @@ export class BillingService {
         }
       }
 
-      invoice.status = InvoiceStatus.FINANCE_APPROVED;
-      invoice.financeApprovedBy = userId;
-      invoice.financeApprovedAt = new Date();
+      // 2. Process Initial Readings
+      if (itemUpdates && itemUpdates.length > 0) {
+        const inventoryServiceUrl = process.env.INVENTORY_SERVICE_URL || 'http://localhost:3003';
+        for (const update of itemUpdates) {
+          const item = invoice.items.find((i) => i.id === update.id);
+          if (item && item.productId) {
+            // Check product color to enforce reading requirements
+            let product;
+            try {
+              const response = await fetch(`${inventoryServiceUrl}/products/${item.productId}`, {
+                headers: { Authorization: token, 'Content-Type': 'application/json' },
+              });
+              if (response.ok) {
+                const data = await response.json();
+                product = data.data;
+              }
+            } catch (error) {
+              logger.error(`Product fetch failed for readings: ${item.productId}`, error);
+            }
 
-      // Final Transition
+            if (invoice.saleType !== SaleType.SALE) {
+              if (update.initialBwCount === undefined) {
+                throw new AppError(
+                  `Initial B&W reading missing for item: ${item.description}`,
+                  400,
+                );
+              }
+            }
+
+            if (update.initialBwCount !== undefined) item.initialBwCount = update.initialBwCount;
+            if (update.initialBwA3Count !== undefined)
+              item.initialBwA3Count = update.initialBwA3Count;
+
+            if (product && product.print_colour === 'BLACK_WHITE') {
+              item.initialColorCount = 0;
+            } else {
+              if (invoice.saleType !== SaleType.SALE && update.initialColorCount === undefined) {
+                throw new AppError(`Initial Color reading missing for ${item.description}`, 400);
+              }
+              if (update.initialColorCount !== undefined)
+                item.initialColorCount = update.initialColorCount;
+              if (update.initialColorA3Count !== undefined)
+                item.initialColorA3Count = update.initialColorA3Count;
+            }
+
+            // Update the existing allocation record
+            await queryRunner.manager.update(
+              ProductAllocation,
+              { contractId: invoice.id, productId: item.productId },
+              {
+                initialBwA4: item.initialBwCount || 0,
+                initialBwA3: item.initialBwA3Count || 0,
+                initialColorA4: item.initialColorCount || 0,
+                initialColorA3: item.initialColorA3Count || 0,
+                currentBwA4: item.initialBwCount || 0,
+                currentBwA3: item.initialBwA3Count || 0,
+                currentColorA4: item.initialColorCount || 0,
+                currentColorA3: item.initialColorA3Count || 0,
+              },
+            );
+          }
+        }
+      }
+
+      // Final Activation
+      invoice.financeApprovedAt = new Date();
+      invoice.financeApprovedBy = userId;
+
       if (invoice.saleType === SaleType.SALE) {
         invoice.type = InvoiceType.FINAL;
         invoice.status = InvoiceStatus.PAID;
+        invoice.contractStatus = ContractStatus.ACTIVE; // Set to Active for consistency
       } else {
-        // Rent or Lease
-        invoice.type = InvoiceType.PROFORMA;
         invoice.contractStatus = ContractStatus.ACTIVE;
         this.setEffectiveDates(invoice);
       }
@@ -838,7 +1033,7 @@ export class BillingService {
       const savedInvoice = await queryRunner.manager.save(invoice);
       await queryRunner.commitTransaction();
 
-      // Post-transaction events
+      // Emit status updates
       this.emitProductStatusUpdates(savedInvoice, userId);
 
       return savedInvoice;
@@ -847,120 +1042,6 @@ export class BillingService {
       throw err;
     } finally {
       await queryRunner.release();
-    }
-  }
-
-  // Private Helper Methods
-
-  private async validateAllocations(
-    invoice: Invoice,
-    itemUpdates: ItemUpdate[] | undefined,
-    deposit: { amount?: number } | undefined,
-  ) {
-    // 1. Ensure Deposit for Rent
-    if (invoice.saleType === SaleType.RENT) {
-      if (!deposit || !deposit.amount || deposit.amount <= 0) {
-        throw new AppError('Security Deposit is mandatory for Rent contracts', 400);
-      }
-    }
-
-    // 2. Validate Product Allocations
-    const productItems = invoice.items.filter((item) => item.itemType === 'PRODUCT');
-    const updatesMap = new Map<
-      string,
-      { id: string; productId?: string; initialBwCount?: number }
-    >();
-    if (Array.isArray(itemUpdates)) {
-      itemUpdates.forEach((u) => updatesMap.set(String(u.id).toLowerCase().trim(), u));
-    }
-
-    for (const item of productItems) {
-      const itemKey = String(item.id).toLowerCase().trim();
-      const update = updatesMap.get(itemKey);
-      const isAllocated = !!(item.productId || update?.productId);
-
-      if (!isAllocated && item.modelId) {
-        throw new AppError(
-          `Machine allocation (Serial Number) is required for: ${item.description}`,
-          400,
-        );
-      }
-
-      if (invoice.saleType !== SaleType.SALE) {
-        const bwCount =
-          update?.initialBwCount !== undefined ? update.initialBwCount : item.initialBwCount;
-        if (bwCount === undefined || bwCount === null) {
-          throw new AppError(`Initial B&W reading missing for item: ${item.description}`, 400);
-        }
-      }
-    }
-  }
-
-  private async processItemUpdates(
-    manager: EntityManager,
-    invoice: Invoice,
-    itemUpdates: ItemUpdate[],
-    token: string,
-  ) {
-    const inventoryServiceUrl = process.env.INVENTORY_SERVICE_URL || 'http://localhost:3003';
-
-    for (const update of itemUpdates) {
-      const item = invoice.items.find((i) => i.id === update.id);
-      if (item) {
-        // Fetch Product
-        let product;
-        try {
-          const response = await fetch(`${inventoryServiceUrl}/products/${update.productId}`, {
-            headers: { Authorization: token, 'Content-Type': 'application/json' },
-          });
-          if (!response.ok) throw new Error(response.statusText);
-          const data = await response.json();
-          product = data.data;
-        } catch (error) {
-          logger.error(`Product validation failed: ${update.productId}`, error);
-          throw new AppError(`Failed to validate product ${update.productId}`, 500);
-        }
-
-        if (!product) throw new AppError(`Product ${update.productId} not found`, 404);
-        if (!product.print_colour)
-          throw new AppError(
-            `Product capability undefined for ${product.serial_no || update.productId}`,
-            400,
-          );
-
-        // Update Item
-        item.productId = update.productId;
-        if (update.initialBwCount !== undefined) item.initialBwCount = update.initialBwCount;
-        if (update.initialBwA3Count !== undefined) item.initialBwA3Count = update.initialBwA3Count;
-
-        if (product.print_colour === 'BLACK_WHITE') {
-          item.initialColorCount = 0;
-        } else {
-          if (update.initialColorCount === undefined) {
-            throw new AppError(`Initial Color reading missing for ${product.serial_no}`, 400);
-          }
-          item.initialColorCount = update.initialColorCount;
-          if (update.initialColorA3Count !== undefined)
-            item.initialColorA3Count = update.initialColorA3Count;
-        }
-
-        // Create Allocation Record
-        await manager.insert(ProductAllocation, {
-          contractId: invoice.id,
-          modelId: item.modelId,
-          productId: update.productId,
-          serialNumber: product.serial_no || 'Unknown',
-          initialBwA4: item.initialBwCount || 0,
-          initialBwA3: item.initialBwA3Count || 0,
-          initialColorA4: item.initialColorCount || 0,
-          initialColorA3: item.initialColorA3Count || 0,
-          currentBwA4: item.initialBwCount || 0,
-          currentBwA3: item.initialBwA3Count || 0,
-          currentColorA4: item.initialColorCount || 0,
-          currentColorA3: item.initialColorA3Count || 0,
-          status: AllocationStatus.ALLOCATED,
-        });
-      }
     }
   }
 
@@ -1039,7 +1120,42 @@ export class BillingService {
     invoice.financeApprovedAt = new Date();
     invoice.financeRemarks = reason;
 
-    return this.invoiceRepo.save(invoice);
+    await this.invoiceRepo.save(invoice);
+
+    // Release any product allocations back to AVAILABLE
+    const allocations = await this.invoiceRepo.manager.find(ProductAllocation, {
+      where: { contractId: invoice.id, status: AllocationStatus.ALLOCATED },
+    });
+
+    if (allocations.length > 0) {
+      // Mark all allocations as RETURNED in our DB
+      await this.invoiceRepo.manager.update(
+        ProductAllocation,
+        { contractId: invoice.id, status: AllocationStatus.ALLOCATED },
+        { status: AllocationStatus.RETURNED },
+      );
+
+      // Emit status-update events so ven_inv_service marks products as AVAILABLE
+      for (const allocation of allocations) {
+        if (!allocation.productId) continue;
+        try {
+          await emitProductStatusUpdate({
+            productId: allocation.productId,
+            billType: 'RETURNED',
+            invoiceId: invoice.id,
+            approvedBy: userId,
+            approvedAt: invoice.financeApprovedAt,
+          });
+        } catch (e) {
+          logger.error('Failed to emit product status update on finance reject', {
+            productId: allocation.productId,
+            error: e,
+          });
+        }
+      }
+    }
+
+    return invoice;
   }
 
   /**
