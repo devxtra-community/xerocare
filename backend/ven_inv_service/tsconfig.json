@@ -11,5 +11,9 @@
     "emitDecoratorMetadata": true
   },
   "include": ["src/**/*"],
+  "files": ["src/types/express.d.ts"],
+  "ts-node": {
+    "files": true
+  },
   "exclude": ["node_modules"]
 }
