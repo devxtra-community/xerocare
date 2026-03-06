@@ -36,6 +36,19 @@ router.post(
   rfqController.sendRfq,
 );
 
+router.get(
+  '/:id/download-excel',
+  authMiddleware,
+  roleMiddleware(['ADMIN', 'MANAGER']),
+  rfqController.downloadExcel,
+);
+router.get(
+  '/:id/quote/excel/:vendorId/download',
+  authMiddleware,
+  roleMiddleware(['ADMIN', 'MANAGER']),
+  rfqController.downloadVendorQuote,
+);
+
 // Quote Entry routes
 router.post(
   '/:id/quote/manual',

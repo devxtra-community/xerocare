@@ -9,14 +9,28 @@ import {
   getRfqComparison,
   awardVendor,
   createLotFromRfq,
+  downloadRfqExcel,
+  downloadVendorQuote,
   Rfq,
   RfqStatus,
 } from '@/lib/rfq';
+import { formatCurrency } from '@/lib/format';
 import { Model, getAllModels } from '@/lib/model';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Send, Upload, CheckCircle, Package } from 'lucide-react';
+import { ArrowLeft, Send, Upload, CheckCircle, Package, Download, Eye, Clock } from 'lucide-react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { AlertCircle } from 'lucide-react';
 
 interface RfqDetailsProps {
   id: string;
@@ -30,6 +44,7 @@ export default function RfqDetails({ id, basePath }: RfqDetailsProps) {
   const [models, setModels] = useState<Model[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'items' | 'vendors' | 'comparison'>('items');
+  const [vendorToAward, setVendorToAward] = useState<string | null>(null);
 
   useEffect(() => {
     const loadInitialData = async () => {
@@ -72,6 +87,17 @@ export default function RfqDetails({ id, basePath }: RfqDetailsProps) {
     return model ? model.model_name || model.model_no : itemId;
   };
 
+  const handleDownloadVendorQuote = async (vendorId: string, vendorName: string) => {
+    try {
+      toast.loading(`Downloading ${vendorName}'s Quote...`, { id: 'v-download' });
+      await downloadVendorQuote(id, vendorId, vendorName);
+      toast.success('Downloaded successfully', { id: 'v-download' });
+    } catch (error) {
+      console.error(error);
+      toast.error('Failed to download vendor quote', { id: 'v-download' });
+    }
+  };
+
   const handleSendRfq = async () => {
     try {
       await sendRfq(id);
@@ -104,10 +130,10 @@ export default function RfqDetails({ id, basePath }: RfqDetailsProps) {
     }
   };
 
-  const handleAward = async (vendorId: string) => {
-    if (!confirm('Are you sure you want to award this vendor? This action is final.')) return;
+  const confirmAward = async () => {
+    if (!vendorToAward) return;
     try {
-      await awardVendor(id, vendorId);
+      await awardVendor(id, vendorToAward);
       toast.success('Vendor awarded successfully');
       fetchData();
     } catch (error: unknown) {
@@ -115,6 +141,8 @@ export default function RfqDetails({ id, basePath }: RfqDetailsProps) {
         (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
           'Failed to award vendor',
       );
+    } finally {
+      setVendorToAward(null);
     }
   };
 
@@ -164,6 +192,25 @@ export default function RfqDetails({ id, basePath }: RfqDetailsProps) {
         </div>
 
         <div className="flex gap-3">
+          {rfq.status !== RfqStatus.DRAFT && (
+            <Button
+              variant="outline"
+              onClick={async () => {
+                try {
+                  toast.loading('Downloading Excel...', { id: 'download' });
+                  await downloadRfqExcel(id, rfq.rfq_number);
+                  toast.success('Downloaded successfully', { id: 'download' });
+                } catch (error) {
+                  console.error(error);
+                  toast.error('Failed to download Excel', { id: 'download' });
+                }
+              }}
+              className="bg-white text-slate-700 border-slate-300"
+            >
+              <Download className="mr-2 h-4 w-4" />
+              Download Excel
+            </Button>
+          )}
           {rfq.status === RfqStatus.DRAFT && (
             <Button onClick={handleSendRfq} className="bg-blue-600 hover:bg-blue-700">
               <Send className="mr-2 h-4 w-4" />
@@ -292,7 +339,10 @@ export default function RfqDetails({ id, basePath }: RfqDetailsProps) {
                   <div className="flex justify-between items-center">
                     <span className="text-sm font-medium text-slate-600">Total Quote</span>
                     <span className="text-lg font-bold text-slate-900">
-                      ${Number(v.total_quoted_amount).toLocaleString()}
+                      {formatCurrency(
+                        v.total_quoted_amount as number,
+                        (v.vendor as { currency?: string })?.currency || 'QAR',
+                      )}
                     </span>
                   </div>
                 )}
@@ -353,7 +403,25 @@ export default function RfqDetails({ id, basePath }: RfqDetailsProps) {
                           key={vs.vendorId as string}
                           className="px-5 py-4 font-semibold text-center min-w-[180px]"
                         >
-                          <div className="text-slate-800 text-base">{vs.vendorName as string}</div>
+                          <div className="flex items-center justify-center gap-2">
+                            <div className="text-slate-800 text-base">
+                              {vs.vendorName as string}
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                              onClick={() =>
+                                handleDownloadVendorQuote(
+                                  vs.vendorId as string,
+                                  vs.vendorName as string,
+                                )
+                              }
+                              title="View Vendor Quote"
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                          </div>
                           <div className="text-[10px] text-slate-400 font-normal uppercase tracking-wider mt-1.5">
                             Quote Details
                           </div>
@@ -400,12 +468,27 @@ export default function RfqDetails({ id, basePath }: RfqDetailsProps) {
                                       <span
                                         className={`text-base font-bold ${vp.isLowest ? 'text-green-700' : 'text-slate-800'}`}
                                       >
-                                        ${Number(vp.unitPrice).toLocaleString()}
+                                        {formatCurrency(
+                                          vp.unitPrice as number,
+                                          (rfqVendor?.vendor as { currency?: string })?.currency ||
+                                            'QAR',
+                                        )}
                                       </span>
                                       {!!(vp as { isLowest?: boolean }).isLowest && (
                                         <CheckCircle className="h-3 w-3 text-green-600" />
                                       )}
                                     </div>
+                                    {!!vp.estimatedShipmentDate && (
+                                      <div className="flex items-center justify-center gap-1 text-[10px] text-orange-600 font-medium bg-orange-50 px-1.5 py-0.5 rounded-md">
+                                        <Clock className="h-3 w-3" />
+                                        <span>
+                                          Ship by:{' '}
+                                          {new Date(
+                                            vp.estimatedShipmentDate as string,
+                                          ).toLocaleDateString()}
+                                        </span>
+                                      </div>
+                                    )}
                                     {detail && (
                                       <div className="flex flex-col gap-1 mt-1">
                                         <Badge
@@ -454,11 +537,21 @@ export default function RfqDetails({ id, basePath }: RfqDetailsProps) {
                     {(comparison.vendorsSummary as Record<string, unknown>[]).map(
                       (vs: Record<string, unknown>) => (
                         <td key={vs.vendorId as string} className="px-5 py-6 text-center">
-                          <div
-                            className={`text-xl font-black ${vs.isCheapest ? 'text-green-600' : 'text-slate-900'}`}
-                          >
-                            ${Number(vs.totalAmount).toLocaleString()}
-                          </div>
+                          {(() => {
+                            const rfqVendor = (rfq.vendors as Record<string, unknown>[]).find(
+                              (rv) => rv.vendor_id === vs.vendorId,
+                            );
+                            return (
+                              <div
+                                className={`text-xl font-black ${vs.isCheapest ? 'text-green-600' : 'text-slate-900'}`}
+                              >
+                                {formatCurrency(
+                                  vs.totalAmount as number,
+                                  (rfqVendor?.vendor as { currency?: string })?.currency || 'QAR',
+                                )}
+                              </div>
+                            );
+                          })()}
                           {!!(vs as { isCheapest?: boolean }).isCheapest && (
                             <div className="mt-2 flex justify-center">
                               <Badge className="bg-green-600 hover:bg-green-600 animate-pulse text-[10px] px-3">
@@ -480,7 +573,7 @@ export default function RfqDetails({ id, basePath }: RfqDetailsProps) {
                         (vs: Record<string, unknown>) => (
                           <td key={vs.vendorId as string} className="px-5 py-6 text-center">
                             <Button
-                              onClick={() => handleAward(vs.vendorId as string)}
+                              onClick={() => setVendorToAward(vs.vendorId as string)}
                               variant={vs.isCheapest ? 'default' : 'outline'}
                               className={`w-full h-11 transition-all ${vs.isCheapest ? 'bg-primary hover:bg-primary/90 shadow-md hover:shadow-lg' : 'hover:border-primary/50 hover:text-primary'}`}
                             >
@@ -498,6 +591,35 @@ export default function RfqDetails({ id, basePath }: RfqDetailsProps) {
           </div>
         )}
       </div>
+
+      <AlertDialog open={!!vendorToAward} onOpenChange={(open) => !open && setVendorToAward(null)}>
+        <AlertDialogContent className="bg-white p-6 sm:p-8 rounded-2xl max-w-md border border-slate-100 shadow-xl overflow-hidden relative">
+          <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-blue-500 to-indigo-600"></div>
+          <AlertDialogHeader className="space-y-4">
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-blue-50/80">
+              <AlertCircle className="h-8 w-8 text-blue-600" />
+            </div>
+            <AlertDialogTitle className="text-2xl font-bold text-center text-slate-800 tracking-tight">
+              Award Vendor
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-center text-slate-500 text-[15px] leading-relaxed px-2">
+              Are you sure you want to award this quotation to the selected vendor? This action is
+              final and will generate a lot for the awarded items.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="mt-8 gap-3 sm:gap-2 sm:justify-center flex-col sm:flex-row w-full">
+            <AlertDialogCancel className="w-full sm:w-1/2 rounded-xl h-12 text-[15px] font-medium border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-800 transition-colors">
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmAward}
+              className="w-full sm:w-1/2 rounded-xl h-12 text-[15px] font-medium bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-500/20 transition-all"
+            >
+              Confirm Award
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

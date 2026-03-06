@@ -33,6 +33,45 @@ export class RfqController {
     }
   };
 
+  downloadExcel = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const buffer = await this.rfqService.generateExcelForDownload(req.params.id as string);
+
+      res.setHeader(
+        'Content-Type',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      );
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename="RFQ_Template_${req.params.id}.xlsx"`,
+      );
+      return res.send(buffer);
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  downloadVendorQuote = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const buffer = await this.rfqService.generateVendorQuoteExcel(
+        req.params.id as string,
+        req.params.vendorId as string,
+      );
+
+      res.setHeader(
+        'Content-Type',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      );
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename="Vendor_Quote_${req.params.vendorId}.xlsx"`,
+      );
+      return res.send(buffer);
+    } catch (error) {
+      next(error);
+    }
+  };
+
   enterQuoteManual = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { vendorId, quotes } = req.body;

@@ -93,3 +93,31 @@ export async function createLotFromRfq(id: string) {
   const res = await api.post(`/i/rfq/${id}/create-lot`);
   return res.data;
 }
+
+export async function downloadRfqExcel(id: string, rfqNumber: string) {
+  const res = await api.get(`/i/rfq/${id}/download-excel`, {
+    responseType: 'blob',
+  });
+  const url = window.URL.createObjectURL(new Blob([res.data]));
+  const link = document.createElement('a');
+  link.href = url;
+  link.setAttribute('download', `${rfqNumber}.xlsx`);
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.URL.revokeObjectURL(url);
+}
+
+export async function downloadVendorQuote(id: string, vendorId: string, vendorName: string) {
+  const res = await api.get(`/i/rfq/${id}/quote/excel/${vendorId}/download`, {
+    responseType: 'blob',
+  });
+  const url = window.URL.createObjectURL(new Blob([res.data]));
+  const link = document.createElement('a');
+  link.href = url;
+  link.setAttribute('download', `Quote_${vendorName}_${id.slice(0, 8)}.xlsx`);
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.URL.revokeObjectURL(url);
+}

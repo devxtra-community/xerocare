@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Search, Plus, Trash2 } from 'lucide-react';
+import { Search, Plus, Trash2, Building2, Copy, Check } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -70,6 +70,7 @@ export default function BranchReport() {
   const [formOpen, setFormOpen] = useState(false);
   const [editingBranch, setEditingBranch] = useState<Branch | null>(null);
   const [branchToDelete, setBranchToDelete] = useState<Branch | null>(null);
+  const [selectedBranch, setSelectedBranch] = useState<Branch | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   const user = getUserFromToken();
@@ -260,7 +261,14 @@ export default function BranchReport() {
             <TableBody>
               {filtered.map((b, i) => (
                 <TableRow key={b.id} className={i % 2 ? 'bg-blue-50/20' : 'bg-card'}>
-                  <TableCell className="px-4 font-medium">{b.name}</TableCell>
+                  <TableCell className="px-4 font-medium">
+                    <button
+                      className="text-primary hover:underline text-left font-medium"
+                      onClick={() => setSelectedBranch(b)}
+                    >
+                      {b.name}
+                    </button>
+                  </TableCell>
                   <TableCell className="px-4">{b.address}</TableCell>
                   <TableCell className="px-4">{b.location}</TableCell>
                   <TableCell className="px-4">
@@ -327,6 +335,14 @@ export default function BranchReport() {
           open={true}
           onCancel={() => setBranchToDelete(null)}
           onConfirm={confirmDelete}
+        />
+      )}
+
+      {selectedBranch && (
+        <BranchDetailModal
+          branch={selectedBranch}
+          managerName={getManagerName(selectedBranch.manager_id)}
+          onClose={() => setSelectedBranch(null)}
         />
       )}
     </div>
@@ -534,6 +550,122 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
         {label}
       </label>
       {children}
+    </div>
+  );
+}
+
+function BranchDetailModal({
+  branch,
+  managerName,
+  onClose,
+}: {
+  branch: Branch;
+  managerName: string;
+  onClose: () => void;
+}) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(branch.id);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const formatDate = (dateString: string) =>
+    new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    });
+
+  return (
+    <Dialog open={true} onOpenChange={(val) => !val && onClose()}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader className="pb-4 border-b">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
+              <Building2 className="h-5 w-5 text-primary" />
+            </div>
+            <div>
+              <DialogTitle className="text-xl font-bold text-primary">{branch.name}</DialogTitle>
+              <p className="text-xs text-slate-400 mt-0.5">Branch Details</p>
+            </div>
+          </div>
+        </DialogHeader>
+
+        <div className="space-y-4 py-2">
+          {/* Branch ID */}
+          <div className="rounded-xl bg-slate-50 border border-slate-200 p-3">
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+              Branch ID
+            </p>
+            <div className="flex items-center gap-2">
+              <code className="text-xs font-mono text-slate-700 flex-1 truncate">{branch.id}</code>
+              <button
+                onClick={handleCopy}
+                className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 transition-colors"
+                title="Copy ID"
+              >
+                {copied ? (
+                  <>
+                    <Check className="h-3.5 w-3.5" /> Copied
+                  </>
+                ) : (
+                  <>
+                    <Copy className="h-3.5 w-3.5" /> Copy
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+
+          {/* Detail grid */}
+          <div className="grid grid-cols-2 gap-3">
+            <DetailField label="Address" value={branch.address} fullWidth />
+            <DetailField label="Location" value={branch.location} />
+            <DetailField label="Manager" value={managerName} />
+            <DetailField label="Started Date" value={formatDate(branch.started_date)} />
+            <DetailField
+              label="Status"
+              value={
+                <span
+                  className={`px-2.5 py-1 rounded-full text-xs font-semibold ${
+                    branch.status === 'ACTIVE'
+                      ? 'bg-success/10 text-success'
+                      : 'bg-danger/10 text-danger'
+                  }`}
+                >
+                  {branch.status}
+                </span>
+              }
+            />
+            <DetailField label="Created At" value={formatDate(branch.created_at)} />
+          </div>
+        </div>
+
+        <div className="flex justify-end pt-2 border-t">
+          <Button className="rounded-full px-6" onClick={onClose}>
+            Close
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function DetailField({
+  label,
+  value,
+  fullWidth,
+}: {
+  label: string;
+  value: React.ReactNode;
+  fullWidth?: boolean;
+}) {
+  return (
+    <div className={fullWidth ? 'col-span-2' : ''}>
+      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">{label}</p>
+      <p className="text-sm text-foreground font-medium">{value}</p>
     </div>
   );
 }

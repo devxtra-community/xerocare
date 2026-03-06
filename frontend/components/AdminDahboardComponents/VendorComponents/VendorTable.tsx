@@ -7,7 +7,13 @@ import { usePagination } from '@/hooks/usePagination';
 import VendorStats from './VendorStats';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Eye, Edit, Trash2 } from 'lucide-react';
+import { Eye, Edit, Trash2, Search, Filter, Plus } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useRouter } from 'next/navigation';
 import {
@@ -20,6 +26,7 @@ import {
 } from '@/lib/vendor';
 import { toast } from 'sonner';
 import { AxiosError } from 'axios';
+import { formatCurrency } from '@/lib/format';
 import {
   Select,
   SelectContent,
@@ -43,6 +50,7 @@ type Vendor = {
   purchaseValue: number;
   outstandingAmount: number;
   status: 'Active' | 'On Hold';
+  currency: string;
 };
 
 type VendorFormData = {
@@ -52,6 +60,7 @@ type VendorFormData = {
   phone: string;
   email: string;
   status: 'Active' | 'On Hold';
+  currency: string;
 };
 
 export { type Vendor }; // Export so parent can use it
@@ -63,8 +72,10 @@ export { type Vendor }; // Export so parent can use it
  */
 export default function VendorTable({ basePath = '/admin' }: { basePath?: string }) {
   const router = useRouter();
-  const [search] = useState('');
-  const [filterType] = useState<'All' | 'Supplier' | 'Distributor' | 'Service'>('All');
+  const [search, setSearch] = useState('');
+  const [filterType, setFilterType] = useState<'All' | 'Supplier' | 'Distributor' | 'Service'>(
+    'All',
+  );
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -94,6 +105,7 @@ export default function VendorTable({ basePath = '/admin' }: { basePath?: string
         purchaseValue: (v.purchaseValue as number) || 0,
         outstandingAmount: (v.outstandingAmount as number) || 0,
         status: v.status === 'ACTIVE' ? 'Active' : 'On Hold',
+        currency: (v.currency as string) || 'QAR',
       }));
 
       setVendors(mappedVendors);
@@ -151,6 +163,7 @@ export default function VendorTable({ basePath = '/admin' }: { basePath?: string
         type: data.type,
         contactPerson: data.contactPerson,
         status: (data.status === 'Active' ? 'ACTIVE' : 'INACTIVE') as 'ACTIVE' | 'INACTIVE',
+        currency: data.currency,
       };
 
       if (editingVendor) {
@@ -212,6 +225,48 @@ export default function VendorTable({ basePath = '/admin' }: { basePath?: string
         totalOrders={stats.totalOrders}
       />
 
+      {/* Search and Filters */}
+      <div className="flex flex-col sm:flex-row gap-4 justify-between items-center px-4 pt-4">
+        <div className="relative w-full sm:w-[300px]">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+          <Input
+            placeholder="Search vendors..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-9 h-10 bg-card border-blue-400/60 focus:border-blue-400 focus:ring-4 focus:ring-blue-100 outline-none shadow-sm transition-all"
+          />
+        </div>
+        <div className="flex gap-2 w-full sm:w-auto">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" className="gap-2 bg-card border-blue-400/60">
+                <Filter className="h-4 w-4" />
+                Filter: {filterType}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => setFilterType('All')}>All Types</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setFilterType('Supplier')}>
+                Supplier
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setFilterType('Distributor')}>
+                Distributor
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setFilterType('Service')}>Service</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <Button
+            className="bg-primary text-white gap-2"
+            onClick={() => {
+              setEditingVendor(null);
+              setFormOpen(true);
+            }}
+          >
+            <Plus size={16} /> Add Vendor
+          </Button>
+        </div>
+      </div>
+
       <StandardTable
         columns={[
           {
@@ -272,7 +327,9 @@ export default function VendorTable({ basePath = '/admin' }: { basePath?: string
             header: 'PURCHASE VALUE',
             className: 'text-right font-semibold text-[11px] text-primary uppercase w-[120px]',
             cell: (v: Vendor) => (
-              <span className="font-bold text-primary">QAR {v.purchaseValue.toLocaleString()}</span>
+              <span className="font-bold text-primary">
+                {formatCurrency(v.purchaseValue, v.currency)}
+              </span>
             ),
           },
           {
@@ -281,7 +338,7 @@ export default function VendorTable({ basePath = '/admin' }: { basePath?: string
             className: 'text-right font-semibold text-[11px] text-primary uppercase w-[120px]',
             cell: (v: Vendor) => (
               <span className="font-bold text-red-600">
-                QAR {v.outstandingAmount.toLocaleString()}
+                {formatCurrency(v.outstandingAmount, v.currency)}
               </span>
             ),
           },
@@ -407,6 +464,7 @@ function VendorFormModal({
     phone: '',
     email: '',
     status: 'Active',
+    currency: 'QAR',
   });
 
   React.useEffect(() => {
@@ -419,6 +477,7 @@ function VendorFormModal({
           phone: initialData.phone,
           email: initialData.email,
           status: initialData.status,
+          currency: initialData.currency || 'QAR',
         });
       } else {
         setForm({
@@ -428,6 +487,7 @@ function VendorFormModal({
           phone: '',
           email: '',
           status: 'Active',
+          currency: 'QAR',
         });
       }
     }
@@ -511,6 +571,29 @@ function VendorFormModal({
                 onChange={(e) => setForm({ ...form, email: e.target.value })}
                 className="h-12 rounded-xl bg-card border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
               />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                Currency
+              </label>
+              <Select
+                value={form.currency}
+                onValueChange={(value) => setForm({ ...form, currency: value })}
+              >
+                <SelectTrigger className="h-12 rounded-xl bg-card border-none shadow-sm focus:ring-2 focus:ring-blue-400">
+                  <SelectValue placeholder="Select currency" />
+                </SelectTrigger>
+                <SelectContent className="rounded-xl">
+                  <SelectItem value="QAR">QAR (Qatari Riyal)</SelectItem>
+                  <SelectItem value="USD">USD (US Dollar)</SelectItem>
+                  <SelectItem value="EUR">EUR (Euro)</SelectItem>
+                  <SelectItem value="GBP">GBP (British Pound)</SelectItem>
+                  <SelectItem value="INR">INR (Indian Rupee)</SelectItem>
+                  <SelectItem value="AED">AED (UAE Dirham)</SelectItem>
+                  <SelectItem value="SAR">SAR (Saudi Riyal)</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="col-span-2 space-y-2">

@@ -16,22 +16,27 @@ export function formatCompactNumber(num: number | string): string {
  * Formats a number as a currency string with QAR symbol.
  * Uses compact formatting for large numbers.
  */
-export function formatCurrency(amount: number | string): string {
+export function formatCurrency(amount: number | string, currency: string = 'QAR'): string {
   const value = typeof amount === 'string' ? parseFloat(amount) : amount;
-  if (typeof value !== 'number' || isNaN(value)) return 'QAR 0';
+  if (typeof value !== 'number' || isNaN(value)) return `${currency} 0`;
 
   // For small numbers, show regular currency format
   if (Math.abs(value) < 1000) {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'QAR',
-      minimumFractionDigits: 0,
-    })
-      .format(value)
-      .replace('QAR', 'QAR ');
+    try {
+      return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: currency,
+        minimumFractionDigits: 0,
+      })
+        .format(value)
+        .replace(currency, `${currency} `);
+    } catch {
+      // Fallback if currency code is invalid or not supported
+      return `${currency} ${value.toLocaleString()}`;
+    }
   }
 
   // For large numbers, use compact notation
   const compactValue = formatCompactNumber(value);
-  return `QAR ${compactValue}`;
+  return `${currency} ${compactValue}`;
 }

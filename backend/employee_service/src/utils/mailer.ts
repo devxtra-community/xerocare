@@ -377,3 +377,91 @@ export async function sendRfqExcelMail(
     ],
   });
 }
+
+export async function sendRfqAwardedMail(to: string, vendorName: string, rfqNumber: string) {
+  const htmlContent = `
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <style>
+        body { font-family: 'Inter', Segoe UI, Roboto, sans-serif; background-color: #f3f4f6; padding: 20px; color: #374151; }
+        .container { max-width: 600px; margin: auto; background: #fff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .header { background: #16a34a; padding: 30px; text-align: center; color: #fff; }
+        .content { padding: 40px; }
+        .greeting { font-size: 18px; font-weight: 600; margin-bottom: 20px; }
+        .success-notice { background: #f0fdf4; padding: 16px; border-radius: 8px; margin-bottom: 30px; border-left: 4px solid #22c55e; }
+        .footer { padding: 20px; text-align: center; border-top: 1px solid #e5e7eb; font-size: 13px; color: #6b7280; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header"><h1>Order Confirmation</h1></div>
+        <div class="content">
+          <div class="greeting">Congratulations ${vendorName},</div>
+          <p>We are pleased to inform you that your quotation for RFQ <b>${rfqNumber}</b> has been accepted and awarded to your company.</p>
+          <div class="success-notice">
+            <strong>Next Steps:</strong>
+            <p>Our procurement team will be in touch shortly to finalize the fulfillment details.</p>
+            <p>Please ensure that all requested items are prepared for delivery within the agreed timeline.</p>
+          </div>
+          <p>Thank you for offering competitive pricing and partnering with XeroCare.</p>
+        </div>
+        <div class="footer">Team XeroCare</div>
+      </div>
+    </body>
+    </html>
+  `;
+
+  await mailer.sendMail({
+    from: process.env.MAIL_USER,
+    to,
+    subject: `Order Confirmation: Awarded RFQ ${rfqNumber}`,
+    html: htmlContent,
+  });
+}
+
+export async function sendRfqRejectedMail(to: string, vendorName: string, rfqNumber: string) {
+  const htmlContent = `
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <style>
+        body { font-family: 'Inter', Segoe UI, Roboto, sans-serif; background-color: #f3f4f6; padding: 20px; color: #374151; }
+        .container { max-width: 600px; margin: auto; background: #fff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .header { background: #475569; padding: 30px; text-align: center; color: #fff; }
+        .content { padding: 40px; }
+        .greeting { font-size: 18px; font-weight: 600; margin-bottom: 20px; }
+        .info-notice { background: #f8fafc; padding: 16px; border-radius: 8px; margin-bottom: 30px; border-left: 4px solid #94a3b8; }
+        .footer { padding: 20px; text-align: center; border-top: 1px solid #e5e7eb; font-size: 13px; color: #6b7280; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header"><h1>RFQ Status Update</h1></div>
+        <div class="content">
+          <div class="greeting">Dear ${vendorName},</div>
+          <p>Thank you for submitting a quotation for RFQ <b>${rfqNumber}</b>.</p>
+          <p>After careful evaluation of all submissions, we regret to inform you that your quotation was not selected for this particular requirement.</p>
+          <div class="info-notice">
+            <p>We appreciate the time and effort your team took to submit the proposal.</p>
+            <p>We will keep your company in mind for future procurement needs where there may be a better alignment.</p>
+          </div>
+          <p>Thank you for your continued interest in doing business with XeroCare.</p>
+        </div>
+        <div class="footer">Team XeroCare</div>
+      </div>
+    </body>
+    </html>
+  `;
+
+  await mailer.sendMail({
+    from: process.env.MAIL_USER,
+    to,
+    subject: `Status Update for RFQ ${rfqNumber}`,
+    html: htmlContent,
+  });
+}

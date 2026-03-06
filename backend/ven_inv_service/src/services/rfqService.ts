@@ -8,6 +8,7 @@ import { LotItem, LotItemType } from '../entities/lotItemEntity';
 import { Model } from '../entities/modelEntity';
 import { AppError } from '../errors/appError';
 import * as xlsx from 'xlsx';
+import * as ExcelJS from 'exceljs';
 
 interface CreateRfqDto {
   branchId: string;
@@ -147,7 +148,8 @@ export class RfqService {
   }
 
   private async generateRfqExcel(rfq: Rfq): Promise<Buffer> {
-    const rows: Record<string, unknown>[] = [];
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('RFQ_Response');
 
     // Fetch full model details for items
     const rfqWithFullItems = await this.dataSource.getRepository(Rfq).findOne({
@@ -157,35 +159,122 @@ export class RfqService {
 
     if (!rfqWithFullItems) throw new AppError('RFQ items not found', 404);
 
+    worksheet.columns = [
+      { header: 'rfq_item_id', key: 'rfq_item_id', width: 25 },
+      { header: 'model_id', key: 'model_id', width: 20 },
+      { header: 'hs_code', key: 'hs_code', width: 15 },
+      { header: 'description', key: 'description', width: 30 },
+      { header: 'quantity', key: 'quantity', width: 15 },
+      { header: 'unit_price', key: 'unit_price', width: 15 },
+      { header: 'total_price', key: 'total_price', width: 15 },
+      { header: 'stock_status', key: 'stock_status', width: 25 },
+      { header: 'available_quantity', key: 'available_quantity', width: 20 },
+      { header: 'estimated_shipment_date', key: 'estimated_shipment_date', width: 25 },
+      { header: 'vendor_note', key: 'vendor_note', width: 30 },
+    ];
+
     for (const item of rfqWithFullItems.items) {
       const model = await this.dataSource
         .getRepository(Model)
         .findOne({ where: { id: item.item_id } });
 
-      rows.push({
-        rfq_item_id: item.id, // HIDDEN but required for strict 2-way match
+      worksheet.addRow({
+        rfq_item_id: item.id,
         model_id: item.item_id,
         hs_code: model?.hs_code || '',
         description: model?.description || '',
         quantity: item.quantity,
         unit_price: '',
         total_price: '',
-        stock_status: '[IN_STOCK / OUT_OF_STOCK / ON_PRODUCTION]',
+        stock_status: '',
         available_quantity: '',
-        estimated_shipment_date: 'YYYY-MM-DD',
+        estimated_shipment_date: '',
         vendor_note: '',
       });
     }
 
-    const wb = xlsx.utils.book_new();
-    const ws = xlsx.utils.json_to_sheet(rows);
+    const rowCount = worksheet.rowCount;
+    // Add dropdown validation to the stock_status column (column H)
+    for (let i = 2; i <= Math.max(rowCount, 100); i++) {
+      worksheet.getCell(`H${i}`).dataValidation = {
+        type: 'list',
+        allowBlank: true,
+        formulae: ['"IN_STOCK,OUT_OF_STOCK,ON_PRODUCTION"'],
+        showErrorMessage: true,
+        errorTitle: 'Invalid Status',
+        error: 'Please select a valid stock status from the dropdown list.',
+      };
+    }
 
-    // Hide the first column (rfq_item_id) if we want to be clean,
-    // but the user said "model_id... will be filled by user"
-    // Actually, if we use rfq_item_id, matching is trivial.
+    const buffer = await workbook.xlsx.writeBuffer();
+    return Buffer.from(buffer);
+  }
 
-    xlsx.utils.book_append_sheet(wb, ws, 'RFQ_Response');
-    return xlsx.write(wb, { type: 'buffer', bookType: 'xlsx' });
+  async generateExcelForDownload(rfqId: string): Promise<Buffer> {
+    const rfq = await this.dataSource.getRepository(Rfq).findOne({
+      where: { id: rfqId },
+      relations: ['items', 'vendors'],
+    });
+
+    if (!rfq) throw new AppError('RFQ not found', 404);
+
+    return this.generateRfqExcel(rfq);
+  }
+
+  async generateVendorQuoteExcel(rfqId: string, vendorId: string): Promise<Buffer> {
+    const rfq = await this.dataSource.getRepository(Rfq).findOne({
+      where: { id: rfqId },
+      relations: ['items', 'vendors', 'vendors.vendor', 'vendors.items'],
+    });
+
+    if (!rfq) throw new AppError('RFQ not found', 404);
+
+    const rfqVendor = rfq.vendors.find((v) => v.vendor_id === vendorId);
+    if (!rfqVendor) throw new AppError('Vendor not found in this RFQ', 404);
+
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Vendor_Quote_Review');
+
+    worksheet.columns = [
+      { header: 'rfq_item_id', key: 'rfq_item_id', width: 25 },
+      { header: 'model_id', key: 'model_id', width: 20 },
+      { header: 'hs_code', key: 'hs_code', width: 15 },
+      { header: 'description', key: 'description', width: 30 },
+      { header: 'quantity', key: 'quantity', width: 15 },
+      { header: 'unit_price', key: 'unit_price', width: 15 },
+      { header: 'total_price', key: 'total_price', width: 15 },
+      { header: 'stock_status', key: 'stock_status', width: 25 },
+      { header: 'available_quantity', key: 'available_quantity', width: 20 },
+      { header: 'estimated_shipment_date', key: 'estimated_shipment_date', width: 25 },
+      { header: 'vendor_note', key: 'vendor_note', width: 30 },
+    ];
+
+    for (const item of rfq.items) {
+      const model = await this.dataSource
+        .getRepository(Model)
+        .findOne({ where: { id: item.item_id } });
+
+      const vendorItem = rfqVendor.items?.find((vi) => vi.rfq_item_id === item.id);
+
+      worksheet.addRow({
+        rfq_item_id: item.id,
+        model_id: item.item_id,
+        hs_code: model?.hs_code || '',
+        description: model?.description || '',
+        quantity: item.quantity,
+        unit_price: vendorItem?.unit_price || '',
+        total_price: vendorItem?.total_price || '',
+        stock_status: vendorItem?.stock_status || '',
+        available_quantity: vendorItem?.available_quantity || '',
+        estimated_shipment_date: vendorItem?.estimated_shipment_date
+          ? new Date(vendorItem.estimated_shipment_date).toLocaleDateString()
+          : '',
+        vendor_note: vendorItem?.vendor_note || '',
+      });
+    }
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    return Buffer.from(buffer);
   }
 
   async sendRfq(rfqId: string): Promise<Rfq> {
@@ -281,6 +370,7 @@ export class RfqService {
 
       await manager.save(vendorItemsToSave);
 
+      rfqVendor.items = vendorItemsToSave;
       rfqVendor.status = RfqVendorStatus.QUOTED;
       rfqVendor.total_quoted_amount = totalQuotedAmount;
       rfqVendor.quoted_at = new Date();
@@ -316,6 +406,7 @@ export class RfqService {
             vendorName: vq.vendor?.name,
             unitPrice: vi ? Number(vi.unit_price) : null,
             totalPrice: vi ? Number(vi.total_price) : null,
+            estimatedShipmentDate: vi ? vi.estimated_shipment_date : null,
           };
         })
         .filter((vp) => vp.unitPrice !== null);
@@ -373,7 +464,10 @@ export class RfqService {
         throw new AppError('RFQ must be fully or partially quoted before award', 400);
       }
 
-      const allVendors = await manager.find(RfqVendor, { where: { rfq_id: rfqId } });
+      const allVendors = await manager.find(RfqVendor, {
+        where: { rfq_id: rfqId },
+        relations: ['vendor'], // Need vendor details for emails
+      });
       const targetVendor = allVendors.find((v) => v.vendor_id === vendorId);
 
       if (!targetVendor) throw new AppError('Vendor not found in this RFQ', 404);
@@ -381,11 +475,31 @@ export class RfqService {
         throw new AppError('Vendor has not provided a valid quote', 400);
       }
 
+      const { publishEmailJob } = await import('../queues/emailPublisher');
+
       for (const vendor of allVendors) {
         if (vendor.id === targetVendor.id) {
           vendor.status = RfqVendorStatus.AWARDED;
+
+          if (vendor.vendor?.email) {
+            await publishEmailJob({
+              type: 'RFQ_AWARDED',
+              email: vendor.vendor.email,
+              vendorName: vendor.vendor.name,
+              rfqNumber: rfq.rfq_number,
+            });
+          }
         } else {
           vendor.status = RfqVendorStatus.REJECTED;
+
+          if (vendor.vendor?.email) {
+            await publishEmailJob({
+              type: 'RFQ_REJECTED',
+              email: vendor.vendor.email,
+              vendorName: vendor.vendor.name,
+              rfqNumber: rfq.rfq_number,
+            });
+          }
         }
         await manager.save(vendor);
       }

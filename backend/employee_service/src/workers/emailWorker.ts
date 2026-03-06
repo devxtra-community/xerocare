@@ -7,6 +7,8 @@ import {
   sendVendorWelcomeMail,
   sendLoginAlertMail,
   sendProductRequestMail,
+  sendRfqAwardedMail,
+  sendRfqRejectedMail,
 } from '../utils/mailer';
 
 import { logger } from '../config/logger';
@@ -71,6 +73,16 @@ export const startWorker = async () => {
             : Buffer.from(job.excelBuffer);
 
         await sendRfqExcelMail(job.email, job.vendorName, job.rfqNumber, buffer);
+      }
+
+      if (job.type === 'RFQ_AWARDED') {
+        await sendRfqAwardedMail(job.email, job.vendorName, job.rfqNumber);
+        logger.info(`Successfully sent order confirmation mail to: ${job.email}`);
+      }
+
+      if (job.type === 'RFQ_REJECTED') {
+        await sendRfqRejectedMail(job.email, job.vendorName, job.rfqNumber);
+        logger.info(`Successfully sent rejection mail to: ${job.email}`);
       }
 
       channel.ack(msg);

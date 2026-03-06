@@ -409,7 +409,7 @@ export class EmployeeService {
       let category = 'OTHER';
       if (item.role === 'MANAGER') category = 'BRANCH_MANAGER';
       else if (item.role === 'HR') category = 'HR';
-      else if (item.job === 'EMPLOYEE_MANAGER') category = 'EMPLOYEE_MANAGER';
+      else if (item.job === 'MANAGER') category = 'MANAGER';
       else if (item.role === 'FINANCE') category = 'FINANCE';
       else if (
         ['SALES', 'FINANCE_SALES'].includes(item.job || '') ||
@@ -417,8 +417,8 @@ export class EmployeeService {
       )
         category = 'SALES_STAFF';
       else if (
-        ['RENT', 'LEASE', 'FINANCE_RENT_LEASE'].includes(item.job || '') ||
-        ['RENT', 'LEASE', 'FINANCE_RENT_LEASE'].includes(item.financeJob || '')
+        ['RENT_AND_LEASE', 'FINANCE_RENT_LEASE'].includes(item.job || '') ||
+        ['RENT_AND_LEASE', 'FINANCE_RENT_LEASE'].includes(item.financeJob || '')
       )
         category = 'RENT_LEASE_STAFF';
       else if (['CRM'].includes(item.job || '')) category = 'SERVICE_STAFF';
