@@ -8,8 +8,8 @@ import { InvoiceItem } from '../entities/invoiceItemEntity';
 import { UsageRecord } from '../entities/usageRecordEntity';
 
 import { ProductAllocation } from '../entities/productAllocationEntity';
-import { DeviceMeterReading } from '../entities/deviceMeterReadingEntity';
 import { UsageRecordItem } from '../entities/usageRecordItemEntity';
+import { DeviceMeterReading } from '../entities/deviceMeterReadingEntity';
 
 export const Source = new DataSource({
   type: 'postgres',
@@ -21,8 +21,8 @@ export const Source = new DataSource({
     InvoiceItem,
     UsageRecord,
     ProductAllocation,
-    DeviceMeterReading,
     UsageRecordItem,
+    DeviceMeterReading,
   ],
   extra: { max: 2 },
 });

@@ -135,6 +135,9 @@ export interface UsageRecord {
   colorA3Count: number;
   remarks?: string;
   advanceAdjusted?: number;
+  discountAmount?: number;
+  discountBwCopies?: number;
+  discountColorCopies?: number;
   // Extended pricing details for UI breakdown
   rentType?: string;
   bwFreeLimit?: number;
@@ -143,6 +146,25 @@ export interface UsageRecord {
   bwExcessRate?: number;
   colorExcessRate?: number;
   combinedExcessRate?: number;
+  items?: Array<{
+    allocationId: string;
+    allocation?: {
+      serialNumber: string;
+      modelId: string;
+    };
+    startBwA4: number;
+    endBwA4: number;
+    deltaBwA4: number;
+    startBwA3: number;
+    endBwA3: number;
+    deltaBwA3: number;
+    startColorA4: number;
+    endColorA4: number;
+    deltaColorA4: number;
+    startColorA3: number;
+    endColorA3: number;
+    deltaColorA3: number;
+  }>;
 }
 
 /**
@@ -663,6 +685,8 @@ export const updateUsageRecord = async (
     discountAmount?: number;
     discountBwCopies?: number;
     discountColorCopies?: number;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    items?: any[];
   },
 ): Promise<unknown> => {
   const response = await api.put(`/b/usage/${usageId}`, payload);
