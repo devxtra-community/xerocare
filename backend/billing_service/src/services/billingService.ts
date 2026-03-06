@@ -18,6 +18,7 @@ import { emitProductStatusUpdate } from '../events/publisher/productStatusEvent'
 import { ContractStatus } from '../entities/enums/contractStatus';
 import { ProductAllocation, AllocationStatus } from '../entities/productAllocationEntity';
 import { DeviceMeterReading, ReadingSource } from '../entities/deviceMeterReadingEntity';
+import { UsageRecord } from '../entities/usageRecordEntity';
 
 const appendOpenEndedSlab = <T extends { from: number; to: number; rate: number }>(
   ranges: T[] | undefined,
@@ -1193,61 +1194,70 @@ export class BillingService {
    * Retrieves a single invoice by ID.
    */
   async getInvoiceById(id: string) {
-    const invoice = await this.invoiceRepo.findById(id);
-    if (!invoice) {
-      throw new AppError('Invoice not found', 404);
-    }
+    try {
+      const invoice = await this.invoiceRepo.findById(id);
+      if (!invoice) {
+        throw new AppError('Invoice not found', 404);
+      }
 
-    if (
-      (invoice.type === InvoiceType.PROFORMA || invoice.status === InvoiceStatus.ACTIVE_LEASE) &&
-      (invoice.bwA4Count === null || invoice.bwA4Count === undefined)
-    ) {
-      const history = await this.usageRepo.getUsageHistory(invoice.id);
-      const latestUsage = history[0];
-      if (latestUsage) {
-        invoice.bwA4Count = latestUsage.bwA4Count;
-        invoice.bwA3Count = latestUsage.bwA3Count;
-        invoice.colorA4Count = latestUsage.colorA4Count;
-        invoice.colorA3Count = latestUsage.colorA3Count;
-        invoice.billingPeriodStart = latestUsage.billingPeriodStart;
-        invoice.billingPeriodEnd = latestUsage.billingPeriodEnd;
+      if (
+        (invoice.type === InvoiceType.PROFORMA || invoice.status === InvoiceStatus.ACTIVE_LEASE) &&
+        (invoice.bwA4Count === null || invoice.bwA4Count === undefined)
+      ) {
+        const history = await this.usageRepo.getUsageHistory(invoice.id);
+        const latestUsage = history[0];
+        if (latestUsage) {
+          invoice.bwA4Count = latestUsage.bwA4Count;
+          invoice.bwA3Count = latestUsage.bwA3Count;
+          invoice.colorA4Count = latestUsage.colorA4Count;
+          invoice.colorA3Count = latestUsage.colorA3Count;
+          invoice.billingPeriodStart = latestUsage.billingPeriodStart;
+          invoice.billingPeriodEnd = latestUsage.billingPeriodEnd;
 
-        const isFirstMonth = history.length === 1;
-        if (isFirstMonth && invoice.advanceAmount && invoice.advanceAmount > 0) {
-          invoice.advanceAdjusted = invoice.advanceAmount;
+          const isFirstMonth = history.length === 1;
+          if (isFirstMonth && invoice.advanceAmount && invoice.advanceAmount > 0) {
+            invoice.advanceAdjusted = invoice.advanceAmount;
+          }
         }
       }
-    }
 
-    if (
-      invoice.type === InvoiceType.FINAL &&
-      invoice.referenceContractId &&
-      (!invoice.items || !invoice.items.some((i) => i.itemType === ItemType.PRICING_RULE))
-    ) {
-      const contract = await this.invoiceRepo.findById(invoice.referenceContractId);
-      if (contract && contract.items) {
-        const rules = contract.items.filter((i) => i.itemType === ItemType.PRICING_RULE);
-        if (!invoice.items) invoice.items = [];
-        invoice.items.push(...rules);
+      if (
+        invoice.type === InvoiceType.FINAL &&
+        invoice.referenceContractId &&
+        (!invoice.items || !invoice.items.some((i) => i.itemType === ItemType.PRICING_RULE))
+      ) {
+        const contract = await this.invoiceRepo.findById(invoice.referenceContractId);
+        if (contract && contract.items) {
+          const rules = contract.items.filter((i) => i.itemType === ItemType.PRICING_RULE);
+          if (!invoice.items) invoice.items = [];
+          invoice.items.push(...rules);
+        }
       }
+
+      if (invoice.type === InvoiceType.FINAL && invoice.referenceContractId) {
+        (invoice as Invoice & { invoiceHistory?: Invoice[] }).invoiceHistory =
+          await this.invoiceRepo.findFinalInvoicesByContractId(invoice.referenceContractId);
+      } else if (
+        invoice.type === InvoiceType.PROFORMA ||
+        invoice.status === InvoiceStatus.ACTIVE_LEASE
+      ) {
+        (invoice as Invoice & { invoiceHistory?: Invoice[] }).invoiceHistory =
+          await this.invoiceRepo.findFinalInvoicesByContractId(invoice.id);
+
+        const usageHistory = await this.usageRepo.getUsageHistory(invoice.id);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (invoice as Invoice & { usageHistory?: any[] }).usageHistory = usageHistory;
+      }
+
+      return invoice;
+    } catch (error) {
+      logger.error('Error in BillingService.getInvoiceById', {
+        id,
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+      });
+      throw error;
     }
-
-    if (invoice.type === InvoiceType.FINAL && invoice.referenceContractId) {
-      (invoice as Invoice & { invoiceHistory?: Invoice[] }).invoiceHistory =
-        await this.invoiceRepo.findFinalInvoicesByContractId(invoice.referenceContractId);
-    } else if (
-      invoice.type === InvoiceType.PROFORMA ||
-      invoice.status === InvoiceStatus.ACTIVE_LEASE
-    ) {
-      (invoice as Invoice & { invoiceHistory?: Invoice[] }).invoiceHistory =
-        await this.invoiceRepo.findFinalInvoicesByContractId(invoice.id);
-
-      const usageHistory = await this.usageRepo.getUsageHistory(invoice.id);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (invoice as Invoice & { usageHistory?: any[] }).usageHistory = usageHistory;
-    }
-
-    return invoice;
   }
 
   async completeContract(contractId: string) {
@@ -1540,10 +1550,10 @@ export class BillingService {
       const {
         allocationId,
         replacementTimestamp,
-        oldMeter,
+        oldMeter = {},
         newProductId,
         newSerialNumber,
-        newInitialMeter,
+        newInitialMeter = {},
         reason,
       } = payload;
 
@@ -1553,6 +1563,47 @@ export class BillingService {
 
       if (!oldAllocation) {
         throw new AppError('Active product allocation not found', 404);
+      }
+
+      // 0. Validate oldMeter reading against the latest usage record for this contract
+      const latestUsageRecord = await queryRunner.manager
+        .getRepository(UsageRecord)
+        .createQueryBuilder('ur')
+        .where('ur.contractId = :contractId', { contractId: oldAllocation.contractId })
+        .orderBy('ur.billingPeriodEnd', 'DESC')
+        .getOne();
+
+      if (latestUsageRecord) {
+        if (oldMeter.bwA4 !== undefined && oldMeter.bwA4 < (latestUsageRecord.bwA4Count || 0)) {
+          throw new AppError(
+            `Old B&W A4 meter (${oldMeter.bwA4}) cannot be lower than previously billed (${latestUsageRecord.bwA4Count})`,
+            400,
+          );
+        }
+        if (oldMeter.bwA3 !== undefined && oldMeter.bwA3 < (latestUsageRecord.bwA3Count || 0)) {
+          throw new AppError(
+            `Old B&W A3 meter (${oldMeter.bwA3}) cannot be lower than previously billed (${latestUsageRecord.bwA3Count})`,
+            400,
+          );
+        }
+        if (
+          oldMeter.colorA4 !== undefined &&
+          oldMeter.colorA4 < (latestUsageRecord.colorA4Count || 0)
+        ) {
+          throw new AppError(
+            `Old Color A4 meter (${oldMeter.colorA4}) cannot be lower than previously billed (${latestUsageRecord.colorA4Count})`,
+            400,
+          );
+        }
+        if (
+          oldMeter.colorA3 !== undefined &&
+          oldMeter.colorA3 < (latestUsageRecord.colorA3Count || 0)
+        ) {
+          throw new AppError(
+            `Old Color A3 meter (${oldMeter.colorA3}) cannot be lower than previously billed (${latestUsageRecord.colorA3Count})`,
+            400,
+          );
+        }
       }
 
       const ts = new Date(replacementTimestamp);
@@ -1621,8 +1672,6 @@ export class BillingService {
       const invoice = await queryRunner.manager.findOne(Invoice, {
         where: { id: oldAllocation.contractId },
       });
-
-      await queryRunner.commitTransaction();
 
       // Emit events to update inventory status (Return old, Allocate new)
       if (oldAllocation.productId) {

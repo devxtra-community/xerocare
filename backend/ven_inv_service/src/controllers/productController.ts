@@ -4,6 +4,7 @@ import { ProductService } from '../services/productService';
 import { logger } from '../config/logger';
 import { BulkProductRow } from '../dto/product.dto';
 import { MulterS3File } from '../types/multer-s3-file';
+import { ProductStatus } from '../entities/productEntity';
 
 const service = new ProductService();
 
@@ -88,9 +89,13 @@ export const getallproducts = async (req: Request, res: Response) => {
 
     // Admins see all, others only their branch
     const filteredBranchId = isAdmin ? undefined : branchId;
+    const modelId = req.query.modelId as string | undefined;
+    const status = req.query.status as ProductStatus | undefined;
 
-    logger.info(`Fetching products for branch: ${filteredBranchId || 'All'}`);
-    const products = await service.getAllProducts(filteredBranchId);
+    logger.info(
+      `Fetching products for branch: ${filteredBranchId || 'All'}, model: ${modelId || 'All'}, status: ${status || 'Any'}`,
+    );
+    const products = await service.getAllProducts(filteredBranchId, modelId, status);
     logger.info(`Fetched ${products?.length || 0} products`);
 
     if (!products || products.length === 0) {

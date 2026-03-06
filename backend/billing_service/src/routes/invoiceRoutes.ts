@@ -34,6 +34,7 @@ import {
   getAvailableYears,
   uploadContractConfirmation,
   replaceDeviceAllocation,
+  getContractAllocations,
 } from '../controllers/invoiceController';
 import { uploadMeterImage } from '../middlewares/uploadMiddleware';
 import { authMiddleware } from '../middlewares/authMiddleware';
@@ -184,6 +185,8 @@ router.put(
 
 router.post('/:id/notify/email', authMiddleware, sendEmailNotification);
 router.post('/:id/notify/whatsapp', authMiddleware, sendWhatsappNotification);
+
+router.get('/:contractId/allocations', authMiddleware, getContractAllocations);
 
 router.get('/:id', authMiddleware, getInvoiceById);
 

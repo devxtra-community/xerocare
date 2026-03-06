@@ -1,4 +1,4 @@
-import { Repository, Between, Brackets } from 'typeorm';
+import { Repository, Brackets } from 'typeorm';
 import { Invoice } from '../entities/invoiceEntity';
 import { InvoiceStatus } from '../entities/enums/invoiceStatus';
 import { InvoiceType } from '../entities/enums/invoiceType';
@@ -77,11 +77,29 @@ export class InvoiceRepository {
 
   /**
    * Generates a unique invoice number (INV-YYYY-XXXX).
+   * Parses the highest existing number for the current year to safely handle deletions.
    */
   async generateInvoiceNumber(): Promise<string> {
     const year = new Date().getFullYear();
-    const count = await this.getInvoiceCountForYear(year);
-    const paddedCount = String(count + 1).padStart(4, '0');
+
+    const latestInvoice = await this.repo
+      .createQueryBuilder('invoice')
+      .where('invoice.invoiceNumber LIKE :pattern', { pattern: `INV-${year}-%` })
+      .orderBy('invoice.invoiceNumber', 'DESC')
+      .getOne();
+
+    let nextNumber = 1;
+    if (latestInvoice && latestInvoice.invoiceNumber) {
+      const parts = latestInvoice.invoiceNumber.split('-');
+      if (parts.length === 3) {
+        const lastNumber = parseInt(parts[2], 10);
+        if (!isNaN(lastNumber)) {
+          nextNumber = lastNumber + 1;
+        }
+      }
+    }
+
+    const paddedCount = String(nextNumber).padStart(4, '0');
     return `INV-${year}-${paddedCount}`;
   }
 
@@ -209,17 +227,6 @@ export class InvoiceRepository {
    */
   updateStatus(id: string, status: Invoice['status']) {
     return this.repo.update(id, { status });
-  }
-
-  async getInvoiceCountForYear(year: number): Promise<number> {
-    const startDate = new Date(year, 0, 1);
-    const endDate = new Date(year + 1, 0, 1);
-
-    return await this.repo.count({
-      where: {
-        createdAt: Between(startDate, endDate),
-      },
-    });
   }
 
   /**

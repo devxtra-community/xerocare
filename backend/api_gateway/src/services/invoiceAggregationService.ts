@@ -48,13 +48,20 @@ interface InvoiceItem {
   unitPrice?: number;
 }
 
+interface ProductAllocation {
+  id: string;
+  productId: string;
+  serialNumber: string;
+  modelName: string;
+}
+
 interface Invoice {
   id: string;
   invoiceNumber: string;
   branchId: string;
-  customerId?: string;
+  customerId: string;
   createdBy: string;
-  totalAmount?: number;
+  totalAmount: number;
   status: InvoiceStatus;
 
   type: InvoiceType;
@@ -63,7 +70,7 @@ interface Invoice {
   monthlyRent?: number;
   advanceAmount?: number;
   discountPercent?: number;
-  effectiveFrom: string;
+  effectiveFrom?: string;
   effectiveTo?: string;
 
   saleType: string;
@@ -85,6 +92,7 @@ interface Invoice {
   billingPeriodStart?: string;
   billingPeriodEnd?: string;
   advanceAdjusted?: number;
+  productAllocations?: ProductAllocation[];
 }
 
 interface AggregatedInvoice extends Invoice {
@@ -1379,6 +1387,24 @@ export class InvoiceAggregationService {
         );
       }
       throw new AppError('Internal Gateway Error during device replacement', 500);
+    }
+  }
+
+  async getContractAllocations(contractId: string, token: string) {
+    try {
+      const response = await axios.get(
+        `${BILLING_SERVICE_URL}/invoices/${contractId}/allocations`,
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      return response.data.data;
+    } catch (error: unknown) {
+      if (axios.isAxiosError(error)) {
+        throw new AppError(
+          error.response?.data?.message || 'Failed to fetch contract allocations',
+          error.response?.status || 500,
+        );
+      }
+      throw new AppError('Internal Gateway Error while fetching allocations', 500);
     }
   }
 }

@@ -51,8 +51,6 @@ const getCleanProductName = (name: string) => {
   return clean.trim();
 };
 
-import { generateConsolidatedFinalInvoice } from '@/lib/invoice';
-
 /**
  * Comprehensive dialog for viewing invoice details.
  * improved financial summary, broken down by Rent, Lease, Sale, and Usage.
@@ -71,7 +69,6 @@ export function InvoiceDetailsDialog({
   const [currentInvoice, setCurrentInvoice] = React.useState<Invoice>(invoice);
   const [rejectReason, setRejectReason] = React.useState('');
   const [rejecting, setRejecting] = React.useState(false);
-  const [completing, setCompleting] = React.useState(false);
   const [isLoading, setIsLoading] = React.useState(false);
   const [isEmailSending, setIsEmailSending] = React.useState(false);
   const [isUsageModalOpen, setIsUsageModalOpen] = React.useState(false);
@@ -79,6 +76,7 @@ export function InvoiceDetailsDialog({
   const [replacingAllocation, setReplacingAllocation] = React.useState<{
     allocationId: string;
     serialNumber: string;
+    modelId: string;
   } | null>(null);
 
   const historyRef = React.useRef<HTMLDivElement>(null);
@@ -95,20 +93,6 @@ export function InvoiceDetailsDialog({
       setCurrentInvoice(data);
     } catch {
       toast.error('Failed to load invoice details');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleCompleteContract = async () => {
-    setIsLoading(true);
-    try {
-      await generateConsolidatedFinalInvoice(currentInvoice.id);
-      toast.success('Contract Completed & Final Invoice Generated');
-      onClose();
-    } catch (error: unknown) {
-      const err = error as { message?: string };
-      toast.error(err.message || 'Failed to complete contract');
     } finally {
       setIsLoading(false);
     }
@@ -872,6 +856,7 @@ export function InvoiceDetailsDialog({
                                     setReplacingAllocation({
                                       allocationId: alloc.id,
                                       serialNumber: alloc.serialNumber,
+                                      modelId: alloc.modelId,
                                     });
                                     setIsReplaceModalOpen(true);
                                   }}
@@ -1312,40 +1297,6 @@ export function InvoiceDetailsDialog({
                   </>
                 )
               ) : mode === 'FINANCE' &&
-                (currentInvoice.saleType === 'RENT' || currentInvoice.saleType === 'LEASE') &&
-                currentInvoice.contractStatus === 'ACTIVE' ? (
-                completing ? (
-                  <div className="flex items-center gap-3 animate-in slide-in-from-right-4">
-                    <span className="text-xs font-bold text-slate-500">End Contract?</span>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setCompleting(false)}
-                      className="h-10 text-muted-foreground hover:text-slate-800"
-                    >
-                      Cancel
-                    </Button>
-                    <Button
-                      size="sm"
-                      className="h-10 bg-slate-900 text-white shadow-sm hover:bg-slate-800 px-4"
-                      onClick={handleCompleteContract}
-                      disabled={isLoading}
-                    >
-                      {isLoading ? <Loader2 className="animate-spin h-4 w-4 mr-2" /> : null}
-                      Confirm Completion
-                    </Button>
-                  </div>
-                ) : (
-                  <Button
-                    variant="outline"
-                    className="flex-1 sm:flex-none rounded-xl h-10 px-6 font-bold text-slate-700 border-slate-200 hover:bg-slate-50"
-                    onClick={() => setCompleting(true)}
-                    disabled={isLoading}
-                  >
-                    Complete Contract
-                  </Button>
-                )
-              ) : mode === 'FINANCE' &&
                 (currentInvoice.saleType === 'RENT' ||
                   currentInvoice.saleType === 'LEASE') ? null : onApprove &&
                 (currentInvoice.status === 'DRAFT' || currentInvoice.status === 'SENT') ? (
@@ -1597,6 +1548,7 @@ export function InvoiceDetailsDialog({
           contractId={currentInvoice.referenceContractId || currentInvoice.id}
           allocationId={replacingAllocation.allocationId}
           oldSerialNumber={replacingAllocation.serialNumber}
+          modelId={replacingAllocation.modelId}
           onSuccess={() => {
             handleSelectInvoice(currentInvoice.id); // Refresh current view
           }}

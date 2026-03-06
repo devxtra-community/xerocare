@@ -13,12 +13,18 @@ export class ProductRepository {
   }
 
   /**
-   * Retrieves all products not associated with spare parts, optionally filtered by branch.
+   * Retrieves all products, optionally filtered by branch, model, and status.
    */
-  async getAllProducts(branchId?: string) {
+  async getAllProducts(branchId?: string, modelId?: string, status?: ProductStatus) {
     const where: FindOptionsWhere<Product> = { spare_part_id: IsNull() };
     if (branchId && branchId !== 'All') {
       where.warehouse = { branchId };
+    }
+    if (modelId) {
+      where.model_id = modelId;
+    }
+    if (status) {
+      where.product_status = status;
     }
 
     return this.repo.find({

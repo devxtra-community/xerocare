@@ -216,6 +216,85 @@ export default function UsageRecordingModal({
       .sort((a, b) => new Date(b.periodStart).getTime() - new Date(a.periodStart).getTime())[0];
   }, [history, formData.billingPeriodStart, editingInvoice]);
 
+  // If the current allocation is a replacement device, its meter starts from its own
+  // initial readings (e.g. 0), NOT the previous device's final cumulative count.
+  // This prevents showing a wrong "Prev" and wrong delta in the UI after device replacement.
+  const activeAllocationInitialCounts = React.useMemo(() => {
+    const allocs = contract?.productAllocations;
+    if (!allocs) return null;
+    const activeAlloc = allocs.find((a) => a.status === 'ALLOCATED' && a.replacementOfAllocationId);
+    if (!activeAlloc) return null;
+    return {
+      bwA4: activeAlloc.initialBwA4 ?? 0,
+      bwA3: activeAlloc.initialBwA3 ?? 0,
+      clrA4: activeAlloc.initialColorA4 ?? 0,
+      clrA3: activeAlloc.initialColorA3 ?? 0,
+    };
+  }, [contract?.productAllocations]);
+
+  // Calculate usage of any devices that were replaced *during* this billing period
+  const replacedDeltas = React.useMemo(() => {
+    const deltas = { bwA4: 0, bwA3: 0, clrA4: 0, clrA3: 0 };
+
+    if (
+      !contract?.productAllocations ||
+      !formData.billingPeriodStart ||
+      !formData.billingPeriodEnd
+    ) {
+      return deltas;
+    }
+
+    const startPeriod = new Date(formData.billingPeriodStart).getTime();
+    const endPeriod = new Date(formData.billingPeriodEnd).getTime();
+
+    contract.productAllocations
+      .filter((a) => {
+        // @ts-expect-error DB field not in frontend type
+        if (a.status !== 'REPLACED' || !a.endTimestamp) return false;
+        // @ts-expect-error DB field not in frontend type
+        const endTs = new Date(a.endTimestamp).getTime();
+        return endTs >= startPeriod && endTs <= endPeriod;
+      })
+      .forEach((allocation) => {
+        // @ts-expect-error DB field not in frontend type
+        const allocStartTs = new Date(allocation.startTimestamp).getTime();
+
+        const startBwA4 =
+          allocStartTs < startPeriod && prevUsage
+            ? prevUsage.bwA4Count
+            : allocation.initialBwA4 || 0;
+        const startBwA3 =
+          allocStartTs < startPeriod && prevUsage
+            ? prevUsage.bwA3Count
+            : allocation.initialBwA3 || 0;
+        const startClrA4 =
+          allocStartTs < startPeriod && prevUsage
+            ? prevUsage.colorA4Count
+            : allocation.initialColorA4 || 0;
+        const startClrA3 =
+          allocStartTs < startPeriod && prevUsage
+            ? prevUsage.colorA3Count
+            : allocation.initialColorA3 || 0;
+
+        const finalBwA4 = allocation.currentBwA4 || 0;
+        const finalBwA3 = allocation.currentBwA3 || 0;
+        const finalClrA4 = allocation.currentColorA4 || 0;
+        const finalClrA3 = allocation.currentColorA3 || 0;
+
+        deltas.bwA4 += Math.max(0, finalBwA4 - startBwA4);
+        deltas.bwA3 += Math.max(0, finalBwA3 - startBwA3);
+        deltas.clrA4 += Math.max(0, finalClrA4 - startClrA4);
+        deltas.clrA3 += Math.max(0, finalClrA3 - startClrA3);
+      });
+
+    return deltas;
+  }, [
+    contract?.productAllocations,
+    formData.billingPeriodStart,
+    formData.billingPeriodEnd,
+    prevUsage,
+  ]);
+
   // Fetch product details when contract changes
   React.useEffect(() => {
     if (!contract?.items) return;
@@ -335,6 +414,33 @@ export default function UsageRecordingModal({
     });
     return { bwA4, bwA3, clrA4, clrA3 };
   }, [contract]);
+
+  const effectivePrevCounts = React.useMemo(() => {
+    return {
+      bwA4: activeAllocationInitialCounts
+        ? activeAllocationInitialCounts.bwA4
+        : prevUsage
+          ? prevUsage.bwA4Count
+          : calculatedInitialCounts.bwA4,
+      bwA3: activeAllocationInitialCounts
+        ? activeAllocationInitialCounts.bwA3
+        : prevUsage
+          ? prevUsage.bwA3Count
+          : calculatedInitialCounts.bwA3,
+      clrA4: activeAllocationInitialCounts
+        ? activeAllocationInitialCounts.clrA4
+        : prevUsage
+          ? prevUsage.colorA4Count
+          : calculatedInitialCounts.clrA4,
+      clrA3: activeAllocationInitialCounts
+        ? activeAllocationInitialCounts.clrA3
+        : prevUsage
+          ? prevUsage.colorA3Count
+          : calculatedInitialCounts.clrA3,
+      label: activeAllocationInitialCounts ? 'Replaced Initial' : prevUsage ? 'Prev' : 'Initial',
+    };
+  }, [activeAllocationInitialCounts, prevUsage, calculatedInitialCounts]);
+
   // Detect Last Month (Strict Date Match)
   const isLastMonth = React.useMemo(() => {
     if (!contract?.effectiveTo || !formData.billingPeriodEnd) return false;
@@ -465,15 +571,15 @@ export default function UsageRecordingModal({
     // Rent is calculated at the end.
     let totalAmount = 0;
 
-    const bwA4 = safeParse(formData.bwA4Count);
-    const bwA3 = safeParse(formData.bwA3Count);
-    const clrA4 = safeParse(formData.colorA4Count);
-    const clrA3 = safeParse(formData.colorA3Count);
+    const bwA4 = safeParse(formData.bwA4Count) + replacedDeltas.bwA4;
+    const bwA3 = safeParse(formData.bwA3Count) + replacedDeltas.bwA3;
+    const clrA4 = safeParse(formData.colorA4Count) + replacedDeltas.clrA4;
+    const clrA3 = safeParse(formData.colorA3Count) + replacedDeltas.clrA3;
 
-    const prevBwA4 = prevUsage ? prevUsage.bwA4Count : calculatedInitialCounts.bwA4;
-    const prevBwA3 = prevUsage ? prevUsage.bwA3Count : calculatedInitialCounts.bwA3;
-    const prevClrA4 = prevUsage ? prevUsage.colorA4Count : calculatedInitialCounts.clrA4;
-    const prevClrA3 = prevUsage ? prevUsage.colorA3Count : calculatedInitialCounts.clrA3;
+    const prevBwA4 = effectivePrevCounts.bwA4;
+    const prevBwA3 = effectivePrevCounts.bwA3;
+    const prevClrA4 = effectivePrevCounts.clrA4;
+    const prevClrA3 = effectivePrevCounts.clrA3;
 
     if (ruleItems.combo) {
       const breakdown = calculateRuleCost(
@@ -580,10 +686,10 @@ export default function UsageRecordingModal({
     const clrA4 = Number(formData.colorA4Count || 0);
     const clrA3 = Number(formData.colorA3Count || 0);
 
-    const prevBwA4 = prevUsage ? prevUsage.bwA4Count : calculatedInitialCounts.bwA4;
-    const prevBwA3 = prevUsage ? prevUsage.bwA3Count : calculatedInitialCounts.bwA3;
-    const prevClrA4 = prevUsage ? prevUsage.colorA4Count : calculatedInitialCounts.clrA4;
-    const prevClrA3 = prevUsage ? prevUsage.colorA3Count : calculatedInitialCounts.clrA3;
+    const prevBwA4 = effectivePrevCounts.bwA4;
+    const prevBwA3 = effectivePrevCounts.bwA3;
+    const prevClrA4 = effectivePrevCounts.clrA4;
+    const prevClrA3 = effectivePrevCounts.clrA3;
 
     if (!isSimplifiedLease) {
       if (bwA4 > 0 && bwA4 < prevBwA4) errs.bwA4 = `Cannot be less than ${prevBwA4}`;
@@ -614,12 +720,10 @@ export default function UsageRecordingModal({
     const clrA4 = Number(formData.colorA4Count || 0);
     const clrA3 = Number(formData.colorA3Count || 0);
 
-    const prevBwA4 = prevUsage
-      ? prevUsage.bwA4Count
-      : ruleItems.bw?.initialBwCount || ruleItems.combo?.initialBwCount || 0;
-    const prevBwA3 = prevUsage ? prevUsage.bwA3Count : 0;
-    const prevClrA4 = prevUsage ? prevUsage.colorA4Count : ruleItems.color?.initialColorCount || 0;
-    const prevClrA3 = prevUsage ? prevUsage.colorA3Count : 0;
+    const prevBwA4 = effectivePrevCounts.bwA4;
+    const prevBwA3 = effectivePrevCounts.bwA3;
+    const prevClrA4 = effectivePrevCounts.clrA4;
+    const prevClrA3 = effectivePrevCounts.clrA3;
 
     // 1. Rollback Validation (Only for non-simplified leases)
     if (!isSimplifiedLease) {
@@ -777,10 +881,12 @@ export default function UsageRecordingModal({
         const response = await recordUsage(payload);
         toast.success('Usage recorded successfully');
 
-        const prevBwA4 = prevUsage ? prevUsage.bwA4Count : calculatedInitialCounts.bwA4;
-        const prevBwA3 = prevUsage ? prevUsage.bwA3Count : calculatedInitialCounts.bwA3;
-        const prevClrA4 = prevUsage ? prevUsage.colorA4Count : calculatedInitialCounts.clrA4;
-        const prevClrA3 = prevUsage ? prevUsage.colorA3Count : calculatedInitialCounts.clrA3;
+        toast.success('Usage recorded successfully');
+
+        const prevBwA4 = effectivePrevCounts.bwA4;
+        const prevBwA3 = effectivePrevCounts.bwA3;
+        const prevClrA4 = effectivePrevCounts.clrA4;
+        const prevClrA3 = effectivePrevCounts.clrA3;
 
         setRecordedUsageData({
           bwA4Count: Number(formData.bwA4Count),
@@ -890,41 +996,42 @@ export default function UsageRecordingModal({
             </div>
 
             {/* Rent / EMI Section Display Only */}
-            <div className="p-4 rounded-xl bg-blue-50/50 border border-blue-100 space-y-2">
-              <h3 className="text-sm font-bold text-blue-700 flex items-center gap-2">
-                <Coins size={16} /> {isSimplifiedLease ? 'EMI Info' : 'Rent Info'}
-              </h3>
-              <div className="flex justify-between items-center">
-                <span className="text-xs font-semibold text-slate-600">
-                  {isSimplifiedLease
-                    ? 'Monthly EMI Amount'
-                    : 'Monthly Rent (Accrued until contract end)'}
-                </span>
-                <span className="text-sm font-bold text-slate-800">
-                  {(() => {
-                    const tenure = contract?.leaseTenureMonths || 0;
-                    const isFinalMonth = tenure > 0 && history.length + 1 === tenure;
-                    const amount = Number(
-                      contract?.monthlyRent ||
-                        contract?.monthlyLeaseAmount ||
-                        contract?.monthlyEmiAmount ||
-                        0,
-                    );
+            {!contract?.rentType?.includes('CPC') && (
+              <div className="p-4 rounded-xl bg-blue-50/50 border border-blue-100 space-y-2">
+                <h3 className="text-sm font-bold text-blue-700 flex items-center gap-2">
+                  <Coins size={16} /> {isSimplifiedLease ? 'EMI Info' : 'Rent Info'}
+                </h3>
+                <div className="flex justify-between items-center">
+                  <span className="text-xs font-semibold text-slate-600">
+                    {isSimplifiedLease
+                      ? 'Monthly EMI Amount'
+                      : 'Monthly Rent (Accrued until contract end)'}
+                  </span>
+                  <span className="text-sm font-bold text-slate-800">
+                    {(() => {
+                      const tenure = contract?.leaseTenureMonths || 0;
+                      const isFinalMonth = tenure > 0 && history.length + 1 === tenure;
+                      const amount = Number(
+                        contract?.monthlyRent ||
+                          contract?.monthlyLeaseAmount ||
+                          contract?.monthlyEmiAmount ||
+                          0,
+                      );
 
-                    if (isFinalMonth) return `${formatCurrency(0)} (Adjusted from Advance)`;
-                    return formatCurrency(amount);
-                  })()}
-                </span>
+                      if (isFinalMonth) return `${formatCurrency(0)} (Adjusted from Advance)`;
+                      return formatCurrency(amount);
+                    })()}
+                  </span>
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Last Month Alert */}
-            {isLastMonth && (
+            {isLastMonth && !contract?.rentType?.includes('CPC') && (
               <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 space-y-2 animate-in fade-in slide-in-from-top-2">
-                <div className="flex items-center gap-2 font-bold text-lg">
-                  <span className="text-xl">⚠️</span>
-                  <h3>Last Month of Contract</h3>
-                </div>
+                <h3 className="text-sm font-bold flex items-center gap-2">
+                  <span className="text-amber-500 text-lg">⚠️</span> Last Month of Contract
+                </h3>
                 <p className="text-sm text-amber-800">
                   This billing period matches the contract end date. The{' '}
                   <strong>Advance Amount</strong> will be adjusted against this month&apos;s rent.
@@ -1026,15 +1133,13 @@ export default function UsageRecordingModal({
                           <Label className="text-xs font-semibold">A4 Current Reading</Label>
                           <div className="text-right">
                             <span className="text-[10px] text-orange-600 block">
-                              {prevUsage ? 'Prev' : 'Initial'}:{' '}
-                              {prevUsage ? prevUsage.bwA4Count : calculatedInitialCounts.bwA4}
+                              {effectivePrevCounts.label}: {effectivePrevCounts.bwA4}
                             </span>
                             <span className="text-[10px] text-green-600 font-bold block">
                               Usage:{' '}
                               {Math.max(
                                 0,
-                                Number(formData.bwA4Count || 0) -
-                                  (prevUsage ? prevUsage.bwA4Count : calculatedInitialCounts.bwA4),
+                                Number(formData.bwA4Count || 0) - effectivePrevCounts.bwA4,
                               )}
                             </span>
                           </div>
@@ -1061,15 +1166,13 @@ export default function UsageRecordingModal({
                           <Label className="text-xs font-semibold">A3 Current Reading</Label>
                           <div className="text-right">
                             <span className="text-[10px] text-orange-600 block">
-                              {prevUsage ? 'Prev' : 'Initial'}:{' '}
-                              {prevUsage ? prevUsage.bwA3Count : calculatedInitialCounts.bwA3}
+                              {effectivePrevCounts.label}: {effectivePrevCounts.bwA3}
                             </span>
                             <span className="text-[10px] text-green-600 font-bold block">
                               Usage:{' '}
                               {Math.max(
                                 0,
-                                Number(formData.bwA3Count || 0) -
-                                  (prevUsage ? prevUsage.bwA3Count : calculatedInitialCounts.bwA3),
+                                Number(formData.bwA3Count || 0) - effectivePrevCounts.bwA3,
                               )}
                             </span>
                           </div>
@@ -1151,17 +1254,13 @@ export default function UsageRecordingModal({
                           <Label className="text-xs font-semibold">A4 Current Reading</Label>
                           <div className="text-right">
                             <span className="text-[10px] text-orange-600 block">
-                              {prevUsage ? 'Prev' : 'Initial'}:{' '}
-                              {prevUsage ? prevUsage.colorA4Count : calculatedInitialCounts.clrA4}
+                              {effectivePrevCounts.label}: {effectivePrevCounts.clrA4}
                             </span>
                             <span className="text-[10px] text-green-600 font-bold block">
                               Usage:{' '}
                               {Math.max(
                                 0,
-                                Number(formData.colorA4Count || 0) -
-                                  (prevUsage
-                                    ? prevUsage.colorA4Count
-                                    : calculatedInitialCounts.clrA4),
+                                Number(formData.colorA4Count || 0) - effectivePrevCounts.clrA4,
                               )}
                             </span>
                           </div>
@@ -1190,17 +1289,13 @@ export default function UsageRecordingModal({
                           <Label className="text-xs font-semibold">A3 Current Reading</Label>
                           <div className="text-right">
                             <span className="text-[10px] text-orange-600 block">
-                              {prevUsage ? 'Prev' : 'Initial'}:{' '}
-                              {prevUsage ? prevUsage.colorA3Count : calculatedInitialCounts.clrA3}
+                              {effectivePrevCounts.label}: {effectivePrevCounts.clrA3}
                             </span>
                             <span className="text-[10px] text-green-600 font-bold block">
                               Usage:{' '}
                               {Math.max(
                                 0,
-                                Number(formData.colorA3Count || 0) -
-                                  (prevUsage
-                                    ? prevUsage.colorA3Count
-                                    : calculatedInitialCounts.clrA3),
+                                Number(formData.colorA3Count || 0) - effectivePrevCounts.clrA3,
                               )}
                             </span>
                           </div>
@@ -1362,9 +1457,100 @@ export default function UsageRecordingModal({
                         Black & White & Color (Combined)
                       </p>
                       <div className="space-y-1 text-xs">
-                        <div className="flex justify-between">
-                          <span className="text-slate-500">
-                            Monthly Equivalent (Delta A4 + 2×Delta A3):
+                        {(replacedDeltas.bwA4 > 0 ||
+                          replacedDeltas.bwA3 > 0 ||
+                          replacedDeltas.clrA4 > 0 ||
+                          replacedDeltas.clrA3 > 0) && (
+                          <div className="flex flex-col gap-1 mt-2 p-2 bg-amber-50 rounded text-[10px] text-amber-700 border border-amber-100">
+                            <span className="font-bold flex items-center gap-1">
+                              <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                              Includes usage from replaced devices:
+                            </span>
+                            <div className="grid grid-cols-2 gap-x-4 pl-2.5">
+                              {replacedDeltas.bwA4 > 0 && (
+                                <span>B&W A4: {replacedDeltas.bwA4}</span>
+                              )}
+                              {replacedDeltas.bwA3 > 0 && (
+                                <span>B&W A3: {replacedDeltas.bwA3}</span>
+                              )}
+                              {replacedDeltas.clrA4 > 0 && (
+                                <span>Color A4: {replacedDeltas.clrA4}</span>
+                              )}
+                              {replacedDeltas.clrA3 > 0 && (
+                                <span>Color A3: {replacedDeltas.clrA3}</span>
+                              )}
+                            </div>
+                            <div className="pl-2.5 mt-0.5 pt-0.5 border-t border-amber-200 font-semibold gap-1 flex justify-between">
+                              <span>
+                                Total Equivalent Replaced:{' '}
+                                {replacedDeltas.bwA4 +
+                                  replacedDeltas.bwA3 * 2 +
+                                  replacedDeltas.clrA4 +
+                                  replacedDeltas.clrA3 * 2}{' '}
+                                units
+                              </span>
+                              <span>
+                                {(() => {
+                                  // Reuse the same rate logic as the "Excess Rate" below
+                                  const isCpc = contract?.rentType?.includes('CPC');
+                                  if (isCpc) {
+                                    const slabs = parseSlabs(ruleItems.combo?.comboSlabRanges);
+                                    if (slabs.length > 0) {
+                                      const prevA4 = prevUsage
+                                        ? prevUsage.bwA4Count
+                                        : calculatedInitialCounts.bwA4;
+                                      const prevA3 = prevUsage
+                                        ? prevUsage.bwA3Count
+                                        : calculatedInitialCounts.bwA3;
+                                      const deltaA4 =
+                                        Math.max(0, Number(formData.bwA4Count || 0) - prevA4) +
+                                        replacedDeltas.bwA4;
+                                      const deltaA3 =
+                                        Math.max(0, Number(formData.bwA3Count || 0) - prevA3) +
+                                        replacedDeltas.bwA3;
+                                      const prevClrA4 = prevUsage
+                                        ? prevUsage.colorA4Count
+                                        : calculatedInitialCounts.clrA4;
+                                      const prevClrA3 = prevUsage
+                                        ? prevUsage.colorA3Count
+                                        : calculatedInitialCounts.clrA3;
+                                      const deltaClrA4 =
+                                        Math.max(
+                                          0,
+                                          Number(formData.colorA4Count || 0) - prevClrA4,
+                                        ) + replacedDeltas.clrA4;
+                                      const deltaClrA3 =
+                                        Math.max(
+                                          0,
+                                          Number(formData.colorA3Count || 0) - prevClrA3,
+                                        ) + replacedDeltas.clrA3;
+                                      const totalVolume =
+                                        deltaA4 + deltaA3 * 2 + deltaClrA4 + deltaClrA3 * 2;
+                                      const sortedSlabs = [...slabs].sort(
+                                        (a, b) => a.from - b.from,
+                                      );
+                                      let applicableRate = sortedSlabs[0]?.rate || 0;
+                                      for (const slab of sortedSlabs) {
+                                        if (totalVolume >= slab.from) applicableRate = slab.rate;
+                                      }
+                                      return `@ QAR ${applicableRate}/unit`;
+                                    }
+                                    return '@ Slab-based rate';
+                                  }
+                                  return `@ QAR ${Number(ruleItems.combo?.combinedExcessRate || 0).toFixed(2)}/unit`;
+                                })()}
+                              </span>
+                            </div>
+                          </div>
+                        )}
+                        <div className="flex justify-between text-slate-700 mt-2">
+                          <span>
+                            {replacedDeltas.bwA4 > 0 ||
+                            replacedDeltas.bwA3 > 0 ||
+                            replacedDeltas.clrA4 > 0 ||
+                            replacedDeltas.clrA3 > 0
+                              ? 'Total Billed Units (Current + Replaced):'
+                              : 'Total Billed Units:'}
                           </span>
                           <span className="font-bold">
                             {(() => {
@@ -1392,16 +1578,18 @@ export default function UsageRecordingModal({
                                 Number(formData.colorA3Count || 0) - prevClrA3,
                               );
 
-                              return (
-                                deltaA4 +
-                                deltaA3 * 2 +
-                                deltaClrA4 +
-                                deltaClrA3 * 2
-                              ).toLocaleString();
+                              const currentVolume =
+                                deltaA4 + deltaA3 * 2 + deltaClrA4 + deltaClrA3 * 2;
+                              const replacedVolume =
+                                replacedDeltas.bwA4 +
+                                replacedDeltas.bwA3 * 2 +
+                                replacedDeltas.clrA4 +
+                                replacedDeltas.clrA3 * 2;
+                              return (currentVolume + replacedVolume).toLocaleString() + ' units';
                             })()}
                           </span>
                         </div>
-                        <div className="flex justify-between text-slate-500">
+                        <div className="flex justify-between text-slate-500 mt-1">
                           <span>Excess Rate:</span>
                           <span className="font-bold">
                             {(() => {
@@ -1415,14 +1603,12 @@ export default function UsageRecordingModal({
                                   const prevA3 = prevUsage
                                     ? prevUsage.bwA3Count
                                     : calculatedInitialCounts.bwA3;
-                                  const deltaA4 = Math.max(
-                                    0,
-                                    Number(formData.bwA4Count || 0) - prevA4,
-                                  );
-                                  const deltaA3 = Math.max(
-                                    0,
-                                    Number(formData.bwA3Count || 0) - prevA3,
-                                  );
+                                  const deltaA4 =
+                                    Math.max(0, Number(formData.bwA4Count || 0) - prevA4) +
+                                    replacedDeltas.bwA4;
+                                  const deltaA3 =
+                                    Math.max(0, Number(formData.bwA3Count || 0) - prevA3) +
+                                    replacedDeltas.bwA3;
 
                                   const prevClrA4 = prevUsage
                                     ? prevUsage.colorA4Count
@@ -1430,14 +1616,12 @@ export default function UsageRecordingModal({
                                   const prevClrA3 = prevUsage
                                     ? prevUsage.colorA3Count
                                     : calculatedInitialCounts.clrA3;
-                                  const deltaClrA4 = Math.max(
-                                    0,
-                                    Number(formData.colorA4Count || 0) - prevClrA4,
-                                  );
-                                  const deltaClrA3 = Math.max(
-                                    0,
-                                    Number(formData.colorA3Count || 0) - prevClrA3,
-                                  );
+                                  const deltaClrA4 =
+                                    Math.max(0, Number(formData.colorA4Count || 0) - prevClrA4) +
+                                    replacedDeltas.clrA4;
+                                  const deltaClrA3 =
+                                    Math.max(0, Number(formData.colorA3Count || 0) - prevClrA3) +
+                                    replacedDeltas.clrA3;
 
                                   const totalVolume =
                                     deltaA4 + deltaA3 * 2 + deltaClrA4 + deltaClrA3 * 2;
@@ -1469,8 +1653,8 @@ export default function UsageRecordingModal({
                           <span>
                             QAR
                             {(() => {
-                              const bwA4 = Number(formData.bwA4Count || 0);
-                              const bwA3 = Number(formData.bwA3Count || 0);
+                              const bwA4 = Number(formData.bwA4Count || 0) + replacedDeltas.bwA4;
+                              const bwA3 = Number(formData.bwA3Count || 0) + replacedDeltas.bwA3;
                               const prevA4 = prevUsage
                                 ? prevUsage.bwA4Count
                                 : calculatedInitialCounts.bwA4;
@@ -1478,8 +1662,10 @@ export default function UsageRecordingModal({
                                 ? prevUsage.bwA3Count
                                 : calculatedInitialCounts.bwA3;
 
-                              const clrA4 = Number(formData.colorA4Count || 0);
-                              const clrA3 = Number(formData.colorA3Count || 0);
+                              const clrA4 =
+                                Number(formData.colorA4Count || 0) + replacedDeltas.clrA4;
+                              const clrA3 =
+                                Number(formData.colorA3Count || 0) + replacedDeltas.clrA3;
                               const prevClrA4 = prevUsage
                                 ? prevUsage.colorA4Count
                                 : calculatedInitialCounts.clrA4;
@@ -1534,11 +1720,91 @@ export default function UsageRecordingModal({
                                     0,
                                     Number(formData.bwA3Count || 0) - prevA3,
                                   );
-                                  return (deltaA4 + deltaA3 * 2).toLocaleString();
+                                  return (deltaA4 + deltaA3 * 2).toLocaleString() + ' units';
                                 })()}
                               </span>
                             </div>
-                            <div className="flex justify-between text-slate-500">
+                            {(replacedDeltas.bwA4 > 0 || replacedDeltas.bwA3 > 0) && (
+                              <div className="flex flex-col gap-1 mt-2 p-2 bg-amber-50 rounded text-[10px] text-amber-700 border border-amber-100">
+                                <span className="font-bold flex items-center gap-1">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                                  Includes usage from replaced devices:
+                                </span>
+                                <div className="grid grid-cols-2 gap-x-4 pl-2.5">
+                                  {replacedDeltas.bwA4 > 0 && (
+                                    <span>B&W A4: {replacedDeltas.bwA4}</span>
+                                  )}
+                                  {replacedDeltas.bwA3 > 0 && (
+                                    <span>B&W A3: {replacedDeltas.bwA3}</span>
+                                  )}
+                                </div>
+                                <div className="pl-2.5 mt-0.5 pt-0.5 border-t border-amber-200 font-semibold gap-1 flex justify-between">
+                                  <span>
+                                    Total Equivalent Replaced:{' '}
+                                    {replacedDeltas.bwA4 + replacedDeltas.bwA3 * 2} units
+                                  </span>
+                                  <span>
+                                    {(() => {
+                                      const isCpc = contract?.rentType?.includes('CPC');
+                                      if (isCpc) {
+                                        const slabs = parseSlabs(ruleItems.bw?.bwSlabRanges);
+                                        if (slabs.length > 0) {
+                                          const prevA4 = prevUsage
+                                            ? prevUsage.bwA4Count
+                                            : calculatedInitialCounts.bwA4;
+                                          const prevA3 = prevUsage
+                                            ? prevUsage.bwA3Count
+                                            : calculatedInitialCounts.bwA3;
+                                          const deltaA4 =
+                                            Math.max(0, Number(formData.bwA4Count || 0) - prevA4) +
+                                            replacedDeltas.bwA4;
+                                          const deltaA3 =
+                                            Math.max(0, Number(formData.bwA3Count || 0) - prevA3) +
+                                            replacedDeltas.bwA3;
+                                          const totalVolume = deltaA4 + deltaA3 * 2;
+                                          const sortedSlabs = [...slabs].sort(
+                                            (a, b) => a.from - b.from,
+                                          );
+                                          let applicableRate = sortedSlabs[0]?.rate || 0;
+                                          for (const slab of sortedSlabs) {
+                                            if (totalVolume >= slab.from)
+                                              applicableRate = slab.rate;
+                                          }
+                                          return `@ QAR ${applicableRate}/unit`;
+                                        }
+                                        return '@ Slab-based rate';
+                                      }
+                                      return `@ QAR ${Number(ruleItems.bw?.bwExcessRate || 0).toFixed(2)}/unit`;
+                                    })()}
+                                  </span>
+                                </div>
+                              </div>
+                            )}
+                            <div className="flex justify-between text-slate-700 mt-2">
+                              <span>
+                                {replacedDeltas.bwA4 > 0 || replacedDeltas.bwA3 > 0
+                                  ? 'Total Billed Units (Current + Replaced):'
+                                  : 'Total Billed Units:'}
+                              </span>
+                              <span className="font-bold">
+                                {(() => {
+                                  const prevA4 = prevUsage
+                                    ? prevUsage.bwA4Count
+                                    : calculatedInitialCounts.bwA4;
+                                  const prevA3 = prevUsage
+                                    ? prevUsage.bwA3Count
+                                    : calculatedInitialCounts.bwA3;
+                                  const deltaA4 =
+                                    Math.max(0, Number(formData.bwA4Count || 0) - prevA4) +
+                                    replacedDeltas.bwA4;
+                                  const deltaA3 =
+                                    Math.max(0, Number(formData.bwA3Count || 0) - prevA3) +
+                                    replacedDeltas.bwA3;
+                                  return (deltaA4 + deltaA3 * 2).toLocaleString() + ' units';
+                                })()}
+                              </span>
+                            </div>
+                            <div className="flex justify-between text-slate-500 mt-1">
                               <span>Excess Rate:</span>
                               <span className="font-bold">
                                 {(() => {
@@ -1552,14 +1818,12 @@ export default function UsageRecordingModal({
                                       const prevA3 = prevUsage
                                         ? prevUsage.bwA3Count
                                         : calculatedInitialCounts.bwA3;
-                                      const deltaA4 = Math.max(
-                                        0,
-                                        Number(formData.bwA4Count || 0) - prevA4,
-                                      );
-                                      const deltaA3 = Math.max(
-                                        0,
-                                        Number(formData.bwA3Count || 0) - prevA3,
-                                      );
+                                      const deltaA4 =
+                                        Math.max(0, Number(formData.bwA4Count || 0) - prevA4) +
+                                        replacedDeltas.bwA4;
+                                      const deltaA3 =
+                                        Math.max(0, Number(formData.bwA3Count || 0) - prevA3) +
+                                        replacedDeltas.bwA3;
                                       const totalVolume = deltaA4 + deltaA3 * 2;
 
                                       // Find applicable slab
@@ -1642,11 +1906,57 @@ export default function UsageRecordingModal({
                                     0,
                                     Number(formData.colorA3Count || 0) - prevA3,
                                   );
-                                  return (deltaA4 + deltaA3 * 2).toLocaleString();
+                                  return (deltaA4 + deltaA3 * 2).toLocaleString() + ' units';
                                 })()}
                               </span>
                             </div>
-                            <div className="flex justify-between text-slate-500">
+                            {(replacedDeltas.clrA4 > 0 || replacedDeltas.clrA3 > 0) && (
+                              <div className="flex flex-col gap-1 mt-2 p-2 bg-amber-50 rounded text-[10px] text-amber-700 border border-amber-100">
+                                <span className="font-bold flex items-center gap-1">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                                  Includes usage from replaced devices:
+                                </span>
+                                <div className="grid grid-cols-2 gap-x-4 pl-2.5">
+                                  {replacedDeltas.clrA4 > 0 && (
+                                    <span>Color A4: {replacedDeltas.clrA4}</span>
+                                  )}
+                                  {replacedDeltas.clrA3 > 0 && (
+                                    <span>Color A3: {replacedDeltas.clrA3}</span>
+                                  )}
+                                </div>
+                                <div className="pl-2.5 mt-0.5 pt-0.5 border-t border-amber-200 font-semibold gap-1 flex justify-between">
+                                  <span>
+                                    Total Equivalent Replaced:{' '}
+                                    {replacedDeltas.clrA4 + replacedDeltas.clrA3 * 2} units
+                                  </span>
+                                </div>
+                              </div>
+                            )}
+                            <div className="flex justify-between text-slate-700 mt-2">
+                              <span>
+                                {replacedDeltas.clrA4 > 0 || replacedDeltas.clrA3 > 0
+                                  ? 'Total Billed Units (Current + Replaced):'
+                                  : 'Total Billed Units:'}
+                              </span>
+                              <span className="font-bold">
+                                {(() => {
+                                  const prevA4 = prevUsage
+                                    ? prevUsage.colorA4Count
+                                    : calculatedInitialCounts.clrA4;
+                                  const prevA3 = prevUsage
+                                    ? prevUsage.colorA3Count
+                                    : calculatedInitialCounts.clrA3;
+                                  const deltaA4 =
+                                    Math.max(0, Number(formData.colorA4Count || 0) - prevA4) +
+                                    replacedDeltas.clrA4;
+                                  const deltaA3 =
+                                    Math.max(0, Number(formData.colorA3Count || 0) - prevA3) +
+                                    replacedDeltas.clrA3;
+                                  return (deltaA4 + deltaA3 * 2).toLocaleString() + ' units';
+                                })()}
+                              </span>
+                            </div>
+                            <div className="flex justify-between text-slate-500 mt-1">
                               <span>Excess Rate:</span>
                               <span className="font-bold">
                                 {(() => {
@@ -1660,14 +1970,12 @@ export default function UsageRecordingModal({
                                       const prevA3 = prevUsage
                                         ? prevUsage.colorA3Count
                                         : calculatedInitialCounts.clrA3;
-                                      const deltaA4 = Math.max(
-                                        0,
-                                        Number(formData.colorA4Count || 0) - prevA4,
-                                      );
-                                      const deltaA3 = Math.max(
-                                        0,
-                                        Number(formData.colorA3Count || 0) - prevA3,
-                                      );
+                                      const deltaA4 =
+                                        Math.max(0, Number(formData.colorA4Count || 0) - prevA4) +
+                                        replacedDeltas.clrA4;
+                                      const deltaA3 =
+                                        Math.max(0, Number(formData.colorA3Count || 0) - prevA3) +
+                                        replacedDeltas.clrA3;
                                       const totalVolume = deltaA4 + deltaA3 * 2;
 
                                       // Find applicable slab
@@ -1699,8 +2007,10 @@ export default function UsageRecordingModal({
                               <span>
                                 QAR
                                 {(() => {
-                                  const clrA4 = Number(formData.colorA4Count || 0);
-                                  const clrA3 = Number(formData.colorA3Count || 0);
+                                  const clrA4 =
+                                    Number(formData.colorA4Count || 0) + replacedDeltas.clrA4;
+                                  const clrA3 =
+                                    Number(formData.colorA3Count || 0) + replacedDeltas.clrA3;
                                   const prevClrA4 = prevUsage
                                     ? prevUsage.colorA4Count
                                     : calculatedInitialCounts.clrA4;

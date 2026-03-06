@@ -4,6 +4,8 @@ import { BillingReportService } from '../services/billingReportService';
 import { NotificationService } from '../services/notificationService';
 import { AppError } from '../errors/appError';
 import { MulterS3File } from '../types/multer-s3-file';
+import { Source } from '../config/dataSource';
+import { ProductAllocation } from '../entities/productAllocationEntity';
 
 const billingService = new BillingService();
 const reportService = new BillingReportService();
@@ -821,6 +823,24 @@ export const replaceDeviceAllocation = async (req: Request, res: Response, next:
       data: result,
       message: 'Device replaced successfully',
     });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Returns all product allocations for a contract (including initial meter readings).
+ * Used by the Usage Recording Modal to compute correct delta after device replacement.
+ */
+export const getContractAllocations = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { contractId } = req.params;
+    if (!contractId) throw new AppError('contractId is required', 400);
+    const allocations = await Source.getRepository(ProductAllocation).find({
+      where: { contractId: String(contractId) },
+      order: { startTimestamp: 'ASC' },
+    });
+    return res.status(200).json({ success: true, data: allocations });
   } catch (error) {
     next(error);
   }

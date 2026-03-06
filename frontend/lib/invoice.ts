@@ -99,6 +99,15 @@ export interface Invoice {
     modelId: string;
     serialNumber: string;
     status: string;
+    replacementOfAllocationId?: string;
+    initialBwA4?: number;
+    initialBwA3?: number;
+    initialColorA4?: number;
+    initialColorA3?: number;
+    currentBwA4?: number;
+    currentBwA3?: number;
+    currentColorA4?: number;
+    currentColorA3?: number;
   }>;
 }
 
@@ -243,14 +252,23 @@ export const updateQuotation = async (
  */
 export const replaceDeviceAllocation = async (payload: {
   contractId: string;
-  oldAllocationId: string;
+  allocationId: string;
+  newProductId?: string;
   newSerialNumber: string;
-  replacementDate: string;
-  replacementReason: string;
-  currentBwA4?: number;
-  currentBwA3?: number;
-  currentColorA4?: number;
-  currentColorA3?: number;
+  replacementTimestamp: string;
+  reason: string;
+  oldMeter: {
+    bwA4?: number;
+    bwA3?: number;
+    colorA4?: number;
+    colorA3?: number;
+  };
+  newInitialMeter: {
+    bwA4?: number;
+    bwA3?: number;
+    colorA4?: number;
+    colorA3?: number;
+  };
 }): Promise<void> => {
   const response = await api.post(`/b/invoices/allocations/replace`, payload);
   return response.data.data;

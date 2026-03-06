@@ -143,14 +143,16 @@ export class UsageService {
           startColorA3 = prevItem.endColorA3;
         } else if (
           previousRecord &&
-          new Date(alloc.startTimestamp) < new Date(payload.billingPeriodStart)
+          new Date(alloc.startTimestamp) < new Date(payload.billingPeriodStart) &&
+          !alloc.replacementOfAllocationId // NOT a replacement — carried over from previous period
         ) {
-          // Legacy fallback
+          // Legacy fallback: device was active in previous period, its reading carries forward
           startBwA4 = previousRecord.bwA4Count;
           startBwA3 = previousRecord.bwA3Count;
           startColorA4 = previousRecord.colorA4Count;
           startColorA3 = previousRecord.colorA3Count;
         } else {
+          // Replacement device OR brand-new allocation: start from its own initial reading
           startBwA4 = alloc.initialBwA4;
           startBwA3 = alloc.initialBwA3;
           startColorA4 = alloc.initialColorA4;
