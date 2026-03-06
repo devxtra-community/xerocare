@@ -16,13 +16,14 @@ export class BranchService {
     name: string;
     address: string;
     location: string;
-    manager_id: string;
+    manager_id?: string;
     started_date: Date;
   }) {
-    const manager = await this.managerRepo.findActiveManager(payload.manager_id);
-
-    if (!manager) {
-      throw new AppError('Manager does not exist or inactive', 400);
+    if (payload.manager_id) {
+      const manager = await this.managerRepo.findActiveManager(payload.manager_id);
+      if (!manager) {
+        throw new AppError('Manager does not exist or inactive', 400);
+      }
     }
 
     const branch = await this.repo.create(payload);
@@ -82,7 +83,7 @@ export class BranchService {
       name?: string;
       address?: string;
       location?: string;
-      manager_id?: string;
+      manager_id?: string | null;
       started_date?: Date;
       status?: BranchStatus;
     },

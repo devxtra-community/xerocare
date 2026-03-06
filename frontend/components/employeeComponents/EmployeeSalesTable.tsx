@@ -356,9 +356,9 @@ export default function EmployeeSalesTable({ mode = 'EMPLOYEE' }: EmployeeSalesT
               : async () => {
                   // FINANCE Mode Approve
                   try {
-                    const { financeApproveInvoice } = await import('@/lib/invoice');
-                    await financeApproveInvoice(selectedInvoice.id, {});
-                    toast.success('Invoice Approved Successfully');
+                    const { allocateMachinesInvoice } = await import('@/lib/invoice');
+                    await allocateMachinesInvoice(selectedInvoice.id, {});
+                    toast.success('Approved');
                     setDetailsOpen(false);
                     fetchInvoices();
                   } catch (err: unknown) {

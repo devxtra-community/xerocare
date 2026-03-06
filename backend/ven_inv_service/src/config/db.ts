@@ -1,3 +1,4 @@
+import { logger } from './logger';
 import 'reflect-metadata';
 import { DataSource } from 'typeorm';
 import './env';
@@ -15,20 +16,18 @@ import { Brand } from '../entities/brandEntity';
 import { Lot } from '../entities/lotEntity';
 import { LotItem } from '../entities/lotItemEntity';
 
-import { logger } from './logger';
-
-const getDirectDbUrl = (url?: string) => {
-  if (!url) return '';
-  return url.replace('-pooler.', '.');
-};
+import { Rfq } from '../entities/rfqEntity';
+import { RfqItem } from '../entities/rfqItemEntity';
+import { RfqVendor } from '../entities/rfqVendorEntity';
+import { RfqVendorItem } from '../entities/rfqVendorItemEntity';
 
 export const Source = new DataSource({
   type: 'postgres',
-  url: getDirectDbUrl(process.env.VENDOR_DATABASE_URL),
+  url: process.env.VENDOR_DATABASE_URL || process.env.DATABASE_URL,
   ssl: {
     rejectUnauthorized: false,
   },
-  synchronize: false, // Enabled to fix missing columns (lots.branch_id)
+  synchronize: true, // Enabled to fix missing columns (lots.branch_id)
   entities: [
     Vendor,
     Model,
@@ -41,6 +40,10 @@ export const Source = new DataSource({
     Brand,
     Lot,
     LotItem,
+    Rfq,
+    RfqItem,
+    RfqVendor,
+    RfqVendorItem,
   ],
   extra: {
     max: 1,

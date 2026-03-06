@@ -4,15 +4,10 @@ import './env';
 import { Customer } from '../entities/customerEntity';
 import { logger } from './logger';
 
-const getDirectDbUrl = (url?: string) => {
-  if (!url) return '';
-  return url.replace('-pooler.', '.');
-};
-
 export const Source = new DataSource({
   type: 'postgres',
-  url: getDirectDbUrl(process.env.CRM_DATABASE_URL),
-  synchronize: false,
+  url: process.env.CRM_DATABASE_URL || process.env.DATABASE_URL,
+  synchronize: true,
   logging: false,
   entities: [Customer],
   extra: {

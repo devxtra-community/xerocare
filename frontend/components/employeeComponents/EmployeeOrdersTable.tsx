@@ -370,13 +370,10 @@ export default function EmployeeOrdersTable({
             } else {
               // FINANCE Appprove
               try {
-                const { financeApproveInvoice } = await import('@/lib/invoice');
-                await financeApproveInvoice(selectedInvoice.id, {});
-                toast.success('Order Approved');
+                const { allocateMachinesInvoice } = await import('@/lib/invoice');
+                await allocateMachinesInvoice(selectedInvoice.id, {});
+                toast.success('Invoice Approved');
                 setDetailsOpen(false);
-                // Refresh? If propInvoices, parent needs refresh.
-                // If internal fetch, we can re-fetch.
-                // We'll rely on parent refresh if possible, or force reload.
                 window.location.reload(); // Simple fallback for now
               } catch {
                 toast.error('Failed to approve');

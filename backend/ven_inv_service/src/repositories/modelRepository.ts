@@ -1,3 +1,4 @@
+import { Brackets } from 'typeorm';
 import { Source } from '../config/db';
 import { Model } from '../entities/modelEntity';
 
@@ -19,15 +20,31 @@ export class ModelRepository {
   }
 
   /**
-   * Retrieves all models with associated product details, optionally filtered by branch.
+   * Retrieves all models with associated product details, optionally filtered by branch and search query.
    */
-  async getAllModels(branchId?: string) {
+  async getAllModels(branchId?: string, search?: string) {
     const query = this.repo
       .createQueryBuilder('model')
       .leftJoinAndSelect('model.brandRelation', 'brandRelation');
 
     if (branchId) {
       query.where('model.branch_id = :branchId', { branchId });
+    }
+
+    if (search) {
+      const searchTerms = `%${search}%`;
+      const searchBrackets = new Brackets((qb) => {
+        qb.where('model.model_name ILIKE :search', { search: searchTerms })
+          .orWhere('model.model_no ILIKE :search', { search: searchTerms })
+          .orWhere('model.id::text ILIKE :search', { search: searchTerms })
+          .orWhere('brandRelation.name ILIKE :search', { search: searchTerms });
+      });
+
+      if (branchId) {
+        query.andWhere(searchBrackets);
+      } else {
+        query.where(searchBrackets);
+      }
     }
 
     const rawAndEntities = await query

@@ -1,4 +1,5 @@
 import axios from 'axios';
+import FormData from 'form-data';
 import { AppError } from '../errors/appError';
 import { logger } from '../config/logger';
 import { redis } from '../config/redis';
@@ -47,13 +48,20 @@ interface InvoiceItem {
   unitPrice?: number;
 }
 
+interface ProductAllocation {
+  id: string;
+  productId: string;
+  serialNumber: string;
+  modelName: string;
+}
+
 interface Invoice {
   id: string;
   invoiceNumber: string;
   branchId: string;
-  customerId?: string;
+  customerId: string;
   createdBy: string;
-  totalAmount?: number;
+  totalAmount: number;
   status: InvoiceStatus;
 
   type: InvoiceType;
@@ -62,7 +70,7 @@ interface Invoice {
   monthlyRent?: number;
   advanceAmount?: number;
   discountPercent?: number;
-  effectiveFrom: string;
+  effectiveFrom?: string;
   effectiveTo?: string;
 
   saleType: string;
@@ -84,6 +92,7 @@ interface Invoice {
   billingPeriodStart?: string;
   billingPeriodEnd?: string;
   advanceAdjusted?: number;
+  productAllocations?: ProductAllocation[];
 }
 
 interface AggregatedInvoice extends Invoice {
@@ -716,11 +725,46 @@ export class InvoiceAggregationService {
   }
 
   /**
-   * Finance approves a quotation.
+   * Finance team allocates machines (Step 1).
    */
-  async financeApprove(
+  async allocateMachines(
     id: string,
     token: string,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    itemUpdates?: any[],
+  ) {
+    try {
+      const response = await axios.post<{ data: Invoice }>(
+        `${BILLING_SERVICE_URL}/invoices/${id}/allocate-machines`,
+        { itemUpdates },
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
+      return response.data.data;
+    } catch (error: unknown) {
+      if (axios.isAxiosError(error)) {
+        logger.error('Axios error in allocate machines', {
+          message: error.message,
+          responseStatus: error.response?.status,
+          responseData: error.response?.data,
+        });
+        throw new AppError(
+          error.response?.data?.message || 'Failed to allocate machines',
+          error.response?.status || 500,
+        );
+      }
+      throw new AppError('Internal Gateway Error during machine allocation', 500);
+    }
+  }
+
+  /**
+   * Finance team activates the contract (Step 2).
+   */
+  async activateContract(
+    id: string,
+    token: string,
+    contractConfirmationUrl: string,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     deposit?: any,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -728,28 +772,64 @@ export class InvoiceAggregationService {
   ) {
     try {
       const response = await axios.post<{ data: Invoice }>(
-        `${BILLING_SERVICE_URL}/invoices/${id}/finance-approve`,
-        { deposit, itemUpdates },
+        `${BILLING_SERVICE_URL}/invoices/${id}/activate-contract`,
+        { contractConfirmationUrl, deposit, itemUpdates },
         {
           headers: { Authorization: `Bearer ${token}` },
         },
       );
-      const invoice = response.data.data;
-
-      return invoice;
+      return response.data.data;
     } catch (error: unknown) {
       if (axios.isAxiosError(error)) {
-        logger.error('Axios error in finance approve', {
+        logger.error('Axios error in activate contract', {
           message: error.message,
           responseStatus: error.response?.status,
           responseData: error.response?.data,
         });
         throw new AppError(
-          error.response?.data?.message || 'Failed to approve quotation',
+          error.response?.data?.message || 'Failed to activate contract',
           error.response?.status || 500,
         );
       }
-      throw new AppError('Internal Gateway Error during finance approval', 500);
+      throw new AppError('Internal Gateway Error during contract activation', 500);
+    }
+  }
+
+  /**
+   * Upload contract confirmation document.
+   */
+  async uploadContractConfirmation(id: string, token: string, file: Express.Multer.File) {
+    try {
+      const formData = new FormData();
+      formData.append('file', file.buffer, {
+        filename: file.originalname,
+        contentType: file.mimetype,
+      });
+
+      const response = await axios.post<{ data: { url: string } }>(
+        `${BILLING_SERVICE_URL}/invoices/${id}/upload-confirmation`,
+        formData,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            ...formData.getHeaders(),
+          },
+        },
+      );
+      return response.data;
+    } catch (error: unknown) {
+      if (axios.isAxiosError(error)) {
+        logger.error('Axios error in upload contract confirmation', {
+          message: error.message,
+          responseStatus: error.response?.status,
+          responseData: error.response?.data,
+        });
+        throw new AppError(
+          error.response?.data?.message || 'Failed to upload contract confirmation document',
+          error.response?.status || 500,
+        );
+      }
+      throw new AppError('Internal Gateway Error during contract document upload', 500);
     }
   }
 
@@ -1286,6 +1366,45 @@ export class InvoiceAggregationService {
         );
       }
       throw new AppError('Internal Gateway Error during finance stats fetch', 500);
+    }
+  }
+
+  async replaceDeviceAllocation(payload: unknown, token: string) {
+    try {
+      const response = await axios.post(
+        `${BILLING_SERVICE_URL}/invoices/allocations/replace`,
+        payload,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
+      return response.data.data;
+    } catch (error: unknown) {
+      if (axios.isAxiosError(error)) {
+        throw new AppError(
+          error.response?.data?.message || 'Failed to replace device allocation',
+          error.response?.status || 500,
+        );
+      }
+      throw new AppError('Internal Gateway Error during device replacement', 500);
+    }
+  }
+
+  async getContractAllocations(contractId: string, token: string) {
+    try {
+      const response = await axios.get(
+        `${BILLING_SERVICE_URL}/invoices/${contractId}/allocations`,
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      return response.data.data;
+    } catch (error: unknown) {
+      if (axios.isAxiosError(error)) {
+        throw new AppError(
+          error.response?.data?.message || 'Failed to fetch contract allocations',
+          error.response?.status || 500,
+        );
+      }
+      throw new AppError('Internal Gateway Error while fetching allocations', 500);
     }
   }
 }

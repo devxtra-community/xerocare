@@ -52,6 +52,9 @@ export class Vendor {
   })
   status!: VendorStatus;
 
+  @Column({ type: 'varchar', length: 10, default: 'QAR' })
+  currency!: string;
+
   @CreateDateColumn()
   createdAt!: Date;
 

@@ -277,6 +277,7 @@ export function BulkProductDialog({ open, onClose, onSuccess }: BulkProductDialo
       const payload = validRows.map((r) => ({
         ...r,
         model_no: r.model_id, // Overwrite with UUID
+        lot_id: r.lot_id || undefined, // prevent empty string UUID error
       }));
 
       const response = await productService.bulkCreateProducts(payload as BulkProductRow[]);

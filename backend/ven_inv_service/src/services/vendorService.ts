@@ -13,6 +13,7 @@ interface CreateVendorDTO {
   type?: 'Supplier' | 'Distributor' | 'Service';
   contactPerson?: string;
   status?: VendorStatus;
+  currency?: string;
 }
 
 interface RequestProductsDTO {

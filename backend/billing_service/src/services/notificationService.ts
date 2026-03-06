@@ -298,6 +298,9 @@ export class NotificationService {
       body,
       invoiceId: contract.id,
     });
+
+    contract.emailSentAt = new Date();
+    await this.invoiceRepo.save(contract);
   }
 
   /**

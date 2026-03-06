@@ -37,14 +37,6 @@ export class ExcelHandler {
       purchaseDateStr = `${date.y}-${String(date.m).padStart(2, '0')}-${String(date.d).padStart(2, '0')}`;
     }
 
-    const getCost = (row: number) => Number(getCellValue(row, 1) || 0);
-    const transportationCost = getCost(7);
-    const documentationCost = getCost(8);
-    const shippingCost = getCost(9);
-    const groundFieldCost = getCost(10);
-    const certificationCost = getCost(11);
-    const labourCost = getCost(12);
-
     const itemsData: ExcelLotItemRow[] = XLSX.utils.sheet_to_json(worksheet, { range: 15 });
 
     if (itemsData.length === 0) {
@@ -182,12 +174,6 @@ export class ExcelHandler {
       lotNumber: String(lotNumber).trim(),
       purchaseDate: String(purchaseDateStr),
       items,
-      transportationCost,
-      documentationCost,
-      shippingCost,
-      groundFieldCost,
-      certificationCost,
-      labourCost,
       notes: notes ? String(notes) : undefined,
       branchId,
       createdBy: 'EXCEL_UPLOAD',
@@ -203,16 +189,6 @@ export class ExcelHandler {
     const purchaseDateStr = new Date(lot.purchaseDate).toISOString().split('T')[0];
     rows.push(['Purchase Date', purchaseDateStr]);
     rows.push(['Status', lot.status]);
-    rows.push([]);
-
-    rows.push(['COST BREAKDOWN']);
-    rows.push(['Type', 'Amount']);
-    rows.push(['Transportation', lot.transportationCost]);
-    rows.push(['Documentation', lot.documentationCost]);
-    rows.push(['Shipping', lot.shippingCost]);
-    rows.push(['Ground Field', lot.groundFieldCost]);
-    rows.push(['Certification', lot.certificationCost]);
-    rows.push(['Labour', lot.labourCost]);
     rows.push([]);
 
     rows.push(['LOT ITEMS']);

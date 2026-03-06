@@ -12,6 +12,7 @@ import {
   Printer,
   Settings,
   Award,
+  FileText,
 } from 'lucide-react';
 
 import {
@@ -67,6 +68,11 @@ const menuItems = [
     href: '/manager/vendors',
   },
   {
+    title: 'RFQs',
+    icon: FileText,
+    href: '/manager/rfqs',
+  },
+  {
     title: 'Employees',
     icon: Users,
     href: '/manager/employees',
@@ -83,8 +89,13 @@ const menuItems = [
     href: '/manager/inventory',
   },
   {
+    title: 'Warehouse',
+    icon: Package,
+    href: '/manager/warehouse',
+  },
+  {
     title: 'Lots',
-    icon: Package, // Using Package icon for Lots/Orders
+    icon: Boxes, // Fallback to Boxes since we reclaimed Package for Warehouse, adjusting
     href: '/manager/lots',
   },
 ];

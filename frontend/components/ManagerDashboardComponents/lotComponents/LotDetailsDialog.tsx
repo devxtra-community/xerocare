@@ -101,16 +101,6 @@ export default function LotDetailsDialog({ lot, onClose }: LotDetailsDialogProps
     }
   };
 
-  const costBreakdown = [
-    { label: 'Transportation', value: lot.transportationCost },
-    { label: 'Documentation', value: lot.documentationCost },
-    { label: 'Shipping', value: lot.shippingCost },
-    { label: 'Ground/Field', value: lot.groundFieldCost },
-    { label: 'Certification', value: lot.certificationCost },
-    { label: 'Labour', value: lot.labourCost },
-  ];
-
-  const totalCosts = costBreakdown.reduce((sum, item) => sum + Number(item.value || 0), 0);
   const itemsTotal = lot.items.reduce((sum, item) => sum + Number(item.totalPrice), 0);
 
   // Check if lot has products or spare parts
@@ -212,22 +202,11 @@ export default function LotDetailsDialog({ lot, onClose }: LotDetailsDialogProps
             </div>
           </div>
 
-          {/* Right: Costs & Summary */}
+          {/* Right: Summary */}
           <div className="flex-1 border rounded-lg bg-slate-50 flex flex-col">
-            <div className="p-3 bg-gray-100 border-b font-semibold text-sm">Cost Breakdown</div>
+            <div className="p-3 bg-gray-100 border-b font-semibold text-sm">Summary</div>
             <div className="p-4 space-y-3 flex-1 overflow-y-auto">
-              {costBreakdown.map((cost) => (
-                <div key={cost.label} className="flex justify-between text-sm">
-                  <span className="text-gray-600">{cost.label}</span>
-                  <span className="font-medium">{formatCurrency(Number(cost.value || 0))}</span>
-                </div>
-              ))}
-              <div className="border-t pt-2 mt-2 flex justify-between font-semibold text-sm">
-                <span>Costs Total</span>
-                <span>{formatCurrency(totalCosts)}</span>
-              </div>
-
-              <div className="border-t pt-4 mt-4">
+              <div>
                 <div className="text-xs text-gray-500 uppercase font-semibold mb-2">Notes</div>
                 <p className="text-sm text-gray-700 bg-white p-3 rounded border min-h-[60px]">
                   {lot.notes || 'No notes.'}

@@ -4,7 +4,7 @@ import { ProductRepository } from '../repositories/productRepository';
 import { ModelRepository } from '../repositories/modelRepository';
 import { ModelService } from './modelService';
 import { WarehouseRepository } from '../repositories/warehouseRepository';
-import { Product } from '../entities/productEntity';
+import { Product, ProductStatus } from '../entities/productEntity';
 import { logger } from '../config/logger';
 import { LotService } from './lotService';
 import { LotItemType } from '../entities/lotItemEntity';
@@ -91,7 +91,7 @@ export class ProductService {
           product_status: row.product_status,
           print_colour: row.print_colour,
           max_discount_amount: maxDiscount,
-          lot_id: row.lot_id,
+          lot_id: row.lot_id || undefined,
         });
 
         await this.model.syncModelQuantities(modelDetails.id);
@@ -198,10 +198,10 @@ export class ProductService {
   }
 
   /**
-   * Retrieves all products, optionally filtered by branch.
+   * Retrieves all products, optionally filtered by branch, model, and status.
    */
-  async getAllProducts(branchId?: string) {
-    return this.productRepo.getAllProducts(branchId);
+  async getAllProducts(branchId?: string, modelId?: string, status?: ProductStatus) {
+    return this.productRepo.getAllProducts(branchId, modelId, status);
   }
 
   /**

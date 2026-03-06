@@ -4,7 +4,8 @@ import {
   updateQuotation,
   approveQuotation,
   employeeApprove,
-  financeApprove,
+  allocateMachines,
+  activateContract,
   financeReject,
   generateFinalInvoice,
   getAllInvoices,
@@ -31,7 +32,11 @@ import {
   sendEmailNotification,
   sendWhatsappNotification,
   getAvailableYears,
+  uploadContractConfirmation,
+  replaceDeviceAllocation,
+  getContractAllocations,
 } from '../controllers/invoiceController';
+import { uploadMeterImage } from '../middlewares/uploadMiddleware';
 import { authMiddleware } from '../middlewares/authMiddleware';
 import { requireRole } from '../middlewares/roleMiddleware';
 import { EmployeeRole } from '../constants/employeeRole';
@@ -54,10 +59,24 @@ router.post(
   employeeApprove,
 );
 router.post(
-  '/:id/finance-approve',
+  '/:id/allocate-machines',
   authMiddleware,
-  // requireRole(FinanceRole.FINANCE), // Ensure generic roles or specific Finance Role check
-  financeApprove,
+  // requireRole(FinanceRole.FINANCE),
+  allocateMachines,
+);
+
+router.post(
+  '/:id/activate-contract',
+  authMiddleware,
+  // requireRole(FinanceRole.FINANCE),
+  activateContract,
+);
+
+router.post(
+  '/:id/upload-confirmation',
+  authMiddleware,
+  uploadMeterImage.single('file'),
+  uploadContractConfirmation,
 );
 
 router.post(
@@ -122,6 +141,13 @@ router.get(
   getCompletedCollections,
 );
 
+router.post(
+  '/allocations/replace',
+  authMiddleware,
+  requireRole(EmployeeRole.ADMIN, EmployeeRole.FINANCE),
+  replaceDeviceAllocation,
+);
+
 router.get(
   '/completed-collections/:contractId/download',
   // authMiddleware, // Allow download? Auth needed.
@@ -159,6 +185,8 @@ router.put(
 
 router.post('/:id/notify/email', authMiddleware, sendEmailNotification);
 router.post('/:id/notify/whatsapp', authMiddleware, sendWhatsappNotification);
+
+router.get('/:contractId/allocations', authMiddleware, getContractAllocations);
 
 router.get('/:id', authMiddleware, getInvoiceById);
 

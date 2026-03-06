@@ -22,6 +22,9 @@ export const createUsageRecord = async (req: Request, res: Response, next: NextF
       bwA3Count,
       colorA4Count,
       colorA3Count,
+      discountBwCopies,
+      discountColorCopies,
+      discountAmount,
 
       reportedBy,
       remarks,
@@ -43,6 +46,9 @@ export const createUsageRecord = async (req: Request, res: Response, next: NextF
       bwA3Count: Number(bwA3Count) || 0,
       colorA4Count: Number(colorA4Count) || 0,
       colorA3Count: Number(colorA3Count) || 0,
+      discountBwCopies: Number(discountBwCopies) || 0,
+      discountColorCopies: Number(discountColorCopies) || 0,
+      discountAmount: Number(discountAmount) || 0,
       meterImageUrl,
       reportedBy: reportedBy || 'EMPLOYEE', // Default if missing
       remarks,
@@ -61,7 +67,16 @@ export const createUsageRecord = async (req: Request, res: Response, next: NextF
 export const updateUsageRecord = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = req.params.id as string;
-    const { bwA4Count, bwA3Count, colorA4Count, colorA3Count, billingPeriodEnd } = req.body;
+    const {
+      bwA4Count,
+      bwA3Count,
+      colorA4Count,
+      colorA3Count,
+      billingPeriodEnd,
+      discountBwCopies,
+      discountColorCopies,
+      discountAmount,
+    } = req.body;
 
     const result = await usageService.updateUsageRecord(id, {
       bwA4Count: Number(bwA4Count) || 0,
@@ -69,6 +84,10 @@ export const updateUsageRecord = async (req: Request, res: Response, next: NextF
       colorA4Count: Number(colorA4Count) || 0,
       colorA3Count: Number(colorA3Count) || 0,
       billingPeriodEnd,
+      discountBwCopies: discountBwCopies !== undefined ? Number(discountBwCopies) : undefined,
+      discountColorCopies:
+        discountColorCopies !== undefined ? Number(discountColorCopies) : undefined,
+      discountAmount: discountAmount !== undefined ? Number(discountAmount) : undefined,
     });
 
     return res.status(200).json({

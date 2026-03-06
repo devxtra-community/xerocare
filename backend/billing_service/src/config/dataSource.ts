@@ -7,38 +7,24 @@ import { Invoice } from '../entities/invoiceEntity';
 import { InvoiceItem } from '../entities/invoiceItemEntity';
 import { UsageRecord } from '../entities/usageRecordEntity';
 import { ProductAllocation } from '../entities/productAllocationEntity';
-
+import { DeviceMeterReading } from '../entities/deviceMeterReadingEntity';
+import { UsageRecordItem } from '../entities/usageRecordItemEntity';
 import { logger } from './logger';
-
-/**
- * Neon DB specific fix: Avoid pooler instability.
- * The Neon connection pooler (indicated by "-pooler" in the hostname) can drop connections
- * during AWS network hiccups or proxy resets. Connecting directly to the compute node
- * avoids intermittent ENETUNREACH or ETIMEDOUT crashes.
- */
-const getDirectDbUrl = (url?: string) => {
-  if (!url) return '';
-  return url.replace('-pooler.', '.');
-};
 
 export const Source = new DataSource({
   type: 'postgres',
-  url: getDirectDbUrl(process.env.BILLING_DATABASE_URL),
-  synchronize: false,
-  logging: false, // Keep disabled in production to avoid clutter
-  entities: [Invoice, InvoiceItem, UsageRecord, ProductAllocation],
-  extra: {
-    max: 1,
-    // SSL is required by Neon.
-    // rejectUnauthorized: false ensures docker doesn't fail due to missing local root certs.
-    ssl: {
-      rejectUnauthorized: false,
-    },
-    // Fails fast (5s) to trigger retries instead of hanging indefinitely
-    connectionTimeoutMillis: 5000,
-    // TCP keep-alive to safely handle silent network drops (AWS hiccups)
-    keepAlive: true,
-  },
+  url: process.env.BILLING_DATABASE_URL || process.env.DATABASE_URL,
+  synchronize: true,
+  logging: false,
+  entities: [
+    Invoice,
+    InvoiceItem,
+    UsageRecord,
+    ProductAllocation,
+    DeviceMeterReading,
+    UsageRecordItem,
+  ],
+  extra: { max: 2 },
 });
 
 /**

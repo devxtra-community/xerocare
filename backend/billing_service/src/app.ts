@@ -35,12 +35,8 @@ process.on('unhandledRejection', (reason) => {
 
 const startServer = async () => {
   try {
-    logger.info('Starting Billing Service initialization...');
-
-    // Attempt DB connection with resilience and backoff
-    // Blocks app startup until successfully connected, but does NOT crash loops
     await connectWithRetry();
-
+    logger.info('Database connected');
     await getRabbitChannel();
     startEmailWorker();
 

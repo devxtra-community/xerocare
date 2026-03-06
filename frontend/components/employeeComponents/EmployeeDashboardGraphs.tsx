@@ -116,7 +116,7 @@ export default function EmployeeDashboardGraphs() {
     fetchData();
 
     const user = getUserFromToken();
-    setIsRentLeaseEmployee(user?.employeeJob === EmployeeJob.RENT_LEASE);
+    setIsRentLeaseEmployee(user?.employeeJob === EmployeeJob.RENT_AND_LEASE);
   }, []);
 
   if (loading) {
