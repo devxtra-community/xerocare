@@ -290,29 +290,22 @@ export class BillingReportService {
       const summaryInvoice = finalInvoices.find((inv) => inv.isSummaryInvoice);
 
       let totalCollected = 0;
-      let finalAmount = 0;
       let grossAmount = 0;
       let advanceAdjusted = 0;
 
       if (summaryInvoice) {
-        grossAmount = Number(summaryInvoice.grossAmount || 0);
+        grossAmount = Number(summaryInvoice.grossAmount || summaryInvoice.totalAmount || 0);
         advanceAdjusted = Number(summaryInvoice.advanceAdjusted || 0);
-        finalAmount = Number(summaryInvoice.totalAmount || 0);
-        totalCollected = grossAmount;
+        totalCollected = grossAmount + Number(contract.advanceAmount || 0);
       } else if (contract.type === InvoiceType.FINAL) {
-        grossAmount = Number(contract.grossAmount || 0);
+        grossAmount = Number(contract.grossAmount || contract.totalAmount || 0);
         advanceAdjusted = Number(contract.advanceAmount || 0);
-        finalAmount = Number(contract.totalAmount || 0);
-        totalCollected = grossAmount;
+        totalCollected = grossAmount + Number(contract.advanceAmount || 0);
       } else {
         const monthlyInvoices = finalInvoices.filter(
           (inv) => !inv.isSummaryInvoice && inv.type === InvoiceType.FINAL,
         );
 
-        const monthlySum = monthlyInvoices.reduce(
-          (sum, inv) => sum + Number(inv.totalAmount || 0),
-          0,
-        );
         const monthlyGross = monthlyInvoices.reduce(
           (sum, inv) => sum + Number(inv.grossAmount || inv.totalAmount || 0),
           0,
@@ -320,18 +313,19 @@ export class BillingReportService {
 
         grossAmount = monthlyGross;
         advanceAdjusted = Number(contract.advanceAmount || 0);
-        finalAmount = monthlySum;
-        totalCollected = grossAmount;
+        totalCollected = grossAmount + Number(contract.advanceAmount || 0);
       }
 
       if (grossAmount === 0) {
         try {
           const history = await this.usageRepo.getUsageHistory(contract.id, 'ASC');
           if (history.length > 0) {
-            const usageGross = history.reduce((sum, u) => sum + Number(u.totalCharge || 0), 0);
+            const usageGross = history.reduce(
+              (sum, u) => sum + (Number(u.monthlyRent || 0) + Number(u.exceededCharge || 0)),
+              0,
+            );
             grossAmount = usageGross;
-            totalCollected = usageGross;
-            finalAmount = usageGross;
+            totalCollected = usageGross + Number(contract.advanceAmount || 0);
           }
         } catch {
           // Ignore
@@ -352,8 +346,8 @@ export class BillingReportService {
           summaryInvoice?.invoiceNumber ||
           (contract.type === InvoiceType.FINAL ? contract.invoiceNumber : undefined),
         totalCollected,
-        finalAmount,
-        totalAmount: finalAmount, // Add for compatibility with frontend
+        finalAmount: totalCollected,
+        totalAmount: totalCollected, // Ensure compatibility with all frontend views
         grossAmount,
         advanceAdjusted,
         securityDepositAmount: Number(contract.securityDepositAmount || 0),
@@ -563,8 +557,12 @@ export class BillingReportService {
   /**
    * Retrieves invoice history for a branch.
    */
-  async getInvoiceHistory(branchId: string, saleType?: string) {
-    const invoices = await this.invoiceRepo.findFinalInvoicesByBranch(branchId, saleType);
+  async getInvoiceHistory(branchId: string, saleType?: string, creatorId?: string) {
+    const invoices = await this.invoiceRepo.findFinalInvoicesByBranch(
+      branchId,
+      saleType,
+      creatorId,
+    );
 
     const enrichedInvoices = await Promise.all(
       invoices.map(async (invoice) => {
@@ -584,9 +582,17 @@ export class BillingReportService {
           }
         }
 
+        // Fetch all usage records for this contract to sum up accrued revenue
+        const usageHistory = await this.usageRepo.getUsageHistory(invoice.id);
+        const usageRevenue = usageHistory.reduce(
+          (sum, u) => sum + (Number(u.monthlyRent || 0) + Number(u.exceededCharge || 0)),
+          0,
+        );
+
         return {
           ...invoice,
           usageData,
+          usageRevenue,
         };
       }),
     );

@@ -90,6 +90,7 @@ export interface Invoice {
   advanceAdjusted?: number;
   grossAmount?: number;
   displayAmount?: number; // Backend aggregated lifetime total
+  usageRevenue?: number; // Sum of all recorded EMIs/UsageRecords
   invoiceHistory?: Invoice[];
 }
 
@@ -117,6 +118,10 @@ export interface UsageRecord {
   colorA3Count: number;
   remarks?: string;
   advanceAdjusted?: number;
+  advanceAmount?: number;
+  totalLeaseAmount?: number;
+  emiAmount?: number;
+  contractTotalAmount?: number;
   // Extended pricing details for UI breakdown
   rentType?: string;
   bwFreeLimit?: number;

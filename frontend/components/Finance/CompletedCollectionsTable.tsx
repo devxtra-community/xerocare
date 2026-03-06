@@ -26,7 +26,13 @@ import { formatCurrency } from '@/lib/format';
  * Table displaying completed rental and lease collections.
  * Allows viewing consolidated statements and sending final invoices.
  */
-export default function CompletedCollectionsTable({ mode }: { mode?: 'RENT' | 'LEASE' }) {
+export default function CompletedCollectionsTable({
+  mode,
+  onSuccess,
+}: {
+  mode?: 'RENT' | 'LEASE';
+  onSuccess?: () => void;
+}) {
   const [collections, setCollections] = useState<CompletedCollection[]>([]);
   const [loading, setLoading] = useState(true);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
@@ -192,6 +198,7 @@ export default function CompletedCollectionsTable({ mode }: { mode?: 'RENT' | 'L
           customerName={
             collections.find((c) => c.contractId === historyContractId)?.customerName || ''
           }
+          onSuccess={onSuccess}
           onClose={() => {
             setIsHistoryOpen(false);
             setHistoryContractId('');

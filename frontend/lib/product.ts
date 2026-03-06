@@ -98,7 +98,7 @@ export const getAvailableProductsByModel = async (modelId: string): Promise<Prod
   return allProducts.filter(
     (p) =>
       (p.model?.id === modelId || (p.model as { model_id?: string })?.model_id === modelId) &&
-      p.product_status === ProductStatus.AVAILABLE,
+      (p.product_status === ProductStatus.AVAILABLE || p.product_status === ProductStatus.LEASE),
   );
 };
 

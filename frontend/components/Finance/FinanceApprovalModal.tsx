@@ -104,7 +104,7 @@ export function FinanceApprovalModal({ invoice, onClose, onSuccess }: FinanceApp
       const uniqueModelIds = Array.from(
         new Set(
           invoice.items
-            ?.filter((i) => i.modelId && !i.productId) // Only items needing allocation
+            ?.filter((i) => i.modelId) // Fetch for ALL items with a modelId
             .map((i) => i.modelId!),
         ),
       );

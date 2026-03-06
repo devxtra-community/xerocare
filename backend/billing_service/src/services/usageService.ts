@@ -479,6 +479,14 @@ export class UsageService {
         exceededAmount: exceededCharge,
         rent: monthlyRent,
         advanceAdjusted,
+        // Advance amount from the contract (total security deposit / advance)
+        advanceAmount: Number(contract.advanceAmount || 0),
+        // EMI per cycle
+        emiAmount: Number(
+          contract.monthlyEmiAmount || contract.monthlyLeaseAmount || contract.monthlyRent || 0,
+        ),
+        // The total value of the entire contract (e.g. 1.2M)
+        totalLeaseAmount: Number(contract.totalLeaseAmount || contract.totalAmount || 0),
         finalTotal: finalTotal,
         meterImageUrl,
         emailSentAt: record.emailSentAt ? new Date(record.emailSentAt).toISOString() : undefined,

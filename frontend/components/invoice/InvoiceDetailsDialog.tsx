@@ -190,6 +190,9 @@ export function InvoiceDetailsDialog({
   }, [currentInvoice]);
 
   const grandTotal = React.useMemo(() => {
+    if (currentInvoice.saleType === 'LEASE' && currentInvoice.totalLeaseAmount) {
+      return currentInvoice.totalLeaseAmount;
+    }
     if (currentInvoice.saleType === 'RENT' || currentInvoice.saleType === 'LEASE') {
       const rent = currentInvoice.monthlyRent || 0;
       const additional = currentInvoice.additionalCharges || 0;
@@ -219,7 +222,10 @@ export function InvoiceDetailsDialog({
     const currentInvoiceAmt = grandTotal;
     const historyTotal = history.reduce((sum, inv) => sum + (inv.totalAmount || 0), 0);
 
-    const totalInvoiced = currentInvoiceAmt + historyTotal;
+    const totalInvoiced =
+      currentInvoice.saleType === 'LEASE' && currentInvoice.totalLeaseAmount
+        ? currentInvoice.totalLeaseAmount
+        : currentInvoiceAmt + historyTotal;
 
     // Calculate total paid from history only, as current invoice is usually not paid if we are approving it
     // If current invoice IS paid, it should be in history or handled separately?
@@ -230,7 +236,11 @@ export function InvoiceDetailsDialog({
         .reduce((sum, inv) => sum + (inv.totalAmount || 0), 0) +
       (currentInvoice.status === 'PAID' ? currentInvoiceAmt : 0);
 
-    const pendingBalance = totalInvoiced - totalPaid;
+    const advance = Number(currentInvoice.advanceAmount || currentInvoice.advanceAdjusted || 0);
+    const pendingBalance =
+      currentInvoice.saleType === 'LEASE'
+        ? totalInvoiced - totalPaid - advance
+        : totalInvoiced - totalPaid;
 
     return {
       totalInvoiced,
@@ -991,7 +1001,14 @@ export function InvoiceDetailsDialog({
                           {item.quantity}
                         </TableCell>
                         <TableCell className="text-right font-bold text-foreground text-sm align-top py-3">
-                          QAR {((item.quantity || 0) * (item.unitPrice || 0)).toLocaleString()}
+                          QAR{' '}
+                          {(
+                            (item.quantity || 0) * (item.unitPrice || 0) ||
+                            (currentInvoice.saleType === 'LEASE'
+                              ? currentInvoice.totalLeaseAmount
+                              : 0) ||
+                            0
+                          ).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                         </TableCell>
                       </TableRow>
                     ))}
@@ -1079,21 +1096,23 @@ export function InvoiceDetailsDialog({
                       </p>
                     </div>
                   )}
-                  <div className="col-span-full pt-3 mt-1 border-t border-gray-100 flex justify-between items-center">
-                    <p className="text-[10px] font-bold text-primary uppercase">
-                      Current Pending Balance
-                    </p>
-                    <p
-                      className={`text-lg font-bold ${financialSummary.pendingBalance > 0 ? 'text-danger' : 'text-success'}`}
-                    >
-                      QAR
-                      {financialSummary.pendingBalance.toLocaleString(undefined, {
-                        minimumFractionDigits: 2,
-                      })}
-                    </p>
-                  </div>
                 </>
               )}
+              <div className="col-span-full pt-3 mt-1 border-t border-gray-100 flex justify-between items-center">
+                <p className="text-[10px] font-bold text-primary uppercase">
+                  {currentInvoice.saleType === 'LEASE'
+                    ? 'Total Pending Amount'
+                    : 'Current Pending Balance'}
+                </p>
+                <p
+                  className={`text-lg font-bold ${financialSummary.pendingBalance > 0 ? 'text-danger' : 'text-success'}`}
+                >
+                  QAR
+                  {financialSummary.pendingBalance.toLocaleString(undefined, {
+                    minimumFractionDigits: 2,
+                  })}
+                </p>
+              </div>
             </div>
           </div>
 

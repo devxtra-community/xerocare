@@ -116,7 +116,9 @@ export class InvoiceRepository {
         displayAmount = Number(entity.totalAmount) || 0;
       }
 
-      (entity as Invoice & { displayAmount?: number }).displayAmount = displayAmount;
+      (entity as Invoice & { displayAmount?: number; usageRevenue?: number }).displayAmount =
+        displayAmount;
+      (entity as Invoice & { usageRevenue?: number }).usageRevenue = calculatedTotal;
       return entity;
     });
   }
@@ -131,7 +133,7 @@ export class InvoiceRepository {
       .leftJoinAndSelect('invoice.items', 'items')
       .addSelect((subQuery) => {
         return subQuery
-          .select('COALESCE(SUM(usage.totalCharge), 0)', 'calculatedTotal')
+          .select('COALESCE(SUM(usage.monthlyRent + usage.exceededCharge), 0)', 'calculatedTotal')
           .from('usage_records', 'usage')
           .where('usage.contractId = invoice.id');
       }, 'calculatedTotal')
@@ -162,7 +164,7 @@ export class InvoiceRepository {
       .leftJoinAndSelect('invoice.items', 'items')
       .addSelect((subQuery) => {
         return subQuery
-          .select('COALESCE(SUM(usage.totalCharge), 0)', 'calculatedTotal')
+          .select('COALESCE(SUM(usage.monthlyRent + usage.exceededCharge), 0)', 'calculatedTotal')
           .from('usage_records', 'usage')
           .where('usage.contractId = invoice.id');
       }, 'calculatedTotal')
@@ -182,7 +184,7 @@ export class InvoiceRepository {
       .leftJoinAndSelect('invoice.items', 'items')
       .addSelect((subQuery) => {
         return subQuery
-          .select('COALESCE(SUM(usage.totalCharge), 0)', 'calculatedTotal')
+          .select('COALESCE(SUM(usage.monthlyRent + usage.exceededCharge), 0)', 'calculatedTotal')
           .from('usage_records', 'usage')
           .where('usage.contractId = invoice.id');
       }, 'calculatedTotal')
@@ -347,7 +349,10 @@ export class InvoiceRepository {
       .createQueryBuilder('invoice')
       .select("TO_CHAR(invoice.createdAt, 'YYYY-MM-DD')", 'date')
       .addSelect('invoice.saleType', 'saleType')
-      .addSelect('SUM(invoice.totalAmount)', 'totalSales')
+      .addSelect(
+        'SUM(CASE WHEN invoice.type = :proforma THEN COALESCE(invoice.advanceAmount, 0) ELSE COALESCE(invoice.totalAmount, 0) END)',
+        'totalSales',
+      )
       .where('invoice.createdAt >= :startDate', { startDate })
       .andWhere('invoice.status IN (:...statuses)', {
         statuses: [
@@ -357,7 +362,12 @@ export class InvoiceRepository {
           InvoiceStatus.ACTIVE_LEASE,
           InvoiceStatus.EMPLOYEE_APPROVED,
           InvoiceStatus.APPROVED,
+          InvoiceStatus.SENT,
         ],
+      })
+      .andWhere('(invoice.type != :proforma OR invoice.saleType IN (:...saleTypes))', {
+        proforma: InvoiceType.PROFORMA,
+        saleTypes: ['SALE', 'RENT', 'LEASE'],
       });
 
     if (endDate) {
@@ -367,7 +377,8 @@ export class InvoiceRepository {
     query
       .groupBy("TO_CHAR(invoice.createdAt, 'YYYY-MM-DD')")
       .addGroupBy('invoice.saleType')
-      .orderBy('date', 'ASC');
+      .orderBy('date', 'ASC')
+      .setParameter('proforma', InvoiceType.PROFORMA);
 
     const results = await query.getRawMany();
     return results.map((r) => ({
@@ -387,7 +398,10 @@ export class InvoiceRepository {
   }> {
     const totalQuery = this.repo
       .createQueryBuilder('invoice')
-      .select('SUM(invoice.totalAmount)', 'totalSales')
+      .select(
+        'SUM(CASE WHEN invoice.type = :proforma THEN COALESCE(invoice.advanceAmount, 0) ELSE COALESCE(invoice.totalAmount, 0) END)',
+        'totalSales',
+      )
       .addSelect('COUNT(*)', 'totalInvoices')
       .where('invoice.status IN (:...statuses)', {
         statuses: [
@@ -397,14 +411,19 @@ export class InvoiceRepository {
           InvoiceStatus.ACTIVE_LEASE,
           InvoiceStatus.EMPLOYEE_APPROVED,
           InvoiceStatus.APPROVED,
+          InvoiceStatus.SENT,
         ],
+      })
+      .andWhere('(invoice.type != :proforma OR invoice.saleType IN (:...saleTypes))', {
+        proforma: InvoiceType.PROFORMA,
+        saleTypes: ['SALE', 'RENT', 'LEASE'],
       });
 
     if (year) {
       totalQuery.andWhere('EXTRACT(YEAR FROM invoice.createdAt) = :year', { year });
     }
 
-    const totalResult = await totalQuery.getRawOne();
+    const totalResult = await totalQuery.setParameter('proforma', InvoiceType.PROFORMA).getRawOne();
 
     const totalSales = parseFloat(totalResult?.totalSales) || 0;
     const totalInvoices = parseInt(totalResult?.totalInvoices, 10) || 0;
@@ -412,7 +431,10 @@ export class InvoiceRepository {
     const salesByTypeQuery = this.repo
       .createQueryBuilder('invoice')
       .select('invoice.saleType', 'saleType')
-      .addSelect('SUM(invoice.totalAmount)', 'total')
+      .addSelect(
+        'SUM(CASE WHEN invoice.type = :proforma THEN COALESCE(invoice.advanceAmount, 0) ELSE COALESCE(invoice.totalAmount, 0) END)',
+        'total',
+      )
       .where('invoice.status IN (:...statuses)', {
         statuses: [
           InvoiceStatus.PAID,
@@ -421,14 +443,22 @@ export class InvoiceRepository {
           InvoiceStatus.ACTIVE_LEASE,
           InvoiceStatus.EMPLOYEE_APPROVED,
           InvoiceStatus.APPROVED,
+          InvoiceStatus.SENT,
         ],
+      })
+      .andWhere('(invoice.type != :proforma OR invoice.saleType IN (:...saleTypes))', {
+        proforma: InvoiceType.PROFORMA,
+        saleTypes: ['SALE', 'RENT', 'LEASE'],
       });
 
     if (year) {
       salesByTypeQuery.andWhere('EXTRACT(YEAR FROM invoice.createdAt) = :year', { year });
     }
 
-    const salesByTypeResults = await salesByTypeQuery.groupBy('invoice.saleType').getRawMany();
+    const salesByTypeResults = await salesByTypeQuery
+      .groupBy('invoice.saleType')
+      .setParameter('proforma', InvoiceType.PROFORMA)
+      .getRawMany();
 
     const salesByType = salesByTypeResults.map((r) => ({
       saleType: r.saleType,
@@ -455,7 +485,10 @@ export class InvoiceRepository {
   }> {
     const totalQuery = this.repo
       .createQueryBuilder('invoice')
-      .select('SUM(invoice.totalAmount)', 'totalSales')
+      .select(
+        'SUM(CASE WHEN invoice.type = :proforma THEN COALESCE(invoice.advanceAmount, 0) ELSE COALESCE(invoice.totalAmount, 0) END)',
+        'totalSales',
+      )
       .addSelect('COUNT(*)', 'totalInvoices')
       .where('invoice.branchId = :branchId', { branchId })
       .andWhere('invoice.status IN (:...statuses)', {
@@ -466,10 +499,11 @@ export class InvoiceRepository {
           InvoiceStatus.ACTIVE_LEASE,
           InvoiceStatus.APPROVED,
           InvoiceStatus.EMPLOYEE_APPROVED,
+          InvoiceStatus.SENT,
         ],
       })
-      .andWhere('(invoice.type != :type OR invoice.saleType IN (:...saleTypes))', {
-        type: InvoiceType.PROFORMA,
+      .andWhere('(invoice.type != :proforma OR invoice.saleType IN (:...saleTypes))', {
+        proforma: InvoiceType.PROFORMA,
         saleTypes: ['SALE', 'RENT', 'LEASE'],
       });
 
@@ -477,15 +511,19 @@ export class InvoiceRepository {
       totalQuery.andWhere('EXTRACT(YEAR FROM invoice.createdAt) = :year', { year });
     }
 
-    const totalResult = await totalQuery.getRawOne();
+    const totalResult = await totalQuery.setParameter('proforma', InvoiceType.PROFORMA).getRawOne();
 
-    const totalSales = parseFloat(totalResult?.totalSales) || 0;
-    const totalInvoices = parseInt(totalResult?.totalInvoices, 10) || 0;
+    const totalSales = parseFloat(totalResult?.totalSales || totalResult?.totalsales) || 0;
+    const totalInvoices =
+      parseInt(totalResult?.totalInvoices || totalResult?.totalinvoices, 10) || 0;
 
     const salesByTypeQuery = this.repo
       .createQueryBuilder('invoice')
       .select('invoice.saleType', 'saleType')
-      .addSelect('SUM(invoice.totalAmount)', 'total')
+      .addSelect(
+        'SUM(CASE WHEN invoice.type = :proforma THEN COALESCE(invoice.advanceAmount, 0) ELSE COALESCE(invoice.totalAmount, 0) END)',
+        'total',
+      )
       .where('invoice.branchId = :branchId', { branchId })
       .andWhere('invoice.status IN (:...statuses)', {
         statuses: [
@@ -495,10 +533,11 @@ export class InvoiceRepository {
           InvoiceStatus.ACTIVE_LEASE,
           InvoiceStatus.APPROVED,
           InvoiceStatus.EMPLOYEE_APPROVED,
+          InvoiceStatus.SENT,
         ],
       })
-      .andWhere('(invoice.type != :type OR invoice.saleType IN (:...saleTypes))', {
-        type: InvoiceType.PROFORMA,
+      .andWhere('(invoice.type != :proforma OR invoice.saleType IN (:...saleTypes))', {
+        proforma: InvoiceType.PROFORMA,
         saleTypes: ['SALE', 'RENT', 'LEASE'],
       });
 
@@ -506,7 +545,10 @@ export class InvoiceRepository {
       salesByTypeQuery.andWhere('EXTRACT(YEAR FROM invoice.createdAt) = :year', { year });
     }
 
-    const salesByTypeResults = await salesByTypeQuery.groupBy('invoice.saleType').getRawMany();
+    const salesByTypeResults = await salesByTypeQuery
+      .groupBy('invoice.saleType')
+      .setParameter('proforma', InvoiceType.PROFORMA)
+      .getRawMany();
 
     const salesByType = salesByTypeResults.map((r) => ({
       saleType: r.saleType,
@@ -568,7 +610,9 @@ export class InvoiceRepository {
   async findCompletedContracts(branchId?: string) {
     const qb = this.repo.createQueryBuilder('invoice').leftJoinAndSelect('invoice.items', 'items');
 
-    qb.where('invoice.contractStatus = :completed', { completed: ContractStatus.COMPLETED });
+    qb.where('invoice.contractStatus = :completed', {
+      completed: ContractStatus.COMPLETED,
+    }).andWhere('invoice.referenceContractId IS NULL');
 
     if (branchId) {
       qb.andWhere('invoice.branchId = :branchId', { branchId });
@@ -609,11 +653,27 @@ export class InvoiceRepository {
   ) {
     const qb = this.repo
       .createQueryBuilder('invoice')
+      .leftJoin(
+        (subQuery) =>
+          subQuery
+            .select('u.contractId', 'contractId')
+            .addSelect('SUM(u.totalCharge)', 'usageTotal')
+            .from('usage_records', 'u')
+            .groupBy('u.contractId'),
+        'usage',
+        'usage.contractId = invoice.id',
+      )
       .select("TO_CHAR(invoice.createdAt, 'YYYY-MM')", 'month')
       .addSelect('invoice.branchId', 'branchId')
       .addSelect('invoice.saleType', 'saleType')
-      .addSelect('SUM(COALESCE(invoice.totalAmount, 0))', 'income')
-      .addSelect('SUM(COALESCE(invoice.totalAmount, 0))', 'grossIncome')
+      .addSelect(
+        'SUM(CASE WHEN invoice.type = :proforma THEN COALESCE(invoice.advanceAmount, 0) + COALESCE(usage.usageTotal, 0) ELSE COALESCE(invoice.totalAmount, 0) END)',
+        'income',
+      )
+      .addSelect(
+        'SUM(CASE WHEN invoice.type = :proforma THEN COALESCE(invoice.advanceAmount, 0) + COALESCE(usage.usageTotal, 0) ELSE COALESCE(invoice.totalAmount, 0) END)',
+        'grossIncome',
+      )
       .addSelect('COUNT(invoice.id)', 'count')
       .where('invoice.status IN (:...includedStatuses)', {
         includedStatuses: [
@@ -651,6 +711,7 @@ export class InvoiceRepository {
     }
 
     const results = await qb
+      .setParameter('proforma', InvoiceType.PROFORMA)
       .groupBy("TO_CHAR(invoice.createdAt, 'YYYY-MM')")
       .addGroupBy('invoice.branchId')
       .addGroupBy('invoice.saleType')
@@ -754,7 +815,11 @@ export class InvoiceRepository {
   /**
    * Finds final invoices for a branch to show history.
    */
-  async findFinalInvoicesByBranch(branchId: string, saleType?: string): Promise<Invoice[]> {
+  async findFinalInvoicesByBranch(
+    branchId: string,
+    saleType?: string,
+    creatorId?: string,
+  ): Promise<Invoice[]> {
     const qb = this.repo
       .createQueryBuilder('invoice')
       .leftJoinAndSelect('invoice.items', 'items')
@@ -770,8 +835,11 @@ export class InvoiceRepository {
           InvoiceStatus.ISSUED,
           InvoiceStatus.PAID,
         ],
-      })
-      .orderBy('invoice.createdAt', 'DESC');
+      });
+
+    if (creatorId) {
+      qb.andWhere('invoice.createdBy = :creatorId', { creatorId });
+    }
 
     if (saleType) {
       qb.andWhere('invoice.saleType = :saleType', { saleType });
