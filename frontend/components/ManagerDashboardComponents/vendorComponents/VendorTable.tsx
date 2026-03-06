@@ -49,6 +49,7 @@ type Vendor = {
   purchaseValue: number;
   outstandingAmount: number;
   status: 'Active' | 'On Hold';
+  currency: string;
 };
 
 type VendorFormData = {
@@ -58,6 +59,7 @@ type VendorFormData = {
   phone: string;
   email: string;
   status: 'Active' | 'On Hold';
+  currency: string;
 };
 
 /**
@@ -104,6 +106,7 @@ export default function VendorTable({
         type: data.type,
         contactPerson: data.contactPerson,
         status: (data.status === 'Active' ? 'ACTIVE' : 'INACTIVE') as 'ACTIVE' | 'INACTIVE',
+        currency: data.currency,
       };
 
       if (editingVendor) {
@@ -267,10 +270,10 @@ export default function VendorTable({
                       {vendor.totalOrders}
                     </TableCell>
                     <TableCell className="text-right font-bold text-primary text-xs">
-                      {formatCurrency(vendor.purchaseValue)}
+                      {formatCurrency(vendor.purchaseValue, vendor.currency)}
                     </TableCell>
                     <TableCell className="text-right font-bold text-red-600 text-xs">
-                      {formatCurrency(vendor.outstandingAmount)}
+                      {formatCurrency(vendor.outstandingAmount, vendor.currency)}
                     </TableCell>
                     <TableCell>
                       <span
@@ -369,6 +372,7 @@ function VendorFormModal({
     phone: '',
     email: '',
     status: 'Active',
+    currency: 'QAR',
   });
 
   React.useEffect(() => {
@@ -381,6 +385,7 @@ function VendorFormModal({
           phone: initialData.phone,
           email: initialData.email,
           status: initialData.status,
+          currency: initialData.currency || 'QAR',
         });
       } else {
         setForm({
@@ -390,6 +395,7 @@ function VendorFormModal({
           phone: '',
           email: '',
           status: 'Active',
+          currency: 'QAR',
         });
       }
     }
@@ -473,6 +479,29 @@ function VendorFormModal({
                 onChange={(e) => setForm({ ...form, email: e.target.value })}
                 className="h-12 rounded-xl bg-card border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
               />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                Currency
+              </label>
+              <Select
+                value={form.currency}
+                onValueChange={(value) => setForm({ ...form, currency: value })}
+              >
+                <SelectTrigger className="h-12 rounded-xl bg-card border-none shadow-sm focus:ring-2 focus:ring-blue-400">
+                  <SelectValue placeholder="Select currency" />
+                </SelectTrigger>
+                <SelectContent className="rounded-xl">
+                  <SelectItem value="QAR">QAR (Qatari Riyal)</SelectItem>
+                  <SelectItem value="USD">USD (US Dollar)</SelectItem>
+                  <SelectItem value="EUR">EUR (Euro)</SelectItem>
+                  <SelectItem value="GBP">GBP (British Pound)</SelectItem>
+                  <SelectItem value="INR">INR (Indian Rupee)</SelectItem>
+                  <SelectItem value="AED">AED (UAE Dirham)</SelectItem>
+                  <SelectItem value="SAR">SAR (Saudi Riyal)</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="col-span-2 space-y-2">

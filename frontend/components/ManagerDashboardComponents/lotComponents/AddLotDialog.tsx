@@ -69,12 +69,6 @@ const createLotSchema = z.object({
   purchaseDate: z.string().min(1, 'Purchase date is required'),
   notes: z.string().optional(),
   items: z.array(lotItemSchema).min(1, 'At least one item is required'),
-  transportationCost: z.coerce.number().min(0).optional(),
-  documentationCost: z.coerce.number().min(0).optional(),
-  shippingCost: z.coerce.number().min(0).optional(),
-  groundFieldCost: z.coerce.number().min(0).optional(),
-  certificationCost: z.coerce.number().min(0).optional(),
-  labourCost: z.coerce.number().min(0).optional(),
 });
 
 type CreateLotFormValues = z.infer<typeof createLotSchema>;
@@ -84,53 +78,10 @@ interface AddLotDialogProps {
   onSuccess: () => void;
 }
 
-interface CostInputProps<T extends import('react-hook-form').FieldValues> {
-  control: import('react-hook-form').Control<T>;
-  name: import('react-hook-form').Path<T>;
-  label: string;
-}
-
-const CostInput = <T extends import('react-hook-form').FieldValues>({
-  control,
-  name,
-  label,
-}: CostInputProps<T>) => {
-  return (
-    <FormField
-      control={control}
-      name={name}
-      render={({ field }) => (
-        <FormItem className="space-y-1.5">
-          <div className="flex justify-between items-center">
-            <FormLabel className="text-sm font-medium text-gray-700">{label}</FormLabel>
-          </div>
-          <FormControl>
-            <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-[10px] font-bold">
-                QAR
-              </span>
-              <Input
-                type="number"
-                min="0"
-                step="0.01"
-                className="h-10 text-sm pl-10 text-right font-medium"
-                {...field}
-                value={(field.value as number) || ''}
-                onChange={(e) => field.onChange(e.target.valueAsNumber)}
-                onFocus={(e) => e.target.select()}
-              />
-            </div>
-          </FormControl>
-          <FormMessage />
-        </FormItem>
-      )}
-    />
-  );
-};
-
 /**
  * Dialog component for creating or uploading new inventory lots.
- * Supports manual entry of lot details, items (Products/Spare Parts), and associated costs.
+ * Supports manual entry of lot details and items (Products/Spare Parts).
+ * Costs are no longer handled within the lot.
  * Also provides functionality to upload lot data via Excel templates.
  */
 export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) {
@@ -164,12 +115,6 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
           partName: '',
         },
       ],
-      transportationCost: 0,
-      documentationCost: 0,
-      shippingCost: 0,
-      groundFieldCost: 0,
-      certificationCost: 0,
-      labourCost: 0,
     },
   });
 
@@ -282,14 +227,6 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
       ['Purchase Date', new Date().toISOString().split('T')[0]],
       ['Notes', 'Optional notes here'],
       [],
-      ['ADDITIONAL COSTS'],
-      ['Transportation', 0],
-      ['Documentation', 0],
-      ['Shipping', 0],
-      ['Ground Field', 0],
-      ['Certification', 0],
-      ['Labour', 0],
-      [],
       ['LOT ITEMS'],
       ['Item Type', 'Item Name', 'Brand', 'Quantity', 'Unit Price'],
       ['PRODUCT', 'Example Model Name', 'Example Brand', 10, 100],
@@ -308,15 +245,6 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
 
   // Calculate totals for display
   const watchedItems = form.watch('items');
-  const watchedCosts = form.watch([
-    'transportationCost',
-    'documentationCost',
-    'shippingCost',
-    'groundFieldCost',
-    'certificationCost',
-    'labourCost',
-  ] as const);
-
   const calculateItemsTotal = () => {
     return (
       watchedItems?.reduce((sum, item) => sum + (item.quantity || 0) * (item.unitPrice || 0), 0) ??
@@ -324,11 +252,7 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
     );
   };
 
-  const calculateCostsTotal = () => {
-    return watchedCosts?.reduce((sum: number, cost) => sum + (cost || 0), 0) ?? 0;
-  };
-
-  const calculateGrandTotal = () => calculateItemsTotal() + calculateCostsTotal();
+  const calculateGrandTotal = () => calculateItemsTotal();
 
   const formControl = form.control as unknown as Control<CreateLotFormValues>;
 
@@ -380,7 +304,7 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
                 className="w-4 h-4"
               >
                 <path d="M18 6 6 18" />
-                <path d="m6 6 18 18" />
+                <path d="M6 6l12 12" />
               </svg>
             </Button>
           </div>
@@ -394,8 +318,7 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
               </div>
               <h3 className="text-2xl font-bold">Upload Data</h3>
               <p className="text-gray-500 text-base">
-                Download the template, fill in your lot details including items and costs, and
-                upload it here.
+                Download the template, fill in your lot details and items, and upload it here.
               </p>
             </div>
 
@@ -450,8 +373,8 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
               className="flex flex-col flex-1 overflow-hidden"
             >
               <div className="flex-1 overflow-hidden grid grid-cols-12 gap-0">
-                {/* Left Section: Main Form & Items (9 cols) */}
-                <div className="col-span-12 lg:col-span-9 flex flex-col h-full overflow-hidden border-r">
+                {/* Items Section (Full Width) */}
+                <div className="col-span-12 flex flex-col h-full overflow-hidden">
                   <div className="p-4 pb-2 grid grid-cols-1 md:grid-cols-4 gap-4">
                     <FormField
                       control={formControl}
@@ -832,47 +755,6 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
                           {formatCurrency(calculateItemsTotal())}
                         </span>
                       </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Right Section: Costs (3 cols) */}
-                <div className="col-span-12 lg:col-span-3 flex flex-col h-full overflow-hidden bg-white">
-                  <div className="p-6 pb-2">
-                    <h3 className="font-bold text-gray-900 text-base">Additional Costs</h3>
-                  </div>
-                  <div className="flex-1 overflow-y-auto px-6 py-2">
-                    <div className="space-y-5">
-                      <CostInput
-                        control={formControl}
-                        name="transportationCost"
-                        label="Transportation"
-                      />
-                      <CostInput
-                        control={formControl}
-                        name="documentationCost"
-                        label="Documentation"
-                      />
-                      <CostInput control={formControl} name="shippingCost" label="Shipping" />
-                      <CostInput
-                        control={formControl}
-                        name="groundFieldCost"
-                        label="Ground / Field"
-                      />
-                      <CostInput
-                        control={formControl}
-                        name="certificationCost"
-                        label="Certification"
-                      />
-                      <CostInput control={formControl} name="labourCost" label="Labour" />
-                    </div>
-                  </div>
-                  <div className="p-6 border-t mt-auto">
-                    <div className="flex justify-between items-center">
-                      <span className="text-gray-600 text-sm font-medium">Costs Total:</span>
-                      <span className="font-bold text-base text-gray-900">
-                        {formatCurrency(calculateCostsTotal())}
-                      </span>
                     </div>
                   </div>
                 </div>

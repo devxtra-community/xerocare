@@ -22,6 +22,7 @@ export interface Vendor {
     ifsc: string;
     bankName: string;
   };
+  currency?: string;
 }
 
 export async function createVendor(data: Partial<Vendor>) {

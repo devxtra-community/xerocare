@@ -7,7 +7,6 @@ import {
   ClipboardList,
   TrendingUp,
   Key,
-  ScrollText,
   LogOut,
   Calendar,
 } from 'lucide-react';
@@ -68,16 +67,10 @@ const menuItems = [
     modules: ['sales'], // Only for SALES employees
   },
   {
-    title: 'Rent',
+    title: 'Rent & Lease',
     icon: Key,
     href: '/employee/rent',
     modules: ['rent', 'lease'],
-  },
-  {
-    title: 'Lease',
-    icon: ScrollText,
-    href: '/employee/lease',
-    modules: ['lease'],
   },
 ];
 

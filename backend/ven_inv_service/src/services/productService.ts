@@ -91,7 +91,7 @@ export class ProductService {
           product_status: row.product_status,
           print_colour: row.print_colour,
           max_discount_amount: maxDiscount,
-          lot_id: row.lot_id,
+          lot_id: row.lot_id || undefined,
         });
 
         await this.model.syncModelQuantities(modelDetails.id);

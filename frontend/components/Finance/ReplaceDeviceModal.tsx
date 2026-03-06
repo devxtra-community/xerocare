@@ -123,7 +123,7 @@ export default function ReplaceDeviceModal({
         fetchAvailableProducts();
       }
     }
-  }, [isOpen, modelId]);
+  }, [isOpen, modelId, contractId]);
 
   const handleSubmit = async () => {
     if (!formData.newSerialNumber.trim()) {

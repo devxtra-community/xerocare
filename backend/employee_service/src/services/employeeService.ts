@@ -417,22 +417,8 @@ export class EmployeeService {
       )
         category = 'SALES_STAFF';
       else if (
-        [
-          'RENT',
-          'LEASE',
-          'RENT_LEASE',
-          'FINANCE_RENT',
-          'FINANCE_LEASE',
-          'FINANCE_RENT_LEASE',
-        ].includes(item.job || '') ||
-        [
-          'RENT',
-          'LEASE',
-          'RENT_LEASE',
-          'FINANCE_RENT',
-          'FINANCE_LEASE',
-          'FINANCE_RENT_LEASE',
-        ].includes(item.financeJob || '')
+        ['RENT_AND_LEASE', 'FINANCE_RENT_LEASE'].includes(item.job || '') ||
+        ['RENT_AND_LEASE', 'FINANCE_RENT_LEASE'].includes(item.financeJob || '')
       )
         category = 'RENT_LEASE_STAFF';
       else if (['CRM'].includes(item.job || '')) category = 'SERVICE_STAFF';

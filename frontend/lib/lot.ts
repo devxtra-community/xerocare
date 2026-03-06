@@ -38,12 +38,6 @@ export interface Lot {
   vendorId: string;
   vendor: Vendor;
   purchaseDate: string;
-  transportationCost: number;
-  documentationCost: number;
-  shippingCost: number;
-  groundFieldCost: number;
-  certificationCost: number;
-  labourCost: number;
   totalAmount: number;
   status: LotStatus;
   notes?: string;
@@ -68,12 +62,6 @@ export interface CreateLotData {
   vendorId: string;
   lotNumber: string;
   purchaseDate: string;
-  transportationCost?: number;
-  documentationCost?: number;
-  shippingCost?: number;
-  groundFieldCost?: number;
-  certificationCost?: number;
-  labourCost?: number;
   notes?: string;
   branchId?: string;
   warehouseId?: string;

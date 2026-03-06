@@ -47,7 +47,15 @@ export const addproduct = async (req: Request, res: Response, next: NextFunction
       tax_rate,
       print_colour,
       max_discount_amount,
+      lot_id,
     } = req.body;
+
+    if (!model_id || !warehouse_id || !vendor_id || !serial_no || !name || !brand || !MFD) {
+      throw new AppError(
+        'Missing required fields. Please ensure all required product details are provided.',
+        400,
+      );
+    }
 
     const file = req.file as MulterS3File;
     const imageKey = file?.key ?? null;
@@ -68,6 +76,7 @@ export const addproduct = async (req: Request, res: Response, next: NextFunction
       print_colour,
       max_discount_amount: max_discount_amount ? Number(max_discount_amount) : null,
       imageUrl,
+      lot_id: lot_id || undefined,
     });
     res
       .status(200)

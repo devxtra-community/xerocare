@@ -676,6 +676,8 @@ export default function UsageRecordingModal({
     calculatedInitialCounts.bwA3,
     calculatedInitialCounts.clrA4,
     calculatedInitialCounts.clrA3,
+    effectivePrevCounts,
+    replacedDeltas,
   ]);
 
   // Real-time error detection for UI feedback
@@ -707,6 +709,7 @@ export default function UsageRecordingModal({
     calculatedInitialCounts.bwA4,
     calculatedInitialCounts.clrA3,
     calculatedInitialCounts.clrA4,
+    effectivePrevCounts,
     isSimplifiedLease,
   ]);
 

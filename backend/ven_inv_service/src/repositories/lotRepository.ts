@@ -34,13 +34,6 @@ export class LotRepository {
       lot.warehouse_id = data.warehouseId;
       lot.createdBy = data.createdBy;
 
-      lot.transportationCost = data.transportationCost || 0;
-      lot.documentationCost = data.documentationCost || 0;
-      lot.shippingCost = data.shippingCost || 0;
-      lot.groundFieldCost = data.groundFieldCost || 0;
-      lot.certificationCost = data.certificationCost || 0;
-      lot.labourCost = data.labourCost || 0;
-
       const savedLot = await manager.save(Lot, lot);
 
       let itemsTotal = 0;
@@ -173,15 +166,7 @@ export class LotRepository {
         lotItems.push(lotItem);
       }
 
-      const costsTotal =
-        Number(savedLot.transportationCost) +
-        Number(savedLot.documentationCost) +
-        Number(savedLot.shippingCost) +
-        Number(savedLot.groundFieldCost) +
-        Number(savedLot.certificationCost) +
-        Number(savedLot.labourCost);
-
-      savedLot.totalAmount = itemsTotal + costsTotal;
+      savedLot.totalAmount = itemsTotal;
       savedLot.items = lotItems;
 
       // Sync vendor totals
