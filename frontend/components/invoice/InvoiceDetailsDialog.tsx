@@ -1141,15 +1141,14 @@ export function InvoiceDetailsDialog({
                 </div>
               )}
 
-              {currentInvoice.saleType === 'SALE' &&
-              (currentInvoice.discountAmount || currentInvoice.discountPercent) ? (
+              {currentInvoice.discountAmount || currentInvoice.discountPercent ? (
                 <div className="space-y-1">
-                  <p className="text-[10px] font-bold text-gray-400 uppercase">Discount Amount</p>
+                  <p className="text-[10px] font-bold text-gray-400 uppercase">Discount Given</p>
                   <p className="text-sm font-bold text-success">
                     - QAR{' '}
                     {(
                       currentInvoice.discountAmount ||
-                      (currentInvoice.grossAmount || 0) *
+                      (currentInvoice.grossAmount || currentInvoice.monthlyRent || 0) *
                         ((currentInvoice.discountPercent || 0) / 100)
                     ).toLocaleString(undefined, {
                       minimumFractionDigits: 2,
@@ -1506,6 +1505,8 @@ export function InvoiceDetailsDialog({
                               ${itemsHtml}
 
                               <div style="margin-top: 30px; text-align: right;">
+                                ${inv.grossAmount ? `<p style="margin: 5px 0; color: #6b7280;">Gross Amount: <strong>QAR ${inv.grossAmount.toLocaleString()}</strong></p>` : ''}
+                                ${inv.discountAmount && inv.discountAmount > 0 ? `<p style="margin: 5px 0; color: #dc2626;">Discount Given: <strong>- QAR ${inv.discountAmount.toLocaleString()}</strong> ${inv.discountPercent ? `(${inv.discountPercent}%)` : ''}</p>` : ''}
                                 <p style="font-size: 18px; margin: 5px 0;">Total Amount: <strong style="color: #1d4ed8;">QAR ${(inv.totalAmount || 0).toLocaleString()}</strong></p>
                                 ${inv.advanceAmount ? `<p style="margin: 5px 0; color: #059669;">Advance Required: <strong>QAR ${inv.advanceAmount.toLocaleString()}</strong></p>` : ''}
                               </div>

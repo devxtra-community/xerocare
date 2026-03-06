@@ -1227,10 +1227,15 @@ export class BillingService {
         (!invoice.items || !invoice.items.some((i) => i.itemType === ItemType.PRICING_RULE))
       ) {
         const contract = await this.invoiceRepo.findById(invoice.referenceContractId);
-        if (contract && contract.items) {
-          const rules = contract.items.filter((i) => i.itemType === ItemType.PRICING_RULE);
-          if (!invoice.items) invoice.items = [];
-          invoice.items.push(...rules);
+        if (contract) {
+          if (contract.items) {
+            const rules = contract.items.filter((i) => i.itemType === ItemType.PRICING_RULE);
+            if (!invoice.items) invoice.items = [];
+            invoice.items.push(...rules);
+          }
+          if (contract.productAllocations) {
+            invoice.productAllocations = contract.productAllocations;
+          }
         }
       }
 
@@ -1668,12 +1673,36 @@ export class BillingService {
       });
       await queryRunner.manager.save(DeviceMeterReading, newReading);
 
-      // Fetch invoice for billType
+      // Fetch invoice for updating InvoiceItems
       const invoice = await queryRunner.manager.findOne(Invoice, {
         where: { id: oldAllocation.contractId },
+        relations: ['items'],
       });
 
+      if (invoice && invoice.items) {
+        // Find the item that matches the old product
+        const itemIndex = invoice.items.findIndex((i) => i.productId === oldAllocation.productId);
+        if (itemIndex !== -1) {
+          const item = invoice.items[itemIndex];
+          item.productId = newProductId;
+          // Note: serialNumber is not a property of InvoiceItem, we only update productId and modelId
+          // If the new product has a different model, update it
+          item.modelId = oldAllocation.modelId; // Assuming model stays same for now, but we can update if needed
+          // Description might need update if it contains the old Serial Number
+          if (item.description.includes(oldAllocation.serialNumber)) {
+            item.description = item.description.replace(
+              oldAllocation.serialNumber,
+              newSerialNumber,
+            );
+          }
+          await queryRunner.manager.save(InvoiceItem, item);
+        }
+      }
+
+      await queryRunner.commitTransaction();
+
       // Emit events to update inventory status (Return old, Allocate new)
+      // We do this AFTER commit to ensure database consistency
       if (oldAllocation.productId) {
         emitProductStatusUpdate({
           productId: oldAllocation.productId,
@@ -1681,7 +1710,7 @@ export class BillingService {
           invoiceId: oldAllocation.contractId,
           approvedBy: 'SYSTEM',
           approvedAt: ts,
-        }).catch((err) => logger.error('Failed to emitRETURNED event', err));
+        }).catch((err) => logger.error('Failed to emit RETURNED event', err));
       }
       if (newAllocation.productId) {
         emitProductStatusUpdate({
@@ -1690,7 +1719,7 @@ export class BillingService {
           invoiceId: newAllocation.contractId,
           approvedBy: 'SYSTEM',
           approvedAt: ts,
-        }).catch((err) => logger.error('Failed to emit LEASE event', err));
+        }).catch((err) => logger.error('Failed to emit LEASE/RENT event', err));
       }
 
       return newAllocation;

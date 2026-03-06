@@ -5,9 +5,11 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   ManyToOne,
+  OneToMany,
   JoinColumn,
 } from 'typeorm';
 import { Invoice } from './invoiceEntity';
+import { UsageRecordItem } from './usageRecordItemEntity';
 
 export enum ReportedBy {
   CUSTOMER = 'CUSTOMER',
@@ -107,4 +109,7 @@ export class UsageRecord {
 
   @Column({ type: 'timestamp', nullable: true })
   whatsappSentAt?: Date;
+
+  @OneToMany(() => UsageRecordItem, (item) => item.usageRecord)
+  items!: UsageRecordItem[];
 }

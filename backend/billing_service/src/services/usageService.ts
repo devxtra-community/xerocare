@@ -39,6 +39,8 @@ export class UsageService {
     meterImageUrl?: string;
     reportedBy?: 'CUSTOMER' | 'EMPLOYEE';
     remarks?: string;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    items?: any[];
   }) {
     // 1. Fetch Contract
     const contract = await this.invoiceRepo.findById(payload.contractId);
@@ -120,6 +122,11 @@ export class UsageService {
     let colorA4Delta = 0;
     let colorA3Delta = 0;
 
+    let totalEndBwA4 = 0;
+    let totalEndBwA3 = 0;
+    let totalEndColorA4 = 0;
+    let totalEndColorA3 = 0;
+
     const usageItemsToSave: Partial<UsageRecordItem>[] = [];
 
     // PER-ALLOCATION DELTA CALCULATION
@@ -143,43 +150,72 @@ export class UsageService {
           startColorA3 = prevItem.endColorA3;
         } else if (
           previousRecord &&
-          new Date(alloc.startTimestamp) < new Date(payload.billingPeriodStart) &&
-          !alloc.replacementOfAllocationId // NOT a replacement — carried over from previous period
+          new Date(alloc.startTimestamp) < new Date(payload.billingPeriodStart)
         ) {
-          // Legacy fallback: device was active in previous period, its reading carries forward
-          startBwA4 = previousRecord.bwA4Count;
-          startBwA3 = previousRecord.bwA3Count;
-          startColorA4 = previousRecord.colorA4Count;
-          startColorA3 = previousRecord.colorA3Count;
+          // Legacy fallback: device was active in previous period, but per-unit items are missing.
+          // Fallback to the current captured reading on the allocation if it looks reasonable (e.g. less than current reading)
+          // Otherwise use initial. Using previousRecord.bwA4Count is dangerous for multi-machine contracts.
+          startBwA4 = alloc.initialBwA4 || 0;
+          startBwA3 = alloc.initialBwA3 || 0;
+          startColorA4 = alloc.initialColorA4 || 0;
+          startColorA3 = alloc.initialColorA3 || 0;
+
+          // Optimization: If this machine has 'current' counts from a previous internal record, use them
+          if (alloc.currentBwA4 > alloc.initialBwA4) startBwA4 = alloc.currentBwA4;
+          if (alloc.currentBwA3 > alloc.initialBwA3) startBwA3 = alloc.currentBwA3;
+          if (alloc.currentColorA4 > alloc.initialColorA4) startColorA4 = alloc.currentColorA4;
+          if (alloc.currentColorA3 > alloc.initialColorA3) startColorA3 = alloc.currentColorA3;
         } else {
           // Replacement device OR brand-new allocation: start from its own initial reading
-          startBwA4 = alloc.initialBwA4;
-          startBwA3 = alloc.initialBwA3;
-          startColorA4 = alloc.initialColorA4;
-          startColorA3 = alloc.initialColorA3;
+          startBwA4 = alloc.initialBwA4 || 0;
+          startBwA3 = alloc.initialBwA3 || 0;
+          startColorA4 = alloc.initialColorA4 || 0;
+          startColorA3 = alloc.initialColorA3 || 0;
         }
 
-        if (
-          alloc.status === AllocationStatus.REPLACED &&
-          alloc.endTimestamp &&
-          new Date(alloc.endTimestamp) <= new Date(payload.billingPeriodEnd)
-        ) {
-          endBwA4 = alloc.currentBwA4;
-          endBwA3 = alloc.currentBwA3;
-          endColorA4 = alloc.currentColorA4;
-          endColorA3 = alloc.currentColorA3;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const payloadItem = payload.items?.find((i: any) => i.allocationId === alloc.id);
+
+        if (alloc.status === AllocationStatus.REPLACED) {
+          // Replaced machines are now settled at the time of replacement.
+          // We exclude them from the regular monthly billing delta.
+          endBwA4 = alloc.currentBwA4 || startBwA4;
+          endBwA3 = alloc.currentBwA3 || startBwA3;
+          endColorA4 = alloc.currentColorA4 || startColorA4;
+          endColorA3 = alloc.currentColorA3 || startColorA3;
         } else {
           // Currently active allocation
-          endBwA4 = payload.bwA4Count;
-          endBwA3 = payload.bwA3Count;
-          endColorA4 = payload.colorA4Count;
-          endColorA3 = payload.colorA3Count;
+          // FIX: If we have multiple machines, we MUST NOT fallback to the total payload count
+          // unless this is the ONLY machine or specifically matched.
+          const isOnlyMachine =
+            overlappingAllocations.filter((a) => a.status === AllocationStatus.ALLOCATED).length ===
+            1;
+
+          if (payloadItem) {
+            endBwA4 = payloadItem.endBwA4;
+            endBwA3 = payloadItem.endBwA3;
+            endColorA4 = payloadItem.endColorA4;
+            endColorA3 = payloadItem.endColorA3;
+          } else if (isOnlyMachine) {
+            // Fallback only if it's the single active machine
+            endBwA4 = payload.bwA4Count;
+            endBwA3 = payload.bwA3Count;
+            endColorA4 = payload.colorA4Count;
+            endColorA3 = payload.colorA3Count;
+          } else {
+            // Multi-machine contract but no specific reading for this machine:
+            // Default to NO usage (end = start) to prevent duplication.
+            endBwA4 = startBwA4;
+            endBwA3 = startBwA3;
+            endColorA4 = startColorA4;
+            endColorA3 = startColorA3;
+          }
 
           // Pre-emptively update current reading on the allocation itself
-          alloc.currentBwA4 = payload.bwA4Count;
-          alloc.currentBwA3 = payload.bwA3Count;
-          alloc.currentColorA4 = payload.colorA4Count;
-          alloc.currentColorA3 = payload.colorA3Count;
+          alloc.currentBwA4 = endBwA4;
+          alloc.currentBwA3 = endBwA3;
+          alloc.currentColorA4 = endColorA4;
+          alloc.currentColorA3 = endColorA3;
           await this.invoiceRepo.manager.save(ProductAllocation, alloc);
         }
 
@@ -192,6 +228,11 @@ export class UsageService {
         bwA3Delta += dBwA3;
         colorA4Delta += dColorA4;
         colorA3Delta += dColorA3;
+
+        totalEndBwA4 += endBwA4;
+        totalEndBwA3 += endBwA3;
+        totalEndColorA4 += endColorA4;
+        totalEndColorA3 += endColorA3;
 
         usageItemsToSave.push({
           allocation: { id: alloc.id } as ProductAllocation,
@@ -367,10 +408,10 @@ export class UsageService {
           contract: { id: payload.contractId } as any,
           billingPeriodStart: new Date(payload.billingPeriodStart),
           billingPeriodEnd: new Date(payload.billingPeriodEnd),
-          bwA4Count: payload.bwA4Count,
-          bwA3Count: payload.bwA3Count,
-          colorA4Count: payload.colorA4Count,
-          colorA3Count: payload.colorA3Count,
+          bwA4Count: totalEndBwA4 || payload.bwA4Count,
+          bwA3Count: totalEndBwA3 || payload.bwA3Count,
+          colorA4Count: totalEndColorA4 || payload.colorA4Count,
+          colorA3Count: totalEndColorA3 || payload.colorA3Count,
           bwA4Delta,
           bwA3Delta,
           colorA4Delta,
@@ -455,10 +496,10 @@ export class UsageService {
         contract: { id: payload.contractId } as any,
         billingPeriodStart: new Date(payload.billingPeriodStart),
         billingPeriodEnd: new Date(payload.billingPeriodEnd),
-        bwA4Count: payload.bwA4Count,
-        bwA3Count: payload.bwA3Count,
-        colorA4Count: payload.colorA4Count,
-        colorA3Count: payload.colorA3Count,
+        bwA4Count: totalEndBwA4 || payload.bwA4Count,
+        bwA3Count: totalEndBwA3 || payload.bwA3Count,
+        colorA4Count: totalEndColorA4 || payload.colorA4Count,
+        colorA3Count: totalEndColorA3 || payload.colorA3Count,
         bwA4Delta,
         bwA3Delta,
         colorA4Delta,
@@ -661,6 +702,10 @@ export class UsageService {
         colorA4Delta: colorA4D,
         colorA3Delta: colorA3D,
         remarks: record.remarks,
+        discountAmount: Number(record.discountAmount || 0),
+        discountBwCopies: Number(record.discountBwCopies || 0),
+        discountColorCopies: Number(record.discountColorCopies || 0),
+        items: record.items, // Ensure items are passed to the frontend for editing
         // Detailed Breakdown for UI "View Details"
         bwFreeLimit: Number(pricingRule.bwIncludedLimit || 0),
         colorFreeLimit: Number(pricingRule.colorIncludedLimit || 0),
@@ -1029,6 +1074,8 @@ export class UsageService {
       discountBwCopies?: number;
       discountColorCopies?: number;
       discountAmount?: number;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      items?: any[];
     },
   ) {
     const usage = await this.usageRepo.findById(id);
@@ -1082,10 +1129,20 @@ export class UsageService {
       }
     }
 
-    const bwA4Delta = Math.max(0, payload.bwA4Count - prevBwA4);
-    const bwA3Delta = Math.max(0, payload.bwA3Count - prevBwA3);
-    const colorA4Delta = Math.max(0, payload.colorA4Count - prevColorA4);
-    const colorA3Delta = Math.max(0, payload.colorA3Count - prevColorA3);
+    let bwA4Delta = 0;
+    let bwA3Delta = 0;
+    let colorA4Delta = 0;
+    let colorA3Delta = 0;
+
+    // Use items to calculate deltas if provided, otherwise fallback to contract-level counts (safe only for single device)
+    if (payload.items && payload.items.length > 0) {
+      // Deltas will be summed from items below
+    } else {
+      bwA4Delta = Math.max(0, payload.bwA4Count - prevBwA4);
+      bwA3Delta = Math.max(0, payload.bwA3Count - prevBwA3);
+      colorA4Delta = Math.max(0, payload.colorA4Count - prevColorA4);
+      colorA3Delta = Math.max(0, payload.colorA3Count - prevColorA3);
+    }
 
     const discountBw = payload.discountBwCopies ?? usage.discountBwCopies ?? 0;
     const discountColor = payload.discountColorCopies ?? usage.discountColorCopies ?? 0;
@@ -1134,6 +1191,66 @@ export class UsageService {
     usage.colorA4Count = payload.colorA4Count;
     usage.colorA3Count = payload.colorA3Count;
     usage.billingPeriodEnd = new Date(payload.billingPeriodEnd);
+
+    // Update UsageRecordItems and pre-emptively update ProductAllocations based on payload.items
+    if (payload.items && payload.items.length > 0) {
+      const existingItems = await this.invoiceRepo.manager.find(UsageRecordItem, {
+        where: { usageRecordId: usage.id },
+        relations: ['allocation'],
+      });
+
+      // Reset deltas for recalculation from items
+      bwA4Delta = 0;
+      bwA3Delta = 0;
+      colorA4Delta = 0;
+      colorA3Delta = 0;
+
+      for (const existingItem of existingItems) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const payloadItem = payload.items.find((i: any) => i.id === existingItem.id);
+        if (payloadItem && existingItem.allocation) {
+          const alloc = existingItem.allocation;
+
+          if (alloc.status === AllocationStatus.REPLACED) {
+            // Replaced machines usage is already settled. Skip their delta for current billing.
+            existingItem.endBwA4 = alloc.currentBwA4 || existingItem.startBwA4;
+            existingItem.endBwA3 = alloc.currentBwA3 || existingItem.startBwA3;
+            existingItem.endColorA4 = alloc.currentColorA4 || existingItem.endColorA4;
+            existingItem.endColorA3 = alloc.currentColorA3 || existingItem.endColorA3;
+          } else {
+            existingItem.endBwA4 = payloadItem.endBwA4;
+            existingItem.endBwA3 = payloadItem.endBwA3;
+            existingItem.endColorA4 = payloadItem.endColorA4;
+            existingItem.endColorA3 = payloadItem.endColorA3;
+
+            // Pre-emptively update current reading on the allocation itself
+            alloc.currentBwA4 = existingItem.endBwA4;
+            alloc.currentBwA3 = existingItem.endBwA3;
+            alloc.currentColorA4 = existingItem.endColorA4;
+            alloc.currentColorA3 = existingItem.endColorA3;
+            await this.invoiceRepo.manager.save(ProductAllocation, alloc);
+          }
+
+          existingItem.deltaBwA4 = Math.max(0, existingItem.endBwA4 - existingItem.startBwA4);
+          existingItem.deltaBwA3 = Math.max(0, existingItem.endBwA3 - existingItem.startBwA3);
+          existingItem.deltaColorA4 = Math.max(
+            0,
+            existingItem.endColorA4 - existingItem.startColorA4,
+          );
+          existingItem.deltaColorA3 = Math.max(
+            0,
+            existingItem.endColorA3 - existingItem.startColorA3,
+          );
+
+          bwA4Delta += existingItem.deltaBwA4;
+          bwA3Delta += existingItem.deltaBwA3;
+          colorA4Delta += existingItem.deltaColorA4;
+          colorA3Delta += existingItem.deltaColorA3;
+
+          await this.invoiceRepo.manager.save(UsageRecordItem, existingItem);
+        }
+      }
+    }
 
     usage.bwA4Delta = bwA4Delta;
     usage.bwA3Delta = bwA3Delta;

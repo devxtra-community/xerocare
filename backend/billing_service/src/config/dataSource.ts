@@ -7,8 +7,8 @@ import { Invoice } from '../entities/invoiceEntity';
 import { InvoiceItem } from '../entities/invoiceItemEntity';
 import { UsageRecord } from '../entities/usageRecordEntity';
 import { ProductAllocation } from '../entities/productAllocationEntity';
-import { DeviceMeterReading } from '../entities/deviceMeterReadingEntity';
 import { UsageRecordItem } from '../entities/usageRecordItemEntity';
+import { DeviceMeterReading } from '../entities/deviceMeterReadingEntity';
 import { logger } from './logger';
 
 export const Source = new DataSource({
@@ -21,8 +21,8 @@ export const Source = new DataSource({
     InvoiceItem,
     UsageRecord,
     ProductAllocation,
-    DeviceMeterReading,
     UsageRecordItem,
+    DeviceMeterReading,
   ],
   extra: { max: 2 },
 });
