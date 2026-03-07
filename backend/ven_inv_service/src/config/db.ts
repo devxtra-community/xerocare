@@ -47,7 +47,7 @@ export const Source = new DataSource({
     RfqVendorItem,
   ],
   extra: {
-    max: 10,
+    max: 1,
     ssl: { rejectUnauthorized: false },
     connectionTimeoutMillis: 5000,
     keepAlive: true,

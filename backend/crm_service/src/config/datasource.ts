@@ -14,7 +14,7 @@ export const Source = new DataSource({
   logging: false,
   entities: [Customer],
   extra: {
-    max: 10,
+    max: 1,
     connectionTimeoutMillis: 5000,
     keepAlive: true,
   },
