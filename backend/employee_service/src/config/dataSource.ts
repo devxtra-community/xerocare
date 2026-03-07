@@ -13,15 +13,9 @@ import { Notification } from '../entities/notificationEntity';
 
 import { logger } from './logger';
 
-const getDirectDbUrl = (url?: string) => {
-  if (!url) return '';
-  return url.replace('-pooler.', '.');
-};
-
 export const Source = new DataSource({
-  // [/] Update `DataSource` configuration
   type: 'postgres',
-  url: getDirectDbUrl(process.env.EMPLOYEE_DATABASE_URL),
+  url: process.env.EMPLOYEE_DATABASE_URL,
   ssl: {
     rejectUnauthorized: false,
   },
@@ -29,7 +23,6 @@ export const Source = new DataSource({
   entities: [Admin, Employee, Auth, Branch, LeaveApplication, Payroll, Notification],
   extra: {
     max: 10,
-    ssl: { rejectUnauthorized: false },
     connectionTimeoutMillis: 5000,
     keepAlive: true,
   },

@@ -9,23 +9,15 @@ import { UsageRecord } from '../entities/usageRecordEntity';
 import { ProductAllocation } from '../entities/productAllocationEntity';
 
 import { logger } from './logger';
-
-/**
- * Neon DB specific fix: Avoid pooler instability.
- * The Neon connection pooler (indicated by "-pooler" in the hostname) can drop connections
- * during AWS network hiccups or proxy resets. Connecting directly to the compute node
- * avoids intermittent ENETUNREACH or ETIMEDOUT crashes.
- */
-const getDirectDbUrl = (url?: string) => {
-  if (!url) return '';
-  return url.replace('-pooler.', '.');
-};
 import { UsageRecordItem } from '../entities/usageRecordItemEntity';
 import { DeviceMeterReading } from '../entities/deviceMeterReadingEntity';
 
 export const Source = new DataSource({
   type: 'postgres',
-  url: getDirectDbUrl(process.env.BILLING_DATABASE_URL),
+  url: process.env.BILLING_DATABASE_URL,
+  ssl: {
+    rejectUnauthorized: false,
+  },
   synchronize: false,
   logging: false,
   entities: [
@@ -38,7 +30,6 @@ export const Source = new DataSource({
   ],
   extra: {
     max: 10,
-    ssl: { rejectUnauthorized: false },
     connectionTimeoutMillis: 5000,
     keepAlive: true,
   },

@@ -4,20 +4,17 @@ import './env';
 import { Customer } from '../entities/customerEntity';
 import { logger } from './logger';
 
-const getDirectDbUrl = (url?: string) => {
-  if (!url) return '';
-  return url.replace('-pooler.', '.');
-};
-
 export const Source = new DataSource({
   type: 'postgres',
-  url: getDirectDbUrl(process.env.CRM_DATABASE_URL),
+  url: process.env.CRM_DATABASE_URL,
+  ssl: {
+    rejectUnauthorized: false,
+  },
   synchronize: false,
   logging: false,
   entities: [Customer],
   extra: {
     max: 10,
-    ssl: { rejectUnauthorized: false },
     connectionTimeoutMillis: 5000,
     keepAlive: true,
   },
