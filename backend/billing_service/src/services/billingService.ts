@@ -1,4 +1,3 @@
-import { EntityManager } from 'typeorm';
 import { InvoiceRepository } from '../repositories/invoiceRepository';
 // import { getRabbitChannel } from '../config/rabbitmq';
 import { InvoiceStatus } from '../entities/enums/invoiceStatus';
@@ -18,15 +17,26 @@ import { InvoiceType } from '../entities/enums/invoiceType';
 import { emitProductStatusUpdate } from '../events/publisher/productStatusEvent';
 import { ContractStatus } from '../entities/enums/contractStatus';
 import { ProductAllocation, AllocationStatus } from '../entities/productAllocationEntity';
+import { DeviceMeterReading, ReadingSource } from '../entities/deviceMeterReadingEntity';
+import { UsageRecord } from '../entities/usageRecordEntity';
 
-interface ItemUpdate {
-  id: string;
-  productId?: string;
-  initialBwCount?: number;
-  initialColorCount?: number;
-  initialBwA3Count?: number;
-  initialColorA3Count?: number;
-}
+const appendOpenEndedSlab = <T extends { from: number; to: number; rate: number }>(
+  ranges: T[] | undefined,
+  excessRate: number | undefined,
+): T[] | undefined => {
+  if (
+    !ranges ||
+    !Array.isArray(ranges) ||
+    ranges.length === 0 ||
+    excessRate === undefined ||
+    excessRate === null
+  ) {
+    return ranges;
+  }
+  const maxTo = Math.max(...ranges.map((r) => Number(r.to) || 0));
+  if (maxTo >= 999999) return ranges;
+  return [...ranges, { from: maxTo + 1, to: 9999999, rate: Number(excessRate) } as T];
+};
 
 export class BillingService {
   private invoiceRepo = new InvoiceRepository();
@@ -390,9 +400,12 @@ export class BillingService {
         invItem.bwExcessRate = item.bwExcessRate;
         invItem.colorExcessRate = item.colorExcessRate;
         invItem.combinedExcessRate = item.combinedExcessRate;
-        invItem.bwSlabRanges = item.bwSlabRanges;
-        invItem.colorSlabRanges = item.colorSlabRanges;
-        invItem.comboSlabRanges = item.comboSlabRanges;
+        invItem.bwSlabRanges = appendOpenEndedSlab(item.bwSlabRanges, item.bwExcessRate);
+        invItem.colorSlabRanges = appendOpenEndedSlab(item.colorSlabRanges, item.colorExcessRate);
+        invItem.comboSlabRanges = appendOpenEndedSlab(
+          item.comboSlabRanges,
+          item.combinedExcessRate,
+        );
 
         logger.info(
           `Created invoice item (cons): Desc=${invItem.description} Model=${invItem.modelId} BWLimit=${invItem.bwIncludedLimit} ColorLimit=${invItem.colorIncludedLimit} BWExcess=${invItem.bwExcessRate}`,
@@ -425,9 +438,15 @@ export class BillingService {
         invoiceItem.colorExcessRate = item.colorExcessRate;
         invoiceItem.combinedExcessRate = item.combinedExcessRate;
 
-        invoiceItem.bwSlabRanges = item.bwSlabRanges;
-        invoiceItem.colorSlabRanges = item.colorSlabRanges;
-        invoiceItem.comboSlabRanges = item.comboSlabRanges;
+        invoiceItem.bwSlabRanges = appendOpenEndedSlab(item.bwSlabRanges, item.bwExcessRate);
+        invoiceItem.colorSlabRanges = appendOpenEndedSlab(
+          item.colorSlabRanges,
+          item.colorExcessRate,
+        );
+        invoiceItem.comboSlabRanges = appendOpenEndedSlab(
+          item.comboSlabRanges,
+          item.combinedExcessRate,
+        );
 
         return invoiceItem;
       });
@@ -618,9 +637,12 @@ export class BillingService {
         invItem.bwExcessRate = item.bwExcessRate;
         invItem.colorExcessRate = item.colorExcessRate;
         invItem.combinedExcessRate = item.combinedExcessRate;
-        invItem.bwSlabRanges = item.bwSlabRanges;
-        invItem.colorSlabRanges = item.colorSlabRanges;
-        invItem.comboSlabRanges = item.comboSlabRanges;
+        invItem.bwSlabRanges = appendOpenEndedSlab(item.bwSlabRanges, item.bwExcessRate);
+        invItem.colorSlabRanges = appendOpenEndedSlab(item.colorSlabRanges, item.colorExcessRate);
+        invItem.comboSlabRanges = appendOpenEndedSlab(
+          item.comboSlabRanges,
+          item.combinedExcessRate,
+        );
 
         return invItem;
       });
@@ -639,9 +661,15 @@ export class BillingService {
         invoiceItem.bwExcessRate = item.bwExcessRate;
         invoiceItem.colorExcessRate = item.colorExcessRate;
         invoiceItem.combinedExcessRate = item.combinedExcessRate;
-        invoiceItem.bwSlabRanges = item.bwSlabRanges;
-        invoiceItem.colorSlabRanges = item.colorSlabRanges;
-        invoiceItem.comboSlabRanges = item.comboSlabRanges;
+        invoiceItem.bwSlabRanges = appendOpenEndedSlab(item.bwSlabRanges, item.bwExcessRate);
+        invoiceItem.colorSlabRanges = appendOpenEndedSlab(
+          item.colorSlabRanges,
+          item.colorExcessRate,
+        );
+        invoiceItem.comboSlabRanges = appendOpenEndedSlab(
+          item.comboSlabRanges,
+          item.combinedExcessRate,
+        );
         return invoiceItem;
       });
       newInvoiceItems.push(...ruleItems);
@@ -768,12 +796,123 @@ export class BillingService {
   }
 
   /**
-   * Finance approves the quotation, finalizing it for contract creation.
+   * Step 1: Finance allocates machines for the quotation.
+   * Finalizes as a PROFORMA contract pending customer confirmation.
    */
-  async financeApprove(
+  async allocateMachines(
     id: string,
     userId: string,
     token: string,
+    itemUpdates?: { id: string; productId: string }[],
+  ) {
+    const queryRunner = this.invoiceRepo.manager.connection.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      const invoice = await queryRunner.manager.findOne(Invoice, {
+        where: { id },
+        relations: ['items'],
+      });
+
+      if (!invoice) throw new AppError('Quotation not found', 404);
+      if (invoice.status !== InvoiceStatus.EMPLOYEE_APPROVED) {
+        throw new AppError('Only Employee Approved quotations can be allocated by Finance', 400);
+      }
+
+      // Check that all machines are allocated
+      const productItems = invoice.items.filter(
+        (item) => item.itemType === 'PRODUCT' && item.modelId,
+      );
+      const updatesMap = new Map<string, { id: string; productId: string }>();
+      if (itemUpdates) itemUpdates.forEach((u) => updatesMap.set(String(u.id).toLowerCase(), u));
+
+      for (const item of productItems) {
+        const update = updatesMap.get(String(item.id).toLowerCase());
+        const isAllocated = !!(item.productId || update?.productId);
+        if (!isAllocated) {
+          throw new AppError(
+            `Machine allocation (Serial Number) is required for: ${item.description}`,
+            400,
+          );
+        }
+      }
+
+      if (itemUpdates && itemUpdates.length > 0) {
+        const inventoryServiceUrl = process.env.INVENTORY_SERVICE_URL || 'http://localhost:3003';
+        for (const update of itemUpdates) {
+          const item = invoice.items.find((i) => i.id === update.id);
+          if (item && update.productId) {
+            let product;
+            try {
+              const response = await fetch(`${inventoryServiceUrl}/products/${update.productId}`, {
+                headers: { Authorization: token, 'Content-Type': 'application/json' },
+              });
+              if (!response.ok) throw new Error(response.statusText);
+              const data = await response.json();
+              product = data.data;
+            } catch (error) {
+              logger.error(`Product validation failed: ${update.productId}`, error);
+              throw new AppError(`Failed to validate product ${update.productId}`, 500);
+            }
+
+            if (!product) throw new AppError(`Product ${update.productId} not found`, 404);
+
+            item.productId = update.productId;
+
+            // Create basic allocation record without meter readings yet
+            await queryRunner.manager.insert(ProductAllocation, {
+              contractId: invoice.id,
+              modelId: item.modelId,
+              productId: update.productId,
+              serialNumber: product.serial_no || 'Unknown',
+              status: AllocationStatus.ALLOCATED,
+              initialBwA4: 0,
+              initialBwA3: 0,
+              initialColorA4: 0,
+              initialColorA3: 0,
+              currentBwA4: 0,
+              currentBwA3: 0,
+              currentColorA4: 0,
+              currentColorA3: 0,
+            });
+          }
+        }
+      }
+
+      invoice.status = InvoiceStatus.FINANCE_APPROVED;
+      invoice.type = InvoiceType.PROFORMA;
+      invoice.contractStatus = ContractStatus.PENDING_CONFIRMATION;
+
+      // We don't record financeApprovedAt until the contract is fully activated in Step 2,
+      // but we record who drafted the allocation.
+      invoice.financeApprovedBy = userId;
+
+      const savedInvoice = await queryRunner.manager.save(invoice);
+      await queryRunner.commitTransaction();
+
+      // Emit status update as "ALLOCATED" to reserve stock in inventory
+      // We can use the existing saleType but understand it's pre-active
+      this.emitProductStatusUpdates(savedInvoice, userId);
+
+      return savedInvoice;
+    } catch (err) {
+      await queryRunner.rollbackTransaction();
+      throw err;
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  /**
+   * Step 2: Customer confirmed the contract. Upload confirmation, record deposit & readings.
+   * Activates the Contract.
+   */
+  async activateContract(
+    id: string,
+    userId: string,
+    token: string,
+    contractConfirmationUrl: string,
     deposit?: {
       amount: number;
       mode: SecurityDepositMode;
@@ -782,7 +921,6 @@ export class BillingService {
     },
     itemUpdates?: {
       id: string;
-      productId: string;
       initialBwCount?: number;
       initialBwA3Count?: number;
       initialColorCount?: number;
@@ -800,18 +938,15 @@ export class BillingService {
       });
 
       if (!invoice) throw new AppError('Quotation not found', 404);
-      if (invoice.status !== InvoiceStatus.EMPLOYEE_APPROVED) {
-        throw new AppError('Only Employee Approved quotations can be finalized by Finance', 400);
+      if (invoice.contractStatus !== ContractStatus.PENDING_CONFIRMATION) {
+        throw new AppError('Contract is not pending confirmation', 400);
       }
 
-      await this.validateAllocations(invoice, itemUpdates, deposit);
+      invoice.contractConfirmationUrl = contractConfirmationUrl;
 
-      if (itemUpdates && itemUpdates.length > 0) {
-        await this.processItemUpdates(queryRunner.manager, invoice, itemUpdates, token);
-      }
+      // 1. Deposit is optional — record it if provided, but don't block activation
 
-      // Security Deposit
-      if (deposit) {
+      if (deposit && deposit.amount > 0) {
         invoice.securityDepositAmount = deposit.amount;
         invoice.securityDepositMode = deposit.mode;
         invoice.securityDepositReference = deposit.reference;
@@ -820,17 +955,79 @@ export class BillingService {
         }
       }
 
-      invoice.status = InvoiceStatus.FINANCE_APPROVED;
-      invoice.financeApprovedBy = userId;
-      invoice.financeApprovedAt = new Date();
+      // 2. Process Initial Readings
+      if (itemUpdates && itemUpdates.length > 0) {
+        const inventoryServiceUrl = process.env.INVENTORY_SERVICE_URL || 'http://localhost:3003';
+        for (const update of itemUpdates) {
+          const item = invoice.items.find((i) => i.id === update.id);
+          if (item && item.productId) {
+            // Check product color to enforce reading requirements
+            let product;
+            try {
+              const response = await fetch(`${inventoryServiceUrl}/products/${item.productId}`, {
+                headers: { Authorization: token, 'Content-Type': 'application/json' },
+              });
+              if (response.ok) {
+                const data = await response.json();
+                product = data.data;
+              }
+            } catch (error) {
+              logger.error(`Product fetch failed for readings: ${item.productId}`, error);
+            }
 
-      // Final Transition
+            if (invoice.saleType !== SaleType.SALE) {
+              if (update.initialBwCount === undefined) {
+                throw new AppError(
+                  `Initial B&W reading missing for item: ${item.description}`,
+                  400,
+                );
+              }
+            }
+
+            if (update.initialBwCount !== undefined) item.initialBwCount = update.initialBwCount;
+            if (update.initialBwA3Count !== undefined)
+              item.initialBwA3Count = update.initialBwA3Count;
+
+            if (product && product.print_colour === 'BLACK_WHITE') {
+              item.initialColorCount = 0;
+            } else {
+              if (invoice.saleType !== SaleType.SALE && update.initialColorCount === undefined) {
+                throw new AppError(`Initial Color reading missing for ${item.description}`, 400);
+              }
+              if (update.initialColorCount !== undefined)
+                item.initialColorCount = update.initialColorCount;
+              if (update.initialColorA3Count !== undefined)
+                item.initialColorA3Count = update.initialColorA3Count;
+            }
+
+            // Update the existing allocation record
+            await queryRunner.manager.update(
+              ProductAllocation,
+              { contractId: invoice.id, productId: item.productId },
+              {
+                initialBwA4: item.initialBwCount || 0,
+                initialBwA3: item.initialBwA3Count || 0,
+                initialColorA4: item.initialColorCount || 0,
+                initialColorA3: item.initialColorA3Count || 0,
+                currentBwA4: item.initialBwCount || 0,
+                currentBwA3: item.initialBwA3Count || 0,
+                currentColorA4: item.initialColorCount || 0,
+                currentColorA3: item.initialColorA3Count || 0,
+              },
+            );
+          }
+        }
+      }
+
+      // Final Activation
+      invoice.financeApprovedAt = new Date();
+      invoice.financeApprovedBy = userId;
+
       if (invoice.saleType === SaleType.SALE) {
         invoice.type = InvoiceType.FINAL;
         invoice.status = InvoiceStatus.PAID;
+        invoice.contractStatus = ContractStatus.ACTIVE; // Set to Active for consistency
       } else {
-        // Rent or Lease
-        invoice.type = InvoiceType.PROFORMA;
         invoice.contractStatus = ContractStatus.ACTIVE;
         this.setEffectiveDates(invoice);
       }
@@ -838,7 +1035,7 @@ export class BillingService {
       const savedInvoice = await queryRunner.manager.save(invoice);
       await queryRunner.commitTransaction();
 
-      // Post-transaction events
+      // Emit status updates
       this.emitProductStatusUpdates(savedInvoice, userId);
 
       return savedInvoice;
@@ -847,120 +1044,6 @@ export class BillingService {
       throw err;
     } finally {
       await queryRunner.release();
-    }
-  }
-
-  // Private Helper Methods
-
-  private async validateAllocations(
-    invoice: Invoice,
-    itemUpdates: ItemUpdate[] | undefined,
-    deposit: { amount?: number } | undefined,
-  ) {
-    // 1. Ensure Deposit for Rent
-    if (invoice.saleType === SaleType.RENT) {
-      if (!deposit || !deposit.amount || deposit.amount <= 0) {
-        throw new AppError('Security Deposit is mandatory for Rent contracts', 400);
-      }
-    }
-
-    // 2. Validate Product Allocations
-    const productItems = invoice.items.filter((item) => item.itemType === 'PRODUCT');
-    const updatesMap = new Map<
-      string,
-      { id: string; productId?: string; initialBwCount?: number }
-    >();
-    if (Array.isArray(itemUpdates)) {
-      itemUpdates.forEach((u) => updatesMap.set(String(u.id).toLowerCase().trim(), u));
-    }
-
-    for (const item of productItems) {
-      const itemKey = String(item.id).toLowerCase().trim();
-      const update = updatesMap.get(itemKey);
-      const isAllocated = !!(item.productId || update?.productId);
-
-      if (!isAllocated && item.modelId) {
-        throw new AppError(
-          `Machine allocation (Serial Number) is required for: ${item.description}`,
-          400,
-        );
-      }
-
-      if (invoice.saleType !== SaleType.SALE) {
-        const bwCount =
-          update?.initialBwCount !== undefined ? update.initialBwCount : item.initialBwCount;
-        if (bwCount === undefined || bwCount === null) {
-          throw new AppError(`Initial B&W reading missing for item: ${item.description}`, 400);
-        }
-      }
-    }
-  }
-
-  private async processItemUpdates(
-    manager: EntityManager,
-    invoice: Invoice,
-    itemUpdates: ItemUpdate[],
-    token: string,
-  ) {
-    const inventoryServiceUrl = process.env.INVENTORY_SERVICE_URL || 'http://localhost:3003';
-
-    for (const update of itemUpdates) {
-      const item = invoice.items.find((i) => i.id === update.id);
-      if (item) {
-        // Fetch Product
-        let product;
-        try {
-          const response = await fetch(`${inventoryServiceUrl}/products/${update.productId}`, {
-            headers: { Authorization: token, 'Content-Type': 'application/json' },
-          });
-          if (!response.ok) throw new Error(response.statusText);
-          const data = await response.json();
-          product = data.data;
-        } catch (error) {
-          logger.error(`Product validation failed: ${update.productId}`, error);
-          throw new AppError(`Failed to validate product ${update.productId}`, 500);
-        }
-
-        if (!product) throw new AppError(`Product ${update.productId} not found`, 404);
-        if (!product.print_colour)
-          throw new AppError(
-            `Product capability undefined for ${product.serial_no || update.productId}`,
-            400,
-          );
-
-        // Update Item
-        item.productId = update.productId;
-        if (update.initialBwCount !== undefined) item.initialBwCount = update.initialBwCount;
-        if (update.initialBwA3Count !== undefined) item.initialBwA3Count = update.initialBwA3Count;
-
-        if (product.print_colour === 'BLACK_WHITE') {
-          item.initialColorCount = 0;
-        } else {
-          if (update.initialColorCount === undefined) {
-            throw new AppError(`Initial Color reading missing for ${product.serial_no}`, 400);
-          }
-          item.initialColorCount = update.initialColorCount;
-          if (update.initialColorA3Count !== undefined)
-            item.initialColorA3Count = update.initialColorA3Count;
-        }
-
-        // Create Allocation Record
-        await manager.insert(ProductAllocation, {
-          contractId: invoice.id,
-          modelId: item.modelId,
-          productId: update.productId,
-          serialNumber: product.serial_no || 'Unknown',
-          initialBwA4: item.initialBwCount || 0,
-          initialBwA3: item.initialBwA3Count || 0,
-          initialColorA4: item.initialColorCount || 0,
-          initialColorA3: item.initialColorA3Count || 0,
-          currentBwA4: item.initialBwCount || 0,
-          currentBwA3: item.initialBwA3Count || 0,
-          currentColorA4: item.initialColorCount || 0,
-          currentColorA3: item.initialColorA3Count || 0,
-          status: AllocationStatus.ALLOCATED,
-        });
-      }
     }
   }
 
@@ -1039,7 +1122,42 @@ export class BillingService {
     invoice.financeApprovedAt = new Date();
     invoice.financeRemarks = reason;
 
-    return this.invoiceRepo.save(invoice);
+    await this.invoiceRepo.save(invoice);
+
+    // Release any product allocations back to AVAILABLE
+    const allocations = await this.invoiceRepo.manager.find(ProductAllocation, {
+      where: { contractId: invoice.id, status: AllocationStatus.ALLOCATED },
+    });
+
+    if (allocations.length > 0) {
+      // Mark all allocations as RETURNED in our DB
+      await this.invoiceRepo.manager.update(
+        ProductAllocation,
+        { contractId: invoice.id, status: AllocationStatus.ALLOCATED },
+        { status: AllocationStatus.RETURNED },
+      );
+
+      // Emit status-update events so ven_inv_service marks products as AVAILABLE
+      for (const allocation of allocations) {
+        if (!allocation.productId) continue;
+        try {
+          await emitProductStatusUpdate({
+            productId: allocation.productId,
+            billType: 'RETURNED',
+            invoiceId: invoice.id,
+            approvedBy: userId,
+            approvedAt: invoice.financeApprovedAt,
+          });
+        } catch (e) {
+          logger.error('Failed to emit product status update on finance reject', {
+            productId: allocation.productId,
+            error: e,
+          });
+        }
+      }
+    }
+
+    return invoice;
   }
 
   /**
@@ -1076,61 +1194,75 @@ export class BillingService {
    * Retrieves a single invoice by ID.
    */
   async getInvoiceById(id: string) {
-    const invoice = await this.invoiceRepo.findById(id);
-    if (!invoice) {
-      throw new AppError('Invoice not found', 404);
-    }
+    try {
+      const invoice = await this.invoiceRepo.findById(id);
+      if (!invoice) {
+        throw new AppError('Invoice not found', 404);
+      }
 
-    if (
-      (invoice.type === InvoiceType.PROFORMA || invoice.status === InvoiceStatus.ACTIVE_LEASE) &&
-      (invoice.bwA4Count === null || invoice.bwA4Count === undefined)
-    ) {
-      const history = await this.usageRepo.getUsageHistory(invoice.id);
-      const latestUsage = history[0];
-      if (latestUsage) {
-        invoice.bwA4Count = latestUsage.bwA4Count;
-        invoice.bwA3Count = latestUsage.bwA3Count;
-        invoice.colorA4Count = latestUsage.colorA4Count;
-        invoice.colorA3Count = latestUsage.colorA3Count;
-        invoice.billingPeriodStart = latestUsage.billingPeriodStart;
-        invoice.billingPeriodEnd = latestUsage.billingPeriodEnd;
+      if (
+        (invoice.type === InvoiceType.PROFORMA || invoice.status === InvoiceStatus.ACTIVE_LEASE) &&
+        (invoice.bwA4Count === null || invoice.bwA4Count === undefined)
+      ) {
+        const history = await this.usageRepo.getUsageHistory(invoice.id);
+        const latestUsage = history[0];
+        if (latestUsage) {
+          invoice.bwA4Count = latestUsage.bwA4Count;
+          invoice.bwA3Count = latestUsage.bwA3Count;
+          invoice.colorA4Count = latestUsage.colorA4Count;
+          invoice.colorA3Count = latestUsage.colorA3Count;
+          invoice.billingPeriodStart = latestUsage.billingPeriodStart;
+          invoice.billingPeriodEnd = latestUsage.billingPeriodEnd;
 
-        const isFirstMonth = history.length === 1;
-        if (isFirstMonth && invoice.advanceAmount && invoice.advanceAmount > 0) {
-          invoice.advanceAdjusted = invoice.advanceAmount;
+          const isFirstMonth = history.length === 1;
+          if (isFirstMonth && invoice.advanceAmount && invoice.advanceAmount > 0) {
+            invoice.advanceAdjusted = invoice.advanceAmount;
+          }
         }
       }
-    }
 
-    if (
-      invoice.type === InvoiceType.FINAL &&
-      invoice.referenceContractId &&
-      (!invoice.items || !invoice.items.some((i) => i.itemType === ItemType.PRICING_RULE))
-    ) {
-      const contract = await this.invoiceRepo.findById(invoice.referenceContractId);
-      if (contract && contract.items) {
-        const rules = contract.items.filter((i) => i.itemType === ItemType.PRICING_RULE);
-        if (!invoice.items) invoice.items = [];
-        invoice.items.push(...rules);
+      if (
+        invoice.type === InvoiceType.FINAL &&
+        invoice.referenceContractId &&
+        (!invoice.items || !invoice.items.some((i) => i.itemType === ItemType.PRICING_RULE))
+      ) {
+        const contract = await this.invoiceRepo.findById(invoice.referenceContractId);
+        if (contract) {
+          if (contract.items) {
+            const rules = contract.items.filter((i) => i.itemType === ItemType.PRICING_RULE);
+            if (!invoice.items) invoice.items = [];
+            invoice.items.push(...rules);
+          }
+          if (contract.productAllocations) {
+            invoice.productAllocations = contract.productAllocations;
+          }
+        }
       }
+
+      if (invoice.type === InvoiceType.FINAL && invoice.referenceContractId) {
+        (invoice as Invoice & { invoiceHistory?: Invoice[] }).invoiceHistory =
+          await this.invoiceRepo.findFinalInvoicesByContractId(invoice.referenceContractId);
+      } else if (
+        invoice.type === InvoiceType.PROFORMA ||
+        invoice.status === InvoiceStatus.ACTIVE_LEASE
+      ) {
+        (invoice as Invoice & { invoiceHistory?: Invoice[] }).invoiceHistory =
+          await this.invoiceRepo.findFinalInvoicesByContractId(invoice.id);
+
+        const usageHistory = await this.usageRepo.getUsageHistory(invoice.id);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (invoice as Invoice & { usageHistory?: any[] }).usageHistory = usageHistory;
+      }
+
+      return invoice;
+    } catch (error) {
+      logger.error('Error in BillingService.getInvoiceById', {
+        id,
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+      });
+      throw error;
     }
-
-    if (invoice.type === InvoiceType.FINAL && invoice.referenceContractId) {
-      (invoice as Invoice & { invoiceHistory?: Invoice[] }).invoiceHistory =
-        await this.invoiceRepo.findFinalInvoicesByContractId(invoice.referenceContractId);
-    } else if (
-      invoice.type === InvoiceType.PROFORMA ||
-      invoice.status === InvoiceStatus.ACTIVE_LEASE
-    ) {
-      (invoice as Invoice & { invoiceHistory?: Invoice[] }).invoiceHistory =
-        await this.invoiceRepo.findFinalInvoicesByContractId(invoice.id);
-
-      const usageHistory = await this.usageRepo.getUsageHistory(invoice.id);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (invoice as Invoice & { usageHistory?: any[] }).usageHistory = usageHistory;
-    }
-
-    return invoice;
   }
 
   async completeContract(contractId: string) {
@@ -1400,5 +1532,202 @@ export class BillingService {
       body: fullBody,
       invoiceId: contract.id,
     });
+  }
+
+  /**
+   * Replaces a device allocation mid-contract, effectively splitting the allocation timeline
+   * and tracking meter readings correctly so usage is calculated per-allocation window.
+   */
+  async replaceDeviceAllocation(payload: {
+    allocationId: string;
+    replacementTimestamp: string;
+    oldMeter: { bwA4?: number; bwA3?: number; colorA4?: number; colorA3?: number };
+    newProductId: string;
+    newSerialNumber: string;
+    newInitialMeter: { bwA4?: number; bwA3?: number; colorA4?: number; colorA3?: number };
+    reason?: string;
+  }) {
+    const queryRunner = this.invoiceRepo.manager.connection.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      const {
+        allocationId,
+        replacementTimestamp,
+        oldMeter = {},
+        newProductId,
+        newSerialNumber,
+        newInitialMeter = {},
+        reason,
+      } = payload;
+
+      const oldAllocation = await queryRunner.manager.findOne(ProductAllocation, {
+        where: { id: allocationId, status: AllocationStatus.ALLOCATED },
+      });
+
+      if (!oldAllocation) {
+        throw new AppError('Active product allocation not found', 404);
+      }
+
+      // 0. Validate oldMeter reading against the latest usage record for this contract
+      const latestUsageRecord = await queryRunner.manager
+        .getRepository(UsageRecord)
+        .createQueryBuilder('ur')
+        .where('ur.contractId = :contractId', { contractId: oldAllocation.contractId })
+        .orderBy('ur.billingPeriodEnd', 'DESC')
+        .getOne();
+
+      if (latestUsageRecord) {
+        if (oldMeter.bwA4 !== undefined && oldMeter.bwA4 < (latestUsageRecord.bwA4Count || 0)) {
+          throw new AppError(
+            `Old B&W A4 meter (${oldMeter.bwA4}) cannot be lower than previously billed (${latestUsageRecord.bwA4Count})`,
+            400,
+          );
+        }
+        if (oldMeter.bwA3 !== undefined && oldMeter.bwA3 < (latestUsageRecord.bwA3Count || 0)) {
+          throw new AppError(
+            `Old B&W A3 meter (${oldMeter.bwA3}) cannot be lower than previously billed (${latestUsageRecord.bwA3Count})`,
+            400,
+          );
+        }
+        if (
+          oldMeter.colorA4 !== undefined &&
+          oldMeter.colorA4 < (latestUsageRecord.colorA4Count || 0)
+        ) {
+          throw new AppError(
+            `Old Color A4 meter (${oldMeter.colorA4}) cannot be lower than previously billed (${latestUsageRecord.colorA4Count})`,
+            400,
+          );
+        }
+        if (
+          oldMeter.colorA3 !== undefined &&
+          oldMeter.colorA3 < (latestUsageRecord.colorA3Count || 0)
+        ) {
+          throw new AppError(
+            `Old Color A3 meter (${oldMeter.colorA3}) cannot be lower than previously billed (${latestUsageRecord.colorA3Count})`,
+            400,
+          );
+        }
+      }
+
+      const ts = new Date(replacementTimestamp);
+
+      // 1. Close old allocation
+      oldAllocation.endTimestamp = ts;
+      oldAllocation.status = AllocationStatus.REPLACED;
+      oldAllocation.replacementReason = reason;
+      oldAllocation.currentBwA4 =
+        oldMeter.bwA4 !== undefined ? oldMeter.bwA4 : oldAllocation.currentBwA4;
+      oldAllocation.currentBwA3 =
+        oldMeter.bwA3 !== undefined ? oldMeter.bwA3 : oldAllocation.currentBwA3;
+      oldAllocation.currentColorA4 =
+        oldMeter.colorA4 !== undefined ? oldMeter.colorA4 : oldAllocation.currentColorA4;
+      oldAllocation.currentColorA3 =
+        oldMeter.colorA3 !== undefined ? oldMeter.colorA3 : oldAllocation.currentColorA3;
+      await queryRunner.manager.save(ProductAllocation, oldAllocation);
+
+      // 2. Record final meter reading for old device
+      const oldReading = queryRunner.manager.create(DeviceMeterReading, {
+        serialNumber: oldAllocation.serialNumber,
+        timestamp: ts,
+        bwA4: oldMeter.bwA4 || 0,
+        bwA3: oldMeter.bwA3 || 0,
+        colorA4: oldMeter.colorA4 || 0,
+        colorA3: oldMeter.colorA3 || 0,
+        source: ReadingSource.MANUAL, // ReadingSource enum handles this
+        invoiceId: oldAllocation.contractId,
+      });
+      await queryRunner.manager.save(DeviceMeterReading, oldReading);
+
+      // 3. Create new allocation
+      const newAllocation = queryRunner.manager.create(ProductAllocation, {
+        contractId: oldAllocation.contractId,
+        modelId: oldAllocation.modelId,
+        productId: newProductId,
+        serialNumber: newSerialNumber,
+        status: AllocationStatus.ALLOCATED,
+        startTimestamp: ts,
+        initialBwA4: newInitialMeter.bwA4 || 0,
+        initialBwA3: newInitialMeter.bwA3 || 0,
+        initialColorA4: newInitialMeter.colorA4 || 0,
+        initialColorA3: newInitialMeter.colorA3 || 0,
+        currentBwA4: newInitialMeter.bwA4 || 0,
+        currentBwA3: newInitialMeter.bwA3 || 0,
+        currentColorA4: newInitialMeter.colorA4 || 0,
+        currentColorA3: newInitialMeter.colorA3 || 0,
+        replacementOfAllocationId: oldAllocation.id,
+      });
+      await queryRunner.manager.save(ProductAllocation, newAllocation);
+
+      // 4. Record initial meter reading for new device
+      const newReading = queryRunner.manager.create(DeviceMeterReading, {
+        serialNumber: newSerialNumber,
+        timestamp: ts,
+        bwA4: newInitialMeter.bwA4 || 0,
+        bwA3: newInitialMeter.bwA3 || 0,
+        colorA4: newInitialMeter.colorA4 || 0,
+        colorA3: newInitialMeter.colorA3 || 0,
+        source: ReadingSource.MANUAL,
+        invoiceId: oldAllocation.contractId,
+      });
+      await queryRunner.manager.save(DeviceMeterReading, newReading);
+
+      // Fetch invoice for updating InvoiceItems
+      const invoice = await queryRunner.manager.findOne(Invoice, {
+        where: { id: oldAllocation.contractId },
+        relations: ['items'],
+      });
+
+      if (invoice && invoice.items) {
+        // Find the item that matches the old product
+        const itemIndex = invoice.items.findIndex((i) => i.productId === oldAllocation.productId);
+        if (itemIndex !== -1) {
+          const item = invoice.items[itemIndex];
+          item.productId = newProductId;
+          // Note: serialNumber is not a property of InvoiceItem, we only update productId and modelId
+          // If the new product has a different model, update it
+          item.modelId = oldAllocation.modelId; // Assuming model stays same for now, but we can update if needed
+          // Description might need update if it contains the old Serial Number
+          if (item.description.includes(oldAllocation.serialNumber)) {
+            item.description = item.description.replace(
+              oldAllocation.serialNumber,
+              newSerialNumber,
+            );
+          }
+          await queryRunner.manager.save(InvoiceItem, item);
+        }
+      }
+
+      await queryRunner.commitTransaction();
+
+      // Emit events to update inventory status (Return old, Allocate new)
+      // We do this AFTER commit to ensure database consistency
+      if (oldAllocation.productId) {
+        emitProductStatusUpdate({
+          productId: oldAllocation.productId,
+          billType: 'RETURNED',
+          invoiceId: oldAllocation.contractId,
+          approvedBy: 'SYSTEM',
+          approvedAt: ts,
+        }).catch((err) => logger.error('Failed to emit RETURNED event', err));
+      }
+      if (newAllocation.productId) {
+        emitProductStatusUpdate({
+          productId: newAllocation.productId,
+          billType: invoice?.saleType === 'LEASE' ? 'LEASE' : 'RENT',
+          invoiceId: newAllocation.contractId,
+          approvedBy: 'SYSTEM',
+          approvedAt: ts,
+        }).catch((err) => logger.error('Failed to emit LEASE/RENT event', err));
+      }
+
+      return newAllocation;
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      throw error;
+    } finally {
+      await queryRunner.release();
+    }
   }
 }

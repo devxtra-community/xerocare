@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Search, Plus, Trash2, X } from 'lucide-react';
+import { Search, Plus, Trash2, Building2, Copy, Check } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -45,7 +45,7 @@ type BranchFormData = {
   location: string;
   started_date: string;
   status: 'ACTIVE' | 'INACTIVE';
-  manager_id: string;
+  manager_id?: string | null;
 };
 
 const formatDate = (dateString: string) => {
@@ -70,6 +70,8 @@ export default function BranchReport() {
   const [formOpen, setFormOpen] = useState(false);
   const [editingBranch, setEditingBranch] = useState<Branch | null>(null);
   const [branchToDelete, setBranchToDelete] = useState<Branch | null>(null);
+  const [selectedBranch, setSelectedBranch] = useState<Branch | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
   const user = getUserFromToken();
   const isAdmin = user?.role === 'ADMIN';
@@ -97,7 +99,8 @@ export default function BranchReport() {
     }
   };
 
-  const getManagerName = (managerId: string) => {
+  const getManagerName = (managerId?: string | null) => {
+    if (!managerId) return 'Unassigned';
     const manager = managers.find((m) => m.id === managerId);
     return manager ? `${manager.first_name} ${manager.last_name}` : 'Unassigned';
   };
@@ -116,6 +119,7 @@ export default function BranchReport() {
 
   const handleSave = async (data: BranchFormData) => {
     try {
+      setSubmitting(true);
       if (editingBranch) {
         const res = await updateBranch(editingBranch.id, {
           name: data.name,
@@ -152,6 +156,8 @@ export default function BranchReport() {
           ? (error as { response?: { data?: { message?: string } } }).response?.data?.message
           : undefined;
       toast.error(message || 'Failed to save branch');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -255,7 +261,14 @@ export default function BranchReport() {
             <TableBody>
               {filtered.map((b, i) => (
                 <TableRow key={b.id} className={i % 2 ? 'bg-blue-50/20' : 'bg-card'}>
-                  <TableCell className="px-4 font-medium">{b.name}</TableCell>
+                  <TableCell className="px-4 font-medium">
+                    <button
+                      className="text-primary hover:underline text-left font-medium"
+                      onClick={() => setSelectedBranch(b)}
+                    >
+                      {b.name}
+                    </button>
+                  </TableCell>
                   <TableCell className="px-4">{b.address}</TableCell>
                   <TableCell className="px-4">{b.location}</TableCell>
                   <TableCell className="px-4">
@@ -310,6 +323,7 @@ export default function BranchReport() {
         <BranchFormModal
           initialData={editingBranch}
           managers={managers}
+          isSubmitting={submitting}
           onClose={() => setFormOpen(false)}
           onConfirm={handleSave}
         />
@@ -323,6 +337,14 @@ export default function BranchReport() {
           onConfirm={confirmDelete}
         />
       )}
+
+      {selectedBranch && (
+        <BranchDetailModal
+          branch={selectedBranch}
+          managerName={getManagerName(selectedBranch.manager_id)}
+          onClose={() => setSelectedBranch(null)}
+        />
+      )}
     </div>
   );
 }
@@ -330,11 +352,13 @@ export default function BranchReport() {
 function BranchFormModal({
   initialData,
   managers,
+  isSubmitting,
   onClose,
   onConfirm,
 }: {
   initialData: Branch | null;
   managers: Employee[];
+  isSubmitting: boolean;
   onClose: () => void;
   onConfirm: (data: BranchFormData) => void;
 }) {
@@ -362,16 +386,10 @@ function BranchFormModal({
   return (
     <Dialog open={true} onOpenChange={(val) => !val && onClose()}>
       <DialogContent className="sm:max-w-xl">
-        <DialogHeader>
-          <DialogTitle className="text-2xl font-bold text-primary">
+        <DialogHeader className="flex flex-row items-center justify-between pb-2 border-b">
+          <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-primary to-blue-600 bg-clip-text text-transparent">
             {initialData ? 'Update Branch' : 'Add Branch'}
           </DialogTitle>
-          <button
-            onClick={onClose}
-            className="h-7 w-7 flex items-center justify-center rounded-full border text-muted-foreground hover:text-gray-800"
-          >
-            <X size={14} />
-          </button>
         </DialogHeader>
 
         <div className="space-y-4">
@@ -380,6 +398,7 @@ function BranchFormModal({
               placeholder="Full name"
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
+              className="h-11 rounded-xl bg-card border shadow-sm focus-visible:ring-2 focus-visible:ring-primary/20"
             />
           </Field>
 
@@ -400,26 +419,33 @@ function BranchFormModal({
               placeholder="City / Area"
               value={form.location}
               onChange={(e) => setForm({ ...form, location: e.target.value })}
+              className="h-11 rounded-xl bg-card border shadow-sm focus-visible:ring-2 focus-visible:ring-primary/20"
             />
           </Field>
 
           <Field label="Started Date">
             <Input
               type="date"
-              value={form.started_date}
+              value={form.started_date ? form.started_date.split('T')[0] : ''}
               onChange={(e) => setForm({ ...form, started_date: e.target.value })}
+              className="h-11 rounded-xl bg-card border shadow-sm focus-visible:ring-2 focus-visible:ring-primary/20"
             />
           </Field>
 
           <Field label="Assign Manager">
             <Select
-              value={form.manager_id}
-              onValueChange={(value) => setForm({ ...form, manager_id: value })}
+              value={form.manager_id || 'unassigned'}
+              onValueChange={(value) =>
+                setForm({ ...form, manager_id: value === 'unassigned' ? null : value })
+              }
             >
-              <SelectTrigger className="w-full">
+              <SelectTrigger className="w-full h-11 rounded-xl bg-card border shadow-sm">
                 <SelectValue placeholder="Select manager" />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="unassigned" className="text-muted-foreground italic">
+                  Not Assigned
+                </SelectItem>
                 {managers.map((manager) => (
                   <SelectItem
                     key={manager.id}
@@ -440,7 +466,7 @@ function BranchFormModal({
                 setForm({ ...form, status: value as 'ACTIVE' | 'INACTIVE' })
               }
             >
-              <SelectTrigger className="w-full">
+              <SelectTrigger className="w-full h-11 rounded-xl bg-card border shadow-sm">
                 <SelectValue placeholder="Select status" />
               </SelectTrigger>
               <SelectContent>
@@ -462,8 +488,9 @@ function BranchFormModal({
           <Button
             className="rounded-full px-6 bg-primary hover:bg-primary/90 text-white"
             onClick={() => onConfirm(form)}
+            disabled={isSubmitting}
           >
-            Confirm
+            {isSubmitting ? 'Processing...' : 'Confirm'}
           </Button>
         </div>
       </DialogContent>
@@ -519,10 +546,126 @@ function ConfirmDeleteModal({
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="space-y-2">
-      <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+      <label className="text-xs font-semibold text-slate-500 uppercase tracking-tight">
         {label}
       </label>
       {children}
+    </div>
+  );
+}
+
+function BranchDetailModal({
+  branch,
+  managerName,
+  onClose,
+}: {
+  branch: Branch;
+  managerName: string;
+  onClose: () => void;
+}) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(branch.id);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const formatDate = (dateString: string) =>
+    new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    });
+
+  return (
+    <Dialog open={true} onOpenChange={(val) => !val && onClose()}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader className="pb-4 border-b">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
+              <Building2 className="h-5 w-5 text-primary" />
+            </div>
+            <div>
+              <DialogTitle className="text-xl font-bold text-primary">{branch.name}</DialogTitle>
+              <p className="text-xs text-slate-400 mt-0.5">Branch Details</p>
+            </div>
+          </div>
+        </DialogHeader>
+
+        <div className="space-y-4 py-2">
+          {/* Branch ID */}
+          <div className="rounded-xl bg-slate-50 border border-slate-200 p-3">
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+              Branch ID
+            </p>
+            <div className="flex items-center gap-2">
+              <code className="text-xs font-mono text-slate-700 flex-1 truncate">{branch.id}</code>
+              <button
+                onClick={handleCopy}
+                className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 transition-colors"
+                title="Copy ID"
+              >
+                {copied ? (
+                  <>
+                    <Check className="h-3.5 w-3.5" /> Copied
+                  </>
+                ) : (
+                  <>
+                    <Copy className="h-3.5 w-3.5" /> Copy
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+
+          {/* Detail grid */}
+          <div className="grid grid-cols-2 gap-3">
+            <DetailField label="Address" value={branch.address} fullWidth />
+            <DetailField label="Location" value={branch.location} />
+            <DetailField label="Manager" value={managerName} />
+            <DetailField label="Started Date" value={formatDate(branch.started_date)} />
+            <DetailField
+              label="Status"
+              value={
+                <span
+                  className={`px-2.5 py-1 rounded-full text-xs font-semibold ${
+                    branch.status === 'ACTIVE'
+                      ? 'bg-success/10 text-success'
+                      : 'bg-danger/10 text-danger'
+                  }`}
+                >
+                  {branch.status}
+                </span>
+              }
+            />
+            <DetailField label="Created At" value={formatDate(branch.created_at)} />
+          </div>
+        </div>
+
+        <div className="flex justify-end pt-2 border-t">
+          <Button className="rounded-full px-6" onClick={onClose}>
+            Close
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function DetailField({
+  label,
+  value,
+  fullWidth,
+}: {
+  label: string;
+  value: React.ReactNode;
+  fullWidth?: boolean;
+}) {
+  return (
+    <div className={fullWidth ? 'col-span-2' : ''}>
+      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">{label}</p>
+      <p className="text-sm text-foreground font-medium">{value}</p>
     </div>
   );
 }

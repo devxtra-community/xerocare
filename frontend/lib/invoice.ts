@@ -35,7 +35,9 @@ export interface Invoice {
   createdBy: string;
   totalAmount: number;
   status: string;
-  contractStatus?: 'ACTIVE' | 'COMPLETED' | 'CANCELLED';
+  contractStatus?: 'PENDING_CONFIRMATION' | 'ACTIVE' | 'COMPLETED' | 'CANCELLED';
+  contractConfirmationUrl?: string;
+  emailSentAt?: string;
   type?: 'QUOTATION' | 'PROFORMA' | 'FINAL';
   saleType: string;
   rentType?: 'FIXED_LIMIT' | 'FIXED_COMBO' | 'FIXED_FLAT' | 'CPC' | 'CPC_COMBO';
@@ -91,6 +93,22 @@ export interface Invoice {
   grossAmount?: number;
   displayAmount?: number; // Backend aggregated lifetime total
   invoiceHistory?: Invoice[];
+  productAllocations?: Array<{
+    id: string;
+    productId: string;
+    modelId: string;
+    serialNumber: string;
+    status: string;
+    replacementOfAllocationId?: string;
+    initialBwA4?: number;
+    initialBwA3?: number;
+    initialColorA4?: number;
+    initialColorA3?: number;
+    currentBwA4?: number;
+    currentBwA3?: number;
+    currentColorA4?: number;
+    currentColorA3?: number;
+  }>;
 }
 
 export interface UsageRecord {
@@ -117,6 +135,9 @@ export interface UsageRecord {
   colorA3Count: number;
   remarks?: string;
   advanceAdjusted?: number;
+  discountAmount?: number;
+  discountBwCopies?: number;
+  discountColorCopies?: number;
   // Extended pricing details for UI breakdown
   rentType?: string;
   bwFreeLimit?: number;
@@ -125,6 +146,25 @@ export interface UsageRecord {
   bwExcessRate?: number;
   colorExcessRate?: number;
   combinedExcessRate?: number;
+  items?: Array<{
+    allocationId: string;
+    allocation?: {
+      serialNumber: string;
+      modelId: string;
+    };
+    startBwA4: number;
+    endBwA4: number;
+    deltaBwA4: number;
+    startBwA3: number;
+    endBwA3: number;
+    deltaBwA3: number;
+    startColorA4: number;
+    endColorA4: number;
+    deltaColorA4: number;
+    startColorA3: number;
+    endColorA3: number;
+    deltaColorA3: number;
+  }>;
 }
 
 /**
@@ -230,6 +270,33 @@ export const updateQuotation = async (
 };
 
 /**
+ * Replaces a device allocation mid-contract.
+ */
+export const replaceDeviceAllocation = async (payload: {
+  contractId: string;
+  allocationId: string;
+  newProductId?: string;
+  newSerialNumber: string;
+  replacementTimestamp: string;
+  reason: string;
+  oldMeter: {
+    bwA4?: number;
+    bwA3?: number;
+    colorA4?: number;
+    colorA3?: number;
+  };
+  newInitialMeter: {
+    bwA4?: number;
+    bwA3?: number;
+    colorA4?: number;
+    colorA3?: number;
+  };
+}): Promise<void> => {
+  const response = await api.post(`/b/invoices/allocations/replace`, payload);
+  return response.data.data;
+};
+
+/**
  * Approves a quotation and handles security deposit recording.
  * @param invoiceId The ID of the quotation to approve
  * @param deposit Optional deposit information
@@ -248,6 +315,17 @@ export const approveQuotation = async (
 };
 
 /**
+ * Approves an invoice from finance perspective.
+ */
+export const financeApproveInvoice = async (
+  invoiceId: string,
+  payload?: Record<string, unknown>,
+): Promise<Invoice> => {
+  const response = await api.put(`/b/invoices/${invoiceId}/approve`, payload);
+  return response.data.data;
+};
+
+/**
  * Marks an invoice as approved by the employee.
  */
 export const employeeApproveInvoice = async (id: string): Promise<Invoice> => {
@@ -256,13 +334,47 @@ export const employeeApproveInvoice = async (id: string): Promise<Invoice> => {
 };
 
 /**
- * Performs final finance approval for an invoice, including initial meter readings.
+ * Step 1: Finance allocates machines.
  * @param id The ID of the invoice
- * @param payload Approval data including deposit and item updates
+ * @param payload Allocation data
  */
-export const financeApproveInvoice = async (
+export const allocateMachinesInvoice = async (
   id: string,
   payload: {
+    itemUpdates?: {
+      id: string;
+      productId: string;
+    }[];
+  },
+): Promise<Invoice> => {
+  const response = await api.post(`/b/invoices/${id}/allocate-machines`, payload);
+  return response.data.data;
+};
+
+export const uploadContractConfirmationInvoice = async (
+  id: string,
+  file: File,
+): Promise<{ url: string }> => {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const response = await api.post(`/b/invoices/${id}/upload-confirmation`, formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  });
+  return response.data.data;
+};
+
+/**
+ * Step 2: Finance activates the contract after confirmation document is uploaded.
+ * @param id The ID of the invoice
+ * @param payload Activation data including confirmation URL, deposit and initial readings
+ */
+export const activateContractInvoice = async (
+  id: string,
+  payload: {
+    contractConfirmationUrl: string;
     deposit?: {
       amount: number;
       mode: 'CASH' | 'CHEQUE' | 'UPI' | 'BANK_TRANSFER';
@@ -271,7 +383,6 @@ export const financeApproveInvoice = async (
     };
     itemUpdates?: {
       id: string;
-      productId: string;
       initialBwCount?: number;
       initialBwA3Count?: number;
       initialColorCount?: number;
@@ -279,7 +390,7 @@ export const financeApproveInvoice = async (
     }[];
   },
 ): Promise<Invoice> => {
-  const response = await api.post(`/b/invoices/${id}/finance-approve`, payload);
+  const response = await api.post(`/b/invoices/${id}/activate-contract`, payload);
   return response.data.data;
 };
 
@@ -573,6 +684,11 @@ export const updateUsageRecord = async (
     colorA4Count: number;
     colorA3Count: number;
     billingPeriodEnd?: string;
+    discountAmount?: number;
+    discountBwCopies?: number;
+    discountColorCopies?: number;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    items?: any[];
   },
 ): Promise<unknown> => {
   const response = await api.put(`/b/usage/${usageId}`, payload);

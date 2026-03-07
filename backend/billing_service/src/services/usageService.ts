@@ -1,7 +1,7 @@
 import { UsageRepository } from '../repositories/usageRepository';
 import { InvoiceRepository } from '../repositories/invoiceRepository';
 import { AppError } from '../errors/appError';
-import { ReportedBy } from '../entities/usageRecordEntity';
+import { ReportedBy, UsageRecord } from '../entities/usageRecordEntity';
 import { InvoiceType } from '../entities/enums/invoiceType';
 import { ContractStatus } from '../entities/enums/contractStatus';
 import { InvoiceStatus } from '../entities/enums/invoiceStatus';
@@ -13,6 +13,8 @@ import { logger } from '../config/logger';
 import { SaleType } from '../entities/enums/saleType';
 import { ProductAllocation, AllocationStatus } from '../entities/productAllocationEntity';
 import { emitProductStatusUpdate } from '../events/publisher/productStatusEvent';
+import { UsageRecordItem } from '../entities/usageRecordItemEntity';
+import { MoreThanOrEqual } from 'typeorm';
 
 export class UsageService {
   private usageRepo = new UsageRepository();
@@ -30,10 +32,15 @@ export class UsageService {
     bwA3Count: number;
     colorA4Count: number;
     colorA3Count: number;
+    discountBwCopies?: number;
+    discountColorCopies?: number;
+    discountAmount?: number;
 
     meterImageUrl?: string;
     reportedBy?: 'CUSTOMER' | 'EMPLOYEE';
     remarks?: string;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    items?: any[];
   }) {
     // 1. Fetch Contract
     const contract = await this.invoiceRepo.findById(payload.contractId);
@@ -88,32 +95,193 @@ export class UsageService {
     }
     const rule = pricingRules[0]; // Assuming single rule for now
 
-    // 3. Previous Readings for Delta Calculation (Already fetched history above)
+    // 3. Previous Readings & Allocations for Delta Calculation
     const previousRecord = history.length > 0 ? history[0] : null;
 
-    let prevBwA4 = 0;
-    let prevBwA3 = 0;
-    let prevColorA4 = 0;
-    let prevColorA3 = 0;
-
+    let previousItems: UsageRecordItem[] = [];
     if (previousRecord) {
-      prevBwA4 = previousRecord.bwA4Count;
-      prevBwA3 = previousRecord.bwA3Count;
-      prevColorA4 = previousRecord.colorA4Count;
-      prevColorA3 = previousRecord.colorA3Count;
-    } else {
-      // First Month Logic: Use initial counts from contract items
-      prevBwA4 = rule?.initialBwCount || 0;
-      prevBwA3 = 0; // Assuming initial counts are A4 equivalent or A4 only
-      prevColorA4 = rule?.initialColorCount || 0;
-      prevColorA3 = 0;
+      previousItems = await this.invoiceRepo.manager.find(UsageRecordItem, {
+        where: { usageRecordId: previousRecord.id },
+      });
     }
 
-    // 4. Calculate Deltas (Monthly Consumption)
-    const bwA4Delta = payload.bwA4Count - prevBwA4;
-    const bwA3Delta = payload.bwA3Count - prevBwA3;
-    const colorA4Delta = payload.colorA4Count - prevColorA4;
-    const colorA3Delta = payload.colorA3Count - prevColorA3;
+    // Fetch Overlapping Allocations for this billing period
+    const overlappingAllocations = await this.invoiceRepo.manager.find(ProductAllocation, {
+      where: [
+        { contractId: payload.contractId, status: AllocationStatus.ALLOCATED },
+        {
+          contractId: payload.contractId,
+          status: AllocationStatus.REPLACED,
+          endTimestamp: MoreThanOrEqual(new Date(payload.billingPeriodStart)),
+        },
+      ],
+    });
+
+    let bwA4Delta = 0;
+    let bwA3Delta = 0;
+    let colorA4Delta = 0;
+    let colorA3Delta = 0;
+
+    let totalEndBwA4 = 0;
+    let totalEndBwA3 = 0;
+    let totalEndColorA4 = 0;
+    let totalEndColorA3 = 0;
+
+    const usageItemsToSave: Partial<UsageRecordItem>[] = [];
+
+    // PER-ALLOCATION DELTA CALCULATION
+    if (overlappingAllocations.length > 0) {
+      for (const alloc of overlappingAllocations) {
+        let startBwA4 = 0,
+          startBwA3 = 0,
+          startColorA4 = 0,
+          startColorA3 = 0;
+        let endBwA4 = 0,
+          endBwA3 = 0,
+          endColorA4 = 0,
+          endColorA3 = 0;
+
+        const prevItem = previousItems.find((i) => i.allocationId === alloc.id);
+
+        if (prevItem) {
+          startBwA4 = prevItem.endBwA4;
+          startBwA3 = prevItem.endBwA3;
+          startColorA4 = prevItem.endColorA4;
+          startColorA3 = prevItem.endColorA3;
+        } else if (
+          previousRecord &&
+          new Date(alloc.startTimestamp) < new Date(payload.billingPeriodStart)
+        ) {
+          // Legacy fallback: device was active in previous period, but per-unit items are missing.
+          // Fallback to the current captured reading on the allocation if it looks reasonable (e.g. less than current reading)
+          // Otherwise use initial. Using previousRecord.bwA4Count is dangerous for multi-machine contracts.
+          startBwA4 = alloc.initialBwA4 || 0;
+          startBwA3 = alloc.initialBwA3 || 0;
+          startColorA4 = alloc.initialColorA4 || 0;
+          startColorA3 = alloc.initialColorA3 || 0;
+
+          // Optimization: If this machine has 'current' counts from a previous internal record, use them
+          if (alloc.currentBwA4 > alloc.initialBwA4) startBwA4 = alloc.currentBwA4;
+          if (alloc.currentBwA3 > alloc.initialBwA3) startBwA3 = alloc.currentBwA3;
+          if (alloc.currentColorA4 > alloc.initialColorA4) startColorA4 = alloc.currentColorA4;
+          if (alloc.currentColorA3 > alloc.initialColorA3) startColorA3 = alloc.currentColorA3;
+        } else {
+          // Replacement device OR brand-new allocation: start from its own initial reading
+          startBwA4 = alloc.initialBwA4 || 0;
+          startBwA3 = alloc.initialBwA3 || 0;
+          startColorA4 = alloc.initialColorA4 || 0;
+          startColorA3 = alloc.initialColorA3 || 0;
+        }
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const payloadItem = payload.items?.find((i: any) => i.allocationId === alloc.id);
+
+        if (alloc.status === AllocationStatus.REPLACED) {
+          // Replaced machines are now settled at the time of replacement.
+          // We exclude them from the regular monthly billing delta.
+          endBwA4 = alloc.currentBwA4 || startBwA4;
+          endBwA3 = alloc.currentBwA3 || startBwA3;
+          endColorA4 = alloc.currentColorA4 || startColorA4;
+          endColorA3 = alloc.currentColorA3 || startColorA3;
+        } else {
+          // Currently active allocation
+          // FIX: If we have multiple machines, we MUST NOT fallback to the total payload count
+          // unless this is the ONLY machine or specifically matched.
+          const isOnlyMachine =
+            overlappingAllocations.filter((a) => a.status === AllocationStatus.ALLOCATED).length ===
+            1;
+
+          if (payloadItem) {
+            endBwA4 = payloadItem.endBwA4;
+            endBwA3 = payloadItem.endBwA3;
+            endColorA4 = payloadItem.endColorA4;
+            endColorA3 = payloadItem.endColorA3;
+          } else if (isOnlyMachine) {
+            // Fallback only if it's the single active machine
+            endBwA4 = payload.bwA4Count;
+            endBwA3 = payload.bwA3Count;
+            endColorA4 = payload.colorA4Count;
+            endColorA3 = payload.colorA3Count;
+          } else {
+            // Multi-machine contract but no specific reading for this machine:
+            // Default to NO usage (end = start) to prevent duplication.
+            endBwA4 = startBwA4;
+            endBwA3 = startBwA3;
+            endColorA4 = startColorA4;
+            endColorA3 = startColorA3;
+          }
+
+          // Pre-emptively update current reading on the allocation itself
+          alloc.currentBwA4 = endBwA4;
+          alloc.currentBwA3 = endBwA3;
+          alloc.currentColorA4 = endColorA4;
+          alloc.currentColorA3 = endColorA3;
+          await this.invoiceRepo.manager.save(ProductAllocation, alloc);
+        }
+
+        const dBwA4 = Math.max(0, endBwA4 - startBwA4);
+        const dBwA3 = Math.max(0, endBwA3 - startBwA3);
+        const dColorA4 = Math.max(0, endColorA4 - startColorA4);
+        const dColorA3 = Math.max(0, endColorA3 - startColorA3);
+
+        bwA4Delta += dBwA4;
+        bwA3Delta += dBwA3;
+        colorA4Delta += dColorA4;
+        colorA3Delta += dColorA3;
+
+        totalEndBwA4 += endBwA4;
+        totalEndBwA3 += endBwA3;
+        totalEndColorA4 += endColorA4;
+        totalEndColorA3 += endColorA3;
+
+        usageItemsToSave.push({
+          allocation: { id: alloc.id } as ProductAllocation,
+          periodStart: new Date(payload.billingPeriodStart),
+          periodEnd: new Date(payload.billingPeriodEnd),
+          startBwA4,
+          startBwA3,
+          startColorA4,
+          startColorA3,
+          endBwA4,
+          endBwA3,
+          endColorA4,
+          endColorA3,
+          deltaBwA4: dBwA4,
+          deltaBwA3: dBwA3,
+          deltaColorA4: dColorA4,
+          deltaColorA3: dColorA3,
+        });
+      }
+    } else {
+      // Legacy / No Allocations Fallback
+      let prevBwA4 = 0;
+      let prevBwA3 = 0;
+      let prevColorA4 = 0;
+      let prevColorA3 = 0;
+
+      if (previousRecord) {
+        prevBwA4 = previousRecord.bwA4Count;
+        prevBwA3 = previousRecord.bwA3Count;
+        prevColorA4 = previousRecord.colorA4Count;
+        prevColorA3 = previousRecord.colorA3Count;
+      } else {
+        if (contract.items) {
+          for (const item of contract.items) {
+            if (item.itemType === 'PRODUCT' || item.productId) {
+              prevBwA4 += item.initialBwCount || 0;
+              prevBwA3 += item.initialBwA3Count || 0;
+              prevColorA4 += item.initialColorCount || 0;
+              prevColorA3 += item.initialColorA3Count || 0;
+            }
+          }
+        }
+      }
+
+      bwA4Delta = Math.max(0, payload.bwA4Count - prevBwA4);
+      bwA3Delta = Math.max(0, payload.bwA3Count - prevBwA3);
+      colorA4Delta = Math.max(0, payload.colorA4Count - prevColorA4);
+      colorA3Delta = Math.max(0, payload.colorA3Count - prevColorA3);
+    }
 
     // 5. Backend Validations
     const isSimplifiedLease =
@@ -138,8 +306,9 @@ export class UsageService {
     }
 
     // 6. Normalize Monthly Usage (DELTA BASED)
-    const monthlyBw = bwA4Delta + bwA3Delta * 2;
-    const monthlyColor = colorA4Delta + colorA3Delta * 2;
+    // We calculate based on full usage; discount is applied to the charge later.
+    const monthlyBw = Math.max(0, bwA4Delta + bwA3Delta * 2);
+    const monthlyColor = Math.max(0, colorA4Delta + colorA3Delta * 2);
     const monthlyNormalized = monthlyBw + monthlyColor;
 
     // 7. Calculate Exceeded & Charges (BACKEND SOURCE OF TRUTH)
@@ -163,7 +332,11 @@ export class UsageService {
         exceededTotal = Math.max(0, totalMonthly - combinedLimit);
         exceededCharge = exceededTotal * Number(rule.combinedExcessRate || rule.bwExcessRate || 0);
       } else if (contract.rentType === 'CPC' || contract.rentType === 'CPC_COMBO') {
-        exceededTotal = monthlyNormalized;
+        // For exceeded total count, we show the net (after discount) copies
+        exceededTotal = Math.max(
+          0,
+          monthlyNormalized - (payload.discountBwCopies || 0) - (payload.discountColorCopies || 0),
+        );
         const bwCharge = this.calculateSlabCharge(monthlyBw, rule.bwSlabRanges);
         const colorCharge = this.calculateSlabCharge(monthlyColor, rule.colorSlabRanges);
         const comboCharge = this.calculateSlabCharge(monthlyNormalized, rule.comboSlabRanges);
@@ -174,6 +347,10 @@ export class UsageService {
             ? comboCharge
             : bwCharge + colorCharge;
       }
+    }
+
+    if (payload.discountAmount && payload.discountAmount > 0) {
+      exceededCharge = Math.max(0, exceededCharge - payload.discountAmount);
     }
 
     // 8. Determine Rent & Final Month Logic
@@ -231,10 +408,10 @@ export class UsageService {
           contract: { id: payload.contractId } as any,
           billingPeriodStart: new Date(payload.billingPeriodStart),
           billingPeriodEnd: new Date(payload.billingPeriodEnd),
-          bwA4Count: payload.bwA4Count,
-          bwA3Count: payload.bwA3Count,
-          colorA4Count: payload.colorA4Count,
-          colorA3Count: payload.colorA3Count,
+          bwA4Count: totalEndBwA4 || payload.bwA4Count,
+          bwA3Count: totalEndBwA3 || payload.bwA3Count,
+          colorA4Count: totalEndColorA4 || payload.colorA4Count,
+          colorA3Count: totalEndColorA3 || payload.colorA3Count,
           bwA4Delta,
           bwA3Delta,
           colorA4Delta,
@@ -247,8 +424,21 @@ export class UsageService {
           advanceAdjusted, // Store Advance Used
           totalCharge: monthlyRent + exceededCharge - advanceAdjusted, // Store ACTUAL PAYABLE charge
           exceededTotal,
+          discountBwCopies: payload.discountBwCopies || 0,
+          discountColorCopies: payload.discountColorCopies || 0,
+          discountAmount: payload.discountAmount || 0,
         });
         await queryRunner.manager.save(usage);
+
+        if (usageItemsToSave.length > 0) {
+          const itemsToCreate = usageItemsToSave.map((item) =>
+            queryRunner.manager.create(UsageRecordItem, {
+              ...item,
+              usageRecord: { id: usage.id } as UsageRecord,
+            }),
+          );
+          await queryRunner.manager.save(UsageRecordItem, itemsToCreate);
+        }
 
         await queryRunner.commitTransaction();
 
@@ -306,10 +496,10 @@ export class UsageService {
         contract: { id: payload.contractId } as any,
         billingPeriodStart: new Date(payload.billingPeriodStart),
         billingPeriodEnd: new Date(payload.billingPeriodEnd),
-        bwA4Count: payload.bwA4Count,
-        bwA3Count: payload.bwA3Count,
-        colorA4Count: payload.colorA4Count,
-        colorA3Count: payload.colorA3Count,
+        bwA4Count: totalEndBwA4 || payload.bwA4Count,
+        bwA3Count: totalEndBwA3 || payload.bwA3Count,
+        colorA4Count: totalEndColorA4 || payload.colorA4Count,
+        colorA3Count: totalEndColorA3 || payload.colorA3Count,
         bwA4Delta,
         bwA3Delta,
         colorA4Delta,
@@ -321,8 +511,21 @@ export class UsageService {
         monthlyRent,
         totalCharge,
         exceededTotal,
+        discountBwCopies: payload.discountBwCopies || 0,
+        discountColorCopies: payload.discountColorCopies || 0,
+        discountAmount: payload.discountAmount || 0,
       });
       await this.usageRepo.save(usage);
+
+      if (usageItemsToSave.length > 0) {
+        const itemsToCreate = usageItemsToSave.map((item) =>
+          this.invoiceRepo.manager.create(UsageRecordItem, {
+            ...item,
+            usageRecord: { id: usage.id } as UsageRecord,
+          }),
+        );
+        await this.invoiceRepo.manager.save(UsageRecordItem, itemsToCreate);
+      }
 
       // Return next period for UI convenience
       const nextPeriod = this.calculateNextPeriod(contract, new Date(payload.billingPeriodEnd));
@@ -330,28 +533,25 @@ export class UsageService {
     }
   }
 
-  // Helper: Slab Calculation (Progressive)
+  // Helper: Slab Calculation (Flat-rate)
+  // Whichever slab the total count falls into, that rate applies to ALL copies.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private calculateSlabCharge(count: number, slabs: any[] | undefined): number {
     if (!slabs || !Array.isArray(slabs) || slabs.length === 0) return 0;
+    if (count <= 0) return 0;
 
     // Sort slabs by 'from'
     const sortedSlabs = [...slabs].sort((a, b) => a.from - b.from);
-    let remaining = count;
-    let totalCharge = 0;
 
+    // Find the applicable slab
+    let applicableRate = sortedSlabs[0].rate;
     for (const slab of sortedSlabs) {
-      if (remaining <= 0) break;
-
-      const slabSize = slab.to - slab.from + 1; // e.g. 0-999 is 1000 units
-      // Adjust if 'to' is infinite or very large? Usually 'to' matches next 'from'.
-      // If we assume standard ranges:
-      const applicable = Math.min(remaining, slabSize);
-      totalCharge += applicable * Number(slab.rate);
-      remaining -= applicable;
+      if (count >= slab.from) {
+        applicableRate = slab.rate;
+      }
     }
 
-    return totalCharge;
+    return count * Number(applicableRate);
   }
 
   // Helper: Next Period
@@ -494,6 +694,10 @@ export class UsageService {
         colorA4Delta: colorA4D,
         colorA3Delta: colorA3D,
         remarks: record.remarks,
+        discountAmount: Number(record.discountAmount || 0),
+        discountBwCopies: Number(record.discountBwCopies || 0),
+        discountColorCopies: Number(record.discountColorCopies || 0),
+        items: record.items, // Ensure items are passed to the frontend for editing
         // Detailed Breakdown for UI "View Details"
         bwFreeLimit: Number(pricingRule.bwIncludedLimit || 0),
         colorFreeLimit: Number(pricingRule.colorIncludedLimit || 0),
@@ -652,6 +856,9 @@ export class UsageService {
       advanceAdjusted?: number;
       totalCharge?: number;
       meterImageUrlNormalized?: string;
+      discountAmount?: number;
+      discountBwCopies?: number;
+      discountColorCopies?: number;
     },
     customerName: string,
     periodStart: Date,
@@ -796,6 +1003,22 @@ export class UsageService {
 
         <table style="width: 100%; border-collapse: collapse; margin-top: 20px;">
           <tr>
+            <td style="padding: 10px; border-bottom: 1px solid #edf2f7;">Exceeded Charges</td>
+            <td style="padding: 10px; text-align: right; border-bottom: 1px solid #edf2f7;">${formatCurrency(Number(usage.exceededCharge || 0) + Number(usage.discountAmount || 0))}</td>
+          </tr>
+          ${
+            usage.discountAmount && usage.discountAmount > 0
+              ? `
+          <tr>
+            <td style="padding: 10px; border-bottom: 1px solid #edf2f7; color: #702459;">
+              Discount Applied ${usage.discountBwCopies || usage.discountColorCopies ? `(${Number(usage.discountBwCopies || 0) + Number(usage.discountColorCopies || 0)} copies)` : ''}
+            </td>
+            <td style="padding: 10px; text-align: right; border-bottom: 1px solid #edf2f7; color: #702459;">-${formatCurrency(usage.discountAmount)}</td>
+          </tr>
+          `
+              : ''
+          }
+          <tr>
             <td style="padding: 10px; border-bottom: 1px solid #edf2f7;"><strong>Exceeded Charges Total</strong></td>
             <td style="padding: 10px; text-align: right; border-bottom: 1px solid #edf2f7;"><strong>${formatCurrency(usage.exceededCharge)}</strong></td>
           </tr>
@@ -840,6 +1063,11 @@ export class UsageService {
       colorA4Count: number;
       colorA3Count: number;
       billingPeriodEnd: string;
+      discountBwCopies?: number;
+      discountColorCopies?: number;
+      discountAmount?: number;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      items?: any[];
     },
   ) {
     const usage = await this.usageRepo.findById(id);
@@ -877,19 +1105,43 @@ export class UsageService {
       prevColorA4 = previousRecord.colorA4Count;
       prevColorA3 = previousRecord.colorA3Count;
     } else {
-      prevBwA4 = rule?.initialBwCount || 0;
-      prevBwA3 = rule?.initialBwA3Count || 0;
-      prevColorA4 = rule?.initialColorCount || 0;
-      prevColorA3 = rule?.initialColorA3Count || 0;
+      prevBwA4 = 0;
+      prevBwA3 = 0;
+      prevColorA4 = 0;
+      prevColorA3 = 0;
+      if (contract.items) {
+        for (const item of contract.items) {
+          if (item.itemType === 'PRODUCT' || item.productId) {
+            prevBwA4 += item.initialBwCount || 0;
+            prevBwA3 += item.initialBwA3Count || 0;
+            prevColorA4 += item.initialColorCount || 0;
+            prevColorA3 += item.initialColorA3Count || 0;
+          }
+        }
+      }
     }
 
-    const bwA4Delta = Math.max(0, payload.bwA4Count - prevBwA4);
-    const bwA3Delta = Math.max(0, payload.bwA3Count - prevBwA3);
-    const colorA4Delta = Math.max(0, payload.colorA4Count - prevColorA4);
-    const colorA3Delta = Math.max(0, payload.colorA3Count - prevColorA3);
+    let bwA4Delta = 0;
+    let bwA3Delta = 0;
+    let colorA4Delta = 0;
+    let colorA3Delta = 0;
 
-    const monthlyBw = bwA4Delta + bwA3Delta * 2;
-    const monthlyColor = colorA4Delta + colorA3Delta * 2;
+    // Use items to calculate deltas if provided, otherwise fallback to contract-level counts (safe only for single device)
+    if (payload.items && payload.items.length > 0) {
+      // Deltas will be summed from items below
+    } else {
+      bwA4Delta = Math.max(0, payload.bwA4Count - prevBwA4);
+      bwA3Delta = Math.max(0, payload.bwA3Count - prevBwA3);
+      colorA4Delta = Math.max(0, payload.colorA4Count - prevColorA4);
+      colorA3Delta = Math.max(0, payload.colorA3Count - prevColorA3);
+    }
+
+    const discountBw = payload.discountBwCopies ?? usage.discountBwCopies ?? 0;
+    const discountColor = payload.discountColorCopies ?? usage.discountColorCopies ?? 0;
+    const discountAmt = payload.discountAmount ?? usage.discountAmount ?? 0;
+
+    const monthlyBw = Math.max(0, bwA4Delta + bwA3Delta * 2);
+    const monthlyColor = Math.max(0, colorA4Delta + colorA3Delta * 2);
     const monthlyNormalized = monthlyBw + monthlyColor;
 
     let exceededTotal = 0;
@@ -911,7 +1163,7 @@ export class UsageService {
         exceededTotal = Math.max(0, totalMonthly - combinedLimit);
         exceededCharge = exceededTotal * Number(rule.combinedExcessRate || rule.bwExcessRate || 0);
       } else if (contract.rentType === 'CPC' || contract.rentType === 'CPC_COMBO') {
-        exceededTotal = monthlyNormalized;
+        exceededTotal = Math.max(0, monthlyNormalized - discountBw - discountColor);
         const bwCharge = this.calculateSlabCharge(monthlyBw, rule.bwSlabRanges);
         const colorCharge = this.calculateSlabCharge(monthlyColor, rule.colorSlabRanges);
         const comboCharge = this.calculateSlabCharge(monthlyNormalized, rule.comboSlabRanges);
@@ -922,11 +1174,75 @@ export class UsageService {
       }
     }
 
+    if (discountAmt > 0) {
+      exceededCharge = Math.max(0, exceededCharge - discountAmt);
+    }
+
     usage.bwA4Count = payload.bwA4Count;
     usage.bwA3Count = payload.bwA3Count;
     usage.colorA4Count = payload.colorA4Count;
     usage.colorA3Count = payload.colorA3Count;
     usage.billingPeriodEnd = new Date(payload.billingPeriodEnd);
+
+    // Update UsageRecordItems and pre-emptively update ProductAllocations based on payload.items
+    if (payload.items && payload.items.length > 0) {
+      const existingItems = await this.invoiceRepo.manager.find(UsageRecordItem, {
+        where: { usageRecordId: usage.id },
+        relations: ['allocation'],
+      });
+
+      // Reset deltas for recalculation from items
+      bwA4Delta = 0;
+      bwA3Delta = 0;
+      colorA4Delta = 0;
+      colorA3Delta = 0;
+
+      for (const existingItem of existingItems) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const payloadItem = payload.items.find((i: any) => i.id === existingItem.id);
+        if (payloadItem && existingItem.allocation) {
+          const alloc = existingItem.allocation;
+
+          if (alloc.status === AllocationStatus.REPLACED) {
+            // Replaced machines usage is already settled. Skip their delta for current billing.
+            existingItem.endBwA4 = alloc.currentBwA4 || existingItem.startBwA4;
+            existingItem.endBwA3 = alloc.currentBwA3 || existingItem.startBwA3;
+            existingItem.endColorA4 = alloc.currentColorA4 || existingItem.endColorA4;
+            existingItem.endColorA3 = alloc.currentColorA3 || existingItem.endColorA3;
+          } else {
+            existingItem.endBwA4 = payloadItem.endBwA4;
+            existingItem.endBwA3 = payloadItem.endBwA3;
+            existingItem.endColorA4 = payloadItem.endColorA4;
+            existingItem.endColorA3 = payloadItem.endColorA3;
+
+            // Pre-emptively update current reading on the allocation itself
+            alloc.currentBwA4 = existingItem.endBwA4;
+            alloc.currentBwA3 = existingItem.endBwA3;
+            alloc.currentColorA4 = existingItem.endColorA4;
+            alloc.currentColorA3 = existingItem.endColorA3;
+            await this.invoiceRepo.manager.save(ProductAllocation, alloc);
+          }
+
+          existingItem.deltaBwA4 = Math.max(0, existingItem.endBwA4 - existingItem.startBwA4);
+          existingItem.deltaBwA3 = Math.max(0, existingItem.endBwA3 - existingItem.startBwA3);
+          existingItem.deltaColorA4 = Math.max(
+            0,
+            existingItem.endColorA4 - existingItem.startColorA4,
+          );
+          existingItem.deltaColorA3 = Math.max(
+            0,
+            existingItem.endColorA3 - existingItem.startColorA3,
+          );
+
+          bwA4Delta += existingItem.deltaBwA4;
+          bwA3Delta += existingItem.deltaBwA3;
+          colorA4Delta += existingItem.deltaColorA4;
+          colorA3Delta += existingItem.deltaColorA3;
+
+          await this.invoiceRepo.manager.save(UsageRecordItem, existingItem);
+        }
+      }
+    }
 
     usage.bwA4Delta = bwA4Delta;
     usage.bwA3Delta = bwA3Delta;
@@ -934,6 +1250,10 @@ export class UsageService {
     usage.colorA3Delta = colorA3Delta;
     usage.exceededCharge = exceededCharge;
     usage.exceededTotal = exceededTotal;
+
+    usage.discountBwCopies = discountBw;
+    usage.discountColorCopies = discountColor;
+    usage.discountAmount = discountAmt;
 
     usage.totalCharge =
       Number(usage.monthlyRent) + exceededCharge - Number(usage.advanceAdjusted || 0);

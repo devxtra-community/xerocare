@@ -5,7 +5,7 @@ export interface Branch {
   name: string;
   address: string;
   location: string;
-  manager_id: string;
+  manager_id?: string | null;
   started_date: string;
   status: string;
 }

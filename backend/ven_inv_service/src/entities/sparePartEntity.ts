@@ -3,6 +3,8 @@ import {
   PrimaryGeneratedColumn,
   Column,
   ManyToOne,
+  ManyToMany,
+  JoinTable,
   JoinColumn,
   CreateDateColumn,
   UpdateDateColumn,
@@ -36,6 +38,14 @@ export class SparePart {
   @ManyToOne(() => Model, { nullable: true })
   @JoinColumn({ name: 'model_id' })
   model?: Model;
+
+  @ManyToMany(() => Model, { nullable: true })
+  @JoinTable({
+    name: 'spare_parts_models',
+    joinColumn: { name: 'spare_part_id', referencedColumnName: 'id' },
+    inverseJoinColumn: { name: 'model_id', referencedColumnName: 'id' },
+  })
+  models?: Model[];
 
   @Column({ name: 'branch_id', type: 'uuid' })
   @Index()

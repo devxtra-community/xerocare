@@ -11,6 +11,7 @@ interface BulkUploadRow {
   part_name: string;
   brand: string;
   model_id?: string;
+  model_ids?: string[];
   base_price: number;
   quantity?: number;
   lot_id?: string;
@@ -52,11 +53,23 @@ export class SparePartService {
     // In bulk upload, item_code might be missing as it's generated
     // if (!itemCode) throw new Error('Item Code is required');
 
-    const modelId = data.model_id;
-    if (modelId) {
-      const model = await this.modelRepo.findbyid(modelId);
-      if (!model) throw new Error(`Model not found: ${modelId}`);
+    // Handle single model_id or array of model_ids
+    let modelIds = data.model_ids || [];
+    if (data.model_id && data.model_id !== 'universal' && modelIds.length === 0) {
+      modelIds = [data.model_id];
     }
+
+    const models = [];
+    if (modelIds.length > 0 && !modelIds.includes('universal')) {
+      for (const mId of modelIds) {
+        const model = await this.modelRepo.findbyid(mId);
+        if (!model) throw new Error(`Model not found: ${mId}`);
+        models.push(model);
+      }
+    }
+
+    // Determine the primary model_id for backwards compatibility
+    const primaryModelId = models.length > 0 ? models[0].id : undefined;
 
     const quantity = data.quantity || 0;
     let lotId = data.lot_id;
@@ -95,13 +108,23 @@ export class SparePartService {
     // Check if a part with same code, model and warehouse already exists
     const existingPart = await this.repo.findExistingSparePart(
       data.part_name,
-      modelId,
+      primaryModelId,
       warehouseId,
       vendorId,
+      modelIds.length > 0 ? modelIds : undefined,
     );
 
     if (existingPart) {
       await this.repo.updateStock(existingPart.id, quantity);
+
+      // Also update models if new ones are provided (optional merging logic)
+      if (models.length > 0) {
+        const partWithModels = await this.repo.findById(existingPart.id);
+        if (partWithModels && (!partWithModels.models || partWithModels.models.length === 0)) {
+          await this.repo.updateMaster(existingPart.id, { models });
+        }
+      }
+
       await deleteCached(`sparepart:${existingPart.id}`);
       return { success: true, message: 'Existing spare part stock incremented' };
     }
@@ -110,7 +133,8 @@ export class SparePartService {
       item_code: itemCode,
       part_name: data.part_name,
       brand: data.brand,
-      model_id: modelId || undefined,
+      model_id: primaryModelId || undefined,
+      models: models.length > 0 ? models : undefined,
       base_price: data.base_price,
       branch_id: branchId,
       quantity: quantity,
@@ -125,12 +149,26 @@ export class SparePartService {
   /**
    * Updates a spare part's details.
    */
-  async updateSparePart(id: string, data: Partial<SparePart>) {
+  async updateSparePart(id: string, data: Partial<SparePart> & { model_ids?: string[] }) {
+    let models = undefined;
+    if (data.model_ids) {
+      models = [];
+      if (!data.model_ids.includes('universal')) {
+        for (const mId of data.model_ids) {
+          const m = await this.modelRepo.findbyid(mId);
+          if (m) models.push(m);
+        }
+      }
+    }
+
+    const primaryModelId = models && models.length > 0 ? models[0].id : data.model_id;
+
     const updateData: Partial<SparePart> = {
       part_name: data.part_name,
       brand: data.brand,
-      model_id: data.model_id,
+      model_id: primaryModelId,
       base_price: data.base_price,
+      models: models,
     };
     Object.keys(updateData).forEach(
       (key) =>

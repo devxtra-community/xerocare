@@ -85,6 +85,7 @@ export class UsageRepository {
   getUsageHistory(contractId: string, order: 'ASC' | 'DESC' = 'DESC') {
     return this.repo.find({
       where: { contractId },
+      relations: ['items', 'items.allocation'],
       order: {
         billingPeriodStart: order,
       },

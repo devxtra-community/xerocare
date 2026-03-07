@@ -35,7 +35,7 @@ export default function EmployeeStatsCards() {
     fetchStats();
 
     const user = getUserFromToken();
-    setIsRentLeaseEmployee(user?.employeeJob === EmployeeJob.RENT_LEASE);
+    setIsRentLeaseEmployee(user?.employeeJob === EmployeeJob.RENT_AND_LEASE);
   }, []);
 
   const totalOrders = stats.SALE + stats.RENT + stats.LEASE;

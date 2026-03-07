@@ -29,10 +29,10 @@ export class ModelService {
   }
 
   /**
-   * Retrieves all models, optionally filtered by branch.
+   * Retrieves all models, optionally filtered by branch and search query.
    */
-  async fetchAllModels(branchId?: string) {
-    return this.modelRepository.getAllModels(branchId);
+  async fetchAllModels(branchId?: string, search?: string) {
+    return this.modelRepository.getAllModels(branchId, search);
   }
 
   /**

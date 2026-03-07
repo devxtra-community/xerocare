@@ -3,6 +3,9 @@ import { BillingService } from '../services/billingService';
 import { BillingReportService } from '../services/billingReportService';
 import { NotificationService } from '../services/notificationService';
 import { AppError } from '../errors/appError';
+import { MulterS3File } from '../types/multer-s3-file';
+import { Source } from '../config/dataSource';
+import { ProductAllocation } from '../entities/productAllocationEntity';
 
 const billingService = new BillingService();
 const reportService = new BillingReportService();
@@ -192,10 +195,9 @@ export const employeeApprove = async (req: Request, res: Response, next: NextFun
 };
 
 /**
- * Finance team approves a quotation.
- * Can override deposit amounts and item details during approval.
+ * Finance team allocates machines. (Step 1 of Finance Approval)
  */
-export const financeApprove = async (req: Request, res: Response, next: NextFunction) => {
+export const allocateMachines = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = req.params.id as string;
 
@@ -203,12 +205,50 @@ export const financeApprove = async (req: Request, res: Response, next: NextFunc
       throw new AppError('User context missing', 401);
     }
 
-    const { deposit, itemUpdates } = req.body;
+    const { itemUpdates } = req.body;
 
-    const invoice = await billingService.financeApprove(
+    const invoice = await billingService.allocateMachines(
       id,
       req.user.userId,
       req.headers.authorization || '',
+      itemUpdates,
+    );
+
+    return res.status(200).json({
+      success: true,
+      data: invoice,
+      message: 'Machines allocated successfully, waiting for contract confirmation',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Finance team activates the contract. (Step 2 of Finance Approval)
+ */
+export const activateContract = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = req.params.id as string;
+
+    if (!req.user || !req.user.userId) {
+      throw new AppError('User context missing', 401);
+    }
+
+    const { contractConfirmationUrl, deposit, itemUpdates } = req.body;
+
+    if (!contractConfirmationUrl) {
+      throw new AppError(
+        'Contract confirmation document URL is required to activate the contract',
+        400,
+      );
+    }
+
+    const invoice = await billingService.activateContract(
+      id,
+      req.user.userId,
+      req.headers.authorization || '',
+      contractConfirmationUrl,
       deposit,
       itemUpdates,
     );
@@ -216,7 +256,30 @@ export const financeApprove = async (req: Request, res: Response, next: NextFunc
     return res.status(200).json({
       success: true,
       data: invoice,
-      message: 'Finance approved successfully',
+      message: 'Contract activated successfully',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Uploads a contract confirmation document to S3/R2 and returns the URL.
+ */
+export const uploadContractConfirmation = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const file = req.file as MulterS3File | undefined;
+    if (!file) {
+      throw new AppError('No file uploaded', 400);
+    }
+    return res.status(200).json({
+      success: true,
+      data: { url: file.location },
+      message: 'Contract confirmation document uploaded successfully',
     });
   } catch (error) {
     next(error);
@@ -743,6 +806,41 @@ export const getAvailableYears = async (req: Request, res: Response, next: NextF
       data: years,
       message: 'Available years fetched successfully',
     });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Replace a device allocation for a contract.
+ */
+export const replaceDeviceAllocation = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const payload = req.body;
+    const result = await billingService.replaceDeviceAllocation(payload);
+    return res.status(200).json({
+      success: true,
+      data: result,
+      message: 'Device replaced successfully',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Returns all product allocations for a contract (including initial meter readings).
+ * Used by the Usage Recording Modal to compute correct delta after device replacement.
+ */
+export const getContractAllocations = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { contractId } = req.params;
+    if (!contractId) throw new AppError('contractId is required', 400);
+    const allocations = await Source.getRepository(ProductAllocation).find({
+      where: { contractId: String(contractId) },
+      order: { startTimestamp: 'ASC' },
+    });
+    return res.status(200).json({ success: true, data: allocations });
   } catch (error) {
     next(error);
   }

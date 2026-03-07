@@ -420,11 +420,27 @@ function ProductFormModal({
   const handleSubmit = async () => {
     if (isSubmitting) return; // Prevent duplicate submissions
 
+    // Frontend validation to prevent submitting missing required fields
+    if (
+      !form.name ||
+      !form.brand ||
+      !form.serial_no ||
+      !form.model_id ||
+      !form.vendor_id ||
+      !form.warehouse_id ||
+      !form.MFD ||
+      form.sale_price === '' ||
+      form.tax_rate === ''
+    ) {
+      toast.error('Please fill in all required fields including Vendor, Warehouse, and Model.');
+      return;
+    }
+
     try {
       setIsSubmitting(true);
       const formData = new FormData();
       Object.entries(form).forEach(([key, value]) => {
-        if (value !== undefined && value !== null) {
+        if (value !== undefined && value !== null && value !== '') {
           formData.append(key, value.toString());
         }
       });

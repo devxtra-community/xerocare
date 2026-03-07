@@ -78,7 +78,9 @@ export class NotificationService {
 
       const securityDeposit = Number(contract.securityDepositAmount || 0);
       const advanceAmountCollected = Number(contract.advanceAmount || 0);
-      const grandTotal = calculatedGrossTotal - calculatedAdvanceAdjusted;
+      const discountAmount = Number(contract.discountAmount || 0);
+
+      const grandTotal = calculatedGrossTotal - calculatedAdvanceAdjusted - discountAmount;
 
       let securityDepositRow = '';
       if (securityDeposit > 0) {
@@ -93,6 +95,16 @@ export class NotificationService {
                 </div>
             </div>
          `;
+      }
+
+      let discountSettlementRow = '';
+      if (discountAmount > 0) {
+        discountSettlementRow = `
+            <div style="margin-top: 10px; padding: 10px; background-color: #f0fff4; border-radius: 8px; border: 1px solid #c6f6d5; display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-size: 11px; font-weight: 800; color: #2f855a; text-transform: uppercase;">Discount Applied</span>
+                <span style="font-size: 14px; font-weight: 900; color: #2f855a;">-${formatCurrency(discountAmount)}</span>
+            </div>
+        `;
       }
 
       let pricingRulesHTML = '';
@@ -182,13 +194,22 @@ export class NotificationService {
                 <tbody>
                     ${historyRows}
                     ${
+                      discountAmount > 0
+                        ? `
+                    <tr style="background-color: #f0fff4;">
+                        <td colspan="4" style="padding: 12px; border-bottom: 1px solid #e5e7eb; font-size: 13px; color: #2f855a; font-weight: 700;">Discount Applied</td>
+                        <td style="padding: 12px; border-bottom: 1px solid #e5e7eb; text-align: right; font-weight: 900; color: #2f855a;">-${formatCurrency(
+                          discountAmount,
+                        )}</td>
+                    </tr>
+                    `
+                        : ''
+                    }
+                    ${
                       advanceAmountCollected > 0
                         ? `
                     <tr style="background-color: #fef3c7;">
-                        <td style="padding: 12px; border-bottom: 1px solid #e5e7eb; font-size: 13px; color: #92400e; font-weight: 700;">Advance Amount (Adjustable)</td>
-                        <td style="padding: 12px; border-bottom: 1px solid #e5e7eb; text-align: right; color: #6b7280;">-</td>
-                        <td style="padding: 12px; border-bottom: 1px solid #e5e7eb; text-align: right; color: #6b7280;">-</td>
-                        <td style="padding: 12px; border-bottom: 1px solid #e5e7eb; text-align: right; color: #6b7280;">-</td>
+                        <td colspan="4" style="padding: 12px; border-bottom: 1px solid #e5e7eb; font-size: 13px; color: #92400e; font-weight: 700;">Advance Amount (Adjustable)</td>
                         <td style="padding: 12px; border-bottom: 1px solid #e5e7eb; text-align: right; font-weight: 900; color: #92400e;">${formatCurrency(
                           advanceAmountCollected,
                         )}</td>
@@ -200,10 +221,7 @@ export class NotificationService {
                       securityDeposit > 0
                         ? `
                     <tr style="background-color: #f0f7ff;">
-                        <td style="padding: 12px; border-bottom: 1px solid #e5e7eb; font-size: 13px; color: #1e40af; font-weight: 700;">Security Deposit (Collected)</td>
-                        <td style="padding: 12px; border-bottom: 1px solid #e5e7eb; text-align: right; color: #6b7280;">-</td>
-                        <td style="padding: 12px; border-bottom: 1px solid #e5e7eb; text-align: right; color: #6b7280;">-</td>
-                        <td style="padding: 12px; border-bottom: 1px solid #e5e7eb; text-align: right; color: #6b7280;">-</td>
+                        <td colspan="4" style="padding: 12px; border-bottom: 1px solid #e5e7eb; font-size: 13px; color: #1e40af; font-weight: 700;">Security Deposit (Collected)</td>
                         <td style="padding: 12px; border-bottom: 1px solid #e5e7eb; text-align: right; font-weight: 900; color: #1e40af;">${formatCurrency(
                           securityDeposit,
                         )}</td>
@@ -219,6 +237,18 @@ export class NotificationService {
                           calculatedGrossTotal,
                         )}</td>
                     </tr>
+                    ${
+                      discountAmount > 0
+                        ? `
+                    <tr>
+                        <td colspan="4" style="padding: 5px 12px; text-align: right; font-size: 14px; font-weight: 700; color: #2f855a;">Less: Total Discount:</td>
+                        <td style="padding: 5px 12px; text-align: right; font-size: 16px; font-weight: 800; color: #2f855a;">-${formatCurrency(
+                          discountAmount,
+                        )}</td>
+                    </tr>
+                    `
+                        : ''
+                    }
                     ${
                       calculatedAdvanceAdjusted > 0
                         ? `
@@ -247,6 +277,7 @@ export class NotificationService {
             </div>
 
             ${securityDepositRow}
+            ${discountSettlementRow}
         </div>
 
         <div style="margin-top: 40px; padding-top: 40px; border-top: 1px solid #f3f4f6; text-align: center;">
@@ -298,6 +329,9 @@ export class NotificationService {
       body,
       invoiceId: contract.id,
     });
+
+    contract.emailSentAt = new Date();
+    await this.invoiceRepo.save(contract);
   }
 
   /**

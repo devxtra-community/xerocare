@@ -17,6 +17,7 @@ import inventoryRouter from './routes/inventoryRoutes';
 import sparePartRouter from './routes/sparePartRoutes';
 import brandRouter from './routes/brandRoute';
 import lotRouter from './routes/lotRoutes';
+import rfqRouter from './routes/rfqRoute';
 import { httpLogger } from './middlewares/httpLogger';
 
 const app = express();
@@ -34,6 +35,7 @@ app.use('/inventory', inventoryRouter);
 app.use('/spare-parts', sparePartRouter);
 app.use('/brands', brandRouter);
 app.use('/lots', lotRouter);
+app.use('/rfq', rfqRouter);
 app.use(errorHandler);
 
 process.on('uncaughtException', (err) => {
@@ -52,7 +54,7 @@ const startServer = async () => {
     await startProductStatusConsumer();
     // consumeBillingEvents removed as it is legacy
 
-    const PORT = process.env.VENDOR_PORT;
+    const PORT = process.env.PORT;
     app.listen(PORT, () => {
       logger.info(`Server running on port ${PORT}`);
     });

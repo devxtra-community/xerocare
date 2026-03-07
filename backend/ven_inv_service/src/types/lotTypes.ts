@@ -16,12 +16,6 @@ export interface CreateLotDto {
   purchaseDate: string;
   items: CreateLotItemDto[];
   notes?: string;
-  transportationCost?: number;
-  documentationCost?: number;
-  shippingCost?: number;
-  groundFieldCost?: number;
-  certificationCost?: number;
-  labourCost?: number;
   branchId?: string;
   warehouseId?: string;
   createdBy?: string;

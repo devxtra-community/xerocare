@@ -28,16 +28,7 @@ import {
 } from '@/lib/invoice';
 import { format } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
-import {
-  Loader2,
-  History,
-  Send,
-  CheckCircle2,
-  Eye,
-  X,
-  Image as ImageIcon,
-  Edit,
-} from 'lucide-react';
+import { Loader2, History, Send, Mail, Eye, X, Image as ImageIcon, Edit } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { formatCurrency } from '@/lib/format';
@@ -221,6 +212,9 @@ export default function UsageHistoryDialog({
                       )}
                       <TableHead className="font-bold text-white text-right">AMOUNT</TableHead>
                       <TableHead className="font-bold text-white text-right">RENT</TableHead>
+                      <TableHead className="font-bold text-emerald-400 text-right">
+                        DISCOUNT
+                      </TableHead>
                       <TableHead className="font-bold text-blue-400 text-right">
                         ADVANCE USED
                       </TableHead>
@@ -330,6 +324,9 @@ export default function UsageHistoryDialog({
                         <TableCell className="text-right font-bold text-slate-700">
                           {formatCurrency(Number(record.rent))}
                         </TableCell>
+                        <TableCell className="text-right font-bold text-emerald-600">
+                          {formatCurrency(Number(record.discountAmount || 0))}
+                        </TableCell>
                         <TableCell className="text-right font-bold text-blue-600">
                           {formatCurrency(Number(record.advanceAdjusted || 0))}
                         </TableCell>
@@ -367,7 +364,7 @@ export default function UsageHistoryDialog({
                               {sendingId === record.id ? (
                                 <Loader2 className="h-4 w-4 animate-spin" />
                               ) : record.emailSentAt ? (
-                                <CheckCircle2 className="h-4 w-4" />
+                                <Mail className="h-4 w-4" />
                               ) : (
                                 <Send className="h-4 w-4" />
                               )}
@@ -587,6 +584,72 @@ function UsageDetailsModal({ record }: { record: UsageRecord }) {
             </TableBody>
           </Table>
         </div>
+
+        {/* Per-Machine Breakdown (Replacements Support) */}
+        {record.items && record.items.length > 0 && (
+          <div className="mt-6 space-y-3">
+            <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider px-1">
+              Per-Machine Details
+            </h4>
+            <div className="rounded-xl border border-slate-100 overflow-hidden">
+              <Table>
+                <TableHeader className="bg-slate-50/50">
+                  <TableRow>
+                    <TableHead className="text-[10px] font-bold h-8">MACHINE</TableHead>
+                    <TableHead className="text-[10px] font-bold h-8 text-right">
+                      BW (A4/A3)
+                    </TableHead>
+                    <TableHead className="text-[10px] font-bold h-8 text-right">
+                      CLR (A4/A3)
+                    </TableHead>
+                    <TableHead className="text-[10px] font-bold h-8 text-right">TOTAL</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {record.items.map((item, idx) => (
+                    <TableRow key={idx} className="h-10 hover:bg-slate-50/30 transition-colors">
+                      <TableCell className="py-2">
+                        <div className="flex flex-col">
+                          <span className="text-[10px] font-bold text-slate-700">
+                            SN: {item.allocation?.serialNumber || item.allocationId.slice(0, 8)}
+                          </span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right py-2">
+                        <div className="flex flex-col items-end">
+                          <span className="text-[11px] font-black text-slate-600">
+                            {item.deltaBwA4 + item.deltaBwA3 * 2}
+                          </span>
+                          <span className="text-[8px] text-slate-400">
+                            ({item.deltaBwA4}/{item.deltaBwA3})
+                          </span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right py-2">
+                        <div className="flex flex-col items-end">
+                          <span className="text-[11px] font-black text-rose-600">
+                            {item.deltaColorA4 + item.deltaColorA3 * 2}
+                          </span>
+                          <span className="text-[8px] text-rose-400">
+                            ({item.deltaColorA4}/{item.deltaColorA3})
+                          </span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right py-2">
+                        <span className="text-xs font-bold text-slate-900">
+                          {item.deltaBwA4 +
+                            item.deltaBwA3 * 2 +
+                            item.deltaColorA4 +
+                            item.deltaColorA3 * 2}
+                        </span>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </div>
+        )}
 
         {/* Readings Summary */}
         <div className="mt-4 grid grid-cols-2 gap-4">

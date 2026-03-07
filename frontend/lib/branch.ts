@@ -6,7 +6,7 @@ export interface Branch {
   name: string;
   address: string;
   location: string;
-  manager_id: string;
+  manager_id?: string | null;
   started_date: string;
   status: 'ACTIVE' | 'INACTIVE' | 'DELETED';
   created_at: string;
@@ -17,7 +17,7 @@ export interface CreateBranchPayload {
   name: string;
   address: string;
   location: string;
-  manager_id: string;
+  manager_id?: string | null;
   started_date: string;
 }
 
@@ -25,7 +25,7 @@ export interface UpdateBranchPayload {
   name?: string;
   address?: string;
   location?: string;
-  manager_id?: string;
+  manager_id?: string | null;
   started_date?: string;
   status?: 'ACTIVE' | 'INACTIVE';
 }

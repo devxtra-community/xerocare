@@ -7,6 +7,25 @@ export type EmailJob =
       vendorName: string;
       productList: string;
       message: string;
+    }
+  | {
+      type: 'RFQ_SENT';
+      email: string;
+      vendorName: string;
+      rfqNumber: string;
+      excelBuffer: Buffer;
+    }
+  | {
+      type: 'RFQ_AWARDED';
+      email: string;
+      vendorName: string;
+      rfqNumber: string;
+    }
+  | {
+      type: 'RFQ_REJECTED';
+      email: string;
+      vendorName: string;
+      rfqNumber: string;
     };
 
 export async function publishEmailJob(job: EmailJob) {

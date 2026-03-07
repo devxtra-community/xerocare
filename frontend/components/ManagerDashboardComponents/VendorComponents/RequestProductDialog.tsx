@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -9,8 +9,10 @@ import {
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Send, Loader2 } from 'lucide-react';
+import { Send, Loader2, UploadCloud } from 'lucide-react';
 import { Vendor } from '@/components/AdminDahboardComponents/VendorComponents/VendorTable';
+import * as XLSX from 'xlsx';
+import { toast } from 'sonner';
 
 interface RequestProductDialogProps {
   open: boolean;
@@ -32,6 +34,7 @@ export default function RequestProductDialog({
   const [loading, setLoading] = useState(false);
   const [products, setProducts] = useState('');
   const [message, setMessage] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleConfirm = async () => {
     if (!products.trim()) return;
@@ -46,6 +49,62 @@ export default function RequestProductDialog({
     }
   };
 
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const data = new Uint8Array(event.target?.result as ArrayBuffer);
+        const workbook = XLSX.read(data, { type: 'array' });
+
+        // Assume first sheet
+        const firstSheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[firstSheetName];
+
+        // Convert to JSON
+        const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+        // Parse rows to text list
+        let parsedText = '';
+        jsonData.forEach((row: unknown) => {
+          if (Array.isArray(row) && row.length > 0) {
+            // Join columns with space and ignore empty columns
+            const rowText = row.filter(Boolean).join(' - ');
+            if (rowText) {
+              parsedText += `- ${rowText}\n`;
+            }
+          }
+        });
+
+        if (parsedText.trim()) {
+          // Append to existing products or replace if empty
+          setProducts((prev) =>
+            prev.trim() ? `${prev}\n\n${parsedText.trim()}` : parsedText.trim(),
+          );
+          toast.success('Excel data imported successfully!');
+        } else {
+          toast.error('Could not find readable data in the Excel file.');
+        }
+      } catch (error) {
+        console.error('Error parsing Excel file:', error);
+        toast.error('Failed to parse Excel file. Ensure it is a valid .xlsx or .xls file.');
+      }
+
+      // Reset input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    };
+
+    reader.onerror = () => {
+      toast.error('Failed to read the file.');
+    };
+
+    reader.readAsArrayBuffer(file);
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[500px]">
@@ -57,15 +116,36 @@ export default function RequestProductDialog({
 
         <div className="space-y-4 py-4">
           <div className="space-y-2">
-            <Label htmlFor="products">
-              Product List <span className="text-red-500">*</span>
-            </Label>
+            <div className="flex justify-between items-center w-full">
+              <Label htmlFor="products">
+                Product List <span className="text-red-500">*</span>
+              </Label>
+
+              <input
+                type="file"
+                accept=".xlsx, .xls, .csv"
+                className="hidden"
+                ref={fileInputRef}
+                onChange={handleFileUpload}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-8 gap-1.5 text-xs text-blue-600 border-blue-200 bg-blue-50 hover:bg-blue-100 hover:text-blue-700"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <UploadCloud size={14} />
+                Upload Excel
+              </Button>
+            </div>
+
             <Textarea
               id="products"
-              placeholder="e.g. 10x HP Toner Cartridges&#10;5x Samsung Monitors"
+              placeholder="e.g. 10x HP Toner Cartridges&#10;5x Samsung Monitors&#10;&#10;Or click 'Upload Excel' to parse a sheet."
               value={products}
               onChange={(e) => setProducts(e.target.value)}
-              className="min-h-[100px]"
+              className="min-h-[140px]"
               required
             />
           </div>

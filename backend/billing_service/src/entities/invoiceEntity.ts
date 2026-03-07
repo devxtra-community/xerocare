@@ -15,6 +15,7 @@ import { RentType } from './enums/rentType';
 import { RentPeriod } from './enums/rentPeriod';
 import { LeaseType } from './enums/leaseType';
 import { ContractStatus } from './enums/contractStatus';
+import { ProductAllocation } from './productAllocationEntity';
 
 export enum SecurityDepositMode {
   CASH = 'CASH',
@@ -80,6 +81,9 @@ export class Invoice {
   })
   contractStatus?: ContractStatus;
 
+  @Column({ type: 'varchar', nullable: true })
+  contractConfirmationUrl?: string;
+
   // --- Audit Fields ---
   @Column({ nullable: true })
   employeeApprovedBy?: string;
@@ -100,6 +104,11 @@ export class Invoice {
     cascade: true,
   })
   items!: InvoiceItem[];
+
+  @OneToMany(() => ProductAllocation, (allocation) => allocation.contract, {
+    cascade: false,
+  })
+  productAllocations?: ProductAllocation[];
 
   @CreateDateColumn()
   createdAt!: Date;

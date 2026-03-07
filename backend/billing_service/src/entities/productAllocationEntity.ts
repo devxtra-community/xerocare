@@ -13,6 +13,7 @@ import { Invoice } from './invoiceEntity';
 export enum AllocationStatus {
   ALLOCATED = 'ALLOCATED',
   RETURNED = 'RETURNED',
+  REPLACED = 'REPLACED',
 }
 
 @Entity('product_allocations')
@@ -44,6 +45,18 @@ export class ProductAllocation {
     default: AllocationStatus.ALLOCATED,
   })
   status!: AllocationStatus;
+
+  @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
+  startTimestamp!: Date;
+
+  @Column({ type: 'timestamp', nullable: true })
+  endTimestamp?: Date;
+
+  @Column({ type: 'uuid', nullable: true })
+  replacementOfAllocationId?: string;
+
+  @Column({ type: 'text', nullable: true })
+  replacementReason?: string;
 
   // --- Initial Meter Readings ---
   @Column({ type: 'int', default: 0 })

@@ -26,8 +26,8 @@ export class Branch {
   @Column()
   location!: string;
 
-  @Column()
-  manager_id!: string;
+  @Column({ nullable: true })
+  manager_id?: string;
 
   @Column({ type: 'date' })
   started_date!: Date;

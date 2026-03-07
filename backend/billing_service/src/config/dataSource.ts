@@ -20,25 +20,23 @@ const getDirectDbUrl = (url?: string) => {
   if (!url) return '';
   return url.replace('-pooler.', '.');
 };
+import { UsageRecordItem } from '../entities/usageRecordItemEntity';
+import { DeviceMeterReading } from '../entities/deviceMeterReadingEntity';
 
 export const Source = new DataSource({
   type: 'postgres',
   url: getDirectDbUrl(process.env.BILLING_DATABASE_URL),
   synchronize: false,
-  logging: false, // Keep disabled in production to avoid clutter
-  entities: [Invoice, InvoiceItem, UsageRecord, ProductAllocation],
-  extra: {
-    max: 1,
-    // SSL is required by Neon.
-    // rejectUnauthorized: false ensures docker doesn't fail due to missing local root certs.
-    ssl: {
-      rejectUnauthorized: false,
-    },
-    // Fails fast (5s) to trigger retries instead of hanging indefinitely
-    connectionTimeoutMillis: 5000,
-    // TCP keep-alive to safely handle silent network drops (AWS hiccups)
-    keepAlive: true,
-  },
+  logging: false,
+  entities: [
+    Invoice,
+    InvoiceItem,
+    UsageRecord,
+    ProductAllocation,
+    UsageRecordItem,
+    DeviceMeterReading,
+  ],
+  extra: { max: 2 },
 });
 
 /**

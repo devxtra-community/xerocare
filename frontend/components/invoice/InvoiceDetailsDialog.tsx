@@ -22,6 +22,8 @@ import { formatCurrency } from '@/lib/format';
 import { Invoice, getInvoiceById } from '@/lib/invoice';
 import { differenceInMonths, differenceInDays } from 'date-fns';
 import UsageRecordingModal from '@/components/Finance/UsageRecordingModal';
+import ReplaceDeviceModal from '@/components/Finance/ReplaceDeviceModal';
+import { RefreshCw } from 'lucide-react';
 
 interface InvoiceDetailsDialogProps {
   invoice: Invoice;
@@ -49,8 +51,6 @@ const getCleanProductName = (name: string) => {
   return clean.trim();
 };
 
-import { generateConsolidatedFinalInvoice } from '@/lib/invoice';
-
 /**
  * Comprehensive dialog for viewing invoice details.
  * improved financial summary, broken down by Rent, Lease, Sale, and Usage.
@@ -69,10 +69,16 @@ export function InvoiceDetailsDialog({
   const [currentInvoice, setCurrentInvoice] = React.useState<Invoice>(invoice);
   const [rejectReason, setRejectReason] = React.useState('');
   const [rejecting, setRejecting] = React.useState(false);
-  const [completing, setCompleting] = React.useState(false);
   const [isLoading, setIsLoading] = React.useState(false);
   const [isEmailSending, setIsEmailSending] = React.useState(false);
   const [isUsageModalOpen, setIsUsageModalOpen] = React.useState(false);
+  const [isReplaceModalOpen, setIsReplaceModalOpen] = React.useState(false);
+  const [replacingAllocation, setReplacingAllocation] = React.useState<{
+    allocationId: string;
+    serialNumber: string;
+    modelId: string;
+  } | null>(null);
+
   const historyRef = React.useRef<HTMLDivElement>(null);
   const scrollContainerRef = React.useRef<HTMLDivElement>(null);
 
@@ -87,20 +93,6 @@ export function InvoiceDetailsDialog({
       setCurrentInvoice(data);
     } catch {
       toast.error('Failed to load invoice details');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleCompleteContract = async () => {
-    setIsLoading(true);
-    try {
-      await generateConsolidatedFinalInvoice(currentInvoice.id);
-      toast.success('Contract Completed & Final Invoice Generated');
-      onClose();
-    } catch (error: unknown) {
-      const err = error as { message?: string };
-      toast.error(err.message || 'Failed to complete contract');
     } finally {
       setIsLoading(false);
     }
@@ -795,6 +787,94 @@ export function InvoiceDetailsDialog({
               </>
             )}
 
+          {/* Allocated Devices Section for Rent/Lease */}
+          {(currentInvoice.saleType === 'RENT' || currentInvoice.saleType === 'LEASE') &&
+            currentInvoice.productAllocations &&
+            currentInvoice.productAllocations.length > 0 && (
+              <div className="space-y-4 pb-6 border-b border-gray-100 mb-6">
+                <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                  Allocated Equipment
+                </h3>
+                <div className="rounded-xl border border-gray-100 overflow-hidden">
+                  <Table>
+                    <TableHeader className="bg-muted/50/80">
+                      <TableRow className="hover:bg-transparent border-gray-100">
+                        <TableHead className="text-[10px] font-bold text-gray-400 h-10">
+                          MODEL/PRODUCT
+                        </TableHead>
+                        <TableHead className="text-[10px] font-bold text-gray-400 h-10">
+                          SERIAL NUMBER
+                        </TableHead>
+                        <TableHead className="text-[10px] font-bold text-gray-400 h-10">
+                          STATUS
+                        </TableHead>
+                        <TableHead className="text-[10px] font-bold text-gray-400 text-right h-10">
+                          ACTIONS
+                        </TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {currentInvoice.productAllocations.map((alloc) => {
+                        // Find matching item description
+                        const item = currentInvoice.items?.find(
+                          (i) => i.modelId === alloc.modelId || i.productId === alloc.productId,
+                        );
+                        const isReplaced =
+                          alloc.status === 'REPLACED' || alloc.status === 'RETURNED';
+
+                        return (
+                          <TableRow
+                            key={alloc.id}
+                            className={`border-gray-50 ${isReplaced ? 'bg-gray-50/50 opacity-70' : ''}`}
+                          >
+                            <TableCell className="py-3 font-medium text-sm text-gray-700">
+                              {item ? getCleanProductName(item.description) : 'Equipment'}
+                            </TableCell>
+                            <TableCell className="py-3 font-bold text-[13px] text-gray-900">
+                              {alloc.serialNumber}
+                            </TableCell>
+                            <TableCell className="py-3 text-xs">
+                              <Badge
+                                variant={isReplaced ? 'outline' : 'default'}
+                                className={
+                                  isReplaced
+                                    ? 'text-gray-500 bg-gray-100'
+                                    : 'bg-emerald-100/50 text-emerald-700 hover:bg-emerald-100 border-emerald-200'
+                                }
+                              >
+                                {alloc.status}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="py-3 text-right">
+                              {mode === 'FINANCE' && alloc.status === 'ALLOCATED' && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-8 px-3 text-xs font-bold text-blue-600 border-blue-200 hover:bg-blue-50"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setReplacingAllocation({
+                                      allocationId: alloc.id,
+                                      serialNumber: alloc.serialNumber,
+                                      modelId: alloc.modelId,
+                                    });
+                                    setIsReplaceModalOpen(true);
+                                  }}
+                                >
+                                  <RefreshCw size={14} className="mr-1.5" />
+                                  Replace
+                                </Button>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
+            )}
+
           <div className="space-y-4">
             <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
               Order Items
@@ -1044,15 +1124,14 @@ export function InvoiceDetailsDialog({
                 </div>
               )}
 
-              {currentInvoice.saleType === 'SALE' &&
-              (currentInvoice.discountAmount || currentInvoice.discountPercent) ? (
+              {currentInvoice.discountAmount || currentInvoice.discountPercent ? (
                 <div className="space-y-1">
-                  <p className="text-[10px] font-bold text-gray-400 uppercase">Discount Amount</p>
+                  <p className="text-[10px] font-bold text-gray-400 uppercase">Discount Given</p>
                   <p className="text-sm font-bold text-success">
                     - QAR{' '}
                     {(
                       currentInvoice.discountAmount ||
-                      (currentInvoice.grossAmount || 0) *
+                      (currentInvoice.grossAmount || currentInvoice.monthlyRent || 0) *
                         ((currentInvoice.discountPercent || 0) / 100)
                     ).toLocaleString(undefined, {
                       minimumFractionDigits: 2,
@@ -1215,40 +1294,6 @@ export function InvoiceDetailsDialog({
                       Approve
                     </Button>
                   </>
-                )
-              ) : mode === 'FINANCE' &&
-                (currentInvoice.saleType === 'RENT' || currentInvoice.saleType === 'LEASE') &&
-                currentInvoice.contractStatus === 'ACTIVE' ? (
-                completing ? (
-                  <div className="flex items-center gap-3 animate-in slide-in-from-right-4">
-                    <span className="text-xs font-bold text-slate-500">End Contract?</span>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setCompleting(false)}
-                      className="h-10 text-muted-foreground hover:text-slate-800"
-                    >
-                      Cancel
-                    </Button>
-                    <Button
-                      size="sm"
-                      className="h-10 bg-slate-900 text-white shadow-sm hover:bg-slate-800 px-4"
-                      onClick={handleCompleteContract}
-                      disabled={isLoading}
-                    >
-                      {isLoading ? <Loader2 className="animate-spin h-4 w-4 mr-2" /> : null}
-                      Confirm Completion
-                    </Button>
-                  </div>
-                ) : (
-                  <Button
-                    variant="outline"
-                    className="flex-1 sm:flex-none rounded-xl h-10 px-6 font-bold text-slate-700 border-slate-200 hover:bg-slate-50"
-                    onClick={() => setCompleting(true)}
-                    disabled={isLoading}
-                  >
-                    Complete Contract
-                  </Button>
                 )
               ) : mode === 'FINANCE' &&
                 (currentInvoice.saleType === 'RENT' ||
@@ -1441,6 +1486,8 @@ export function InvoiceDetailsDialog({
                               ${itemsHtml}
 
                               <div style="margin-top: 30px; text-align: right;">
+                                ${inv.grossAmount ? `<p style="margin: 5px 0; color: #6b7280;">Gross Amount: <strong>QAR ${inv.grossAmount.toLocaleString()}</strong></p>` : ''}
+                                ${inv.discountAmount && inv.discountAmount > 0 ? `<p style="margin: 5px 0; color: #dc2626;">Discount Given: <strong>- QAR ${inv.discountAmount.toLocaleString()}</strong> ${inv.discountPercent ? `(${inv.discountPercent}%)` : ''}</p>` : ''}
                                 <p style="font-size: 18px; margin: 5px 0;">Total Amount: <strong style="color: #1d4ed8;">QAR ${(inv.totalAmount || 0).toLocaleString()}</strong></p>
                                 ${inv.advanceAmount ? `<p style="margin: 5px 0; color: #059669;">Advance Required: <strong>QAR ${inv.advanceAmount.toLocaleString()}</strong></p>` : ''}
                               </div>
@@ -1491,6 +1538,23 @@ export function InvoiceDetailsDialog({
         }}
         invoice={undefined}
       />
+
+      {replacingAllocation && (
+        <ReplaceDeviceModal
+          isOpen={isReplaceModalOpen}
+          onClose={() => {
+            setIsReplaceModalOpen(false);
+            setReplacingAllocation(null);
+          }}
+          contractId={currentInvoice.referenceContractId || currentInvoice.id}
+          allocationId={replacingAllocation.allocationId}
+          oldSerialNumber={replacingAllocation.serialNumber}
+          modelId={replacingAllocation.modelId}
+          onSuccess={() => {
+            handleSelectInvoice(currentInvoice.id); // Refresh current view
+          }}
+        />
+      )}
     </Dialog>
   );
 }

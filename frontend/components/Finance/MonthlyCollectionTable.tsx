@@ -147,7 +147,14 @@ export default function MonthlyCollectionTable({ mode }: { mode?: 'RENT' | 'LEAS
     {
       id: 'invoiceNumber',
       header: 'INV NUMBER',
-      accessorKey: 'invoiceNumber' as keyof CollectionAlert,
+      cell: (alertItem: CollectionAlert) => (
+        <button
+          onClick={() => handleViewDetails(alertItem)}
+          className="font-bold text-blue-600 hover:text-blue-800 hover:underline transition-colors"
+        >
+          {alertItem.invoiceNumber}
+        </button>
+      ),
     },
     {
       id: 'customer',
@@ -251,7 +258,17 @@ export default function MonthlyCollectionTable({ mode }: { mode?: 'RENT' | 'LEAS
       header: 'ACTION',
       className: 'text-right',
       cell: (alertItem: CollectionAlert) => (
-        <div className="flex justify-end gap-2">
+        <div className="flex justify-end gap-2 text-right">
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => handleViewDetails(alertItem)}
+            className="h-8 w-8 p-0 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-full transition-all"
+            title="View Details"
+          >
+            <Eye className="h-4 w-4" />
+          </Button>
+
           {alertItem.type === 'USAGE_PENDING' && (
             <Button
               size="sm"
@@ -337,6 +354,7 @@ export default function MonthlyCollectionTable({ mode }: { mode?: 'RENT' | 'LEAS
       {viewingInvoice && (
         <InvoiceDetailsDialog
           invoice={viewingInvoice}
+          mode="FINANCE"
           onClose={() => {
             setViewingInvoice(null);
           }}

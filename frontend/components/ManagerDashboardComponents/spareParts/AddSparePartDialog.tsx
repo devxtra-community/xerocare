@@ -13,6 +13,7 @@ import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { sparePartService } from '@/services/sparePartService';
 import { SearchableSelect } from '@/components/ui/searchable-select';
+import { MultiSelect } from '@/components/ui/multi-select';
 import { lotService, Lot, Vendor } from '@/lib/lot';
 import { warehouseService } from '@/services/warehouseService';
 import { vendorService } from '@/services/vendorService';
@@ -57,7 +58,7 @@ export default function AddSparePartDialog({
   const [formData, setFormData] = useState({
     part_name: '',
     brand: '',
-    model_id: '',
+    model_ids: [] as string[],
     base_price: '',
     warehouse_id: '',
     vendor_id: '',
@@ -135,7 +136,7 @@ export default function AddSparePartDialog({
       const respo = await sparePartService.addSparePart({
         ...formData,
         item_code: selectedLotItem.sparePart.item_code.toUpperCase(),
-        model_id: formData.model_id === 'null' ? undefined : formData.model_id,
+        model_ids: formData.model_ids,
         warehouse_id: formData.warehouse_id || undefined,
         vendor_id: formData.vendor_id || undefined,
         base_price: Number(formData.base_price),
@@ -149,7 +150,7 @@ export default function AddSparePartDialog({
       setFormData({
         part_name: '',
         brand: '',
-        model_id: '',
+        model_ids: [],
         base_price: '',
         warehouse_id: '',
         vendor_id: '',
@@ -223,7 +224,9 @@ export default function AddSparePartDialog({
                         part_name: selectedItem.sparePart.part_name,
                         brand: selectedItem.sparePart.brand,
                         base_price: selectedItem.unitPrice.toString(),
-                        model_id: selectedItem.sparePart.model_id || '',
+                        model_ids: selectedItem.sparePart.model_id
+                          ? [selectedItem.sparePart.model_id]
+                          : [],
                       });
                     }
                   }}
@@ -364,13 +367,13 @@ export default function AddSparePartDialog({
               />
             </div>
             <div className="space-y-2">
-              <Label>Compatible Model</Label>
-              <SearchableSelect
-                value={formData.model_id}
-                onValueChange={(val) => setFormData({ ...formData, model_id: val })}
+              <Label>Compatible Models</Label>
+              <MultiSelect
+                values={formData.model_ids}
+                onValuesChange={(vals) => setFormData({ ...formData, model_ids: vals })}
                 options={[
                   {
-                    value: 'null',
+                    value: 'universal',
                     label: 'Universal (No Model)',
                     description: 'Compatible with all models',
                   },
@@ -380,7 +383,7 @@ export default function AddSparePartDialog({
                     description: '',
                   })),
                 ]}
-                placeholder="Select Model (Optional)"
+                placeholder="Select Models (Optional)"
                 emptyText="No models found."
               />
             </div>

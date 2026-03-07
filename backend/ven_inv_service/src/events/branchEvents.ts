@@ -7,7 +7,7 @@ export enum BranchEventType {
 export interface BranchCreatedEvent {
   branchId: string;
   name: string;
-  managerId: string;
+  managerId?: string;
   location: string;
   createdAt: string;
 }

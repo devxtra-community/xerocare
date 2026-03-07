@@ -4,6 +4,7 @@ import { ProductService } from '../services/productService';
 import { logger } from '../config/logger';
 import { BulkProductRow } from '../dto/product.dto';
 import { MulterS3File } from '../types/multer-s3-file';
+import { ProductStatus } from '../entities/productEntity';
 
 const service = new ProductService();
 
@@ -46,7 +47,15 @@ export const addproduct = async (req: Request, res: Response, next: NextFunction
       tax_rate,
       print_colour,
       max_discount_amount,
+      lot_id,
     } = req.body;
+
+    if (!model_id || !warehouse_id || !vendor_id || !serial_no || !name || !brand || !MFD) {
+      throw new AppError(
+        'Missing required fields. Please ensure all required product details are provided.',
+        400,
+      );
+    }
 
     const file = req.file as MulterS3File;
     const imageKey = file?.key ?? null;
@@ -67,6 +76,7 @@ export const addproduct = async (req: Request, res: Response, next: NextFunction
       print_colour,
       max_discount_amount: max_discount_amount ? Number(max_discount_amount) : null,
       imageUrl,
+      lot_id: lot_id || undefined,
     });
     res
       .status(200)
@@ -88,9 +98,13 @@ export const getallproducts = async (req: Request, res: Response) => {
 
     // Admins see all, others only their branch
     const filteredBranchId = isAdmin ? undefined : branchId;
+    const modelId = req.query.modelId as string | undefined;
+    const status = req.query.status as ProductStatus | undefined;
 
-    logger.info(`Fetching products for branch: ${filteredBranchId || 'All'}`);
-    const products = await service.getAllProducts(filteredBranchId);
+    logger.info(
+      `Fetching products for branch: ${filteredBranchId || 'All'}, model: ${modelId || 'All'}, status: ${status || 'Any'}`,
+    );
+    const products = await service.getAllProducts(filteredBranchId, modelId, status);
     logger.info(`Fetched ${products?.length || 0} products`);
 
     if (!products || products.length === 0) {

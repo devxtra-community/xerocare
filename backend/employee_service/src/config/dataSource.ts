@@ -25,7 +25,7 @@ export const Source = new DataSource({
   ssl: {
     rejectUnauthorized: false,
   },
-  synchronize: false,
+  synchronize: true,
   entities: [Admin, Employee, Auth, Branch, LeaveApplication, Payroll, Notification],
   extra: {
     max: 1,
