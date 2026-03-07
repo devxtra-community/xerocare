@@ -36,7 +36,12 @@ export const Source = new DataSource({
     UsageRecordItem,
     DeviceMeterReading,
   ],
-  extra: { max: 2 },
+  extra: {
+    max: 10,
+    ssl: { rejectUnauthorized: false },
+    connectionTimeoutMillis: 5000,
+    keepAlive: true,
+  },
 });
 
 /**

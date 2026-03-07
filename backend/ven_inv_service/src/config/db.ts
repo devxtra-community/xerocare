@@ -33,7 +33,7 @@ export const Source = new DataSource({
   ssl: {
     rejectUnauthorized: false,
   },
-  synchronize: true, // Enabled to fix missing columns (lots.branch_id)
+  synchronize: false, // Enabled to fix missing columns (lots.branch_id)
   entities: [
     Vendor,
     Model,
@@ -52,7 +52,8 @@ export const Source = new DataSource({
     RfqVendorItem,
   ],
   extra: {
-    max: 1,
+    max: 10,
+    ssl: { rejectUnauthorized: false },
     connectionTimeoutMillis: 5000,
     keepAlive: true,
   },

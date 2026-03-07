@@ -25,10 +25,11 @@ export const Source = new DataSource({
   ssl: {
     rejectUnauthorized: false,
   },
-  synchronize: true,
+  synchronize: false,
   entities: [Admin, Employee, Auth, Branch, LeaveApplication, Payroll, Notification],
   extra: {
-    max: 1,
+    max: 10,
+    ssl: { rejectUnauthorized: false },
     connectionTimeoutMillis: 5000,
     keepAlive: true,
   },
