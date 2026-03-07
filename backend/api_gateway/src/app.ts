@@ -57,13 +57,6 @@ app.use(
 app.use(compression());
 
 // ---------------------------------------------------------------------------
-// Body parsers — MUST come before proxy middleware so bodies are available
-// for any gateway-level routes (e.g. invoiceRouter) that need them.
-// ---------------------------------------------------------------------------
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-
-// ---------------------------------------------------------------------------
 // HTTP request/response logger
 // ---------------------------------------------------------------------------
 app.use(httpLogger);
