@@ -19,12 +19,12 @@ import {
   getUsageHistory,
   Invoice,
   InvoiceItem,
-  UsageRecord,
 } from '@/lib/invoice';
 import { Product, getProductById } from '@/lib/product';
 import { toast } from 'sonner';
 import { Loader2, Calendar, Coins } from 'lucide-react';
 import { formatCurrency } from '@/lib/format';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { format } from 'date-fns';
 
@@ -87,14 +87,25 @@ export default function UsageRecordingModal({
   onSuccess,
   invoice: editingInvoice,
 }: UsageRecordingModalProps) {
+  const queryClient = useQueryClient();
+  const { data: contract } = useQuery({
+    queryKey: ['invoice', contractId || editingInvoice?.referenceContractId],
+    queryFn: () => getInvoiceById(contractId || editingInvoice!.referenceContractId!),
+    enabled: !!(contractId || editingInvoice?.referenceContractId),
+  });
+
+  const { data: history = [] } = useQuery({
+    queryKey: ['usage-history', contractId],
+    queryFn: () => getUsageHistory(contractId),
+    enabled: !!contractId,
+  });
+
   const [loading, setLoading] = useState(false);
-  const [contract, setContract] = useState<Invoice | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [estimatedCost, setEstimatedCost] = useState<number>(0);
   const [showPreview, setShowPreview] = useState(false);
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [recordedUsageData, setRecordedUsageData] = useState<RecordedUsageData | null>(null);
-  const [history, setHistory] = useState<UsageRecord[]>([]);
 
   const [formData, setFormData] = useState({
     billingPeriodStart: '',
@@ -133,6 +144,113 @@ export default function UsageRecordingModal({
     }
   }, [isOpen]);
 
+  // Hook Ordering Fix: Define memoized values used in effects first
+  const prevUsage = React.useMemo(() => {
+    if (!history.length || !formData.billingPeriodStart) return null;
+    const currentStart = new Date(formData.billingPeriodStart);
+    return history
+      .filter((h) => new Date(h.periodStart) < currentStart && h.id !== editingInvoice?.id)
+      .sort((a, b) => new Date(b.periodStart).getTime() - new Date(a.periodStart).getTime())[0];
+  }, [history, formData.billingPeriodStart, editingInvoice]);
+
+  const activeAllocationInitialCounts = React.useMemo(() => {
+    const allocs = contract?.productAllocations;
+    if (!allocs) return null;
+    const activeAlloc = allocs.find((a) => a.status === 'ALLOCATED' && a.replacementOfAllocationId);
+    if (!activeAlloc) return null;
+    return {
+      bwA4: activeAlloc.initialBwA4 ?? 0,
+      bwA3: activeAlloc.initialBwA3 ?? 0,
+      clrA4: activeAlloc.initialColorA4 ?? 0,
+      clrA3: activeAlloc.initialColorA3 ?? 0,
+    };
+  }, [contract?.productAllocations]);
+
+  // Calculate Aggregated Initial Counts from ALL Product Items
+  const calculatedInitialCounts = React.useMemo(() => {
+    if (!contract?.items) return { bwA4: 0, bwA3: 0, clrA4: 0, clrA3: 0 };
+
+    let bwA4 = 0,
+      bwA3 = 0,
+      clrA4 = 0,
+      clrA3 = 0;
+    contract.items.forEach((item) => {
+      // Check for product items (Allocated items)
+      if (item.itemType === 'PRODUCT' || item.productId) {
+        bwA4 += item.initialBwCount || 0;
+        bwA3 += item.initialBwA3Count || 0;
+        clrA4 += item.initialColorCount || 0;
+        clrA3 += item.initialColorA3Count || 0;
+      }
+    });
+    return { bwA4, bwA3, clrA4, clrA3 };
+  }, [contract]);
+
+  const effectivePrevCounts = React.useMemo(() => {
+    // Determine active machine(s)
+    const activeAllocs =
+      contract?.productAllocations?.filter((a) => a.status === 'ALLOCATED') || [];
+
+    // Priority 1: If we have previous usage record, try to get specific machine readings
+    if (prevUsage) {
+      // If there is exactly one active machine, use its reading from the previous record.
+      if (activeAllocs.length === 1) {
+        if (prevUsage.items && prevUsage.items.length > 0) {
+          const activeItem = prevUsage.items.find(
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (i: any) => i.allocationId === activeAllocs[0].id,
+          );
+          if (activeItem) {
+            return {
+              bwA4: activeItem.endBwA4 || 0,
+              bwA3: activeItem.endBwA3 || 0,
+              clrA4: activeItem.endColorA4 || 0,
+              clrA3: activeItem.endColorA3 || 0,
+              label: 'Prev',
+            };
+          }
+        }
+
+        // If it's the only machine but wasn't in the previous usage record's items list...
+        // it means it was newly replaced THIS month. Fallback to its own initial counts.
+        if (activeAllocationInitialCounts) {
+          return {
+            ...activeAllocationInitialCounts,
+            label: 'Replaced Initial',
+          };
+        }
+      }
+
+      // If it's a multi-machine contract without itemized tracking, fallback to gross cumulative sum
+      return {
+        bwA4: prevUsage.bwA4Count || 0,
+        bwA3: prevUsage.bwA3Count || 0,
+        clrA4: prevUsage.colorA4Count || 0,
+        clrA3: prevUsage.colorA3Count || 0,
+        label: 'Prev',
+      };
+    }
+
+    // Priority 2: If NO prevUsage exists (first month of contract), check if it's already a replacement
+    if (activeAllocationInitialCounts) {
+      return {
+        ...activeAllocationInitialCounts,
+        label: 'Replaced Initial',
+      };
+    }
+
+    // Priority 3: Original contract initial counts
+    return {
+      ...calculatedInitialCounts,
+      label: 'Initial',
+    };
+  }, [
+    activeAllocationInitialCounts,
+    prevUsage,
+    calculatedInitialCounts,
+    contract?.productAllocations,
+  ]);
+
   React.useEffect(() => {
     if (editingInvoice) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -145,7 +263,8 @@ export default function UsageRecordingModal({
       else if (inv.discountBwCopies > 0 || inv.discountColorCopies > 0)
         initialDiscountType = 'COPIES';
 
-      setFormData({
+      setFormData((prev) => ({
+        ...prev,
         billingPeriodStart: start,
         billingPeriodEnd: end,
         bwA4Count: String(inv.bwA4Count || 0),
@@ -171,93 +290,75 @@ export default function UsageRecordingModal({
           startColorA3: item.startColorA3 || 0,
           endColorA3: item.endColorA3 || 0,
         })),
-      });
+      }));
 
-      if (editingInvoice.referenceContractId || contractId) {
-        getInvoiceById(editingInvoice.referenceContractId || contractId)
-          .then((contractData) => {
-            setContract(contractData);
-            // Fix formData initialized values if there's exactly one active machine
-            const activeAllocs =
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              contractData.productAllocations?.filter((pa: any) => pa.status === 'ALLOCATED') || [];
-            if (activeAllocs.length === 1) {
-              const activeId = activeAllocs[0].id;
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              const activeItem = inv.items?.find((i: any) => i.allocationId === activeId);
-              if (activeItem) {
-                setFormData((prev) => ({
-                  ...prev,
-                  bwA4Count: String(activeItem.endBwA4 || 0),
-                  bwA3Count: String(activeItem.endBwA3 || 0),
-                  colorA4Count: String(activeItem.endColorA4 || 0),
-                  colorA3Count: String(activeItem.endColorA3 || 0),
-                }));
-              }
-            }
-          })
-          .catch((err) => console.error('Failed to fetch reference contract:', err));
+      if (contract) {
+        // Fix formData initialized values if there's exactly one active machine
+        const activeAllocs =
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          contract.productAllocations?.filter((pa: any) => pa.status === 'ALLOCATED') || [];
+        if (activeAllocs.length === 1) {
+          const activeId = activeAllocs[0].id;
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const activeItem = inv.items?.find((i: any) => i.allocationId === activeId);
+          if (activeItem) {
+            setFormData((prev) => ({
+              ...prev,
+              bwA4Count: String(activeItem.endBwA4 || 0),
+              bwA3Count: String(activeItem.endBwA3 || 0),
+              colorA4Count: String(activeItem.endColorA4 || 0),
+              colorA3Count: String(activeItem.endColorA3 || 0),
+            }));
+          }
+        }
       }
-    } else if (contractId) {
-      getInvoiceById(contractId)
-        .then((data) => {
-          setContract(data);
+    } else if (contract) {
+      // Use the contract's actual billing period (effectiveFrom to effectiveTo)
+      const startStr = contract.effectiveFrom?.split('T')[0] || '';
+      const endStr = contract.effectiveTo?.split('T')[0] || '';
 
-          // Use the contract's actual billing period (effectiveFrom to effectiveTo)
-          const startStr = data.effectiveFrom?.split('T')[0] || '';
-          const endStr = data.effectiveTo?.split('T')[0] || '';
-
-          setFormData((prev) => ({
-            ...prev,
-            billingPeriodStart: startStr,
-            billingPeriodEnd: endStr,
-            items: (data.productAllocations || [])
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              .filter((a: any) => {
-                if (a.status === 'ALLOCATED') return true;
-                if (a.status === 'REPLACED' && a.endTimestamp) {
-                  // Replaced during or before current period
-                  return true;
-                }
-                return false;
-              })
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              .map((a: any) => ({
-                allocationId: a.id,
-                serialNumber: a.serialNumber,
-                modelId: a.modelId,
-                startBwA4:
-                  a.status === 'ALLOCATED'
-                    ? effectivePrevCounts?.bwA4 || a.initialBwA4 || 0
-                    : a.initialBwA4 || 0,
-                endBwA4: a.status === 'ALLOCATED' ? a.currentBwA4 || 0 : a.currentBwA4 || 0,
-                startBwA3:
-                  a.status === 'ALLOCATED'
-                    ? effectivePrevCounts?.bwA3 || a.initialBwA3 || 0
-                    : a.initialBwA3 || 0,
-                endBwA3: a.status === 'ALLOCATED' ? a.currentBwA3 || 0 : a.currentBwA3 || 0,
-                startColorA4:
-                  a.status === 'ALLOCATED'
-                    ? effectivePrevCounts?.clrA4 || a.initialColorA4 || 0
-                    : a.initialColorA4 || 0,
-                endColorA4:
-                  a.status === 'ALLOCATED' ? a.currentColorA4 || 0 : a.currentColorA4 || 0,
-                startColorA3:
-                  a.status === 'ALLOCATED'
-                    ? effectivePrevCounts?.clrA3 || a.initialColorA3 || 0
-                    : a.initialColorA3 || 0,
-                endColorA3:
-                  a.status === 'ALLOCATED' ? a.currentColorA3 || 0 : a.currentColorA3 || 0,
-              })),
-          }));
-        })
-        .catch((err) => console.error('Failed to fetch contract details:', err));
-
-      getUsageHistory(contractId)
-        .then((data) => setHistory(data))
-        .catch((err) => console.error('Failed to fetch usage history:', err));
+      setFormData((prev) => ({
+        ...prev,
+        billingPeriodStart: startStr,
+        billingPeriodEnd: endStr,
+        items: (contract.productAllocations || [])
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          .filter((a: any) => {
+            if (a.status === 'ALLOCATED') return true;
+            if (a.status === 'REPLACED' && a.endTimestamp) {
+              return true;
+            }
+            return false;
+          })
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          .map((a: any) => ({
+            allocationId: a.id,
+            serialNumber: a.serialNumber,
+            modelId: a.modelId,
+            startBwA4:
+              a.status === 'ALLOCATED'
+                ? effectivePrevCounts?.bwA4 || a.initialBwA4 || 0
+                : a.initialBwA4 || 0,
+            endBwA4: a.status === 'ALLOCATED' ? a.currentBwA4 || 0 : a.currentBwA4 || 0,
+            startBwA3:
+              a.status === 'ALLOCATED'
+                ? effectivePrevCounts?.bwA3 || a.initialBwA3 || 0
+                : a.initialBwA3 || 0,
+            endBwA3: a.status === 'ALLOCATED' ? a.currentBwA3 || 0 : a.currentBwA3 || 0,
+            startColorA4:
+              a.status === 'ALLOCATED'
+                ? effectivePrevCounts?.clrA4 || a.initialColorA4 || 0
+                : a.initialColorA4 || 0,
+            endColorA4: a.status === 'ALLOCATED' ? a.currentColorA4 || 0 : a.currentColorA4 || 0,
+            startColorA3:
+              a.status === 'ALLOCATED'
+                ? effectivePrevCounts?.clrA3 || a.initialColorA3 || 0
+                : a.initialColorA3 || 0,
+            endColorA3: a.status === 'ALLOCATED' ? a.currentColorA3 || 0 : a.currentColorA3 || 0,
+          })),
+      }));
     }
-  }, [contractId, editingInvoice]);
+  }, [contract, editingInvoice, effectivePrevCounts]);
 
   React.useEffect(() => {
     if (editingInvoice) return;
@@ -311,30 +412,6 @@ export default function UsageRecordingModal({
       }));
     }
   }, [history, contract, editingInvoice]);
-
-  const prevUsage = React.useMemo(() => {
-    if (!history.length || !formData.billingPeriodStart) return null;
-    const currentStart = new Date(formData.billingPeriodStart);
-    return history
-      .filter((h) => new Date(h.periodStart) < currentStart && h.id !== editingInvoice?.id)
-      .sort((a, b) => new Date(b.periodStart).getTime() - new Date(a.periodStart).getTime())[0];
-  }, [history, formData.billingPeriodStart, editingInvoice]);
-
-  // If the current allocation is a replacement device, its meter starts from its own
-  // initial readings (e.g. 0), NOT the previous device's final cumulative count.
-  // This prevents showing a wrong "Prev" and wrong delta in the UI after device replacement.
-  const activeAllocationInitialCounts = React.useMemo(() => {
-    const allocs = contract?.productAllocations;
-    if (!allocs) return null;
-    const activeAlloc = allocs.find((a) => a.status === 'ALLOCATED' && a.replacementOfAllocationId);
-    if (!activeAlloc) return null;
-    return {
-      bwA4: activeAlloc.initialBwA4 ?? 0,
-      bwA3: activeAlloc.initialBwA3 ?? 0,
-      clrA4: activeAlloc.initialColorA4 ?? 0,
-      clrA3: activeAlloc.initialColorA3 ?? 0,
-    };
-  }, [contract?.productAllocations]);
 
   // Calculate usage of any devices that were replaced *during* this billing period
   const replacedDeltas = React.useMemo(() => {
@@ -530,91 +607,6 @@ export default function UsageRecordingModal({
     if (ruleItems.color || ruleItems.combo) return true;
     return products.some((p) => p.print_colour === 'COLOUR' || p.print_colour === 'BOTH');
   }, [ruleItems, products]);
-
-  // Calculate Aggregated Initial Counts from ALL Product Items
-  const calculatedInitialCounts = React.useMemo(() => {
-    if (!contract?.items) return { bwA4: 0, bwA3: 0, clrA4: 0, clrA3: 0 };
-
-    let bwA4 = 0,
-      bwA3 = 0,
-      clrA4 = 0,
-      clrA3 = 0;
-    contract.items.forEach((item) => {
-      // Check for product items (Allocated items)
-      if (item.itemType === 'PRODUCT' || item.productId) {
-        bwA4 += item.initialBwCount || 0;
-        bwA3 += item.initialBwA3Count || 0;
-        clrA4 += item.initialColorCount || 0;
-        clrA3 += item.initialColorA3Count || 0;
-      }
-    });
-    return { bwA4, bwA3, clrA4, clrA3 };
-  }, [contract]);
-
-  const effectivePrevCounts = React.useMemo(() => {
-    // Determine active machine(s)
-    const activeAllocs =
-      contract?.productAllocations?.filter((a) => a.status === 'ALLOCATED') || [];
-
-    // Priority 1: If we have previous usage record, try to get specific machine readings
-    if (prevUsage) {
-      // If there is exactly one active machine, use its reading from the previous record.
-      if (activeAllocs.length === 1) {
-        if (prevUsage.items && prevUsage.items.length > 0) {
-          const activeItem = prevUsage.items.find(
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            (i: any) => i.allocationId === activeAllocs[0].id,
-          );
-          if (activeItem) {
-            return {
-              bwA4: activeItem.endBwA4 || 0,
-              bwA3: activeItem.endBwA3 || 0,
-              clrA4: activeItem.endColorA4 || 0,
-              clrA3: activeItem.endColorA3 || 0,
-              label: 'Prev',
-            };
-          }
-        }
-
-        // If it's the only machine but wasn't in the previous usage record's items list...
-        // it means it was newly replaced THIS month. Fallback to its own initial counts.
-        if (activeAllocationInitialCounts) {
-          return {
-            ...activeAllocationInitialCounts,
-            label: 'Replaced Initial',
-          };
-        }
-      }
-
-      // If it's a multi-machine contract without itemized tracking, fallback to gross cumulative sum
-      return {
-        bwA4: prevUsage.bwA4Count || 0,
-        bwA3: prevUsage.bwA3Count || 0,
-        clrA4: prevUsage.colorA4Count || 0,
-        clrA3: prevUsage.colorA3Count || 0,
-        label: 'Prev',
-      };
-    }
-
-    // Priority 2: If NO prevUsage exists (first month of contract), check if it's already a replacement
-    if (activeAllocationInitialCounts) {
-      return {
-        ...activeAllocationInitialCounts,
-        label: 'Replaced Initial',
-      };
-    }
-
-    // Priority 3: Original contract initial counts
-    return {
-      ...calculatedInitialCounts,
-      label: 'Initial',
-    };
-  }, [
-    activeAllocationInitialCounts,
-    prevUsage,
-    calculatedInitialCounts,
-    contract?.productAllocations,
-  ]);
 
   // Detect Last Month (Strict Date Match)
   const isLastMonth = React.useMemo(() => {
@@ -1032,6 +1024,11 @@ export default function UsageRecordingModal({
           items: formData.items,
         });
         toast.success('Usage record updated successfully');
+        queryClient.invalidateQueries({ queryKey: ['invoices'] });
+        queryClient.invalidateQueries({ queryKey: ['usage-history', contractId] });
+        queryClient.invalidateQueries({
+          queryKey: ['invoice', contractId || editingInvoice?.referenceContractId],
+        });
         onSuccess();
         onClose();
       } else {
@@ -1133,6 +1130,9 @@ export default function UsageRecordingModal({
         // We do *not* call onSuccess() here. Calling it triggers the parent to fetch and remount
         // the state, which instantly kills the UsagePreviewDialog and flips back to the input form.
         // onSuccess is deferred to the close callback of the Preview Dialog.
+        queryClient.invalidateQueries({ queryKey: ['invoices'] });
+        queryClient.invalidateQueries({ queryKey: ['usage-history', contractId] });
+        queryClient.invalidateQueries({ queryKey: ['invoice', contractId] });
         onSuccess();
         onClose();
       }
@@ -1316,9 +1316,13 @@ export default function UsageRecordingModal({
                           <span className="invisible">Free Limit: 0</span>
                         ) : (
                           <span>
-                            Free Limit:{' '}
+                            {ruleItems.combo ? 'Combined Total Limit' : 'Free Limit'}:{' '}
                             <span className="font-bold text-slate-700">
-                              {Number(ruleItems.bw?.bwIncludedLimit || 0).toLocaleString()}
+                              {Number(
+                                ruleItems.combo?.combinedIncludedLimit ||
+                                  ruleItems.bw?.bwIncludedLimit ||
+                                  0,
+                              ).toLocaleString()}
                             </span>{' '}
                             per month
                           </span>
@@ -1515,9 +1519,13 @@ export default function UsageRecordingModal({
                           <span className="invisible">Free Limit: 0</span>
                         ) : (
                           <span>
-                            Free Limit:{' '}
+                            {ruleItems.combo ? 'Combined Total Limit' : 'Free Limit'}:{' '}
                             <span className="font-bold text-rose-700">
-                              {Number(ruleItems.color?.colorIncludedLimit || 0).toLocaleString()}
+                              {Number(
+                                ruleItems.combo?.combinedIncludedLimit ||
+                                  ruleItems.color?.colorIncludedLimit ||
+                                  0,
+                              ).toLocaleString()}
                             </span>{' '}
                             per month
                           </span>
@@ -2499,54 +2507,178 @@ export default function UsageRecordingModal({
 
                   {/* Discount row */}
                   {formData.discountType !== 'NONE' && (
-                    <div className="pt-1 flex justify-between items-center text-xs text-purple-700">
-                      <span className="font-medium">Discount Applied</span>
-                      <span className="font-bold">
-                        {formData.discountType === 'AMOUNT'
-                          ? `- QAR ${Number(formData.discountAmount || 0).toLocaleString()}`
-                          : (() => {
-                              const discountCopies =
-                                Number(formData.discountBwCopies || 0) +
-                                Number(formData.discountColorCopies || 0);
-                              // Find the applicable slab rate for the current volume
-                              const slabs = parseSlabs(
-                                ruleItems.combo?.comboSlabRanges ||
-                                  ruleItems.bw?.bwSlabRanges ||
-                                  ruleItems.color?.colorSlabRanges,
-                              );
-                              let rate = 0;
-                              if (slabs.length > 0) {
-                                const sortedSlabs = [...slabs].sort((a, b) => a.from - b.from);
-                                rate = sortedSlabs[0]?.rate || 0;
+                    <div className="pt-1 flex flex-col items-end text-xs text-purple-700">
+                      <div className="w-full flex justify-between items-center mb-0.5">
+                        <span className="font-medium font-bold">Discount Applied</span>
+                        <span className="font-bold">
+                          {formData.discountType === 'AMOUNT'
+                            ? `- QAR ${Number(formData.discountAmount || 0).toLocaleString()}`
+                            : (() => {
+                                // Calculate total monetary discount from both types
+                                const bwDiscount = Number(formData.discountBwCopies || 0);
+                                const clrDiscount = Number(formData.discountColorCopies || 0);
 
-                                // Calculate Gross Usage Delta for Slab Detection in UI
-                                const grossBwA4 = Number(formData.bwA4Count || 0);
-                                const grossBwA3 = Number(formData.bwA3Count || 0);
-                                const grossClrA4 = Number(formData.colorA4Count || 0);
-                                const grossClrA3 = Number(formData.colorA3Count || 0);
+                                // Find rates
+                                let bwRate = 0;
+                                let clrRate = 0;
 
-                                const grossUsageDelta =
-                                  grossBwA4 -
-                                  effectivePrevCounts.bwA4 +
-                                  (grossBwA3 - effectivePrevCounts.bwA3) * 2 +
-                                  (grossClrA4 -
+                                if (contract?.rentType?.includes('CPC')) {
+                                  const bwSlabs = parseSlabs(ruleItems.bw?.bwSlabRanges);
+                                  const clrSlabs = parseSlabs(ruleItems.color?.colorSlabRanges);
+                                  const comboSlabs = parseSlabs(ruleItems.combo?.comboSlabRanges);
+
+                                  const bwUsage =
+                                    Number(formData.bwA4Count || 0) -
+                                    effectivePrevCounts.bwA4 +
+                                    (Number(formData.bwA3Count || 0) - effectivePrevCounts.bwA3) *
+                                      2;
+                                  const clrUsage =
+                                    Number(formData.colorA4Count || 0) -
                                     effectivePrevCounts.clrA4 +
-                                    (grossClrA3 - effectivePrevCounts.clrA3) * 2);
+                                    (Number(formData.colorA3Count || 0) -
+                                      effectivePrevCounts.clrA3) *
+                                      2;
+                                  const totalUsage = bwUsage + clrUsage;
 
-                                for (const s of sortedSlabs) {
-                                  if (grossUsageDelta >= s.from) rate = Number(s.rate);
-                                }
-                              } else {
-                                rate = Number(
-                                  ruleItems.combo?.combinedExcessRate ||
+                                  if (comboSlabs.length > 0) {
+                                    const sorted = [...comboSlabs].sort((a, b) => a.from - b.from);
+                                    let rate = sorted[0]?.rate || 0;
+                                    for (const s of sorted) {
+                                      if (totalUsage >= s.from) rate = s.rate;
+                                    }
+                                    bwRate = rate;
+                                    clrRate = rate;
+                                  } else {
+                                    if (bwSlabs.length > 0) {
+                                      const sorted = [...bwSlabs].sort((a, b) => a.from - b.from);
+                                      let rate = sorted[0]?.rate || 0;
+                                      for (const s of sorted) {
+                                        if (bwUsage >= s.from) rate = s.rate;
+                                      }
+                                      bwRate = rate;
+                                    } else {
+                                      bwRate = Number(
+                                        ruleItems.bw?.bwExcessRate ||
+                                          ruleItems.combo?.combinedExcessRate ||
+                                          0,
+                                      );
+                                    }
+
+                                    if (clrSlabs.length > 0) {
+                                      const sorted = [...clrSlabs].sort((a, b) => a.from - b.from);
+                                      let rate = sorted[0]?.rate || 0;
+                                      for (const s of sorted) {
+                                        if (clrUsage >= s.from) rate = s.rate;
+                                      }
+                                      clrRate = rate;
+                                    } else {
+                                      clrRate = Number(
+                                        ruleItems.color?.colorExcessRate ||
+                                          ruleItems.combo?.combinedExcessRate ||
+                                          0,
+                                      );
+                                    }
+                                  }
+                                } else {
+                                  bwRate = Number(
                                     ruleItems.bw?.bwExcessRate ||
+                                      ruleItems.combo?.combinedExcessRate ||
+                                      0,
+                                  );
+                                  clrRate = Number(
                                     ruleItems.color?.colorExcessRate ||
-                                    0,
-                                );
-                              }
-                              return `${discountCopies} copies (- QAR ${(discountCopies * rate).toLocaleString()})`;
-                            })()}
-                      </span>
+                                      ruleItems.combo?.combinedExcessRate ||
+                                      0,
+                                  );
+                                }
+
+                                const totalMonetary = bwDiscount * bwRate + clrDiscount * clrRate;
+                                return `- QAR ${totalMonetary.toLocaleString()}`;
+                              })()}
+                        </span>
+                      </div>
+                      {formData.discountType === 'COPIES' && (
+                        <div className="text-[9px] text-purple-600/70 italic text-right">
+                          {Number(formData.discountBwCopies || 0) > 0 && (
+                            <div>
+                              • BW: {formData.discountBwCopies} copies
+                              {(() => {
+                                let rate = 0;
+                                if (contract?.rentType?.includes('CPC')) {
+                                  const slabs = parseSlabs(
+                                    ruleItems.bw?.bwSlabRanges || ruleItems.combo?.comboSlabRanges,
+                                  );
+                                  const usage =
+                                    Number(formData.bwA4Count || 0) -
+                                    effectivePrevCounts.bwA4 +
+                                    (Number(formData.bwA3Count || 0) - effectivePrevCounts.bwA3) *
+                                      2;
+                                  if (slabs.length > 0) {
+                                    const sorted = [...slabs].sort((a, b) => a.from - b.from);
+                                    rate = sorted[0]?.rate || 0;
+                                    for (const s of sorted) {
+                                      if (usage >= s.from) rate = s.rate;
+                                    }
+                                  } else {
+                                    rate = Number(
+                                      ruleItems.bw?.bwExcessRate ||
+                                        ruleItems.combo?.combinedExcessRate ||
+                                        0,
+                                    );
+                                  }
+                                } else {
+                                  rate = Number(
+                                    ruleItems.bw?.bwExcessRate ||
+                                      ruleItems.combo?.combinedExcessRate ||
+                                      0,
+                                  );
+                                }
+                                return ` (- QAR ${(Number(formData.discountBwCopies) * rate).toLocaleString()})`;
+                              })()}
+                            </div>
+                          )}
+                          {Number(formData.discountColorCopies || 0) > 0 && (
+                            <div>
+                              • Color: {formData.discountColorCopies} copies
+                              {(() => {
+                                let rate = 0;
+                                if (contract?.rentType?.includes('CPC')) {
+                                  const slabs = parseSlabs(
+                                    ruleItems.color?.colorSlabRanges ||
+                                      ruleItems.combo?.comboSlabRanges,
+                                  );
+                                  const usage =
+                                    Number(formData.colorA4Count || 0) -
+                                    effectivePrevCounts.clrA4 +
+                                    (Number(formData.colorA3Count || 0) -
+                                      effectivePrevCounts.clrA3) *
+                                      2;
+                                  if (slabs.length > 0) {
+                                    const sorted = [...slabs].sort((a, b) => a.from - b.from);
+                                    rate = sorted[0]?.rate || 0;
+                                    for (const s of sorted) {
+                                      if (usage >= s.from) rate = s.rate;
+                                    }
+                                  } else {
+                                    rate = Number(
+                                      ruleItems.color?.colorExcessRate ||
+                                        ruleItems.combo?.combinedExcessRate ||
+                                        0,
+                                    );
+                                  }
+                                } else {
+                                  rate = Number(
+                                    ruleItems.color?.colorExcessRate ||
+                                      ruleItems.combo?.combinedExcessRate ||
+                                      0,
+                                  );
+                                }
+                                return ` (- QAR ${(Number(formData.discountColorCopies) * rate).toLocaleString()})`;
+                              })()}
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   )}
 

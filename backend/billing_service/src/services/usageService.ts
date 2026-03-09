@@ -317,8 +317,14 @@ export class UsageService {
 
     if (rule) {
       if (contract.rentType === 'FIXED_LIMIT') {
-        const bwExceeded = Math.max(0, monthlyBw - (rule.bwIncludedLimit || 0));
-        const colorExceeded = Math.max(0, monthlyColor - (rule.colorIncludedLimit || 0));
+        const bwExceeded = Math.max(
+          0,
+          monthlyBw - (rule.bwIncludedLimit || 0) - (payload.discountBwCopies || 0),
+        );
+        const colorExceeded = Math.max(
+          0,
+          monthlyColor - (rule.colorIncludedLimit || 0) - (payload.discountColorCopies || 0),
+        );
 
         exceededTotal = bwExceeded + colorExceeded;
         const bwCharge = bwExceeded * Number(rule.bwExcessRate || 0);
@@ -329,17 +335,27 @@ export class UsageService {
           rule.combinedIncludedLimit ||
           (rule.bwIncludedLimit || 0) + (rule.colorIncludedLimit || 0);
         const totalMonthly = monthlyBw + monthlyColor;
-        exceededTotal = Math.max(0, totalMonthly - combinedLimit);
+        exceededTotal = Math.max(
+          0,
+          totalMonthly -
+            combinedLimit -
+            (payload.discountBwCopies || 0) -
+            (payload.discountColorCopies || 0),
+        );
         exceededCharge = exceededTotal * Number(rule.combinedExcessRate || rule.bwExcessRate || 0);
       } else if (contract.rentType === 'CPC' || contract.rentType === 'CPC_COMBO') {
         // For exceeded total count, we show the net (after discount) copies
-        exceededTotal = Math.max(
+        const bwNet = Math.max(0, monthlyBw - (payload.discountBwCopies || 0));
+        const clrNet = Math.max(0, monthlyColor - (payload.discountColorCopies || 0));
+        const totalNet = Math.max(
           0,
           monthlyNormalized - (payload.discountBwCopies || 0) - (payload.discountColorCopies || 0),
         );
-        const bwCharge = this.calculateSlabCharge(monthlyBw, rule.bwSlabRanges);
-        const colorCharge = this.calculateSlabCharge(monthlyColor, rule.colorSlabRanges);
-        const comboCharge = this.calculateSlabCharge(monthlyNormalized, rule.comboSlabRanges);
+
+        exceededTotal = totalNet;
+        const bwCharge = this.calculateSlabCharge(bwNet, rule.bwSlabRanges);
+        const colorCharge = this.calculateSlabCharge(clrNet, rule.colorSlabRanges);
+        const comboCharge = this.calculateSlabCharge(totalNet, rule.comboSlabRanges);
 
         // If it's a combo rule, use comboCharge, otherwise sum BW and Color
         exceededCharge =
