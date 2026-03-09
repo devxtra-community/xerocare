@@ -15,6 +15,7 @@ import { Product, getAvailableProductsByModel } from '@/lib/product';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { SearchableSelect } from '@/components/ui/searchable-select';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface FinanceApprovalModalProps {
   invoice: Invoice;
@@ -27,6 +28,7 @@ interface FinanceApprovalModalProps {
  */
 export function FinanceApprovalModal({ invoice, onClose, onSuccess }: FinanceApprovalModalProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const queryClient = useQueryClient();
 
   const getAllocatableItems = () => {
     return invoice.items?.filter((i) => i.itemType === 'PRODUCT' && i.id) || [];
@@ -105,6 +107,8 @@ export function FinanceApprovalModal({ invoice, onClose, onSuccess }: FinanceApp
       await allocateMachinesInvoice(invoice.id, { itemUpdates });
 
       toast.success('Machines allocated successfully!');
+      queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      queryClient.invalidateQueries({ queryKey: ['invoice', invoice.id] });
       onSuccess();
       onClose();
     } catch (error) {

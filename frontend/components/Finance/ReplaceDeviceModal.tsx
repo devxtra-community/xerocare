@@ -13,10 +13,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
+import { getAvailableProductsByModel, Product } from '@/lib/product';
+import { useQueryClient } from '@tanstack/react-query';
 import { Loader2, RefreshCw } from 'lucide-react';
 import { replaceDeviceAllocation, getUsageHistory } from '@/lib/invoice';
 import { SearchableSelect } from '@/components/ui/searchable-select';
-import api from '@/lib/api';
 
 interface ReplaceDeviceModalProps {
   isOpen: boolean;
@@ -28,14 +29,15 @@ interface ReplaceDeviceModalProps {
   onSuccess: () => void;
 }
 
-interface Product {
-  id: string;
-  serial_no: string;
-  name?: string;
-  model?: {
-    name: string;
-  };
-}
+// Product interface is now imported from '@/lib/product'
+// interface Product {
+//   id: string;
+//   serial_no: string;
+//   name?: string;
+//   model?: {
+//     name: string;
+//   };
+// }
 
 interface UsageHistory {
   periodEnd: string;
@@ -55,6 +57,9 @@ export default function ReplaceDeviceModal({
   onSuccess,
 }: ReplaceDeviceModalProps) {
   const [loading, setLoading] = useState(false);
+  const queryClient = useQueryClient();
+
+  // Load available products for the same model
   const [fetchingProducts, setFetchingProducts] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
   const [prevUsage, setPrevUsage] = useState<UsageHistory | null>(null);
@@ -112,8 +117,8 @@ export default function ReplaceDeviceModal({
         const fetchAvailableProducts = async () => {
           setFetchingProducts(true);
           try {
-            const response = await api.get(`/i/products?modelId=${modelId}&status=AVAILABLE`);
-            setProducts(response.data.data || []);
+            const response = await getAvailableProductsByModel(modelId);
+            setProducts(response || []);
           } catch (error) {
             console.error('Failed to fetch available products:', error);
           } finally {
@@ -188,7 +193,10 @@ export default function ReplaceDeviceModal({
         },
       });
 
-      toast.success('Device replaced successfully.');
+      toast.success('Device replaced successfully');
+      queryClient.invalidateQueries({ queryKey: ['invoice', contractId] });
+      queryClient.invalidateQueries({ queryKey: ['usage-history', contractId] });
+      queryClient.invalidateQueries({ queryKey: ['invoices'] });
       onSuccess();
       onClose();
     } catch (error: unknown) {
@@ -202,7 +210,7 @@ export default function ReplaceDeviceModal({
   const productOptions = products.map((p) => ({
     value: p.serial_no,
     label: p.serial_no,
-    description: p.name || p.model?.name,
+    description: p.name || p.model?.model_name,
   }));
 
   return (
