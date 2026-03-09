@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import EmployeeRentStats from '@/components/employeeComponents/EmployeeRentStats';
 import EmployeeRentGraphs from '@/components/employeeComponents/EmployeeRentGraphs';
-import { getBranchInvoices, Invoice } from '@/lib/invoice';
+import { getBranchInvoices, getGlobalSalesTotals, Invoice } from '@/lib/invoice';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import MonthlyCollectionTable from '@/components/Finance/MonthlyCollectionTable';
 import CompletedCollectionsTable from '@/components/Finance/CompletedCollectionsTable';
@@ -11,17 +11,25 @@ import FinanceApprovalTable from '@/components/Finance/FinanceApprovalTable';
 
 export default function RentPage() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [rentTotalOverride, setRentTotalOverride] = useState<number | undefined>(undefined);
 
   useEffect(() => {
-    const fetchInvoices = async () => {
+    const fetchData = async () => {
       try {
-        const data = await getBranchInvoices();
-        setInvoices(data);
+        const [invoiceData, salesTotals] = await Promise.all([
+          getBranchInvoices(),
+          getGlobalSalesTotals(),
+        ]);
+        setInvoices(invoiceData);
+
+        // Use the backend-aggregated RENT total (same as finance dashboard 35.8k)
+        const rentEntry = salesTotals.salesByType.find((s) => s.saleType === 'RENT');
+        setRentTotalOverride(rentEntry ? rentEntry.total : 0);
       } catch (error) {
         console.error('Failed to fetch finance rent:', error);
       }
     };
-    fetchInvoices();
+    fetchData();
   }, []);
 
   return (
@@ -32,7 +40,7 @@ export default function RentPage() {
           <p className="text-muted-foreground">Manage and approve rental agreements</p>
         </div>
 
-        <EmployeeRentStats invoices={invoices} />
+        <EmployeeRentStats invoices={invoices} rentTotalOverride={rentTotalOverride} />
         <EmployeeRentGraphs invoices={invoices} />
 
         <Tabs defaultValue="pending" className="w-full space-y-4">
@@ -53,7 +61,7 @@ export default function RentPage() {
 
           <TabsContent value="collection" className="space-y-4">
             <h3 className="text-xl font-bold text-slate-800 tracking-tight">
-              Monthly Usage & Billing
+              Monthly Usage &amp; Billing
             </h3>
             <div className="bg-card rounded-xl shadow-sm border border-slate-100 p-1">
               <MonthlyCollectionTable mode="RENT" />

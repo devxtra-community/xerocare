@@ -23,8 +23,8 @@ export class RfqItem {
   item_type!: ItemType;
 
   // UUID corresponding to either Model or SparePart
-  @Column({ type: 'uuid' })
-  item_id!: string;
+  @Column({ type: 'uuid', nullable: true })
+  item_id?: string;
 
   @Column({ type: 'int' })
   quantity!: number;

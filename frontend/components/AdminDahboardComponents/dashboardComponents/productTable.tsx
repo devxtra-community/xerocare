@@ -4,13 +4,15 @@ import { useState, useEffect } from 'react';
 import {} from // Table imports removed as they were unused
 '@/components/ui/table';
 import { Product, getAllProducts } from '@/lib/product';
+import { usePagination } from '@/hooks/usePagination';
+import Pagination from '@/components/Pagination';
 
 /**
  * Dashboard widget displaying recent products and their stock levels.
  * Shows product name, total aggregated quantity, price, and creation date.
  */
 export default function ProductsTable() {
-  const [page, setPage] = useState(1);
+  const { page, limit, total, setPage, setTotal, totalPages } = usePagination(5);
   const [data, setData] = useState<Product[]>([]);
 
   useEffect(() => {
@@ -28,10 +30,11 @@ export default function ProductsTable() {
   const getTotalStock = (p: Product) =>
     p.inventory?.reduce((sum, inv) => sum + inv.quantity, 0) || 0;
 
-  const ITEMS_PER_PAGE = 5;
-  const totalPages = Math.ceil(data.length / ITEMS_PER_PAGE);
-  const startIndex = (page - 1) * ITEMS_PER_PAGE;
-  const currentData = data.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+  useEffect(() => {
+    setTotal(data.length);
+  }, [data.length, setTotal]);
+
+  const currentData = data.slice((page - 1) * limit, page * limit);
 
   return (
     <div className="rounded-2xl bg-card p-2 sm:p-3 shadow-sm w-full h-[280px] flex flex-col">
@@ -82,47 +85,17 @@ export default function ProductsTable() {
         </table>
       </div>
 
-      <div className="mt-2 sm:mt-3 flex items-center justify-center gap-1 sm:gap-1.5 text-[10px] sm:text-xs flex-shrink-0">
-        <button
-          onClick={() => setPage((p) => Math.max(1, p - 1))}
-          disabled={page === 1}
-          className="rounded-md border px-1.5 sm:px-2 py-0.5 disabled:opacity-40 hover:bg-muted/50 transition"
-        >
-          &lt;
-        </button>
-
-        {Array.from({ length: Math.min(totalPages, 4) }, (_, i) => {
-          const pageNum = i + 1;
-          if (pageNum === 4 && totalPages > 4) {
-            return (
-              <span key="ellipsis" className="px-0.5 sm:px-1">
-                ...
-              </span>
-            );
-          }
-          return (
-            <button
-              key={pageNum}
-              onClick={() => setPage(pageNum)}
-              className={`px-1.5 sm:px-2 py-0.5 rounded-md transition ${
-                page === pageNum ? 'bg-primary text-white' : 'border hover:bg-muted/50'
-              }`}
-            >
-              {pageNum}
-            </button>
-          );
-        })}
-
-        {totalPages > 4 && <button onClick={() => setPage(totalPages)}>{totalPages}</button>}
-
-        <button
-          onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-          disabled={page === totalPages}
-          className="rounded-md border px-1.5 sm:px-2 py-0.5 disabled:opacity-40 hover:bg-muted/50 transition"
-        >
-          &gt;
-        </button>
-      </div>
+      {totalPages > 1 && (
+        <div className="mt-auto pt-2">
+          <Pagination
+            page={page}
+            totalPages={totalPages}
+            total={total}
+            limit={limit}
+            onPageChange={setPage}
+          />
+        </div>
+      )}
     </div>
   );
 }

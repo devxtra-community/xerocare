@@ -550,6 +550,7 @@ export interface CompletedCollection {
   securityDepositBank?: string;
   securityDepositReference?: string;
   advanceAmount?: number;
+  discountAmount?: number;
   customerEmail?: string;
 }
 

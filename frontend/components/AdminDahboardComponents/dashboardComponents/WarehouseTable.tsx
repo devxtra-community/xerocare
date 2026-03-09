@@ -2,15 +2,15 @@
 
 import { useState, useEffect } from 'react';
 import { getWarehouses, Warehouse } from '@/lib/warehouse';
-
-const ITEMS_PER_PAGE = 5;
+import { usePagination } from '@/hooks/usePagination';
+import Pagination from '@/components/Pagination';
 
 /**
  * Dashboard widget displaying warehouse list and capacity.
  * Shows location, associated branch, and storage capacity for each warehouse.
  */
 export default function WarehouseTable({ selectedYear }: { selectedYear: number | 'all' }) {
-  const [page, setPage] = useState(1);
+  const { page, limit, total, setPage, setTotal, totalPages } = usePagination(5);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -39,9 +39,11 @@ export default function WarehouseTable({ selectedYear }: { selectedYear: number 
     fetchWarehouses();
   }, [selectedYear]);
 
-  const totalPages = Math.ceil(warehouses.length / ITEMS_PER_PAGE) || 1;
-  const startIndex = (page - 1) * ITEMS_PER_PAGE;
-  const currentData = warehouses.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+  useEffect(() => {
+    setTotal(warehouses.length);
+  }, [warehouses.length, setTotal]);
+
+  const currentData = warehouses.slice((page - 1) * limit, page * limit);
 
   return (
     <div className="rounded-2xl bg-card p-2 sm:p-3 shadow-sm w-full h-[280px] flex flex-col">
@@ -91,36 +93,17 @@ export default function WarehouseTable({ selectedYear }: { selectedYear: number 
         )}
       </div>
 
-      {/* Pagination */}
-      <div className="mt-2 flex items-center justify-center gap-1 text-[10px] sm:text-xs">
-        <button
-          onClick={() => setPage((p) => Math.max(1, p - 1))}
-          disabled={page === 1}
-          className="rounded-md border px-2 py-0.5 disabled:opacity-40"
-        >
-          &lt;
-        </button>
-
-        {Array.from({ length: totalPages }, (_, i) => i + 1).map((num) => (
-          <button
-            key={num}
-            onClick={() => setPage(num)}
-            className={`px-2 py-0.5 rounded-md ${
-              page === num ? 'bg-primary text-white' : 'border hover:bg-muted/50'
-            }`}
-          >
-            {num}
-          </button>
-        ))}
-
-        <button
-          onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-          disabled={page === totalPages}
-          className="rounded-md border px-2 py-0.5 disabled:opacity-40"
-        >
-          &gt;
-        </button>
-      </div>
+      {totalPages > 1 && (
+        <div className="mt-auto pt-2">
+          <Pagination
+            page={page}
+            totalPages={totalPages}
+            total={total}
+            limit={limit}
+            onPageChange={setPage}
+          />
+        </div>
+      )}
     </div>
   );
 }

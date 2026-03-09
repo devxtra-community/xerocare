@@ -9,6 +9,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { usePagination } from '@/hooks/usePagination';
+import Pagination from '@/components/Pagination';
 import { Button } from '@/components/ui/button';
 import {
   getCompletedCollections,
@@ -39,6 +41,7 @@ export default function CompletedCollectionsTable({
   const [historyContractId, setHistoryContractId] = useState<string>('');
   const [isStatementOpen, setIsStatementOpen] = useState(false);
   const [statementCollection, setStatementCollection] = useState<CompletedCollection | null>(null);
+  const { page: currentPage, limit, total, setPage, setTotal, totalPages } = usePagination(5);
 
   const fetchCollections = useCallback(async () => {
     setLoading(true);
@@ -56,6 +59,12 @@ export default function CompletedCollectionsTable({
   useEffect(() => {
     fetchCollections();
   }, [fetchCollections]);
+
+  useEffect(() => {
+    setTotal(collections.length);
+  }, [collections.length, setTotal]);
+
+  const paginatedCollections = collections.slice((currentPage - 1) * limit, currentPage * limit);
 
   const handleShowHistory = (contractId: string) => {
     setHistoryContractId(contractId);
@@ -118,14 +127,14 @@ export default function CompletedCollectionsTable({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {collections.length === 0 ? (
+            {paginatedCollections.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={6} className="text-center py-8 text-slate-500">
                   No completed collections found
                 </TableCell>
               </TableRow>
             ) : (
-              collections.map((collection) => (
+              paginatedCollections.map((collection) => (
                 <TableRow key={collection.contractId}>
                   <TableCell className="font-medium">{collection.invoiceNumber}</TableCell>
                   <TableCell>
@@ -190,6 +199,16 @@ export default function CompletedCollectionsTable({
           </TableBody>
         </Table>
       </div>
+
+      {totalPages > 1 && (
+        <Pagination
+          page={currentPage}
+          totalPages={totalPages}
+          total={total}
+          limit={limit}
+          onPageChange={setPage}
+        />
+      )}
 
       {isHistoryOpen && historyContractId && (
         <UsageHistoryDialog

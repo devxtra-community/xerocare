@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect } from 'react';
+import { usePagination } from '@/hooks/usePagination';
 import {
   Table,
   TableBody,
@@ -50,12 +51,13 @@ const data = [
  * Monitors operational activities related to inventory assets.
  */
 export default function InventoryActionsTable() {
-  const [currentPage, setCurrentPage] = useState(1);
-  const ITEMS_PER_PAGE = 10;
+  const { page, limit, total, setPage, setTotal, totalPages } = usePagination(10);
 
-  const totalPages = Math.ceil(data.length / ITEMS_PER_PAGE);
-  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-  const currentData = data.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+  useEffect(() => {
+    setTotal(data.length);
+  }, [setTotal]);
+
+  const currentData = data.slice((page - 1) * limit, page * limit);
 
   return (
     <div className="rounded-xl border bg-card shadow-sm overflow-hidden p-4">
@@ -104,7 +106,13 @@ export default function InventoryActionsTable() {
       </Table>
       {totalPages > 1 && (
         <div className="mt-4">
-          <Pagination page={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
+          <Pagination
+            page={page}
+            totalPages={totalPages}
+            total={total}
+            limit={limit}
+            onPageChange={setPage}
+          />
         </div>
       )}
     </div>

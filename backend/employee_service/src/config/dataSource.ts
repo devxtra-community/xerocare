@@ -12,11 +12,13 @@ import { Payroll } from '../entities/payrollEntity'; // [x] Define `Payroll` ent
 import { Notification } from '../entities/notificationEntity';
 
 import { logger } from './logger';
+import { url } from 'inspector';
 
 export const Source = new DataSource({
   // [/] Update `DataSource` configuration
   type: 'postgres',
   url: process.env.EMPLOYEE_DATABASE_URL || process.env.DATABASE_URL,
+
   ssl: {
     rejectUnauthorized: false,
   },
@@ -37,6 +39,7 @@ export const connectWithRetry = async (initialDelayMs = 2000): Promise<DataSourc
     try {
       if (!Source.isInitialized) {
         logger.info(`Attempting database connection (Attempt ${attempt})...`);
+        logger.info(url.toString());
         await Source.initialize();
         logger.info('Database connected successfully.');
       }

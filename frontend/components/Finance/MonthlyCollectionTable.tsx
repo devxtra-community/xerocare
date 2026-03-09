@@ -49,7 +49,7 @@ export default function MonthlyCollectionTable({
   const [historyContractId, setHistoryContractId] = useState<string>('');
   const [contractItems, setContractItems] = useState<Record<string, string>>({});
 
-  const { page, limit, setPage, setLimit } = usePagination(10);
+  const { page, limit, setPage, setLimit } = usePagination(5);
   // const years = Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 1 + i);
 
   const handleShowHistory = (alertItem: CollectionAlert) => {

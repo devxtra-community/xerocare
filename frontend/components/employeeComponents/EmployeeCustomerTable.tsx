@@ -13,6 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { usePagination } from '@/hooks/usePagination';
 import Pagination from '@/components/Pagination';
 import {
   Customer,
@@ -60,16 +61,17 @@ export default function EmployeeCustomerTable() {
       c.id.toLowerCase().includes(searchTerm.toLowerCase()),
   );
 
-  const [currentPage, setCurrentPage] = useState(1);
-  const ITEMS_PER_PAGE = 10;
+  const { page, limit, total, setPage, setTotal, totalPages } = usePagination(10);
 
   useEffect(() => {
-    setCurrentPage(1);
-  }, [searchTerm]);
+    setPage(1);
+  }, [searchTerm, setPage]);
 
-  const totalPages = Math.ceil(filteredCustomers.length / ITEMS_PER_PAGE);
-  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-  const paginatedCustomers = filteredCustomers.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+  useEffect(() => {
+    setTotal(filteredCustomers.length);
+  }, [filteredCustomers.length, setTotal]);
+
+  const paginatedCustomers = filteredCustomers.slice((page - 1) * limit, page * limit);
 
   const handleAddCustomer = () => {
     setSelectedCustomer(null);
@@ -268,7 +270,13 @@ export default function EmployeeCustomerTable() {
         </div>
 
         {totalPages > 1 && (
-          <Pagination page={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
+          <Pagination
+            page={page}
+            totalPages={totalPages}
+            total={total}
+            limit={limit}
+            onPageChange={setPage}
+          />
         )}
       </div>
 

@@ -228,23 +228,23 @@ export default function UsageRecordingModal({
                 modelId: a.modelId,
                 startBwA4:
                   a.status === 'ALLOCATED'
-                    ? effectivePrevCounts?.bwA4 || a.initialBwA4 || 0
+                    ? effectivePrevCounts?.bwA4 || a.currentBwA4 || a.initialBwA4 || 0
                     : a.initialBwA4 || 0,
                 endBwA4: a.status === 'ALLOCATED' ? a.currentBwA4 || 0 : a.currentBwA4 || 0,
                 startBwA3:
                   a.status === 'ALLOCATED'
-                    ? effectivePrevCounts?.bwA3 || a.initialBwA3 || 0
+                    ? effectivePrevCounts?.bwA3 || a.currentBwA3 || a.initialBwA3 || 0
                     : a.initialBwA3 || 0,
                 endBwA3: a.status === 'ALLOCATED' ? a.currentBwA3 || 0 : a.currentBwA3 || 0,
                 startColorA4:
                   a.status === 'ALLOCATED'
-                    ? effectivePrevCounts?.clrA4 || a.initialColorA4 || 0
+                    ? effectivePrevCounts?.clrA4 || a.currentColorA4 || a.initialColorA4 || 0
                     : a.initialColorA4 || 0,
                 endColorA4:
                   a.status === 'ALLOCATED' ? a.currentColorA4 || 0 : a.currentColorA4 || 0,
                 startColorA3:
                   a.status === 'ALLOCATED'
-                    ? effectivePrevCounts?.clrA3 || a.initialColorA3 || 0
+                    ? effectivePrevCounts?.clrA3 || a.currentColorA3 || a.initialColorA3 || 0
                     : a.initialColorA3 || 0,
                 endColorA3:
                   a.status === 'ALLOCATED' ? a.currentColorA3 || 0 : a.currentColorA3 || 0,
@@ -831,10 +831,6 @@ export default function UsageRecordingModal({
       }
     }
 
-    if (formData.discountType === 'AMOUNT') {
-      totalAmount = Math.max(0, totalAmount - Number(formData.discountAmount || 0));
-    }
-
     const finalVal = Math.round((totalAmount + Number.EPSILON) * 100) / 100;
 
     // Rent Calculation Logic
@@ -866,7 +862,13 @@ export default function UsageRecordingModal({
       total: (isNaN(finalVal) ? 0 : finalVal) + applicableRent,
     });
 
-    setEstimatedCost((isNaN(finalVal) ? 0 : finalVal) + applicableRent);
+    const usageCharge = isNaN(finalVal) ? 0 : finalVal;
+    let netTotal = usageCharge + applicableRent;
+    if (formData.discountType === 'AMOUNT') {
+      netTotal = Math.max(0, netTotal - Number(formData.discountAmount || 0));
+    }
+
+    setEstimatedCost(netTotal);
   }, [
     formData,
     contract,

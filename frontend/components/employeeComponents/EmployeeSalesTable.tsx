@@ -40,6 +40,7 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
+import { usePagination } from '@/hooks/usePagination';
 import Pagination from '@/components/Pagination';
 import { InvoiceDetailsDialog } from '../invoice/InvoiceDetailsDialog';
 
@@ -60,12 +61,11 @@ export default function EmployeeSalesTable({ mode = 'EMPLOYEE' }: EmployeeSalesT
   const [search, setSearch] = useState('');
   const [filterType, setFilterType] = useState<string>('All');
 
-  const [currentPage, setCurrentPage] = useState(1);
-  const ITEMS_PER_PAGE = 10;
+  const { page, limit, total, setPage, setTotal, totalPages } = usePagination(10);
 
   useEffect(() => {
-    setCurrentPage(1);
-  }, [search, filterType]);
+    setPage(1);
+  }, [search, filterType, setPage]);
 
   // New state for Finance Approval Dialog
 
@@ -120,9 +120,11 @@ export default function EmployeeSalesTable({ mode = 'EMPLOYEE' }: EmployeeSalesT
       return matchesSearch && matchesFilter;
     });
 
-  const totalPages = Math.ceil(filteredInvoices.length / ITEMS_PER_PAGE);
-  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-  const paginatedInvoices = filteredInvoices.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+  useEffect(() => {
+    setTotal(filteredInvoices.length);
+  }, [filteredInvoices.length, setTotal]);
+
+  const paginatedInvoices = filteredInvoices.slice((page - 1) * limit, page * limit);
 
   const handleCreate = async (data: CreateInvoicePayload) => {
     try {
@@ -339,7 +341,13 @@ export default function EmployeeSalesTable({ mode = 'EMPLOYEE' }: EmployeeSalesT
           </Table>
         </div>
         {totalPages > 1 && (
-          <Pagination page={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
+          <Pagination
+            page={page}
+            totalPages={totalPages}
+            total={total}
+            limit={limit}
+            onPageChange={setPage}
+          />
         )}
       </div>
 

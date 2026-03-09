@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import Image from 'next/image';
 import { Search, Filter, Download, Loader2, Eye } from 'lucide-react';
+import { usePagination } from '@/hooks/usePagination';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -20,9 +21,10 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { toast } from 'sonner';
-import { getAllEmployees, Employee, EmployeeResponse } from '@/lib/employee';
+import { getAllEmployees, Employee } from '@/lib/employee';
 import { EMPLOYEE_JOB_LABELS, EmployeeJob } from '@/lib/employeeJob';
 import { FINANCE_JOB_LABELS, FinanceJob } from '@/lib/financeJob';
+import Pagination from '@/components/Pagination';
 import HRAttendanceDetailDialog, {
   AttendanceEmployee,
 } from '@/components/HrComponents/HRAttendanceDetailDialog';
@@ -41,21 +43,16 @@ export default function HRAttendanceTable() {
   const [departmentFilter, setDepartmentFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
   const [employees, setEmployees] = useState<AttendanceEmployee[]>([]);
-  const [pagination, setPagination] = useState<EmployeeResponse['pagination']>({
-    total: 0,
-    page: 1,
-    limit: 10,
-    totalPages: 0,
-  });
+  const { page, limit, total, setPage, setTotal, totalPages } = usePagination(10);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedEmployee, setSelectedEmployee] = useState<AttendanceEmployee | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
 
   const fetchEmployees = useCallback(
-    async (page = 1) => {
+    async (p = 1) => {
       setIsLoading(true);
       try {
-        const response = await getAllEmployees(page, pagination.limit, roleFilter);
+        const response = await getAllEmployees(p, limit, roleFilter);
         if (response.success) {
           // Augment with mock attendance data
           const augmented: AttendanceEmployee[] = response.data.employees.map((emp: Employee) => ({
@@ -66,7 +63,7 @@ export default function HRAttendanceTable() {
             todayStatus: Math.random() > 0.1 ? 'Present' : 'On Leave',
           }));
           setEmployees(augmented);
-          setPagination(response.data.pagination);
+          setTotal(response.data.pagination.total);
         }
       } catch {
         toast.error('Failed to load attendance records');
@@ -74,12 +71,12 @@ export default function HRAttendanceTable() {
         setIsLoading(false);
       }
     },
-    [pagination.limit, roleFilter],
+    [limit, roleFilter, setTotal],
   );
 
   useEffect(() => {
-    fetchEmployees(1);
-  }, [fetchEmployees]);
+    fetchEmployees(page);
+  }, [fetchEmployees, page]);
 
   const filteredEmployees = employees.filter((emp) => {
     const fullName = `${emp.first_name || ''} ${emp.last_name || ''}`.toLowerCase();
@@ -87,10 +84,9 @@ export default function HRAttendanceTable() {
       fullName.includes(searchTerm.toLowerCase()) ||
       emp.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       emp.display_id?.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesRole = roleFilter === 'All' || emp.role === roleFilter;
     const matchesStatus = statusFilter === 'All' || emp.todayStatus === statusFilter;
     const matchesDepartment = !departmentFilter || getDepartmentDisplay(emp) === departmentFilter;
-    return matchesSearch && matchesRole && matchesStatus && matchesDepartment;
+    return matchesSearch && matchesStatus && matchesDepartment;
   });
 
   function getDepartmentDisplay(emp: AttendanceEmployee) {
@@ -345,6 +341,16 @@ export default function HRAttendanceTable() {
             </TableBody>
           </Table>
         </div>
+
+        {totalPages > 1 && (
+          <Pagination
+            page={page}
+            totalPages={totalPages}
+            total={total}
+            limit={limit}
+            onPageChange={setPage}
+          />
+        )}
       </div>
 
       <HRAttendanceDetailDialog

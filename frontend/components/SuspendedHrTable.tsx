@@ -1,6 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect } from 'react';
+import { usePagination } from '@/hooks/usePagination';
+import Pagination from '@/components/Pagination';
 import {
   Table,
   TableHeader,
@@ -83,18 +85,18 @@ const humanResourcedatas = [
   },
 ];
 
-const ITEMS_PER_PAGE = 5;
-
 /**
  * Table component for displaying suspended HR staff.
  * Includes pagination and styled table rows.
  */
 export default function SuspendedHrTable() {
-  const [page, setPage] = useState(1);
+  const { page, limit, total, setPage, setTotal, totalPages } = usePagination(5);
 
-  const totalPages = Math.ceil(humanResourcedatas.length / ITEMS_PER_PAGE);
-  const startIndex = (page - 1) * ITEMS_PER_PAGE;
-  const currentData = humanResourcedatas.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+  useEffect(() => {
+    setTotal(humanResourcedatas.length);
+  }, [setTotal]);
+
+  const currentData = humanResourcedatas.slice((page - 1) * limit, page * limit);
 
   return (
     <div className="rounded-2xl bg-card p-6 shadow-sm">
@@ -125,28 +127,15 @@ export default function SuspendedHrTable() {
         </TableBody>
       </Table>
 
-      {/* Pagination */}
-      <div className="mt-6 flex items-center gap-4 text-sm">
-        <button
-          onClick={() => setPage((p) => p - 1)}
-          disabled={page === 1}
-          className="rounded-md border px-4 py-2 disabled:opacity-40"
-        >
-          Previous
-        </button>
-
-        <span className="text-muted-foreground">
-          Page {page} of {totalPages}
-        </span>
-
-        <button
-          onClick={() => setPage((p) => p + 1)}
-          disabled={page === totalPages}
-          className="rounded-md border px-4 py-2 disabled:opacity-40"
-        >
-          Next
-        </button>
-      </div>
+      {totalPages > 1 && (
+        <Pagination
+          page={page}
+          totalPages={totalPages}
+          total={total}
+          limit={limit}
+          onPageChange={setPage}
+        />
+      )}
     </div>
   );
 }

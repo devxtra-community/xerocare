@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useMemo, useEffect } from 'react';
+import { usePagination } from '@/hooks/usePagination';
 import {
   Table,
   TableBody,
@@ -21,6 +22,7 @@ import {
 import { getFinanceReport, FinanceReportItem } from '@/lib/invoice';
 import { formatCurrency } from '@/lib/format';
 import { Search, Loader2 } from 'lucide-react';
+import Pagination from '@/components/Pagination';
 
 interface RevenueSummaryTableProps {
   selectedYear?: number | 'all';
@@ -32,6 +34,7 @@ interface RevenueSummaryTableProps {
  * Includes search and filtering by date, month, and revenue type.
  */
 export default function RevenueSummaryTable({ selectedYear }: RevenueSummaryTableProps) {
+  const { page: currentPage, limit, total, setPage, setTotal, totalPages } = usePagination(5);
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<FinanceReportItem[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -93,6 +96,12 @@ export default function RevenueSummaryTable({ selectedYear }: RevenueSummaryTabl
     { value: '10', label: 'November' },
     { value: '11', label: 'December' },
   ];
+
+  useEffect(() => {
+    setTotal(filteredData.length);
+  }, [filteredData.length, setTotal]);
+
+  const paginatedRows = filteredData.slice((currentPage - 1) * limit, currentPage * limit);
 
   return (
     <div className="space-y-4">
@@ -182,7 +191,7 @@ export default function RevenueSummaryTable({ selectedYear }: RevenueSummaryTabl
                 </TableCell>
               </TableRow>
             ) : filteredData.length > 0 ? (
-              filteredData.map((row, i) => (
+              paginatedRows.map((row, i) => (
                 <TableRow
                   key={i}
                   className={`hover:bg-blue-50/30 transition-colors ${
@@ -226,6 +235,16 @@ export default function RevenueSummaryTable({ selectedYear }: RevenueSummaryTabl
           </TableBody>
         </Table>
       </div>
+
+      {totalPages > 1 && (
+        <Pagination
+          page={currentPage}
+          totalPages={totalPages}
+          total={total}
+          limit={limit}
+          onPageChange={setPage}
+        />
+      )}
     </div>
   );
 }

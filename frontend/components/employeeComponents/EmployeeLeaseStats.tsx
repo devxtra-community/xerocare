@@ -36,8 +36,10 @@ export default function EmployeeLeaseStats({ invoices: propInvoices }: EmployeeL
     fetchInvoices();
   }, [propInvoices]);
 
-  // 1. Total Lease: All lease contracts (active, completed, pending, etc.)
-  const allLeases = invoices.filter((inv) => inv.saleType === 'LEASE');
+  // 1. Total Lease: All lease contracts (excluding rejected/cancelled)
+  const allLeases = invoices.filter(
+    (inv) => inv.saleType === 'LEASE' && !['REJECTED', 'CANCELLED'].includes(inv.status),
+  );
 
   const now = new Date();
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -71,8 +73,11 @@ export default function EmployeeLeaseStats({ invoices: propInvoices }: EmployeeL
         const relevantContractIds = new Set(invoices.map((i) => i.id));
         invoices.forEach((inv) => {
           if (inv.saleType === 'LEASE' && revenueStatuses.includes(inv.status)) {
-            // Revenue = Advance Collected + All Monthly Collections (usageRevenue)
-            revenue += Number(inv.advanceAmount || 0) + Number(inv.usageRevenue || 0);
+            // Revenue = Advance Collected + All Monthly Collections (usageRevenue) - Total Discount
+            revenue +=
+              Number(inv.advanceAmount || 0) +
+              Number(inv.usageRevenue || 0) -
+              Number(inv.discountAmount || 0);
           }
         });
 
@@ -85,8 +90,11 @@ export default function EmployeeLeaseStats({ invoices: propInvoices }: EmployeeL
                 revenue += Number(emi.totalAmount || 0);
               } else {
                 // Completed/Consolidated Lease Contract
+                // Net Revenue = Advance + (Usage/Gross) - Discount
                 revenue +=
-                  Number(emi.advanceAmount || 0) + Number(emi.usageRevenue || emi.totalAmount || 0);
+                  Number(emi.advanceAmount || 0) +
+                  Number(emi.usageRevenue || emi.totalAmount || 0) -
+                  Number(emi.discountAmount || 0);
               }
             }
           }

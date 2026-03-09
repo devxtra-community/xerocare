@@ -1,7 +1,8 @@
-'use client';
 import { useState, useEffect } from 'react';
 import { getAllEmployees, Employee } from '@/lib/employee';
 import { toast } from 'sonner';
+import { usePagination } from '@/hooks/usePagination';
+import Pagination from '@/components/Pagination';
 
 interface EmployeeDisplay {
   Fullname: string;
@@ -11,14 +12,12 @@ interface EmployeeDisplay {
   avatar: string;
 }
 
-const ITEMS_PER_PAGE = 5;
-
 /**
  * Dashboard widget displaying recent employee additions.
  * Shows a paginated list of employees with their position, start date, and salary.
  */
 export default function HrTable({ selectedYear }: { selectedYear: number | 'all' }) {
-  const [page, setPage] = useState(1);
+  const { page, limit, total, setPage, setTotal, totalPages } = usePagination(5);
   const [employees, setEmployees] = useState<EmployeeDisplay[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -71,9 +70,11 @@ export default function HrTable({ selectedYear }: { selectedYear: number | 'all'
     fetchEmployees();
   }, [selectedYear]);
 
-  const totalPages = Math.ceil(employees.length / ITEMS_PER_PAGE);
-  const startIndex = (page - 1) * ITEMS_PER_PAGE;
-  const currentData = employees.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+  useEffect(() => {
+    setTotal(employees.length);
+  }, [employees.length, setTotal]);
+
+  const currentData = employees.slice((page - 1) * limit, page * limit);
 
   if (loading) {
     return (
@@ -139,40 +140,17 @@ export default function HrTable({ selectedYear }: { selectedYear: number | 'all'
         </table>
       </div>
 
-      {/* PAGINATION */}
-      <div className="mt-2 sm:mt-3 flex items-center justify-center gap-1 sm:gap-1.5 text-[10px] sm:text-xs flex-shrink-0">
-        <button
-          onClick={() => setPage((p) => Math.max(1, p - 1))}
-          disabled={page === 1}
-          className="rounded-md border px-1.5 sm:px-2 py-0.5 disabled:opacity-40 hover:bg-muted/50 transition"
-        >
-          &lt;
-        </button>
-
-        {Array.from({ length: totalPages }, (_, i) => i + 1)
-          .slice(0, 4)
-          .map((num) => (
-            <button
-              key={num}
-              onClick={() => setPage(num)}
-              className={`px-1.5 sm:px-2 py-0.5 rounded-md transition ${
-                page === num ? 'bg-primary text-white' : 'border hover:bg-muted/50'
-              }`}
-            >
-              {num}
-            </button>
-          ))}
-
-        {totalPages > 4 && <span className="px-0.5 sm:px-1">...</span>}
-
-        <button
-          onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-          disabled={page === totalPages}
-          className="rounded-md border px-1.5 sm:px-2 py-0.5 disabled:opacity-40 hover:bg-muted/50 transition"
-        >
-          &gt;
-        </button>
-      </div>
+      {totalPages > 1 && (
+        <div className="mt-auto pt-2">
+          <Pagination
+            page={page}
+            totalPages={totalPages}
+            total={total}
+            limit={limit}
+            onPageChange={setPage}
+          />
+        </div>
+      )}
     </div>
   );
 }

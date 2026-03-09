@@ -103,7 +103,7 @@ export default function RentFormModal({
     effectiveTo: initialData?.effectiveTo
       ? new Date(initialData.effectiveTo).toISOString().split('T')[0]
       : '',
-    leaseType: 'EMI' as 'EMI' | 'FSM',
+    leaseType: (initialData?.leaseType as 'EMI' | 'FSM') || 'EMI',
     leaseTenureMonths:
       initialData?.leaseTenureMonths !== undefined ? String(initialData.leaseTenureMonths) : '',
     totalLeaseAmount:
@@ -269,6 +269,7 @@ export default function RentFormModal({
     );
   });
 
+  const { rentType } = form;
   // Hydrate models with full details from backend
   useEffect(() => {
     if (initialData?.items) {
@@ -301,7 +302,7 @@ export default function RentFormModal({
           setSelectedModels(hydrated);
 
           // Regenerate pricing rules based on hydrated models to ensure they appear
-          const generatedRules: typeof form.pricingItems = [];
+          const generatedRules: PricingItem[] = [];
 
           // Helper to check if a rule exists in initialData (fuzzy match)
           const findInitialRule = (desc: string) => {
@@ -394,7 +395,7 @@ export default function RentFormModal({
               generatedRules.push(newRule);
             };
 
-            if (form.rentType.includes('COMBO')) {
+            if (rentType.includes('COMBO')) {
               addRule('Combined', 'COMBO');
             } else {
               addRule('Black & White', 'BW');
@@ -413,7 +414,30 @@ export default function RentFormModal({
       };
       fetchFullModels();
     }
-  }, [initialData, form]);
+  }, [initialData, rentType]);
+
+  // Reactive EMI/Lease Amount calculation based on Tenure and Total
+  useEffect(() => {
+    if (form.saleType === 'LEASE' && form.leaseTenureMonths && form.totalLeaseAmount) {
+      const tenure = Number(form.leaseTenureMonths);
+      const total = Number(form.totalLeaseAmount);
+      if (tenure > 0) {
+        const calculatedAmount = String(Math.round(total / tenure));
+        if (form.leaseType === 'EMI' && form.monthlyEmiAmount !== calculatedAmount) {
+          setForm((prev) => ({ ...prev, monthlyEmiAmount: calculatedAmount }));
+        } else if (form.leaseType === 'FSM' && form.monthlyLeaseAmount !== calculatedAmount) {
+          setForm((prev) => ({ ...prev, monthlyLeaseAmount: calculatedAmount }));
+        }
+      }
+    }
+  }, [
+    form.saleType,
+    form.leaseType,
+    form.leaseTenureMonths,
+    form.totalLeaseAmount,
+    form.monthlyEmiAmount,
+    form.monthlyLeaseAmount,
+  ]);
 
   const updateUsageRules = (
     models: (Model & { quantity: number })[],
@@ -510,15 +534,32 @@ export default function RentFormModal({
           leaseType: form.leaseType,
           leaseTenureMonths: cleanNumber(form.leaseTenureMonths),
 
-          // EMI Fields
-          totalLeaseAmount:
-            form.leaseType === 'EMI' ? cleanNumber(form.totalLeaseAmount) : undefined,
+          // EMI & FSM Fields
+          totalLeaseAmount: cleanNumber(form.totalLeaseAmount),
           monthlyEmiAmount:
             form.leaseType === 'EMI' ? cleanNumber(form.monthlyEmiAmount) : undefined,
 
           // FSM Fields
           monthlyLeaseAmount:
             form.leaseType === 'FSM' ? cleanNumber(form.monthlyLeaseAmount) : undefined,
+
+          rentType:
+            form.leaseType === 'FSM'
+              ? (form.rentType as
+                  | 'FIXED_LIMIT'
+                  | 'FIXED_COMBO'
+                  | 'FIXED_FLAT'
+                  | 'CPC'
+                  | 'CPC_COMBO')
+              : undefined,
+          rentPeriod:
+            form.leaseType === 'FSM'
+              ? (form.rentPeriod as 'MONTHLY' | 'QUARTERLY' | 'HALF_YEARLY' | 'YEARLY' | 'CUSTOM')
+              : undefined,
+          billingCycleInDays:
+            form.leaseType === 'FSM' && form.rentPeriod === 'CUSTOM'
+              ? cleanNumber(form.billingCycleInDays)
+              : undefined,
 
           effectiveFrom: form.effectiveFrom,
           effectiveTo: form.effectiveTo || undefined,
@@ -1079,15 +1120,6 @@ export default function RentFormModal({
                             setForm({
                               ...form,
                               totalLeaseAmount: handleNumberInput(e.target.value),
-                              // Auto-calculate monthly EMI
-                              monthlyEmiAmount:
-                                e.target.value && form.leaseTenureMonths
-                                  ? String(
-                                      Math.round(
-                                        Number(e.target.value) / Number(form.leaseTenureMonths),
-                                      ),
-                                    )
-                                  : '',
                             })
                           }
                           className="font-bold text-slate-800"
@@ -1114,22 +1146,43 @@ export default function RentFormModal({
                       </div>
                     </>
                   ) : (
-                    <div className="space-y-2">
-                      <label className="text-[11px] font-bold text-muted-foreground uppercase">
-                        Monthly Lease Amount
-                      </label>
-                      <Input
-                        type="number"
-                        value={form.monthlyLeaseAmount}
-                        onChange={(e) =>
-                          setForm({
-                            ...form,
-                            monthlyLeaseAmount: handleNumberInput(e.target.value),
-                          })
-                        }
-                        className="font-bold text-slate-800"
-                      />
-                    </div>
+                    <>
+                      <div className="space-y-2">
+                        <label className="text-[11px] font-bold text-muted-foreground uppercase">
+                          Total Lease Amount
+                        </label>
+                        <Input
+                          type="number"
+                          value={form.totalLeaseAmount}
+                          onChange={(e) =>
+                            setForm({
+                              ...form,
+                              totalLeaseAmount: handleNumberInput(e.target.value),
+                            })
+                          }
+                          className="font-bold text-slate-800"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[11px] font-bold text-muted-foreground uppercase flex items-center gap-1">
+                          Monthly Lease Amount
+                          <span className="text-[9px] text-green-600 font-bold bg-green-50 px-1.5 rounded-full">
+                            AUTO
+                          </span>
+                        </label>
+                        <Input
+                          type="number"
+                          value={form.monthlyLeaseAmount}
+                          readOnly
+                          className="font-bold text-slate-800 bg-slate-50 cursor-not-allowed"
+                          placeholder={
+                            form.totalLeaseAmount && form.leaseTenureMonths
+                              ? 'Calculating...'
+                              : 'Enter total & tenure first'
+                          }
+                        />
+                      </div>
+                    </>
                   )}
                   {/* Advance Amount for Lease */}
                   <div className="space-y-2">

@@ -1,5 +1,4 @@
 'use client';
-import { useState } from 'react';
 import {
   Table,
   TableBody,
@@ -9,6 +8,8 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import Pagination from '@/components/Pagination';
+import { usePagination } from '@/hooks/usePagination';
+import { useEffect } from 'react';
 
 const auditData = [
   {
@@ -64,11 +65,13 @@ const auditData = [
  * Provides transparency and accountability for stock changes.
  */
 export default function AuditLogTable() {
-  const [page, setPage] = useState(1);
-  const ITEMS_PER_PAGE = 10;
-  const totalPages = Math.ceil(auditData.length / ITEMS_PER_PAGE);
-  const startIndex = (page - 1) * ITEMS_PER_PAGE;
-  const currentData = auditData.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+  const { page, limit, total, setPage, setTotal, totalPages } = usePagination(10);
+
+  useEffect(() => {
+    setTotal(auditData.length);
+  }, [setTotal]);
+
+  const currentData = auditData.slice((page - 1) * limit, page * limit);
 
   return (
     <div className="rounded-2xl bg-card p-2 sm:p-3 shadow-sm w-full min-h-[260px] flex flex-col">
@@ -132,7 +135,13 @@ export default function AuditLogTable() {
         </Table>
       </div>
       <div className="mt-4">
-        <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
+        <Pagination
+          page={page}
+          totalPages={totalPages}
+          total={total}
+          limit={limit}
+          onPageChange={setPage}
+        />
       </div>
     </div>
   );

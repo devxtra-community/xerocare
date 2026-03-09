@@ -37,6 +37,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { usePagination } from '@/hooks/usePagination';
 import Pagination from '@/components/Pagination';
 
 const leaveTypeLabels: Record<LeaveType, string> = {
@@ -60,8 +61,7 @@ export default function EmployeeLeaveApplicationsTable() {
   const [selectedLeave, setSelectedLeave] = useState<LeaveApplication | null>(null);
   const [isCancelling, setIsCancelling] = useState(false);
 
-  const [currentPage, setCurrentPage] = useState(1);
-  const ITEMS_PER_PAGE = 10;
+  const { page, limit, total, setPage, setTotal, totalPages } = usePagination(10);
 
   const fetchLeaveApplications = useCallback(async () => {
     setIsLoading(true);
@@ -81,9 +81,11 @@ export default function EmployeeLeaveApplicationsTable() {
     fetchLeaveApplications();
   }, [fetchLeaveApplications]);
 
-  const totalPages = Math.ceil(leaveApplications.length / ITEMS_PER_PAGE);
-  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-  const paginatedApplications = leaveApplications.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+  useEffect(() => {
+    setTotal(leaveApplications.length);
+  }, [leaveApplications.length, setTotal]);
+
+  const paginatedApplications = leaveApplications.slice((page - 1) * limit, page * limit);
 
   const handleCancelClick = (leaveId: string) => {
     setSelectedLeaveId(leaveId);
@@ -261,7 +263,13 @@ export default function EmployeeLeaveApplicationsTable() {
           </Table>
         </div>
         {totalPages > 1 && (
-          <Pagination page={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
+          <Pagination
+            page={page}
+            totalPages={totalPages}
+            total={total}
+            limit={limit}
+            onPageChange={setPage}
+          />
         )}
       </div>
 

@@ -17,6 +17,7 @@ import {
 import { getMyInvoices, Invoice } from '@/lib/invoice';
 import { Loader2 } from 'lucide-react';
 import { ChartTooltipContent } from '@/components/ui/ChartTooltip';
+import { formatCurrency } from '@/lib/format';
 
 interface SalesChartDataItem {
   name: string;
@@ -69,7 +70,10 @@ const ChartContainer = ({
             tick={{ fill: '#94a3b8', fontSize: 9, fontWeight: 700 }}
             tickFormatter={(val) => `QAR ${val >= 1000 ? (val / 1000).toFixed(0) + 'k' : val}`}
           />
-          <Tooltip content={<ChartTooltipContent />} cursor={{ fill: '#f1f5f9', opacity: 0.4 }} />
+          <Tooltip
+            content={<ChartTooltipContent valueFormatter={(val) => formatCurrency(Number(val))} />}
+            cursor={{ fill: '#f1f5f9', opacity: 0.4 }}
+          />
           <Bar dataKey={dataKeyAmount} fill={color} radius={[4, 4, 0, 0]} barSize={10} />
         </BarChart>
       </ResponsiveContainer>
@@ -130,9 +134,7 @@ const ForexChartContainer = ({
             />
             <Tooltip
               content={
-                <ChartTooltipContent
-                  valueFormatter={(value) => `QAR ${Number(value).toLocaleString()}`}
-                />
+                <ChartTooltipContent valueFormatter={(value) => formatCurrency(Number(value))} />
               }
               cursor={{ stroke: color, strokeWidth: 1, strokeDasharray: '4 4' }}
             />

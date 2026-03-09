@@ -292,15 +292,18 @@ export class BillingReportService {
       let totalCollected = 0;
       let grossAmount = 0;
       let advanceAdjusted = 0;
+      let discountAmount = 0;
 
       if (summaryInvoice) {
         grossAmount = Number(summaryInvoice.grossAmount || summaryInvoice.totalAmount || 0);
         advanceAdjusted = Number(summaryInvoice.advanceAdjusted || 0);
-        totalCollected = grossAmount + Number(contract.advanceAmount || 0);
+        discountAmount = Number(summaryInvoice.discountAmount || 0);
+        totalCollected = grossAmount - discountAmount + Number(contract.advanceAmount || 0);
       } else if (contract.type === InvoiceType.FINAL) {
         grossAmount = Number(contract.grossAmount || contract.totalAmount || 0);
         advanceAdjusted = Number(contract.advanceAmount || 0);
-        totalCollected = grossAmount + Number(contract.advanceAmount || 0);
+        discountAmount = Number(contract.discountAmount || 0);
+        totalCollected = grossAmount - discountAmount + Number(contract.advanceAmount || 0);
       } else {
         const monthlyInvoices = finalInvoices.filter(
           (inv) => !inv.isSummaryInvoice && inv.type === InvoiceType.FINAL,
@@ -311,12 +314,18 @@ export class BillingReportService {
           0,
         );
 
+        const monthlyDiscount = monthlyInvoices.reduce(
+          (sum, inv) => sum + Number(inv.discountAmount || 0),
+          0,
+        );
+
         grossAmount = monthlyGross;
         advanceAdjusted = Number(contract.advanceAmount || 0);
-        totalCollected = grossAmount + Number(contract.advanceAmount || 0);
+        discountAmount = monthlyDiscount;
+        totalCollected = grossAmount - discountAmount + Number(contract.advanceAmount || 0);
       }
 
-      if (grossAmount === 0) {
+      if (grossAmount === 0 || discountAmount === 0) {
         try {
           const history = await this.usageRepo.getUsageHistory(contract.id, 'ASC');
           if (history.length > 0) {
@@ -324,8 +333,26 @@ export class BillingReportService {
               (sum, u) => sum + (Number(u.monthlyRent || 0) + Number(u.exceededCharge || 0)),
               0,
             );
-            grossAmount = usageGross;
-            totalCollected = usageGross + Number(contract.advanceAmount || 0);
+            const usageDiscount = history.reduce(
+              (sum, u) => sum + Number(u.discountAmount || 0),
+              0,
+            );
+            const usageAdvance = history.reduce(
+              (sum, u) => sum + Number(u.advanceAdjusted || 0),
+              0,
+            );
+            if (grossAmount === 0) {
+              grossAmount = usageGross;
+              totalCollected = usageGross - usageDiscount + Number(contract.advanceAmount || 0);
+            }
+            if (discountAmount === 0) {
+              discountAmount = usageDiscount;
+              // Recalculate if gross was already set but discount wasn't
+              totalCollected = grossAmount - usageDiscount + Number(contract.advanceAmount || 0);
+            }
+            if (advanceAdjusted === 0) {
+              advanceAdjusted = usageAdvance;
+            }
           }
         } catch {
           // Ignore
@@ -350,6 +377,7 @@ export class BillingReportService {
         totalAmount: totalCollected, // Ensure compatibility with all frontend views
         grossAmount,
         advanceAdjusted,
+        discountAmount,
         securityDepositAmount: Number(contract.securityDepositAmount || 0),
         securityDepositMode: contract.securityDepositMode,
         securityDepositDate: contract.securityDepositDate,
@@ -582,10 +610,14 @@ export class BillingReportService {
           }
         }
 
-        // Fetch all usage records for this contract to sum up accrued revenue
+        // Fetch all usage records for this contract to sum up accrued revenue and discounts
         const usageHistory = await this.usageRepo.getUsageHistory(invoice.id);
         const usageRevenue = usageHistory.reduce(
           (sum, u) => sum + (Number(u.monthlyRent || 0) + Number(u.exceededCharge || 0)),
+          0,
+        );
+        const discountAmount = usageHistory.reduce(
+          (sum, u) => sum + Number(u.discountAmount || 0),
           0,
         );
 
@@ -593,6 +625,7 @@ export class BillingReportService {
           ...invoice,
           usageData,
           usageRevenue,
+          discountAmount: Number(invoice.discountAmount || 0) || discountAmount,
         };
       }),
     );
@@ -708,10 +741,14 @@ export class BillingReportService {
 
     doc.moveDown();
     doc.font('Helvetica-Bold');
-    const totalCollected =
+    const grossVal =
       summaryInvoice?.grossAmount ||
       monthlyInvoices.reduce((s, i) => s + Number(i.grossAmount || 0), 0);
-    doc.text(`Total Collected: QAR ${Number(totalCollected).toFixed(2)}`, amountX, y + 20);
+    const discVal =
+      summaryInvoice?.discountAmount ||
+      monthlyInvoices.reduce((s, i) => s + Number(i.discountAmount || 0), 0);
+    const totalCollected = Number(grossVal) - Number(discVal);
+    doc.text(`Total Due: QAR ${totalCollected.toFixed(2)}`, amountX, y + 20);
 
     doc.end();
   }
