@@ -134,132 +134,6 @@ export default function UsageRecordingModal({
   }, [isOpen]);
 
   React.useEffect(() => {
-    if (editingInvoice) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const inv = editingInvoice as any;
-      const start = (inv.billingPeriodStart || inv.periodStart || '').split('T')[0];
-      const end = (inv.billingPeriodEnd || inv.periodEnd || '').split('T')[0];
-
-      let initialDiscountType: 'NONE' | 'AMOUNT' | 'COPIES' = 'NONE';
-      if (inv.discountAmount > 0) initialDiscountType = 'AMOUNT';
-      else if (inv.discountBwCopies > 0 || inv.discountColorCopies > 0)
-        initialDiscountType = 'COPIES';
-
-      setFormData({
-        billingPeriodStart: start,
-        billingPeriodEnd: end,
-        bwA4Count: String(inv.bwA4Count || 0),
-        bwA3Count: String(inv.bwA3Count || 0),
-        colorA4Count: String(inv.colorA4Count || 0),
-        colorA3Count: String(inv.colorA3Count || 0),
-        discountType: initialDiscountType,
-        discountAmount: inv.discountAmount ? String(inv.discountAmount) : '',
-        discountBwCopies: inv.discountBwCopies ? String(inv.discountBwCopies) : '',
-        discountColorCopies: inv.discountColorCopies ? String(inv.discountColorCopies) : '',
-        remarks: inv.financeRemarks || inv.remarks || '',
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        items: (inv.items || []).map((item: any) => ({
-          allocationId: item.allocationId,
-          serialNumber: item.allocation?.serialNumber,
-          modelId: item.allocation?.modelId,
-          startBwA4: item.startBwA4 || 0,
-          endBwA4: item.endBwA4 || 0,
-          startBwA3: item.startBwA3 || 0,
-          endBwA3: item.endBwA3 || 0,
-          startColorA4: item.startColorA4 || 0,
-          endColorA4: item.endColorA4 || 0,
-          startColorA3: item.startColorA3 || 0,
-          endColorA3: item.endColorA3 || 0,
-        })),
-      });
-
-      if (editingInvoice.referenceContractId || contractId) {
-        getInvoiceById(editingInvoice.referenceContractId || contractId)
-          .then((contractData) => {
-            setContract(contractData);
-            // Fix formData initialized values if there's exactly one active machine
-            const activeAllocs =
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              contractData.productAllocations?.filter((pa: any) => pa.status === 'ALLOCATED') || [];
-            if (activeAllocs.length === 1) {
-              const activeId = activeAllocs[0].id;
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              const activeItem = inv.items?.find((i: any) => i.allocationId === activeId);
-              if (activeItem) {
-                setFormData((prev) => ({
-                  ...prev,
-                  bwA4Count: String(activeItem.endBwA4 || 0),
-                  bwA3Count: String(activeItem.endBwA3 || 0),
-                  colorA4Count: String(activeItem.endColorA4 || 0),
-                  colorA3Count: String(activeItem.endColorA3 || 0),
-                }));
-              }
-            }
-          })
-          .catch((err) => console.error('Failed to fetch reference contract:', err));
-      }
-    } else if (contractId) {
-      getInvoiceById(contractId)
-        .then((data) => {
-          setContract(data);
-
-          // Use the contract's actual billing period (effectiveFrom to effectiveTo)
-          const startStr = data.effectiveFrom?.split('T')[0] || '';
-          const endStr = data.effectiveTo?.split('T')[0] || '';
-
-          setFormData((prev) => ({
-            ...prev,
-            billingPeriodStart: startStr,
-            billingPeriodEnd: endStr,
-            items: (data.productAllocations || [])
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              .filter((a: any) => {
-                if (a.status === 'ALLOCATED') return true;
-                if (a.status === 'REPLACED' && a.endTimestamp) {
-                  // Replaced during or before current period
-                  return true;
-                }
-                return false;
-              })
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              .map((a: any) => ({
-                allocationId: a.id,
-                serialNumber: a.serialNumber,
-                modelId: a.modelId,
-                startBwA4:
-                  a.status === 'ALLOCATED'
-                    ? effectivePrevCounts?.bwA4 || a.currentBwA4 || a.initialBwA4 || 0
-                    : a.initialBwA4 || 0,
-                endBwA4: a.status === 'ALLOCATED' ? a.currentBwA4 || 0 : a.currentBwA4 || 0,
-                startBwA3:
-                  a.status === 'ALLOCATED'
-                    ? effectivePrevCounts?.bwA3 || a.currentBwA3 || a.initialBwA3 || 0
-                    : a.initialBwA3 || 0,
-                endBwA3: a.status === 'ALLOCATED' ? a.currentBwA3 || 0 : a.currentBwA3 || 0,
-                startColorA4:
-                  a.status === 'ALLOCATED'
-                    ? effectivePrevCounts?.clrA4 || a.currentColorA4 || a.initialColorA4 || 0
-                    : a.initialColorA4 || 0,
-                endColorA4:
-                  a.status === 'ALLOCATED' ? a.currentColorA4 || 0 : a.currentColorA4 || 0,
-                startColorA3:
-                  a.status === 'ALLOCATED'
-                    ? effectivePrevCounts?.clrA3 || a.currentColorA3 || a.initialColorA3 || 0
-                    : a.initialColorA3 || 0,
-                endColorA3:
-                  a.status === 'ALLOCATED' ? a.currentColorA3 || 0 : a.currentColorA3 || 0,
-              })),
-          }));
-        })
-        .catch((err) => console.error('Failed to fetch contract details:', err));
-
-      getUsageHistory(contractId)
-        .then((data) => setHistory(data))
-        .catch((err) => console.error('Failed to fetch usage history:', err));
-    }
-  }, [contractId, editingInvoice]);
-
-  React.useEffect(() => {
     if (editingInvoice) return;
 
     if (history.length > 0) {
@@ -615,6 +489,132 @@ export default function UsageRecordingModal({
     calculatedInitialCounts,
     contract?.productAllocations,
   ]);
+
+  React.useEffect(() => {
+    if (editingInvoice) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const inv = editingInvoice as any;
+      const start = (inv.billingPeriodStart || inv.periodStart || '').split('T')[0];
+      const end = (inv.billingPeriodEnd || inv.periodEnd || '').split('T')[0];
+
+      let initialDiscountType: 'NONE' | 'AMOUNT' | 'COPIES' = 'NONE';
+      if (inv.discountAmount > 0) initialDiscountType = 'AMOUNT';
+      else if (inv.discountBwCopies > 0 || inv.discountColorCopies > 0)
+        initialDiscountType = 'COPIES';
+
+      setFormData({
+        billingPeriodStart: start,
+        billingPeriodEnd: end,
+        bwA4Count: String(inv.bwA4Count || 0),
+        bwA3Count: String(inv.bwA3Count || 0),
+        colorA4Count: String(inv.colorA4Count || 0),
+        colorA3Count: String(inv.colorA3Count || 0),
+        discountType: initialDiscountType,
+        discountAmount: inv.discountAmount ? String(inv.discountAmount) : '',
+        discountBwCopies: inv.discountBwCopies ? String(inv.discountBwCopies) : '',
+        discountColorCopies: inv.discountColorCopies ? String(inv.discountColorCopies) : '',
+        remarks: inv.financeRemarks || inv.remarks || '',
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        items: (inv.items || []).map((item: any) => ({
+          allocationId: item.allocationId,
+          serialNumber: item.allocation?.serialNumber,
+          modelId: item.allocation?.modelId,
+          startBwA4: item.startBwA4 || 0,
+          endBwA4: item.endBwA4 || 0,
+          startBwA3: item.startBwA3 || 0,
+          endBwA3: item.endBwA3 || 0,
+          startColorA4: item.startColorA4 || 0,
+          endColorA4: item.endColorA4 || 0,
+          startColorA3: item.startColorA3 || 0,
+          endColorA3: item.endColorA3 || 0,
+        })),
+      });
+
+      if (editingInvoice.referenceContractId || contractId) {
+        getInvoiceById(editingInvoice.referenceContractId || contractId)
+          .then((contractData) => {
+            setContract(contractData);
+            // Fix formData initialized values if there's exactly one active machine
+            const activeAllocs =
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              contractData.productAllocations?.filter((pa: any) => pa.status === 'ALLOCATED') || [];
+            if (activeAllocs.length === 1) {
+              const activeId = activeAllocs[0].id;
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              const activeItem = inv.items?.find((i: any) => i.allocationId === activeId);
+              if (activeItem) {
+                setFormData((prev) => ({
+                  ...prev,
+                  bwA4Count: String(activeItem.endBwA4 || 0),
+                  bwA3Count: String(activeItem.endBwA3 || 0),
+                  colorA4Count: String(activeItem.endColorA4 || 0),
+                  colorA3Count: String(activeItem.endColorA3 || 0),
+                }));
+              }
+            }
+          })
+          .catch((err) => console.error('Failed to fetch reference contract:', err));
+      }
+    } else if (contractId) {
+      getInvoiceById(contractId)
+        .then((data) => {
+          setContract(data);
+
+          // Use the contract's actual billing period (effectiveFrom to effectiveTo)
+          const startStr = data.effectiveFrom?.split('T')[0] || '';
+          const endStr = data.effectiveTo?.split('T')[0] || '';
+
+          setFormData((prev) => ({
+            ...prev,
+            billingPeriodStart: startStr,
+            billingPeriodEnd: endStr,
+            items: (data.productAllocations || [])
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              .filter((a: any) => {
+                if (a.status === 'ALLOCATED') return true;
+                if (a.status === 'REPLACED' && a.endTimestamp) {
+                  // Replaced during or before current period
+                  return true;
+                }
+                return false;
+              })
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              .map((a: any) => ({
+                allocationId: a.id,
+                serialNumber: a.serialNumber,
+                modelId: a.modelId,
+                startBwA4:
+                  a.status === 'ALLOCATED'
+                    ? effectivePrevCounts?.bwA4 || a.currentBwA4 || a.initialBwA4 || 0
+                    : a.initialBwA4 || 0,
+                endBwA4: a.status === 'ALLOCATED' ? a.currentBwA4 || 0 : a.currentBwA4 || 0,
+                startBwA3:
+                  a.status === 'ALLOCATED'
+                    ? effectivePrevCounts?.bwA3 || a.currentBwA3 || a.initialBwA3 || 0
+                    : a.initialBwA3 || 0,
+                endBwA3: a.status === 'ALLOCATED' ? a.currentBwA3 || 0 : a.currentBwA3 || 0,
+                startColorA4:
+                  a.status === 'ALLOCATED'
+                    ? effectivePrevCounts?.clrA4 || a.currentColorA4 || a.initialColorA4 || 0
+                    : a.initialColorA4 || 0,
+                endColorA4:
+                  a.status === 'ALLOCATED' ? a.currentColorA4 || 0 : a.currentColorA4 || 0,
+                startColorA3:
+                  a.status === 'ALLOCATED'
+                    ? effectivePrevCounts?.clrA3 || a.currentColorA3 || a.initialColorA3 || 0
+                    : a.initialColorA3 || 0,
+                endColorA3:
+                  a.status === 'ALLOCATED' ? a.currentColorA3 || 0 : a.currentColorA3 || 0,
+              })),
+          }));
+        })
+        .catch((err) => console.error('Failed to fetch contract details:', err));
+
+      getUsageHistory(contractId)
+        .then((data) => setHistory(data))
+        .catch((err) => console.error('Failed to fetch usage history:', err));
+    }
+  }, [contractId, editingInvoice, effectivePrevCounts]);
 
   // Detect Last Month (Strict Date Match)
   const isLastMonth = React.useMemo(() => {

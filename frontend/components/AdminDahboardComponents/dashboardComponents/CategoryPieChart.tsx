@@ -56,7 +56,7 @@ export default function CategoryPieChart({ selectedYear }: { selectedYear: numbe
   }, [selectedYear]);
 
   return (
-    <div className="rounded-2xl bg-card p-2 sm:p-3 shadow-sm w-full h-[280px] flex flex-col">
+    <div className="rounded-2xl bg-card p-2 sm:p-3 shadow-sm w-full h-[340px] flex flex-col">
       {!isClient || data.length === 0 ? (
         <div className="flex-1 flex items-center justify-center">
           <p className="text-sm text-muted-foreground">Loading distribution...</p>
@@ -87,7 +87,7 @@ export default function CategoryPieChart({ selectedYear }: { selectedYear: numbe
             </PieChart>
           </div>
 
-          <div className="w-full space-y-1.5 overflow-y-auto max-h-[100px] flex-1">
+          <div className="w-full space-y-1.5 overflow-y-auto max-h-[160px] flex-1">
             {data.map((item) => (
               <div key={item.name} className="flex items-center justify-between text-xs py-0.5">
                 <div className="flex items-center gap-1.5">

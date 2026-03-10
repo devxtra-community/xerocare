@@ -91,7 +91,7 @@ export default function SalesChart({ selectedYear = new Date().getFullYear() }: 
   }, [selectedPeriod, selectedYear]);
 
   return (
-    <div className="rounded-2xl bg-card h-[280px] w-full shadow-sm flex flex-col p-3 border border-gray-100">
+    <div className="rounded-2xl bg-card h-[340px] w-full shadow-sm flex flex-col p-3 border border-gray-100">
       <div className="flex flex-row items-center justify-between pb-2">
         <h4 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">
           Revenue Trend ({selectedYear === 'all' ? 'All Years' : selectedYear})
