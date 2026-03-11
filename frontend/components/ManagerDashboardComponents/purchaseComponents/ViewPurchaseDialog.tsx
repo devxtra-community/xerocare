@@ -29,24 +29,24 @@ export default function ViewPurchaseDialog({
         <div className="space-y-6">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <p className="text-sm font-medium text-muted-foreground">Purchase Number</p>
-              <p className="font-semibold">{purchase.purchase_number}</p>
+              <p className="text-sm font-medium text-muted-foreground">ID</p>
+              <p className="font-semibold">{purchase.id}</p>
             </div>
             <div>
-              <p className="text-sm font-medium text-muted-foreground">Lot Number</p>
-              <p className="font-semibold">{purchase.lot_number}</p>
+              <p className="text-sm font-medium text-muted-foreground">Lot ID</p>
+              <p className="font-semibold">{purchase.lotId}</p>
             </div>
             <div>
-              <p className="text-sm font-medium text-muted-foreground">Vendor</p>
-              <p className="font-semibold">{purchase.vendor_name}</p>
+              <p className="text-sm font-medium text-muted-foreground">Vendor ID</p>
+              <p className="font-semibold">{purchase.vendorId}</p>
             </div>
             <div>
               <p className="text-sm font-medium text-muted-foreground">Status</p>
               <Badge
                 variant={
-                  purchase.status === 'COMPLETED'
+                  purchase.status === 'PAID'
                     ? 'default'
-                    : purchase.status === 'PENDING'
+                    : purchase.status === 'PARTIAL'
                       ? 'secondary'
                       : 'destructive'
                 }
@@ -57,35 +57,25 @@ export default function ViewPurchaseDialog({
             </div>
             <div>
               <p className="text-sm font-medium text-muted-foreground">Created At</p>
-              <p className="font-medium">{new Date(purchase.created_at).toLocaleDateString()}</p>
+              <p className="font-medium">{new Date(purchase.createdAt).toLocaleDateString()}</p>
             </div>
             <div>
               <p className="text-sm font-medium text-muted-foreground">Total Amount</p>
               <p className="font-bold text-lg text-primary">
-                {formatCurrency(purchase.total_amount)}
+                {formatCurrency(purchase.totalAmount)}
               </p>
             </div>
           </div>
 
           <div className="border-t pt-4">
-            <h4 className="font-semibold mb-2">Products</h4>
-            <div className="bg-muted/50 p-3 rounded-md">
-              <ul className="list-disc list-inside space-y-1">
-                {purchase.product_names.map((name, i) => (
-                  <li key={i}>{name}</li>
-                ))}
-              </ul>
-            </div>
-          </div>
-
-          <div className="border-t pt-4">
-            <h4 className="font-semibold mb-2">Models</h4>
-            <div className="bg-muted/50 p-3 rounded-md">
-              <ul className="list-disc list-inside space-y-1">
-                {purchase.model_names.map((name, i) => (
-                  <li key={i}>{name}</li>
-                ))}
-              </ul>
+            <h4 className="font-semibold mb-2">Costs Breakdown</h4>
+            <div className="bg-muted/50 p-3 rounded-md space-y-1 text-sm">
+              <p>Documentation Fee: {formatCurrency(purchase.documentationFee)}</p>
+              <p>Labour Cost: {formatCurrency(purchase.labourCost)}</p>
+              <p>Handling Fee: {formatCurrency(purchase.handlingFee)}</p>
+              <p>Transportation Cost: {formatCurrency(purchase.transportationCost)}</p>
+              <p>Shipping Cost: {formatCurrency(purchase.shippingCost)}</p>
+              <p>Groundfield Cost: {formatCurrency(purchase.groundfieldCost)}</p>
             </div>
           </div>
         </div>

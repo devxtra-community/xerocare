@@ -1,6 +1,7 @@
+import './env';
+
 import 'reflect-metadata';
 import { DataSource } from 'typeorm';
-import './env';
 import { Vendor } from '../entities/vendorEntity';
 import { Model } from '../entities/modelEntity';
 import { Product } from '../entities/productEntity';
@@ -22,11 +23,11 @@ import { RfqVendorItem } from '../entities/rfqVendorItemEntity';
 
 export const Source = new DataSource({
   type: 'postgres',
-  url: process.env.VENDOR_DATABASE_URL || process.env.DATABASE_URL,
+  url: process.env.VENDOR_DATABASE_URL,
   ssl: {
     rejectUnauthorized: false,
   },
-  synchronize: true, // Enabled to fix missing columns (lots.branch_id)
+  synchronize: true,
   entities: [
     Vendor,
     Model,

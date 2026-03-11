@@ -3,6 +3,7 @@ import { ModelRepository } from '../repositories/modelRepository';
 import { SparePart } from '../entities/sparePartEntity';
 import { LotService } from './lotService';
 import { LotItemType } from '../entities/lotItemEntity';
+import { LotStatus } from '../entities/lotEntity';
 import { getCached, setCached, deleteCached } from '../utils/cacheUtil';
 import { logger } from '../config/logger';
 
@@ -96,6 +97,13 @@ export class SparePartService {
     }
 
     if (lotId && itemCode) {
+      // Guard: inventory cannot be created before lot is received
+      const lot = await this.lotService.getLotById(lotId);
+      if (lot.status !== LotStatus.RECEIVED) {
+        throw new Error(
+          'Inventory cannot be created until the lot is received. Please confirm the lot reception first.',
+        );
+      }
       // The lot tracking currently uses item_code.
       await this.lotService.validateAndTrackUsage(
         lotId,

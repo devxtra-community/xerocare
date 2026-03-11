@@ -118,7 +118,7 @@ export default function AddSparePartDialog({
     }
 
     // Validate quantity against available stock
-    const availableQuantity = selectedLotItem.quantity - selectedLotItem.usedQuantity;
+    const availableQuantity = selectedLotItem.receivedQuantity - selectedLotItem.usedQuantity;
     const requestedQuantity = Number(formData.quantity);
 
     if (requestedQuantity > availableQuantity) {
@@ -238,11 +238,11 @@ export default function AddSparePartDialog({
                       ) || [];
 
                     return sparePartItems.map((item) => {
-                      const available = item.quantity - item.usedQuantity;
+                      const available = item.receivedQuantity - item.usedQuantity;
                       return {
                         value: item.id,
                         label: `${item.sparePart!.item_code} - ${item.sparePart!.part_name}`,
-                        description: `Available: ${available} / ${item.quantity} | Price: QAR ${item.unitPrice}`,
+                        description: `Available: ${available} / ${item.receivedQuantity} | Price: QAR ${item.unitPrice}`,
                       };
                     });
                   })()}
@@ -261,7 +261,7 @@ export default function AddSparePartDialog({
 
                       if (!selectedItem) return null;
 
-                      const available = selectedItem.quantity - selectedItem.usedQuantity;
+                      const available = selectedItem.receivedQuantity - selectedItem.usedQuantity;
                       const requested = Number(formData.quantity) || 0;
                       const remaining = available - requested;
 
@@ -274,7 +274,7 @@ export default function AddSparePartDialog({
                           }
                         >
                           {remaining >= 0 && requested > 0
-                            ? `✓ Valid - Remaining in lot after this: ${remaining} / ${selectedItem.quantity}`
+                            ? `✓ Valid - Remaining in lot after this: ${remaining} / ${selectedItem.receivedQuantity}`
                             : `✗ Invalid - Available: ${available}, Requested: ${requested}`}
                         </span>
                       );

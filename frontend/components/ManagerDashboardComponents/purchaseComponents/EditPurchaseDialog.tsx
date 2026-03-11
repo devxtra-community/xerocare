@@ -5,13 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+
 import { purchaseService, Purchase, UpdatePurchaseDTO } from '@/services/purchaseService';
 import { toast } from 'sonner';
 
@@ -38,14 +32,12 @@ export default function EditPurchaseDialog({
   useEffect(() => {
     if (open && purchase) {
       setFormData({
-        purchase_number: purchase.purchase_number,
-        lot_number: purchase.lot_number,
-        vendor_id: purchase.vendor_id,
-        total_amount: purchase.total_amount,
-        status: purchase.status,
-        // Note: Keeping existing product/model IDs as is for now in this simplified form
-        product_ids: purchase.product_ids,
-        model_ids: purchase.model_ids,
+        documentationFee: purchase.documentationFee,
+        labourCost: purchase.labourCost,
+        handlingFee: purchase.handlingFee,
+        transportationCost: purchase.transportationCost,
+        shippingCost: purchase.shippingCost,
+        groundfieldCost: purchase.groundfieldCost,
       });
     }
   }, [open, purchase]);
@@ -74,64 +66,76 @@ export default function EditPurchaseDialog({
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="edit_purchase_number">Purchase Number</Label>
+              <Label htmlFor="edit_documentationFee">Documentation Fee</Label>
               <Input
-                id="edit_purchase_number"
-                value={formData.purchase_number || ''}
-                onChange={(e) => setFormData({ ...formData, purchase_number: e.target.value })}
+                id="edit_documentationFee"
+                type="number"
+                value={formData.documentationFee || 0}
+                onChange={(e) =>
+                  setFormData({ ...formData, documentationFee: Number(e.target.value) })
+                }
                 required
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="edit_lot_number">Lot Number</Label>
+              <Label htmlFor="edit_labourCost">Labour Cost</Label>
               <Input
-                id="edit_lot_number"
-                value={formData.lot_number || ''}
-                onChange={(e) => setFormData({ ...formData, lot_number: e.target.value })}
+                id="edit_labourCost"
+                type="number"
+                value={formData.labourCost || 0}
+                onChange={(e) => setFormData({ ...formData, labourCost: Number(e.target.value) })}
                 required
               />
             </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="edit_vendor">Vendor ID</Label>
-            <Input
-              id="edit_vendor"
-              value={formData.vendor_id || ''}
-              onChange={(e) => setFormData({ ...formData, vendor_id: e.target.value })}
-              placeholder="Enter Vendor ID"
-              required
-            />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="edit_total_amount">Total Amount</Label>
+              <Label htmlFor="edit_handlingFee">Handling Fee</Label>
               <Input
-                id="edit_total_amount"
+                id="edit_handlingFee"
                 type="number"
-                value={formData.total_amount || 0}
-                onChange={(e) => setFormData({ ...formData, total_amount: Number(e.target.value) })}
+                value={formData.handlingFee || 0}
+                onChange={(e) => setFormData({ ...formData, handlingFee: Number(e.target.value) })}
                 required
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="edit_status">Status</Label>
-              <Select
-                value={formData.status}
-                onValueChange={(value: 'PENDING' | 'COMPLETED' | 'CANCELLED') =>
-                  setFormData({ ...formData, status: value })
+              <Label htmlFor="edit_transportationCost">Transportation Cost</Label>
+              <Input
+                id="edit_transportationCost"
+                type="number"
+                value={formData.transportationCost || 0}
+                onChange={(e) =>
+                  setFormData({ ...formData, transportationCost: Number(e.target.value) })
                 }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="PENDING">Pending</SelectItem>
-                  <SelectItem value="COMPLETED">Completed</SelectItem>
-                  <SelectItem value="CANCELLED">Cancelled</SelectItem>
-                </SelectContent>
-              </Select>
+                required
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit_shippingCost">Shipping Cost</Label>
+              <Input
+                id="edit_shippingCost"
+                type="number"
+                value={formData.shippingCost || 0}
+                onChange={(e) => setFormData({ ...formData, shippingCost: Number(e.target.value) })}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit_groundfieldCost">Groundfield Cost</Label>
+              <Input
+                id="edit_groundfieldCost"
+                type="number"
+                value={formData.groundfieldCost || 0}
+                onChange={(e) =>
+                  setFormData({ ...formData, groundfieldCost: Number(e.target.value) })
+                }
+                required
+              />
             </div>
           </div>
 

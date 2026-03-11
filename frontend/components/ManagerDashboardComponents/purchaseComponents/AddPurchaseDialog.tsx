@@ -5,13 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+
 import { purchaseService, CreatePurchaseDTO } from '@/services/purchaseService';
 import { toast } from 'sonner';
 
@@ -32,13 +26,13 @@ export default function AddPurchaseDialog({
 }: AddPurchaseDialogProps) {
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState<CreatePurchaseDTO>({
-    purchase_number: '',
-    lot_number: '',
-    product_ids: [],
-    model_ids: [],
-    vendor_id: '',
-    total_amount: 0,
-    status: 'PENDING',
+    lotId: '',
+    documentationFee: 0,
+    labourCost: 0,
+    handlingFee: 0,
+    transportationCost: 0,
+    shippingCost: 0,
+    groundfieldCost: 0,
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -48,13 +42,13 @@ export default function AddPurchaseDialog({
       await purchaseService.createPurchase(formData);
       toast.success('Purchase created successfully');
       setFormData({
-        purchase_number: '',
-        lot_number: '',
-        product_ids: [],
-        model_ids: [],
-        vendor_id: '',
-        total_amount: 0,
-        status: 'PENDING',
+        lotId: '',
+        documentationFee: 0,
+        labourCost: 0,
+        handlingFee: 0,
+        transportationCost: 0,
+        shippingCost: 0,
+        groundfieldCost: 0,
       });
       onSuccess();
       onOpenChange(false);
@@ -74,64 +68,89 @@ export default function AddPurchaseDialog({
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="purchase_number">Purchase Number</Label>
+              <Label htmlFor="lotId">Lot ID</Label>
               <Input
-                id="purchase_number"
-                value={formData.purchase_number}
-                onChange={(e) => setFormData({ ...formData, purchase_number: e.target.value })}
+                id="lotId"
+                value={formData.lotId}
+                onChange={(e) => setFormData({ ...formData, lotId: e.target.value })}
+                placeholder="Enter Lot ID"
                 required
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="lot_number">Lot Number</Label>
+              <Label htmlFor="documentationFee">Documentation Fee</Label>
               <Input
-                id="lot_number"
-                value={formData.lot_number}
-                onChange={(e) => setFormData({ ...formData, lot_number: e.target.value })}
+                id="documentationFee"
+                type="number"
+                value={formData.documentationFee}
+                onChange={(e) =>
+                  setFormData({ ...formData, documentationFee: Number(e.target.value) })
+                }
                 required
               />
             </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="vendor">Vendor ID</Label>
-            <Input
-              id="vendor"
-              value={formData.vendor_id}
-              onChange={(e) => setFormData({ ...formData, vendor_id: e.target.value })}
-              placeholder="Enter Vendor ID"
-              required
-            />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="total_amount">Total Amount</Label>
+              <Label htmlFor="labourCost">Labour Cost</Label>
               <Input
-                id="total_amount"
+                id="labourCost"
                 type="number"
-                value={formData.total_amount}
-                onChange={(e) => setFormData({ ...formData, total_amount: Number(e.target.value) })}
+                value={formData.labourCost}
+                onChange={(e) => setFormData({ ...formData, labourCost: Number(e.target.value) })}
                 required
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="status">Status</Label>
-              <Select
-                value={formData.status}
-                onValueChange={(value: 'PENDING' | 'COMPLETED' | 'CANCELLED') =>
-                  setFormData({ ...formData, status: value })
+              <Label htmlFor="handlingFee">Handling Fee</Label>
+              <Input
+                id="handlingFee"
+                type="number"
+                value={formData.handlingFee}
+                onChange={(e) => setFormData({ ...formData, handlingFee: Number(e.target.value) })}
+                required
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="transportationCost">Transportation Cost</Label>
+              <Input
+                id="transportationCost"
+                type="number"
+                value={formData.transportationCost}
+                onChange={(e) =>
+                  setFormData({ ...formData, transportationCost: Number(e.target.value) })
                 }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="PENDING">Pending</SelectItem>
-                  <SelectItem value="COMPLETED">Completed</SelectItem>
-                  <SelectItem value="CANCELLED">Cancelled</SelectItem>
-                </SelectContent>
-              </Select>
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="shippingCost">Shipping Cost</Label>
+              <Input
+                id="shippingCost"
+                type="number"
+                value={formData.shippingCost}
+                onChange={(e) => setFormData({ ...formData, shippingCost: Number(e.target.value) })}
+                required
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="groundfieldCost">Groundfield Cost</Label>
+              <Input
+                id="groundfieldCost"
+                type="number"
+                value={formData.groundfieldCost}
+                onChange={(e) =>
+                  setFormData({ ...formData, groundfieldCost: Number(e.target.value) })
+                }
+                required
+              />
             </div>
           </div>
 

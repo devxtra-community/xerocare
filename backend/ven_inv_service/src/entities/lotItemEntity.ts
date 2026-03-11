@@ -49,9 +49,29 @@ export class LotItem {
   @JoinColumn({ name: 'spare_part_id' })
   sparePart?: SparePart;
 
-  @Column({ type: 'int' })
-  quantity!: number;
+  /**
+   * Expected quantity ordered from vendor (maps to legacy `quantity` column
+   * so existing rows remain valid).
+   */
+  @Column({ name: 'quantity', type: 'int' })
+  expectedQuantity!: number;
 
+  /** Actual quantity confirmed received in good condition. */
+  @Column({ name: 'received_quantity', type: 'int', default: 0 })
+  receivedQuantity!: number;
+
+  /** Quantity received but damaged / defective. */
+  @Column({ name: 'damaged_quantity', type: 'int', default: 0 })
+  damagedQuantity!: number;
+
+  /**
+   * Quantity that has been or will be returned to vendor.
+   * Defaults to damaged_quantity when saving receiving data.
+   */
+  @Column({ name: 'returned_quantity', type: 'int', default: 0 })
+  returnedQuantity!: number;
+
+  /** How many units have already been consumed into inventory. */
   @Column({ name: 'used_quantity', type: 'int', default: 0 })
   usedQuantity!: number;
 

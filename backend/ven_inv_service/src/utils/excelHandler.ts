@@ -211,13 +211,13 @@ export class ExcelHandler {
         item.itemType === LotItemType.MODEL
           ? item.model?.brandRelation?.name
           : item.sparePart?.brand;
-      const remaining = item.quantity - item.usedQuantity;
+      const remaining = item.expectedQuantity - item.usedQuantity;
 
       rows.push([
         item.itemType,
         name || 'N/A',
         brand || 'N/A',
-        item.quantity,
+        item.expectedQuantity,
         item.usedQuantity,
         remaining,
         item.unitPrice,
@@ -272,7 +272,7 @@ export class ExcelHandler {
     ]);
 
     productItems.forEach((item) => {
-      const remaining = item.quantity - item.usedQuantity;
+      const remaining = item.expectedQuantity - item.usedQuantity;
       const modelId = item.modelId || '';
       const modelName = item.model?.model_name || '';
       const modelNo = item.model?.model_no || '';
@@ -348,7 +348,7 @@ export class ExcelHandler {
     ]);
 
     sparePartItems.forEach((item) => {
-      const remaining = item.quantity - item.usedQuantity;
+      const remaining = item.receivedQuantity - item.usedQuantity;
       const itemCode = item.sparePart?.item_code || '';
       const partName = item.sparePart?.part_name || '';
       const brand = item.sparePart?.brand || '';

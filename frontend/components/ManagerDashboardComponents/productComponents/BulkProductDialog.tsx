@@ -422,9 +422,9 @@ export function BulkProductDialog({ open, onClose, onSuccess }: BulkProductDialo
                               {lotModelItems.map((item) => (
                                 <SelectItem key={item.id} value={item.id}>
                                   {item.model?.model_name ?? item.modelId ?? item.id}
-                                  {item.quantity > 0 && (
+                                  {item.receivedQuantity > 0 && (
                                     <span className="ml-2 text-xs text-muted-foreground">
-                                      (qty: {item.quantity - item.usedQuantity})
+                                      (qty: {item.receivedQuantity - item.usedQuantity})
                                     </span>
                                   )}
                                 </SelectItem>

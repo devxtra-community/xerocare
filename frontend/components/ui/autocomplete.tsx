@@ -23,6 +23,7 @@ interface AutocompleteProps {
   emptyText?: string;
   loading?: boolean;
   className?: string;
+  disabled?: boolean;
 }
 
 export function Autocomplete({
@@ -34,6 +35,7 @@ export function Autocomplete({
   emptyText = 'No results found.',
   loading = false,
   className,
+  disabled = false,
 }: AutocompleteProps) {
   const inputRef = React.useRef<HTMLInputElement>(null);
   const [isOpen, setIsOpen] = React.useState(false);
@@ -71,8 +73,15 @@ export function Autocomplete({
   );
 
   return (
-    <Popover open={isOpen} onOpenChange={setIsOpen}>
-      <Command shouldFilter={false} className={cn('overflow-visible bg-transparent', className)}>
+    <Popover open={isOpen && !disabled} onOpenChange={setIsOpen}>
+      <Command
+        shouldFilter={false}
+        className={cn(
+          'overflow-visible bg-transparent',
+          className,
+          disabled && 'opacity-50 pointer-events-none',
+        )}
+      >
         <PopoverAnchor>
           <div className="group relative rounded-xl border border-border bg-card px-3 py-2 transition-all focus-within:ring-4 focus-within:ring-primary/10 focus-within:border-primary">
             <div className="flex items-center gap-2">
@@ -85,9 +94,12 @@ export function Autocomplete({
                   if (!isOpen) setIsOpen(true);
                   if (!val) onValueChange?.('');
                 }}
-                onFocus={() => setIsOpen(true)}
+                onFocus={() => {
+                  if (!disabled) setIsOpen(true);
+                }}
                 placeholder={placeholder}
-                className="flex-1 bg-transparent text-sm font-medium outline-none placeholder:text-slate-400 placeholder:font-normal"
+                disabled={disabled}
+                className="flex-1 bg-transparent text-sm font-medium outline-none placeholder:text-slate-400 placeholder:font-normal disabled:cursor-not-allowed"
               />
               {loading ? (
                 <Loader2 className="h-4 w-4 animate-spin text-slate-400" />

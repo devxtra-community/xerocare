@@ -628,13 +628,13 @@ function ProductFormModal({
                           .map((i, idx) => {
                             const mId = i.modelId || i.model?.id;
                             const model = models.find((m) => m.id === mId);
-                            const available = i.quantity - i.usedQuantity;
+                            const available = i.receivedQuantity - i.usedQuantity;
                             return {
                               value: i.id || mId || String(idx),
                               label: model
                                 ? `${model.model_name} (${model.model_no})`
                                 : 'Unknown Model',
-                              description: `Available: ${available} / ${i.quantity}`,
+                              description: `Available: ${available} / ${i.receivedQuantity}`,
                             };
                           }) || []
                       );
@@ -653,7 +653,7 @@ function ProductFormModal({
                             i.model?.id === selectedLotItemId,
                         );
                         if (!item) return null;
-                        const available = item.quantity - item.usedQuantity;
+                        const available = item.receivedQuantity - item.usedQuantity;
                         return (
                           <span
                             className={
@@ -663,8 +663,8 @@ function ProductFormModal({
                             }
                           >
                             {available > 0
-                              ? `✓ Available in Lot: ${available} / ${item.quantity}`
-                              : `✗ Out of Stock in Lot: ${available} / ${item.quantity}`}
+                              ? `✓ Available in Lot: ${available} / ${item.receivedQuantity}`
+                              : `✗ Out of Stock in Lot: ${available} / ${item.receivedQuantity}`}
                           </span>
                         );
                       })()}

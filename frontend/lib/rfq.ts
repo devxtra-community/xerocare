@@ -11,14 +11,22 @@ export enum RfqStatus {
 }
 
 export enum ItemType {
-  MODEL = 'MODEL',
+  PRODUCT = 'PRODUCT',
   SPARE_PART = 'SPARE_PART',
 }
 
 export interface RfqItem {
   id?: string;
   itemType: ItemType;
-  itemId: string;
+  modelId?: string;
+  productId?: string;
+  brandId?: string;
+  sparePartId?: string;
+  customProductName?: string;
+  customSparePartName?: string;
+  customBrandName?: string;
+  hsCode?: string;
+  description?: string;
   quantity: number;
   expectedDeliveryDate?: string;
 }

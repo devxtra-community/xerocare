@@ -16,8 +16,21 @@ import {
 } from '@/lib/rfq';
 import { formatCurrency } from '@/lib/format';
 import { Model, getAllModels } from '@/lib/model';
+import { SparePart, getAllSpareParts } from '@/lib/spare-part';
+import { getAllProducts, Product } from '@/lib/product';
+import { getBrands, Brand } from '@/lib/brand';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Send, Upload, CheckCircle, Package, Download, Eye, Clock } from 'lucide-react';
+import {
+  ArrowLeft,
+  Send,
+  Upload,
+  CheckCircle,
+  Package,
+  Download,
+  Eye,
+  Clock,
+  Loader2,
+} from 'lucide-react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -42,17 +55,31 @@ export default function RfqDetails({ id, basePath }: RfqDetailsProps) {
   const [rfq, setRfq] = useState<Rfq | null>(null);
   const [comparison, setComparison] = useState<Record<string, unknown> | null>(null);
   const [models, setModels] = useState<Model[]>([]);
+  const [spareParts, setSpareParts] = useState<SparePart[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [brands, setBrands] = useState<Brand[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'items' | 'vendors' | 'comparison'>('items');
   const [vendorToAward, setVendorToAward] = useState<string | null>(null);
+  const [sendLoading, setSendLoading] = useState(false);
+  const [lotLoading, setLotLoading] = useState(false);
 
   useEffect(() => {
     const loadInitialData = async () => {
       setLoading(true);
       try {
-        const [rfqData, mRes] = await Promise.all([getRfqById(id), getAllModels({ limit: 1000 })]);
+        const [rfqData, mRes, spRes, pRes, bRes] = await Promise.all([
+          getRfqById(id),
+          getAllModels({ limit: 1000 }),
+          getAllSpareParts(),
+          getAllProducts(),
+          getBrands(),
+        ]);
         setRfq(rfqData);
         setModels(mRes.data || mRes);
+        setSpareParts(spRes);
+        setProducts(pRes);
+        setBrands(bRes.data || bRes);
 
         if (['PARTIAL_QUOTED', 'FULLY_QUOTED', 'AWARDED', 'CLOSED'].includes(rfqData.status)) {
           const compData = await getRfqComparison(id);
@@ -82,9 +109,73 @@ export default function RfqDetails({ id, basePath }: RfqDetailsProps) {
     }
   };
 
-  const getItemName = (itemId: string) => {
-    const model = models.find((m) => m.id === itemId);
-    return model ? model.model_name || model.model_no : itemId;
+  /**
+   * Resolve a human-readable name for an RFQ item.
+   * Priority: registered Model name → registered SparePart name → custom name fields → raw ID.
+   */
+  const getItemName = (item: Record<string, unknown>): string => {
+    // Custom names take highest priority (free-text items)
+    if (item.custom_product_name) return item.custom_product_name as string;
+    if (item.custom_spare_part_name) return item.custom_spare_part_name as string;
+
+    // Registered product lookup
+    if (item.product_id) {
+      const p = products.find((pr) => pr.id === item.product_id);
+      if (p) return p.name;
+    }
+    // Registered model lookup
+    if (item.model_id) {
+      const model = models.find((m) => m.id === item.model_id);
+      if (model) return model.model_name || model.model_no || (item.model_id as string);
+    }
+    // Registered spare part lookup
+    if (item.spare_part_id) {
+      const sp = spareParts.find((s) => s.id === item.spare_part_id);
+      if (sp) return sp.part_name;
+    }
+    return (item.model_id || item.spare_part_id || item.product_id || 'Unknown') as string;
+  };
+
+  const getBrandName = (item: Record<string, unknown>): string => {
+    if (item.custom_brand_name) return item.custom_brand_name as string;
+
+    if (item.brand_id) {
+      const b = brands.find((br) => br.id === item.brand_id);
+      if (b) return b.name;
+    }
+
+    if (item.model_id) {
+      const model = models.find((m) => m.id === item.model_id);
+      if (model) {
+        const b = brands.find((br) => br.id === (model as { brand_id?: string }).brand_id);
+        if (b) return b.name;
+        return model.model_no || '-';
+      }
+    }
+
+    if (item.spare_part_id) {
+      const sp = spareParts.find((s) => s.id === item.spare_part_id);
+      if (sp) {
+        if (sp.brand) return sp.brand;
+        const b = brands.find((br) => br.id === (sp as { brand_id?: string }).brand_id);
+        if (b) return b.name;
+      }
+    }
+
+    if (item.product_id) {
+      const p = products.find((pr) => pr.id === item.product_id);
+      const modelId = p?.model?.id || (p as { model_id?: string })?.model_id;
+      if (modelId) {
+        const model = models.find((m) => m.id === modelId);
+        if (model) {
+          const b = brands.find((br) => br.id === (model as { brand_id?: string }).brand_id);
+          if (b) return b.name;
+          return model.model_no || '-';
+        }
+      }
+    }
+
+    return '-';
   };
 
   const handleDownloadVendorQuote = async (vendorId: string, vendorName: string) => {
@@ -100,6 +191,7 @@ export default function RfqDetails({ id, basePath }: RfqDetailsProps) {
 
   const handleSendRfq = async () => {
     try {
+      setSendLoading(true);
       await sendRfq(id);
       toast.success('RFQ Sent to Vendors');
       fetchData();
@@ -108,6 +200,8 @@ export default function RfqDetails({ id, basePath }: RfqDetailsProps) {
         (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
           'Failed to send RFQ',
       );
+    } finally {
+      setSendLoading(false);
     }
   };
 
@@ -148,6 +242,7 @@ export default function RfqDetails({ id, basePath }: RfqDetailsProps) {
 
   const handleCreateLot = async () => {
     try {
+      setLotLoading(true);
       await createLotFromRfq(id);
       toast.success('Lot created successfully');
       router.push(`${basePath}/lots`);
@@ -156,6 +251,8 @@ export default function RfqDetails({ id, basePath }: RfqDetailsProps) {
         (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
           'Failed to create lot',
       );
+    } finally {
+      setLotLoading(false);
     }
   };
 
@@ -212,15 +309,31 @@ export default function RfqDetails({ id, basePath }: RfqDetailsProps) {
             </Button>
           )}
           {rfq.status === RfqStatus.DRAFT && (
-            <Button onClick={handleSendRfq} className="bg-blue-600 hover:bg-blue-700">
-              <Send className="mr-2 h-4 w-4" />
-              Send RFQ
+            <Button
+              onClick={handleSendRfq}
+              className="bg-blue-600 hover:bg-blue-700 min-w-[120px]"
+              disabled={sendLoading}
+            >
+              {sendLoading ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Send className="mr-2 h-4 w-4" />
+              )}
+              {sendLoading ? 'Sending...' : 'Send RFQ'}
             </Button>
           )}
           {rfq.status === RfqStatus.AWARDED && (
-            <Button onClick={handleCreateLot} className="bg-green-600 hover:bg-green-700">
-              <Package className="mr-2 h-4 w-4" />
-              Create Lot
+            <Button
+              onClick={handleCreateLot}
+              className="bg-green-600 hover:bg-green-700 min-w-[130px]"
+              disabled={lotLoading}
+            >
+              {lotLoading ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Package className="mr-2 h-4 w-4" />
+              )}
+              {lotLoading ? 'Creating...' : 'Create Lot'}
             </Button>
           )}
         </div>
@@ -266,6 +379,7 @@ export default function RfqDetails({ id, basePath }: RfqDetailsProps) {
                 <thead className="bg-slate-50 border-b text-slate-600 font-medium">
                   <tr>
                     <th className="px-6 py-3">Requested Item</th>
+                    <th className="px-6 py-3">Brand / Model</th>
                     <th className="px-6 py-3">Item Type</th>
                     <th className="px-6 py-3 text-right">Quantity</th>
                   </tr>
@@ -274,11 +388,14 @@ export default function RfqDetails({ id, basePath }: RfqDetailsProps) {
                   {(rfq.items as Record<string, unknown>[]).map((item: Record<string, unknown>) => (
                     <tr key={item.id as string} className="hover:bg-slate-50/50">
                       <td className="px-6 py-4">
-                        <div className="font-semibold text-slate-800">
-                          {getItemName(item.item_id as string)}
-                        </div>
+                        <div className="font-semibold text-slate-800">{getItemName(item)}</div>
                         <div className="text-[10px] text-slate-400 font-mono mt-0.5">
-                          {item.item_id as string}
+                          {(item.model_id || item.spare_part_id || item.product_id) as string}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="text-sm font-medium text-slate-600">
+                          {getBrandName(item)}
                         </div>
                       </td>
                       <td className="px-6 py-4">
@@ -293,7 +410,7 @@ export default function RfqDetails({ id, basePath }: RfqDetailsProps) {
                   ))}
                   {(!rfq.items || rfq.items.length === 0) && (
                     <tr>
-                      <td colSpan={3} className="px-6 py-8 text-center text-slate-500">
+                      <td colSpan={4} className="px-6 py-8 text-center text-slate-500">
                         No items found
                       </td>
                     </tr>
@@ -435,9 +552,7 @@ export default function RfqDetails({ id, basePath }: RfqDetailsProps) {
                     (item: Record<string, unknown>) => (
                       <tr key={item.rfqItemId as string} className="hover:bg-slate-50/50">
                         <td className="px-5 py-4">
-                          <div className="font-semibold text-slate-800">
-                            {getItemName(item.itemId as string)}
-                          </div>
+                          <div className="font-semibold text-slate-800">{getItemName(item)}</div>
                           <div className="text-[10px] text-slate-500 gap-2 flex items-center mt-1">
                             <Badge variant="outline" className="h-4 px-1.5 text-[9px] uppercase">
                               {item.itemType as string}

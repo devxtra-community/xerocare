@@ -24,6 +24,7 @@ interface SearchableSelectProps {
   emptyText?: string;
   loading?: boolean;
   className?: string;
+  disabled?: boolean;
 }
 
 export function SearchableSelect({
@@ -35,6 +36,7 @@ export function SearchableSelect({
   emptyText = 'No results found.',
   loading = false,
   className,
+  disabled = false,
 }: SearchableSelectProps) {
   const [open, setOpen] = React.useState(false);
   const [searchQuery, setSearchQuery] = React.useState('');
@@ -63,6 +65,7 @@ export function SearchableSelect({
         <Button
           variant="outline"
           role="combobox"
+          disabled={disabled}
           aria-expanded={open}
           className={cn(
             'w-full justify-between h-10 px-3 bg-card hover:bg-muted/50 border-input text-foreground',

@@ -6,6 +6,9 @@ import { RfqVendorItem } from '../entities/rfqVendorItemEntity';
 import { Lot, LotStatus } from '../entities/lotEntity';
 import { LotItem, LotItemType } from '../entities/lotItemEntity';
 import { Model } from '../entities/modelEntity';
+import { Product } from '../entities/productEntity';
+import { SparePart } from '../entities/sparePartEntity';
+import { Brand } from '../entities/brandEntity';
 import { AppError } from '../errors/appError';
 import * as xlsx from 'xlsx';
 import * as ExcelJS from 'exceljs';
@@ -13,7 +16,20 @@ import * as ExcelJS from 'exceljs';
 interface CreateRfqDto {
   branchId: string;
   createdBy: string;
-  items: { itemType: ItemType; itemId: string; quantity: number; expectedDeliveryDate?: Date }[];
+  items: {
+    itemType: ItemType;
+    modelId?: string;
+    productId?: string;
+    brandId?: string;
+    sparePartId?: string;
+    customProductName?: string;
+    customSparePartName?: string;
+    customBrandName?: string;
+    hsCode?: string;
+    description?: string;
+    quantity: number;
+    expectedDeliveryDate?: Date;
+  }[];
   vendorIds: string[];
 }
 
@@ -60,29 +76,114 @@ export class RfqService {
       await manager.save(rfq);
 
       const items: RfqItem[] = [];
-      const seenModelIds = new Set<string>();
 
       for (const row of data) {
-        const modelId = row.model_id as string;
+        const itemTypeRaw = (row.item || row.item_type || 'Product') as string;
+        const itemType = itemTypeRaw.toString().toUpperCase().includes('SPARE')
+          ? ItemType.SPARE_PART
+          : ItemType.PRODUCT;
+
+        const modelIdRaw = (row.model_name || row.model_id) as string;
+        const itemName = (row.product_name || row.item_name || row.description) as string;
+        const description = row.description as string;
         const quantity = parseInt(row.quantity as string);
 
-        if (!modelId) throw new AppError('Missing model_id in row', 400);
         if (isNaN(quantity) || quantity <= 0)
-          throw new AppError(`Invalid quantity for model ${modelId}`, 400);
-        if (seenModelIds.has(modelId)) throw new AppError(`Duplicate model_id: ${modelId}`, 400);
+          throw new AppError(`Invalid quantity for item: ${itemName || modelIdRaw}`, 400);
 
-        const modelExists = await manager.findOne(Model, { where: { id: modelId } });
-        if (!modelExists) throw new AppError(`Model with ID ${modelId} not found`, 404);
+        let validatedModelId: string | undefined = undefined;
+        let validatedProductId: string | undefined = undefined;
+        let validatedSparePartId: string | undefined = undefined;
+        let customProductName: string | undefined = undefined;
+        let customSparePartName: string | undefined = undefined;
+        const customBrandName: string | undefined = row.brand ? String(row.brand) : undefined;
+        const hsCode: string | undefined = row.hs_code ? String(row.hs_code) : undefined;
+
+        if (itemType === ItemType.PRODUCT) {
+          if (!modelIdRaw && !itemName)
+            throw new AppError('Missing model/item information in row', 400);
+
+          if (modelIdRaw) {
+            // Let's try to match modelIdRaw as a UUID first, or as a model_no
+            const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+              modelIdRaw,
+            );
+            let model: Model | null = null;
+            if (isUuid) {
+              model = await manager.findOne(Model, { where: { id: modelIdRaw } });
+            } else {
+              model = await manager.findOne(Model, { where: { model_no: modelIdRaw } });
+            }
+            if (!model) throw new AppError(`Model '${modelIdRaw}' not found in system`, 404);
+            validatedModelId = model.id;
+          }
+
+          if (itemName) {
+            // Try to find a product matching this name
+            const product = await manager.findOne(Product, { where: { name: itemName } });
+            if (product) {
+              validatedProductId = product.id;
+              if (!validatedModelId) validatedModelId = product.model_id;
+            } else {
+              customProductName = itemName;
+            }
+          }
+
+          if (!validatedModelId)
+            throw new AppError(
+              'A valid Model must be specified or dynamically resolved for Product items',
+              400,
+            );
+        } else if (itemType === ItemType.SPARE_PART) {
+          if (!itemName && !modelIdRaw)
+            throw new AppError('Missing spare part information in row', 400);
+          const searchName = itemName || modelIdRaw;
+
+          const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+            searchName,
+          );
+          let sparePart: SparePart | null = null;
+          if (isUuid) {
+            sparePart = await manager.findOne(SparePart, { where: { id: searchName } });
+          } else {
+            sparePart = await manager.findOne(SparePart, { where: { part_name: searchName } });
+            if (!sparePart) {
+              // Also try matching by item_code
+              sparePart = await manager.findOne(SparePart, { where: { item_code: searchName } });
+            }
+          }
+
+          if (sparePart) {
+            validatedSparePartId = sparePart.id;
+          } else {
+            customSparePartName = searchName;
+          }
+        }
+
+        let validatedBrandId: string | undefined = undefined;
+        if (itemType === ItemType.SPARE_PART && customBrandName) {
+          const brand = await manager.findOne(Brand, { where: { name: customBrandName } });
+          if (brand) validatedBrandId = brand.id;
+        }
 
         items.push(
           manager.create(RfqItem, {
             rfq_id: rfq.id,
-            item_type: ItemType.MODEL,
-            item_id: modelId,
+            branch_id: branchId,
+            created_by: createdBy,
+            item_type: itemType,
+            model_id: validatedModelId,
+            product_id: validatedProductId,
+            brand_id: validatedBrandId,
+            spare_part_id: validatedSparePartId,
+            custom_product_name: customProductName,
+            custom_spare_part_name: customSparePartName,
+            custom_brand_name: customBrandName,
+            hs_code: hsCode,
+            description: description !== itemName ? description : undefined,
             quantity,
           }),
         );
-        seenModelIds.add(modelId);
       }
 
       await manager.save(items);
@@ -117,15 +218,35 @@ export class RfqService {
       await manager.save(rfq);
 
       if (data.items?.length > 0) {
-        const items = data.items.map((i) =>
-          manager.create(RfqItem, {
+        const items = data.items.map((i) => {
+          if (i.itemType === ItemType.PRODUCT) {
+            if (!i.modelId) throw new AppError('Model ID is required for Product items', 400);
+            if (!i.productId && !i.customProductName)
+              throw new AppError('Either Product or Custom Product Name is required', 400);
+          } else if (i.itemType === ItemType.SPARE_PART) {
+            if (!i.brandId && !i.customBrandName)
+              throw new AppError('Either Brand or Custom Brand Name is required', 400);
+            if (!i.sparePartId && !i.customSparePartName)
+              throw new AppError('Either Spare Part or Custom Spare Part Name is required', 400);
+          }
+          return manager.create(RfqItem, {
             rfq_id: rfq.id,
+            branch_id: data.branchId,
+            created_by: data.createdBy,
             item_type: i.itemType,
-            item_id: i.itemId,
+            model_id: i.modelId,
+            product_id: i.productId,
+            brand_id: i.brandId,
+            spare_part_id: i.sparePartId,
+            custom_product_name: i.customProductName,
+            custom_spare_part_name: i.customSparePartName,
+            custom_brand_name: i.customBrandName,
+            hs_code: i.hsCode,
+            description: i.description,
             quantity: i.quantity,
             expected_delivery_date: i.expectedDeliveryDate,
-          }),
-        );
+          });
+        });
         await manager.save(items);
       }
 
@@ -160,8 +281,9 @@ export class RfqService {
     if (!rfqWithFullItems) throw new AppError('RFQ items not found', 404);
 
     worksheet.columns = [
-      { header: 'rfq_item_id', key: 'rfq_item_id', width: 25 },
-      { header: 'model_id', key: 'model_id', width: 20 },
+      { header: 'item', key: 'item', width: 15 },
+      { header: 'model_name', key: 'model_name', width: 20 },
+      { header: 'product_name', key: 'product_name', width: 25 },
       { header: 'hs_code', key: 'hs_code', width: 15 },
       { header: 'description', key: 'description', width: 30 },
       { header: 'quantity', key: 'quantity', width: 15 },
@@ -171,18 +293,65 @@ export class RfqService {
       { header: 'available_quantity', key: 'available_quantity', width: 20 },
       { header: 'estimated_shipment_date', key: 'estimated_shipment_date', width: 25 },
       { header: 'vendor_note', key: 'vendor_note', width: 30 },
+      { header: 'rfq_item_id', key: 'rfq_item_id', width: 25 },
     ];
 
     for (const item of rfqWithFullItems.items) {
-      const model = await this.dataSource
-        .getRepository(Model)
-        .findOne({ where: { id: item.item_id } });
+      let modelId = '';
+      let hsCode = '';
+      let desc = '';
+      let partName = '';
+
+      if (item.item_type === ItemType.PRODUCT) {
+        if (item.model_id) {
+          const model = await this.dataSource
+            .getRepository(Model)
+            .findOne({ where: { id: item.model_id } });
+          modelId = model?.model_name || model?.model_no || item.model_id;
+          hsCode = model?.hs_code || '';
+          desc = model?.description || '';
+        }
+        if (item.product_id) {
+          const product = await this.dataSource
+            .getRepository(Product)
+            .findOne({ where: { id: item.product_id } });
+          partName = product?.name || '';
+        } else if (item.custom_product_name) {
+          partName = item.custom_product_name;
+        }
+        hsCode = item.hs_code || hsCode;
+      } else {
+        let brandNamePrefix = item.custom_brand_name ? `[${item.custom_brand_name}] ` : '';
+        if (item.brand_id && !item.custom_brand_name) {
+          const tempBrand = await this.dataSource
+            .getRepository(Brand)
+            .findOne({ where: { id: item.brand_id } });
+          if (tempBrand) brandNamePrefix = `[${tempBrand.name}] `;
+        }
+
+        if (item.spare_part_id) {
+          const sp = await this.dataSource
+            .getRepository(SparePart)
+            .findOne({ where: { id: item.spare_part_id } });
+          partName = `${brandNamePrefix}${sp?.part_name || ''}`;
+          modelId = '';
+        } else if (item.custom_spare_part_name) {
+          partName = `${brandNamePrefix}${item.custom_spare_part_name}`;
+          modelId = '';
+        }
+        hsCode = item.hs_code || '';
+      }
+
+      if (item.description) {
+        desc = item.description;
+      }
 
       worksheet.addRow({
-        rfq_item_id: item.id,
-        model_id: item.item_id,
-        hs_code: model?.hs_code || '',
-        description: model?.description || '',
+        item: item.item_type === ItemType.PRODUCT ? 'Product' : 'Spare Part',
+        model_name: modelId,
+        product_name: partName,
+        hs_code: hsCode,
+        description: desc,
         quantity: item.quantity,
         unit_price: '',
         total_price: '',
@@ -190,13 +359,14 @@ export class RfqService {
         available_quantity: '',
         estimated_shipment_date: '',
         vendor_note: '',
+        rfq_item_id: item.id,
       });
     }
 
     const rowCount = worksheet.rowCount;
-    // Add dropdown validation to the stock_status column (column H)
+    // Add validations for stock_status (Column I) and estimated_shipment_date (Column K)
     for (let i = 2; i <= Math.max(rowCount, 100); i++) {
-      worksheet.getCell(`H${i}`).dataValidation = {
+      worksheet.getCell(`I${i}`).dataValidation = {
         type: 'list',
         allowBlank: true,
         formulae: ['"IN_STOCK,OUT_OF_STOCK,ON_PRODUCTION"'],
@@ -204,6 +374,18 @@ export class RfqService {
         errorTitle: 'Invalid Status',
         error: 'Please select a valid stock status from the dropdown list.',
       };
+
+      worksheet.getCell(`K${i}`).dataValidation = {
+        type: 'date',
+        operator: 'greaterThanOrEqual',
+        showErrorMessage: true,
+        allowBlank: true,
+        formulae: [new Date(new Date().setHours(0, 0, 0, 0))],
+        errorStyle: 'error',
+        errorTitle: 'Invalid Date',
+        error: 'Please enter a valid present or future date.',
+      };
+      worksheet.getCell(`K${i}`).numFmt = 'yyyy-mm-dd';
     }
 
     const buffer = await workbook.xlsx.writeBuffer();
@@ -236,8 +418,9 @@ export class RfqService {
     const worksheet = workbook.addWorksheet('Vendor_Quote_Review');
 
     worksheet.columns = [
-      { header: 'rfq_item_id', key: 'rfq_item_id', width: 25 },
-      { header: 'model_id', key: 'model_id', width: 20 },
+      { header: 'item', key: 'item', width: 15 },
+      { header: 'model_name', key: 'model_name', width: 20 },
+      { header: 'product_name', key: 'product_name', width: 25 },
       { header: 'hs_code', key: 'hs_code', width: 15 },
       { header: 'description', key: 'description', width: 30 },
       { header: 'quantity', key: 'quantity', width: 15 },
@@ -247,30 +430,103 @@ export class RfqService {
       { header: 'available_quantity', key: 'available_quantity', width: 20 },
       { header: 'estimated_shipment_date', key: 'estimated_shipment_date', width: 25 },
       { header: 'vendor_note', key: 'vendor_note', width: 30 },
+      { header: 'rfq_item_id', key: 'rfq_item_id', width: 25 },
     ];
 
     for (const item of rfq.items) {
-      const model = await this.dataSource
-        .getRepository(Model)
-        .findOne({ where: { id: item.item_id } });
+      let modelId = '';
+      let hsCode = '';
+      let desc = '';
+      let partName = '';
+
+      if (item.item_type === ItemType.PRODUCT) {
+        if (item.model_id) {
+          const model = await this.dataSource
+            .getRepository(Model)
+            .findOne({ where: { id: item.model_id } });
+          modelId = model?.model_name || model?.model_no || item.model_id;
+          hsCode = model?.hs_code || '';
+          desc = model?.description || '';
+        }
+        if (item.product_id) {
+          const product = await this.dataSource
+            .getRepository(Product)
+            .findOne({ where: { id: item.product_id } });
+          partName = product?.name || '';
+        } else if (item.custom_product_name) {
+          partName = item.custom_product_name;
+        }
+        hsCode = item.hs_code || hsCode;
+      } else {
+        let brandNamePrefix = item.custom_brand_name ? `[${item.custom_brand_name}] ` : '';
+        if (item.brand_id && !item.custom_brand_name) {
+          const tempBrand = await this.dataSource
+            .getRepository(Brand)
+            .findOne({ where: { id: item.brand_id } });
+          if (tempBrand) brandNamePrefix = `[${tempBrand.name}] `;
+        }
+
+        if (item.spare_part_id) {
+          const sp = await this.dataSource
+            .getRepository(SparePart)
+            .findOne({ where: { id: item.spare_part_id } });
+          partName = `${brandNamePrefix}${sp?.part_name || ''}`;
+          modelId = '';
+        } else if (item.custom_spare_part_name) {
+          partName = `${brandNamePrefix}${item.custom_spare_part_name}`;
+          modelId = '';
+        }
+        hsCode = item.hs_code || '';
+      }
+
+      if (item.description) {
+        desc = item.description;
+      }
 
       const vendorItem = rfqVendor.items?.find((vi) => vi.rfq_item_id === item.id);
 
       worksheet.addRow({
-        rfq_item_id: item.id,
-        model_id: item.item_id,
-        hs_code: model?.hs_code || '',
-        description: model?.description || '',
+        item: item.item_type === ItemType.PRODUCT ? 'Product' : 'Spare Part',
+        model_name: modelId,
+        product_name: partName,
+        hs_code: hsCode,
+        description: desc,
         quantity: item.quantity,
         unit_price: vendorItem?.unit_price || '',
         total_price: vendorItem?.total_price || '',
         stock_status: vendorItem?.stock_status || '',
         available_quantity: vendorItem?.available_quantity || '',
         estimated_shipment_date: vendorItem?.estimated_shipment_date
-          ? new Date(vendorItem.estimated_shipment_date).toLocaleDateString()
+          ? new Date(vendorItem.estimated_shipment_date)
           : '',
         vendor_note: vendorItem?.vendor_note || '',
+        rfq_item_id: item.id,
       });
+    }
+
+    const rowCount = worksheet.rowCount;
+    // Add validations for stock_status (Column I) and estimated_shipment_date (Column K)
+    for (let i = 2; i <= Math.max(rowCount, 100); i++) {
+      worksheet.getCell(`I${i}`).dataValidation = {
+        type: 'list',
+        allowBlank: true,
+        formulae: ['"IN_STOCK,OUT_OF_STOCK,ON_PRODUCTION"'],
+        showErrorMessage: true,
+        errorTitle: 'Invalid Status',
+        error: 'Please select a valid stock status from the dropdown list.',
+      };
+
+      worksheet.getCell(`K${i}`).dataValidation = {
+        type: 'date',
+        operator: 'greaterThanOrEqual',
+        showErrorMessage: true,
+        allowBlank: true,
+        formulae: [new Date(new Date().setHours(0, 0, 0, 0))],
+        errorStyle: 'error',
+        errorTitle: 'Invalid Date',
+        error: 'Please enter a valid present or future date.',
+      };
+      worksheet.getCell(`K${i}`).numFmt = 'yyyy-mm-dd';
     }
 
     const buffer = await workbook.xlsx.writeBuffer();
@@ -321,7 +577,9 @@ export class RfqService {
       });
 
       if (!rfq) throw new AppError('RFQ not found', 404);
-      if (![RfqStatus.SENT, RfqStatus.PARTIAL_QUOTED].includes(rfq.status)) {
+      if (
+        ![RfqStatus.SENT, RfqStatus.PARTIAL_QUOTED, RfqStatus.FULLY_QUOTED].includes(rfq.status)
+      ) {
         throw new AppError('RFQ is not receiving quotes', 400);
       }
 
@@ -351,8 +609,14 @@ export class RfqService {
         if (!quote) throw new AppError(`Missing quote for item ${item.id}`, 400);
         if (quote.unitPrice < 0) throw new AppError('Unit price cannot be negative', 400);
 
-        // Recalculate total price on backend
-        const totalPrice = Number(quote.unitPrice) * Number(item.quantity);
+        // Recalculate total price on backend using the quantity vendor actually quoted
+        // If availableQuantity is not provided, we fallback to requested quantity
+        const actualQty =
+          quote.availableQuantity !== undefined && quote.availableQuantity !== null
+            ? quote.availableQuantity
+            : item.quantity;
+
+        const totalPrice = Number(quote.unitPrice) * Number(actualQty);
         totalQuotedAmount += totalPrice;
 
         const vendorItem = manager.create(RfqVendorItem, {
@@ -395,7 +659,11 @@ export class RfqService {
 
     if (!rfq) throw new AppError('RFQ not found', 404);
 
-    const validQuotes = rfq.vendors.filter((v) => v.status === RfqVendorStatus.QUOTED);
+    const validQuotes = rfq.vendors.filter((v) => {
+      if (!v.status) return false;
+      const s = v.status.toString().toUpperCase().trim();
+      return s === 'QUOTED' || s === 'AWARDED';
+    });
 
     const itemComparisons = rfq.items.map((item) => {
       const vendorPrices = validQuotes
@@ -418,7 +686,13 @@ export class RfqService {
 
       return {
         rfqItemId: item.id,
-        itemId: item.item_id,
+        modelId: item.model_id,
+        productId: item.product_id,
+        brandId: item.brand_id,
+        sparePartId: item.spare_part_id,
+        customProductName: item.custom_product_name,
+        customSparePartName: item.custom_spare_part_name,
+        description: item.description,
         itemType: item.item_type,
         quantity: item.quantity,
         lowestPrice,
@@ -551,17 +825,18 @@ export class RfqService {
 
       for (const quotedItem of awardedVendor.items) {
         const itemType =
-          quotedItem.rfq_item.item_type === ItemType.MODEL
+          quotedItem.rfq_item.item_type === ItemType.PRODUCT
             ? LotItemType.MODEL
             : LotItemType.SPARE_PART;
-        const itemId = quotedItem.rfq_item.item_id;
-
         const lotItem = manager.create(LotItem, {
           lotId: lot.id,
           itemType: itemType,
-          modelId: itemType === LotItemType.MODEL ? itemId : undefined,
-          sparePartId: itemType === LotItemType.SPARE_PART ? itemId : undefined,
-          quantity: quotedItem.rfq_item.quantity,
+          modelId: itemType === LotItemType.MODEL ? quotedItem.rfq_item.model_id : undefined,
+          sparePartId:
+            itemType === LotItemType.SPARE_PART ? quotedItem.rfq_item.spare_part_id : undefined,
+          customProductName: quotedItem.rfq_item.custom_product_name,
+          customSparePartName: quotedItem.rfq_item.custom_spare_part_name,
+          quantity: quotedItem.available_quantity ?? quotedItem.rfq_item.quantity,
           unitPrice: quotedItem.unit_price,
           totalPrice: quotedItem.total_price,
         });
@@ -592,6 +867,7 @@ export class RfqService {
       .getRepository(Rfq)
       .createQueryBuilder('rfq')
       .leftJoinAndSelect('rfq.creator', 'creator')
+      .leftJoinAndSelect('rfq.items', 'items')
       .leftJoinAndSelect('rfq.vendors', 'vendors')
       .leftJoinAndSelect('vendors.vendor', 'vendor');
 

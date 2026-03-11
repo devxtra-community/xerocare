@@ -6,6 +6,7 @@ export interface SparePart {
   item_code: string; // Matches backend entity
   part_name: string;
   brand: string;
+  brand_id?: string;
   description?: string;
   model_id?: string;
   model?: Model; // Populated when joined (e.g. via lot items)

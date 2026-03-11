@@ -6,13 +6,31 @@ import { createRfq, uploadRfqExcel, ItemType, RfqItem } from '@/lib/rfq';
 import { getVendors, Vendor } from '@/lib/vendor';
 import { getAllModels, Model } from '@/lib/model';
 import { getAllSpareParts, SparePart } from '@/lib/spare-part';
+import { getAllProducts, Product } from '@/lib/product';
+import { getBrands, Brand } from '@/lib/brand';
 import { Button } from '@/components/ui/button';
-import { Trash2, PlusCircle, Save, ArrowLeft, UploadCloud, DownloadCloud } from 'lucide-react';
+import {
+  Trash2,
+  PlusCircle,
+  Save,
+  ArrowLeft,
+  UploadCloud,
+  DownloadCloud,
+  Search,
+  CheckCircle2,
+} from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
-import { Autocomplete, AutocompleteOption } from '@/components/ui/autocomplete';
+import { SearchableSelect } from '@/components/ui/searchable-select';
+import { AddModelDialog } from '../productComponents/AddModelDialog';
+import { AddBrandDialog } from '../BrandComponents/AddBrandDialog';
+
+interface ExtendedRfqItem extends RfqItem {
+  isRequestingNewProduct?: boolean;
+  isRequestingNewPart?: boolean;
+}
 
 interface RfqCreateFormProps {
   basePath: string;
@@ -24,10 +42,19 @@ export default function RfqCreateForm({ basePath }: RfqCreateFormProps) {
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [models, setModels] = useState<Model[]>([]);
   const [spareParts, setSpareParts] = useState<SparePart[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [brands, setBrands] = useState<Brand[]>([]);
 
   const [selectedVendors, setSelectedVendors] = useState<string[]>([]);
-  const [items, setItems] = useState<RfqItem[]>([]);
+  const [items, setItems] = useState<ExtendedRfqItem[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Vendor search state
+  const [vendorSearchQuery, setVendorSearchQuery] = useState('');
+
+  // Dialog states
+  const [modelDialogOpen, setModelDialogOpen] = useState(false);
+  const [brandDialogOpen, setBrandDialogOpen] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -35,14 +62,18 @@ export default function RfqCreateForm({ basePath }: RfqCreateFormProps) {
 
   const fetchData = async () => {
     try {
-      const [vRes, mRes, spRes] = await Promise.all([
+      const [vRes, mRes, spRes, pRes, bRes] = await Promise.all([
         getVendors({ limit: 1000 }),
         getAllModels({ limit: 1000 }),
         getAllSpareParts(),
+        getAllProducts(),
+        getBrands(),
       ]);
       setVendors(vRes.data || vRes);
       setModels(mRes.data || mRes);
       setSpareParts(spRes);
+      setProducts(pRes);
+      setBrands(bRes.data || bRes);
     } catch (error) {
       console.error('Failed to load initial data', error);
       toast.error('Failed to load initial data');
@@ -56,16 +87,42 @@ export default function RfqCreateForm({ basePath }: RfqCreateFormProps) {
   };
 
   const addItemRow = () => {
-    setItems((prev) => [...prev, { itemType: ItemType.MODEL, itemId: '', quantity: 1 }]);
+    setItems((prev) => [...prev, { itemType: ItemType.PRODUCT, quantity: 1 }]);
   };
 
-  const updateItem = (index: number, field: keyof RfqItem, value: string | number) => {
-    const newItems = [...items];
-    newItems[index] = { ...newItems[index], [field]: value };
-    if (field === 'itemType') {
-      newItems[index].itemId = '';
-    }
-    setItems(newItems);
+  const updateItem = (
+    index: number,
+    field: keyof ExtendedRfqItem,
+    value: string | number | boolean | ItemType | undefined,
+  ) => {
+    setItems((prev) => {
+      const newItems = [...prev];
+      newItems[index] = { ...newItems[index], [field]: value };
+
+      if (field === 'itemType') {
+        newItems[index].modelId = undefined;
+        newItems[index].productId = undefined;
+        newItems[index].brandId = undefined;
+        newItems[index].sparePartId = undefined;
+        newItems[index].customProductName = undefined;
+        newItems[index].customSparePartName = undefined;
+        newItems[index].customBrandName = undefined;
+        newItems[index].hsCode = undefined;
+        newItems[index].isRequestingNewProduct = false;
+        newItems[index].isRequestingNewPart = false;
+      }
+      if (field === 'modelId') {
+        newItems[index].productId = undefined;
+        newItems[index].customProductName = undefined;
+        newItems[index].isRequestingNewProduct = false;
+      }
+      if (field === 'brandId') {
+        newItems[index].sparePartId = undefined;
+        newItems[index].customSparePartName = undefined;
+        newItems[index].isRequestingNewPart = false;
+      }
+      return newItems;
+    });
   };
 
   const removeItem = (index: number) => {
@@ -200,15 +257,41 @@ export default function RfqCreateForm({ basePath }: RfqCreateFormProps) {
     if (items.length === 0) {
       return toast.error('Please add at least one item');
     }
-    if (items.some((i) => !i.itemId || i.quantity <= 0)) {
+    if (
+      items.some(
+        (i) =>
+          i.quantity <= 0 ||
+          (i.itemType === ItemType.PRODUCT && !i.modelId) ||
+          (i.itemType === ItemType.SPARE_PART && !i.brandId && !i.customBrandName),
+      )
+    ) {
       return toast.error('Please complete all item rows properly');
     }
+
+    // Enrich items with backend-required fields before submission
+    const enrichedItems: RfqItem[] = items.map((item) => {
+      if (item.itemType === ItemType.PRODUCT) {
+        const model = models.find((m) => m.id === item.modelId);
+        return {
+          ...item,
+          customProductName:
+            item.customProductName ||
+            (!item.productId ? model?.model_name || model?.model_no || item.modelId : undefined),
+        };
+      } else {
+        return {
+          ...item,
+          customSparePartName:
+            item.customSparePartName || (!item.sparePartId ? 'Unknown Part' : undefined),
+        };
+      }
+    });
 
     try {
       setLoading(true);
       await createRfq({
         vendorIds: selectedVendors,
-        items,
+        items: enrichedItems,
       });
       toast.success('RFQ created successfully');
       router.push(`${basePath}/rfqs`);
@@ -223,8 +306,36 @@ export default function RfqCreateForm({ basePath }: RfqCreateFormProps) {
     }
   };
 
+  const filteredVendors = vendors.filter(
+    (v) =>
+      v.name.toLowerCase().includes(vendorSearchQuery.toLowerCase()) ||
+      v.email.toLowerCase().includes(vendorSearchQuery.toLowerCase()) ||
+      v.id.toLowerCase().includes(vendorSearchQuery.toLowerCase()) ||
+      (v as { vendor_code?: string }).vendor_code
+        ?.toLowerCase()
+        .includes(vendorSearchQuery.toLowerCase()),
+  );
+
+  const sortedVendors = [...filteredVendors].sort((a, b) => {
+    const aSelected = selectedVendors.includes(a.id);
+    const bSelected = selectedVendors.includes(b.id);
+    if (aSelected && !bSelected) return -1;
+    if (!aSelected && bSelected) return 1;
+    return 0;
+  });
+
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+    <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden relative">
+      <AddModelDialog
+        open={modelDialogOpen}
+        onOpenChange={setModelDialogOpen}
+        onSuccess={fetchData}
+      />
+      <AddBrandDialog
+        open={brandDialogOpen}
+        onOpenChange={setBrandDialogOpen}
+        onSuccess={fetchData}
+      />
       <div className="p-4 sm:p-6 border-b border-slate-200 bg-slate-50/50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="icon" onClick={() => router.back()}>
@@ -240,30 +351,56 @@ export default function RfqCreateForm({ basePath }: RfqCreateFormProps) {
           <h4 className="font-semibold text-slate-700 text-base border-b pb-2">
             1. Select Vendors
           </h4>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-            {vendors.map((vendor) => (
-              <label
-                key={vendor.id}
-                className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all ${
-                  selectedVendors.includes(vendor.id)
-                    ? 'border-primary bg-primary/5 shadow-sm'
-                    : 'border-slate-200 hover:border-primary/50 hover:bg-slate-50'
-                }`}
-              >
-                <input
-                  type="checkbox"
-                  className="rounded border-slate-300 text-primary focus:ring-primary h-4 w-4"
-                  checked={selectedVendors.includes(vendor.id)}
-                  onChange={() => toggleVendor(vendor.id)}
-                />
-                <div className="flex flex-col">
-                  <span className="font-medium text-slate-800 text-sm">{vendor.name}</span>
-                  <span className="text-xs text-slate-500 line-clamp-1">{vendor.email}</span>
-                </div>
-              </label>
-            ))}
+
+          <div className="relative max-w-md">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <Input
+              placeholder="Search Vendor by Name or Vendor ID"
+              value={vendorSearchQuery}
+              onChange={(e) => setVendorSearchQuery(e.target.value)}
+              className="pl-9"
+            />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 max-h-[300px] overflow-y-auto p-1">
+            {sortedVendors.map((vendor) => {
+              const isSelected = selectedVendors.includes(vendor.id);
+              return (
+                <label
+                  key={vendor.id}
+                  className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-all ${
+                    isSelected
+                      ? 'border-primary bg-primary/5 shadow-sm'
+                      : 'border-slate-200 hover:border-primary/40 hover:bg-slate-50'
+                  }`}
+                >
+                  <div className="mt-0.5 flex-shrink-0">
+                    {isSelected ? (
+                      <CheckCircle2 className="h-5 w-5 text-primary fill-primary/10" />
+                    ) : (
+                      <div className="h-5 w-5 rounded border border-slate-300 bg-white" />
+                    )}
+                    <input
+                      type="checkbox"
+                      className="sr-only"
+                      checked={isSelected}
+                      onChange={() => toggleVendor(vendor.id)}
+                    />
+                  </div>
+                  <div className="flex flex-col min-w-0">
+                    <span className="font-medium text-slate-800 text-sm truncate">
+                      {vendor.name}
+                    </span>
+                    <span className="text-xs text-slate-500 truncate">{vendor.email}</span>
+                  </div>
+                </label>
+              );
+            })}
           </div>
           {vendors.length === 0 && <p className="text-sm text-slate-500">No vendors available.</p>}
+          {vendors.length > 0 && sortedVendors.length === 0 && (
+            <p className="text-sm text-slate-500">No vendors match your search.</p>
+          )}
         </section>
 
         {/* Items Section */}
@@ -317,72 +454,237 @@ export default function RfqCreateForm({ basePath }: RfqCreateFormProps) {
             {items.map((item, index) => (
               <div
                 key={index}
-                className="flex flex-wrap sm:flex-nowrap gap-3 items-end p-4 rounded-lg bg-slate-50 border border-slate-100"
+                className="flex flex-col gap-3 p-4 rounded-lg bg-slate-50 border border-slate-200"
               >
-                <div className="w-full sm:w-1/4 space-y-1">
-                  <Label className="text-xs text-slate-500">Type</Label>
-                  <select
-                    className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm ring-offset-white file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                    value={item.itemType}
-                    onChange={(e) => updateItem(index, 'itemType', e.target.value as ItemType)}
-                  >
-                    <option value={ItemType.MODEL}>Model</option>
-                    <option value={ItemType.SPARE_PART}>Spare Part</option>
-                  </select>
-                </div>
+                {/* Row 1: Type & Model/Brand */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <Label className="text-xs text-slate-500 font-medium">Type</Label>
+                    <select
+                      className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm ring-offset-white file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 transition-colors hover:border-slate-300"
+                      value={item.itemType}
+                      onChange={(e) => updateItem(index, 'itemType', e.target.value as ItemType)}
+                    >
+                      <option value={ItemType.PRODUCT}>Product</option>
+                      <option value={ItemType.SPARE_PART}>Spare Part</option>
+                    </select>
+                  </div>
 
-                <div className="w-full sm:w-2/4 space-y-1">
-                  <Label className="text-xs text-slate-500">Item Name</Label>
-                  {item.itemType === ItemType.MODEL ? (
-                    <Autocomplete
-                      options={models.map(
-                        (m): AutocompleteOption => ({
+                  {item.itemType === ItemType.PRODUCT ? (
+                    <div className="space-y-1">
+                      <div className="flex justify-between items-center h-4 mb-1">
+                        <Label className="text-xs text-slate-500 font-medium">Model *</Label>
+                        <button
+                          type="button"
+                          onClick={() => setModelDialogOpen(true)}
+                          className="text-[10px] text-blue-600 hover:text-blue-800 font-medium transition-colors"
+                        >
+                          + Request New Model?
+                        </button>
+                      </div>
+                      <SearchableSelect
+                        options={models.map((m) => ({
                           value: m.id,
                           label: `${m.model_no} - ${m.model_name}`,
-                        }),
-                      )}
-                      value={item.itemId}
-                      onValueChange={(val) => updateItem(index, 'itemId', val)}
-                      placeholder="Search Model by Name, Brand or ID..."
-                      emptyText="No models found"
-                    />
+                        }))}
+                        value={item.modelId || ''}
+                        onValueChange={(val) => updateItem(index, 'modelId', val)}
+                        placeholder="Search Model..."
+                        emptyText="No models found"
+                      />
+                    </div>
                   ) : (
-                    <Autocomplete
-                      options={spareParts.map(
-                        (sp): AutocompleteOption => ({
-                          value: sp.id,
-                          label: `${sp.item_code} - ${sp.part_name}`,
-                        }),
-                      )}
-                      value={item.itemId}
-                      onValueChange={(val) => updateItem(index, 'itemId', val)}
-                      placeholder="Search Spare Part by Name, Brand or Code..."
-                      emptyText="No spare parts found"
-                    />
+                    <div className="space-y-1">
+                      <div className="flex justify-between items-center h-4 mb-1">
+                        <Label className="text-xs text-slate-500 font-medium">Brand *</Label>
+                        <button
+                          type="button"
+                          onClick={() => setBrandDialogOpen(true)}
+                          className="text-[10px] text-blue-600 hover:text-blue-800 font-medium transition-colors"
+                        >
+                          + Create Brand?
+                        </button>
+                      </div>
+                      <SearchableSelect
+                        options={brands.map((b) => ({
+                          value: b.id,
+                          label: b.name,
+                        }))}
+                        value={item.brandId || ''}
+                        onValueChange={(val) => updateItem(index, 'brandId', val)}
+                        placeholder="Search Brand..."
+                        emptyText="No brands found"
+                      />
+                    </div>
                   )}
                 </div>
 
-                <div className="w-full sm:w-1/4 space-y-1">
-                  <Label className="text-xs text-slate-500">Quantity</Label>
-                  <Input
-                    type="number"
-                    min="1"
-                    placeholder="Qty"
-                    value={item.quantity}
-                    onChange={(e) => updateItem(index, 'quantity', parseInt(e.target.value) || 1)}
-                    required
-                  />
-                </div>
+                {/* Row 2: Product/Part & Quantity & Delete */}
+                <div className="grid grid-cols-[1fr_120px_40px] gap-4 items-end">
+                  {item.itemType === ItemType.PRODUCT ? (
+                    item.isRequestingNewProduct ? (
+                      <div className="space-y-1">
+                        <div className="flex justify-between items-center h-4 mb-1">
+                          <Label className="text-xs text-slate-500 font-medium">
+                            New Product Name
+                          </Label>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              updateItem(index, 'isRequestingNewProduct', false);
+                              updateItem(index, 'customProductName', undefined);
+                            }}
+                            className="text-[10px] text-red-500 hover:text-red-700 font-medium transition-colors"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                        <Input
+                          placeholder="Custom product name"
+                          value={item.customProductName || ''}
+                          onChange={(e) => updateItem(index, 'customProductName', e.target.value)}
+                          required
+                        />
+                      </div>
+                    ) : (
+                      <div className="space-y-1">
+                        <div className="flex justify-between items-center h-4 mb-1">
+                          <Label className="text-xs text-slate-500 font-medium">Product</Label>
+                          {item.modelId && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                updateItem(index, 'isRequestingNewProduct', true);
+                                updateItem(index, 'productId', undefined);
+                              }}
+                              className="text-[10px] text-blue-600 hover:text-blue-800 font-medium transition-colors"
+                            >
+                              + Request New Product?
+                            </button>
+                          )}
+                        </div>
+                        <SearchableSelect
+                          options={products
+                            .filter(
+                              (p) =>
+                                !item.modelId ||
+                                p.model?.id === item.modelId ||
+                                (p as { model_id?: string }).model_id === item.modelId,
+                            )
+                            .map((p) => ({
+                              value: p.id,
+                              label: p.name,
+                            }))}
+                          value={item.productId || ''}
+                          onValueChange={(val) => updateItem(index, 'productId', val)}
+                          placeholder="Search Product..."
+                          emptyText="No products found"
+                          disabled={!item.modelId}
+                        />
+                      </div>
+                    )
+                  ) : item.isRequestingNewPart ? (
+                    <div className="flex gap-4">
+                      <div className="flex-1 space-y-1">
+                        <div className="flex justify-between items-center h-4 mb-1">
+                          <Label className="text-xs text-slate-500 font-medium">
+                            New Part Name
+                          </Label>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              updateItem(index, 'isRequestingNewPart', false);
+                              updateItem(index, 'customSparePartName', undefined);
+                              updateItem(index, 'hsCode', undefined);
+                            }}
+                            className="text-[10px] text-red-500 hover:text-red-700 font-medium transition-colors"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                        <Input
+                          placeholder="Custom part name"
+                          value={item.customSparePartName || ''}
+                          onChange={(e) => updateItem(index, 'customSparePartName', e.target.value)}
+                          required
+                        />
+                      </div>
+                      <div className="w-[120px] space-y-1">
+                        <Label className="text-xs text-slate-500 font-medium h-4 mb-1 block">
+                          HS Code *
+                        </Label>
+                        <Input
+                          placeholder="00.00"
+                          value={item.hsCode || ''}
+                          onChange={(e) => updateItem(index, 'hsCode', e.target.value)}
+                          required={!!item.customSparePartName}
+                        />
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-1">
+                      <div className="flex justify-between items-center h-4 mb-1">
+                        <Label className="text-xs text-slate-500 font-medium">Spare Part</Label>
+                        {item.brandId && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              updateItem(index, 'isRequestingNewPart', true);
+                              updateItem(index, 'sparePartId', undefined);
+                            }}
+                            className="text-[10px] text-blue-600 hover:text-blue-800 font-medium transition-colors"
+                          >
+                            + Request New Spare Part?
+                          </button>
+                        )}
+                      </div>
+                      <SearchableSelect
+                        options={spareParts
+                          .filter(
+                            (spItem: { brand_id?: string }) =>
+                              !item.brandId || spItem.brand_id === item.brandId,
+                          )
+                          .map(
+                            (spItem: { id: string; item_code?: string; part_name?: string }) => ({
+                              value: spItem.id,
+                              label: `${spItem.item_code} - ${spItem.part_name}`,
+                            }),
+                          )}
+                        value={item.sparePartId || ''}
+                        onValueChange={(val) => updateItem(index, 'sparePartId', val)}
+                        placeholder="Search Part..."
+                        emptyText="No spare parts found"
+                        disabled={!item.brandId}
+                      />
+                    </div>
+                  )}
 
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="text-red-500 hover:text-red-700 hover:bg-red-50"
-                  onClick={() => removeItem(index)}
-                >
-                  <Trash2 className="h-5 w-5" />
-                </Button>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-slate-500 font-medium h-4 mb-1 block">
+                      Quantity
+                    </Label>
+                    <Input
+                      type="number"
+                      min="1"
+                      placeholder="Qty"
+                      value={item.quantity}
+                      onChange={(e) =>
+                        updateItem(index, 'quantity', parseInt(e.target.value, 10) || 1)
+                      }
+                      required
+                    />
+                  </div>
+
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="text-red-500 hover:text-red-700 hover:bg-red-50 hover:border-red-200 border border-transparent transition-all h-10 w-10 mb-[1px]"
+                    onClick={() => removeItem(index)}
+                  >
+                    <Trash2 className="h-5 w-5" />
+                  </Button>
+                </div>
               </div>
             ))}
             {items.length === 0 && (

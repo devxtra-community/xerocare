@@ -53,16 +53,14 @@ export default function ManagerPurchaseTable() {
   }, []);
 
   const filtered = purchases.filter((p) =>
-    `${p.purchase_number} ${p.vendor_name} ${p.lot_number}`
-      .toLowerCase()
-      .includes(search.toLowerCase()),
+    `${p.lotId} ${p.vendorId}`.toLowerCase().includes(search.toLowerCase()),
   );
 
   // Stats calculation
-  const totalCost = purchases.reduce((sum, p) => sum + p.total_amount, 0);
-  const totalVendors = new Set(purchases.map((p) => p.vendor_id)).size;
-  const totalProducts = purchases.reduce((sum, p) => sum + p.product_ids.length, 0);
-  const totalModels = purchases.reduce((sum, p) => sum + p.model_ids.length, 0);
+  const totalCost = purchases.reduce((sum, p) => sum + p.totalAmount, 0);
+  const totalVendors = new Set(purchases.map((p) => p.vendorId)).size;
+  const totalProducts = purchases.length; // Simplified since product_ids is missing
+  const totalModels = 0; // Simplified since model_ids is missing
 
   const handleEdit = (purchase: Purchase) => {
     setSelectedPurchase(purchase);
@@ -108,11 +106,11 @@ export default function ManagerPurchaseTable() {
           <TableHeader>
             <TableRow>
               {[
-                'PURCHASE NO',
-                'LOT NO',
-                'PRODUCTS',
-                'MODELS',
-                'VENDOR',
+                'ID',
+                'LOT ID',
+                'VENDOR ID',
+                'PURCHASE AMT',
+                'TOTAL AMT',
                 'AMOUNT',
                 'STATUS',
                 'ACTION',
@@ -140,26 +138,17 @@ export default function ManagerPurchaseTable() {
             ) : (
               filtered.map((p, i) => (
                 <TableRow key={p.id} className={i % 2 ? 'bg-sky-100/60' : ''}>
-                  <TableCell className="px-4 font-medium">{p.purchase_number}</TableCell>
-                  <TableCell className="px-4">{p.lot_number}</TableCell>
-                  <TableCell className="px-4">
-                    <div className="max-w-[150px] truncate" title={p.product_names.join(', ')}>
-                      {p.product_names.join(', ')}
-                    </div>
-                  </TableCell>
-                  <TableCell className="px-4">
-                    <div className="max-w-[150px] truncate" title={p.model_names.join(', ')}>
-                      {p.model_names.join(', ')}
-                    </div>
-                  </TableCell>
-                  <TableCell className="px-4">{p.vendor_name}</TableCell>
-                  <TableCell className="px-4">{formatCurrency(p.total_amount)}</TableCell>
+                  <TableCell className="px-4 font-medium">{p.id.slice(0, 8)}</TableCell>
+                  <TableCell className="px-4">{p.lotId}</TableCell>
+                  <TableCell className="px-4">{p.vendorId}</TableCell>
+                  <TableCell className="px-4">{formatCurrency(p.purchaseAmount)}</TableCell>
+                  <TableCell className="px-4">{formatCurrency(p.totalAmount)}</TableCell>
                   <TableCell className="px-4">
                     <span
                       className={`px-2 py-1 rounded-full text-xs ${
-                        p.status === 'COMPLETED'
+                        p.status === 'PAID'
                           ? 'bg-green-100 text-green-700'
-                          : p.status === 'PENDING'
+                          : p.status === 'PARTIAL'
                             ? 'bg-yellow-100 text-yellow-700'
                             : 'bg-red-100 text-red-700'
                       }`}
