@@ -1,9 +1,12 @@
+import api from '@/lib/api';
+
 export interface Payment {
   id: string;
   amount: number;
   paymentMethod: string;
   referenceNumber?: string;
   paymentDate: string;
+  description?: string;
 }
 
 export interface Purchase {
@@ -16,6 +19,8 @@ export interface Purchase {
   shippingCost: number;
   groundfieldCost: number;
   totalAmount: number;
+  paidAmount: number;
+  remainingAmount: number;
   status: 'UNPAID' | 'PARTIAL' | 'PAID';
   lotId: string;
   vendorId: string;
@@ -23,6 +28,14 @@ export interface Purchase {
   createdBy: string;
   createdAt: string;
   payments?: Payment[];
+  vendor?: {
+    id: string;
+    name: string;
+  };
+  lot?: {
+    id: string;
+    lot_number?: string;
+  };
 }
 
 export interface AddPaymentDto {
@@ -50,127 +63,54 @@ export const purchaseService = {
    * Retrieves all purchases.
    */
   getAllPurchases: async (): Promise<Purchase[]> => {
-    return [
-      {
-        id: '1',
-        purchaseAmount: 14000,
-        documentationFee: 500,
-        labourCost: 200,
-        handlingFee: 100,
-        transportationCost: 100,
-        shippingCost: 100,
-        groundfieldCost: 0,
-        totalAmount: 15000,
-        status: 'PAID',
-        lotId: 'lot-1',
-        vendorId: 'v1',
-        branchId: 'b1',
-        createdBy: 'u1',
-        createdAt: new Date().toISOString(),
-        payments: [],
-      },
-    ];
+    const response = await api.get('/i/purchases');
+    return response.data.data;
   },
 
   /**
    * Retrieves a purchase by ID.
    */
   getPurchaseById: async (id: string): Promise<Purchase> => {
-    return {
-      id,
-      purchaseAmount: 14000,
-      documentationFee: 500,
-      labourCost: 200,
-      handlingFee: 100,
-      transportationCost: 100,
-      shippingCost: 100,
-      groundfieldCost: 0,
-      totalAmount: 15000,
-      status: 'UNPAID',
-      lotId: 'lot-1',
-      vendorId: 'v1',
-      branchId: 'b1',
-      createdBy: 'u1',
-      createdAt: new Date().toISOString(),
-      payments: [],
-    };
+    const response = await api.get(`/i/purchases/${id}`);
+    return response.data.data;
   },
 
   /**
    * Retrieves a purchase by Lot ID.
    */
   getPurchaseByLotId: async (lotId: string): Promise<Purchase | null> => {
-    console.log('Fetching purchase for lot:', lotId);
-    return null;
+    const response = await api.get(`/i/purchases/lot/${lotId}`);
+    return response.data.data;
   },
 
   /**
    * Creates a new purchase.
    */
   createPurchase: async (data: CreatePurchaseDTO): Promise<Purchase> => {
-    return {
-      id: Math.random().toString(36).substr(2, 9),
-      purchaseAmount: 1000,
-      documentationFee: data.documentationFee,
-      labourCost: data.labourCost,
-      handlingFee: data.handlingFee,
-      transportationCost: data.transportationCost,
-      shippingCost: data.shippingCost,
-      groundfieldCost: data.groundfieldCost,
-      totalAmount:
-        1000 +
-        data.documentationFee +
-        data.labourCost +
-        data.handlingFee +
-        data.transportationCost +
-        data.shippingCost +
-        data.groundfieldCost,
-      status: 'UNPAID',
-      lotId: data.lotId,
-      vendorId: 'v1',
-      branchId: 'b1',
-      createdBy: 'u1',
-      createdAt: new Date().toISOString(),
-      payments: [],
-    };
+    const response = await api.post('/i/purchases', data);
+    return response.data.data;
   },
 
   /**
    * Updates an existing purchase.
    */
   updatePurchase: async (id: string, data: UpdatePurchaseDTO): Promise<Purchase> => {
-    return {
-      id,
-      purchaseAmount: 14000,
-      documentationFee: data.documentationFee || 0,
-      labourCost: data.labourCost || 0,
-      handlingFee: data.handlingFee || 0,
-      transportationCost: data.transportationCost || 0,
-      shippingCost: data.shippingCost || 0,
-      groundfieldCost: data.groundfieldCost || 0,
-      totalAmount: 15000,
-      status: 'PAID',
-      lotId: 'lot-1',
-      vendorId: 'v1',
-      branchId: 'b1',
-      createdBy: 'u1',
-      createdAt: new Date().toISOString(),
-      payments: [],
-    };
+    const response = await api.patch(`/i/purchases/${id}`, data);
+    return response.data.data;
   },
 
   /**
    * Deletes a purchase.
    */
   deletePurchase: async (id: string): Promise<void> => {
-    console.log('Deleting purchase:', id);
+    await api.delete(`/i/purchases/${id}`);
   },
 
   /**
    * Adds a payment to a purchase.
    */
-  addPayment: async (purchaseId: string, data: AddPaymentDto): Promise<{ success: boolean }> => {
-    console.log('Adding payment for purchase:', purchaseId, data);
-    return { success: true };
+  addPayment: async (purchaseId: string, data: AddPaymentDto): Promise<Payment> => {
+    const response = await api.post(`/i/purchases/${purchaseId}/payments`, data);
+    return response.data.data;
   },
 };

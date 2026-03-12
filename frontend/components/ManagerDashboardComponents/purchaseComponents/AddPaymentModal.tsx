@@ -21,7 +21,8 @@ interface AddPaymentModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   purchaseId: string;
-  remainingAmount: number;
+  totalAmount: number;
+  paidAmount: number;
   onSuccess: () => void;
 }
 
@@ -29,9 +30,11 @@ export default function AddPaymentModal({
   open,
   onOpenChange,
   purchaseId,
-  remainingAmount,
+  totalAmount,
+  paidAmount,
   onSuccess,
 }: AddPaymentModalProps) {
+  const remainingAmount = Math.max(0, totalAmount - paidAmount);
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState<AddPaymentDto>({
     amount: 0,

@@ -20,6 +20,9 @@ import { Rfq } from '../entities/rfqEntity';
 import { RfqItem } from '../entities/rfqItemEntity';
 import { RfqVendor } from '../entities/rfqVendorEntity';
 import { RfqVendorItem } from '../entities/rfqVendorItemEntity';
+import { Purchase } from '../entities/purchaseEntity';
+import { PurchasePayment } from '../entities/purchasePaymentEntity';
+import { SparePartInventory } from '../entities/sparePartInventoryEntity';
 
 export const Source = new DataSource({
   type: 'postgres',
@@ -44,6 +47,9 @@ export const Source = new DataSource({
     RfqItem,
     RfqVendor,
     RfqVendorItem,
+    Purchase,
+    PurchasePayment,
+    SparePartInventory,
   ],
   extra: { max: 2 },
 });

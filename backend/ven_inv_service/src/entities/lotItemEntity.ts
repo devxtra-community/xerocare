@@ -19,7 +19,7 @@ export enum LotItemType {
 
 @Entity('lot_items')
 @Check(
-  `("model_id" IS NOT NULL AND "spare_part_id" IS NULL) OR ("model_id" IS NULL AND "spare_part_id" IS NOT NULL)`,
+  `("model_id" IS NOT NULL OR "custom_product_name" IS NOT NULL) AND "spare_part_id" IS NULL AND "custom_spare_part_name" IS NULL OR ("spare_part_id" IS NOT NULL OR "custom_spare_part_name" IS NOT NULL) AND "model_id" IS NULL AND "custom_product_name" IS NULL`,
 )
 export class LotItem {
   @PrimaryGeneratedColumn('uuid')
@@ -74,6 +74,12 @@ export class LotItem {
   /** How many units have already been consumed into inventory. */
   @Column({ name: 'used_quantity', type: 'int', default: 0 })
   usedQuantity!: number;
+
+  @Column({ name: 'custom_product_name', type: 'varchar', nullable: true })
+  customProductName?: string;
+
+  @Column({ name: 'custom_spare_part_name', type: 'varchar', nullable: true })
+  customSparePartName?: string;
 
   @Column({ name: 'unit_price', type: 'decimal', precision: 12, scale: 2 })
   unitPrice!: number;

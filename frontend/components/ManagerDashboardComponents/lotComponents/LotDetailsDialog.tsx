@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   X,
   Download,
@@ -17,6 +17,8 @@ import {
   AlertCircle,
   CheckCircle2,
   AlertTriangle,
+  Plus,
+  Pencil,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -35,6 +37,8 @@ import { format } from 'date-fns';
 import { formatCurrency } from '@/lib/format';
 import { purchaseService, Purchase } from '@/services/purchaseService';
 import { Input } from '@/components/ui/input';
+import AddPaymentModal from '../purchaseComponents/AddPaymentModal';
+import AddPurchaseDialog from '../purchaseComponents/AddPurchaseDialog';
 
 interface LotDetailsDialogProps {
   lot: Lot;
@@ -57,6 +61,8 @@ export default function LotDetailsDialog({ lot, onClose }: LotDetailsDialogProps
   const [isSaving, setIsSaving] = useState(false);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [currentLot, setCurrentLot] = useState<Lot>(lot);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [showEditPurchaseModal, setShowEditPurchaseModal] = useState(false);
 
   useEffect(() => {
     // Initialize receivedItems from lot data
@@ -70,20 +76,21 @@ export default function LotDetailsDialog({ lot, onClose }: LotDetailsDialogProps
     setReceivedItems(initial);
   }, [currentLot.items]);
 
-  useEffect(() => {
-    const fetchPurchase = async () => {
-      try {
-        setLoadingPurchase(true);
-        const record = await purchaseService.getPurchaseByLotId(currentLot.id);
-        setPurchaseRecord(record);
-      } catch (err) {
-        console.error('Failed to load purchase record:', err);
-      } finally {
-        setLoadingPurchase(false);
-      }
-    };
-    fetchPurchase();
+  const fetchPurchase = React.useCallback(async () => {
+    try {
+      setLoadingPurchase(true);
+      const record = await purchaseService.getPurchaseByLotId(currentLot.id);
+      setPurchaseRecord(record);
+    } catch (err) {
+      console.error('Failed to load purchase record:', err);
+    } finally {
+      setLoadingPurchase(false);
+    }
   }, [currentLot.id]);
+
+  useEffect(() => {
+    fetchPurchase();
+  }, [currentLot.id, fetchPurchase]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -669,8 +676,18 @@ export default function LotDetailsDialog({ lot, onClose }: LotDetailsDialogProps
                       </div>
 
                       <div className="pt-3 border-t border-dashed">
-                        <div className="text-[10px] text-slate-400 uppercase font-bold tracking-wider mb-2">
-                          Additional Costs
+                        <div className="flex justify-between items-center mb-2">
+                          <div className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">
+                            Additional Costs
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 px-2 text-[10px] gap-1"
+                            onClick={() => setShowEditPurchaseModal(true)}
+                          >
+                            <Pencil size={10} /> Edit
+                          </Button>
                         </div>
                         <div className="space-y-2 pl-3 border-l-2 border-slate-100">
                           {[
@@ -680,29 +697,58 @@ export default function LotDetailsDialog({ lot, onClose }: LotDetailsDialogProps
                             { label: 'Transportation', value: purchaseRecord.transportationCost },
                             { label: 'Shipping', value: purchaseRecord.shippingCost },
                             { label: 'Groundfield', value: purchaseRecord.groundfieldCost },
-                          ]
-                            .filter((item) => Number(item.value) > 0)
-                            .map((item, idx) => (
-                              <div key={idx} className="flex justify-between text-xs">
-                                <span className="text-slate-500">{item.label}</span>
-                                <span className="font-bold text-slate-700">
-                                  {formatCurrency(Number(item.value))}
+                          ].map((item, idx) => (
+                            <div key={idx} className="flex justify-between text-xs">
+                              <span className="text-slate-500">{item.label}</span>
+                              <span
+                                className={`font-bold ${Number(item.value) > 0 ? 'text-slate-700' : 'text-slate-300'}`}
+                              >
+                                {formatCurrency(Number(item.value))}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Payment Summary */}
+                      <div className="pt-3 border-t border-dashed space-y-2">
+                        <div className="flex justify-between text-sm">
+                          <span className="text-slate-500 font-medium">Total Lot Cost</span>
+                          <span className="font-bold text-slate-900">
+                            {formatCurrency(purchaseRecord.totalAmount)}
+                          </span>
+                        </div>
+
+                        {(() => {
+                          const paidAmount =
+                            purchaseRecord.payments?.reduce(
+                              (sum, p) => sum + Number(p.amount),
+                              0,
+                            ) || 0;
+                          const remainingAmount = Math.max(
+                            0,
+                            purchaseRecord.totalAmount - paidAmount,
+                          );
+
+                          return (
+                            <>
+                              <div className="flex justify-between text-sm">
+                                <span className="text-green-600 font-medium">Paid Amount</span>
+                                <span className="font-bold text-green-700">
+                                  {formatCurrency(paidAmount)}
                                 </span>
                               </div>
-                            ))}
-                          {![
-                            purchaseRecord.documentationFee,
-                            purchaseRecord.labourCost,
-                            purchaseRecord.handlingFee,
-                            purchaseRecord.transportationCost,
-                            purchaseRecord.shippingCost,
-                            purchaseRecord.groundfieldCost,
-                          ].some((v) => Number(v) > 0) && (
-                            <span className="text-[10px] italic text-slate-400">
-                              No additional costs recorded
-                            </span>
-                          )}
-                        </div>
+                              <div className="flex justify-between text-sm p-2 bg-slate-50 rounded-lg border border-slate-100">
+                                <span className="text-slate-600 font-bold">Remaining Balance</span>
+                                <span
+                                  className={`font-black ${remainingAmount > 0 ? 'text-amber-600' : 'text-green-600'}`}
+                                >
+                                  {formatCurrency(remainingAmount)}
+                                </span>
+                              </div>
+                            </>
+                          );
+                        })()}
                       </div>
 
                       {purchaseRecord.payments && purchaseRecord.payments.length > 0 && (
@@ -745,21 +791,50 @@ export default function LotDetailsDialog({ lot, onClose }: LotDetailsDialogProps
               </div>
 
               {purchaseRecord && (
-                <div className="bg-slate-50 p-4 border-t flex justify-between items-center shrink-0">
-                  <div className="flex flex-col">
-                    <span className="text-[10px] font-bold text-primary uppercase tracking-widest leading-none mb-1">
-                      Final Lot Value
-                    </span>
-                    <span className="text-[9px] text-slate-400 italic">Total landing cost</span>
-                  </div>
-                  <span className="font-black text-primary text-xl tracking-tight">
-                    {formatCurrency(purchaseRecord.totalAmount)}
-                  </span>
+                <div className="bg-slate-50 p-4 border-t gap-3 flex flex-col shrink-0">
+                  <Button
+                    variant="default"
+                    className="w-full gap-2 shadow-md bg-primary hover:bg-primary/90"
+                    onClick={() => setShowPaymentModal(true)}
+                    disabled={
+                      (purchaseRecord.payments?.reduce((sum, p) => sum + Number(p.amount), 0) ||
+                        0) >= purchaseRecord.totalAmount
+                    }
+                  >
+                    <Plus size={16} /> Add Payment
+                  </Button>
                 </div>
               )}
             </Card>
           </div>
         </div>
+
+        {showPaymentModal && purchaseRecord && (
+          <AddPaymentModal
+            open={showPaymentModal}
+            onOpenChange={(open) => setShowPaymentModal(open)}
+            purchaseId={purchaseRecord.id}
+            totalAmount={purchaseRecord.totalAmount}
+            paidAmount={purchaseRecord.payments?.reduce((sum, p) => sum + Number(p.amount), 0) || 0}
+            onSuccess={() => {
+              fetchPurchase();
+              setShowPaymentModal(false);
+            }}
+          />
+        )}
+
+        {showEditPurchaseModal && purchaseRecord && (
+          <AddPurchaseDialog
+            open={showEditPurchaseModal}
+            onOpenChange={(open) => setShowEditPurchaseModal(open)}
+            editMode={true}
+            purchaseData={purchaseRecord}
+            onSuccess={() => {
+              fetchPurchase();
+              setShowEditPurchaseModal(false);
+            }}
+          />
+        )}
       </div>
 
       {/* Custom Confirmation Dialog */}

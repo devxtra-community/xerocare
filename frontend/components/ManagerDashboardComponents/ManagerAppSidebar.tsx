@@ -98,6 +98,11 @@ const menuItems = [
     icon: Boxes, // Fallback to Boxes since we reclaimed Package for Warehouse, adjusting
     href: '/manager/lots',
   },
+  {
+    title: 'Purchases',
+    icon: Wallet,
+    href: '/manager/purchases',
+  },
 ];
 
 /**

@@ -5,6 +5,7 @@ import { RfqVendor, RfqVendorStatus } from '../entities/rfqVendorEntity';
 import { RfqVendorItem } from '../entities/rfqVendorItemEntity';
 import { Lot, LotStatus } from '../entities/lotEntity';
 import { LotItem, LotItemType } from '../entities/lotItemEntity';
+import { Purchase } from '../entities/purchaseEntity';
 import { Model } from '../entities/modelEntity';
 import { Product } from '../entities/productEntity';
 import { SparePart } from '../entities/sparePartEntity';
@@ -831,12 +832,21 @@ export class RfqService {
         const lotItem = manager.create(LotItem, {
           lotId: lot.id,
           itemType: itemType,
-          modelId: itemType === LotItemType.MODEL ? quotedItem.rfq_item.model_id : undefined,
+          modelId:
+            itemType === LotItemType.MODEL ? quotedItem.rfq_item.model_id || undefined : undefined,
           sparePartId:
-            itemType === LotItemType.SPARE_PART ? quotedItem.rfq_item.spare_part_id : undefined,
-          customProductName: quotedItem.rfq_item.custom_product_name,
-          customSparePartName: quotedItem.rfq_item.custom_spare_part_name,
-          quantity: quotedItem.available_quantity ?? quotedItem.rfq_item.quantity,
+            itemType === LotItemType.SPARE_PART
+              ? quotedItem.rfq_item.spare_part_id || undefined
+              : undefined,
+          customProductName:
+            itemType === LotItemType.MODEL
+              ? quotedItem.rfq_item.custom_product_name || undefined
+              : undefined,
+          customSparePartName:
+            itemType === LotItemType.SPARE_PART
+              ? quotedItem.rfq_item.custom_spare_part_name || undefined
+              : undefined,
+          expectedQuantity: quotedItem.available_quantity ?? quotedItem.rfq_item.quantity,
           unitPrice: quotedItem.unit_price,
           totalPrice: quotedItem.total_price,
         });
@@ -845,6 +855,23 @@ export class RfqService {
       }
 
       await manager.save(lotItemsToSave);
+
+      // Create Purchase record for financial tracking
+      const purchase = manager.create(Purchase, {
+        lotId: lot.id,
+        vendorId: lot.vendorId,
+        branchId: lot.branch_id || '',
+        purchaseAmount: lot.totalAmount,
+        documentationFee: 0,
+        labourCost: 0,
+        handlingFee: 0,
+        transportationCost: 0,
+        shippingCost: 0,
+        groundfieldCost: 0,
+        totalAmount: lot.totalAmount,
+        createdBy: userId,
+      });
+      await manager.save(purchase);
 
       rfq.status = RfqStatus.CLOSED;
       await manager.save(rfq);

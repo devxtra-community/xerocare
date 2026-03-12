@@ -708,7 +708,7 @@ export default function RfqDetails({ id, basePath }: RfqDetailsProps) {
       </div>
 
       <AlertDialog open={!!vendorToAward} onOpenChange={(open) => !open && setVendorToAward(null)}>
-        <AlertDialogContent className="bg-white p-6 sm:p-8 rounded-2xl max-w-md border border-slate-100 shadow-xl overflow-hidden relative">
+        <AlertDialogContent className="bg-white p-6 sm:p-10 rounded-[2rem] max-w-lg border-none shadow-2xl overflow-y-auto max-h-[calc(100dvh-2rem)]">
           <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-blue-500 to-indigo-600"></div>
           <AlertDialogHeader className="space-y-4">
             <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-blue-50/80">

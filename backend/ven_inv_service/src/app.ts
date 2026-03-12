@@ -18,6 +18,7 @@ import sparePartRouter from './routes/sparePartRoutes';
 import brandRouter from './routes/brandRoute';
 import lotRouter from './routes/lotRoutes';
 import rfqRouter from './routes/rfqRoute';
+import purchaseRouter from './routes/purchaseRoutes';
 import { httpLogger } from './middlewares/httpLogger';
 
 const app = express();
@@ -36,6 +37,7 @@ app.use('/spare-parts', sparePartRouter);
 app.use('/brands', brandRouter);
 app.use('/lots', lotRouter);
 app.use('/rfq', rfqRouter);
+app.use('/purchases', purchaseRouter);
 app.use(errorHandler);
 
 const startServer = async () => {

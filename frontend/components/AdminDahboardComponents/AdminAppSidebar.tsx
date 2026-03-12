@@ -68,6 +68,11 @@ const menuItems = [
     icon: Boxes,
     href: '/admin/inventory',
   },
+  {
+    title: 'Purchases',
+    icon: Wallet,
+    href: '/admin/purchases',
+  },
 ];
 
 /**

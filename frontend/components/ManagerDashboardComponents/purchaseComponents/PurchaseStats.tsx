@@ -5,7 +5,7 @@ interface PurchaseStatsProps {
   totalCost: number;
   totalVendors: number;
   totalProducts: number;
-  totalModels: number;
+  totalPaid: number;
 }
 
 /**
@@ -16,7 +16,7 @@ export default function PurchaseStats({
   totalCost,
   totalVendors,
   totalProducts,
-  totalModels,
+  totalPaid,
 }: PurchaseStatsProps) {
   return (
     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -31,7 +31,11 @@ export default function PurchaseStats({
         value={totalProducts.toString()}
         subtitle="Items Purchased"
       />
-      <StatCard title="Total Models" value={totalModels.toString()} subtitle="Models Purchased" />
+      <StatCard
+        title="Total Paid"
+        value={`QAR ${totalPaid.toLocaleString()}`}
+        subtitle="Settled Amount"
+      />
     </div>
   );
 }

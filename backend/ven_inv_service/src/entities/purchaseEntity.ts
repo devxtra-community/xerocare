@@ -7,10 +7,12 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   ManyToOne,
+  OneToMany,
 } from 'typeorm';
 import { Lot } from './lotEntity';
 import { Vendor } from './vendorEntity';
 import { Branch } from './branchEntity';
+import { PurchasePayment } from './purchasePaymentEntity';
 
 @Entity('purchases')
 export class Purchase {
@@ -70,4 +72,7 @@ export class Purchase {
 
   @UpdateDateColumn({ name: 'updated_at' })
   updatedAt!: Date;
+
+  @OneToMany(() => PurchasePayment, (payment) => payment.purchase)
+  payments!: PurchasePayment[];
 }
