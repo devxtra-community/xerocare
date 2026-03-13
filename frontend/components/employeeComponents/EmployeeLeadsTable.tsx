@@ -23,6 +23,7 @@ import {
 import LeadDialog from './LeadDialog';
 import { Lead, getLeads, createLead, updateLead, deleteLead, CreateLeadData } from '@/lib/lead';
 import { toast } from 'sonner';
+import { usePagination } from '@/hooks/usePagination';
 import Pagination from '@/components/Pagination';
 
 /**
@@ -133,16 +134,17 @@ export default function EmployeeLeadsTable() {
     }
   };
 
-  const [currentPage, setCurrentPage] = useState(1);
-  const ITEMS_PER_PAGE = 10;
+  const { page, limit, total, setPage, setTotal, totalPages } = usePagination(10);
 
   useEffect(() => {
-    setCurrentPage(1);
-  }, [search, filterType, showDeleted]);
+    setPage(1);
+  }, [search, filterType, showDeleted, setPage]);
 
-  const totalPages = Math.ceil(filteredLeads.length / ITEMS_PER_PAGE);
-  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-  const paginatedLeads = filteredLeads.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+  useEffect(() => {
+    setTotal(filteredLeads.length);
+  }, [filteredLeads.length, setTotal]);
+
+  const paginatedLeads = filteredLeads.slice((page - 1) * limit, page * limit);
 
   return (
     <div className="space-y-4">
@@ -320,7 +322,13 @@ export default function EmployeeLeadsTable() {
           </Table>
         </div>
         {totalPages > 1 && (
-          <Pagination page={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
+          <Pagination
+            page={page}
+            totalPages={totalPages}
+            total={total}
+            limit={limit}
+            onPageChange={setPage}
+          />
         )}
       </div>
 

@@ -15,6 +15,8 @@ import { format } from 'date-fns';
 import { VendorRequest } from '@/lib/vendor';
 
 import Pagination from '@/components/Pagination';
+import { usePagination } from '@/hooks/usePagination';
+import { useEffect } from 'react';
 
 interface VendorTransactionsTableProps {
   requests: VendorRequest[];
@@ -30,9 +32,8 @@ export default function VendorTransactionsTable({
   requests,
   loading,
 }: VendorTransactionsTableProps) {
-  const [page, setPage] = useState(1);
+  const { page, limit, total, setPage, setTotal, totalPages } = usePagination(10);
   const [searchQuery, setSearchQuery] = useState('');
-  const ITEMS_PER_PAGE = 10;
 
   const filteredRequests = requests.filter((req) => {
     return (
@@ -42,9 +43,11 @@ export default function VendorTransactionsTable({
     );
   });
 
-  const totalPages = Math.ceil(filteredRequests.length / ITEMS_PER_PAGE);
-  const startIndex = (page - 1) * ITEMS_PER_PAGE;
-  const currentData = filteredRequests.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+  useEffect(() => {
+    setTotal(filteredRequests.length);
+  }, [filteredRequests.length, setTotal]);
+
+  const currentData = filteredRequests.slice((page - 1) * limit, page * limit);
 
   if (loading) {
     return (
@@ -181,7 +184,13 @@ export default function VendorTransactionsTable({
         </div>
 
         {totalPages > 1 && (
-          <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
+          <Pagination
+            page={page}
+            totalPages={totalPages}
+            total={total}
+            limit={limit}
+            onPageChange={setPage}
+          />
         )}
       </div>
     </div>

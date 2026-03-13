@@ -92,6 +92,7 @@ export interface Invoice {
   advanceAdjusted?: number;
   grossAmount?: number;
   displayAmount?: number; // Backend aggregated lifetime total
+  usageRevenue?: number; // Sum of all recorded EMIs/UsageRecords
   invoiceHistory?: Invoice[];
   productAllocations?: Array<{
     id: string;
@@ -135,6 +136,9 @@ export interface UsageRecord {
   colorA3Count: number;
   remarks?: string;
   advanceAdjusted?: number;
+  discountAmount?: number;
+  discountBwCopies?: number;
+  discountColorCopies?: number;
   // Extended pricing details for UI breakdown
   rentType?: string;
   bwFreeLimit?: number;
@@ -143,6 +147,25 @@ export interface UsageRecord {
   bwExcessRate?: number;
   colorExcessRate?: number;
   combinedExcessRate?: number;
+  items?: Array<{
+    allocationId: string;
+    allocation?: {
+      serialNumber: string;
+      modelId: string;
+    };
+    startBwA4: number;
+    endBwA4: number;
+    deltaBwA4: number;
+    startBwA3: number;
+    endBwA3: number;
+    deltaBwA3: number;
+    startColorA4: number;
+    endColorA4: number;
+    deltaColorA4: number;
+    startColorA3: number;
+    endColorA3: number;
+    deltaColorA3: number;
+  }>;
 }
 
 /**
@@ -487,6 +510,8 @@ export interface CollectionAlert {
   effectiveFrom?: string;
   effectiveTo?: string;
   monthlyRent?: number;
+  monthlyLeaseAmount?: number;
+  monthlyEmiAmount?: number;
   totalAmount?: number;
   usageData?: {
     bwA4Count: number;
@@ -525,6 +550,7 @@ export interface CompletedCollection {
   securityDepositBank?: string;
   securityDepositReference?: string;
   advanceAmount?: number;
+  discountAmount?: number;
   customerEmail?: string;
 }
 
@@ -663,6 +689,8 @@ export const updateUsageRecord = async (
     discountAmount?: number;
     discountBwCopies?: number;
     discountColorCopies?: number;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    items?: any[];
   },
 ): Promise<unknown> => {
   const response = await api.put(`/b/usage/${usageId}`, payload);

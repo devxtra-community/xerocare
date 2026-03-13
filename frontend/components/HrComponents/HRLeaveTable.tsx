@@ -9,6 +9,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import Pagination from '@/components/Pagination';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -55,6 +56,8 @@ const leaveTypeLabels: Record<LeaveType, string> = {
  * Lists all leave applications with details (employee, type, dates, reason).
  * Supports approval/rejection workflows, filtering by status, and generating leave letters.
  */
+import { usePagination } from '@/hooks/usePagination';
+
 export default function HRLeaveTable() {
   const [leaves, setLeaves] = useState<LeaveApplication[]>([]);
   const [search, setSearch] = useState('');
@@ -65,6 +68,8 @@ export default function HRLeaveTable() {
   const [rejectionReason, setRejectionReason] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [isLetterOpen, setIsLetterOpen] = useState(false);
+
+  const { page, limit, total, setPage, setTotal, totalPages } = usePagination(10);
 
   const calculateDays = (start: string, end: string) => {
     const s = new Date(start);
@@ -86,6 +91,8 @@ export default function HRLeaveTable() {
     setIsLoading(true);
     try {
       const status = statusFilter === 'ALL' ? undefined : (statusFilter as LeaveStatus);
+      // Fetching slightly more to handle local filtering/pagination if needed,
+      // but ideally this should be server-side. For now keeping original logic but standardizing UI.
       const response = await getBranchLeaveApplications(1, 100, status);
       if (response.success) {
         setLeaves(response.data.leaveApplications);
@@ -101,6 +108,10 @@ export default function HRLeaveTable() {
     fetchLeaveApplications();
   }, [fetchLeaveApplications]);
 
+  useEffect(() => {
+    setPage(1);
+  }, [search, statusFilter, setPage]);
+
   const filteredLeaves = leaves.filter(
     (leave) =>
       leave.employee.first_name?.toLowerCase().includes(search.toLowerCase()) ||
@@ -108,6 +119,12 @@ export default function HRLeaveTable() {
       leave.employee.display_id?.toLowerCase().includes(search.toLowerCase()) ||
       leave.employee.email.toLowerCase().includes(search.toLowerCase()),
   );
+
+  useEffect(() => {
+    setTotal(filteredLeaves.length);
+  }, [filteredLeaves.length, setTotal]);
+
+  const paginatedLeaves = filteredLeaves.slice((page - 1) * limit, page * limit);
 
   const handleApprove = async (leave: LeaveApplication) => {
     if (leave.status !== LeaveStatus.PENDING) {
@@ -253,8 +270,8 @@ export default function HRLeaveTable() {
                     <Loader2 className="h-6 w-6 animate-spin mx-auto text-blue-500" />
                   </TableCell>
                 </TableRow>
-              ) : filteredLeaves.length > 0 ? (
-                filteredLeaves.map((leave) => (
+              ) : paginatedLeaves.length > 0 ? (
+                paginatedLeaves.map((leave) => (
                   <TableRow key={leave.id} className="hover:bg-muted/50/50 transition-colors">
                     <TableCell className="px-3 py-1.5 font-medium text-primary">
                       {leave.employee.display_id || '---'}
@@ -342,6 +359,16 @@ export default function HRLeaveTable() {
             </TableBody>
           </Table>
         </div>
+
+        {totalPages > 1 && (
+          <Pagination
+            page={page}
+            totalPages={totalPages}
+            total={total}
+            limit={limit}
+            onPageChange={setPage}
+          />
+        )}
       </div>
 
       <Dialog open={isRejectDialogOpen} onOpenChange={setIsRejectDialogOpen}>

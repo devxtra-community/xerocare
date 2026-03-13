@@ -1,46 +1,154 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import {} from // Table imports removed as they were unused
-'@/components/ui/table';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Product, getAllProducts } from '@/lib/product';
+import { getBranches, Branch } from '@/lib/branch';
+import { getWarehouses, Warehouse } from '@/lib/warehouse';
+import { usePagination } from '@/hooks/usePagination';
+import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Search, Filter } from 'lucide-react';
+import Pagination from '@/components/Pagination';
 
 /**
  * Dashboard widget displaying recent products and their stock levels.
  * Shows product name, total aggregated quantity, price, and creation date.
  */
 export default function ProductsTable() {
-  const [page, setPage] = useState(1);
+  const { page, limit, total, setPage, setTotal, totalPages } = usePagination(5);
   const [data, setData] = useState<Product[]>([]);
+  const [branches, setBranches] = useState<Branch[]>([]);
+  const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedBranch, setSelectedBranch] = useState<string>('all');
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const products = await getAllProducts();
+        setLoading(true);
+        const [products, branchRes, warehouseRes] = await Promise.all([
+          getAllProducts(),
+          getBranches(),
+          getWarehouses(),
+        ]);
         setData(products);
+        setBranches(branchRes.data || []);
+        setWarehouses(warehouseRes.data || []);
       } catch (error) {
         console.error(error);
+      } finally {
+        setLoading(false);
       }
     };
     fetchData();
   }, []);
 
-  const getTotalStock = (p: Product) =>
-    p.inventory?.reduce((sum, inv) => sum + inv.quantity, 0) || 0;
+  const warehouseToBranchMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    warehouses.forEach((w) => {
+      if (w.id && w.branch?.name) {
+        map[w.id] = w.branch.name;
+      }
+    });
+    return map;
+  }, [warehouses]);
 
-  const ITEMS_PER_PAGE = 5;
-  const totalPages = Math.ceil(data.length / ITEMS_PER_PAGE);
-  const startIndex = (page - 1) * ITEMS_PER_PAGE;
-  const currentData = data.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+  const getProductBranches = useCallback(
+    (p: Product) => {
+      const branchNames = new Set<string>();
+      p.inventory?.forEach((inv) => {
+        const bName = warehouseToBranchMap[inv.warehouseId];
+        if (bName) branchNames.add(bName);
+      });
+      return Array.from(branchNames);
+    },
+    [warehouseToBranchMap],
+  );
+
+  const getBranchQuantity = (p: Product, branchName: string) => {
+    if (branchName === 'all') {
+      return p.inventory?.reduce((sum, inv) => sum + inv.quantity, 0) || 0;
+    }
+    return (
+      p.inventory?.reduce((sum, inv) => {
+        const bName = warehouseToBranchMap[inv.warehouseId];
+        return bName === branchName ? sum + inv.quantity : sum;
+      }, 0) || 0
+    );
+  };
+
+  const filteredData = useMemo(() => {
+    return data.filter((p) => {
+      const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase());
+      const pBranches = getProductBranches(p);
+      const matchesBranch = selectedBranch === 'all' || pBranches.includes(selectedBranch);
+      return matchesSearch && matchesBranch;
+    });
+  }, [data, searchTerm, selectedBranch, getProductBranches]);
+
+  useEffect(() => {
+    setTotal(filteredData.length);
+  }, [filteredData.length, setTotal]);
+
+  const currentData = filteredData.slice((page - 1) * limit, page * limit);
+
+  if (loading) {
+    return (
+      <div className="rounded-2xl bg-card p-2 sm:p-3 shadow-sm w-full h-[340px] flex items-center justify-center">
+        <p className="text-sm text-muted-foreground">Loading products...</p>
+      </div>
+    );
+  }
 
   return (
-    <div className="rounded-2xl bg-card p-2 sm:p-3 shadow-sm w-full h-[280px] flex flex-col">
+    <div className="rounded-2xl bg-card p-2 sm:p-3 shadow-sm w-full h-[340px] flex flex-col">
+      {/* Search and Filter Bar */}
+      <div className="flex flex-col sm:flex-row gap-2 mb-3">
+        <div className="relative flex-1">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+          <Input
+            placeholder="Search product..."
+            className="pl-8 h-8 text-[11px] bg-background/50 border-muted-foreground/20 focus-visible:ring-primary/20"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
+        <Select value={selectedBranch} onValueChange={setSelectedBranch}>
+          <SelectTrigger className="w-full sm:w-[140px] h-8 text-[11px] bg-background/50 border-muted-foreground/20">
+            <div className="flex items-center gap-2">
+              <Filter className="h-3 w-3 text-muted-foreground" />
+              <SelectValue placeholder="Branch" />
+            </div>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all" className="text-[11px]">
+              All Branches
+            </SelectItem>
+            {branches.map((b) => (
+              <SelectItem key={b.id} value={b.name} className="text-[11px]">
+                {b.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
       <div className="flex-1 overflow-x-auto">
         <table className="w-full">
           <thead>
             <tr className="border-b">
               <th className="text-left text-[10px] sm:text-xs font-semibold text-primary py-1.5 sm:py-2 px-1 sm:px-2">
                 PRODUCT
+              </th>
+              <th className="text-left text-[10px] sm:text-xs font-semibold text-primary py-1.5 sm:py-2 px-1 sm:px-2">
+                BRANCH
               </th>
               <th className="text-left text-[10px] sm:text-xs font-semibold text-primary py-1.5 sm:py-2 px-1 sm:px-2">
                 QTY
@@ -61,7 +169,12 @@ export default function ProductsTable() {
                     {item.name}
                   </td>
                   <td className="py-1.5 sm:py-2 px-1 sm:px-2 text-[10px] sm:text-xs text-gray-700">
-                    {getTotalStock(item)}
+                    {selectedBranch === 'all'
+                      ? getProductBranches(item).join(', ') || 'N/A'
+                      : selectedBranch}
+                  </td>
+                  <td className="py-1.5 sm:py-2 px-1 sm:px-2 text-[10px] sm:text-xs text-gray-700">
+                    {getBranchQuantity(item, selectedBranch)}
                   </td>
                   <td className="py-1.5 sm:py-2 px-1 sm:px-2 text-[10px] sm:text-xs text-gray-700">
                     {item.sale_price}
@@ -73,7 +186,7 @@ export default function ProductsTable() {
               ))
             ) : (
               <tr>
-                <td colSpan={4} className="text-center py-6 text-xs text-muted-foreground">
+                <td colSpan={5} className="text-center py-6 text-xs text-muted-foreground">
                   No products found
                 </td>
               </tr>
@@ -82,47 +195,17 @@ export default function ProductsTable() {
         </table>
       </div>
 
-      <div className="mt-2 sm:mt-3 flex items-center justify-center gap-1 sm:gap-1.5 text-[10px] sm:text-xs flex-shrink-0">
-        <button
-          onClick={() => setPage((p) => Math.max(1, p - 1))}
-          disabled={page === 1}
-          className="rounded-md border px-1.5 sm:px-2 py-0.5 disabled:opacity-40 hover:bg-muted/50 transition"
-        >
-          &lt;
-        </button>
-
-        {Array.from({ length: Math.min(totalPages, 4) }, (_, i) => {
-          const pageNum = i + 1;
-          if (pageNum === 4 && totalPages > 4) {
-            return (
-              <span key="ellipsis" className="px-0.5 sm:px-1">
-                ...
-              </span>
-            );
-          }
-          return (
-            <button
-              key={pageNum}
-              onClick={() => setPage(pageNum)}
-              className={`px-1.5 sm:px-2 py-0.5 rounded-md transition ${
-                page === pageNum ? 'bg-primary text-white' : 'border hover:bg-muted/50'
-              }`}
-            >
-              {pageNum}
-            </button>
-          );
-        })}
-
-        {totalPages > 4 && <button onClick={() => setPage(totalPages)}>{totalPages}</button>}
-
-        <button
-          onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-          disabled={page === totalPages}
-          className="rounded-md border px-1.5 sm:px-2 py-0.5 disabled:opacity-40 hover:bg-muted/50 transition"
-        >
-          &gt;
-        </button>
-      </div>
+      {totalPages > 1 && (
+        <div className="mt-auto pt-2">
+          <Pagination
+            page={page}
+            totalPages={totalPages}
+            total={total}
+            limit={limit}
+            onPageChange={setPage}
+          />
+        </div>
+      )}
     </div>
   );
 }

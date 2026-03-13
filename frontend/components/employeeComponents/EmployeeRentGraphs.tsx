@@ -50,7 +50,9 @@ export default function EmployeeRentGraphs({ invoices: propInvoices }: EmployeeR
           invoices = await getMyInvoices();
         }
         const rentInvoices = invoices.filter(
-          (inv) => inv.saleType === 'RENT' && inv.contractStatus === 'ACTIVE',
+          (inv) =>
+            inv.saleType === 'RENT' &&
+            ['ACTIVE', 'PENDING_CONFIRMATION', 'COMPLETED'].includes(inv.contractStatus || ''),
         );
 
         const now = new Date();

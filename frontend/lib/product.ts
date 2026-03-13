@@ -80,16 +80,20 @@ interface ApiResponse<T> {
 }
 
 /**
- * Retrieves a list of all products from the inventory service.
+ * Retrieves a list of products from the inventory service, optionally filtered.
+ * @param params Optional filters for status and modelId
  * @returns Array of Product objects
  */
-export const getAllProducts = async (): Promise<Product[]> => {
-  const response = await api.get<ApiResponse<Product[]>>('/i/products/');
+export const getAllProducts = async (params?: {
+  status?: string;
+  modelId?: string;
+}): Promise<Product[]> => {
+  const response = await api.get<ApiResponse<Product[]>>('/i/products/', { params });
   return response.data.data || [];
 };
 
 /**
- * Filters available products by their associated model ID.
+ * Filters available products by their associated model ID using backend filtering.
  * @param modelId The ID of the model to filter by
  * @returns Array of available products for the specified model
  */
@@ -98,7 +102,7 @@ export const getAvailableProductsByModel = async (modelId: string): Promise<Prod
   return allProducts.filter(
     (p) =>
       (p.model?.id === modelId || (p.model as { model_id?: string })?.model_id === modelId) &&
-      p.product_status === ProductStatus.AVAILABLE,
+      (p.product_status === ProductStatus.AVAILABLE || p.product_status === ProductStatus.LEASE),
   );
 };
 

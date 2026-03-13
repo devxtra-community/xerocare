@@ -1,6 +1,4 @@
-'use client';
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import api from '@/lib/api';
 import { toast } from 'sonner';
 import {
@@ -25,8 +23,9 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { EMPLOYEE_JOB_LABELS, EmployeeJob } from '@/lib/employeeJob';
 import { FINANCE_JOB_LABELS, FinanceJob } from '@/lib/financeJob';
+import { usePagination } from '@/hooks/usePagination';
+import Pagination from '@/components/Pagination';
 
-// Mock data type updated to match real data or mapping
 export type PayrollRecord = {
   id: string;
   name: string;
@@ -41,42 +40,6 @@ export type PayrollRecord = {
   payrollId?: string;
 };
 
-/*
- ### Bug Fixes (Persistence & Logic)
-
-- **Resolved 404 Not Found**: Fixed an ID mismatch where the employee ID was being used instead of the payroll UUID for updates. The backend now returns `payroll_id`, which the frontend uses for `PUT` requests.
-- **Resolved 400 Bad Request**: Implemented a "smart update" mechanism. The frontend now automatically detects if a payroll record exists for the month; if not, it uses `POST` to create it, otherwise it uses `PUT` to update the existing one. This prevents duplicate record errors.
-- **Improved Data Integrity**: The "Add Salary" and "Update Payroll" flows now properly synchronize with the database, ensuring that HR changes are persistent and correctly trigger employee notifications.
-
-## Verification Results
-
-### Backend
-- All routes are registered and lint errors fixed.
-- `Notification` entity is properly synchronized.
-- `payroll_id` successfully included in summary response.
-
-### Frontend
-- Notification bell correctly displays the unread count.
-- Notifications are fetched and displayed in the dropdown.
-- Clicking a salary notification opens the `SalaryDetailsDialog`.
-- Payroll updates now persist correctly without 404/400 errors.
-- "Mark all as read" functionality works as expected.
-*/
-
-/**
- * Main Payroll Management Table.
- * Features:
- * - List of all employee payroll records.
- * - Filtering by Role and Status (Paid/Pending).
- * - Searching by name, email, or department.
- * - Integration with Add and Update Payroll dialogs.
- * - Smart handling of payroll record creation vs update.
- */
-/**
- * Payroll Management Table.
- * Displays employee payroll records with salary details and payment status.
- * Allows HR to add new payroll entries or update existing ones, with search and filter support.
- */
 export default function HRPayrollTable({
   data,
   loading,
@@ -94,6 +57,8 @@ export default function HRPayrollTable({
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState<PayrollRecord | null>(null);
+
+  const { page, limit, total, setPage, setTotal, totalPages } = usePagination(10);
 
   const handleEditClick = (record: PayrollRecord) => {
     setSelectedRecord(record);
@@ -136,17 +101,17 @@ export default function HRPayrollTable({
     }
   };
 
-  const filteredData = data.filter((record) => {
-    const getDepartmentLabel = (dept: string) => {
-      if (!dept) return 'N/A';
-      if (dept === 'HR') return 'HR';
-      if (dept === 'Management') return 'Management';
-      if (dept === 'Administration') return 'Administration';
-      return (
-        EMPLOYEE_JOB_LABELS[dept as EmployeeJob] || FINANCE_JOB_LABELS[dept as FinanceJob] || dept
-      );
-    };
+  const getDepartmentLabel = (dept: string) => {
+    if (!dept) return 'N/A';
+    if (dept === 'HR') return 'HR';
+    if (dept === 'Management') return 'Management';
+    if (dept === 'Administration') return 'Administration';
+    return (
+      EMPLOYEE_JOB_LABELS[dept as EmployeeJob] || FINANCE_JOB_LABELS[dept as FinanceJob] || dept
+    );
+  };
 
+  const filteredData = data.filter((record) => {
     const matchesSearch =
       record.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       record.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -159,24 +124,17 @@ export default function HRPayrollTable({
   });
 
   const allDepartments = Array.from(
-    new Set(
-      data.map((record) => {
-        if (!record.department) return 'N/A';
-        if (record.department === 'HR') return 'HR';
-        if (record.department === 'Management') return 'Management';
-        if (record.department === 'Administration') return 'Administration';
-        return (
-          EMPLOYEE_JOB_LABELS[record.department as EmployeeJob] ||
-          FINANCE_JOB_LABELS[record.department as FinanceJob] ||
-          record.department
-        );
-      }),
-    ),
+    new Set(data.map((record) => getDepartmentLabel(record.department))),
   ).sort();
+
+  useEffect(() => {
+    setTotal(filteredData.length);
+  }, [filteredData.length, setTotal]);
+
+  const paginatedData = filteredData.slice((page - 1) * limit, page * limit);
 
   return (
     <div className="space-y-4">
-      {/* Filters and Actions */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto flex-1">
           <div className="relative w-full sm:w-[300px]">
@@ -205,36 +163,17 @@ export default function HRPayrollTable({
                 align="end"
                 className="w-40 rounded-xl p-1 bg-white border-slate-200 shadow-xl"
               >
-                <DropdownMenuItem
-                  onClick={() => setRoleFilter('All')}
-                  className="rounded-lg focus:bg-accent focus:text-accent-foreground cursor-pointer px-3 py-2"
-                >
-                  All Roles
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => setRoleFilter('EMPLOYEE')}
-                  className="rounded-lg focus:bg-accent focus:text-accent-foreground cursor-pointer px-3 py-2"
-                >
+                <DropdownMenuItem onClick={() => setRoleFilter('All')}>All Roles</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setRoleFilter('EMPLOYEE')}>
                   Employee
                 </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => setRoleFilter('FINANCE')}
-                  className="rounded-lg focus:bg-accent focus:text-accent-foreground cursor-pointer px-3 py-2"
-                >
+                <DropdownMenuItem onClick={() => setRoleFilter('FINANCE')}>
                   Finance
                 </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => setRoleFilter('MANAGER')}
-                  className="rounded-lg focus:bg-accent focus:text-accent-foreground cursor-pointer px-3 py-2"
-                >
+                <DropdownMenuItem onClick={() => setRoleFilter('MANAGER')}>
                   Manager
                 </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => setRoleFilter('HR')}
-                  className="rounded-lg focus:bg-accent focus:text-accent-foreground cursor-pointer px-3 py-2"
-                >
-                  HR
-                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setRoleFilter('HR')}>HR</DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
@@ -255,22 +194,11 @@ export default function HRPayrollTable({
                 align="end"
                 className="w-40 rounded-xl p-1 bg-white border-slate-200 shadow-xl"
               >
-                <DropdownMenuItem
-                  onClick={() => setStatusFilter('All')}
-                  className="rounded-lg focus:bg-accent focus:text-accent-foreground cursor-pointer px-3 py-2"
-                >
+                <DropdownMenuItem onClick={() => setStatusFilter('All')}>
                   All Status
                 </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => setStatusFilter('PAID')}
-                  className="rounded-lg focus:bg-accent focus:text-accent-foreground cursor-pointer px-3 py-2"
-                >
-                  Paid
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => setStatusFilter('PENDING')}
-                  className="rounded-lg focus:bg-accent focus:text-accent-foreground cursor-pointer px-3 py-2"
-                >
+                <DropdownMenuItem onClick={() => setStatusFilter('PAID')}>Paid</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setStatusFilter('PENDING')}>
                   Pending
                 </DropdownMenuItem>
               </DropdownMenuContent>
@@ -285,7 +213,7 @@ export default function HRPayrollTable({
                 >
                   <div className="flex items-center gap-2 truncate">
                     <Filter className="h-4 w-4" />
-                    <span className="truncate">Dept: {departmentFilter}</span>
+                    <span className="truncate">Dept: {departmentFilter || 'All'}</span>
                   </div>
                 </Button>
               </DropdownMenuTrigger>
@@ -293,6 +221,9 @@ export default function HRPayrollTable({
                 align="end"
                 className="w-48 rounded-xl p-1 bg-white border-slate-200 shadow-xl max-h-[300px] overflow-y-auto"
               >
+                <DropdownMenuItem onClick={() => setDepartmentFilter('')}>
+                  All Departments
+                </DropdownMenuItem>
                 {allDepartments.map((dept) => (
                   <DropdownMenuItem
                     key={dept}
@@ -319,12 +250,11 @@ export default function HRPayrollTable({
             className="h-10 bg-card border-blue-400/60 focus:ring-blue-100 rounded-xl flex-1 sm:flex-none"
           >
             <Download className="h-4 w-4 mr-2" />
-            Export Payroll
+            Export
           </Button>
         </div>
       </div>
 
-      {/* Table */}
       <div className="bg-card rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="overflow-auto max-h-[500px] relative">
           <Table className="w-full text-left">
@@ -372,7 +302,7 @@ export default function HRPayrollTable({
                     </div>
                   </TableCell>
                 </TableRow>
-              ) : filteredData.length === 0 ? (
+              ) : paginatedData.length === 0 ? (
                 <TableRow>
                   <TableCell
                     colSpan={9}
@@ -382,7 +312,7 @@ export default function HRPayrollTable({
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredData.map((record, index) => (
+                paginatedData.map((record, index) => (
                   <TableRow
                     key={record.id}
                     className={`transition-colors h-11 border-b border-gray-50 hover:bg-primary/5 ${
@@ -401,17 +331,7 @@ export default function HRPayrollTable({
                       </span>
                     </TableCell>
                     <TableCell className="px-3 py-1.5 whitespace-nowrap uppercase text-[10px] font-bold text-primary">
-                      {(() => {
-                        if (!record.department) return 'N/A';
-                        if (record.department === 'HR') return 'HR';
-                        if (record.department === 'Management') return 'Management';
-                        if (record.department === 'Administration') return 'Administration';
-                        return (
-                          EMPLOYEE_JOB_LABELS[record.department as EmployeeJob] ||
-                          FINANCE_JOB_LABELS[record.department as FinanceJob] ||
-                          record.department
-                        );
-                      })()}
+                      {getDepartmentLabel(record.department)}
                     </TableCell>
                     <TableCell className="px-3 py-1.5 font-medium whitespace-nowrap text-right text-primary">
                       {record.salaryPerMonth}
@@ -463,6 +383,14 @@ export default function HRPayrollTable({
             </TableBody>
           </Table>
         </div>
+
+        <Pagination
+          page={page}
+          totalPages={totalPages}
+          total={total}
+          limit={limit}
+          onPageChange={setPage}
+        />
       </div>
 
       <UpdatePayrollDialog

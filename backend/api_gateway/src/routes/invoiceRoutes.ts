@@ -80,7 +80,11 @@ router.get(
   getCollectionAlerts, // Ensure import!
 );
 
-router.get('/history', requireRole(UserRole.ADMIN, UserRole.FINANCE), getInvoiceHistory);
+router.get(
+  '/history',
+  requireRole(UserRole.ADMIN, UserRole.FINANCE, UserRole.EMPLOYEE),
+  getInvoiceHistory,
+);
 
 router.get(
   '/completed-collections',

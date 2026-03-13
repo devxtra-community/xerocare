@@ -28,6 +28,7 @@ import {
 import { Search, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
+import { usePagination } from '@/hooks/usePagination';
 import Pagination from '@/components/Pagination';
 
 /**
@@ -42,8 +43,7 @@ export default function DashbordTable() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedBrand, setSelectedBrand] = useState<string>('all');
   const [selectedVendor, setSelectedVendor] = useState<string>('all');
-  const [currentPage, setCurrentPage] = useState(1);
-  const ITEMS_PER_PAGE = 10;
+  const { page: currentPage, limit, total, setPage, setTotal, totalPages } = usePagination(10);
 
   useEffect(() => {
     setMounted(true);
@@ -82,8 +82,8 @@ export default function DashbordTable() {
 
   // Reset page when filters change
   useEffect(() => {
-    setCurrentPage(1);
-  }, [searchQuery, selectedBrand, selectedVendor]);
+    setPage(1);
+  }, [searchQuery, selectedBrand, selectedVendor, setPage]);
 
   // Filtering logic
   const filteredData = data.filter((item) => {
@@ -98,9 +98,11 @@ export default function DashbordTable() {
     return matchesSearch && matchesBrand && matchesVendor;
   });
 
-  const totalPages = Math.ceil(filteredData.length / ITEMS_PER_PAGE);
-  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-  const paginatedData = filteredData.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+  useEffect(() => {
+    setTotal(filteredData.length);
+  }, [filteredData.length, setTotal]);
+
+  const paginatedData = filteredData.slice((currentPage - 1) * limit, currentPage * limit);
 
   // Extract unique brands and vendors for filters
   const brands = Array.from(new Set(data.map((item) => item.brand))).filter(Boolean);
@@ -272,7 +274,13 @@ export default function DashbordTable() {
           </Table>
         </div>
         {totalPages > 1 && (
-          <Pagination page={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
+          <Pagination
+            page={currentPage}
+            totalPages={totalPages}
+            total={total}
+            limit={limit}
+            onPageChange={setPage}
+          />
         )}
       </div>
     </div>

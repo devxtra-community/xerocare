@@ -9,6 +9,7 @@ import { Loader2 } from 'lucide-react';
 import { ChartTooltipContent } from '@/components/ui/ChartTooltip';
 import { getUserFromToken } from '@/lib/auth';
 import { EmployeeJob } from '@/lib/employeeJob';
+import { formatCurrency } from '@/lib/format';
 
 interface ChartDataItem {
   name: string;
@@ -181,9 +182,7 @@ export default function EmployeeDashboardGraphs() {
                   content={
                     <ChartTooltipContent
                       valueFormatter={
-                        chart.type === 'sales'
-                          ? (val) => `QAR ${Number(val).toLocaleString()}`
-                          : undefined
+                        chart.type === 'sales' ? (val) => formatCurrency(Number(val)) : undefined
                       }
                     />
                   }

@@ -21,6 +21,8 @@ import {
 } from '@/lib/invoice';
 import { toast } from 'sonner';
 import { formatCurrency } from '@/lib/format';
+import { usePagination } from '@/hooks/usePagination';
+import Pagination from '@/components/Pagination';
 
 interface ConsolidatedStatementDialogProps {
   isOpen: boolean;
@@ -70,6 +72,8 @@ export default function ConsolidatedStatementDialog({
   };
 
   const isCpc = contract?.rentType?.includes('CPC');
+  const isEmi = contract?.saleType === 'LEASE' && contract?.leaseType === 'EMI';
+  const isFsm = contract?.saleType === 'LEASE' && contract?.leaseType === 'FSM';
 
   // Calculate applied slab rate for a given total usage count
   const getAppliedRate = (totalUsage: number): string => {
@@ -98,6 +102,14 @@ export default function ConsolidatedStatementDialog({
     }
     return `QAR ${rate} (${range})`;
   };
+
+  const { page: currentPage, limit, total, setPage, setTotal, totalPages } = usePagination(5);
+
+  useEffect(() => {
+    setTotal(history.length);
+  }, [history.length, setTotal]);
+
+  const paginatedHistory = history.slice((currentPage - 1) * limit, currentPage * limit);
 
   return (
     <Dialog open={isOpen} onOpenChange={(val) => !val && onClose()}>
@@ -295,21 +307,27 @@ export default function ConsolidatedStatementDialog({
               {/* Transaction Table (Usage History) */}
               <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
                 <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
-                  <h3 className="font-bold text-slate-700">Transaction History (Usage & Rent)</h3>
+                  <h3 className="font-bold text-slate-700">
+                    Transaction History (Usage & {contract?.saleType === 'LEASE' ? 'EMI' : 'Rent'})
+                  </h3>
                 </div>
                 <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead>Period</TableHead>
                       {isCpc && <TableHead className="text-right">Rate Applied</TableHead>}
-                      <TableHead className="text-right">Usage</TableHead>
-                      <TableHead className="text-right">Rent</TableHead>
-                      <TableHead className="text-right">Excess</TableHead>
+                      {!isEmi && <TableHead className="text-right">Usage</TableHead>}
+                      <TableHead className="text-right">
+                        {contract?.saleType === 'LEASE' ? 'EMI' : 'Rent'}
+                      </TableHead>
+                      {!isEmi && <TableHead className="text-right">Excess</TableHead>}
+                      {isFsm && <TableHead className="text-right text-red-500">Discount</TableHead>}
+                      <TableHead className="text-right text-indigo-500">Advance Used</TableHead>
                       <TableHead className="text-right">Total</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {history.length === 0 ? (
+                    {paginatedHistory.length === 0 ? (
                       <TableRow>
                         <TableCell colSpan={5} className="text-center py-8 text-slate-500">
                           No usage history found.
@@ -317,7 +335,7 @@ export default function ConsolidatedStatementDialog({
                       </TableRow>
                     ) : (
                       <>
-                        {history.map((record) => (
+                        {paginatedHistory.map((record) => (
                           <TableRow key={record.id}>
                             <TableCell className="font-medium text-slate-700">
                               <div className="flex flex-col">
@@ -332,18 +350,32 @@ export default function ConsolidatedStatementDialog({
                                 {getAppliedRate(record.totalUsage)}
                               </TableCell>
                             )}
-                            <TableCell className="text-right">
-                              <div className="flex flex-col items-end">
-                                <span className="font-medium text-slate-900">
-                                  {record.totalUsage?.toLocaleString() || 0} units
-                                </span>
-                              </div>
-                            </TableCell>
+                            {!isEmi && (
+                              <TableCell className="text-right">
+                                <div className="flex flex-col items-end">
+                                  <span className="font-medium text-slate-900">
+                                    {record.totalUsage?.toLocaleString() || 0} units
+                                  </span>
+                                </div>
+                              </TableCell>
+                            )}
                             <TableCell className="text-right text-slate-600">
                               {formatCurrency(Number(record.rent || 0))}
                             </TableCell>
-                            <TableCell className="text-right text-orange-600">
-                              {formatCurrency(Number(record.exceededAmount || 0))}
+                            {!isEmi && (
+                              <TableCell className="text-right text-orange-600">
+                                {formatCurrency(Number(record.exceededAmount || 0))}
+                              </TableCell>
+                            )}
+                            {isFsm && (
+                              <TableCell className="text-right text-red-600 font-medium">
+                                - {formatCurrency(Number(record.discountAmount || 0))}
+                              </TableCell>
+                            )}
+                            <TableCell className="text-right text-indigo-600 font-medium">
+                              {Number(record.advanceAdjusted || 0) > 0
+                                ? `- ${formatCurrency(Number(record.advanceAdjusted || 0))}`
+                                : '-'}
                             </TableCell>
                             <TableCell className="text-right font-bold text-blue-700">
                               {formatCurrency(Number(record.finalTotal || 0))}
@@ -359,11 +391,33 @@ export default function ConsolidatedStatementDialog({
                                   </span>
                                 </TableCell>
                                 {isCpc && <TableCell className="text-right">-</TableCell>}
+                                {!isEmi && <TableCell className="text-right">-</TableCell>}
                                 <TableCell className="text-right">-</TableCell>
-                                <TableCell className="text-right">-</TableCell>
+                                {!isEmi && <TableCell className="text-right">-</TableCell>}
+                                {isFsm && <TableCell className="text-right">-</TableCell>}
                                 <TableCell className="text-right">-</TableCell>
                                 <TableCell className="text-right font-black text-orange-700">
                                   {formatCurrency(collection.advanceAmount)}
+                                </TableCell>
+                              </TableRow>
+                            )
+                          : null}
+                        {isFsm && collection.discountAmount
+                          ? collection.discountAmount > 0 && (
+                              <TableRow className="bg-red-50/30">
+                                <TableCell className="font-medium text-red-700">
+                                  <span className="text-sm font-bold uppercase tracking-tight">
+                                    Total Discount (Applied)
+                                  </span>
+                                </TableCell>
+                                {isCpc && <TableCell className="text-right">-</TableCell>}
+                                {!isEmi && <TableCell className="text-right">-</TableCell>}
+                                <TableCell className="text-right">-</TableCell>
+                                {!isEmi && <TableCell className="text-right">-</TableCell>}
+                                <TableCell className="text-right">-</TableCell>
+                                <TableCell className="text-right">-</TableCell>
+                                <TableCell className="text-right font-black text-red-700">
+                                  - {formatCurrency(collection.discountAmount)}
                                 </TableCell>
                               </TableRow>
                             )
@@ -377,8 +431,10 @@ export default function ConsolidatedStatementDialog({
                                   </span>
                                 </TableCell>
                                 {isCpc && <TableCell className="text-right">-</TableCell>}
+                                {!isEmi && <TableCell className="text-right">-</TableCell>}
                                 <TableCell className="text-right">-</TableCell>
-                                <TableCell className="text-right">-</TableCell>
+                                {!isEmi && <TableCell className="text-right">-</TableCell>}
+                                {isFsm && <TableCell className="text-right">-</TableCell>}
                                 <TableCell className="text-right">-</TableCell>
                                 <TableCell className="text-right font-black text-blue-700">
                                   {formatCurrency(collection.securityDepositAmount)}
@@ -389,7 +445,7 @@ export default function ConsolidatedStatementDialog({
                         {/* Grand Total Row */}
                         <TableRow className="bg-slate-50 border-t-2 border-slate-200 hover:bg-slate-50">
                           <TableCell
-                            colSpan={isCpc ? 5 : 4}
+                            colSpan={isCpc ? (isFsm ? 6 : 5) : isFsm ? 5 : 4}
                             className="text-right font-black text-slate-800 uppercase tracking-wider py-4"
                           >
                             Grand Total
@@ -408,6 +464,16 @@ export default function ConsolidatedStatementDialog({
                   </TableBody>
                 </Table>
               </div>
+
+              {totalPages > 1 && (
+                <Pagination
+                  page={currentPage}
+                  totalPages={totalPages}
+                  total={total}
+                  limit={limit}
+                  onPageChange={setPage}
+                />
+              )}
             </div>
           )}
         </div>
@@ -447,14 +513,46 @@ export default function ConsolidatedStatementDialog({
             </div>
 
             {/* Right: Grand Total */}
-            <div className="w-full md:w-1/2 flex flex-col items-center md:items-end">
+            <div className="w-full md:w-1/2 flex flex-col items-center md:items-end gap-3">
+              {/* Breakdown */}
+              <div className="w-full max-w-xs space-y-1.5 text-sm">
+                <div className="flex justify-between text-slate-600">
+                  <span className="font-semibold">Grand Total</span>
+                  <span className="font-bold">
+                    {formatCurrency(
+                      collection.grossAmount ||
+                        history.reduce((sum, r) => sum + Number(r.finalTotal || 0), 0),
+                    )}
+                  </span>
+                </div>
+                {(collection.advanceAdjusted || 0) > 0 && (
+                  <div className="flex justify-between text-indigo-600">
+                    <span className="font-semibold">Advance Used</span>
+                    <span className="font-bold">
+                      - {formatCurrency(collection.advanceAdjusted || 0)}
+                    </span>
+                  </div>
+                )}
+                {(collection.discountAmount || 0) > 0 && (
+                  <div className="flex justify-between text-red-600">
+                    <span className="font-semibold">Discount Applied</span>
+                    <span className="font-bold">
+                      - {formatCurrency(collection.discountAmount || 0)}
+                    </span>
+                  </div>
+                )}
+                <div className="border-t border-slate-200 pt-1.5 mt-1.5" />
+              </div>
               <span className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] mb-1">
                 Final Settlement
               </span>
               <div className="flex flex-col items-center md:items-end">
                 <span className="text-4xl font-black text-slate-900 leading-none">
                   {formatCurrency(
-                    (collection.grossAmount || 0) - (collection.advanceAdjusted || 0),
+                    (collection.grossAmount ||
+                      history.reduce((sum, r) => sum + Number(r.finalTotal || 0), 0)) -
+                      (collection.discountAmount || 0) -
+                      (collection.advanceAdjusted || 0),
                   )}
                 </span>
                 <span className="text-xs font-bold text-slate-500 mt-2 bg-slate-200 px-3 py-1 rounded-full uppercase tracking-tighter">

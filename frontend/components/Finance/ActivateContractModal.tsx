@@ -26,6 +26,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface ActivateContractModalProps {
   invoice: Invoice;
@@ -47,6 +48,7 @@ interface ReadingInput {
  */
 export function ActivateContractModal({ invoice, onClose, onSuccess }: ActivateContractModalProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const queryClient = useQueryClient();
   const [isUploading, setIsUploading] = useState(false);
   // Flow State
   const [uploadFile, setUploadFile] = useState<File | null>(null);
@@ -187,6 +189,8 @@ export function ActivateContractModal({ invoice, onClose, onSuccess }: ActivateC
       });
 
       toast.success('Contract activated successfully!');
+      queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      queryClient.invalidateQueries({ queryKey: ['invoice', invoice.id] });
       onSuccess();
       onClose();
     } catch (error) {

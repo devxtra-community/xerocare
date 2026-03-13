@@ -215,7 +215,13 @@ export class BillingService {
     const totalMonthlyRent = usageRecords.reduce((sum, u) => sum + Number(u.monthlyRent || 0), 0);
 
     // Total Value of the Contract (Rent + Excess)
-    const finalTotal = totalMonthlyRent + totalExceededCharge;
+    const finalGross = totalMonthlyRent + totalExceededCharge;
+
+    // 🔹 DISCOUNT CALCULATION: Sum up all discounts from usage records
+    const totalDiscountAmount = usageRecords.reduce(
+      (sum, u) => sum + Number(u.discountAmount || 0),
+      0,
+    );
 
     // 4. Update Contract to become the FINAL Invoice
     contract.contractStatus = ContractStatus.COMPLETED;
@@ -223,8 +229,9 @@ export class BillingService {
     contract.status = InvoiceStatus.ISSUED;
     contract.completedAt = new Date();
 
-    contract.grossAmount = finalTotal;
-    contract.totalAmount = finalTotal;
+    contract.grossAmount = finalGross;
+    contract.discountAmount = totalDiscountAmount;
+    contract.totalAmount = finalGross - totalDiscountAmount;
 
     contract.bwA4Count = usageRecords.reduce((s, u) => s + (u.bwA4Count || 0), 0);
     contract.bwA3Count = usageRecords.reduce((s, u) => s + (u.bwA3Count || 0), 0);
@@ -1167,14 +1174,44 @@ export class BillingService {
    * Retrieves all invoices, optionally filtered by branch.
    */
   async getAllInvoices(branchId?: string) {
-    return this.invoiceRepo.findAll(branchId);
+    const invoices = await this.invoiceRepo.findAll(branchId);
+    return Promise.all(
+      invoices.map(async (invoice) => {
+        const history = await this.usageRepo.getUsageHistory(invoice.id);
+        const usageRevenue = history.reduce(
+          (sum, u) => sum + (Number(u.monthlyRent || 0) + Number(u.exceededCharge || 0)),
+          0,
+        );
+        const discountAmount = history.reduce((sum, u) => sum + Number(u.discountAmount || 0), 0);
+        return {
+          ...invoice,
+          usageRevenue,
+          discountAmount: Number(invoice.discountAmount || 0) || discountAmount,
+        };
+      }),
+    );
   }
 
   /**
    * Retrieves invoices created by a specific user.
    */
   async getInvoicesByCreator(creatorId: string) {
-    return this.invoiceRepo.findByCreatorId(creatorId);
+    const invoices = await this.invoiceRepo.findByCreatorId(creatorId);
+    return Promise.all(
+      invoices.map(async (invoice) => {
+        const history = await this.usageRepo.getUsageHistory(invoice.id);
+        const usageRevenue = history.reduce(
+          (sum, u) => sum + (Number(u.monthlyRent || 0) + Number(u.exceededCharge || 0)),
+          0,
+        );
+        const discountAmount = history.reduce((sum, u) => sum + Number(u.discountAmount || 0), 0);
+        return {
+          ...invoice,
+          usageRevenue,
+          discountAmount: Number(invoice.discountAmount || 0) || discountAmount,
+        };
+      }),
+    );
   }
 
   /**
@@ -1184,7 +1221,27 @@ export class BillingService {
    * Retrieves invoices for a specific branch.
    */
   async getBranchInvoices(branchId: string) {
-    return this.invoiceRepo.findByBranchId(branchId);
+    const invoices = await this.invoiceRepo.findByBranchId(branchId);
+
+    // Enrich with usageRevenue and discountAmount for stats accuracy
+    const enriched = await Promise.all(
+      invoices.map(async (invoice) => {
+        const history = await this.usageRepo.getUsageHistory(invoice.id);
+        const usageRevenue = history.reduce(
+          (sum, u) => sum + (Number(u.monthlyRent || 0) + Number(u.exceededCharge || 0)),
+          0,
+        );
+        const discountAmount = history.reduce((sum, u) => sum + Number(u.discountAmount || 0), 0);
+
+        return {
+          ...invoice,
+          usageRevenue,
+          discountAmount: Number(invoice.discountAmount || 0) || discountAmount,
+        };
+      }),
+    );
+
+    return enriched;
   }
 
   /**
@@ -1227,10 +1284,15 @@ export class BillingService {
         (!invoice.items || !invoice.items.some((i) => i.itemType === ItemType.PRICING_RULE))
       ) {
         const contract = await this.invoiceRepo.findById(invoice.referenceContractId);
-        if (contract && contract.items) {
-          const rules = contract.items.filter((i) => i.itemType === ItemType.PRICING_RULE);
-          if (!invoice.items) invoice.items = [];
-          invoice.items.push(...rules);
+        if (contract) {
+          if (contract.items) {
+            const rules = contract.items.filter((i) => i.itemType === ItemType.PRICING_RULE);
+            if (!invoice.items) invoice.items = [];
+            invoice.items.push(...rules);
+          }
+          if (contract.productAllocations) {
+            invoice.productAllocations = contract.productAllocations;
+          }
         }
       }
 
@@ -1668,12 +1730,36 @@ export class BillingService {
       });
       await queryRunner.manager.save(DeviceMeterReading, newReading);
 
-      // Fetch invoice for billType
+      // Fetch invoice for updating InvoiceItems
       const invoice = await queryRunner.manager.findOne(Invoice, {
         where: { id: oldAllocation.contractId },
+        relations: ['items'],
       });
 
+      if (invoice && invoice.items) {
+        // Find the item that matches the old product
+        const itemIndex = invoice.items.findIndex((i) => i.productId === oldAllocation.productId);
+        if (itemIndex !== -1) {
+          const item = invoice.items[itemIndex];
+          item.productId = newProductId;
+          // Note: serialNumber is not a property of InvoiceItem, we only update productId and modelId
+          // If the new product has a different model, update it
+          item.modelId = oldAllocation.modelId; // Assuming model stays same for now, but we can update if needed
+          // Description might need update if it contains the old Serial Number
+          if (item.description.includes(oldAllocation.serialNumber)) {
+            item.description = item.description.replace(
+              oldAllocation.serialNumber,
+              newSerialNumber,
+            );
+          }
+          await queryRunner.manager.save(InvoiceItem, item);
+        }
+      }
+
+      await queryRunner.commitTransaction();
+
       // Emit events to update inventory status (Return old, Allocate new)
+      // We do this AFTER commit to ensure database consistency
       if (oldAllocation.productId) {
         emitProductStatusUpdate({
           productId: oldAllocation.productId,
@@ -1681,7 +1767,7 @@ export class BillingService {
           invoiceId: oldAllocation.contractId,
           approvedBy: 'SYSTEM',
           approvedAt: ts,
-        }).catch((err) => logger.error('Failed to emitRETURNED event', err));
+        }).catch((err) => logger.error('Failed to emit RETURNED event', err));
       }
       if (newAllocation.productId) {
         emitProductStatusUpdate({
@@ -1690,7 +1776,7 @@ export class BillingService {
           invoiceId: newAllocation.contractId,
           approvedBy: 'SYSTEM',
           approvedAt: ts,
-        }).catch((err) => logger.error('Failed to emit LEASE event', err));
+        }).catch((err) => logger.error('Failed to emit LEASE/RENT event', err));
       }
 
       return newAllocation;

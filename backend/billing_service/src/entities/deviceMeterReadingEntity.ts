@@ -1,17 +1,15 @@
-import {
-  Entity,
-  PrimaryGeneratedColumn,
-  Column,
-  CreateDateColumn,
-  UpdateDateColumn,
-  Index,
-} from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, Index } from 'typeorm';
 
 export enum ReadingSource {
   MANUAL = 'MANUAL',
   SYSTEM = 'SYSTEM',
+  OCR = 'OCR',
 }
 
+/**
+ * Records a physical meter reading for a specific device (by serial number).
+ * Used during device replacement to snapshot the final/initial meter state.
+ */
 @Entity('device_meter_readings')
 export class DeviceMeterReading {
   @PrimaryGeneratedColumn('uuid')
@@ -22,7 +20,6 @@ export class DeviceMeterReading {
   serialNumber!: string;
 
   @Column({ type: 'timestamp' })
-  @Index()
   timestamp!: Date;
 
   @Column({ type: 'int', default: 0 })
@@ -45,11 +42,9 @@ export class DeviceMeterReading {
   source!: ReadingSource;
 
   @Column({ type: 'uuid', nullable: true })
-  invoiceId?: string; // Optional: Link reading to a specific contract if needed
+  @Index()
+  invoiceId?: string;
 
   @CreateDateColumn()
   createdAt!: Date;
-
-  @UpdateDateColumn()
-  updatedAt!: Date;
 }

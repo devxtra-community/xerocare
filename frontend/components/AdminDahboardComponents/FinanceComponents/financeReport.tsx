@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { usePagination } from '@/hooks/usePagination';
 import { Input } from '@/components/ui/input';
 import { Search, Calendar, Building, Layers, FilterX } from 'lucide-react';
 import {
@@ -36,6 +37,7 @@ import { getFinanceReport, FinanceReportItem } from '@/lib/invoice';
 import { getBranches, Branch } from '@/lib/branch';
 import { formatCurrency, formatCompactNumber } from '@/lib/format';
 import { YearSelector } from '@/components/ui/YearSelector';
+import Pagination from '@/components/Pagination';
 
 type Finance = {
   id: string;
@@ -196,6 +198,14 @@ export default function FinanceReport() {
       };
     })
     .filter((d) => d.income > 0 || d.expense > 0);
+
+  const { page: currentPage, limit, total, setPage, setTotal, totalPages } = usePagination(5);
+
+  useEffect(() => {
+    setTotal(filteredFinance.length);
+  }, [filteredFinance.length, setTotal]);
+
+  const paginatedFinance = filteredFinance.slice((currentPage - 1) * limit, currentPage * limit);
 
   return (
     <div className="bg-blue-100 min-h-screen p-4 space-y-8 sm:space-y-10">
@@ -472,7 +482,7 @@ export default function FinanceReport() {
                 </TableCell>
               </TableRow>
             ) : (
-              filteredFinance.map((f, i) => (
+              paginatedFinance.map((f, i) => (
                 <TableRow key={f.id} className={i % 2 ? 'bg-blue-50/10' : 'bg-card'}>
                   <TableCell className="px-6 py-4 font-medium text-slate-800">{f.month}</TableCell>
                   <TableCell className="px-6 py-4">
@@ -506,6 +516,16 @@ export default function FinanceReport() {
             )}
           </TableBody>
         </Table>
+
+        {totalPages > 1 && (
+          <Pagination
+            page={currentPage}
+            totalPages={totalPages}
+            total={total}
+            limit={limit}
+            onPageChange={setPage}
+          />
+        )}
         {!loading && filteredFinance.length === 0 && (
           <div className="p-8 text-center text-slate-400 italic">No matching records found.</div>
         )}

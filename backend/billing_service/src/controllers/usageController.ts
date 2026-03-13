@@ -28,6 +28,7 @@ export const createUsageRecord = async (req: Request, res: Response, next: NextF
 
       reportedBy,
       remarks,
+      items,
     } = payload;
 
     const file = req.file as MulterS3File | undefined;
@@ -52,6 +53,7 @@ export const createUsageRecord = async (req: Request, res: Response, next: NextF
       meterImageUrl,
       reportedBy: reportedBy || 'EMPLOYEE', // Default if missing
       remarks,
+      items: items ? (typeof items === 'string' ? JSON.parse(items) : items) : undefined,
     });
 
     return res.status(201).json({
@@ -76,6 +78,7 @@ export const updateUsageRecord = async (req: Request, res: Response, next: NextF
       discountBwCopies,
       discountColorCopies,
       discountAmount,
+      items,
     } = req.body;
 
     const result = await usageService.updateUsageRecord(id, {
@@ -88,6 +91,7 @@ export const updateUsageRecord = async (req: Request, res: Response, next: NextF
       discountColorCopies:
         discountColorCopies !== undefined ? Number(discountColorCopies) : undefined,
       discountAmount: discountAmount !== undefined ? Number(discountAmount) : undefined,
+      items,
     });
 
     return res.status(200).json({
