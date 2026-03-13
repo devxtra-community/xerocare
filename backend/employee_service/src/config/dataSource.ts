@@ -21,10 +21,14 @@ export const Source = new DataSource({
   },
   synchronize: false,
   entities: [Admin, Employee, Auth, Branch, LeaveApplication, Payroll, Notification],
+  poolSize: 1,
   extra: {
     max: 1,
+    min: 0,
     connectionTimeoutMillis: 5000,
     keepAlive: true,
+    idleTimeoutMillis: 30000,
+    statement_timeout: 10000,
   },
 });
 

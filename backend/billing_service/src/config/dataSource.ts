@@ -28,9 +28,13 @@ export const Source = new DataSource({
     UsageRecordItem,
     DeviceMeterReading,
   ],
+  poolSize: 1,
   extra: {
     max: 1,
+    min: 0,
+    idleTimeoutMillis: 30000,
     connectionTimeoutMillis: 5000,
+    statement_timeout: 10000,
     keepAlive: true,
   },
 });

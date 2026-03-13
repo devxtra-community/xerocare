@@ -46,11 +46,15 @@ export const Source = new DataSource({
     RfqVendor,
     RfqVendorItem,
   ],
+  poolSize: 1,
   extra: {
     max: 1,
-    ssl: { rejectUnauthorized: false },
+    // ssl: { rejectUnauthorized: false },
     connectionTimeoutMillis: 5000,
     keepAlive: true,
+    min: 0,
+    idleTimeoutMillis: 30000,
+    statement_timeout: 10000,
   },
 });
 
