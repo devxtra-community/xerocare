@@ -97,8 +97,8 @@ export async function awardVendor(id: string, vendorId: string) {
   return res.data;
 }
 
-export async function createLotFromRfq(id: string) {
-  const res = await api.post(`/i/rfq/${id}/create-lot`);
+export async function createLotFromRfq(id: string, warehouseId?: string) {
+  const res = await api.post(`/i/rfq/${id}/create-lot`, { warehouseId });
   return res.data;
 }
 

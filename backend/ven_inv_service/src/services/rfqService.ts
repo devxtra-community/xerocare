@@ -787,7 +787,7 @@ export class RfqService {
     });
   }
 
-  async createLotFromRfq(rfqId: string, userId: string): Promise<Lot> {
+  async createLotFromRfq(rfqId: string, userId: string, warehouseId?: string): Promise<Lot> {
     return this.dataSource.transaction(async (manager) => {
       const rfq = await manager.findOne(Rfq, {
         where: { id: rfqId },
@@ -816,6 +816,7 @@ export class RfqService {
         totalAmount: awardedVendor.total_quoted_amount,
         status: LotStatus.PENDING,
         branch_id: rfq.branch_id,
+        warehouse_id: warehouseId,
         createdBy: userId,
         notes: `Auto-generated from RFQ ${rfq.rfq_number}`,
       });

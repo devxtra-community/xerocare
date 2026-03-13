@@ -36,6 +36,10 @@ export interface Purchase {
     id: string;
     lot_number?: string;
   };
+  branch?: {
+    id: string;
+    name: string;
+  };
 }
 
 export interface AddPaymentDto {

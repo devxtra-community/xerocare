@@ -409,24 +409,19 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
                           <FormLabel className="text-sm font-medium text-gray-700">
                             Warehouse
                           </FormLabel>
-                          <Select
-                            onValueChange={field.onChange}
-                            defaultValue={field.value}
-                            value={field.value}
-                          >
-                            <FormControl>
-                              <SelectTrigger className="h-10">
-                                <SelectValue placeholder="Select Warehouse" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {warehouses.map((w) => (
-                                <SelectItem key={w.id} value={w.id}>
-                                  {w.warehouseName}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                          <FormControl>
+                            <SearchableSelect
+                              value={field.value}
+                              onValueChange={field.onChange}
+                              options={warehouses.map((w) => ({
+                                value: w.id,
+                                label: `${w.warehouseName} (${w.id})`,
+                              }))}
+                              placeholder="Select Warehouse"
+                              emptyText="No warehouses found."
+                              className="h-10 text-sm"
+                            />
+                          </FormControl>
                           <FormMessage />
                         </FormItem>
                       )}

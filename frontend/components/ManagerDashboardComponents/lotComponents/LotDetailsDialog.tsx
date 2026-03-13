@@ -67,7 +67,7 @@ export default function LotDetailsDialog({ lot, onClose }: LotDetailsDialogProps
   useEffect(() => {
     // Initialize receivedItems from lot data
     const initial: Record<string, { received: number; damaged: number }> = {};
-    currentLot.items.forEach((item) => {
+    (currentLot.items || []).forEach((item) => {
       initial[item.id] = {
         received: item.receivedQuantity || 0,
         damaged: item.damagedQuantity || 0,
@@ -129,13 +129,13 @@ export default function LotDetailsDialog({ lot, onClose }: LotDetailsDialogProps
 
       // Validation
       for (const item of items) {
-        const original = currentLot.items.find((i) => i.id === item.item_id);
+        const original = (currentLot.items || []).find((i) => i.id === item.item_id);
         if (
           original &&
           item.received_quantity + item.damaged_quantity > original.expectedQuantity
         ) {
           toast.error(
-            `Error in item: ${original.itemType === LotItemType.MODEL ? original.model?.model_name : original.sparePart?.part_name}`,
+            `Error in item: ${original.itemType === LotItemType.MODEL ? original.model?.model_name || original.customProductName || 'Unnamed Product' : original.sparePart?.part_name || original.customSparePartName || 'Unnamed Spare'}`,
             {
               description: `Total (Received + Damaged) cannot exceed Expected (${original.expectedQuantity})`,
             },
@@ -227,9 +227,14 @@ export default function LotDetailsDialog({ lot, onClose }: LotDetailsDialogProps
     }
   };
 
-  const itemsTotal = currentLot.items.reduce((sum, item) => sum + Number(item.totalPrice), 0);
-  const hasProducts = currentLot.items.some((item) => item.itemType === LotItemType.MODEL);
-  const hasSpareParts = currentLot.items.some((item) => item.itemType === LotItemType.SPARE_PART);
+  const itemsTotal = (currentLot.items || []).reduce(
+    (sum, item) => sum + Number(item.totalPrice),
+    0,
+  );
+  const hasProducts = (currentLot.items || []).some((item) => item.itemType === LotItemType.MODEL);
+  const hasSpareParts = (currentLot.items || []).some(
+    (item) => item.itemType === LotItemType.SPARE_PART,
+  );
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
@@ -412,7 +417,9 @@ export default function LotDetailsDialog({ lot, onClose }: LotDetailsDialogProps
               <p className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
                 Total Items
               </p>
-              <p className="text-lg font-bold leading-none">{currentLot.items.length} Types</p>
+              <p className="text-lg font-bold leading-none">
+                {(currentLot.items || []).length} Types
+              </p>
             </div>
           </div>
 
@@ -425,7 +432,8 @@ export default function LotDetailsDialog({ lot, onClose }: LotDetailsDialogProps
                 Total Quantity
               </p>
               <p className="text-lg font-bold leading-none">
-                {currentLot.items.reduce((sum, item) => sum + item.expectedQuantity, 0)} Units
+                {(currentLot.items || []).reduce((sum, item) => sum + item.expectedQuantity, 0)}{' '}
+                Units
               </p>
             </div>
           </div>
@@ -441,10 +449,13 @@ export default function LotDetailsDialog({ lot, onClose }: LotDetailsDialogProps
               <div className="flex items-baseline gap-1.5">
                 <p className="text-lg font-bold leading-none">
                   {Math.round(
-                    (currentLot.items.reduce((sum, item) => sum + item.usedQuantity, 0) /
+                    ((currentLot.items || []).reduce((sum, item) => sum + item.usedQuantity, 0) /
                       Math.max(
                         1,
-                        currentLot.items.reduce((sum, item) => sum + item.receivedQuantity, 0),
+                        (currentLot.items || []).reduce(
+                          (sum, item) => sum + item.receivedQuantity,
+                          0,
+                        ),
                       )) *
                       100,
                   ) || 0}
@@ -479,7 +490,7 @@ export default function LotDetailsDialog({ lot, onClose }: LotDetailsDialogProps
                 Lot Items
               </h3>
               <Badge variant="secondary" className="font-normal text-[10px]">
-                {currentLot.items.length} Distinct Entries
+                {(currentLot.items || []).length} Distinct Entries
               </Badge>
             </div>
             <div className="flex-1 overflow-auto">
@@ -501,7 +512,7 @@ export default function LotDetailsDialog({ lot, onClose }: LotDetailsDialogProps
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {currentLot.items.map((item) => {
+                  {(currentLot.items || []).map((item) => {
                     const usagePercent = Math.round(
                       (item.usedQuantity / Math.max(1, item.receivedQuantity)) * 100,
                     );
@@ -528,12 +539,18 @@ export default function LotDetailsDialog({ lot, onClose }: LotDetailsDialogProps
                           <div className="flex flex-col">
                             <span className="text-sm">
                               {item.itemType === LotItemType.MODEL
-                                ? item.model?.model_name
-                                : item.sparePart?.part_name}
+                                ? item.model?.model_name ||
+                                  item.customProductName ||
+                                  'Unnamed Product'
+                                : item.sparePart?.part_name ||
+                                  item.customSparePartName ||
+                                  'Unnamed Spare'}
                             </span>
-                            {item.itemType === LotItemType.MODEL && (
+                            {(item.model?.model_no || item.sparePart?.item_code) && (
                               <span className="text-[10px] text-slate-400 font-mono">
-                                {item.model?.model_no}
+                                {item.itemType === LotItemType.MODEL
+                                  ? item.model?.model_no
+                                  : item.sparePart?.item_code}
                               </span>
                             )}
                           </div>
@@ -627,11 +644,11 @@ export default function LotDetailsDialog({ lot, onClose }: LotDetailsDialogProps
           {/* Right: Summary and Purchase Record */}
           <div className="flex-1 flex flex-col gap-4 overflow-hidden">
             <Card className="p-0 overflow-hidden border-none shadow-sm shrink-0">
-              <div className="p-3 bg-slate-50 border-b flex items-center gap-2">
+              <div className="p-1 bg-slate-50 border-b flex items-center gap-2">
                 <FileText size={16} className="text-slate-400" />
                 <h3 className="font-bold text-sm text-slate-700">Summary Info</h3>
               </div>
-              <div className="p-2 bg-white">
+              <div className="bg-white">
                 <div>
                   <div className="text-[10px] text-slate-400 uppercase font-bold tracking-wider mb-1">
                     Notes
@@ -720,15 +737,8 @@ export default function LotDetailsDialog({ lot, onClose }: LotDetailsDialogProps
                         </div>
 
                         {(() => {
-                          const paidAmount =
-                            purchaseRecord.payments?.reduce(
-                              (sum, p) => sum + Number(p.amount),
-                              0,
-                            ) || 0;
-                          const remainingAmount = Math.max(
-                            0,
-                            purchaseRecord.totalAmount - paidAmount,
-                          );
+                          const paidAmount = purchaseRecord.paidAmount;
+                          const remainingAmount = purchaseRecord.remainingAmount;
 
                           return (
                             <>

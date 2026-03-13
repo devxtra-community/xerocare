@@ -420,7 +420,25 @@ export class LotRepository {
       }
 
       lot.status = LotStatus.RECEIVING;
-      return await manager.save(Lot, lot);
+      const savedLot = await manager.save(Lot, lot);
+
+      // Return with full relations to ensure UI consistency
+      return (await manager.findOne(Lot, {
+        where: { id: savedLot.id },
+        relations: {
+          vendor: true,
+          items: {
+            model: {
+              brandRelation: true,
+            },
+            sparePart: {
+              model: {
+                brandRelation: true,
+              },
+            },
+          },
+        },
+      })) as Lot;
     });
   }
 
@@ -439,7 +457,25 @@ export class LotRepository {
       }
 
       lot.status = LotStatus.RECEIVED;
-      return await manager.save(Lot, lot);
+      const savedLot = await manager.save(Lot, lot);
+
+      // Return with full relations to ensure UI consistency
+      return (await manager.findOne(Lot, {
+        where: { id: savedLot.id },
+        relations: {
+          vendor: true,
+          items: {
+            model: {
+              brandRelation: true,
+            },
+            sparePart: {
+              model: {
+                brandRelation: true,
+              },
+            },
+          },
+        },
+      })) as Lot;
     });
   }
 }

@@ -7,7 +7,6 @@ import { formatCurrency } from '@/lib/format';
 import { Button } from '@/components/ui/button';
 import {
   FileText,
-  Calendar,
   User,
   CreditCard,
   ArrowRight,
@@ -20,12 +19,17 @@ import {
   Package,
   Calculator,
   Building2,
+  History,
+  Plus,
 } from 'lucide-react';
+import AddPaymentModal from './AddPaymentModal';
+import { useState } from 'react';
 
 interface ViewPurchaseDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   purchase: Purchase;
+  onSuccess?: () => void;
 }
 
 /**
@@ -36,7 +40,10 @@ export default function ViewPurchaseDialog({
   open,
   onOpenChange,
   purchase,
+  onSuccess,
 }: ViewPurchaseDialogProps) {
+  const [paymentModalOpen, setPaymentModalOpen] = useState(false);
+
   const getStatusStyle = (status: string) => {
     switch (status) {
       case 'PAID':
@@ -50,7 +57,7 @@ export default function ViewPurchaseDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[700px] p-0 overflow-hidden border-none shadow-2xl">
+      <DialogContent className="sm:max-w-[700px] p-0 overflow-hidden border-none shadow-2xl [&>button]:hidden">
         <div className="bg-primary px-6 py-4 flex items-center gap-3">
           <div className="h-10 w-10 rounded-lg bg-white/10 flex items-center justify-center">
             <FileText className="h-6 w-6 text-white" />
@@ -60,6 +67,17 @@ export default function ViewPurchaseDialog({
             <DialogDescription className="text-white/70 text-sm">
               Financial record overview for Purchase #{purchase.id.slice(0, 8)}
             </DialogDescription>
+          </div>
+          <div className="ml-auto flex gap-2">
+            <Button
+              size="sm"
+              variant="secondary"
+              className="font-bold italic h-8"
+              onClick={() => setPaymentModalOpen(true)}
+              disabled={purchase.status === 'PAID'}
+            >
+              <Plus className="h-4 w-4 mr-1" /> Record Payment
+            </Button>
           </div>
         </div>
 
@@ -86,11 +104,10 @@ export default function ViewPurchaseDialog({
             </div>
             <div className="p-4 rounded-xl bg-slate-50 border border-slate-100 italic">
               <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
-                Creation Date
+                Balance Due
               </p>
-              <p className="text-sm font-bold text-slate-700 flex items-center gap-2">
-                <Calendar className="h-3.5 w-3.5 text-slate-400" />
-                {new Date(purchase.createdAt).toLocaleDateString()}
+              <p className="text-xl font-black text-red-600">
+                {formatCurrency(purchase.remainingAmount)}
               </p>
             </div>
           </div>
@@ -101,34 +118,22 @@ export default function ViewPurchaseDialog({
               <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest border-b pb-2">
                 Record Context
               </h4>
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-slate-500 flex items-center gap-2">
-                    <Boxes className="h-4 w-4" />
-                    Lot Association
-                  </span>
-                  <span className="text-sm font-bold text-slate-800">
-                    {purchase.lotId.slice(0, 8)}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-slate-500 flex items-center gap-2">
-                    <User className="h-4 w-4" />
-                    Vendor Account
-                  </span>
-                  <span className="text-sm font-bold text-slate-800">
-                    {purchase.vendorId.slice(0, 8)}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-slate-500 flex items-center gap-2">
-                    <Building2 className="h-4 w-4" />
-                    Branch ID
-                  </span>
-                  <span className="text-sm font-bold text-slate-800">
-                    {purchase.branchId.slice(0, 8)}
-                  </span>
-                </div>
+              <div className="space-y-6">
+                <ContextItem
+                  icon={Boxes}
+                  label="Lot Reference"
+                  value={purchase.lot?.lot_number || purchase.lotId.slice(0, 8)}
+                />
+                <ContextItem
+                  icon={User}
+                  label="Vendor Account"
+                  value={purchase.vendor?.name || purchase.vendorId.slice(0, 8)}
+                />
+                <ContextItem
+                  icon={Building2}
+                  label="Branch Origin"
+                  value={purchase.branch?.name || purchase.branchId.slice(0, 8)}
+                />
               </div>
             </div>
 
@@ -176,6 +181,50 @@ export default function ViewPurchaseDialog({
             </div>
           </div>
 
+          {/* Payment History Section */}
+          <div className="space-y-4 pt-4 border-t border-slate-100">
+            <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+              <History className="h-4 w-4" />
+              Payment History
+            </h4>
+            {!purchase.payments || purchase.payments.length === 0 ? (
+              <div className="p-8 text-center italic text-slate-400 border-2 border-dashed border-slate-100 rounded-xl text-sm">
+                No payments have been recorded yet.
+              </div>
+            ) : (
+              <div className="rounded-xl border border-slate-100 overflow-hidden">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-slate-50/50">
+                      <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest italic">
+                        Date
+                      </th>
+                      <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest italic">
+                        Method
+                      </th>
+                      <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest italic text-right">
+                        Amount
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50 text-xs">
+                    {purchase.payments.map((p) => (
+                      <tr key={p.id} className="hover:bg-slate-50/30 transition-colors">
+                        <td className="px-4 py-3 font-bold text-slate-700">
+                          {new Date(p.paymentDate).toLocaleDateString()}
+                        </td>
+                        <td className="px-4 py-3 text-slate-500">{p.paymentMethod}</td>
+                        <td className="px-4 py-3 font-black text-slate-800 text-right">
+                          {formatCurrency(p.amount)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
           <div className="flex justify-end pt-4 border-t border-slate-100">
             <Button
               variant="outline"
@@ -186,6 +235,18 @@ export default function ViewPurchaseDialog({
             </Button>
           </div>
         </div>
+
+        <AddPaymentModal
+          open={paymentModalOpen}
+          onOpenChange={setPaymentModalOpen}
+          purchaseId={purchase.id}
+          totalAmount={purchase.totalAmount}
+          paidAmount={purchase.paidAmount}
+          onSuccess={() => {
+            if (onSuccess) onSuccess();
+            onOpenChange(false);
+          }}
+        />
       </DialogContent>
     </Dialog>
   );
@@ -211,6 +272,28 @@ function CostItem({
         </span>
       </div>
       <p className="text-sm font-bold text-slate-700">{formatCurrency(value)}</p>
+    </div>
+  );
+}
+
+interface ContextItemProps {
+  icon: LucideIcon;
+  label: string;
+  value: string;
+}
+
+function ContextItem({ icon: Icon, label, value }: ContextItemProps) {
+  return (
+    <div className="flex items-start gap-4">
+      <div className="p-2 rounded-lg bg-slate-50">
+        <Icon className="h-4 w-4 text-slate-400" />
+      </div>
+      <div className="space-y-0.5">
+        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest italic">
+          {label}
+        </p>
+        <p className="text-xs font-bold text-slate-700 break-all">{value}</p>
+      </div>
     </div>
   );
 }

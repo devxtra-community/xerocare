@@ -1,10 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Search, Plus, Eye, Edit } from 'lucide-react';
+import { Search, Plus, Eye, Edit, CreditCard } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -18,6 +17,8 @@ import { toast } from 'sonner';
 import { formatCurrency } from '@/lib/format';
 import AddPurchaseDialog from './AddPurchaseDialog';
 import EditPurchaseDialog from './EditPurchaseDialog';
+import AddPaymentModal from './AddPaymentModal';
+import ViewPurchaseDialog from './ViewPurchaseDialog';
 import PurchaseStats from './PurchaseStats';
 
 /**
@@ -25,7 +26,6 @@ import PurchaseStats from './PurchaseStats';
  * Transitions to dedicated Details Page for full financial tracking.
  */
 export default function ManagerPurchaseTable() {
-  const router = useRouter();
   const [purchases, setPurchases] = useState<Purchase[]>([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
@@ -33,6 +33,8 @@ export default function ManagerPurchaseTable() {
   // Dialog states
   const [addOpen, setAddOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
+  const [viewOpen, setViewOpen] = useState(false);
+  const [paymentOpen, setPaymentOpen] = useState(false);
   const [selectedPurchase, setSelectedPurchase] = useState<Purchase | null>(null);
 
   const fetchPurchases = async () => {
@@ -69,7 +71,13 @@ export default function ManagerPurchaseTable() {
   };
 
   const handleView = (purchase: Purchase) => {
-    router.push(`/manager/purchases/${purchase.id}`);
+    setSelectedPurchase(purchase);
+    setViewOpen(true);
+  };
+
+  const handleRecordPayment = (purchase: Purchase) => {
+    setSelectedPurchase(purchase);
+    setPaymentOpen(true);
   };
 
   return (
@@ -190,6 +198,13 @@ export default function ManagerPurchaseTable() {
                       >
                         <Edit size={16} />
                       </button>
+                      <button
+                        className="text-emerald-500 hover:text-emerald-600 transition-colors flex items-center gap-1 text-xs font-bold"
+                        onClick={() => handleRecordPayment(p)}
+                        disabled={p.status === 'PAID'}
+                      >
+                        <CreditCard size={16} /> Pay
+                      </button>
                     </div>
                   </TableCell>
                 </TableRow>
@@ -202,12 +217,28 @@ export default function ManagerPurchaseTable() {
       <AddPurchaseDialog open={addOpen} onOpenChange={setAddOpen} onSuccess={fetchPurchases} />
 
       {selectedPurchase && (
-        <EditPurchaseDialog
-          open={editOpen}
-          onOpenChange={setEditOpen}
-          purchase={selectedPurchase}
-          onSuccess={fetchPurchases}
-        />
+        <>
+          <EditPurchaseDialog
+            open={editOpen}
+            onOpenChange={setEditOpen}
+            purchase={selectedPurchase}
+            onSuccess={fetchPurchases}
+          />
+          <AddPaymentModal
+            open={paymentOpen}
+            onOpenChange={setPaymentOpen}
+            purchaseId={selectedPurchase.id}
+            totalAmount={selectedPurchase.totalAmount}
+            paidAmount={selectedPurchase.paidAmount}
+            onSuccess={fetchPurchases}
+          />
+          <ViewPurchaseDialog
+            open={viewOpen}
+            onOpenChange={setViewOpen}
+            purchase={selectedPurchase}
+            onSuccess={fetchPurchases}
+          />
+        </>
       )}
     </div>
   );

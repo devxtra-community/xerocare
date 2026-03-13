@@ -117,7 +117,7 @@ export class PurchaseRepository {
 
     return this.repo.findOne({
       where,
-      relations: ['lot', 'vendor', 'branch'],
+      relations: ['lot', 'vendor', 'branch', 'payments'],
     });
   }
 

@@ -49,9 +49,14 @@ export function SearchableSelect({
     }
   }, [open]);
 
-  const filteredOptions = options.filter((option) =>
-    option.label.toLowerCase().includes(searchQuery.toLowerCase()),
-  );
+  const filteredOptions = options.filter((option) => {
+    const searchStr = searchQuery.toLowerCase();
+    return (
+      option.label.toLowerCase().includes(searchStr) ||
+      option.value.toLowerCase().includes(searchStr) ||
+      (option.description && option.description.toLowerCase().includes(searchStr))
+    );
+  });
 
   const handleSelect = (option: SearchableSelectOption) => {
     onValueChange(option.value);

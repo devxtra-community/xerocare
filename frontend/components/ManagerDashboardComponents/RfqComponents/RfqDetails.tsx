@@ -19,6 +19,8 @@ import { Model, getAllModels } from '@/lib/model';
 import { SparePart, getAllSpareParts } from '@/lib/spare-part';
 import { getAllProducts, Product } from '@/lib/product';
 import { getBrands, Brand } from '@/lib/brand';
+import { getMyBranchWarehouses, Warehouse } from '@/lib/warehouse';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 import { Button } from '@/components/ui/button';
 import {
   ArrowLeft,
@@ -43,7 +45,15 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { AlertCircle } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { AlertCircle, Warehouse as WarehouseIcon } from 'lucide-react';
 
 interface RfqDetailsProps {
   id: string;
@@ -63,23 +73,28 @@ export default function RfqDetails({ id, basePath }: RfqDetailsProps) {
   const [vendorToAward, setVendorToAward] = useState<string | null>(null);
   const [sendLoading, setSendLoading] = useState(false);
   const [lotLoading, setLotLoading] = useState(false);
+  const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
+  const [isWarehouseDialogOpen, setIsWarehouseDialogOpen] = useState(false);
+  const [selectedWarehouseId, setSelectedWarehouseId] = useState<string>('');
 
   useEffect(() => {
     const loadInitialData = async () => {
       setLoading(true);
       try {
-        const [rfqData, mRes, spRes, pRes, bRes] = await Promise.all([
+        const [rfqData, mRes, spRes, pRes, bRes, wRes] = await Promise.all([
           getRfqById(id),
           getAllModels({ limit: 1000 }),
           getAllSpareParts(),
           getAllProducts(),
           getBrands(),
+          getMyBranchWarehouses(),
         ]);
         setRfq(rfqData);
         setModels(mRes.data || mRes);
         setSpareParts(spRes);
         setProducts(pRes);
         setBrands(bRes.data || bRes);
+        setWarehouses(wRes.data || wRes);
 
         if (['PARTIAL_QUOTED', 'FULLY_QUOTED', 'AWARDED', 'CLOSED'].includes(rfqData.status)) {
           const compData = await getRfqComparison(id);
@@ -241,9 +256,14 @@ export default function RfqDetails({ id, basePath }: RfqDetailsProps) {
   };
 
   const handleCreateLot = async () => {
+    if (!selectedWarehouseId && warehouses.length > 0) {
+      setIsWarehouseDialogOpen(true);
+      return;
+    }
+
     try {
       setLotLoading(true);
-      await createLotFromRfq(id);
+      await createLotFromRfq(id, selectedWarehouseId || undefined);
       toast.success('Lot created successfully');
       router.push(`${basePath}/lots`);
     } catch (error: unknown) {
@@ -253,6 +273,7 @@ export default function RfqDetails({ id, basePath }: RfqDetailsProps) {
       );
     } finally {
       setLotLoading(false);
+      setIsWarehouseDialogOpen(false);
     }
   };
 
@@ -735,6 +756,58 @@ export default function RfqDetails({ id, basePath }: RfqDetailsProps) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={isWarehouseDialogOpen} onOpenChange={setIsWarehouseDialogOpen}>
+        <DialogContent className="bg-white p-6 sm:p-10 rounded-[2rem] max-w-lg border-none shadow-2xl overflow-y-auto max-h-[calc(100dvh-2rem)]">
+          <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-blue-500 to-indigo-600"></div>
+          <DialogHeader className="space-y-4">
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-blue-50/80">
+              <WarehouseIcon className="h-8 w-8 text-blue-600" />
+            </div>
+            <DialogTitle className="text-2xl font-bold text-center text-slate-800 tracking-tight">
+              Assign Warehouse
+            </DialogTitle>
+            <DialogDescription className="text-center text-slate-500 text-[15px] leading-relaxed px-2">
+              Select a warehouse where the items from this lot will be stored. This step ensures
+              accurate inventory tracking.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-8">
+            <SearchableSelect
+              value={selectedWarehouseId}
+              onValueChange={setSelectedWarehouseId}
+              options={warehouses.map((w) => ({
+                value: w.id,
+                label: `${w.warehouseName} (${w.id})`,
+              }))}
+              placeholder="Search & Select Warehouse"
+              emptyText="No warehouses found."
+              className="w-full h-12 rounded-xl border-slate-200 focus:ring-blue-500"
+            />
+          </div>
+          <DialogFooter className="mt-4 gap-3 sm:gap-2 sm:justify-center flex-col sm:flex-row w-full">
+            <Button
+              variant="outline"
+              onClick={() => setIsWarehouseDialogOpen(false)}
+              className="w-full sm:w-1/2 rounded-xl h-12 text-[15px] font-medium border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-800 transition-colors"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleCreateLot}
+              disabled={!selectedWarehouseId || lotLoading}
+              className="w-full sm:w-1/2 rounded-xl h-12 text-[15px] font-medium bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-500/20 transition-all"
+            >
+              {lotLoading ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Package className="mr-2 h-4 w-4" />
+              )}
+              {lotLoading ? 'Creating...' : 'Create Lot'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

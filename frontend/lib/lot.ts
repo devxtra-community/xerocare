@@ -40,6 +40,8 @@ export interface LotItem {
   usedQuantity: number;
   unitPrice: number;
   totalPrice: number;
+  customProductName?: string;
+  customSparePartName?: string;
 }
 
 export interface Lot {

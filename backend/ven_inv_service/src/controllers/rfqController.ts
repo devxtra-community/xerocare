@@ -186,7 +186,12 @@ export class RfqController {
 
   createLot = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const lot = await this.rfqService.createLotFromRfq(req.params.id as string, req.user!.userId);
+      const { warehouseId } = req.body;
+      const lot = await this.rfqService.createLotFromRfq(
+        req.params.id as string,
+        req.user!.userId,
+        warehouseId,
+      );
       return res.json({ success: true, data: lot });
     } catch (error) {
       next(error);
