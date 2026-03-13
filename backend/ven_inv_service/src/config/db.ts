@@ -53,7 +53,7 @@ export const Source = new DataSource({
     SparePartInventory,
   ],
   extra: {
-    max: 1,
+    max: 20,
     connectionTimeoutMillis: 5000,
     keepAlive: true,
   },
