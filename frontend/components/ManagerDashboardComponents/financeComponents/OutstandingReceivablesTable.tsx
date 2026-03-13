@@ -1,6 +1,8 @@
 'use client';
 
-import React from 'react';
+import { useEffect } from 'react';
+import { usePagination } from '@/hooks/usePagination';
+import Pagination from '@/components/Pagination';
 import {
   Table,
   TableBody,
@@ -63,6 +65,14 @@ const data = [
  * Helps track and manage overdue payments.
  */
 export default function OutstandingReceivablesTable() {
+  const { page: currentPage, limit, total, setPage, setTotal, totalPages } = usePagination(5);
+
+  useEffect(() => {
+    setTotal(data.length);
+  }, [setTotal]);
+
+  const paginatedData = data.slice((currentPage - 1) * limit, currentPage * limit);
+
   return (
     <div className="bg-card rounded-2xl shadow-sm border border-blue-100 overflow-hidden">
       <div className="overflow-x-auto">
@@ -99,7 +109,7 @@ export default function OutstandingReceivablesTable() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {data.map((row, i) => (
+            {paginatedData.map((row, i) => (
               <TableRow
                 key={i}
                 className={`hover:bg-blue-50/30 transition-colors ${i % 2 ? 'bg-blue-50/20' : 'bg-card'}`}
@@ -147,6 +157,16 @@ export default function OutstandingReceivablesTable() {
           </TableBody>
         </Table>
       </div>
+
+      {totalPages > 1 && (
+        <Pagination
+          page={currentPage}
+          totalPages={totalPages}
+          total={total}
+          limit={limit}
+          onPageChange={setPage}
+        />
+      )}
     </div>
   );
 }

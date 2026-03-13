@@ -1,9 +1,16 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { getInvoices, Invoice, InvoiceItem } from '@/lib/invoice';
-import { Search } from 'lucide-react';
+import { Search, Filter } from 'lucide-react';
 import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { formatCurrency } from '@/lib/format';
 
 // Removed unused static data
@@ -25,6 +32,8 @@ interface SalesRow {
  */
 const SalesSummaryTable = ({ selectedYear }: { selectedYear: number | 'all' }) => {
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedModel, setSelectedModel] = useState<string>('all');
+  const [selectedMonth, setSelectedMonth] = useState<string>('all');
   const [loading, setLoading] = useState(true);
   const [salesData, setSalesData] = useState<SalesRow[]>([]);
 
@@ -72,23 +81,106 @@ const SalesSummaryTable = ({ selectedYear }: { selectedYear: number | 'all' }) =
     fetchSales();
   }, [selectedYear]);
 
-  const filteredData = salesData.filter((row) =>
-    Object.values(row).some((value) =>
-      String(value).toLowerCase().includes(searchTerm.toLowerCase()),
-    ),
-  );
+  const uniqueModels = useMemo(() => {
+    const models = new Set<string>();
+    salesData.forEach((row) => {
+      if (row.model && row.model !== 'N/A') models.add(row.model);
+      else if (row.product) models.add(row.product); // Fallback to product name if model is N/A
+    });
+    return Array.from(models).sort();
+  }, [salesData]);
+
+  const uniqueMonths = useMemo(() => {
+    const months = new Set<string>();
+    salesData.forEach((row) => months.add(row.month));
+    // Sort months chronologically
+    const monthOrder = [
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December',
+    ];
+    return Array.from(months).sort((a, b) => monthOrder.indexOf(a) - monthOrder.indexOf(b));
+  }, [salesData]);
+
+  const filteredData = useMemo(() => {
+    return salesData.filter((row) => {
+      const matchesSearch =
+        row.product.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        row.productId.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        row.model.toLowerCase().includes(searchTerm.toLowerCase());
+
+      const matchesModel =
+        selectedModel === 'all' || row.model === selectedModel || row.product === selectedModel;
+      const matchesMonth = selectedMonth === 'all' || row.month === selectedMonth;
+
+      return matchesSearch && matchesModel && matchesMonth;
+    });
+  }, [salesData, searchTerm, selectedModel, selectedMonth]);
 
   return (
     <div className="rounded-2xl bg-card p-2 sm:p-3 shadow-sm w-full h-full flex flex-col space-y-4">
-      {/* Search Bar */}
-      <div className="relative w-full max-w-sm">
-        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="Search by Product, ID, or Model..."
-          className="pl-9"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-        />
+      {/* Search and Filters Bar */}
+      <div className="flex flex-col sm:flex-row gap-2">
+        <div className="relative flex-1">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+          <Input
+            placeholder="Search product, ID, or model..."
+            className="pl-8 h-8 text-[11px] bg-background/50 border-muted-foreground/20 focus-visible:ring-primary/20"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
+
+        <div className="flex gap-2">
+          {/* Model Filter */}
+          <Select value={selectedModel} onValueChange={setSelectedModel}>
+            <SelectTrigger className="w-[120px] h-8 text-[11px] bg-background/50 border-muted-foreground/20">
+              <div className="flex items-center gap-2">
+                <Filter className="h-3 w-3 text-muted-foreground" />
+                <SelectValue placeholder="Model" />
+              </div>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all" className="text-[11px]">
+                All Models
+              </SelectItem>
+              {uniqueModels.map((m) => (
+                <SelectItem key={m} value={m} className="text-[11px]">
+                  {m}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          {/* Month Filter */}
+          <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+            <SelectTrigger className="w-[120px] h-8 text-[11px] bg-background/50 border-muted-foreground/20">
+              <div className="flex items-center gap-2">
+                <Filter className="h-3 w-3 text-muted-foreground" />
+                <SelectValue placeholder="Month" />
+              </div>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all" className="text-[11px]">
+                All Months
+              </SelectItem>
+              {uniqueMonths.map((m) => (
+                <SelectItem key={m} value={m} className="text-[11px]">
+                  {m}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       <div className="flex-1 overflow-x-auto">

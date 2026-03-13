@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Edit, Trash2, User, Mail, Phone, Loader2, FileText } from 'lucide-react';
 import { Lead, deleteLead } from '@/lib/lead';
 import { toast } from 'sonner';
+import { usePagination } from '@/hooks/usePagination';
 import Pagination from '@/components/Pagination';
 
 interface LeadTableProps {
@@ -28,8 +29,11 @@ interface LeadTableProps {
 export function LeadTable({ leads, onRefresh, onEdit }: LeadTableProps) {
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
 
-  const [currentPage, setCurrentPage] = useState(1);
-  const ITEMS_PER_PAGE = 10;
+  const { page, limit, total, setPage, setTotal, totalPages } = usePagination(10);
+
+  React.useEffect(() => {
+    setTotal(leads.length);
+  }, [leads.length, setTotal]);
 
   const handleDelete = async (id: string) => {
     if (!confirm('Are you sure you want to delete this lead?')) return;
@@ -46,9 +50,7 @@ export function LeadTable({ leads, onRefresh, onEdit }: LeadTableProps) {
     }
   };
 
-  const totalPages = Math.ceil(leads.length / ITEMS_PER_PAGE);
-  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-  const paginatedLeads = leads.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+  const paginatedLeads = leads.slice((page - 1) * limit, page * limit);
 
   return (
     <div className="rounded-2xl bg-card shadow-sm overflow-hidden border p-4">
@@ -155,7 +157,13 @@ export function LeadTable({ leads, onRefresh, onEdit }: LeadTableProps) {
         </Table>
       </div>
       {totalPages > 1 && (
-        <Pagination page={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
+        <Pagination
+          page={page}
+          totalPages={totalPages}
+          total={total}
+          limit={limit}
+          onPageChange={setPage}
+        />
       )}
     </div>
   );

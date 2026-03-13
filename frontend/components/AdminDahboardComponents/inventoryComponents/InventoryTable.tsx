@@ -12,6 +12,7 @@ import {
 import { useEffect, useState } from 'react';
 import api from '@/lib/api';
 import { Product } from '@/lib/product';
+import { usePagination } from '@/hooks/usePagination';
 import Pagination from '@/components/Pagination';
 
 interface InventoryItem {
@@ -40,8 +41,7 @@ interface InventoryResponse {
 export default function InventoryTable() {
   const [data, setData] = useState<InventoryItem[]>([]);
 
-  const [currentPage, setCurrentPage] = useState(1);
-  const ITEMS_PER_PAGE = 10;
+  const { page, limit, total, setPage, setTotal, totalPages } = usePagination(10);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -59,9 +59,11 @@ export default function InventoryTable() {
     fetchData();
   }, []);
 
-  const totalPages = Math.ceil(data.length / ITEMS_PER_PAGE);
-  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-  const currentData = data.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+  useEffect(() => {
+    setTotal(data.length);
+  }, [data.length, setTotal]);
+
+  const currentData = data.slice((page - 1) * limit, page * limit);
 
   return (
     <div className="rounded-2xl border bg-card shadow-sm overflow-hidden p-4">
@@ -125,7 +127,13 @@ export default function InventoryTable() {
       </Table>
       {totalPages > 1 && (
         <div className="mt-4">
-          <Pagination page={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
+          <Pagination
+            page={page}
+            totalPages={totalPages}
+            total={total}
+            limit={limit}
+            onPageChange={setPage}
+          />
         </div>
       )}
     </div>

@@ -12,17 +12,18 @@ import FinanceApprovalTable from '@/components/Finance/FinanceApprovalTable';
 export default function LeasePage() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
 
-  useEffect(() => {
-    const fetchInvoices = async () => {
-      try {
-        const data = await getBranchInvoices();
-        setInvoices(data);
-      } catch (error) {
-        console.error('Failed to fetch finance lease:', error);
-      }
-    };
-    fetchInvoices();
+  const fetchInvoices = React.useCallback(async () => {
+    try {
+      const data = await getBranchInvoices();
+      setInvoices(data);
+    } catch (error) {
+      console.error('Failed to fetch finance lease:', error);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchInvoices();
+  }, [fetchInvoices]);
 
   return (
     <div className="bg-blue-50/50 min-h-full p-6 space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -56,7 +57,7 @@ export default function LeasePage() {
               Monthly Usage & Billing
             </h3>
             <div className="bg-card rounded-xl shadow-sm border border-slate-100 p-1">
-              <MonthlyCollectionTable mode="LEASE" />
+              <MonthlyCollectionTable mode="LEASE" onSuccess={fetchInvoices} />
             </div>
           </TabsContent>
 
@@ -65,7 +66,7 @@ export default function LeasePage() {
               Completed Collections
             </h3>
             <div className="bg-card rounded-xl shadow-sm border border-slate-100 p-1">
-              <CompletedCollectionsTable mode="LEASE" />
+              <CompletedCollectionsTable mode="LEASE" onSuccess={fetchInvoices} />
             </div>
           </TabsContent>
         </Tabs>

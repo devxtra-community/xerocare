@@ -9,6 +9,7 @@ import ProtectedRoute from '@/components/ProtectedRoute';
 
 export default function EmployeeLeasePage() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   useEffect(() => {
     const fetchInvoices = async () => {
@@ -20,7 +21,7 @@ export default function EmployeeLeasePage() {
       }
     };
     fetchInvoices();
-  }, []);
+  }, [refreshTrigger]);
 
   return (
     <ProtectedRoute requiredModules={['lease']}>
@@ -28,11 +29,11 @@ export default function EmployeeLeasePage() {
         <div className="flex flex-col space-y-4 sm:space-y-6">
           <h3 className="text-xl sm:text-2xl font-bold text-primary">Lease Management</h3>
           <EmployeeLeaseStats invoices={invoices} />
-          <EmployeeLeaseGraphs />
+          <EmployeeLeaseGraphs invoices={invoices} />
 
           <div className="space-y-3">
             <h3 className="text-lg sm:text-xl font-bold text-primary">All Leases</h3>
-            <EmployeeLeaseTable />
+            <EmployeeLeaseTable onRefresh={() => setRefreshTrigger((prev) => prev + 1)} />
           </div>
         </div>
       </div>

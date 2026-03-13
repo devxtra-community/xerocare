@@ -23,6 +23,7 @@ import RentFormModal from './RentFormModal';
 import UsageRecordingModal from '../Finance/UsageRecordingModal';
 
 import { Badge } from '@/components/ui/badge';
+import { usePagination } from '@/hooks/usePagination';
 import Pagination from '@/components/Pagination';
 import { formatCurrency } from '@/lib/format';
 
@@ -40,13 +41,17 @@ const calculateDays = (start: string | Date | undefined, end: string | Date | un
 
 interface EmployeeLeaseTableProps {
   mode?: 'EMPLOYEE' | 'FINANCE';
+  onRefresh?: () => void;
 }
 
 /**
  * Table displaying lease agreements managed by the employee.
  * Features search, creation of new leases, and status tracking (Draft, Sent, Paid).
  */
-export default function EmployeeLeaseTable({ mode = 'EMPLOYEE' }: EmployeeLeaseTableProps) {
+export default function EmployeeLeaseTable({
+  mode = 'EMPLOYEE',
+  onRefresh,
+}: EmployeeLeaseTableProps) {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [formOpen, setFormOpen] = useState(false);
@@ -58,12 +63,11 @@ export default function EmployeeLeaseTable({ mode = 'EMPLOYEE' }: EmployeeLeaseT
   const [editingUsage] = useState<Invoice | null>(null);
   const [search, setSearch] = useState('');
 
-  const [currentPage, setCurrentPage] = useState(1);
-  const ITEMS_PER_PAGE = 10;
+  const { page, limit, total, setPage, setTotal, totalPages } = usePagination(10);
 
   useEffect(() => {
-    setCurrentPage(1);
-  }, [search]);
+    setPage(1);
+  }, [search, setPage]);
 
   const fetchInvoices = useCallback(async () => {
     try {
@@ -104,6 +108,7 @@ export default function EmployeeLeaseTable({ mode = 'EMPLOYEE' }: EmployeeLeaseT
       }
       setFormOpen(false);
       setEditInvoice(undefined);
+      onRefresh?.();
     } catch (error: unknown) {
       console.error('Failed to save lease record:', error);
       const err = error as { response?: { data?: { message?: string } } };
@@ -136,6 +141,7 @@ export default function EmployeeLeaseTable({ mode = 'EMPLOYEE' }: EmployeeLeaseT
       toast.success('Sent for Finance Approval');
       setDetailsOpen(false);
       fetchInvoices();
+      onRefresh?.();
     } catch (error) {
       console.error(error);
       toast.error('Failed to send for approval');
@@ -150,9 +156,11 @@ export default function EmployeeLeaseTable({ mode = 'EMPLOYEE' }: EmployeeLeaseT
     );
   });
 
-  const totalPages = Math.ceil(filteredInvoices.length / ITEMS_PER_PAGE);
-  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-  const paginatedInvoices = filteredInvoices.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+  useEffect(() => {
+    setTotal(filteredInvoices.length);
+  }, [filteredInvoices.length, setTotal]);
+
+  const paginatedInvoices = filteredInvoices.slice((page - 1) * limit, page * limit);
 
   const getCleanProductName = (name: string) => {
     // Remove "Black & White - " or "Color - " prefixes
@@ -297,21 +305,38 @@ export default function EmployeeLeaseTable({ mode = 'EMPLOYEE' }: EmployeeLeaseT
                       </Badge>
                     </TableCell>
                     <TableCell className="font-bold text-primary">
-                      {formatCurrency(inv.displayAmount ?? inv.totalAmount ?? 0)}
+                      {formatCurrency(
+                        inv.displayAmount ||
+                          (inv.type === 'PROFORMA'
+                            ? (inv.advanceAmount || 0) + (inv.usageRevenue || 0)
+                            : inv.totalAmount) ||
+                          inv.monthlyRent ||
+                          0,
+                      )}
                     </TableCell>
                     <TableCell>
-                      <span
-                        className={`inline-flex px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide
-                        ${
-                          inv.status === 'PAID'
-                            ? 'bg-green-100 text-green-600'
-                            : inv.status === 'PENDING'
-                              ? 'bg-yellow-100 text-yellow-600'
-                              : 'bg-red-100 text-red-600'
-                        }`}
-                      >
-                        {inv.status}
-                      </span>
+                      {inv.contractStatus === 'COMPLETED' ? (
+                        <span className="inline-flex px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide bg-slate-100 text-slate-700">
+                          CONTRACT CLOSED
+                        </span>
+                      ) : inv.contractStatus === 'ACTIVE' ? (
+                        <span className="inline-flex px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide bg-blue-100 text-blue-700">
+                          CONTRACT ONGOING
+                        </span>
+                      ) : (
+                        <span
+                          className={`inline-flex px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide
+                          ${
+                            inv.status === 'PAID'
+                              ? 'bg-green-100 text-green-600'
+                              : inv.status === 'PENDING'
+                                ? 'bg-yellow-100 text-yellow-600'
+                                : 'bg-red-100 text-red-600'
+                          }`}
+                        >
+                          {inv.status}
+                        </span>
+                      )}
                     </TableCell>
                     <TableCell className="text-muted-foreground text-[11px] font-medium whitespace-nowrap">
                       {new Date(inv.createdAt).toLocaleDateString(undefined, {
@@ -356,7 +381,13 @@ export default function EmployeeLeaseTable({ mode = 'EMPLOYEE' }: EmployeeLeaseT
           </Table>
         </div>
         {totalPages > 1 && (
-          <Pagination page={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
+          <Pagination
+            page={page}
+            totalPages={totalPages}
+            total={total}
+            limit={limit}
+            onPageChange={setPage}
+          />
         )}
       </div>
 
@@ -386,6 +417,7 @@ export default function EmployeeLeaseTable({ mode = 'EMPLOYEE' }: EmployeeLeaseT
                     toast.success('Lease Agreement Approved');
                     setDetailsOpen(false);
                     fetchInvoices();
+                    onRefresh?.();
                   } catch (err: unknown) {
                     console.error(err);
                     const error = err as { response?: { data?: { message?: string } } };
@@ -403,6 +435,7 @@ export default function EmployeeLeaseTable({ mode = 'EMPLOYEE' }: EmployeeLeaseT
                     toast.success('Lease Agreement Rejected');
                     setDetailsOpen(false);
                     fetchInvoices();
+                    onRefresh?.();
                   } catch (err: unknown) {
                     console.error(err);
                     const error = err as { response?: { data?: { message?: string } } };
@@ -416,6 +449,7 @@ export default function EmployeeLeaseTable({ mode = 'EMPLOYEE' }: EmployeeLeaseT
           onSuccess={() => {
             setDetailsOpen(false);
             fetchInvoices();
+            onRefresh?.();
           }}
         />
       )}
@@ -427,6 +461,7 @@ export default function EmployeeLeaseTable({ mode = 'EMPLOYEE' }: EmployeeLeaseT
           onSuccess={() => {
             setApproveOpen(false);
             fetchInvoices();
+            onRefresh?.();
           }}
         />
       )}
@@ -438,7 +473,10 @@ export default function EmployeeLeaseTable({ mode = 'EMPLOYEE' }: EmployeeLeaseT
           contractId={selectedInvoice.id}
           customerName={selectedInvoice.customerName}
           invoice={editingUsage}
-          onSuccess={fetchInvoices}
+          onSuccess={() => {
+            fetchInvoices();
+            onRefresh?.();
+          }}
         />
       )}
     </div>

@@ -9,6 +9,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { usePagination } from '@/hooks/usePagination';
+import Pagination from '@/components/Pagination';
 import { Button } from '@/components/ui/button';
 import {
   getCompletedCollections,
@@ -26,13 +28,20 @@ import { formatCurrency } from '@/lib/format';
  * Table displaying completed rental and lease collections.
  * Allows viewing consolidated statements and sending final invoices.
  */
-export default function CompletedCollectionsTable({ mode }: { mode?: 'RENT' | 'LEASE' }) {
+export default function CompletedCollectionsTable({
+  mode,
+  onSuccess,
+}: {
+  mode?: 'RENT' | 'LEASE';
+  onSuccess?: () => void;
+}) {
   const [collections, setCollections] = useState<CompletedCollection[]>([]);
   const [loading, setLoading] = useState(true);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [historyContractId, setHistoryContractId] = useState<string>('');
   const [isStatementOpen, setIsStatementOpen] = useState(false);
   const [statementCollection, setStatementCollection] = useState<CompletedCollection | null>(null);
+  const { page: currentPage, limit, total, setPage, setTotal, totalPages } = usePagination(5);
 
   const fetchCollections = useCallback(async () => {
     setLoading(true);
@@ -50,6 +59,12 @@ export default function CompletedCollectionsTable({ mode }: { mode?: 'RENT' | 'L
   useEffect(() => {
     fetchCollections();
   }, [fetchCollections]);
+
+  useEffect(() => {
+    setTotal(collections.length);
+  }, [collections.length, setTotal]);
+
+  const paginatedCollections = collections.slice((currentPage - 1) * limit, currentPage * limit);
 
   const handleShowHistory = (contractId: string) => {
     setHistoryContractId(contractId);
@@ -112,14 +127,14 @@ export default function CompletedCollectionsTable({ mode }: { mode?: 'RENT' | 'L
             </TableRow>
           </TableHeader>
           <TableBody>
-            {collections.length === 0 ? (
+            {paginatedCollections.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={6} className="text-center py-8 text-slate-500">
                   No completed collections found
                 </TableCell>
               </TableRow>
             ) : (
-              collections.map((collection) => (
+              paginatedCollections.map((collection) => (
                 <TableRow key={collection.contractId}>
                   <TableCell className="font-medium">{collection.invoiceNumber}</TableCell>
                   <TableCell>
@@ -185,6 +200,16 @@ export default function CompletedCollectionsTable({ mode }: { mode?: 'RENT' | 'L
         </Table>
       </div>
 
+      {totalPages > 1 && (
+        <Pagination
+          page={currentPage}
+          totalPages={totalPages}
+          total={total}
+          limit={limit}
+          onPageChange={setPage}
+        />
+      )}
+
       {isHistoryOpen && historyContractId && (
         <UsageHistoryDialog
           isOpen={isHistoryOpen}
@@ -192,6 +217,7 @@ export default function CompletedCollectionsTable({ mode }: { mode?: 'RENT' | 'L
           customerName={
             collections.find((c) => c.contractId === historyContractId)?.customerName || ''
           }
+          onSuccess={onSuccess}
           onClose={() => {
             setIsHistoryOpen(false);
             setHistoryContractId('');

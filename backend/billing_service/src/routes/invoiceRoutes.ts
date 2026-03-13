@@ -167,7 +167,7 @@ router.get('/branch-invoices', authMiddleware, getBranchInvoices);
 router.get(
   '/history',
   authMiddleware,
-  requireRole(EmployeeRole.ADMIN, EmployeeRole.FINANCE),
+  requireRole(EmployeeRole.ADMIN, EmployeeRole.FINANCE, EmployeeRole.EMPLOYEE),
   getInvoiceHistory,
 );
 router.get(

@@ -98,10 +98,12 @@ export const getAllProducts = async (params?: {
  * @returns Array of available products for the specified model
  */
 export const getAvailableProductsByModel = async (modelId: string): Promise<Product[]> => {
-  return getAllProducts({
-    status: ProductStatus.AVAILABLE,
-    modelId,
-  });
+  const allProducts = await getAllProducts();
+  return allProducts.filter(
+    (p) =>
+      (p.model?.id === modelId || (p.model as { model_id?: string })?.model_id === modelId) &&
+      (p.product_status === ProductStatus.AVAILABLE || p.product_status === ProductStatus.LEASE),
+  );
 };
 
 /**

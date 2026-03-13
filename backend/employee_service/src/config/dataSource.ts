@@ -11,14 +11,46 @@ import { LeaveApplication } from '../entities/leaveApplicationEntity';
 import { Payroll } from '../entities/payrollEntity'; // [x] Define `Payroll` entity
 import { Notification } from '../entities/notificationEntity';
 
+import { logger } from './logger';
+import { url } from 'inspector';
+
 export const Source = new DataSource({
   // [/] Update `DataSource` configuration
   type: 'postgres',
   url: process.env.EMPLOYEE_DATABASE_URL || process.env.DATABASE_URL,
+
   ssl: {
     rejectUnauthorized: false,
   },
   synchronize: true,
   entities: [Admin, Employee, Auth, Branch, LeaveApplication, Payroll, Notification],
-  extra: { max: 2 },
+  extra: {
+    max: 1,
+    connectionTimeoutMillis: 5000,
+    keepAlive: true,
+  },
 });
+
+export const connectWithRetry = async (initialDelayMs = 2000): Promise<DataSource> => {
+  let attempt = 1;
+  let delay = initialDelayMs;
+
+  while (true) {
+    try {
+      if (!Source.isInitialized) {
+        logger.info(`Attempting database connection (Attempt ${attempt})...`);
+        logger.info(url.toString());
+        await Source.initialize();
+        logger.info('Database connected successfully.');
+      }
+      return Source;
+    } catch (error: unknown) {
+      const err = error as Error & { code?: string };
+      logger.error(`Database connection failed on attempt ${attempt}: ${err.code || err.message}`);
+      logger.info(`Waiting ${delay / 1000} seconds before retrying...`);
+      await new Promise((resolve) => setTimeout(resolve, delay));
+      attempt++;
+      delay = Math.min(delay * 2, 30000);
+    }
+  }
+};

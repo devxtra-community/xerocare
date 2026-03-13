@@ -2,27 +2,67 @@ import amqp from 'amqplib';
 import { logger } from './logger';
 
 let channel: amqp.Channel;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let connection: any;
 
 export const getRabbitChannel = async () => {
   if (channel) return channel;
 
-  const connection = await amqp.connect(process.env.RABBITMQ_URL || 'amqp://127.0.0.1', {
-    timeout: 3000,
-  });
+  let attempt = 1;
+  let delay = 2000;
 
-  channel = await connection.createChannel();
+  while (!channel) {
+    try {
+      logger.info(`Attempting RabbitMQ connection (Attempt ${attempt})...`);
+      connection = await amqp.connect(process.env.RABBITMQ_URL || 'amqp://127.0.0.1');
 
-  // Assert queue and exchange
-  // Assert queue and exchange
-  await channel.assertQueue('email_queue', { durable: true });
-  await channel.assertQueue('notification_queue', { durable: true }); // NEW: Dedicated queue for notifications
-  await channel.assertExchange('domain_events', 'topic', { durable: true });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      connection.on('error', (err: any) => {
+        logger.error('RabbitMQ connection error', err);
+        channel = null as unknown as amqp.Channel;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        connection = null as any;
+      });
 
-  // Bind queue to exchange for specific routing keys
-  // notification.# catches notification.email.request AND notification.whatsapp.request
-  await channel.bindQueue('notification_queue', 'domain_events', 'notification.#');
+      connection.on('close', () => {
+        logger.warn('RabbitMQ connection closed');
+        channel = null as unknown as amqp.Channel;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        connection = null as any;
+      });
 
-  logger.info('RabbitMQ connected');
+      channel = await connection.createChannel();
+
+      channel.on('error', (err) => {
+        logger.error('RabbitMQ channel error', err);
+        channel = null as unknown as amqp.Channel;
+      });
+
+      channel.on('close', () => {
+        logger.warn('RabbitMQ channel closed');
+        channel = null as unknown as amqp.Channel;
+      });
+
+      // Assert queue and exchange
+      await channel.assertQueue('email_queue', { durable: true });
+      await channel.assertQueue('notification_queue', { durable: true }); // NEW: Dedicated queue for notifications
+      await channel.assertExchange('domain_events', 'topic', { durable: true });
+
+      // Bind queue to exchange for specific routing keys
+      // notification.# catches notification.email.request AND notification.whatsapp.request
+      await channel.bindQueue('notification_queue', 'domain_events', 'notification.#');
+
+      logger.info('RabbitMQ connected successfully.');
+      return channel;
+    } catch (error: unknown) {
+      const err = error as Error & { code?: string };
+      logger.error(`RabbitMQ connection failed on attempt ${attempt}: ${err.code || err.message}`);
+      logger.info(`Waiting ${delay / 1000} seconds before retrying...`);
+      await new Promise((resolve) => setTimeout(resolve, delay));
+      attempt++;
+      delay = Math.min(delay * 2, 30000);
+    }
+  }
 
   return channel;
 };

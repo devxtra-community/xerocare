@@ -20,6 +20,8 @@ import {
 } from '@/components/ui/select';
 import api from '@/lib/api';
 import { formatCurrency } from '@/lib/format';
+import { usePagination } from '@/hooks/usePagination';
+import Pagination from '@/components/Pagination';
 
 interface InventoryItem {
   id: string;
@@ -56,7 +58,7 @@ interface InventoryResponse {
  * Allows drilling down into specific inventory segments.
  */
 export default function InventoryProductsTable({ selectedYear }: { selectedYear: number | 'all' }) {
-  const [page, setPage] = useState(1);
+  const { page: currentPage, limit, total, setPage, setTotal, totalPages } = usePagination(10);
   const [data, setData] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -70,8 +72,6 @@ export default function InventoryProductsTable({ selectedYear }: { selectedYear:
   const [warehouses, setWarehouses] = useState<FilterOption[]>([]);
   const [branches, setBranches] = useState<FilterOption[]>([]);
   const [brands, setBrands] = useState<FilterOption[]>([]);
-
-  const ITEMS_PER_PAGE = 10;
 
   const fetchData = React.useCallback(async () => {
     try {
@@ -170,9 +170,11 @@ export default function InventoryProductsTable({ selectedYear }: { selectedYear:
     setTimeout(() => fetchData(), 0);
   };
 
-  const totalPages = Math.ceil(data.length / ITEMS_PER_PAGE);
-  const startIndex = (page - 1) * ITEMS_PER_PAGE;
-  const currentData = data.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+  useEffect(() => {
+    setTotal(data.length);
+  }, [data.length, setTotal]);
+
+  const currentData = data.slice((currentPage - 1) * limit, currentPage * limit);
 
   return (
     <div className="space-y-4">
@@ -385,44 +387,14 @@ export default function InventoryProductsTable({ selectedYear }: { selectedYear:
           </Table>
         </div>
 
-        <div className="p-4 border-t border-gray-50 flex items-center justify-between bg-card">
-          <p className="text-xs text-muted-foreground">
-            Showing {startIndex + 1} to {Math.min(startIndex + ITEMS_PER_PAGE, data.length)} of{' '}
-            {data.length} models
-          </p>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              disabled={page === 1}
-              className="h-8 text-[11px] rounded-lg border-blue-100 text-blue-700 hover:bg-blue-50"
-            >
-              Previous
-            </Button>
-            <div className="flex items-center gap-1 mx-2">
-              {[...Array(totalPages)].map((_, i) => (
-                <button
-                  key={i}
-                  onClick={() => setPage(i + 1)}
-                  className={`w-7 h-7 rounded-lg text-[11px] flex items-center justify-center transition-colors ${
-                    page === i + 1 ? 'bg-primary text-white' : 'hover:bg-blue-50 text-blue-600'
-                  }`}
-                >
-                  {i + 1}
-                </button>
-              ))}
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-              disabled={page === totalPages || totalPages === 0}
-              className="h-8 text-[11px] rounded-lg border-blue-100 text-blue-700 hover:bg-blue-50"
-            >
-              Next
-            </Button>
-          </div>
+        <div className="p-4 border-t border-gray-50 flex items-center justify-between bg-card text-primary font-bold">
+          <Pagination
+            page={currentPage}
+            totalPages={totalPages}
+            total={total}
+            limit={limit}
+            onPageChange={setPage}
+          />
         </div>
       </div>
     </div>

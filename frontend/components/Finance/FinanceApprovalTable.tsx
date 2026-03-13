@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Table,
   TableBody,
@@ -34,6 +34,8 @@ import { FinanceApprovalModal } from './FinanceApprovalModal';
 import { ActivateContractModal } from './ActivateContractModal';
 import { formatCurrency } from '@/lib/format';
 import { useQuery } from '@tanstack/react-query';
+import { usePagination } from '@/hooks/usePagination';
+import Pagination from '@/components/Pagination';
 
 interface FinanceApprovalTableProps {
   saleType?: 'RENT' | 'LEASE' | 'SALE';
@@ -46,6 +48,7 @@ interface FinanceApprovalTableProps {
  * Allows finance team to review, approve, or reject invoices created by employees.
  */
 export default function FinanceApprovalTable({ saleType }: FinanceApprovalTableProps) {
+  const { page: currentPage, limit, total, setPage, setTotal, totalPages } = usePagination(5);
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [rejectOpen, setRejectOpen] = useState(false);
@@ -297,6 +300,12 @@ export default function FinanceApprovalTable({ saleType }: FinanceApprovalTableP
     setRejectOpen(true);
   };
 
+  useEffect(() => {
+    setTotal(invoices.length);
+  }, [invoices.length, setTotal]);
+
+  const paginatedInvoices = invoices.slice((currentPage - 1) * limit, currentPage * limit);
+
   if (loading && invoices.length === 0) {
     return (
       <div className="flex justify-center p-8">
@@ -318,7 +327,7 @@ export default function FinanceApprovalTable({ saleType }: FinanceApprovalTableP
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-bold text-foreground">Waiting for Finance Confirmation</h3>
         <Badge variant="secondary" className="bg-primary/10 text-primary">
-          {invoices.length} Pending
+          {paginatedInvoices.length} Pending
         </Badge>
       </div>
 
@@ -337,7 +346,7 @@ export default function FinanceApprovalTable({ saleType }: FinanceApprovalTableP
             </TableRow>
           </TableHeader>
           <TableBody>
-            {invoices.map((inv: Invoice) => (
+            {paginatedInvoices.map((inv) => (
               <TableRow key={inv.id}>
                 <TableCell className="font-bold">{inv.invoiceNumber}</TableCell>
                 <TableCell>{inv.customerName}</TableCell>
@@ -421,6 +430,15 @@ export default function FinanceApprovalTable({ saleType }: FinanceApprovalTableP
         </Table>
       </div>
 
+      {totalPages > 1 && (
+        <Pagination
+          page={currentPage}
+          totalPages={totalPages}
+          total={total}
+          limit={limit}
+          onPageChange={setPage}
+        />
+      )}
       {detailsOpen && selectedInvoice && (
         <InvoiceDetailsDialog
           invoice={selectedInvoice}

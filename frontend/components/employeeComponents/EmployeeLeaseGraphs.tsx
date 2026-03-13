@@ -49,9 +49,7 @@ export default function EmployeeLeaseGraphs({ invoices: propInvoices }: Employee
         if (!invoices) {
           invoices = await getMyInvoices();
         }
-        const leaseInvoices = invoices.filter(
-          (inv) => inv.saleType === 'LEASE' && inv.contractStatus === 'ACTIVE',
-        );
+        const leaseInvoices = invoices.filter((inv) => inv.saleType === 'LEASE');
 
         const now = new Date();
         const currentYear = now.getFullYear();
