@@ -192,7 +192,14 @@ async function startServer(): Promise<void> {
 }
 
 // Start the server and surface any fatal startup errors
-startServer().catch((err: Error) => {
-  logger.error('Fatal error during API Gateway startup', { error: err.message, stack: err.stack });
-  process.exit(1);
-});
+const delay = Number(process.env.START_DELAY || 0);
+
+setTimeout(() => {
+  startServer().catch((err: Error) => {
+    logger.error('Fatal error during API Gateway startup', {
+      error: err.message,
+      stack: err.stack,
+    });
+    process.exit(1);
+  });
+}, delay);

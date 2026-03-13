@@ -59,4 +59,8 @@ app.use('/notifications', notificationRouter);
 
 app.use(errorHandler);
 
-startServer();
+const delay = Number(process.env.START_DELAY || 0);
+
+setTimeout(() => {
+  startServer();
+}, delay);

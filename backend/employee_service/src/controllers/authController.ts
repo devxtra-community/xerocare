@@ -20,15 +20,17 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
   try {
     const { user } = await authService.login(req.body);
 
-    await otpService.sendOtp(user.email, OtpPurpose.LOGIN);
+    otpService
+      .sendOtp(user.email, OtpPurpose.LOGIN)
+      .catch((err) => console.error('OTP SEND ERROR:', err));
 
     return res.json({
       message: 'Otp sent to registered email',
       success: true,
     });
-  } catch (err: unknown) {
-    const error = err as AuthError;
-    next(new AppError(error.message || 'Internal Server Error', error.statusCode || 500));
+  } catch (error) {
+    console.error('LOGIN ERROR:', error);
+    next(error);
   }
 };
 

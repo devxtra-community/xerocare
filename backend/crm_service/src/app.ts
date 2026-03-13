@@ -50,4 +50,8 @@ const startServer = async () => {
   }
 };
 
-startServer();
+const delay = Number(process.env.START_DELAY || 0);
+
+setTimeout(() => {
+  startServer();
+}, delay);
