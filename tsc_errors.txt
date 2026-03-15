@@ -1,0 +1,71 @@
+components/ManagerDashboardComponents/productComponents/BulkProductDialog.tsx(425,41): error TS2339: Property 'quantity' does not exist on type 'LotItem'.
+components/ManagerDashboardComponents/productComponents/BulkProductDialog.tsx(427,51): error TS2339: Property 'quantity' does not exist on type 'LotItem'.
+components/ManagerDashboardComponents/productComponents/managerProductTable.tsx(631,49): error TS2339: Property 'quantity' does not exist on type 'LotItem'.
+components/ManagerDashboardComponents/productComponents/managerProductTable.tsx(637,75): error TS2339: Property 'quantity' does not exist on type 'LotItem'.
+components/ManagerDashboardComponents/productComponents/managerProductTable.tsx(656,48): error TS2339: Property 'quantity' does not exist on type 'LotItem'.
+components/ManagerDashboardComponents/productComponents/managerProductTable.tsx(666,76): error TS2339: Property 'quantity' does not exist on type 'LotItem'.
+components/ManagerDashboardComponents/productComponents/managerProductTable.tsx(667,79): error TS2339: Property 'quantity' does not exist on type 'LotItem'.
+components/ManagerDashboardComponents/purchaseComponents/AddPurchaseDialog.tsx(35,5): error TS2353: Object literal may only specify known properties, and 'purchase_number' does not exist in type 'CreatePurchaseDTO | (() => CreatePurchaseDTO)'.
+components/ManagerDashboardComponents/purchaseComponents/AddPurchaseDialog.tsx(51,9): error TS2353: Object literal may only specify known properties, and 'purchase_number' does not exist in type 'SetStateAction<CreatePurchaseDTO>'.
+components/ManagerDashboardComponents/purchaseComponents/AddPurchaseDialog.tsx(80,33): error TS2339: Property 'purchase_number' does not exist on type 'CreatePurchaseDTO'.
+components/ManagerDashboardComponents/purchaseComponents/AddPurchaseDialog.tsx(81,61): error TS2353: Object literal may only specify known properties, and 'purchase_number' does not exist in type 'SetStateAction<CreatePurchaseDTO>'.
+components/ManagerDashboardComponents/purchaseComponents/AddPurchaseDialog.tsx(89,33): error TS2339: Property 'lot_number' does not exist on type 'CreatePurchaseDTO'.
+components/ManagerDashboardComponents/purchaseComponents/AddPurchaseDialog.tsx(90,61): error TS2353: Object literal may only specify known properties, and 'lot_number' does not exist in type 'SetStateAction<CreatePurchaseDTO>'.
+components/ManagerDashboardComponents/purchaseComponents/AddPurchaseDialog.tsx(100,31): error TS2339: Property 'vendor_id' does not exist on type 'CreatePurchaseDTO'.
+components/ManagerDashboardComponents/purchaseComponents/AddPurchaseDialog.tsx(101,59): error TS2353: Object literal may only specify known properties, and 'vendor_id' does not exist in type 'SetStateAction<CreatePurchaseDTO>'.
+components/ManagerDashboardComponents/purchaseComponents/AddPurchaseDialog.tsx(113,33): error TS2339: Property 'total_amount' does not exist on type 'CreatePurchaseDTO'.
+components/ManagerDashboardComponents/purchaseComponents/AddPurchaseDialog.tsx(114,61): error TS2353: Object literal may only specify known properties, and 'total_amount' does not exist in type 'SetStateAction<CreatePurchaseDTO>'.
+components/ManagerDashboardComponents/purchaseComponents/AddPurchaseDialog.tsx(121,33): error TS2339: Property 'status' does not exist on type 'CreatePurchaseDTO'.
+components/ManagerDashboardComponents/purchaseComponents/AddPurchaseDialog.tsx(123,46): error TS2353: Object literal may only specify known properties, and 'status' does not exist in type 'SetStateAction<CreatePurchaseDTO>'.
+components/ManagerDashboardComponents/purchaseComponents/EditPurchaseDialog.tsx(41,9): error TS2353: Object literal may only specify known properties, and 'purchase_number' does not exist in type 'SetStateAction<Partial<CreatePurchaseDTO>>'.
+components/ManagerDashboardComponents/purchaseComponents/EditPurchaseDialog.tsx(41,35): error TS2339: Property 'purchase_number' does not exist on type 'Purchase'.
+components/ManagerDashboardComponents/purchaseComponents/EditPurchaseDialog.tsx(42,30): error TS2339: Property 'lot_number' does not exist on type 'Purchase'.
+components/ManagerDashboardComponents/purchaseComponents/EditPurchaseDialog.tsx(43,29): error TS2551: Property 'vendor_id' does not exist on type 'Purchase'. Did you mean 'vendorId'?
+components/ManagerDashboardComponents/purchaseComponents/EditPurchaseDialog.tsx(44,32): error TS2551: Property 'total_amount' does not exist on type 'Purchase'. Did you mean 'totalAmount'?
+components/ManagerDashboardComponents/purchaseComponents/EditPurchaseDialog.tsx(47,31): error TS2339: Property 'product_ids' does not exist on type 'Purchase'.
+components/ManagerDashboardComponents/purchaseComponents/EditPurchaseDialog.tsx(48,29): error TS2339: Property 'model_ids' does not exist on type 'Purchase'.
+components/ManagerDashboardComponents/purchaseComponents/EditPurchaseDialog.tsx(80,33): error TS2339: Property 'purchase_number' does not exist on type 'Partial<CreatePurchaseDTO>'.
+components/ManagerDashboardComponents/purchaseComponents/EditPurchaseDialog.tsx(81,61): error TS2353: Object literal may only specify known properties, and 'purchase_number' does not exist in type 'SetStateAction<Partial<CreatePurchaseDTO>>'.
+components/ManagerDashboardComponents/purchaseComponents/EditPurchaseDialog.tsx(89,33): error TS2339: Property 'lot_number' does not exist on type 'Partial<CreatePurchaseDTO>'.
+components/ManagerDashboardComponents/purchaseComponents/EditPurchaseDialog.tsx(90,61): error TS2353: Object literal may only specify known properties, and 'lot_number' does not exist in type 'SetStateAction<Partial<CreatePurchaseDTO>>'.
+components/ManagerDashboardComponents/purchaseComponents/EditPurchaseDialog.tsx(100,31): error TS2339: Property 'vendor_id' does not exist on type 'Partial<CreatePurchaseDTO>'.
+components/ManagerDashboardComponents/purchaseComponents/EditPurchaseDialog.tsx(101,59): error TS2353: Object literal may only specify known properties, and 'vendor_id' does not exist in type 'SetStateAction<Partial<CreatePurchaseDTO>>'.
+components/ManagerDashboardComponents/purchaseComponents/EditPurchaseDialog.tsx(113,33): error TS2339: Property 'total_amount' does not exist on type 'Partial<CreatePurchaseDTO>'.
+components/ManagerDashboardComponents/purchaseComponents/EditPurchaseDialog.tsx(114,61): error TS2353: Object literal may only specify known properties, and 'total_amount' does not exist in type 'SetStateAction<Partial<CreatePurchaseDTO>>'.
+components/ManagerDashboardComponents/purchaseComponents/EditPurchaseDialog.tsx(121,33): error TS2339: Property 'status' does not exist on type 'Partial<CreatePurchaseDTO>'.
+components/ManagerDashboardComponents/purchaseComponents/EditPurchaseDialog.tsx(123,46): error TS2353: Object literal may only specify known properties, and 'status' does not exist in type 'SetStateAction<Partial<CreatePurchaseDTO>>'.
+components/ManagerDashboardComponents/purchaseComponents/ManagerPurchaseTable.tsx(56,10): error TS2339: Property 'purchase_number' does not exist on type 'Purchase'.
+components/ManagerDashboardComponents/purchaseComponents/ManagerPurchaseTable.tsx(56,31): error TS2339: Property 'vendor_name' does not exist on type 'Purchase'.
+components/ManagerDashboardComponents/purchaseComponents/ManagerPurchaseTable.tsx(56,48): error TS2339: Property 'lot_number' does not exist on type 'Purchase'.
+components/ManagerDashboardComponents/purchaseComponents/ManagerPurchaseTable.tsx(62,58): error TS2551: Property 'total_amount' does not exist on type 'Purchase'. Did you mean 'totalAmount'?
+components/ManagerDashboardComponents/purchaseComponents/ManagerPurchaseTable.tsx(63,55): error TS2551: Property 'vendor_id' does not exist on type 'Purchase'. Did you mean 'vendorId'?
+components/ManagerDashboardComponents/purchaseComponents/ManagerPurchaseTable.tsx(64,62): error TS2339: Property 'product_ids' does not exist on type 'Purchase'.
+components/ManagerDashboardComponents/purchaseComponents/ManagerPurchaseTable.tsx(65,60): error TS2339: Property 'model_ids' does not exist on type 'Purchase'.
+components/ManagerDashboardComponents/purchaseComponents/ManagerPurchaseTable.tsx(143,62): error TS2339: Property 'purchase_number' does not exist on type 'Purchase'.
+components/ManagerDashboardComponents/purchaseComponents/ManagerPurchaseTable.tsx(144,50): error TS2339: Property 'lot_number' does not exist on type 'Purchase'.
+components/ManagerDashboardComponents/purchaseComponents/ManagerPurchaseTable.tsx(146,70): error TS2339: Property 'product_names' does not exist on type 'Purchase'.
+components/ManagerDashboardComponents/purchaseComponents/ManagerPurchaseTable.tsx(147,26): error TS2339: Property 'product_names' does not exist on type 'Purchase'.
+components/ManagerDashboardComponents/purchaseComponents/ManagerPurchaseTable.tsx(151,70): error TS2339: Property 'model_names' does not exist on type 'Purchase'.
+components/ManagerDashboardComponents/purchaseComponents/ManagerPurchaseTable.tsx(152,26): error TS2339: Property 'model_names' does not exist on type 'Purchase'.
+components/ManagerDashboardComponents/purchaseComponents/ManagerPurchaseTable.tsx(155,50): error TS2339: Property 'vendor_name' does not exist on type 'Purchase'.
+components/ManagerDashboardComponents/purchaseComponents/ManagerPurchaseTable.tsx(156,65): error TS2551: Property 'total_amount' does not exist on type 'Purchase'. Did you mean 'totalAmount'?
+components/ManagerDashboardComponents/purchaseComponents/ManagerPurchaseTable.tsx(160,25): error TS2367: This comparison appears to be unintentional because the types '"UNPAID" | "PARTIAL" | "PAID"' and '"COMPLETED"' have no overlap.
+components/ManagerDashboardComponents/purchaseComponents/ManagerPurchaseTable.tsx(162,29): error TS2367: This comparison appears to be unintentional because the types '"UNPAID" | "PARTIAL" | "PAID"' and '"PENDING"' have no overlap.
+components/ManagerDashboardComponents/purchaseComponents/ViewPurchaseDialog.tsx(33,54): error TS2339: Property 'purchase_number' does not exist on type 'Purchase'.
+components/ManagerDashboardComponents/purchaseComponents/ViewPurchaseDialog.tsx(37,54): error TS2339: Property 'lot_number' does not exist on type 'Purchase'.
+components/ManagerDashboardComponents/purchaseComponents/ViewPurchaseDialog.tsx(41,54): error TS2339: Property 'vendor_name' does not exist on type 'Purchase'.
+components/ManagerDashboardComponents/purchaseComponents/ViewPurchaseDialog.tsx(47,19): error TS2367: This comparison appears to be unintentional because the types '"UNPAID" | "PARTIAL" | "PAID"' and '"COMPLETED"' have no overlap.
+components/ManagerDashboardComponents/purchaseComponents/ViewPurchaseDialog.tsx(49,23): error TS2367: This comparison appears to be unintentional because the types '"UNPAID" | "PARTIAL" | "PAID"' and '"PENDING"' have no overlap.
+components/ManagerDashboardComponents/purchaseComponents/ViewPurchaseDialog.tsx(60,61): error TS2551: Property 'created_at' does not exist on type 'Purchase'. Did you mean 'createdAt'?
+components/ManagerDashboardComponents/purchaseComponents/ViewPurchaseDialog.tsx(65,42): error TS2551: Property 'total_amount' does not exist on type 'Purchase'. Did you mean 'totalAmount'?
+components/ManagerDashboardComponents/purchaseComponents/ViewPurchaseDialog.tsx(74,27): error TS2339: Property 'product_names' does not exist on type 'Purchase'.
+components/ManagerDashboardComponents/purchaseComponents/ViewPurchaseDialog.tsx(74,46): error TS7006: Parameter 'name' implicitly has an 'any' type.
+components/ManagerDashboardComponents/purchaseComponents/ViewPurchaseDialog.tsx(74,52): error TS7006: Parameter 'i' implicitly has an 'any' type.
+components/ManagerDashboardComponents/purchaseComponents/ViewPurchaseDialog.tsx(85,27): error TS2339: Property 'model_names' does not exist on type 'Purchase'.
+components/ManagerDashboardComponents/purchaseComponents/ViewPurchaseDialog.tsx(85,44): error TS7006: Parameter 'name' implicitly has an 'any' type.
+components/ManagerDashboardComponents/purchaseComponents/ViewPurchaseDialog.tsx(85,50): error TS7006: Parameter 'i' implicitly has an 'any' type.
+components/ManagerDashboardComponents/spareParts/AddSparePartDialog.tsx(121,47): error TS2339: Property 'quantity' does not exist on type 'LotItem'.
+components/ManagerDashboardComponents/spareParts/AddSparePartDialog.tsx(241,46): error TS2339: Property 'quantity' does not exist on type 'LotItem'.
+components/ManagerDashboardComponents/spareParts/AddSparePartDialog.tsx(245,72): error TS2339: Property 'quantity' does not exist on type 'LotItem'.
+components/ManagerDashboardComponents/spareParts/AddSparePartDialog.tsx(264,54): error TS2339: Property 'quantity' does not exist on type 'LotItem'.
+components/ManagerDashboardComponents/spareParts/AddSparePartDialog.tsx(277,101): error TS2339: Property 'quantity' does not exist on type 'LotItem'.

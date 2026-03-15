@@ -2,6 +2,7 @@ import { EntityManager, FindOptionsWhere } from 'typeorm';
 import { Source } from '../config/db';
 import { Lot, LotStatus } from '../entities/lotEntity';
 import { LotItem, LotItemType } from '../entities/lotItemEntity';
+import { Purchase } from '../entities/purchaseEntity';
 import { SparePart } from '../entities/sparePartEntity';
 import { Vendor } from '../entities/vendorEntity';
 import { AppError } from '../errors/appError';
@@ -29,7 +30,7 @@ export class LotRepository {
       lot.lotNumber = data.lotNumber;
       lot.purchaseDate = new Date(data.purchaseDate);
       lot.notes = data.notes;
-      lot.status = LotStatus.COMPLETED;
+      lot.status = LotStatus.PENDING;
       lot.branch_id = data.branchId;
       lot.warehouse_id = data.warehouseId;
       lot.createdBy = data.createdBy;
@@ -42,7 +43,10 @@ export class LotRepository {
       for (const itemData of data.items) {
         const lotItem = new LotItem();
         lotItem.itemType = itemData.itemType;
-        lotItem.quantity = itemData.quantity;
+        lotItem.expectedQuantity = itemData.quantity;
+        lotItem.receivedQuantity = 0;
+        lotItem.damagedQuantity = 0;
+        lotItem.returnedQuantity = 0;
         lotItem.usedQuantity = 0;
         lotItem.unitPrice = itemData.unitPrice;
         lotItem.totalPrice = itemData.quantity * itemData.unitPrice;
@@ -177,7 +181,25 @@ export class LotRepository {
         await manager.save(Vendor, vendor);
       }
 
-      return await manager.save(Lot, savedLot);
+      const finalLot = await manager.save(Lot, savedLot);
+
+      // Auto-create a purchase record with zero costs so pricing can be filled in later
+      const purchase = new Purchase();
+      purchase.lotId = finalLot.id;
+      purchase.vendorId = finalLot.vendorId;
+      purchase.branchId = finalLot.branch_id || '';
+      purchase.purchaseAmount = itemsTotal;
+      purchase.documentationFee = 0;
+      purchase.labourCost = 0;
+      purchase.handlingFee = 0;
+      purchase.transportationCost = 0;
+      purchase.shippingCost = 0;
+      purchase.groundfieldCost = 0;
+      purchase.totalAmount = itemsTotal;
+      purchase.createdBy = data.createdBy;
+      await manager.save(Purchase, purchase);
+
+      return finalLot;
     });
   }
 
@@ -222,10 +244,10 @@ export class LotRepository {
         );
       }
 
-      const remainingManager = lotItem.quantity - lotItem.usedQuantity;
+      const remainingManager = lotItem.receivedQuantity - lotItem.usedQuantity;
       if (quantity > remainingManager) {
         throw new AppError(
-          `Lot quantity exceeded. Remaining: ${remainingManager}, Requested: ${quantity}`,
+          `Lot quantity exceeded. Remaining (Received): ${remainingManager}, Requested: ${quantity}`,
           400,
         );
       }
@@ -359,5 +381,101 @@ export class LotRepository {
       month: r.month,
       total: parseFloat(r.total) || 0,
     }));
+  }
+
+  /**
+   * Updates receiving quantities for lot items.
+   */
+  async updateReceivingQuantities(
+    lotId: string,
+    items: { item_id: string; received_quantity: number; damaged_quantity: number }[],
+    branchId?: string,
+  ): Promise<Lot> {
+    return await Source.transaction(async (manager: EntityManager) => {
+      const lot = await manager.findOne(Lot, {
+        where: { id: lotId, ...(branchId ? { branch_id: branchId } : {}) },
+        relations: ['items'],
+      });
+
+      if (!lot) throw new AppError('Lot not found', 404);
+      if (lot.status === LotStatus.RECEIVED) {
+        throw new AppError('Cannot edit quantities after lot is confirmed received', 400);
+      }
+
+      for (const itemUpdate of items) {
+        const item = lot.items.find((i) => i.id === itemUpdate.item_id);
+        if (!item) throw new AppError(`Item ${itemUpdate.item_id} not found in lot`, 404);
+
+        if (itemUpdate.received_quantity + itemUpdate.damaged_quantity > item.expectedQuantity) {
+          throw new AppError(
+            `Total (Received + Damaged) exceeds Expected for item ${item.id}`,
+            400,
+          );
+        }
+
+        item.receivedQuantity = itemUpdate.received_quantity;
+        item.damagedQuantity = itemUpdate.damaged_quantity;
+        item.returnedQuantity = itemUpdate.damaged_quantity; // Default damaged to returned
+        await manager.save(LotItem, item);
+      }
+
+      lot.status = LotStatus.RECEIVING;
+      const savedLot = await manager.save(Lot, lot);
+
+      // Return with full relations to ensure UI consistency
+      return (await manager.findOne(Lot, {
+        where: { id: savedLot.id },
+        relations: {
+          vendor: true,
+          items: {
+            model: {
+              brandRelation: true,
+            },
+            sparePart: {
+              model: {
+                brandRelation: true,
+              },
+            },
+          },
+        },
+      })) as Lot;
+    });
+  }
+
+  /**
+   * Confirms a lot as RECEIVED.
+   */
+  async confirmLotReceived(lotId: string, branchId?: string): Promise<Lot> {
+    return await Source.transaction(async (manager: EntityManager) => {
+      const lot = await manager.findOne(Lot, {
+        where: { id: lotId, ...(branchId ? { branch_id: branchId } : {}) },
+      });
+
+      if (!lot) throw new AppError('Lot not found', 404);
+      if (lot.status === LotStatus.RECEIVED) {
+        throw new AppError('Lot is already confirmed as received', 400);
+      }
+
+      lot.status = LotStatus.RECEIVED;
+      const savedLot = await manager.save(Lot, lot);
+
+      // Return with full relations to ensure UI consistency
+      return (await manager.findOne(Lot, {
+        where: { id: savedLot.id },
+        relations: {
+          vendor: true,
+          items: {
+            model: {
+              brandRelation: true,
+            },
+            sparePart: {
+              model: {
+                brandRelation: true,
+              },
+            },
+          },
+        },
+      })) as Lot;
+    });
   }
 }

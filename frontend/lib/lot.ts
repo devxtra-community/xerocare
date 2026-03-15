@@ -9,7 +9,9 @@ export enum LotItemType {
 
 export enum LotStatus {
   PENDING = 'PENDING',
-  COMPLETED = 'COMPLETED',
+  RECEIVING = 'RECEIVING',
+  RECEIVED = 'RECEIVED',
+  COMPLETED = 'COMPLETED', // backward-compat alias for RECEIVED in older lots
   CANCELLED = 'CANCELLED',
 }
 
@@ -26,10 +28,20 @@ export interface LotItem {
   model?: Model;
   sparePartId?: string;
   sparePart?: SparePart;
+  /** Expected quantity ordered from vendor */
+  expectedQuantity: number;
+  /** Quantity actually received in good condition */
+  receivedQuantity: number;
+  /** Quantity received but damaged */
+  damagedQuantity: number;
+  /** Quantity sent back to vendor */
+  returnedQuantity: number;
+  /** Quantity already allocated to inventory */
   usedQuantity: number;
-  quantity: number;
   unitPrice: number;
   totalPrice: number;
+  customProductName?: string;
+  customSparePartName?: string;
 }
 
 export interface Lot {
@@ -40,6 +52,7 @@ export interface Lot {
   purchaseDate: string;
   totalAmount: number;
   status: LotStatus;
+  branch_id?: string;
   notes?: string;
   warehouseId?: string;
   warehouse_id?: string;
@@ -69,6 +82,12 @@ export interface CreateLotData {
   items: CreateLotItemData[];
 }
 
+export interface ReceiveLotItemPayload {
+  item_id: string;
+  received_quantity: number;
+  damaged_quantity: number;
+}
+
 export interface PaginatedResponse<T> {
   data: T[];
   page: number;
@@ -90,14 +109,12 @@ export const lotService = {
   }): Promise<PaginatedResponse<Lot>> => {
     const response = await api.get('/i/lots', { params });
     const resData = response.data;
-    const coreData = resData.data || resData; // Handle both direct array and wrapped standard response
+    const coreData = resData.data || resData;
 
-    // If it's the new paginated format
     if (coreData && coreData.page !== undefined) {
       return coreData as PaginatedResponse<Lot>;
     }
 
-    // Fallback if backend still returns array
     const dataArray = Array.isArray(coreData) ? coreData : [];
     return {
       data: dataArray,
@@ -121,9 +138,7 @@ export const lotService = {
     const formData = new FormData();
     formData.append('file', file);
     const response = await api.post<ApiResponse<Lot>>('/i/lots/upload', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
+      headers: { 'Content-Type': 'multipart/form-data' },
     });
     return response.data.data;
   },
@@ -133,5 +148,44 @@ export const lotService = {
       `/i/lots/check-number/${encodeURIComponent(lotNumber)}`,
     );
     return response.data.exists;
+  },
+
+  /**
+   * Save received / damaged quantities for lot items.
+   * Transitions lot status → RECEIVING.
+   */
+  receiveLot: async (lotId: string, items: ReceiveLotItemPayload[]): Promise<Lot> => {
+    const response = await api.patch<ApiResponse<Lot>>(`/i/lots/${lotId}/receive`, { items });
+    return response.data.data;
+  },
+
+  /**
+   * Confirm lot as RECEIVED. Unlocks inventory creation for this lot.
+   */
+  confirmLotReceived: async (lotId: string): Promise<Lot> => {
+    const response = await api.post<ApiResponse<Lot>>(`/i/lots/${lotId}/confirm`);
+    return response.data.data;
+  },
+
+  /** Download full lot Excel report as blob. */
+  downloadLotExcel: async (lotId: string): Promise<ArrayBuffer> => {
+    const response = await api.get(`/i/lots/${lotId}/export`, { responseType: 'arraybuffer' });
+    return response.data;
+  },
+
+  /** Download products-only Excel report as blob. */
+  downloadLotProductsExcel: async (lotId: string): Promise<ArrayBuffer> => {
+    const response = await api.get(`/i/lots/${lotId}/export-products`, {
+      responseType: 'arraybuffer',
+    });
+    return response.data;
+  },
+
+  /** Download spare-parts-only Excel report as blob. */
+  downloadLotSparePartsExcel: async (lotId: string): Promise<ArrayBuffer> => {
+    const response = await api.get(`/i/lots/${lotId}/export-spareparts`, {
+      responseType: 'arraybuffer',
+    });
+    return response.data;
   },
 };

@@ -19,7 +19,7 @@ export enum LotItemType {
 
 @Entity('lot_items')
 @Check(
-  `("model_id" IS NOT NULL AND "spare_part_id" IS NULL) OR ("model_id" IS NULL AND "spare_part_id" IS NOT NULL)`,
+  `("model_id" IS NOT NULL OR "custom_product_name" IS NOT NULL) AND "spare_part_id" IS NULL AND "custom_spare_part_name" IS NULL OR ("spare_part_id" IS NOT NULL OR "custom_spare_part_name" IS NOT NULL) AND "model_id" IS NULL AND "custom_product_name" IS NULL`,
 )
 export class LotItem {
   @PrimaryGeneratedColumn('uuid')
@@ -49,11 +49,37 @@ export class LotItem {
   @JoinColumn({ name: 'spare_part_id' })
   sparePart?: SparePart;
 
-  @Column({ type: 'int' })
-  quantity!: number;
+  /**
+   * Expected quantity ordered from vendor (maps to legacy `quantity` column
+   * so existing rows remain valid).
+   */
+  @Column({ name: 'quantity', type: 'int' })
+  expectedQuantity!: number;
 
+  /** Actual quantity confirmed received in good condition. */
+  @Column({ name: 'received_quantity', type: 'int', default: 0 })
+  receivedQuantity!: number;
+
+  /** Quantity received but damaged / defective. */
+  @Column({ name: 'damaged_quantity', type: 'int', default: 0 })
+  damagedQuantity!: number;
+
+  /**
+   * Quantity that has been or will be returned to vendor.
+   * Defaults to damaged_quantity when saving receiving data.
+   */
+  @Column({ name: 'returned_quantity', type: 'int', default: 0 })
+  returnedQuantity!: number;
+
+  /** How many units have already been consumed into inventory. */
   @Column({ name: 'used_quantity', type: 'int', default: 0 })
   usedQuantity!: number;
+
+  @Column({ name: 'custom_product_name', type: 'varchar', nullable: true })
+  customProductName?: string;
+
+  @Column({ name: 'custom_spare_part_name', type: 'varchar', nullable: true })
+  customSparePartName?: string;
 
   @Column({ name: 'unit_price', type: 'decimal', precision: 12, scale: 2 })
   unitPrice!: number;

@@ -92,6 +92,7 @@ export interface Invoice {
   advanceAdjusted?: number;
   grossAmount?: number;
   displayAmount?: number; // Backend aggregated lifetime total
+  usageRevenue?: number; // Sum of all recorded EMIs/UsageRecords
   invoiceHistory?: Invoice[];
   productAllocations?: Array<{
     id: string;
@@ -549,6 +550,7 @@ export interface CompletedCollection {
   securityDepositBank?: string;
   securityDepositReference?: string;
   advanceAmount?: number;
+  discountAmount?: number;
   customerEmail?: string;
 }
 

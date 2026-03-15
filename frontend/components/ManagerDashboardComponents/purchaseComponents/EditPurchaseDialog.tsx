@@ -2,16 +2,20 @@
 
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+  Pencil,
+  FileCheck,
+  Users,
+  Package,
+  Truck,
+  Globe,
+  Wrench,
+  Loader2,
+  Calculator,
+} from 'lucide-react';
 import { purchaseService, Purchase, UpdatePurchaseDTO } from '@/services/purchaseService';
 import { toast } from 'sonner';
 
@@ -38,14 +42,12 @@ export default function EditPurchaseDialog({
   useEffect(() => {
     if (open && purchase) {
       setFormData({
-        purchase_number: purchase.purchase_number,
-        lot_number: purchase.lot_number,
-        vendor_id: purchase.vendor_id,
-        total_amount: purchase.total_amount,
-        status: purchase.status,
-        // Note: Keeping existing product/model IDs as is for now in this simplified form
-        product_ids: purchase.product_ids,
-        model_ids: purchase.model_ids,
+        documentationFee: purchase.documentationFee,
+        labourCost: purchase.labourCost,
+        handlingFee: purchase.handlingFee,
+        transportationCost: purchase.transportationCost,
+        shippingCost: purchase.shippingCost,
+        groundfieldCost: purchase.groundfieldCost,
       });
     }
   }, [open, purchase]);
@@ -58,8 +60,10 @@ export default function EditPurchaseDialog({
       toast.success('Purchase updated successfully');
       onSuccess();
       onOpenChange(false);
-    } catch {
-      toast.error('Failed to update purchase');
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { message?: string } } };
+      const msg = err.response?.data?.message || 'Failed to update purchase';
+      toast.error(msg);
     } finally {
       setLoading(false);
     }
@@ -67,80 +71,216 @@ export default function EditPurchaseDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px]">
-        <DialogHeader>
-          <DialogTitle>Edit Purchase</DialogTitle>
-        </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="edit_purchase_number">Purchase Number</Label>
-              <Input
-                id="edit_purchase_number"
-                value={formData.purchase_number || ''}
-                onChange={(e) => setFormData({ ...formData, purchase_number: e.target.value })}
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit_lot_number">Lot Number</Label>
-              <Input
-                id="edit_lot_number"
-                value={formData.lot_number || ''}
-                onChange={(e) => setFormData({ ...formData, lot_number: e.target.value })}
-                required
-              />
+      <DialogContent className="sm:max-w-[700px] p-0 overflow-hidden border-none shadow-2xl">
+        <div className="bg-primary px-6 py-4 flex items-center gap-3">
+          <div className="h-10 w-10 rounded-lg bg-white/10 flex items-center justify-center">
+            <Pencil className="h-6 w-6 text-white" />
+          </div>
+          <div>
+            <DialogTitle className="text-xl font-bold text-white">Edit Purchase Costs</DialogTitle>
+            <DialogDescription className="text-white/70 text-sm">
+              Update the financial breakdown for Purchase ID: {purchase.id.slice(0, 8)}
+            </DialogDescription>
+          </div>
+        </div>
+
+        <form
+          onSubmit={handleSubmit}
+          className="p-6 space-y-6 bg-white overflow-y-auto max-h-[85vh]"
+        >
+          <div className="space-y-4">
+            <h4 className="text-sm font-bold text-slate-800 flex items-center gap-2 border-b pb-2">
+              <Calculator className="h-4 w-4 text-primary" />
+              Adjust Cost Breakdown
+            </h4>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+              {/* Documentation Fee */}
+              <div className="space-y-2">
+                <Label
+                  htmlFor="edit_documentationFee"
+                  className="text-xs font-semibold text-slate-600 flex items-center gap-2"
+                >
+                  <FileCheck className="h-3.5 w-3.5" />
+                  Documentation Fee
+                </Label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">
+                    QAR
+                  </span>
+                  <Input
+                    id="edit_documentationFee"
+                    type="number"
+                    step="0.01"
+                    className="pl-12 focus-visible:ring-primary h-11"
+                    value={formData.documentationFee || 0}
+                    onChange={(e) =>
+                      setFormData({ ...formData, documentationFee: Number(e.target.value) })
+                    }
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* Labour Cost */}
+              <div className="space-y-2">
+                <Label
+                  htmlFor="edit_labourCost"
+                  className="text-xs font-semibold text-slate-600 flex items-center gap-2"
+                >
+                  <Users className="h-3.5 w-3.5" />
+                  Labour Cost
+                </Label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">
+                    QAR
+                  </span>
+                  <Input
+                    id="edit_labourCost"
+                    type="number"
+                    step="0.01"
+                    className="pl-12 focus-visible:ring-primary h-11"
+                    value={formData.labourCost || 0}
+                    onChange={(e) =>
+                      setFormData({ ...formData, labourCost: Number(e.target.value) })
+                    }
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* Handling Fee */}
+              <div className="space-y-2">
+                <Label
+                  htmlFor="edit_handlingFee"
+                  className="text-xs font-semibold text-slate-600 flex items-center gap-2"
+                >
+                  <Package className="h-3.5 w-3.5" />
+                  Handling Fee
+                </Label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">
+                    QAR
+                  </span>
+                  <Input
+                    id="edit_handlingFee"
+                    type="number"
+                    step="0.01"
+                    className="pl-12 focus-visible:ring-primary h-11"
+                    value={formData.handlingFee || 0}
+                    onChange={(e) =>
+                      setFormData({ ...formData, handlingFee: Number(e.target.value) })
+                    }
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* Transportation Cost */}
+              <div className="space-y-2">
+                <Label
+                  htmlFor="edit_transportationCost"
+                  className="text-xs font-semibold text-slate-600 flex items-center gap-2"
+                >
+                  <Truck className="h-3.5 w-3.5" />
+                  Transportation Cost
+                </Label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">
+                    QAR
+                  </span>
+                  <Input
+                    id="edit_transportationCost"
+                    type="number"
+                    step="0.01"
+                    className="pl-12 focus-visible:ring-primary h-11"
+                    value={formData.transportationCost || 0}
+                    onChange={(e) =>
+                      setFormData({ ...formData, transportationCost: Number(e.target.value) })
+                    }
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* Shipping Cost */}
+              <div className="space-y-2">
+                <Label
+                  htmlFor="edit_shippingCost"
+                  className="text-xs font-semibold text-slate-600 flex items-center gap-2"
+                >
+                  <Globe className="h-3.5 w-3.5" />
+                  Shipping Cost
+                </Label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">
+                    QAR
+                  </span>
+                  <Input
+                    id="edit_shippingCost"
+                    type="number"
+                    step="0.01"
+                    className="pl-12 focus-visible:ring-primary h-11"
+                    value={formData.shippingCost || 0}
+                    onChange={(e) =>
+                      setFormData({ ...formData, shippingCost: Number(e.target.value) })
+                    }
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* Groundfield Cost */}
+              <div className="space-y-2">
+                <Label
+                  htmlFor="edit_groundfieldCost"
+                  className="text-xs font-semibold text-slate-600 flex items-center gap-2"
+                >
+                  <Wrench className="h-3.5 w-3.5" />
+                  Groundfield Cost
+                </Label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">
+                    QAR
+                  </span>
+                  <Input
+                    id="edit_groundfieldCost"
+                    type="number"
+                    step="0.01"
+                    className="pl-12 focus-visible:ring-primary h-11"
+                    value={formData.groundfieldCost || 0}
+                    onChange={(e) =>
+                      setFormData({ ...formData, groundfieldCost: Number(e.target.value) })
+                    }
+                    required
+                  />
+                </div>
+              </div>
             </div>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="edit_vendor">Vendor ID</Label>
-            <Input
-              id="edit_vendor"
-              value={formData.vendor_id || ''}
-              onChange={(e) => setFormData({ ...formData, vendor_id: e.target.value })}
-              placeholder="Enter Vendor ID"
-              required
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="edit_total_amount">Total Amount</Label>
-              <Input
-                id="edit_total_amount"
-                type="number"
-                value={formData.total_amount || 0}
-                onChange={(e) => setFormData({ ...formData, total_amount: Number(e.target.value) })}
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit_status">Status</Label>
-              <Select
-                value={formData.status}
-                onValueChange={(value: 'PENDING' | 'COMPLETED' | 'CANCELLED') =>
-                  setFormData({ ...formData, status: value })
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="PENDING">Pending</SelectItem>
-                  <SelectItem value="COMPLETED">Completed</SelectItem>
-                  <SelectItem value="CANCELLED">Cancelled</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <div className="flex justify-end gap-3 mt-6">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+          <div className="flex justify-end gap-3 pt-4 !mt-10 border-t border-slate-100">
+            <Button
+              type="button"
+              variant="outline"
+              className="h-11 px-6 font-semibold"
+              onClick={() => onOpenChange(false)}
+            >
               Cancel
             </Button>
-            <Button type="submit" disabled={loading}>
-              {loading ? 'Updating...' : 'Update Purchase'}
+            <Button
+              type="submit"
+              disabled={loading}
+              className="min-w-[150px] h-11 bg-primary px-8 font-bold shadow-lg shadow-primary/20 hover:shadow-primary/40 transition-all active:scale-[0.98]"
+            >
+              {loading ? (
+                <div className="flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Updating...
+                </div>
+              ) : (
+                'Save Changes'
+              )}
             </Button>
           </div>
         </form>

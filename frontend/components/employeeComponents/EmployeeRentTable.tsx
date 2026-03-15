@@ -23,6 +23,7 @@ import RentFormModal from './RentFormModal';
 import { Badge } from '@/components/ui/badge';
 import { ApproveQuotationDialog } from '@/components/invoice/ApproveQuotationDialog';
 import { InvoiceDetailsDialog } from '@/components/invoice/InvoiceDetailsDialog';
+import { usePagination } from '@/hooks/usePagination';
 import Pagination from '@/components/Pagination';
 import { formatCurrency } from '@/lib/format';
 
@@ -48,13 +49,17 @@ const getCleanProductName = (name: string) => {
 
 interface EmployeeRentTableProps {
   mode?: 'EMPLOYEE' | 'FINANCE';
+  onRefresh?: () => void;
 }
 
 /**
  * Table displaying rental agreements managed by the employee.
  * Features search, creation of new rentals, and status tracking (Draft, Sent, Paid).
  */
-export default function EmployeeRentTable({ mode = 'EMPLOYEE' }: EmployeeRentTableProps) {
+export default function EmployeeRentTable({
+  mode = 'EMPLOYEE',
+  onRefresh,
+}: EmployeeRentTableProps) {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [formOpen, setFormOpen] = useState(false);
@@ -66,12 +71,11 @@ export default function EmployeeRentTable({ mode = 'EMPLOYEE' }: EmployeeRentTab
   const [editingUsage] = useState<Invoice | null>(null);
   const [search, setSearch] = useState('');
 
-  const [currentPage, setCurrentPage] = useState(1);
-  const ITEMS_PER_PAGE = 10;
+  const { page, limit, total, setPage, setTotal, totalPages } = usePagination(10);
 
   useEffect(() => {
-    setCurrentPage(1);
-  }, [search]);
+    setPage(1);
+  }, [search, setPage]);
 
   const fetchInvoices = useCallback(async () => {
     try {
@@ -106,9 +110,11 @@ export default function EmployeeRentTable({ mode = 'EMPLOYEE' }: EmployeeRentTab
       : true,
   );
 
-  const totalPages = Math.ceil(filteredInvoices.length / ITEMS_PER_PAGE);
-  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-  const paginatedInvoices = filteredInvoices.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+  useEffect(() => {
+    setTotal(filteredInvoices.length);
+  }, [filteredInvoices.length, setTotal]);
+
+  const paginatedInvoices = filteredInvoices.slice((page - 1) * limit, page * limit);
 
   const handleViewDetails = (id: string) => {
     const invoice = invoices.find((i) => i.id === id);
@@ -133,6 +139,7 @@ export default function EmployeeRentTable({ mode = 'EMPLOYEE' }: EmployeeRentTab
       }
       setFormOpen(false);
       setEditInvoice(undefined);
+      onRefresh?.();
     } catch (error: unknown) {
       console.error('Failed to save rent record:', error);
       const err = error as { response?: { data?: { message?: string } } };
@@ -159,6 +166,7 @@ export default function EmployeeRentTable({ mode = 'EMPLOYEE' }: EmployeeRentTab
       // Small delay to allow backend/DB to settle or service to recover if restarting
       setTimeout(() => {
         fetchInvoices();
+        onRefresh?.();
       }, 500);
     } catch (error) {
       console.error(error);
@@ -278,27 +286,50 @@ export default function EmployeeRentTable({ mode = 'EMPLOYEE' }: EmployeeRentTab
                           : 'N/A'}
                     </TableCell>
                     <TableCell className="font-bold text-slate-700">
-                      {formatCurrency(inv.monthlyRent || inv.displayAmount || inv.totalAmount || 0)}
+                      {formatCurrency(
+                        inv.displayAmount ||
+                          (inv.type === 'PROFORMA'
+                            ? (inv.advanceAmount || 0) + (inv.usageRevenue || 0)
+                            : inv.totalAmount) ||
+                          inv.monthlyRent ||
+                          0,
+                      )}
                     </TableCell>
                     <TableCell>
-                      <Badge
-                        variant="secondary"
-                        className={`rounded-full px-3 py-0.5 text-[10px] font-bold tracking-wider shadow-none
-                            ${
-                              inv.status === 'PAID' ||
-                              inv.status === 'APPROVED' ||
-                              inv.status === 'ISSUED'
-                                ? 'bg-green-100 text-green-700 hover:bg-green-100'
-                                : inv.status === 'SENT'
-                                  ? 'bg-blue-100 text-blue-700 hover:bg-blue-100'
-                                  : inv.status === 'REJECTED' || inv.status === 'CANCELLED'
-                                    ? 'bg-red-100 text-red-700 hover:bg-red-100'
-                                    : 'bg-slate-100 text-slate-700 hover:bg-slate-100'
-                            }
-                          `}
-                      >
-                        {inv.status}
-                      </Badge>
+                      {inv.contractStatus === 'COMPLETED' ? (
+                        <Badge
+                          variant="secondary"
+                          className="rounded-full px-3 py-0.5 text-[10px] font-bold tracking-wider shadow-none bg-slate-100 text-slate-700 hover:bg-slate-100"
+                        >
+                          CONTRACT CLOSED
+                        </Badge>
+                      ) : inv.contractStatus === 'ACTIVE' ? (
+                        <Badge
+                          variant="secondary"
+                          className="rounded-full px-3 py-0.5 text-[10px] font-bold tracking-wider shadow-none bg-blue-100 text-blue-700 hover:bg-blue-100"
+                        >
+                          CONTRACT ONGOING
+                        </Badge>
+                      ) : (
+                        <Badge
+                          variant="secondary"
+                          className={`rounded-full px-3 py-0.5 text-[10px] font-bold tracking-wider shadow-none
+                              ${
+                                inv.status === 'PAID' ||
+                                inv.status === 'APPROVED' ||
+                                inv.status === 'ISSUED'
+                                  ? 'bg-green-100 text-green-700 hover:bg-green-100'
+                                  : inv.status === 'SENT'
+                                    ? 'bg-blue-100 text-blue-700 hover:bg-blue-100'
+                                    : inv.status === 'REJECTED' || inv.status === 'CANCELLED'
+                                      ? 'bg-red-100 text-red-700 hover:bg-red-100'
+                                      : 'bg-slate-100 text-slate-700 hover:bg-slate-100'
+                              }
+                            `}
+                        >
+                          {inv.status}
+                        </Badge>
+                      )}
                     </TableCell>
                     <TableCell className="text-xs text-muted-foreground font-medium whitespace-nowrap">
                       {inv.createdAt ? format(new Date(inv.createdAt), 'MMM dd, yyyy') : 'N/A'}
@@ -340,7 +371,13 @@ export default function EmployeeRentTable({ mode = 'EMPLOYEE' }: EmployeeRentTab
         </div>
 
         {totalPages > 1 && (
-          <Pagination page={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
+          <Pagination
+            page={page}
+            totalPages={totalPages}
+            total={total}
+            limit={limit}
+            onPageChange={setPage}
+          />
         )}
 
         {formOpen && (
@@ -399,6 +436,7 @@ export default function EmployeeRentTable({ mode = 'EMPLOYEE' }: EmployeeRentTab
             onSuccess={() => {
               setDetailsOpen(false);
               fetchInvoices();
+              onRefresh?.();
             }}
           />
         )}
@@ -410,6 +448,7 @@ export default function EmployeeRentTable({ mode = 'EMPLOYEE' }: EmployeeRentTab
             onSuccess={() => {
               setApproveOpen(false);
               fetchInvoices();
+              onRefresh?.();
             }}
           />
         )}
@@ -421,7 +460,10 @@ export default function EmployeeRentTable({ mode = 'EMPLOYEE' }: EmployeeRentTab
             contractId={selectedInvoice.id}
             customerName={selectedInvoice.customerName}
             invoice={editingUsage}
-            onSuccess={fetchInvoices}
+            onSuccess={() => {
+              fetchInvoices();
+              onRefresh?.();
+            }}
           />
         )}
       </div>

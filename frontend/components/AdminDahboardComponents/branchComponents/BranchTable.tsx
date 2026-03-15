@@ -37,6 +37,7 @@ import {
 import { getManagersByRole, Employee } from '@/lib/employee';
 import { toast } from 'sonner';
 import { getUserFromToken } from '@/lib/auth';
+import Pagination from '@/components/Pagination';
 
 type BranchFormData = {
   id?: string;
@@ -62,6 +63,8 @@ const formatDate = (dateString: string) => {
  * Includes statistics/summary cards for branch status.
  * Features a listed view of branches with searching, and add/edit/delete functionality.
  */
+import { usePagination } from '@/hooks/usePagination';
+
 export default function BranchReport() {
   const [branches, setBranches] = useState<Branch[]>([]);
   const [managers, setManagers] = useState<Employee[]>([]);
@@ -72,6 +75,8 @@ export default function BranchReport() {
   const [branchToDelete, setBranchToDelete] = useState<Branch | null>(null);
   const [selectedBranch, setSelectedBranch] = useState<Branch | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  const { page, limit, total, setPage, setTotal, totalPages } = usePagination(5);
 
   const user = getUserFromToken();
   const isAdmin = user?.role === 'ADMIN';
@@ -108,6 +113,14 @@ export default function BranchReport() {
   const filtered = branches.filter((b) =>
     `${b.name} ${b.address} ${b.location}`.toLowerCase().includes(search.toLowerCase()),
   );
+
+  useEffect(() => {
+    setTotal(filtered.length);
+  }, [filtered.length, setTotal]);
+
+  useEffect(() => {
+    setTotal(filtered.length);
+  }, [filtered.length, setTotal]);
 
   const totalBranches = branches.length;
   const activeBranches = branches.filter((b) => b.status === 'ACTIVE').length;
@@ -189,6 +202,8 @@ export default function BranchReport() {
     );
   }
 
+  const paginatedFiltered = filtered.slice((page - 1) * limit, page * limit);
+
   return (
     <div className="bg-bg-muted min-h-screen p-3 sm:p-4 md:p-6 space-y-8 sm:space-y-10">
       {/* BRANCHES */}
@@ -241,7 +256,7 @@ export default function BranchReport() {
         </div>
 
         {/* TABLE */}
-        <div className="rounded-2xl bg-card shadow-sm overflow-hidden">
+        <div className="rounded-2xl bg-card shadow-sm overflow-hidden border">
           <Table>
             <TableHeader>
               <TableRow>
@@ -249,7 +264,7 @@ export default function BranchReport() {
                   (h) => (
                     <TableHead
                       key={h}
-                      className="text-[11px] font-semibold text-primary uppercase px-4"
+                      className="text-[11px] font-semibold text-primary uppercase px-4 py-3"
                     >
                       {h}
                     </TableHead>
@@ -259,9 +274,9 @@ export default function BranchReport() {
             </TableHeader>
 
             <TableBody>
-              {filtered.map((b, i) => (
+              {paginatedFiltered.map((b, i) => (
                 <TableRow key={b.id} className={i % 2 ? 'bg-blue-50/20' : 'bg-card'}>
-                  <TableCell className="px-4 font-medium">
+                  <TableCell className="px-4 py-3 font-medium">
                     <button
                       className="text-primary hover:underline text-left font-medium"
                       onClick={() => setSelectedBranch(b)}
@@ -269,17 +284,17 @@ export default function BranchReport() {
                       {b.name}
                     </button>
                   </TableCell>
-                  <TableCell className="px-4">{b.address}</TableCell>
-                  <TableCell className="px-4">{b.location}</TableCell>
-                  <TableCell className="px-4">
+                  <TableCell className="px-4 py-3">{b.address}</TableCell>
+                  <TableCell className="px-4 py-3">{b.location}</TableCell>
+                  <TableCell className="px-4 py-3">
                     <span
                       className={`${getManagerName(b.manager_id) === 'Unassigned' ? 'text-slate-400' : 'text-foreground'}`}
                     >
                       {getManagerName(b.manager_id)}
                     </span>
                   </TableCell>
-                  <TableCell className="px-4">{formatDate(b.started_date)}</TableCell>
-                  <TableCell className="px-4">
+                  <TableCell className="px-4 py-3">{formatDate(b.started_date)}</TableCell>
+                  <TableCell className="px-4 py-3">
                     <span
                       className={`px-2.5 py-1 rounded-full text-xs font-medium ${
                         b.status === 'ACTIVE'
@@ -290,7 +305,7 @@ export default function BranchReport() {
                       {b.status}
                     </span>
                   </TableCell>
-                  <TableCell className="px-4">
+                  <TableCell className="px-4 py-3 text-right">
                     {isAdmin && (
                       <div className="flex gap-3 text-sm">
                         <button
@@ -316,6 +331,14 @@ export default function BranchReport() {
             </TableBody>
           </Table>
         </div>
+
+        <Pagination
+          page={page}
+          totalPages={totalPages}
+          total={total}
+          limit={limit}
+          onPageChange={setPage}
+        />
       </div>
 
       {/* MODALS */}

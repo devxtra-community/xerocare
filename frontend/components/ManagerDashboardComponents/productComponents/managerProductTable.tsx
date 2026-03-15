@@ -469,7 +469,7 @@ function ProductFormModal({
         {/* Left Column */}
         <div className="space-y-4">
           <Field label="Brand">
-            <Select
+            <SearchableSelect
               value={selectedBrandId}
               disabled={!!initialData}
               onValueChange={(v) => {
@@ -481,22 +481,18 @@ function ProductFormModal({
                   model_id: '', // Reset model when brand changes
                 });
               }}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select Brand" />
-              </SelectTrigger>
-              <SelectContent>
-                {brands.map((b) => (
-                  <SelectItem key={b.id} value={b.id}>
-                    {b.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              options={brands.map((b) => ({
+                value: b.id,
+                label: b.name,
+                description: `ID: ${b.id}`,
+              }))}
+              placeholder="Select Brand"
+              emptyText="No brands found."
+            />
           </Field>
 
           <Field label="Model">
-            <Select
+            <SearchableSelect
               value={form.model_id}
               disabled={!selectedBrandId || !!initialData}
               onValueChange={(v) => {
@@ -505,20 +501,14 @@ function ProductFormModal({
                   model_id: v,
                 });
               }}
-            >
-              <SelectTrigger>
-                <SelectValue
-                  placeholder={selectedBrandId ? 'Select Model' : 'Select Brand First'}
-                />
-              </SelectTrigger>
-              <SelectContent>
-                {filteredModels.map((m) => (
-                  <SelectItem key={m.id} value={m.id}>
-                    {m.model_name} ({m.model_no})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              options={filteredModels.map((m) => ({
+                value: m.id,
+                label: m.model_name,
+                description: `No: ${m.model_no}`,
+              }))}
+              placeholder={selectedBrandId ? 'Select Model' : 'Select Brand First'}
+              emptyText="No models found."
+            />
           </Field>
 
           <Field label="Product Name">
@@ -555,22 +545,18 @@ function ProductFormModal({
 
           <div className="grid grid-cols-2 gap-2">
             <Field label="Vendor">
-              <Select
+              <SearchableSelect
                 value={String(form.vendor_id)}
                 disabled={!!initialData}
                 onValueChange={(v) => setForm({ ...form, vendor_id: v })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select Vendor" />
-                </SelectTrigger>
-                <SelectContent>
-                  {vendors.map((v) => (
-                    <SelectItem key={v.id} value={String(v.id)}>
-                      {v.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                options={vendors.map((v) => ({
+                  value: String(v.id),
+                  label: v.name,
+                  description: `ID: ${v.id}`,
+                }))}
+                placeholder="Select Vendor"
+                emptyText="No vendors found."
+              />
             </Field>
 
             <Field label="Lot (Optional)">
@@ -628,13 +614,13 @@ function ProductFormModal({
                           .map((i, idx) => {
                             const mId = i.modelId || i.model?.id;
                             const model = models.find((m) => m.id === mId);
-                            const available = i.quantity - i.usedQuantity;
+                            const available = i.receivedQuantity - i.usedQuantity;
                             return {
                               value: i.id || mId || String(idx),
                               label: model
                                 ? `${model.model_name} (${model.model_no})`
                                 : 'Unknown Model',
-                              description: `Available: ${available} / ${i.quantity}`,
+                              description: `Available: ${available} / ${i.receivedQuantity}`,
                             };
                           }) || []
                       );
@@ -653,7 +639,7 @@ function ProductFormModal({
                             i.model?.id === selectedLotItemId,
                         );
                         if (!item) return null;
-                        const available = item.quantity - item.usedQuantity;
+                        const available = item.receivedQuantity - item.usedQuantity;
                         return (
                           <span
                             className={
@@ -663,8 +649,8 @@ function ProductFormModal({
                             }
                           >
                             {available > 0
-                              ? `✓ Available in Lot: ${available} / ${item.quantity}`
-                              : `✗ Out of Stock in Lot: ${available} / ${item.quantity}`}
+                              ? `✓ Available in Lot: ${available} / ${item.receivedQuantity}`
+                              : `✗ Out of Stock in Lot: ${available} / ${item.receivedQuantity}`}
                           </span>
                         );
                       })()}
@@ -676,21 +662,17 @@ function ProductFormModal({
           </div>
 
           <Field label="Warehouse">
-            <Select
+            <SearchableSelect
               value={form.warehouse_id}
               onValueChange={(v) => setForm({ ...form, warehouse_id: v })}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select Warehouse" />
-              </SelectTrigger>
-              <SelectContent>
-                {warehouses.map((w) => (
-                  <SelectItem key={w.id} value={w.id}>
-                    {w.warehouseName}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              options={warehouses.map((w) => ({
+                value: w.id,
+                label: w.warehouseName,
+                description: `ID: ${w.id}`,
+              }))}
+              placeholder="Select Warehouse"
+              emptyText="No warehouses found."
+            />
           </Field>
 
           <div className="grid grid-cols-2 gap-2">

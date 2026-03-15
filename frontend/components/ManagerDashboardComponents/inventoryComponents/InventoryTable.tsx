@@ -31,19 +31,20 @@ interface InventoryTableProps {
  * Supports viewing inventory globally, by branch, or by warehouse.
  * Displays detailed stock information: Total, Available, Rented, and Damaged quantities along with Model and Brand details.
  */
+import { usePagination } from '@/hooks/usePagination';
+import Pagination from '@/components/Pagination';
+
 export default function InventoryTable({
   mode = 'global',
   warehouseId,
   selectedYear,
 }: InventoryTableProps) {
-  // const router = useRouter();
-  const [page, setPage] = useState(1);
+  const { page, limit, total, setPage, setTotal, totalPages } = usePagination(8);
   const [data, setData] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedBrand, setSelectedBrand] = useState<string>('all');
   const [selectedVendor, setSelectedVendor] = useState<string>('all');
-  const itemsPerPage = 8;
 
   useEffect(() => {
     const fetchData = async () => {
@@ -86,10 +87,13 @@ export default function InventoryTable({
     Boolean,
   );
 
-  const total = filteredData.length;
-  const totalPages = Math.ceil(total / itemsPerPage);
-  const startIndex = (page - 1) * itemsPerPage;
-  const currentData = filteredData.slice(startIndex, startIndex + itemsPerPage);
+  // Update total items when filtered data changes
+  useEffect(() => {
+    setTotal(filteredData.length);
+  }, [filteredData.length, setTotal]);
+
+  const startIndex = (page - 1) * limit;
+  const currentData = filteredData.slice(startIndex, startIndex + limit);
 
   const resetFilters = () => {
     setSearchQuery('');
@@ -289,43 +293,13 @@ export default function InventoryTable({
           </Table>
         </div>
 
-        <div className="p-4 border-t border-gray-50 flex items-center justify-between bg-card text-xs">
-          Showing {(page - 1) * itemsPerPage + 1} to {Math.min(page * itemsPerPage, total)} of{' '}
-          {total} items
-          <div className="flex items-center gap-1">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              disabled={page === 1}
-              className="h-8 rounded-lg border-gray-100 text-gray-600 hover:bg-muted/50 text-[11px]"
-            >
-              Prev
-            </Button>
-            {[...Array(totalPages)].map((_, i) => (
-              <button
-                key={i}
-                onClick={() => setPage(i + 1)}
-                className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${
-                  page === i + 1
-                    ? 'bg-primary text-white font-bold'
-                    : 'text-muted-foreground hover:bg-muted/50'
-                }`}
-              >
-                {i + 1}
-              </button>
-            ))}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-              disabled={page === totalPages}
-              className="h-8 rounded-lg border-gray-100 text-gray-600 hover:bg-muted/50 text-[11px]"
-            >
-              Next
-            </Button>
-          </div>
-        </div>
+        <Pagination
+          page={page}
+          totalPages={totalPages}
+          total={total}
+          limit={limit}
+          onPageChange={setPage}
+        />
       </div>
     </div>
   );

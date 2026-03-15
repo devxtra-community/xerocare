@@ -365,10 +365,6 @@ export class UsageService {
       }
     }
 
-    if (payload.discountAmount && payload.discountAmount > 0) {
-      exceededCharge = Math.max(0, exceededCharge - payload.discountAmount);
-    }
-
     // 8. Determine Rent & Final Month Logic
     // STRICT CHANGE: Store actual charged rent here based on strict logic
 
@@ -411,11 +407,15 @@ export class UsageService {
         contract.isFinalMonth = true;
         contract.advanceAdjusted = advanceAdjusted;
 
-        // Payable = (Rent + Exceeded) - Deducted Advance
-        // Since Deducted Advance == Rent, Payable = Exceeded
-        contract.totalAmount = monthlyRent + exceededCharge - advanceAdjusted;
+        // Payable = (Rent + Exceeded) - Deducted Advance - Discount
+        contract.totalAmount = Math.max(
+          0,
+          monthlyRent + exceededCharge - advanceAdjusted - (payload.discountAmount || 0),
+        );
 
         contract.grossAmount = monthlyRent + exceededCharge; // Show full amount as Gross
+        contract.discountAmount =
+          (Number(contract.discountAmount) || 0) + (Number(payload.discountAmount) || 0);
 
         await queryRunner.manager.save(contract); // Save contract status update
 
@@ -438,7 +438,10 @@ export class UsageService {
           exceededCharge,
           monthlyRent, // Store ACTUAL rent
           advanceAdjusted, // Store Advance Used
-          totalCharge: monthlyRent + exceededCharge - advanceAdjusted, // Store ACTUAL PAYABLE charge
+          totalCharge: Math.max(
+            0,
+            monthlyRent + exceededCharge - advanceAdjusted - (payload.discountAmount || 0),
+          ), // Store ACTUAL PAYABLE charge
           exceededTotal,
           discountBwCopies: payload.discountBwCopies || 0,
           discountColorCopies: payload.discountColorCopies || 0,
@@ -506,7 +509,6 @@ export class UsageService {
       }
     } else {
       // === STANDARD MONTH LOGIC ===
-      const totalCharge = exceededCharge + monthlyRent;
       const usage = this.usageRepo.create({
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         contract: { id: payload.contractId } as any,
@@ -525,7 +527,7 @@ export class UsageService {
         remarks: payload.remarks,
         exceededCharge,
         monthlyRent,
-        totalCharge,
+        totalCharge: Math.max(0, exceededCharge + monthlyRent - (payload.discountAmount || 0)),
         exceededTotal,
         discountBwCopies: payload.discountBwCopies || 0,
         discountColorCopies: payload.discountColorCopies || 0,
@@ -695,6 +697,14 @@ export class UsageService {
         exceededAmount: exceededCharge,
         rent: monthlyRent,
         advanceAdjusted,
+        // Advance amount from the contract (total security deposit / advance)
+        advanceAmount: Number(contract.advanceAmount || 0),
+        // EMI per cycle
+        emiAmount: Number(
+          contract.monthlyEmiAmount || contract.monthlyLeaseAmount || contract.monthlyRent || 0,
+        ),
+        // The total value of the entire contract (e.g. 1.2M)
+        totalLeaseAmount: Number(contract.totalLeaseAmount || contract.totalAmount || 0),
         finalTotal: finalTotal,
         meterImageUrl,
         emailSentAt: record.emailSentAt ? new Date(record.emailSentAt).toISOString() : undefined,
@@ -1190,10 +1200,7 @@ export class UsageService {
       }
     }
 
-    if (discountAmt > 0) {
-      exceededCharge = Math.max(0, exceededCharge - discountAmt);
-    }
-
+    // Finalize charges
     usage.bwA4Count = payload.bwA4Count;
     usage.bwA3Count = payload.bwA3Count;
     usage.colorA4Count = payload.colorA4Count;
@@ -1271,8 +1278,10 @@ export class UsageService {
     usage.discountColorCopies = discountColor;
     usage.discountAmount = discountAmt;
 
-    usage.totalCharge =
-      Number(usage.monthlyRent) + exceededCharge - Number(usage.advanceAdjusted || 0);
+    usage.totalCharge = Math.max(
+      0,
+      Number(usage.monthlyRent) + exceededCharge - Number(usage.advanceAdjusted || 0) - discountAmt,
+    );
 
     return this.usageRepo.save(usage);
   }

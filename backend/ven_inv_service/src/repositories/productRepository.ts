@@ -28,8 +28,8 @@ export class ProductRepository {
     }
 
     return this.repo.find({
-      relations: { model: true, warehouse: true, lot: true },
       where,
+      relations: { model: true, warehouse: true },
     });
   }
 

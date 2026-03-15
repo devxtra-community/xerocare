@@ -85,7 +85,7 @@ export default function EmployeePieChart({ selectedYear }: { selectedYear: numbe
   }, [selectedYear]);
 
   return (
-    <div className="rounded-2xl bg-card p-2 sm:p-3 shadow-sm w-full h-[280px] flex flex-col">
+    <div className="rounded-2xl bg-card p-2 sm:p-3 shadow-sm w-full h-[340px] flex flex-col">
       {!isClient || data.length === 0 ? (
         <div className="flex-1 flex items-center justify-center">
           <p className="text-sm text-muted-foreground">Loading distribution...</p>

@@ -8,6 +8,7 @@ import { Product, ProductStatus } from '../entities/productEntity';
 import { logger } from '../config/logger';
 import { LotService } from './lotService';
 import { LotItemType } from '../entities/lotItemEntity';
+import { LotStatus } from '../entities/lotEntity';
 import { getCached, setCached, deleteCached, getMultipleCached } from '../utils/cacheUtil';
 
 /**
@@ -70,6 +71,14 @@ export class ProductService {
         }
 
         if (row.lot_id) {
+          // Guard: inventory cannot be created before lot is received
+          const lot = await this.lotService.getLotById(row.lot_id);
+          if (lot.status !== LotStatus.RECEIVED) {
+            throw new AppError(
+              'Inventory cannot be created until the lot is received. Please confirm the lot reception first.',
+              400,
+            );
+          }
           await this.lotService.validateAndTrackUsage(
             row.lot_id,
             LotItemType.MODEL,
@@ -134,6 +143,14 @@ export class ProductService {
       }
 
       if (data.lot_id) {
+        // Guard: inventory cannot be created before lot is received
+        const lot = await this.lotService.getLotById(data.lot_id);
+        if (lot.status !== LotStatus.RECEIVED) {
+          throw new AppError(
+            'Inventory cannot be created until the lot is received. Please confirm the lot reception first.',
+            400,
+          );
+        }
         await this.lotService.validateAndTrackUsage(
           data.lot_id,
           LotItemType.MODEL,

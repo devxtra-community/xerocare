@@ -6,6 +6,7 @@ import { AppError } from '../errors/appError';
 import { MulterS3File } from '../types/multer-s3-file';
 import { Source } from '../config/dataSource';
 import { ProductAllocation } from '../entities/productAllocationEntity';
+import { EmployeeRole } from '../constants/employeeRole';
 
 const billingService = new BillingService();
 const reportService = new BillingReportService();
@@ -676,7 +677,13 @@ export const getInvoiceHistory = async (req: Request, res: Response, next: NextF
     }
 
     const saleType = req.query.saleType as string | undefined;
-    const history = await reportService.getInvoiceHistory(branchId, saleType);
+
+    // If not Admin/Finance, restrict to creator's invoices
+    const isSpecializedRole =
+      req.user?.role === EmployeeRole.ADMIN || req.user?.role === EmployeeRole.FINANCE;
+    const creatorId = isSpecializedRole ? undefined : req.user?.userId;
+
+    const history = await reportService.getInvoiceHistory(branchId, saleType, creatorId);
 
     return res.status(200).json({
       success: true,

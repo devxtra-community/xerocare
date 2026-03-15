@@ -24,6 +24,7 @@ interface SearchableSelectProps {
   emptyText?: string;
   loading?: boolean;
   className?: string;
+  disabled?: boolean;
 }
 
 export function SearchableSelect({
@@ -35,6 +36,7 @@ export function SearchableSelect({
   emptyText = 'No results found.',
   loading = false,
   className,
+  disabled = false,
 }: SearchableSelectProps) {
   const [open, setOpen] = React.useState(false);
   const [searchQuery, setSearchQuery] = React.useState('');
@@ -47,9 +49,14 @@ export function SearchableSelect({
     }
   }, [open]);
 
-  const filteredOptions = options.filter((option) =>
-    option.label.toLowerCase().includes(searchQuery.toLowerCase()),
-  );
+  const filteredOptions = options.filter((option) => {
+    const searchStr = searchQuery.toLowerCase();
+    return (
+      option.label.toLowerCase().includes(searchStr) ||
+      option.value.toLowerCase().includes(searchStr) ||
+      (option.description && option.description.toLowerCase().includes(searchStr))
+    );
+  });
 
   const handleSelect = (option: SearchableSelectOption) => {
     onValueChange(option.value);
@@ -63,6 +70,7 @@ export function SearchableSelect({
         <Button
           variant="outline"
           role="combobox"
+          disabled={disabled}
           aria-expanded={open}
           className={cn(
             'w-full justify-between h-10 px-3 bg-card hover:bg-muted/50 border-input text-foreground',

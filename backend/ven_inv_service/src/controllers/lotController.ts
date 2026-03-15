@@ -1,6 +1,7 @@
 import { NextFunction, Request, Response } from 'express';
 import { LotService } from '../services/lotService';
 import { AppError } from '../errors/appError';
+import { LotStatus } from '../entities/lotEntity';
 
 const lotService = new LotService();
 
@@ -195,6 +196,74 @@ export const getLotStats = async (req: Request, res: Response, next: NextFunctio
         monthlyExpenses: monthly,
       },
     });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * PATCH /lots/:id/receive
+ * Updates received and damaged quantities for lot items.
+ * Transitions lot status to RECEIVING.
+ */
+export const updateReceivingQuantities = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const isAdmin = req.user?.role === 'ADMIN';
+    const branchId = isAdmin ? undefined : req.user?.branchId;
+
+    const { items } = req.body as {
+      items: { item_id: string; received_quantity: number; damaged_quantity: number }[];
+    };
+
+    if (!Array.isArray(items) || items.length === 0) {
+      throw new AppError('items array is required', 400);
+    }
+
+    // Validate individual item payloads
+    for (const item of items) {
+      if (!item.item_id) throw new AppError('item_id is required for each item', 400);
+      if (typeof item.received_quantity !== 'number' || item.received_quantity < 0) {
+        throw new AppError('received_quantity must be a non-negative number', 400);
+      }
+      if (typeof item.damaged_quantity !== 'number' || item.damaged_quantity < 0) {
+        throw new AppError('damaged_quantity must be a non-negative number', 400);
+      }
+    }
+
+    const updatedLot = await lotService.updateReceivingQuantities(id, items, branchId);
+    res.status(200).json({ success: true, data: updatedLot });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * POST /lots/:id/confirm
+ * Confirms lot as RECEIVED. After this, inventory creation is unlocked.
+ */
+export const confirmLotReceived = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const isAdmin = req.user?.role === 'ADMIN';
+    const branchId = isAdmin ? undefined : req.user?.branchId;
+
+    // Fetch the lot first to do an extra branch-isolation check
+    const lot = await lotService.getLotById(id);
+    if (!isAdmin && lot.branch_id !== req.user?.branchId) {
+      throw new AppError('Access denied: Lot belongs to another branch', 403);
+    }
+
+    if (lot.status === LotStatus.RECEIVED) {
+      throw new AppError('Lot is already confirmed as received', 400);
+    }
+
+    const confirmedLot = await lotService.confirmLotReceived(id, branchId);
+    res.status(200).json({ success: true, data: confirmedLot });
   } catch (err) {
     next(err);
   }

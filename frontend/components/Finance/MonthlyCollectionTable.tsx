@@ -29,7 +29,13 @@ import { formatCurrency } from '@/lib/format';
  * Table displaying monthly collection alerts for active contracts.
  * Shows pending usage recording, invoicing, and final summary actions.
  */
-export default function MonthlyCollectionTable({ mode }: { mode?: 'RENT' | 'LEASE' }) {
+export default function MonthlyCollectionTable({
+  mode,
+  onSuccess,
+}: {
+  mode?: 'RENT' | 'LEASE';
+  onSuccess?: () => void;
+}) {
   const [alerts, setAlerts] = useState<CollectionAlert[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedContract, setSelectedContract] = useState<CollectionAlert | null>(null);
@@ -43,7 +49,7 @@ export default function MonthlyCollectionTable({ mode }: { mode?: 'RENT' | 'LEAS
   const [historyContractId, setHistoryContractId] = useState<string>('');
   const [contractItems, setContractItems] = useState<Record<string, string>>({});
 
-  const { page, limit, setPage, setLimit } = usePagination(10);
+  const { page, limit, setPage, setLimit } = usePagination(5);
   // const years = Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 1 + i);
 
   const handleShowHistory = (alertItem: CollectionAlert) => {
@@ -116,6 +122,7 @@ export default function MonthlyCollectionTable({ mode }: { mode?: 'RENT' | 'LEAS
       await generateConsolidatedFinalInvoice(contractToComplete.contractId);
       toast.success('Final summary generated and contract completed!');
       fetchAlerts();
+      onSuccess?.();
     } catch (error: unknown) {
       toast.error((error as { message?: string }).message || 'Failed to generate final summary');
     } finally {
@@ -346,7 +353,10 @@ export default function MonthlyCollectionTable({ mode }: { mode?: 'RENT' | 'LEAS
           }}
           contractId={selectedContract.contractId}
           customerName={selectedContract.customerName}
-          onSuccess={fetchAlerts}
+          onSuccess={() => {
+            fetchAlerts();
+            onSuccess?.();
+          }}
           invoice={editingInvoice}
         />
       )}
@@ -368,6 +378,7 @@ export default function MonthlyCollectionTable({ mode }: { mode?: 'RENT' | 'LEAS
         customerName={
           alerts.find((a) => a.contractId === historyContractId)?.customerName || 'History'
         }
+        onSuccess={onSuccess}
       />
 
       <AlertDialog open={confirmSummaryOpen} onOpenChange={setConfirmSummaryOpen}>

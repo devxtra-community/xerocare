@@ -15,7 +15,9 @@ import { Warehouse } from './warehouseEntity';
 
 export enum LotStatus {
   PENDING = 'PENDING',
-  COMPLETED = 'COMPLETED',
+  RECEIVING = 'RECEIVING',
+  RECEIVED = 'RECEIVED',
+  COMPLETED = 'COMPLETED', // kept for backward compatibility
   CANCELLED = 'CANCELLED',
 }
 
@@ -41,7 +43,7 @@ export class Lot {
   @Column({ name: 'total_amount', type: 'decimal', precision: 12, scale: 2, default: 0 })
   totalAmount!: number;
 
-  @Column({ type: 'enum', enum: LotStatus, default: LotStatus.COMPLETED })
+  @Column({ type: 'enum', enum: LotStatus, default: LotStatus.PENDING })
   status!: LotStatus;
 
   // -------------

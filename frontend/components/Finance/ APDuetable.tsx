@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect } from 'react';
 import Link from 'next/link';
 // Assuming these imports work for your mock data and UI components
 import { apInvoices, vendors } from '@/lib/finance/ap';
@@ -15,8 +16,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ArrowRight } from 'lucide-react';
+import Pagination from '@/components/Pagination';
 
 const isOverdue = (dueDate: string) => new Date(dueDate) < new Date();
+
+import { usePagination } from '@/hooks/usePagination';
 
 /**
  * Table displaying Accounts Payable (AP) invoices that are due.
@@ -35,8 +39,16 @@ export default function APDueTable() {
 
   const dueInvoices = apInvoices
     .filter((inv) => inv.status !== 'Paid')
-    .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime()) // Correct sorting
-    .slice(0, 5); // Show top 5 priority invoices
+    .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
+
+  const { page, limit, total, setPage, setTotal, totalPages } = usePagination(5);
+
+  // Update total when filtered list changes
+  useEffect(() => {
+    setTotal(dueInvoices.length);
+  }, [dueInvoices.length, setTotal]);
+
+  const paginatedDueInvoices = dueInvoices.slice((page - 1) * limit, page * limit);
 
   return (
     <Card className="shadow-sm border-border">
@@ -58,12 +70,11 @@ export default function APDueTable() {
               <TableHead className="w-[120px]">Due Date</TableHead>
               <TableHead className="text-right">Amount</TableHead>
               <TableHead className="w-[120px]">Status</TableHead>
-              {/* <TableHead className="w-[80px] text-right">Action</TableHead> */}
             </TableRow>
           </TableHeader>
 
           <TableBody>
-            {dueInvoices.map((inv) => {
+            {paginatedDueInvoices.map((inv) => {
               const vendor = vendors.find((v) => v.id === inv.vendorId);
               const overdue = isOverdue(inv.dueDate);
 
@@ -96,17 +107,19 @@ export default function APDueTable() {
                       {overdue ? 'Overdue' : 'Pending'}
                     </Badge>
                   </TableCell>
-                  {/* 
-                  <TableCell className="text-right">
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-blue-600 hover:bg-blue-100" title="Initiate Payment">
-                      <DollarSign className="h-4 w-4" />
-                    </Button>
-                  </TableCell> */}
                 </TableRow>
               );
             })}
           </TableBody>
         </Table>
+
+        <Pagination
+          page={page}
+          totalPages={totalPages}
+          total={total}
+          limit={limit}
+          onPageChange={setPage}
+        />
       </CardContent>
     </Card>
   );

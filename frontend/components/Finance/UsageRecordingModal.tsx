@@ -608,6 +608,8 @@ export default function UsageRecordingModal({
     return products.some((p) => p.print_colour === 'COLOUR' || p.print_colour === 'BOTH');
   }, [ruleItems, products]);
 
+  // Calculate Aggregated Initial Counts from ALL Product Items
+
   // Detect Last Month (Strict Date Match)
   const isLastMonth = React.useMemo(() => {
     if (!contract?.effectiveTo || !formData.billingPeriodEnd) return false;
@@ -823,10 +825,6 @@ export default function UsageRecordingModal({
       }
     }
 
-    if (formData.discountType === 'AMOUNT') {
-      totalAmount = Math.max(0, totalAmount - Number(formData.discountAmount || 0));
-    }
-
     const finalVal = Math.round((totalAmount + Number.EPSILON) * 100) / 100;
 
     // Rent Calculation Logic
@@ -858,7 +856,13 @@ export default function UsageRecordingModal({
       total: (isNaN(finalVal) ? 0 : finalVal) + applicableRent,
     });
 
-    setEstimatedCost((isNaN(finalVal) ? 0 : finalVal) + applicableRent);
+    const usageCharge = isNaN(finalVal) ? 0 : finalVal;
+    let netTotal = usageCharge + applicableRent;
+    if (formData.discountType === 'AMOUNT') {
+      netTotal = Math.max(0, netTotal - Number(formData.discountAmount || 0));
+    }
+
+    setEstimatedCost(netTotal);
   }, [
     formData,
     contract,

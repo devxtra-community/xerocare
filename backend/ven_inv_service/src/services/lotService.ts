@@ -114,4 +114,24 @@ export class LotService {
   ): Promise<{ month: string; total: number }[]> {
     return await this.lotRepository.getMonthlyLotTotals(branch_id, year);
   }
+
+  /**
+   * Updates received/damaged quantities for lot items.
+   * Transitions lot status to RECEIVING.
+   */
+  async updateReceivingQuantities(
+    lotId: string,
+    items: { item_id: string; received_quantity: number; damaged_quantity: number }[],
+    branchId?: string,
+  ): Promise<Lot> {
+    return await this.lotRepository.updateReceivingQuantities(lotId, items, branchId);
+  }
+
+  /**
+   * Confirms all goods received; transitions lot status to RECEIVED.
+   * After this call, inventory creation for items in this lot is permitted.
+   */
+  async confirmLotReceived(lotId: string, branchId?: string): Promise<Lot> {
+    return await this.lotRepository.confirmLotReceived(lotId, branchId);
+  }
 }

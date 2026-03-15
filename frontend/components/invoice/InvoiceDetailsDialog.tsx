@@ -182,7 +182,43 @@ export function InvoiceDetailsDialog({
   }, [currentInvoice]);
 
   const grandTotal = React.useMemo(() => {
-    if (currentInvoice.saleType === 'RENT' || currentInvoice.saleType === 'LEASE') {
+    if (currentInvoice.type === 'FINAL') {
+      return currentInvoice.totalAmount || 0;
+    }
+
+    if (currentInvoice.type === 'PROFORMA' && currentInvoice.saleType === 'SALE') {
+      const orderItemsTotal = (currentInvoice.items || []).reduce(
+        (sum, item) => sum + (item.quantity || 0) * (item.unitPrice || 0),
+        0,
+      );
+      const discount =
+        currentInvoice.discountAmount ||
+        (orderItemsTotal * (currentInvoice.discountPercent || 0)) / 100;
+      return Math.max(0, orderItemsTotal - discount);
+    }
+
+    if (currentInvoice.saleType === 'LEASE' && currentInvoice.totalLeaseAmount) {
+      return currentInvoice.totalLeaseAmount;
+    }
+    if (currentInvoice.saleType === 'RENT') {
+      const rent = currentInvoice.monthlyRent || 0;
+      const additional = currentInvoice.additionalCharges || 0;
+
+      // Include other order items if any
+      const orderItemsTotal = (currentInvoice.items || [])
+        .filter(
+          (item) =>
+            item.itemType !== 'PRICING_RULE' &&
+            !item.description.startsWith('Black & White') &&
+            !item.description.startsWith('Color') &&
+            !item.description.startsWith('Combined'),
+        )
+        .reduce((sum, item) => sum + (item.quantity || 0) * (item.unitPrice || 0), 0);
+
+      return Math.max(0, rent + additional + excessAmount + orderItemsTotal);
+    }
+
+    if (currentInvoice.saleType === 'LEASE') {
       const rent = currentInvoice.monthlyRent || 0;
       const additional = currentInvoice.additionalCharges || 0;
       const advance = Number(currentInvoice.advanceAmount || currentInvoice.advanceAdjusted || 0);
@@ -211,9 +247,13 @@ export function InvoiceDetailsDialog({
     const currentInvoiceAmt = grandTotal;
     const historyTotal = history.reduce((sum, inv) => sum + (inv.totalAmount || 0), 0);
 
-    const totalInvoiced = currentInvoiceAmt + historyTotal;
+    const totalInvoiced =
+      currentInvoice.saleType === 'LEASE' && currentInvoice.totalLeaseAmount
+        ? currentInvoice.totalLeaseAmount
+        : (currentInvoice.displayAmount || currentInvoiceAmt + historyTotal) +
+          (currentInvoice.usageRevenue || 0);
 
-    // Calculate total paid from history only, as current invoice is usually not paid if we are approving it
+    // Calculate total paid from history plus any payment on current invoice
     // If current invoice IS paid, it should be in history or handled separately?
     // Usually approved invoice is PENDING.
     const totalPaid =
@@ -222,7 +262,11 @@ export function InvoiceDetailsDialog({
         .reduce((sum, inv) => sum + (inv.totalAmount || 0), 0) +
       (currentInvoice.status === 'PAID' ? currentInvoiceAmt : 0);
 
-    const pendingBalance = totalInvoiced - totalPaid;
+    const advance = Number(currentInvoice.advanceAmount || currentInvoice.advanceAdjusted || 0);
+    const pendingBalance =
+      currentInvoice.saleType === 'LEASE' || currentInvoice.saleType === 'RENT'
+        ? totalInvoiced - totalPaid - advance
+        : totalInvoiced - totalPaid;
 
     return {
       totalInvoiced,
@@ -522,13 +566,17 @@ export function InvoiceDetailsDialog({
                   {currentInvoice.leaseTenureMonths} Months
                 </p>
               </div>
-              {currentInvoice.monthlyEmiAmount && (
+              {(currentInvoice.monthlyEmiAmount || currentInvoice.monthlyLeaseAmount) && (
                 <div className="space-y-1">
                   <p className="text-[10px] font-bold text-lease uppercase tracking-wider">
-                    Monthly EMI
+                    {currentInvoice.leaseType === 'FSM' ? 'Monthly Lease Amount' : 'Monthly EMI'}
                   </p>
                   <p className="text-xs font-bold text-gray-700">
-                    {formatCurrency(currentInvoice.monthlyEmiAmount)}
+                    {formatCurrency(
+                      currentInvoice.leaseType === 'FSM'
+                        ? currentInvoice.monthlyLeaseAmount || currentInvoice.monthlyEmiAmount || 0
+                        : currentInvoice.monthlyEmiAmount || 0,
+                    )}
                   </p>
                 </div>
               )}
@@ -1071,7 +1119,16 @@ export function InvoiceDetailsDialog({
                           {item.quantity}
                         </TableCell>
                         <TableCell className="text-right font-bold text-foreground text-sm align-top py-3">
-                          QAR {((item.quantity || 0) * (item.unitPrice || 0)).toLocaleString()}
+                          QAR{' '}
+                          {(
+                            (item.quantity || 0) * (item.unitPrice || 0) ||
+                            (currentInvoice.saleType === 'LEASE'
+                              ? currentInvoice.totalLeaseAmount
+                              : currentInvoice.saleType === 'RENT'
+                                ? currentInvoice.monthlyRent
+                                : 0) ||
+                            0
+                          ).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                         </TableCell>
                       </TableRow>
                     ))}
@@ -1090,15 +1147,31 @@ export function InvoiceDetailsDialog({
                 <div className="space-y-1">
                   <p className="text-[10px] font-bold text-gray-400 uppercase">
                     {currentInvoice.saleType === 'LEASE'
-                      ? 'Monthly EMI'
+                      ? currentInvoice.leaseType === 'FSM'
+                        ? 'Monthly Lease Amount'
+                        : 'Monthly EMI'
                       : mode === 'EMPLOYEE'
-                        ? 'Monthly Rent Balance'
+                        ? currentInvoice.type === 'PROFORMA'
+                          ? 'Total Rent Collected'
+                          : 'Monthly Rent Balance'
                         : 'Monthly Rent'}
                   </p>
                   <p className="text-sm font-bold text-gray-700">
                     {currentInvoice.saleType === 'LEASE'
-                      ? formatCurrency(currentInvoice.monthlyEmiAmount || 0)
-                      : formatCurrency(financialSummary.monthlyRent)}
+                      ? formatCurrency(
+                          currentInvoice.leaseType === 'FSM'
+                            ? currentInvoice.monthlyLeaseAmount ||
+                                currentInvoice.monthlyEmiAmount ||
+                                0
+                            : currentInvoice.monthlyEmiAmount || 0,
+                        )
+                      : mode === 'EMPLOYEE' && currentInvoice.type === 'PROFORMA'
+                        ? formatCurrency(
+                            currentInvoice.displayAmount ||
+                              (currentInvoice.advanceAmount || 0) +
+                                (currentInvoice.usageRevenue || 0),
+                          )
+                        : formatCurrency(financialSummary.monthlyRent)}
                   </p>
                 </div>
               )}
@@ -1158,20 +1231,24 @@ export function InvoiceDetailsDialog({
                       </p>
                     </div>
                   )}
-                  <div className="col-span-full pt-3 mt-1 border-t border-gray-100 flex justify-between items-center">
-                    <p className="text-[10px] font-bold text-primary uppercase">
-                      Current Pending Balance
-                    </p>
-                    <p
-                      className={`text-lg font-bold ${financialSummary.pendingBalance > 0 ? 'text-danger' : 'text-success'}`}
-                    >
-                      QAR
-                      {financialSummary.pendingBalance.toLocaleString(undefined, {
-                        minimumFractionDigits: 2,
-                      })}
-                    </p>
-                  </div>
                 </>
+              )}
+              {mode === 'FINANCE' && currentInvoice.saleType !== 'SALE' && (
+                <div className="col-span-full pt-3 mt-1 border-t border-gray-100 flex justify-between items-center">
+                  <p className="text-[10px] font-bold text-primary uppercase">
+                    {currentInvoice.saleType === 'LEASE'
+                      ? 'Total Pending Amount'
+                      : 'Current Pending Balance'}
+                  </p>
+                  <p
+                    className={`text-lg font-bold ${financialSummary.pendingBalance > 0 ? 'text-danger' : 'text-success'}`}
+                  >
+                    QAR
+                    {financialSummary.pendingBalance.toLocaleString(undefined, {
+                      minimumFractionDigits: 2,
+                    })}
+                  </p>
+                </div>
               )}
             </div>
           </div>
@@ -1230,10 +1307,16 @@ export function InvoiceDetailsDialog({
         <div className="p-6 bg-muted/50/50 border-t border-gray-100 flex flex-col md:flex-row items-center justify-between gap-6">
           <div className="flex flex-col items-center md:items-start">
             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider leading-none mb-1">
-              Grand Total
+              Grand Total {currentInvoice.type === 'PROFORMA' && '(Collected)'}
             </p>
             <p className="text-2xl font-bold text-primary">
-              QAR {grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+              {formatCurrency(
+                currentInvoice.displayAmount ||
+                  (currentInvoice.type === 'PROFORMA' && currentInvoice.saleType !== 'SALE'
+                    ? (currentInvoice.advanceAmount || 0) + (currentInvoice.usageRevenue || 0)
+                    : grandTotal) ||
+                  grandTotal,
+              )}
             </p>
           </div>
 

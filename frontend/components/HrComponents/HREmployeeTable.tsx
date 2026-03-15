@@ -26,11 +26,11 @@ import {
   createEmployee,
   updateEmployee,
   Employee,
-  EmployeeResponse,
 } from '@/lib/employee';
 import EmployeeFormDialog from '@/components/AdminDahboardComponents/hrComponents/EmployeeFormDialog';
 import DeleteEmployeeDialog from '@/components/AdminDahboardComponents/hrComponents/DeleteEmployeeDialog';
 import { useRouter } from 'next/navigation';
+import Pagination from '@/components/Pagination';
 
 /**
  * General Employee Table Component.
@@ -42,31 +42,30 @@ import { useRouter } from 'next/navigation';
  * Lists all employees with search and multi-filter capabilities (Role, Branch).
  * Supports data export and individual employee actions.
  */
+import { usePagination } from '@/hooks/usePagination';
+
 export default function HREmployeeTable() {
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState('All');
   const [branchFilter, setBranchFilter] = useState('All');
   const router = useRouter();
   const [employees, setEmployees] = useState<Employee[]>([]);
-  const [pagination, setPagination] = useState<EmployeeResponse['pagination']>({
-    total: 0,
-    page: 1,
-    limit: 10,
-    totalPages: 0,
-  });
+
+  const { page, limit, total, setPage, setTotal, totalPages } = usePagination(10);
+
   const [isLoading, setIsLoading] = useState(true);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
 
   const fetchEmployees = useCallback(
-    async (page = 1) => {
+    async (targetPage = 1) => {
       setIsLoading(true);
       try {
-        const response = await getAllEmployees(page, pagination.limit, roleFilter);
+        const response = await getAllEmployees(targetPage, limit, roleFilter);
         if (response.success) {
           setEmployees(response.data.employees);
-          setPagination(response.data.pagination);
+          setTotal(response.data.pagination.total);
         }
       } catch {
         toast.error('Failed to load employee details');
@@ -74,12 +73,12 @@ export default function HREmployeeTable() {
         setIsLoading(false);
       }
     },
-    [pagination.limit, roleFilter],
+    [limit, roleFilter, setTotal],
   );
 
   useEffect(() => {
-    fetchEmployees(1);
-  }, [fetchEmployees]);
+    fetchEmployees(page);
+  }, [page, fetchEmployees]);
 
   const branches = Array.from(
     new Set(employees.map((emp) => emp.branch?.name).filter(Boolean)),
@@ -116,7 +115,7 @@ export default function HREmployeeTable() {
         await createEmployee(formData);
         toast.success('Employee created successfully');
       }
-      fetchEmployees(pagination.page);
+      fetchEmployees(page);
       return true;
     } catch (error: unknown) {
       const err = error as { response?: { data?: { message?: string } } };
@@ -137,12 +136,16 @@ export default function HREmployeeTable() {
         await updateEmployee(selectedEmployee.id, formData);
         toast.success('Employee enabled successfully');
       }
-      fetchEmployees(pagination.page);
+      fetchEmployees(page);
     } catch (error: unknown) {
       const err = error as { response?: { data?: { message?: string } } };
       toast.error(err.response?.data?.message || 'Action failed');
     }
   };
+
+  // Helper for branch dropdown pagination (separate from main list)
+  const BRANCH_PAGE_SIZE = 5;
+  const paginatedBranches = branches.slice(0, BRANCH_PAGE_SIZE);
 
   return (
     <div className="space-y-4">
@@ -205,7 +208,7 @@ export default function HREmployeeTable() {
                 <DropdownMenuItem onClick={() => setBranchFilter('All')}>
                   All Branches
                 </DropdownMenuItem>
-                {branches.map((branch) => (
+                {paginatedBranches.map((branch) => (
                   <DropdownMenuItem key={branch} onClick={() => setBranchFilter(branch)}>
                     {branch}
                   </DropdownMenuItem>
@@ -324,11 +327,7 @@ export default function HREmployeeTable() {
                     <TableCell className="px-3 py-1.5 whitespace-nowrap text-center">
                       <span
                         className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-bold
-                        ${
-                          emp.status === 'ACTIVE'
-                            ? 'bg-green-100 text-green-700'
-                            : 'bg-red-100 text-red-700'
-                        }`}
+                        ${emp.status === 'ACTIVE' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}
                       >
                         <span
                           className={`h-1.5 w-1.5 rounded-full ${emp.status === 'ACTIVE' ? 'bg-green-600' : 'bg-red-600'}`}
@@ -349,7 +348,7 @@ export default function HREmployeeTable() {
                         <Button
                           variant="ghost"
                           title="Disable Access"
-                          className={`h-7 w-7 transition-all ${emp.status !== 'ACTIVE' ? 'text-gray-200 cursor-not-allowed' : 'text-gray-400 hover:text-red-600 hover:bg-red-50'}`}
+                          className="h-7 w-7 text-gray-400 hover:text-red-600 hover:bg-red-50 disabled:text-gray-200 disabled:cursor-not-allowed"
                           disabled={emp.status !== 'ACTIVE'}
                           onClick={() => handleDeleteTrigger(emp)}
                         >
@@ -385,44 +384,14 @@ export default function HREmployeeTable() {
             </TableBody>
           </Table>
         </div>
-        <div className="p-6 border-t border-gray-100 flex items-center justify-between">
-          <p className="text-sm text-muted-foreground">
-            Showing {filteredEmployees.length} of {pagination.total} employees
-          </p>
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              className="rounded-lg h-8 px-4"
-              disabled={pagination.page <= 1}
-              onClick={() => fetchEmployees(pagination.page - 1)}
-            >
-              Previous
-            </Button>
-            <div className="flex items-center gap-1">
-              {[...Array(Math.min(pagination.totalPages, 5))].map((_, i) => (
-                <Button
-                  key={i + 1}
-                  variant={pagination.page === i + 1 ? 'default' : 'outline'}
-                  size="sm"
-                  className={`w-8 h-8 p-0 rounded-lg ${pagination.page === i + 1 ? 'bg-primary text-white' : ''}`}
-                  onClick={() => fetchEmployees(i + 1)}
-                >
-                  {i + 1}
-                </Button>
-              ))}
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              className="rounded-lg h-8 px-4"
-              disabled={pagination.page >= pagination.totalPages}
-              onClick={() => fetchEmployees(pagination.page + 1)}
-            >
-              Next
-            </Button>
-          </div>
-        </div>
+
+        <Pagination
+          page={page}
+          totalPages={totalPages}
+          total={total}
+          limit={limit}
+          onPageChange={setPage}
+        />
       </div>
 
       <EmployeeFormDialog

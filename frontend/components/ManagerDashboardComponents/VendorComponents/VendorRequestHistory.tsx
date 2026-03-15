@@ -37,12 +37,17 @@ interface VendorRequestHistoryProps {
  * Displays date, requested products, and messages.
  * Allows viewing full details of past requests.
  */
+import { usePagination } from '@/hooks/usePagination';
+import Pagination from '@/components/Pagination';
+
 export default function VendorRequestHistory({ vendorName }: VendorRequestHistoryProps) {
   const params = useParams();
   const id = params.id as string;
   const [requests, setRequests] = useState<VendorRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedRequest, setSelectedRequest] = useState<VendorRequest | null>(null);
+
+  const { page, limit, total, setPage, setTotal, totalPages } = usePagination(10);
 
   useEffect(() => {
     const fetchRequests = async () => {
@@ -51,6 +56,7 @@ export default function VendorRequestHistory({ vendorName }: VendorRequestHistor
         const res = await getVendorRequests(id);
         if (res.success) {
           setRequests(res.data);
+          setTotal(res.data.length);
         }
       } catch (error) {
         console.error('Failed to fetch requests', error);
@@ -62,7 +68,9 @@ export default function VendorRequestHistory({ vendorName }: VendorRequestHistor
     if (id) {
       fetchRequests();
     }
-  }, [id]);
+  }, [id, setTotal]);
+
+  const paginatedRequests = requests.slice((page - 1) * limit, page * limit);
 
   if (loading) {
     return (
@@ -100,12 +108,12 @@ export default function VendorRequestHistory({ vendorName }: VendorRequestHistor
                 Products Requested
               </TableHead>
               <TableHead className="text-[10px] font-semibold text-primary uppercase px-4 py-3 text-right">
-                Spended Money
+                Spent Money
               </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {requests.map((req, index) => (
+            {paginatedRequests.map((req, index) => (
               <TableRow
                 key={req.id}
                 className={`hover:bg-muted/50 transition-colors cursor-pointer ${
@@ -136,6 +144,14 @@ export default function VendorRequestHistory({ vendorName }: VendorRequestHistor
           </TableBody>
         </Table>
       </div>
+
+      <Pagination
+        page={page}
+        totalPages={totalPages}
+        total={total}
+        limit={limit}
+        onPageChange={setPage}
+      />
 
       <Dialog open={!!selectedRequest} onOpenChange={(open) => !open && setSelectedRequest(null)}>
         <DialogContent className="sm:max-w-[600px]">

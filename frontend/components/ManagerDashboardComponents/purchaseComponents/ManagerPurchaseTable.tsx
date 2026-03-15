@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Search, Plus, Eye, Edit } from 'lucide-react';
+import { Search, Plus, Eye, Edit, CreditCard } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -17,13 +17,13 @@ import { toast } from 'sonner';
 import { formatCurrency } from '@/lib/format';
 import AddPurchaseDialog from './AddPurchaseDialog';
 import EditPurchaseDialog from './EditPurchaseDialog';
+import AddPaymentModal from './AddPaymentModal';
 import ViewPurchaseDialog from './ViewPurchaseDialog';
 import PurchaseStats from './PurchaseStats';
 
 /**
- * Manager Purchase Management Page.
- * Lists all purchase records with search, filtering, and CRUD operations.
- * Includes a statistical overview of total costs, vendors, products, and models purchased.
+ * Manager Purchase Management Table.
+ * Transitions to dedicated Details Page for full financial tracking.
  */
 export default function ManagerPurchaseTable() {
   const [purchases, setPurchases] = useState<Purchase[]>([]);
@@ -34,6 +34,7 @@ export default function ManagerPurchaseTable() {
   const [addOpen, setAddOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [viewOpen, setViewOpen] = useState(false);
+  const [paymentOpen, setPaymentOpen] = useState(false);
   const [selectedPurchase, setSelectedPurchase] = useState<Purchase | null>(null);
 
   const fetchPurchases = async () => {
@@ -53,16 +54,16 @@ export default function ManagerPurchaseTable() {
   }, []);
 
   const filtered = purchases.filter((p) =>
-    `${p.purchase_number} ${p.vendor_name} ${p.lot_number}`
+    `${p.lotId} ${p.vendorId} ${p.lot?.lot_number || ''}`
       .toLowerCase()
       .includes(search.toLowerCase()),
   );
 
   // Stats calculation
-  const totalCost = purchases.reduce((sum, p) => sum + p.total_amount, 0);
-  const totalVendors = new Set(purchases.map((p) => p.vendor_id)).size;
-  const totalProducts = purchases.reduce((sum, p) => sum + p.product_ids.length, 0);
-  const totalModels = purchases.reduce((sum, p) => sum + p.model_ids.length, 0);
+  const totalCost = purchases.reduce((sum, p) => sum + Number(p.totalAmount), 0);
+  const totalPaid = purchases.reduce((sum, p) => sum + Number(p.paidAmount), 0);
+  const totalVendors = new Set(purchases.map((p) => p.vendorId)).size;
+  const totalRecords = purchases.length;
 
   const handleEdit = (purchase: Purchase) => {
     setSelectedPurchase(purchase);
@@ -74,114 +75,135 @@ export default function ManagerPurchaseTable() {
     setViewOpen(true);
   };
 
+  const handleRecordPayment = (purchase: Purchase) => {
+    setSelectedPurchase(purchase);
+    setPaymentOpen(true);
+  };
+
   return (
-    <div className="bg-blue-100 min-h-screen p-3 sm:p-4 md:p-6 space-y-8">
+    <div className="bg-slate-50 min-h-screen p-3 sm:p-4 md:p-6 space-y-8">
       <div className="flex justify-between items-center">
-        <h3 className="text-xl sm:text-2xl font-bold text-primary">Purchases</h3>
+        <h3 className="text-2xl font-black text-slate-800 italic tracking-tight">
+          Financial Records
+        </h3>
       </div>
 
       <PurchaseStats
         totalCost={totalCost}
         totalVendors={totalVendors}
-        totalProducts={totalProducts}
-        totalModels={totalModels}
+        totalProducts={totalRecords}
+        totalPaid={totalPaid}
       />
 
-      <div className="flex items-center justify-between">
-        <div className="relative w-[260px]">
+      <div className="flex items-center justify-between gap-4">
+        <div className="relative w-full max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
           <Input
-            placeholder="Search..."
+            placeholder="Search lot or vendor..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="pl-9"
+            className="pl-9 h-11 rounded-xl border-slate-200 bg-white"
           />
         </div>
 
-        <Button className="bg-primary text-white gap-2" onClick={() => setAddOpen(true)}>
-          <Plus size={16} /> Add Purchase
+        <Button
+          className="bg-primary hover:bg-primary/90 text-white gap-2 h-11 px-6 rounded-xl font-bold italic shadow-lg shadow-primary/10 transition-all active:scale-95"
+          onClick={() => setAddOpen(true)}
+        >
+          <Plus size={18} /> Add Purchase
         </Button>
       </div>
 
-      <div className="rounded-2xl bg-card shadow-sm overflow-hidden">
+      <div className="rounded-2xl bg-white shadow-sm border border-slate-100 overflow-hidden">
         <Table>
           <TableHeader>
-            <TableRow>
+            <tr className="bg-slate-50/50">
               {[
-                'PURCHASE NO',
-                'LOT NO',
-                'PRODUCTS',
-                'MODELS',
-                'VENDOR',
-                'AMOUNT',
-                'STATUS',
-                'ACTION',
+                'Order ID',
+                'Lot Reference',
+                'Total Value',
+                'Paid Amount',
+                'Balance',
+                'Status',
+                'Action',
               ].map((h) => (
-                <TableHead key={h} className="text-[11px] font-semibold text-primary px-4">
+                <TableHead
+                  key={h}
+                  className="text-[10px] font-black text-slate-400 uppercase tracking-widest italic px-6 py-4"
+                >
                   {h}
                 </TableHead>
               ))}
-            </TableRow>
+            </tr>
           </TableHeader>
 
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={8} className="text-center py-8">
-                  Loading...
+                <TableCell colSpan={7} className="text-center py-12">
+                  <div className="flex items-center justify-center gap-2 text-slate-400 animate-pulse font-bold italic">
+                    <div className="h-2 w-2 bg-primary rounded-full animate-bounce" />
+                    Syncing Ledger...
+                  </div>
                 </TableCell>
               </TableRow>
             ) : filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
-                  No purchases found.
+                <TableCell colSpan={7} className="text-center py-12 text-slate-400 italic">
+                  No financial records found matching your search.
                 </TableCell>
               </TableRow>
             ) : (
-              filtered.map((p, i) => (
-                <TableRow key={p.id} className={i % 2 ? 'bg-sky-100/60' : ''}>
-                  <TableCell className="px-4 font-medium">{p.purchase_number}</TableCell>
-                  <TableCell className="px-4">{p.lot_number}</TableCell>
-                  <TableCell className="px-4">
-                    <div className="max-w-[150px] truncate" title={p.product_names.join(', ')}>
-                      {p.product_names.join(', ')}
-                    </div>
+              filtered.map((p) => (
+                <TableRow key={p.id} className="group hover:bg-slate-50/50 transition-colors">
+                  <TableCell className="px-6 py-4 font-bold text-slate-700">
+                    #{p.id.slice(0, 8)}
                   </TableCell>
-                  <TableCell className="px-4">
-                    <div className="max-w-[150px] truncate" title={p.model_names.join(', ')}>
-                      {p.model_names.join(', ')}
-                    </div>
+                  <TableCell className="px-6 py-4 font-medium text-slate-500">
+                    {p.lot?.lot_number || p.lotId.slice(0, 8)}
                   </TableCell>
-                  <TableCell className="px-4">{p.vendor_name}</TableCell>
-                  <TableCell className="px-4">{formatCurrency(p.total_amount)}</TableCell>
-                  <TableCell className="px-4">
+                  <TableCell className="px-6 py-4 font-black text-slate-800">
+                    {formatCurrency(p.totalAmount)}
+                  </TableCell>
+                  <TableCell className="px-6 py-4 font-bold text-emerald-600">
+                    {formatCurrency(p.paidAmount)}
+                  </TableCell>
+                  <TableCell className="px-6 py-4 font-bold text-primary">
+                    {formatCurrency(p.remainingAmount)}
+                  </TableCell>
+                  <TableCell className="px-6 py-4">
                     <span
-                      className={`px-2 py-1 rounded-full text-xs ${
-                        p.status === 'COMPLETED'
-                          ? 'bg-green-100 text-green-700'
-                          : p.status === 'PENDING'
-                            ? 'bg-yellow-100 text-yellow-700'
-                            : 'bg-red-100 text-red-700'
+                      className={`px-3 py-1 rounded-full text-[10px] font-black italic border ${
+                        p.status === 'PAID'
+                          ? 'bg-green-100 text-green-700 border-green-200'
+                          : p.status === 'PARTIAL'
+                            ? 'bg-yellow-100 text-yellow-700 border-yellow-200'
+                            : 'bg-red-100 text-red-700 border-red-200'
                       }`}
                     >
                       {p.status}
                     </span>
                   </TableCell>
-                  <TableCell className="px-4">
-                    <div className="flex gap-3 text-sm">
+                  <TableCell className="px-6 py-4">
+                    <div className="flex gap-4">
                       <button
-                        className="text-blue-600 hover:text-blue-800"
+                        className="text-slate-400 hover:text-primary transition-colors flex items-center gap-1 text-xs font-bold"
                         onClick={() => handleView(p)}
-                        title="View"
                       >
-                        <Eye size={18} />
+                        <Eye size={16} /> Details
                       </button>
                       <button
-                        className="text-primary hover:underline"
+                        className="text-slate-400 hover:text-slate-700 transition-colors"
                         onClick={() => handleEdit(p)}
-                        title="Edit"
                       >
-                        <Edit size={18} />
+                        <Edit size={16} />
+                      </button>
+                      <button
+                        className="text-emerald-500 hover:text-emerald-600 transition-colors flex items-center gap-1 text-xs font-bold"
+                        onClick={() => handleRecordPayment(p)}
+                        disabled={p.status === 'PAID'}
+                      >
+                        <CreditCard size={16} /> Pay
                       </button>
                     </div>
                   </TableCell>
@@ -202,10 +224,19 @@ export default function ManagerPurchaseTable() {
             purchase={selectedPurchase}
             onSuccess={fetchPurchases}
           />
+          <AddPaymentModal
+            open={paymentOpen}
+            onOpenChange={setPaymentOpen}
+            purchaseId={selectedPurchase.id}
+            totalAmount={selectedPurchase.totalAmount}
+            paidAmount={selectedPurchase.paidAmount}
+            onSuccess={fetchPurchases}
+          />
           <ViewPurchaseDialog
             open={viewOpen}
             onOpenChange={setViewOpen}
             purchase={selectedPurchase}
+            onSuccess={fetchPurchases}
           />
         </>
       )}

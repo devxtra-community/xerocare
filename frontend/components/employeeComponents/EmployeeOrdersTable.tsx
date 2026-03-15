@@ -27,6 +27,8 @@ interface EmployeeOrdersTableProps {
  * Table displaying all orders (invoices) managed by the employee.
  * Features search, filtering by type (Sale/Rent/Lease), and detailed view.
  */
+import { usePagination } from '@/hooks/usePagination';
+
 export default function EmployeeOrdersTable({
   mode = 'EMPLOYEE',
   invoices: propInvoices,
@@ -37,12 +39,11 @@ export default function EmployeeOrdersTable({
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
 
-  const [currentPage, setCurrentPage] = useState(1);
-  const ITEMS_PER_PAGE = 10;
+  const { page, limit, total, setPage, setTotal, totalPages } = usePagination(10);
 
   useEffect(() => {
-    setCurrentPage(1);
-  }, [search]);
+    setPage(1);
+  }, [search, setPage]);
 
   useEffect(() => {
     const fetchInvoices = async () => {
@@ -126,14 +127,15 @@ export default function EmployeeOrdersTable({
     return matchesSearch;
   });
 
-  const aggregateTotal = filteredInvoices.reduce(
-    (sum, inv) => sum + (inv.displayAmount ?? inv.totalAmount ?? 0),
-    0,
-  );
+  const aggregateTotal = filteredInvoices
+    .filter((inv) => !['REJECTED', 'CANCELLED'].includes(inv.status))
+    .reduce((sum, inv) => sum + (inv.displayAmount ?? inv.totalAmount ?? 0), 0);
 
-  const totalPages = Math.ceil(filteredInvoices.length / ITEMS_PER_PAGE);
-  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-  const paginatedInvoices = filteredInvoices.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+  useEffect(() => {
+    setTotal(filteredInvoices.length);
+  }, [filteredInvoices.length, setTotal]);
+
+  const paginatedInvoices = filteredInvoices.slice((page - 1) * limit, page * limit);
 
   const handleViewDetails = async (invoiceId: string) => {
     try {
@@ -344,7 +346,13 @@ export default function EmployeeOrdersTable({
           </Table>
         </div>
         {totalPages > 1 && (
-          <Pagination page={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
+          <Pagination
+            page={page}
+            totalPages={totalPages}
+            total={total}
+            limit={limit}
+            onPageChange={setPage}
+          />
         )}
       </div>
 

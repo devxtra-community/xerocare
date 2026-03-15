@@ -1,6 +1,7 @@
+import './env';
+
 import 'reflect-metadata';
 import { DataSource } from 'typeorm';
-import './env';
 import { Vendor } from '../entities/vendorEntity';
 import { Model } from '../entities/modelEntity';
 import { Product } from '../entities/productEntity';
@@ -21,6 +22,9 @@ import { Rfq } from '../entities/rfqEntity';
 import { RfqItem } from '../entities/rfqItemEntity';
 import { RfqVendor } from '../entities/rfqVendorEntity';
 import { RfqVendorItem } from '../entities/rfqVendorItemEntity';
+import { Purchase } from '../entities/purchaseEntity';
+import { PurchasePayment } from '../entities/purchasePaymentEntity';
+import { SparePartInventory } from '../entities/sparePartInventoryEntity';
 
 export const Source = new DataSource({
   type: 'postgres',
@@ -45,11 +49,13 @@ export const Source = new DataSource({
     RfqItem,
     RfqVendor,
     RfqVendorItem,
+    Purchase,
+    PurchasePayment,
+    SparePartInventory,
   ],
   poolSize: 1,
   extra: {
-    max: 1,
-    // ssl: { rejectUnauthorized: false },
+    max: 20,
     connectionTimeoutMillis: 5000,
     keepAlive: true,
     min: 0,

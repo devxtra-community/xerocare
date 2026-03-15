@@ -22,8 +22,8 @@ import {
   getUsageHistory,
   UsageRecord,
   sendMonthlyUsageInvoice,
-  getInvoiceById,
   Invoice,
+  getInvoiceById,
   InvoiceItem,
 } from '@/lib/invoice';
 import { format } from 'date-fns';
@@ -33,12 +33,15 @@ import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { formatCurrency } from '@/lib/format';
 import UsageRecordingModal from './UsageRecordingModal';
+import { usePagination } from '@/hooks/usePagination';
+import Pagination from '@/components/Pagination';
 
 interface UsageHistoryDialogProps {
   isOpen: boolean;
   onClose: () => void;
   contractId: string;
   customerName: string;
+  onSuccess?: () => void;
 }
 
 /**
@@ -49,45 +52,23 @@ export default function UsageHistoryDialog({
   onClose,
   contractId,
   customerName,
+  onSuccess,
 }: UsageHistoryDialogProps) {
   const [history, setHistory] = useState<UsageRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [sendingId, setSendingId] = useState<string | null>(null);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
-  const [contract, setContract] = useState<Invoice | null>(null);
   const [editingRecord, setEditingRecord] = useState<UsageRecord | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [contract, setContract] = useState<Invoice | null>(null);
 
   useEffect(() => {
     if (isOpen && contractId) {
-      getInvoiceById(contractId).then(setContract).catch(console.error);
+      getInvoiceById(contractId)
+        .then(setContract)
+        .catch((err: Error) => console.error('Failed to fetch contract:', err));
     }
   }, [isOpen, contractId]);
-
-  const ruleItems = React.useMemo(() => {
-    // contract.pricingItems may exist on the endpoint response even if not strictly typed
-    const allItems = [
-      ...(contract?.items || []),
-      ...((contract as Invoice & { pricingItems?: InvoiceItem[] })?.pricingItems || []),
-    ];
-    if (allItems.length === 0) return { bw: undefined, color: undefined, combo: undefined };
-
-    // Sometimes the pricing rule description is nested differently, or itemType might not be present in pricingItems
-    const isRule = (i: InvoiceItem) =>
-      i.itemType === 'PRICING_RULE' || !i.itemType || !!i.bwSlabRanges || !!i.comboSlabRanges;
-
-    return {
-      bw: allItems.find((i) => isRule(i) && (i.description?.includes('Black') || !!i.bwSlabRanges)),
-      color: allItems.find(
-        (i) => isRule(i) && (i.description?.includes('Color') || !!i.colorSlabRanges),
-      ),
-      combo: allItems.find(
-        (i) => isRule(i) && (i.description?.includes('Combined') || !!i.comboSlabRanges),
-      ),
-    };
-  }, [contract]);
-
-  const isCpc = contract?.rentType?.includes('CPC');
 
   const fetchHistory = React.useCallback(() => {
     if (isOpen && contractId) {
@@ -105,6 +86,53 @@ export default function UsageHistoryDialog({
   useEffect(() => {
     fetchHistory();
   }, [fetchHistory]);
+
+  const isCpc = contract?.rentType?.includes('CPC');
+  const isEmiLease = contract?.saleType === 'LEASE' && contract?.leaseType === 'EMI';
+
+  const ruleItems = React.useMemo(() => {
+    if (!contract?.items) return { bw: undefined, color: undefined, combo: undefined };
+    const isRule = (i: InvoiceItem) => i.itemType === 'PRICING_RULE' || !i.itemType;
+    const bw = contract.items.find((i) => isRule(i) && i.description.includes('Black'));
+    const color = contract.items.find((i) => isRule(i) && i.description.includes('Color'));
+    const combo = contract.items.find((i) => isRule(i) && i.description.includes('Combined'));
+
+    const parseSlabs = (ranges: unknown) => {
+      if (Array.isArray(ranges)) return ranges;
+      if (typeof ranges === 'string') {
+        try {
+          return JSON.parse(ranges);
+        } catch {
+          return [];
+        }
+      }
+      return [];
+    };
+
+    const hasSlabs = (ranges: unknown) => parseSlabs(ranges).length > 0;
+    const mergedBw = contract.items.find(
+      (i: InvoiceItem) =>
+        (i.bwIncludedLimit ?? 0) > 0 || (i.bwExcessRate ?? 0) > 0 || hasSlabs(i.bwSlabRanges),
+    );
+    const mergedColor = contract.items.find(
+      (i: InvoiceItem) =>
+        (i.colorIncludedLimit ?? 0) > 0 ||
+        (i.colorExcessRate ?? 0) > 0 ||
+        hasSlabs(i.colorSlabRanges),
+    );
+    const mergedCombo = contract.items.find(
+      (i: InvoiceItem) =>
+        (i.combinedIncludedLimit ?? 0) > 0 ||
+        (i.combinedExcessRate ?? 0) > 0 ||
+        hasSlabs(i.comboSlabRanges),
+    );
+
+    return {
+      bw: bw || mergedBw,
+      color: color || mergedColor,
+      combo: combo || mergedCombo,
+    };
+  }, [contract]);
 
   const handleSendInvoice = async (record: UsageRecord) => {
     setSendingId(record.id);
@@ -129,6 +157,14 @@ export default function UsageHistoryDialog({
   const formatDateLabel = (start: string, end: string) => {
     return `${format(new Date(start), 'MMM dd')} - ${format(new Date(end), 'MMM dd, yyyy')}`;
   };
+
+  const { page: currentPage, limit, total, setPage, setTotal, totalPages } = usePagination(5);
+
+  useEffect(() => {
+    setTotal(history.length);
+  }, [history.length, setTotal]);
+
+  const paginatedHistory = history.slice((currentPage - 1) * limit, currentPage * limit);
 
   return (
     <>
@@ -190,204 +226,228 @@ export default function UsageHistoryDialog({
                 </div>
               </div>
             ) : (
-              <div className="rounded-[1.5rem] border border-slate-100 overflow-hidden shadow-sm">
-                <Table>
-                  <TableHeader className="bg-slate-900 border-none">
-                    <TableRow className="hover:bg-slate-900 border-none">
-                      <TableHead className="font-bold text-white py-5 px-6">PERIOD</TableHead>
-                      {!isCpc && (
-                        <>
+              <>
+                <div className="rounded-[1.5rem] border border-slate-100 overflow-hidden shadow-sm">
+                  <Table>
+                    <TableHeader className="bg-slate-900 border-none">
+                      <TableRow className="hover:bg-slate-900 border-none">
+                        <TableHead className="font-bold text-white py-5 px-6">PERIOD</TableHead>
+                        {!isCpc && !isEmiLease && (
                           <TableHead className="font-bold text-white text-right">
                             FREE LIMIT
                           </TableHead>
-                        </>
-                      )}
-                      <TableHead className="font-bold text-white text-right">TOTAL USAGE</TableHead>
-                      {!isCpc ? (
-                        <TableHead className="font-bold text-white text-center">EXCEEDED</TableHead>
-                      ) : (
+                        )}
+                        {!isEmiLease && (
+                          <>
+                            <TableHead className="font-bold text-white text-right">USAGE</TableHead>
+                            <TableHead className="font-bold text-white text-center">
+                              STATUS
+                            </TableHead>
+                            <TableHead className="font-bold text-orange-400 text-right">
+                              CHARGE
+                            </TableHead>
+                          </>
+                        )}
                         <TableHead className="font-bold text-white text-right">
-                          RATE APPLIED
+                          {isEmiLease ? 'EMI' : 'RENT'}
                         </TableHead>
-                      )}
-                      <TableHead className="font-bold text-white text-right">AMOUNT</TableHead>
-                      <TableHead className="font-bold text-white text-right">RENT</TableHead>
-                      <TableHead className="font-bold text-emerald-400 text-right">
-                        DISCOUNT
-                      </TableHead>
-                      <TableHead className="font-bold text-blue-400 text-right">
-                        ADVANCE USED
-                      </TableHead>
-                      <TableHead className="font-bold text-blue-400 text-right">
-                        FINAL TOTAL
-                      </TableHead>
-                      <TableHead className="font-bold text-white text-center rounded-tr-[1.5rem]">
-                        ACTION
-                      </TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {history.map((record) => (
-                      <TableRow
-                        key={record.id}
-                        className="group border-b border-slate-50 last:border-0 hover:bg-blue-50/20 transition-all duration-300"
-                      >
-                        <TableCell className="py-6 px-6">
-                          <div className="flex flex-col">
-                            <span className="font-bold text-slate-900 text-sm">
-                              {formatDateLabel(record.periodStart, record.periodEnd)}
-                            </span>
-                            <span className="text-[10px] text-slate-400 font-black uppercase mt-0.5">
-                              {format(new Date(record.periodStart), 'MMMM yyyy')}
-                            </span>
-                          </div>
-                        </TableCell>
-                        {!isCpc && (
-                          <TableCell className="text-right font-bold text-slate-500">
-                            {record.freeLimit === 'No Free Limit' ? (
-                              <span className="text-[10px] text-slate-300 italic">No Limit</span>
-                            ) : (
-                              Number(record.freeLimit).toLocaleString()
-                            )}
-                          </TableCell>
+                        {!isEmiLease && (
+                          <TableHead className="font-bold text-emerald-400 text-right">
+                            DISCOUNT
+                          </TableHead>
                         )}
-                        <TableCell className="text-right">
-                          <div className="flex flex-col items-end">
-                            <span className="font-black text-slate-900 text-sm">
-                              {record.totalUsage.toLocaleString()}
-                            </span>
-                            <span className="text-[9px] text-slate-400 font-bold uppercase">
-                              Units
-                            </span>
-                          </div>
-                        </TableCell>
-                        {!isCpc ? (
-                          <TableCell className="text-center">
-                            <Badge
-                              className={`rounded-full px-3 py-1 text-[10px] font-black border-none shadow-sm ${
-                                record.exceededCount > 0
-                                  ? 'bg-orange-100 text-orange-700'
-                                  : 'bg-emerald-100 text-emerald-700'
-                              }`}
-                            >
-                              {record.exceededCount > 0 ? 'EXCEEDED' : 'WITHIN LIMIT'}
-                            </Badge>
+                        <TableHead className="font-bold text-blue-400 text-right">
+                          ADVANCE
+                        </TableHead>
+                        <TableHead className="font-bold text-blue-400 text-right">TOTAL</TableHead>
+                        <TableHead className="font-bold text-white text-center rounded-tr-[1.5rem]">
+                          ACTION
+                        </TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {paginatedHistory.map((record) => (
+                        <TableRow
+                          key={record.id}
+                          className="group border-b border-slate-50 last:border-0 hover:bg-blue-50/20 transition-all duration-300"
+                        >
+                          <TableCell className="py-6 px-6">
+                            <div className="flex flex-col">
+                              <span className="font-bold text-slate-900 text-sm">
+                                {formatDateLabel(record.periodStart, record.periodEnd)}
+                              </span>
+                              <span className="text-[10px] text-slate-400 font-black uppercase mt-0.5">
+                                {format(new Date(record.periodStart), 'MMMM yyyy')}
+                              </span>
+                            </div>
                           </TableCell>
-                        ) : (
-                          <TableCell className="text-right font-bold text-slate-700">
-                            {(() => {
-                              try {
-                                const total = record.totalUsage;
-                                // Basic logic to find which slab applied
-                                // In CPC, record has bw/color delta. If combo, we use combo rule.
-                                // Since UsageRecord doesn't easily map back to the individual rule used in the table here,
-                                // we calculate a rough blended/applied rate string.
-                                let appliedRateStr = '-';
-                                let slabs: Array<{ from: number; to: number; rate: number }> = [];
+                          {!isCpc && !isEmiLease && (
+                            <TableCell className="text-right font-bold text-slate-500">
+                              {record.freeLimit === 'No Free Limit' ? (
+                                <span className="text-[10px] text-slate-300 italic">No Limit</span>
+                              ) : (
+                                Number(record.freeLimit).toLocaleString()
+                              )}
+                            </TableCell>
+                          )}
+                          {!isEmiLease && (
+                            <>
+                              <TableCell className="text-right">
+                                <div className="flex flex-col items-end">
+                                  <span className="font-black text-slate-900 text-sm">
+                                    {record.totalUsage.toLocaleString()}
+                                  </span>
+                                  <span className="text-[9px] text-slate-400 font-bold uppercase">
+                                    Units
+                                  </span>
+                                </div>
+                              </TableCell>
+                              {!isCpc ? (
+                                <TableCell className="text-center">
+                                  <Badge
+                                    className={`rounded-full px-3 py-1 text-[10px] font-black border-none shadow-sm ${
+                                      record.exceededCount > 0
+                                        ? 'bg-orange-100 text-orange-700'
+                                        : 'bg-emerald-100 text-emerald-700'
+                                    }`}
+                                  >
+                                    {record.exceededCount > 0 ? 'EXCEEDED' : 'WITHIN LIMIT'}
+                                  </Badge>
+                                </TableCell>
+                              ) : (
+                                <TableCell className="text-right font-bold text-slate-700">
+                                  {(() => {
+                                    try {
+                                      const total = record.totalUsage;
+                                      // Basic logic to find which slab applied
+                                      // In CPC, record has bw/color delta. If combo, we use combo rule.
+                                      // Since UsageRecord doesn't easily map back to the individual rule used in the table here,
+                                      // we calculate a rough blended/applied rate string.
+                                      let appliedRateStr = '-';
+                                      let slabs: Array<{ from: number; to: number; rate: number }> =
+                                        [];
 
-                                if (ruleItems.combo) {
-                                  slabs = ruleItems.combo.comboSlabRanges || [];
-                                } else if (ruleItems.color && record.colorA4Delta > 0) {
-                                  slabs = ruleItems.color.colorSlabRanges || [];
-                                } else if (ruleItems.bw) {
-                                  slabs = ruleItems.bw.bwSlabRanges || [];
-                                }
+                                      if (ruleItems.combo) {
+                                        slabs = ruleItems.combo.comboSlabRanges || [];
+                                      } else if (ruleItems.color && record.colorA4Delta > 0) {
+                                        slabs = ruleItems.color.colorSlabRanges || [];
+                                      } else if (ruleItems.bw) {
+                                        slabs = ruleItems.bw.bwSlabRanges || [];
+                                      }
 
-                                if (slabs.length > 0) {
-                                  const sortedSlabs = [...slabs].sort((a, b) => a.from - b.from);
-                                  let applicableRate = sortedSlabs[0]?.rate || 0;
-                                  let applicableRange = `${sortedSlabs[0]?.from || 0}-${sortedSlabs[0]?.to || 0}`;
+                                      if (slabs.length > 0) {
+                                        const sortedSlabs = [...slabs].sort(
+                                          (a, b) => a.from - b.from,
+                                        );
+                                        let applicableRate = sortedSlabs[0]?.rate || 0;
+                                        let applicableRange = `${sortedSlabs[0]?.from || 0}-${sortedSlabs[0]?.to || 0}`;
 
-                                  for (const slab of sortedSlabs) {
-                                    if (total >= slab.from) {
-                                      applicableRate = slab.rate;
-                                      applicableRange =
-                                        slab.to === 9999999
-                                          ? `${slab.from}+`
-                                          : `${slab.from}-${slab.to}`;
+                                        for (const slab of sortedSlabs) {
+                                          if (total >= slab.from) {
+                                            applicableRate = slab.rate;
+                                            applicableRange =
+                                              slab.to === 9999999
+                                                ? `${slab.from}+`
+                                                : `${slab.from}-${slab.to}`;
+                                          }
+                                        }
+                                        appliedRateStr = `QAR ${applicableRate} (${applicableRange})`;
+                                      }
+                                      return appliedRateStr;
+                                    } catch {
+                                      return 'Slab-based';
                                     }
-                                  }
-                                  appliedRateStr = `QAR ${applicableRate} (${applicableRange})`;
-                                }
-                                return appliedRateStr;
-                              } catch {
-                                return 'Slab-based';
-                              }
-                            })()}
+                                  })()}
+                                </TableCell>
+                              )}
+                              <TableCell className="text-right">
+                                <span className="font-black text-orange-600 text-sm">
+                                  {formatCurrency(Number(record.exceededAmount))}
+                                </span>
+                              </TableCell>
+                            </>
+                          )}
+
+                          <TableCell className="text-right font-bold text-slate-700">
+                            {formatCurrency(Number(record.rent))}
                           </TableCell>
-                        )}
-                        <TableCell className="text-right">
-                          <span className="font-black text-orange-600 text-sm">
-                            {formatCurrency(Number(record.exceededAmount))}
-                          </span>
-                        </TableCell>
-                        <TableCell className="text-right font-bold text-slate-700">
-                          {formatCurrency(Number(record.rent))}
-                        </TableCell>
-                        <TableCell className="text-right font-bold text-emerald-600">
-                          {formatCurrency(Number(record.discountAmount || 0))}
-                        </TableCell>
-                        <TableCell className="text-right font-bold text-blue-600">
-                          {formatCurrency(Number(record.advanceAdjusted || 0))}
-                        </TableCell>
-                        <TableCell className="text-right bg-blue-50/30 group-hover:bg-blue-100/50 transition-colors">
-                          <span className="font-black text-blue-700 text-base">
-                            {formatCurrency(Number(record.finalTotal))}
-                          </span>
-                        </TableCell>
-                        <TableCell className="text-center">
-                          <div className="flex items-center justify-center gap-2">
-                            <UsageDetailsModal record={record} />
-                            {record.meterImageUrl ? (
+                          {!isEmiLease && (
+                            <TableCell className="text-right font-bold text-emerald-600">
+                              {formatCurrency(Number(record.discountAmount || 0))}
+                            </TableCell>
+                          )}
+                          <TableCell className="text-right font-bold text-blue-600">
+                            {formatCurrency(Number(record.advanceAdjusted || 0))}
+                          </TableCell>
+                          <TableCell className="text-right bg-blue-50/30 group-hover:bg-blue-100/50 transition-colors">
+                            <span className="font-black text-blue-700 text-base">
+                              {formatCurrency(Number(record.finalTotal))}
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <div className="flex items-center justify-center gap-2">
+                              <UsageDetailsModal record={record} />
+                              {record.meterImageUrl ? (
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-8 w-8 p-0 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-full transition-all"
+                                  onClick={() => setPreviewImage(record.meterImageUrl || null)}
+                                  title="View Reading Image"
+                                >
+                                  <ImageIcon className="h-4 w-4" />
+                                </Button>
+                              ) : null}
                               <Button
                                 size="sm"
                                 variant="ghost"
-                                className="h-8 w-8 p-0 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-full transition-all"
-                                onClick={() => setPreviewImage(record.meterImageUrl || null)}
-                                title="View Reading Image"
+                                className={`h-8 w-8 p-0 rounded-full transition-all ${
+                                  record.emailSentAt
+                                    ? 'text-emerald-500 hover:text-emerald-600 hover:bg-emerald-50'
+                                    : 'text-blue-500 hover:text-blue-600 hover:bg-blue-50'
+                                }`}
+                                onClick={() => handleSendInvoice(record)}
+                                disabled={sendingId === record.id}
+                                title={record.emailSentAt ? 'Resend Invoice' : 'Send Invoice'}
                               >
-                                <ImageIcon className="h-4 w-4" />
+                                {sendingId === record.id ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : record.emailSentAt ? (
+                                  <Mail className="h-4 w-4" />
+                                ) : (
+                                  <Send className="h-4 w-4" />
+                                )}
                               </Button>
-                            ) : null}
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className={`h-8 w-8 p-0 rounded-full transition-all ${
-                                record.emailSentAt
-                                  ? 'text-emerald-500 hover:text-emerald-600 hover:bg-emerald-50'
-                                  : 'text-blue-500 hover:text-blue-600 hover:bg-blue-50'
-                              }`}
-                              onClick={() => handleSendInvoice(record)}
-                              disabled={sendingId === record.id}
-                              title={record.emailSentAt ? 'Resend Invoice' : 'Send Invoice'}
-                            >
-                              {sendingId === record.id ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                              ) : record.emailSentAt ? (
-                                <Mail className="h-4 w-4" />
-                              ) : (
-                                <Send className="h-4 w-4" />
-                              )}
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="h-8 w-8 p-0 text-amber-500 hover:text-amber-600 hover:bg-amber-50 rounded-full transition-all"
-                              onClick={() => {
-                                setEditingRecord(record);
-                                setIsEditModalOpen(true);
-                              }}
-                              title="Edit Usage Record"
-                            >
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-8 w-8 p-0 text-amber-500 hover:text-amber-600 hover:bg-amber-50 rounded-full transition-all"
+                                onClick={() => {
+                                  setEditingRecord(record);
+                                  setIsEditModalOpen(true);
+                                }}
+                                title="Edit Usage Record"
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+
+                {totalPages > 1 && (
+                  <Pagination
+                    page={currentPage}
+                    totalPages={totalPages}
+                    total={total}
+                    limit={limit}
+                    onPageChange={setPage}
+                  />
+                )}
+              </>
             )}
           </div>
         </DialogContent>
@@ -405,6 +465,7 @@ export default function UsageHistoryDialog({
           customerName={customerName}
           onSuccess={() => {
             fetchHistory();
+            onSuccess?.();
           }}
           invoice={editingRecord as unknown as Invoice}
         />

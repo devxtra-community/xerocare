@@ -121,13 +121,22 @@ export default function ManagerLotTable() {
               id: 'status',
               header: 'STATUS',
               className: 'font-semibold text-[11px] text-primary uppercase',
-              cell: (lot: Lot) => (
-                <span
-                  className={`px-2 py-1 rounded-full text-xs font-medium ${lot.status === 'COMPLETED' ? 'bg-green-100 text-green-700' : lot.status === 'CANCELLED' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}`}
-                >
-                  {lot.status}
-                </span>
-              ),
+              cell: (lot: Lot) => {
+                const statusStyles: Record<string, string> = {
+                  RECEIVED: 'bg-green-100 text-green-700',
+                  COMPLETED: 'bg-green-100 text-green-700',
+                  RECEIVING: 'bg-blue-100 text-blue-700',
+                  PENDING: 'bg-amber-100 text-amber-700',
+                  CANCELLED: 'bg-red-100 text-red-700',
+                };
+                return (
+                  <span
+                    className={`px-2 py-1 rounded-full text-xs font-medium ${statusStyles[lot.status] ?? 'bg-slate-100 text-slate-600'}`}
+                  >
+                    {lot.status}
+                  </span>
+                );
+              },
             },
             {
               id: 'actions',

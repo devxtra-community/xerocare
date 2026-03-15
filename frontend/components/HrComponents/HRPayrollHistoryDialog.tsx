@@ -13,6 +13,8 @@ import {
 import api from '@/lib/api';
 import { Loader2, History, AlertCircle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { usePagination } from '@/hooks/usePagination';
+import Pagination from '@/components/Pagination';
 
 interface PayrollHistoryItem {
   id: string;
@@ -76,6 +78,14 @@ export default function HRPayrollHistoryDialog({
     }
   }, [open, employeeId, fetchHistory]);
 
+  const { page: currentPage, limit, total, setPage, setTotal, totalPages } = usePagination(5);
+
+  useEffect(() => {
+    setTotal(history.length);
+  }, [history.length, setTotal]);
+
+  const paginatedHistory = history.slice((currentPage - 1) * limit, currentPage * limit);
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-hidden flex flex-col p-0">
@@ -106,37 +116,38 @@ export default function HRPayrollHistoryDialog({
               No payroll history found for this employee.
             </div>
           ) : (
-            <div className="rounded-xl border border-gray-100 overflow-hidden">
-              <Table>
-                <TableHeader className="bg-muted/50">
-                  <TableRow>
-                    <TableHead className="text-xs font-bold text-primary uppercase">
-                      Month/Year
-                    </TableHead>
-                    <TableHead className="text-xs font-bold text-primary uppercase text-right">
-                      Amount
-                    </TableHead>
-                    <TableHead className="text-xs font-bold text-primary uppercase text-center">
-                      Status
-                    </TableHead>
-                    <TableHead className="text-xs font-bold text-primary uppercase">
-                      Paid Date
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {history.map((record) => (
-                    <TableRow key={record.id} className="hover:bg-blue-50/30 transition-colors">
-                      <TableCell className="font-medium text-sm py-3">
-                        {MONTH_NAMES[record.month - 1]} {record.year}
-                      </TableCell>
-                      <TableCell className="text-right font-bold text-sm text-blue-700">
-                        QAR {parseFloat(record.salary_amount.toString()).toLocaleString()}
-                      </TableCell>
-                      <TableCell className="text-center py-3">
-                        <Badge
-                          variant="outline"
-                          className={`
+            <>
+              <div className="rounded-xl border border-gray-100 overflow-hidden">
+                <Table>
+                  <TableHeader className="bg-muted/50">
+                    <TableRow>
+                      <TableHead className="text-xs font-bold text-primary uppercase">
+                        Month/Year
+                      </TableHead>
+                      <TableHead className="text-xs font-bold text-primary uppercase text-right">
+                        Amount
+                      </TableHead>
+                      <TableHead className="text-xs font-bold text-primary uppercase text-center">
+                        Status
+                      </TableHead>
+                      <TableHead className="text-xs font-bold text-primary uppercase">
+                        Paid Date
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {paginatedHistory.map((record) => (
+                      <TableRow key={record.id} className="hover:bg-blue-50/30 transition-colors">
+                        <TableCell className="font-medium text-sm py-3">
+                          {MONTH_NAMES[record.month - 1]} {record.year}
+                        </TableCell>
+                        <TableCell className="text-right font-bold text-sm text-blue-700">
+                          QAR {parseFloat(record.salary_amount.toString()).toLocaleString()}
+                        </TableCell>
+                        <TableCell className="text-center py-3">
+                          <Badge
+                            variant="outline"
+                            className={`
                             text-[10px] font-bold px-2 py-0.5 rounded-full
                             ${
                               record.status === 'PAID'
@@ -144,20 +155,31 @@ export default function HRPayrollHistoryDialog({
                                 : 'bg-amber-50 text-amber-700 border-amber-200'
                             }
                           `}
-                        >
-                          {record.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground py-3">
-                        {record.paid_date
-                          ? new Date(record.paid_date).toLocaleDateString('en-GB')
-                          : '-'}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+                          >
+                            {record.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground py-3">
+                          {record.paid_date
+                            ? new Date(record.paid_date).toLocaleDateString('en-GB')
+                            : '-'}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+
+              {totalPages > 1 && (
+                <Pagination
+                  page={currentPage}
+                  totalPages={totalPages}
+                  total={total}
+                  limit={limit}
+                  onPageChange={setPage}
+                />
+              )}
+            </>
           )}
         </div>
       </DialogContent>

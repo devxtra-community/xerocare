@@ -215,7 +215,13 @@ export class BillingService {
     const totalMonthlyRent = usageRecords.reduce((sum, u) => sum + Number(u.monthlyRent || 0), 0);
 
     // Total Value of the Contract (Rent + Excess)
-    const finalTotal = totalMonthlyRent + totalExceededCharge;
+    const finalGross = totalMonthlyRent + totalExceededCharge;
+
+    // 🔹 DISCOUNT CALCULATION: Sum up all discounts from usage records
+    const totalDiscountAmount = usageRecords.reduce(
+      (sum, u) => sum + Number(u.discountAmount || 0),
+      0,
+    );
 
     // 4. Update Contract to become the FINAL Invoice
     contract.contractStatus = ContractStatus.COMPLETED;
@@ -223,8 +229,9 @@ export class BillingService {
     contract.status = InvoiceStatus.ISSUED;
     contract.completedAt = new Date();
 
-    contract.grossAmount = finalTotal;
-    contract.totalAmount = finalTotal;
+    contract.grossAmount = finalGross;
+    contract.discountAmount = totalDiscountAmount;
+    contract.totalAmount = finalGross - totalDiscountAmount;
 
     contract.bwA4Count = usageRecords.reduce((s, u) => s + (u.bwA4Count || 0), 0);
     contract.bwA3Count = usageRecords.reduce((s, u) => s + (u.bwA3Count || 0), 0);
@@ -1167,14 +1174,44 @@ export class BillingService {
    * Retrieves all invoices, optionally filtered by branch.
    */
   async getAllInvoices(branchId?: string) {
-    return this.invoiceRepo.findAll(branchId);
+    const invoices = await this.invoiceRepo.findAll(branchId);
+    return Promise.all(
+      invoices.map(async (invoice) => {
+        const history = await this.usageRepo.getUsageHistory(invoice.id);
+        const usageRevenue = history.reduce(
+          (sum, u) => sum + (Number(u.monthlyRent || 0) + Number(u.exceededCharge || 0)),
+          0,
+        );
+        const discountAmount = history.reduce((sum, u) => sum + Number(u.discountAmount || 0), 0);
+        return {
+          ...invoice,
+          usageRevenue,
+          discountAmount: Number(invoice.discountAmount || 0) || discountAmount,
+        };
+      }),
+    );
   }
 
   /**
    * Retrieves invoices created by a specific user.
    */
   async getInvoicesByCreator(creatorId: string) {
-    return this.invoiceRepo.findByCreatorId(creatorId);
+    const invoices = await this.invoiceRepo.findByCreatorId(creatorId);
+    return Promise.all(
+      invoices.map(async (invoice) => {
+        const history = await this.usageRepo.getUsageHistory(invoice.id);
+        const usageRevenue = history.reduce(
+          (sum, u) => sum + (Number(u.monthlyRent || 0) + Number(u.exceededCharge || 0)),
+          0,
+        );
+        const discountAmount = history.reduce((sum, u) => sum + Number(u.discountAmount || 0), 0);
+        return {
+          ...invoice,
+          usageRevenue,
+          discountAmount: Number(invoice.discountAmount || 0) || discountAmount,
+        };
+      }),
+    );
   }
 
   /**
@@ -1184,7 +1221,27 @@ export class BillingService {
    * Retrieves invoices for a specific branch.
    */
   async getBranchInvoices(branchId: string) {
-    return this.invoiceRepo.findByBranchId(branchId);
+    const invoices = await this.invoiceRepo.findByBranchId(branchId);
+
+    // Enrich with usageRevenue and discountAmount for stats accuracy
+    const enriched = await Promise.all(
+      invoices.map(async (invoice) => {
+        const history = await this.usageRepo.getUsageHistory(invoice.id);
+        const usageRevenue = history.reduce(
+          (sum, u) => sum + (Number(u.monthlyRent || 0) + Number(u.exceededCharge || 0)),
+          0,
+        );
+        const discountAmount = history.reduce((sum, u) => sum + Number(u.discountAmount || 0), 0);
+
+        return {
+          ...invoice,
+          usageRevenue,
+          discountAmount: Number(invoice.discountAmount || 0) || discountAmount,
+        };
+      }),
+    );
+
+    return enriched;
   }
 
   /**
