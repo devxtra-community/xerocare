@@ -5,7 +5,7 @@ export class VendorController {
   constructor(private readonly vendorService: VendorService) {}
 
   /**
-   * Creates a new vendor.
+   * Add a new vendor (supplier) to our partner directory.
    */
   createVendor = async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -21,7 +21,10 @@ export class VendorController {
   };
 
   /**
-   * Retrieves all active vendors, optionally filtered by branch.
+   * List all the vendors we work with.
+   *
+   * Administrators can see everyone, while other staff members only see
+   * vendors associated with their local office branch.
    */
   getVendors = async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -41,7 +44,8 @@ export class VendorController {
   };
 
   /**
-   * Retrieves a vendor by ID, with branch-specific stats.
+   * Get the specific business and contact details for one vendor.
+   * Also shows how many orders or items are linked to them in this branch.
    */
   getVendorById = async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -64,7 +68,7 @@ export class VendorController {
   };
 
   /**
-   * Updates a vendor.
+   * Update a vendor's information (like their phone number or address).
    */
   updateVendor = async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -80,7 +84,8 @@ export class VendorController {
   };
 
   /**
-   * Soft deletes a vendor.
+   * Remove a vendor from our active partner list.
+   * They won't be erased permanently, but they won't show up in our main lists.
    */
   deleteVendor = async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -88,7 +93,7 @@ export class VendorController {
 
       return res.json({
         success: true,
-        message: 'Vendor deleted successfully',
+        message: 'Vendor has been moved to the archive (removed from active list)',
       });
     } catch (error) {
       next(error);
@@ -96,7 +101,8 @@ export class VendorController {
   };
 
   /**
-   * Sends a product request to a vendor.
+   * Send a formal request for products to a vendor via email.
+   * This is used when we want to order new stock.
    */
   requestProducts = async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -104,7 +110,9 @@ export class VendorController {
       const { userId, branchId } = req.user!;
 
       if (!products) {
-        return res.status(400).json({ success: false, message: 'Product list is required' });
+        return res
+          .status(400)
+          .json({ success: false, message: 'A list of products is required to make a request' });
       }
 
       await this.vendorService.requestProducts(
@@ -117,7 +125,7 @@ export class VendorController {
 
       return res.json({
         success: true,
-        message: 'Product request email sent successfully',
+        message: 'Your product request has been emailed to the vendor successfully',
       });
     } catch (error) {
       next(error);
@@ -125,7 +133,7 @@ export class VendorController {
   };
 
   /**
-   * Retrieves all requests made to a vendor, optionally filtered by branch.
+   * See all the product requests we've ever sent to a specific vendor.
    */
   getVendorRequests = async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -147,7 +155,7 @@ export class VendorController {
   };
 
   /**
-   * Retrieves summary statistics for all vendors, optionally filtered by branch.
+   * Get a high-level summary of our vendor data (e.g., total number of vendors).
    */
   getStats = async (req: Request, res: Response, next: NextFunction) => {
     try {

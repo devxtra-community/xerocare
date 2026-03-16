@@ -8,7 +8,13 @@ import { EmployeeRole } from '../constants/employeeRole';
 const service = new EmployeeService();
 
 /**
- * Adds a new employee.
+ * Hiring a brand new staff member.
+ * This saves their basic info and their job roles, and it also handles
+ * their profile picture and ID documentation.
+ *
+ * Rules:
+ * - Administrators can hire for any branch.
+ * - Local Managers can only hire people for their own specific office.
  */
 export const addEmployee = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -71,7 +77,8 @@ export const addEmployee = async (req: Request, res: Response, next: NextFunctio
 };
 
 /**
- * Retrieves a signed URL for viewing an employee's ID proof.
+ * Get a digital copy of an employee's official ID card.
+ * This is restricted to HR and Management for privacy reasons.
  */
 export const getEmployeeIdProof = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -93,7 +100,10 @@ export const getEmployeeIdProof = async (req: Request, res: Response, next: Next
 };
 
 /**
- * Retrieves all employees with pagination and filtering.
+ * List every single staff member in the company.
+ *
+ * Managers only see people in their own office, while Administrators
+ * can see everyone across all offices.
  */
 export const getAllEmployees = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -125,7 +135,7 @@ export const getAllEmployees = async (req: Request, res: Response, next: NextFun
 };
 
 /**
- * Retrieves a single employee by ID.
+ * Look up the full details of one specific staff member by their ID.
  */
 export const getEmployeeById = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -148,7 +158,8 @@ export const getEmployeeById = async (req: Request, res: Response, next: NextFun
 };
 
 /**
- * Retrieves a public profile for an employee (limited data).
+ * Get a simplified "Public Profile" for a staff member that can
+ * be seen by their colleagues.
  */
 export const getPublicEmployeeProfile = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -166,7 +177,7 @@ export const getPublicEmployeeProfile = async (req: Request, res: Response, next
 };
 
 /**
- * Updates an employee's details.
+ * Update the career details or personal info for a staff member.
  */
 export const updateEmployee = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -211,7 +222,10 @@ export const updateEmployee = async (req: Request, res: Response, next: NextFunc
 };
 
 /**
- * Soft deletes an employee (marks as INACTIVE).
+ * Stop working (Remove staff from active list):
+ * We don't permanently erase records for legal reasons, but
+ * this makes the staff member "Inactive" so they no longer appear
+ * in our active office list.
  */
 export const deleteEmployee = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -235,7 +249,9 @@ export const deleteEmployee = async (req: Request, res: Response, next: NextFunc
 };
 
 /**
- * Retrieves HR statistics (counts, growth, job types).
+ * High-level Summary for HR:
+ * Shows counts of how many people are in each role and how our
+ * workforce is growing over time.
  */
 export const getHRStats = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -258,7 +274,7 @@ export const getHRStats = async (req: Request, res: Response, next: NextFunction
 };
 
 /**
- * Retrieves all branches.
+ * List all the different office branches (e.g., New York, London, Tokyo).
  */
 export const getAllBranches = async (req: Request, res: Response, next: NextFunction) => {
   try {

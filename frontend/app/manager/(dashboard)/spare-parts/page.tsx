@@ -107,9 +107,9 @@ export default function SparePartsPage() {
         <StandardTable
           columns={[
             {
-              id: 'lot_number',
+              id: 'lotNumber',
               header: 'LOT / ORDER NUMBER',
-              accessorKey: 'lot_number' as keyof SparePartInventoryItem,
+              accessorKey: 'lotNumber' as keyof SparePartInventoryItem,
               className: 'font-semibold text-[11px] text-primary uppercase',
             },
             {

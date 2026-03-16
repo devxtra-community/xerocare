@@ -7,6 +7,7 @@ import { SparePart } from '../entities/sparePartEntity';
 import { Vendor } from '../entities/vendorEntity';
 import { AppError } from '../errors/appError';
 import { CreateLotDto } from '../types/lotTypes';
+import { logger } from '../config/logger';
 
 export class LotRepository {
   private get repo() {
@@ -269,7 +270,7 @@ export class LotRepository {
    * Retrieves all lots with relations, optionally filtered by branch.
    */
   async getAllLots(branchId?: string) {
-    console.log('LotRepository: getAllLots called, branchId:', branchId);
+    logger.info('LotRepository: getAllLots called', { branchId });
     try {
       const where: FindOptionsWhere<Lot> = {};
       if (branchId && branchId !== 'All') {
@@ -292,10 +293,10 @@ export class LotRepository {
           createdAt: 'DESC',
         },
       });
-      console.log('LotRepository: getAllLots success, count:', result.length);
+      logger.info('LotRepository: getAllLots success', { count: result.length });
       return result;
     } catch (err) {
-      console.error('LotRepository: getAllLots FAILED', err);
+      logger.error('LotRepository: getAllLots FAILED', { error: err });
       throw err;
     }
   }

@@ -88,10 +88,9 @@ export class UsageService {
     // Usually only one exists.
 
     if (pricingRules.length === 0) {
-      console.warn(
-        'WARNING: No pricing rules (or products with limits) found for contract',
-        contract.id,
-      );
+      logger.warn('No pricing rules (or products with limits) found for contract', {
+        contractId: contract.id,
+      });
     }
     const rule = pricingRules[0]; // Assuming single rule for now
 
@@ -502,7 +501,7 @@ export class UsageService {
         return usage;
       } catch (error) {
         await queryRunner.rollbackTransaction();
-        console.error('Record Usage Transaction failed:', error);
+        logger.error('Record Usage Transaction failed', { error, contractId: contract.id });
         throw error;
       } finally {
         await queryRunner.release();

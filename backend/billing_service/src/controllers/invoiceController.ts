@@ -13,8 +13,11 @@ const reportService = new BillingReportService();
 const notificationService = new NotificationService();
 
 /**
- * Creates a new quotation for a customer.
- * Validates input payload and strictly prohibits security-sensitive fields in the body.
+ * Start a new deal by creating a price estimate (Quotation).
+ *
+ * Before saving, we make sure the salesperson hasn't tried to set
+ * sensitive fields like "which branch this belongs to" manually—our
+ * system handles that automatically for security.
  */
 export const createQuotation = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -105,8 +108,9 @@ export const createQuotation = async (req: Request, res: Response, next: NextFun
 };
 
 /**
- * Updates an existing quotation.
- * Allows modification of rental terms, pricing items, and lease details.
+ * Update an existing price estimate.
+ * This is used if the customer asks for a different price, a longer
+ * lease, or different equipment.
  */
 export const updateQuotation = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -153,8 +157,8 @@ export const updateQuotation = async (req: Request, res: Response, next: NextFun
 };
 
 /**
- * Approves a quotation and converts it to a Proforma invoice.
- * Typically triggered after a deposit is received.
+ * Move a price estimate forward to the next stage (Proforma Invoice).
+ * This usually happens after we've confirmed the customer paid their initial deposit.
  */
 export const approveQuotation = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -173,7 +177,8 @@ export const approveQuotation = async (req: Request, res: Response, next: NextFu
 };
 
 /**
- * Employee submits a quotation for Finance approval.
+ * The branch employee signals they are finished with the deal and
+ * sends it to the central Finance team for a final check.
  */
 export const employeeApprove = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -196,7 +201,9 @@ export const employeeApprove = async (req: Request, res: Response, next: NextFun
 };
 
 /**
- * Finance team allocates machines. (Step 1 of Finance Approval)
+ * Step 1 of the Finance Check:
+ * The Finance team picks out the specific physical machines that will be
+ * sent to the customer.
  */
 export const allocateMachines = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -226,7 +233,9 @@ export const allocateMachines = async (req: Request, res: Response, next: NextFu
 };
 
 /**
- * Finance team activates the contract. (Step 2 of Finance Approval)
+ * Step 2 of the Finance Check:
+ * The Finance team officially signs off and "turns on" the contract.
+ * This usually happens after they verify the signed paperwork is in order.
  */
 export const activateContract = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -265,7 +274,7 @@ export const activateContract = async (req: Request, res: Response, next: NextFu
 };
 
 /**
- * Uploads a contract confirmation document to S3/R2 and returns the URL.
+ * Upload and save a digital scan of the signed contract or payment slip.
  */
 export const uploadContractConfirmation = async (
   req: Request,
@@ -288,8 +297,8 @@ export const uploadContractConfirmation = async (
 };
 
 /**
- * Finance team rejects a quotation.
- * Requires a reason for rejection.
+ * If the central Finance team finds a mistake, they can "reject" the deal
+ * and send it back to the branch with a note explaining what needs fixing.
  */
 export const financeReject = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -327,8 +336,7 @@ export const createNextMonthInvoice = async (req: Request, res: Response, next: 
 };
 
 /**
- * Generates the consolidated final invoice for a contract.
- * Should be used instead of the deprecated generateFinalInvoice.
+ * Create the final official bill for a customer once a deal is fully settled.
  */
 export const generateConsolidatedFinalInvoice = async (
   req: Request,
@@ -354,8 +362,9 @@ export const generateConsolidatedFinalInvoice = async (
 };
 
 /**
- * Retrieves all invoices visible to the user.
- * Admin sees all; Branch Users see only their branch's invoices.
+ * List every single bill.
+ * - Administrators see bills from every branch.
+ * - Local staff only see bills for their own specific branch.
  */
 export const getAllInvoices = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -371,7 +380,7 @@ export const getAllInvoices = async (req: Request, res: Response, next: NextFunc
 };
 
 /**
- * Retrieves invoices created by the authenticated user.
+ * Show me only the bills that I personally created.
  */
 export const getMyInvoices = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -410,7 +419,7 @@ export const getBranchInvoices = async (req: Request, res: Response, next: NextF
 };
 
 /**
- * Retrieves a single invoice by its unique ID.
+ * Get the full details for one specific bill using its ID.
  */
 export const getInvoiceById = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -432,7 +441,7 @@ export const getInvoiceById = async (req: Request, res: Response, next: NextFunc
 };
 
 /**
- * Retrieves invoice statistics (totals, counts) based on user role and filters.
+ * Get the bird's-eye view numbers (how many bills, total money) for the dashboard.
  */
 export const getStats = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -451,7 +460,7 @@ export const getStats = async (req: Request, res: Response, next: NextFunction) 
 };
 
 /**
- * Retrieves a sales overview for the user's branch over a specified period.
+ * See how much money a specific branch has made over a period of time.
  */
 export const getBranchSales = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -475,7 +484,7 @@ export const getBranchSales = async (req: Request, res: Response, next: NextFunc
 };
 
 /**
- * Retrieves total sales figures for the user's branch.
+ * Get the grand total of all sales for my branch.
  */
 export const getBranchSalesTotals = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -498,7 +507,7 @@ export const getBranchSalesTotals = async (req: Request, res: Response, next: Ne
 };
 
 /**
- * Retrieves comprehensive finance stats (Revenue, Expenses, Profit).
+ * Detailed financial health check: How much we made vs. how much we spent.
  */
 export const getBranchFinanceStats = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -521,7 +530,8 @@ export const getBranchFinanceStats = async (req: Request, res: Response, next: N
 };
 
 /**
- * Retrieves counts of pending actions (e.g., pending approvals) for the branch.
+ * Count how many tasks (like bills waiting for design) need attention.
+ * These show up as red "notification" numbers on the screen.
  */
 export const getPendingCounts = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -541,7 +551,7 @@ export const getPendingCounts = async (req: Request, res: Response, next: NextFu
 };
 
 /**
- * Retrieves collection alerts (e.g., overdue payments) for the branch.
+ * Reminders about customer bills that are overdue or need collecting soon.
  */
 export const getCollectionAlerts = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -561,7 +571,7 @@ export const getCollectionAlerts = async (req: Request, res: Response, next: Nex
 };
 
 /**
- * Retrieves a global overview of sales performance (Admin/HQ level).
+ * Sales performance for the entire global company (HQ view).
  */
 export const getGlobalSales = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -579,7 +589,7 @@ export const getGlobalSales = async (req: Request, res: Response, next: NextFunc
 };
 
 /**
- * Retrieves total global sales figures.
+ * Total sales numbers for every office everywhere.
  */
 export const getGlobalSalesTotals = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -596,7 +606,7 @@ export const getGlobalSalesTotals = async (req: Request, res: Response, next: Ne
 };
 
 /**
- * Retrieves a detailed financial report based on filters like branch, sale type, month, and year.
+ * Create a massive report showing all finances, sortable by branch, month, or year.
  */
 export const getFinanceReport = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -626,7 +636,7 @@ export const getFinanceReport = async (req: Request, res: Response, next: NextFu
 };
 
 /**
- * Updates the usage counts (BW/Color) for a specific invoice.
+ * Update the "usage" on a bill—for example, how many pages a customer printed.
  */
 export const updateInvoiceUsage = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -651,7 +661,7 @@ export const updateInvoiceUsage = async (req: Request, res: Response, next: Next
 };
 
 /**
- * Retrieves sales statistics specifically formatted for the Admin dashboard.
+ * Performance numbers specially formatted for the Head Office dashboard.
  */
 export const getAdminSalesStats = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -667,7 +677,7 @@ export const getAdminSalesStats = async (req: Request, res: Response, next: Next
 };
 
 /**
- * Retrieves the history of invoices for a branch, optionally filtered by sale type.
+ * Look back at the history of a bill to see who changed what.
  */
 export const getInvoiceHistory = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -696,7 +706,7 @@ export const getInvoiceHistory = async (req: Request, res: Response, next: NextF
 };
 
 /**
- * Retrieves a list of completed collections for the branch.
+ * List all the bills where we have successfully collected the money.
  */
 export const getCompletedCollections = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -715,7 +725,7 @@ export const getCompletedCollections = async (req: Request, res: Response, next:
 };
 
 /**
- * Downloads the consolidated final invoice as a PDF.
+ * Create a professional PDF of the final bill so it can be printed or shared.
  */
 export const downloadConsolidatedInvoice = async (
   req: Request,
@@ -739,7 +749,7 @@ export const downloadConsolidatedInvoice = async (
 };
 
 /**
- * Sends the consolidated final invoice via notification channels.
+ * Automatically send the final bill to the customer via email or other channels.
  */
 export const sendConsolidatedInvoice = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -757,7 +767,7 @@ export const sendConsolidatedInvoice = async (req: Request, res: Response, next:
 };
 
 /**
- * Sends a generic email notification.
+ * Send a custom email message to a customer about their bill.
  */
 export const sendEmailNotification = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -780,7 +790,7 @@ export const sendEmailNotification = async (req: Request, res: Response, next: N
 };
 
 /**
- * Sends a generic WhatsApp notification.
+ * Send a quick WhatsApp message to a customer about their bill.
  */
 export const sendWhatsappNotification = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -803,7 +813,7 @@ export const sendWhatsappNotification = async (req: Request, res: Response, next
 };
 
 /**
- * Retrieves available years for filtering reports.
+ * Find out which years we have records for, so you can pick them in a filter.
  */
 export const getAvailableYears = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -819,7 +829,7 @@ export const getAvailableYears = async (req: Request, res: Response, next: NextF
 };
 
 /**
- * Replace a device allocation for a contract.
+ * If a customer's machine breaks, swap it for a different one in our records.
  */
 export const replaceDeviceAllocation = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -836,8 +846,7 @@ export const replaceDeviceAllocation = async (req: Request, res: Response, next:
 };
 
 /**
- * Returns all product allocations for a contract (including initial meter readings).
- * Used by the Usage Recording Modal to compute correct delta after device replacement.
+ * Get a list of all equipment currently assigned to a contract.
  */
 export const getContractAllocations = async (req: Request, res: Response, next: NextFunction) => {
   try {

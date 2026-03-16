@@ -3,6 +3,7 @@ import { UsageRepository } from '../repositories/usageRepository';
 import { InvoiceType } from '../entities/enums/invoiceType';
 import { ContractStatus } from '../entities/enums/contractStatus';
 import { AppError } from '../errors/appError';
+import { logger } from '../config/logger';
 
 export class BillingReportService {
   private invoiceRepo = new InvoiceRepository();
@@ -543,7 +544,7 @@ export class BillingReportService {
       const data = await response.json();
       return data.data;
     } catch (err) {
-      console.error('Failed to fetch lot stats from inventory service', err);
+      logger.error('Failed to fetch lot stats from inventory service', { error: err });
       return { totalExpenses: 0, monthlyExpenses: [] };
     }
   }
@@ -577,7 +578,7 @@ export class BillingReportService {
       const data = await response.json();
       return data; // Employee service response is direct object
     } catch (err) {
-      console.error('Failed to fetch payroll stats from employee service', err);
+      logger.error('Failed to fetch payroll stats from employee service', { error: err });
       return { totalSalaries: 0, monthlySalaries: [] };
     }
   }

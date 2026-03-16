@@ -11,19 +11,25 @@ import { logger } from './config/logger';
 import { errorHandler } from './middleware/errorHandler';
 import { otpSendLimiter, otpVerifyLimiter, loginLimiter } from './middleware/rateLimitter';
 
-// ---------------------------------------------------------------------------
-// App instance
-// ---------------------------------------------------------------------------
+/*
+ * This is the main setup for the API Gateway.
+ * Think of the Gateway as the "Front Door" of our system.
+ * Every request from a user comes here first, and this door decides where to send it.
+ */
 const app: Express = express();
 
-// ---------------------------------------------------------------------------
-// Trust proxy — required when running behind Nginx / Dokploy reverse proxy
-// ---------------------------------------------------------------------------
+/**
+ * Trust Proxy setup.
+ * This tells our server that it's sitting behind another gatekeeper (like Nginx).
+ * It helps our system correctly identify the real IP address of the person visiting.
+ */
 app.set('trust proxy', 1);
 
-// ---------------------------------------------------------------------------
-// CORS
-// ---------------------------------------------------------------------------
+/**
+ * Security: Allowed Websites (CORS)
+ * This section defines which external websites or addresses are allowed to
+ * communicate with our system. We only want our own trusted apps to talk to us.
+ */
 const CLIENT_URL = process.env.CLIENT_URL;
 logger.info(`CORS configured for origin: ${CLIENT_URL}`);
 
@@ -34,7 +40,6 @@ const allowedOrigins = [CLIENT_URL, 'http://localhost:3000', 'http://127.0.0.1:3
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Allow requests with no origin (mobile apps, curl, server-to-server)
       if (!origin) return callback(null, true);
       if (
         allowedOrigins.includes(origin) ||
@@ -51,40 +56,48 @@ app.use(
   }),
 );
 
-// ---------------------------------------------------------------------------
-// Compression — reduces response sizes for API/JSON payloads
-// ---------------------------------------------------------------------------
+/**
+ * Performance: Data Squashing (Compression)
+ * This makes the information we send back to the user smaller,
+ * which makes the app feel faster and saves data.
+ */
 app.use(compression());
 
-// ---------------------------------------------------------------------------
-// HTTP request/response logger
-// ---------------------------------------------------------------------------
+/**
+ * Activity Log: Record all incoming requests
+ * This keeps a log of every time someone tries to talk to our server,
+ * which is useful for debugging if something goes wrong.
+ */
 app.use(httpLogger);
 
-// ---------------------------------------------------------------------------
-// Health route — handled entirely by the gateway, no upstream dependency
-// ---------------------------------------------------------------------------
+/**
+ * Health Check: A simple "Are you alive?" test.
+ * This endpoint (/health) is used by our monitoring tools to make sure
+ * the server is still running properly.
+ */
 app.use('/health', healthRouter);
 
-// ---------------------------------------------------------------------------
-// Root route — useful for deployment health checks in Dokploy
-// ---------------------------------------------------------------------------
+/**
+ * Welcome Route: The very base address.
+ * Just a simple confirmation that the gateway is up and running.
+ */
 app.get('/', (_req: Request, res: Response) => {
   res.json({ service: 'api-gateway', status: 'running' });
 });
 
-// ---------------------------------------------------------------------------
-// Gateway-level invoice route (handled locally, not proxied).
-// express.json() is added explicitly here as a defensive measure in case
-// the global body parser order ever changes.
-// ---------------------------------------------------------------------------
+/**
+ * Invoice Management: Local Billing Routes
+ * These routes handle financial documents (invoices).
+ * We process these directly here at the gateway for convenience.
+ */
 app.use('/b/invoices', express.json(), invoiceRouter);
 
-// ---------------------------------------------------------------------------
-// Specific rate limiters — applied only to the exact auth endpoints.
-// Intentionally NOT applying a global limiter before proxy routes to avoid
-// interfering with proxied upstream responses.
-// ---------------------------------------------------------------------------
+/**
+ * Safety: Prevention of Automated Attacks (Rate Limiting)
+ * We limit how many times someone can try to login or request a password reset
+ * in a short period. This prevents hackers from trying thousands of passwords
+ * automatically.
+ */
 app.post('/e/auth/login', loginLimiter);
 app.post(
   ['/e/auth/login/verify', '/e/auth/forgot-password/verify', '/e/auth/magic-link/verify'],
@@ -92,26 +105,23 @@ app.post(
 );
 app.post(['/e/auth/forgot-password', '/e/auth/magic-link'], otpSendLimiter);
 
-// ---------------------------------------------------------------------------
-// Proxy factory — creates a production-safe proxy with:
-//   • 60 s timeout on both the socket and the proxy connection
-//   • changeOrigin so Host header matches the upstream service
-//   • onError hook that returns a clean 502 JSON instead of crashing
-// ---------------------------------------------------------------------------
+/**
+ * Traffic Director: Sending requests to the right service.
+ * This function creates a "tunnel" to another part of our system.
+ * If a request comes in for employees, this tunnel sends it to the Employee Service.
+ *
+ * @param target - The address of the internal service we want to talk to.
+ */
 function createServiceProxy(target: string) {
   return createProxyMiddleware({
     target,
     changeOrigin: true,
-    proxyTimeout: 60_000, // max ms to wait for upstream to respond
-    timeout: 60_000, // socket inactivity timeout
-    secure: false, // allow self-signed certs in internal network
+    proxyTimeout: 60_000, // Wait up to 60 seconds for a response
+    timeout: 60_000, // If nothing happens for 60 seconds, close the connection
+    secure: false, // Trust our own internal network connections
 
-    // Graceful error handler — prevents raw ECONNREFUSED / ECONNRESET from
-    // bubbling up as an unformatted 500. Returns a clean 502 JSON message.
-    // In http-proxy-middleware v3, event handlers live inside `on: {}`.
-    // `res` is typed as Socket | ServerResponse | Response, so we use `any`
-    // and guard with `headersSent` before writing (Socket won't have it).
     on: {
+      // If the destination service is down or doesn't respond, we tell the user.
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       error(err: Error, req: Request, res: any) {
         logger.error(`Proxy error → ${target}: ${err.message}`, {
@@ -130,17 +140,16 @@ function createServiceProxy(target: string) {
   });
 }
 
-// ---------------------------------------------------------------------------
-// Service URLs
-// ---------------------------------------------------------------------------
+// These are the addresses for the different "departments" in our system.
 const EMPLOYEE_SERVICE_URL = process.env.EMPLOYEE_SERVICE_URL as string;
 const VENDOR_INVENTORY_SERVICE_URL = process.env.VENDOR_INVENTORY_SERVICE_URL as string;
 const BILLING_SERVICE_URL = process.env.BILLING_SERVICE_URL as string;
 const CRM_SERVICE_URL = process.env.CRM_SERVICE_URL as string;
 
-// ---------------------------------------------------------------------------
-// Env validation — fail fast before registering any proxy routes
-// ---------------------------------------------------------------------------
+/**
+ * Pre-Flight Check: Ensure we know where everyone is.
+ * Before starting, we make sure we have the addresses for all our internal services.
+ */
 const requiredEnvVars: Record<string, string> = {
   EMPLOYEE_SERVICE_URL,
   VENDOR_INVENTORY_SERVICE_URL,
@@ -154,44 +163,51 @@ for (const [key, value] of Object.entries(requiredEnvVars)) {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Service proxies
-// ---------------------------------------------------------------------------
+/**
+ * Routing Table: Mapping paths to services.
+ * We tell the gateway:
+ * - "/e" goes to Employees
+ * - "/i" goes to Inventory
+ * - "/b" goes to Billing
+ * - "/c" goes to CRM (Customer Management)
+ */
 app.use('/e', createServiceProxy(EMPLOYEE_SERVICE_URL));
 app.use('/i', createServiceProxy(VENDOR_INVENTORY_SERVICE_URL));
 app.use('/b', createServiceProxy(BILLING_SERVICE_URL));
 app.use('/c', createServiceProxy(CRM_SERVICE_URL));
 
-// ---------------------------------------------------------------------------
-// Global error handler — catches errors thrown by gateway-level routes
-// ---------------------------------------------------------------------------
+/**
+ * Universal Safety Net: Catch-all for errors.
+ * If anything goes wrong anywhere in the gateway, this ensures we
+ * send a clean error message back to the user instead of letting the app crash.
+ */
 app.use(errorHandler);
 
-// ---------------------------------------------------------------------------
-// Async bootstrap — ensures the RabbitMQ consumer is fully initialised
-// before the HTTP server begins accepting requests.
-// ---------------------------------------------------------------------------
+/**
+ * Launch Sequence: Starting the engine.
+ * This function connects to our message system (RabbitMQ) first,
+ * then starts listening for users on the internet.
+ */
 async function startServer(): Promise<void> {
   const PORT = process.env.API_GATEWAY_PORT || process.env.PORT || 3001;
 
-  // Wait for the customer consumer to connect to RabbitMQ before opening
-  // the server socket. This prevents a race condition at Docker startup where
-  // the gateway starts routing requests before its workers are ready.
+  // Let's make sure our internal communication channel is open.
   await startCustomerConsumer();
   logger.info('Customer consumer initialised');
 
-  // Log the proxy routing table for easy debugging in Dokploy / Docker logs
+  // Announce where we are sending traffic for debugging purposes.
   logger.info(`Proxying /e → ${EMPLOYEE_SERVICE_URL}`);
   logger.info(`Proxying /i → ${VENDOR_INVENTORY_SERVICE_URL}`);
   logger.info(`Proxying /b → ${BILLING_SERVICE_URL}`);
   logger.info(`Proxying /c → ${CRM_SERVICE_URL}`);
 
+  // Start listening for incoming traffic.
   app.listen(PORT, () => {
     logger.info(`API Gateway running on port ${PORT}`);
   });
 }
 
-// Start the server and surface any fatal startup errors
+// Fire up the server!
 startServer().catch((err: Error) => {
   logger.error('Fatal error during API Gateway startup', { error: err.message, stack: err.stack });
   process.exit(1);

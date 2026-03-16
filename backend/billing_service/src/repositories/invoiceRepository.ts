@@ -6,6 +6,7 @@ import { SaleType } from '../entities/enums/saleType';
 import { InvoiceItem } from '../entities/invoiceItemEntity';
 import { Source } from '../config/dataSource';
 import { ContractStatus } from '../entities/enums/contractStatus';
+import { logger } from '../config/logger';
 
 export class InvoiceRepository {
   private repo: Repository<Invoice>;
@@ -680,7 +681,7 @@ export class InvoiceRepository {
     }
 
     const results = await qb.groupBy('invoice.saleType').getRawMany();
-    console.log('InvoiceRepo: getPendingCounts results:', results);
+    logger.info('InvoiceRepo: getPendingCounts results', { results });
 
     return results.map((r) => ({
       saleType: r.saleType || r.saletype, // Handle potential lowercase alias from Postgres

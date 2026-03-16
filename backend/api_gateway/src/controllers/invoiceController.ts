@@ -13,8 +13,10 @@ interface AuthenticatedRequest extends Request {
 const invoiceAggregationService = new InvoiceAggregationService();
 
 /**
- * Retrieves all invoices for the authenticated user based on their role.
- * Admin/Finance see all, Employees see only their branch's invoices.
+ * Lists all the invoices (bills) in the system.
+ *
+ * If you are an Admin or work in Finance, you see everything.
+ * If you are a Branch Employee, you only see bills related to your specific office.
  */
 export const getAllInvoices = async (
   req: AuthenticatedRequest,
@@ -38,7 +40,7 @@ export const getAllInvoices = async (
 };
 
 /**
- * Retrieves the authenticated user's personal invoices (My Invoices).
+ * Show me only the bills that I personally created or am responsible for.
  */
 export const getMyInvoices = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -54,7 +56,7 @@ export const getMyInvoices = async (req: Request, res: Response, next: NextFunct
 };
 
 /**
- * Retrieves invoices specific to the user's branch.
+ * List all bills that belong to my specific branch or office location.
  */
 export const getBranchInvoices = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -70,7 +72,7 @@ export const getBranchInvoices = async (req: Request, res: Response, next: NextF
 };
 
 /**
- * Retrieves detailed information for a specific invoice by its ID.
+ * Get the full details of one specific bill using its unique identification number.
  */
 export const getInvoiceById = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -88,7 +90,7 @@ export const getInvoiceById = async (req: Request, res: Response, next: NextFunc
 };
 
 /**
- * Creates a new invoice/quotation.
+ * Start the process of billing a customer by creating a new bill or price estimate.
  */
 export const createInvoice = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -103,8 +105,9 @@ export const createInvoice = async (req: Request, res: Response, next: NextFunct
     next(error);
   }
 };
+
 /**
- * Updates an existing quotation.
+ * Change the details of a price estimate (a formal "quotation") if a customer requests changes.
  */
 export const updateQuotation = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -122,7 +125,8 @@ export const updateQuotation = async (req: Request, res: Response, next: NextFun
 };
 
 /**
- * Approves a quotation by an employee, often adding a deposit.
+ * Confirm that a customer has agreed to a price estimate.
+ * This often involves recording the initial down payment (deposit) they made.
  */
 export const approveQuotation = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -142,7 +146,7 @@ export const approveQuotation = async (req: Request, res: Response, next: NextFu
 };
 
 /**
- * Employee submits a quotation for Finance approval.
+ * After a branch employee is happy with a deal, they send it to the main Finance team for a final check.
  */
 export const employeeApprove = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -161,7 +165,7 @@ export const employeeApprove = async (req: Request, res: Response, next: NextFun
 };
 
 /**
- * Finance team allocates machines (Step 1).
+ * The Finance team assigns specific equipment or machines to a customer's order.
  */
 export const allocateMachines = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -181,7 +185,8 @@ export const allocateMachines = async (req: Request, res: Response, next: NextFu
 };
 
 /**
- * Finance team activates the contract (Step 2).
+ * Formally switch on a contract.
+ * This happens after machines are assigned and payments are verified.
  */
 export const activateContract = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -207,7 +212,7 @@ export const activateContract = async (req: Request, res: Response, next: NextFu
 };
 
 /**
- * Upload contract confirmation document.
+ * Save a digital copy of the customer's signed contract or payment confirmation.
  */
 export const uploadContractConfirmation = async (
   req: Request,
@@ -231,7 +236,7 @@ export const uploadContractConfirmation = async (
 };
 
 /**
- * Finance team rejects a quotation with a reason.
+ * If something is wrong with a deal, the Finance team can send it back with a note explaining why.
  */
 export const financeReject = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -251,7 +256,7 @@ export const financeReject = async (req: Request, res: Response, next: NextFunct
 };
 
 /**
- * Generates the final settlement invoice for a contract.
+ * Prepare the final closing bill when a contract is finishing or being settled.
  */
 export const generateFinalInvoice = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -268,7 +273,7 @@ export const generateFinalInvoice = async (req: Request, res: Response, next: Ne
 };
 
 /**
- * Creates the invoice for the next month based on an existing contract.
+ * Automatically set up the bill for the upcoming month based on an ongoing contract.
  */
 export const createNextMonthInvoice = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -286,7 +291,7 @@ export const createNextMonthInvoice = async (req: Request, res: Response, next: 
 };
 
 /**
- * Retrieves invoice statistics (totals, counts) for the dashboard.
+ * Get overall numbers (totals and counts) to show how much work we've done and how much money is coming in.
  */
 export const getStats = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
@@ -306,7 +311,8 @@ export const getStats = async (req: AuthenticatedRequest, res: Response, next: N
 };
 
 /**
- * Retrieves counts of pending actions (e.g., pending approvals) for sidebar badges.
+ * Count how many tasks (like pending approvals) need immediate attention.
+ * This is used for those little notification circles you see in the sidebar.
  */
 export const getPendingCounts = async (
   req: AuthenticatedRequest,
@@ -332,7 +338,7 @@ export const getPendingCounts = async (
 };
 
 /**
- * Retrieves collection alerts for Finance/Admin.
+ * Reminders for the Finance team about bills that need to be collected soon.
  */
 export const getCollectionAlerts = async (
   req: AuthenticatedRequest,
@@ -354,8 +360,9 @@ export const getCollectionAlerts = async (
     next(error);
   }
 };
+
 /**
- * Retrieves a global overview of sales performance.
+ * Show a history of how business performance has changed over time globally.
  */
 export const getGlobalSales = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -372,7 +379,7 @@ export const getGlobalSales = async (req: Request, res: Response, next: NextFunc
 };
 
 /**
- * Retrieves total sales figures globally.
+ * Get the total sales figures for the entire business.
  */
 export const getGlobalSalesTotals = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -388,7 +395,7 @@ export const getGlobalSalesTotals = async (req: Request, res: Response, next: Ne
 };
 
 /**
- * Retrieves the history of invoices.
+ * Look back at all the invoices ever created.
  */
 export const getInvoiceHistory = async (
   req: AuthenticatedRequest,
@@ -412,7 +419,7 @@ export const getInvoiceHistory = async (
 };
 
 /**
- * Retrieves a list of completed collections.
+ * List all the bills where we have successfully received the money.
  */
 export const getCompletedCollections = async (
   req: AuthenticatedRequest,
@@ -435,7 +442,7 @@ export const getCompletedCollections = async (
 };
 
 /**
- * Downloads a specific invoice as a PDF.
+ * Export a professional PDF version of an invoice for printing or sharing.
  */
 export const downloadInvoice = async (
   req: AuthenticatedRequest,
@@ -450,7 +457,6 @@ export const downloadInvoice = async (
 
     const stream = await invoiceAggregationService.downloadInvoice(contractId, token);
 
-    // Pipe the stream to response
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader(
       'Content-Disposition',
@@ -463,7 +469,7 @@ export const downloadInvoice = async (
 };
 
 /**
- * Sends an invoice via email/notification.
+ * Send an invoice to a customer's email or phone as a notification.
  */
 export const sendInvoice = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
@@ -483,7 +489,7 @@ export const sendInvoice = async (req: AuthenticatedRequest, res: Response, next
 };
 
 /**
- * Retrieves detailed sales statistics for Admin.
+ * Get detailed sales performance numbers specifically for higher-level management.
  */
 export const getAdminSalesStats = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -499,7 +505,7 @@ export const getAdminSalesStats = async (req: Request, res: Response, next: Next
 };
 
 /**
- * Retrieves the comprehensive financial report.
+ * Create a comprehensive financial report for accounting purposes.
  */
 export const getFinanceReport = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -515,11 +521,14 @@ export const getFinanceReport = async (req: Request, res: Response, next: NextFu
   }
 };
 
+/**
+ * Manually trigger an email for a specific bill to a customer or staff member.
+ */
 export const sendEmailNotification = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = req.params.id as string;
     const token = req.headers.authorization?.split(' ')[1] || '';
-    const payload = req.body; // { recipient?, subject, body }
+    const payload = req.body;
 
     const result = await invoiceAggregationService.sendEmailNotification(id, payload, token);
     return res.status(200).json({
@@ -532,11 +541,14 @@ export const sendEmailNotification = async (req: Request, res: Response, next: N
   }
 };
 
+/**
+ * Manually trigger a WhatsApp message for a specific bill.
+ */
 export const sendWhatsappNotification = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = req.params.id as string;
     const token = req.headers.authorization?.split(' ')[1] || '';
-    const payload = req.body; // { recipient?, body }
+    const payload = req.body;
 
     const result = await invoiceAggregationService.sendWhatsappNotification(id, payload, token);
     return res.status(200).json({
@@ -550,7 +562,7 @@ export const sendWhatsappNotification = async (req: Request, res: Response, next
 };
 
 /**
- * Retrieves comprehensive finance stats (Revenue, Expenses, Profit) for a branch.
+ * Get a detailed breakdown of revenue and expenses for a specific branch.
  */
 export const getBranchFinanceStats = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -567,7 +579,7 @@ export const getBranchFinanceStats = async (req: Request, res: Response, next: N
 };
 
 /**
- * Replace a device allocation for a contract.
+ * Swap out a machine that was assigned to a deal, perhaps because it's broken or unavailable.
  */
 export const replaceDeviceAllocation = async (req: Request, res: Response, next: NextFunction) => {
   try {

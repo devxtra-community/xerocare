@@ -54,7 +54,7 @@ export default function ManagerPurchaseTable() {
   }, []);
 
   const filtered = purchases.filter((p) =>
-    `${p.lotId} ${p.vendorId} ${p.lot?.lot_number || ''}`
+    `${p.lotId} ${p.vendorId} ${p.lot?.lotNumber || ''}`
       .toLowerCase()
       .includes(search.toLowerCase()),
   );
@@ -160,7 +160,7 @@ export default function ManagerPurchaseTable() {
                     #{p.id.slice(0, 8)}
                   </TableCell>
                   <TableCell className="px-6 py-4 font-medium text-slate-500">
-                    {p.lot?.lot_number || p.lotId.slice(0, 8)}
+                    {p.lot?.lotNumber || p.lotId.slice(0, 8)}
                   </TableCell>
                   <TableCell className="px-6 py-4 font-black text-slate-800">
                     {formatCurrency(p.totalAmount)}

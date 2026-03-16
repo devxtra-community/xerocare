@@ -172,7 +172,7 @@ export default function ManagerProduct() {
           {
             id: 'lot',
             header: 'LOT NUMBER',
-            cell: (p: Product) => p.lot?.lotNumber || p.lot?.lot_number || '-',
+            cell: (p: Product) => p.lot?.lotNumber || '-',
           },
           { id: 'serial', header: 'SERIAL NO', accessorKey: 'serial_no' as keyof Product },
           { id: 'price', header: 'PRICE', cell: (p: Product) => formatCurrency(p.sale_price) },

@@ -7,7 +7,7 @@ import { CheckCircle2, MoreHorizontal } from 'lucide-react';
 export default function Home() {
   return (
     <div className="h-screen w-full bg-[#0F172A] text-white selection:bg-blue-500/30 overflow-hidden flex flex-col">
-      {/* Header / Logo */}
+      {/* 1. Website Header (Company Logo) */}
       <header className="container mx-auto px-6 py-4 flex-none">
         <div className="flex items-center gap-2">
           <div className="h-7 w-7 rounded-lg bg-blue-600 flex items-center justify-center">
@@ -17,9 +17,10 @@ export default function Home() {
         </div>
       </header>
 
+      {/* 2. Main Content Area */}
       <main className="container mx-auto px-6 flex-1 flex flex-col justify-center min-h-0">
         <div className="grid lg:grid-cols-2 gap-8 lg:gap-12 items-center h-full max-h-[800px] m-auto">
-          {/* Left: Content */}
+          {/* Left Side: Welcome Message and "Get Started" Button */}
           <div className="space-y-6 flex flex-col justify-center">
             <div className="w-fit">
               <Badge
@@ -38,9 +39,8 @@ export default function Home() {
             </h1>
 
             <p className="text-slate-400 text-sm sm:text-base max-w-lg leading-relaxed">
-              Manage the relation between your business and your customer perfectly with AI-based
-              Customer Relationship Management. No more miscommunication, no more business value
-              decrease.
+              Our system helps you keep track of your customers and business performance in one
+              place, making sure everything runs smoothly.
             </p>
 
             <div className="flex flex-col sm:flex-row gap-3 pt-1">
@@ -52,12 +52,12 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Right: Visuals (Floating Cards) */}
+          {/* Right Side: A preview of what the dashboard looks like */}
           <div className="relative flex items-center justify-center transform scale-90 lg:scale-100">
-            {/* Glow Effect */}
+            {/* Background Glow */}
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] bg-blue-600/20 blur-[80px] rounded-full pointer-events-none" />
 
-            {/* Main Card: Sales Overview (Back) */}
+            {/* Visual Example: Sales Report Card */}
             <div className="relative z-10 bg-card dark:bg-slate-900 rounded-2xl p-5 shadow-2xl border border-slate-700/50 w-full max-w-[350px] mx-auto lg:ml-auto lg:mr-0 transform -rotate-2 lg:translate-x-4 hover:rotate-0 transition-transform duration-500">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="font-bold text-foreground dark:text-white text-base">
@@ -83,7 +83,7 @@ export default function Home() {
                 </div>
               </div>
 
-              {/* Bar Chart Simulation */}
+              {/* Simulation of a bar chart showing business growth */}
               <div className="h-24 flex items-end justify-between gap-1.5 px-1">
                 {[40, 70, 45, 90, 60, 80, 50].map((h, i) => (
                   <div
@@ -108,7 +108,7 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Floating Card: Upcoming Schedule (Front) */}
+            {/* Visual Example: To-Do List Card */}
             <div className="absolute top-12 -left-2 lg:-left-6 z-20 bg-card dark:bg-card rounded-2xl p-4 shadow-[0_15px_40px_rgba(0,0,0,0.3)] w-60 transform rotate-3 hover:scale-105 transition-all duration-300">
               <div className="flex items-center justify-between mb-3">
                 <h4 className="font-bold text-foreground text-sm">Upcoming Schedule</h4>

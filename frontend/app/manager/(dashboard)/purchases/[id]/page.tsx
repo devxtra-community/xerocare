@@ -100,7 +100,7 @@ export default function PurchaseDetailsPage() {
               Purchase Order #{purchase.id.slice(0, 8)}
             </h1>
             <p className="text-sm text-slate-500 font-medium">
-              Lot: {purchase.lot?.lot_number || purchase.lotId.slice(0, 8)} • Vendor:{' '}
+              Lot: {purchase.lot?.lotNumber || purchase.lotId.slice(0, 8)} • Vendor:{' '}
               {purchase.vendor?.name || purchase.vendorId.slice(0, 8)}
             </p>
           </div>

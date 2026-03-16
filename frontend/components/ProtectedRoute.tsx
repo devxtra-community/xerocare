@@ -12,8 +12,10 @@ interface ProtectedRouteProps {
 }
 
 /**
- * HOC for protecting routes based on user role and module access.
- * Redirects unauthorized users to a fallback path or login.
+ * Security Guard: This tool acts like a guard for our company website.
+ * Before showing a page, it checks:
+ * 1. Are you logged in? (If not, it sends you to the Login page).
+ * 2. Is this your department? (Ensures staff Only see modules they are assigned to).
  */
 export default function ProtectedRoute({
   children,
@@ -23,30 +25,34 @@ export default function ProtectedRoute({
   const router = useRouter();
 
   useEffect(() => {
+    // Check our digital ID card
     const user = getUserFromToken();
 
-    // If not logged in, redirect to login
+    // Safety Check 1: If the user is not signed in at all, take them to the login screen.
     if (!user) {
       router.push('/login');
       return;
     }
 
-    // If not an employee, allow access (for admins/managers)
+    // Administrators and Managers are allowed to see any page.
     if (user.role !== 'EMPLOYEE') {
       return;
     }
 
-    // If employee doesn't have a job assigned, redirect
+    // Safety Check 2: If the employee hasn't been assigned a specific job yet,
+    // send them back to their home dashboard.
     if (!user.employeeJob) {
       router.push(fallbackPath);
       return;
     }
 
-    // Check if employee's job has access to any of the required modules
+    // Safety Check 3: Check if this specific page (Module) is part of their job description.
     const hasAccess = requiredModules.some((module) =>
       hasJobAccess(user.employeeJob as EmployeeJob, module),
     );
 
+    // If they are trying to peek into a department they don't belong to,
+    // send them back home.
     if (!hasAccess) {
       router.push(fallbackPath);
     }

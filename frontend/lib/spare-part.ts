@@ -15,7 +15,7 @@ export interface SparePart {
   image_url?: string;
   created_at: string;
   updated_at: string;
-  lot_number?: string;
+  lotNumber?: string;
 }
 
 interface ApiResponse<T> {

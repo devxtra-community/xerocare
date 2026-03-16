@@ -13,6 +13,7 @@ import { Brand } from '../entities/brandEntity';
 import { AppError } from '../errors/appError';
 import * as xlsx from 'xlsx';
 import * as ExcelJS from 'exceljs';
+import { logger } from '../config/logger';
 
 interface CreateRfqDto {
   branchId: string;
@@ -65,7 +66,12 @@ export class RfqService {
       unknown
     >[];
 
-    if (data.length === 0) throw new AppError('Excel file is empty', 400);
+    if (data.length === 0) {
+      logger.warn('Excel RFQ upload failed: File is empty', { branchId, createdBy });
+      throw new AppError('Excel file is empty', 400);
+    }
+
+    logger.info('Starting RFQ upload from Excel', { rowCount: data.length, branchId });
 
     return this.dataSource.transaction(async (manager) => {
       const rfq = manager.create(Rfq, {
@@ -568,6 +574,11 @@ export class RfqService {
       }
 
       await manager.save(rfq);
+      logger.info('RFQ sent successfully to vendors', {
+        rfqId: rfq.id,
+        rfqNumber: rfq.rfq_number,
+        vendorCount: rfq.vendors.length,
+      });
       return rfq;
     });
   }
@@ -785,6 +796,7 @@ export class RfqService {
       rfq.awarded_vendor_id = targetVendor.vendor_id;
       await manager.save(rfq);
 
+      logger.info('Vendor awarded successfully', { rfqId, awardedVendorId: vendorId });
       return { success: true, message: 'Vendor awarded successfully', rfq };
     });
   }

@@ -81,7 +81,7 @@ export default function SparePartTable({ showActions = true, selectedYear }: Spa
 
   const filtered = parts.filter((p) => {
     const matchesSearch =
-      (p.lot_number?.toLowerCase() || '').includes(search.toLowerCase()) ||
+      (p.lotNumber?.toLowerCase() || '').includes(search.toLowerCase()) ||
       (p.part_name?.toLowerCase() || '').includes(search.toLowerCase()) ||
       (p.brand?.toLowerCase() || '').includes(search.toLowerCase());
 
@@ -209,11 +209,11 @@ export default function SparePartTable({ showActions = true, selectedYear }: Spa
               ) : filtered.length > 0 ? (
                 filtered.map((item, i) => (
                   <TableRow
-                    key={`${item.lot_number}-${i}`}
+                    key={`${item.lotNumber}-${i}`}
                     className={`transition-colors h-11 ${i % 2 === 0 ? 'bg-card' : 'bg-blue-50/20'}`}
                   >
                     <TableCell className="px-3 py-1.5 font-medium text-foreground text-[12px]">
-                      {item.lot_number}
+                      {item.lotNumber}
                     </TableCell>
                     <TableCell className="px-3 py-1.5 font-medium text-primary text-[12px]">
                       {item.part_name}

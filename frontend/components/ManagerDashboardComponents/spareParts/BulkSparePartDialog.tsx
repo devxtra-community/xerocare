@@ -209,7 +209,7 @@ export default function BulkSparePartDialog({
         }
       }
 
-      const lotIdFromExcel = getVal(['lot_id', 'Lot ID', 'Lot', 'lot_number']);
+      const lotIdFromExcel = getVal(['lot_id', 'lotNumber', 'Lot ID', 'Lot', 'lot_number']);
 
       return {
         item_code: itemCode,

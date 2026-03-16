@@ -10,15 +10,24 @@ export interface InventoryItem {
   brand: string;
   vendor_id?: string;
   vendor_name?: string;
+  /** Total number of items we have ever had for this model. */
   total_qty: number;
+  /** Number of items currently sitting in the warehouse and ready to sell. */
   available_qty: number;
+  /** Number of items currently with customers who are renting them. */
   rented_qty: number;
+  /** Number of items currently out on lease agreements. */
   lease_qty: number;
+  /** Items that are in the warehouse but broken or need repair. */
   damaged_qty: number;
+  /** Number of items that have been fully paid for and delivered to customers. */
   sold_qty: number;
   product_cost: number;
 }
 
+/**
+ * Summary information about how much stock we have and its total value.
+ */
 export interface InventoryStats {
   productStock: number;
   spareStock: number;
@@ -26,10 +35,12 @@ export interface InventoryStats {
   spareValue: number;
 }
 
+/**
+ * The Inventory Service tracks our stock levels across all company locations.
+ */
 export const inventoryService = {
-  // Admin: Get all inventory across all locations
   /**
-   * Retrieves global inventory (Admin).
+   * (For Administrators) Get a complete report of all stock in every branch.
    */
   getGlobalInventory: async (year?: number | 'all'): Promise<InventoryItem[]> => {
     const params = year && year !== 'all' ? { year } : {};
@@ -37,9 +48,8 @@ export const inventoryService = {
     return response.data.data;
   },
 
-  // Manager: Get inventory for their branch
   /**
-   * Retrieves inventory for the current user's branch (Manager).
+   * (For Branch Managers) Get a report of the stock available only in your local branch.
    */
   getBranchInventory: async (year?: number | 'all'): Promise<InventoryItem[]> => {
     const params = year && year !== 'all' ? { year } : {};
@@ -47,9 +57,8 @@ export const inventoryService = {
     return response.data.data;
   },
 
-  // Warehouse Staff / Specific View: Get inventory for a specific warehouse
   /**
-   * Retrieves inventory for a specific warehouse.
+   * (For Warehouse Staff) Get a detailed list of items stored in one specific warehouse.
    */
   getWarehouseInventory: async (
     warehouseId: string,
@@ -62,7 +71,7 @@ export const inventoryService = {
   },
 
   /**
-   * Retrieves inventory statistics.
+   * Get a high-level overview of our stock levels and how much money is tied up in inventory.
    */
   getInventoryStats: async (year?: number | 'all'): Promise<InventoryStats> => {
     const params = year && year !== 'all' ? { year } : {};

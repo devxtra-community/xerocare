@@ -2,6 +2,7 @@ import { PurchaseRepository } from '../repositories/purchaseRepository';
 import { PurchasePaymentRepository } from '../repositories/purchasePaymentRepository';
 import { AddPaymentDto, CreatePurchaseDto, PurchaseStatus } from '../types/purchaseTypes';
 import { Purchase } from '../entities/purchaseEntity';
+import { logger } from '../config/logger';
 
 export class PurchaseService {
   private purchaseRepo = new PurchaseRepository();
@@ -28,6 +29,7 @@ export class PurchaseService {
 
   async getAllPurchases(branchId?: string) {
     const purchases = await this.purchaseRepo.getPurchases(branchId);
+    logger.info('Fetched all purchases', { count: purchases.length, branchId });
     return purchases.map((p) => this.enrichPurchase(p));
   }
 
@@ -44,7 +46,9 @@ export class PurchaseService {
   }
 
   async addPayment(purchaseId: string, data: AddPaymentDto, branchId: string) {
-    return await this.paymentRepo.addPayment(purchaseId, data, branchId);
+    const result = await this.paymentRepo.addPayment(purchaseId, data, branchId);
+    logger.info('Payment added successfully', { purchaseId, amount: data.amount });
+    return result;
   }
 
   async updatePurchase(id: string, data: Partial<CreatePurchaseDto>, branchId?: string) {
