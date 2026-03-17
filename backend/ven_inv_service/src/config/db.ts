@@ -29,9 +29,7 @@ import { SparePartInventory } from '../entities/sparePartInventoryEntity';
 export const Source = new DataSource({
   type: 'postgres',
   url: process.env.VENDOR_DATABASE_URL,
-  ssl: {
-    rejectUnauthorized: false,
-  },
+  ssl: false,
   synchronize: false, // Connected to pooler, keep sync false
   entities: [
     Vendor,

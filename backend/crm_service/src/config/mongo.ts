@@ -4,7 +4,7 @@ import { logger } from './logger';
 export const connectMongo = async () => {
   try {
     const mongoUri = process.env.MONGO_URI as string;
-    await mongoose.connect(mongoUri);
+    await mongoose.connect(mongoUri, { ssl: false });
     logger.info('MongoDB connected successfully');
   } catch (error) {
     logger.error('MongoDB connection error:', error);

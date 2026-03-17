@@ -16,9 +16,7 @@ import { logger } from './logger';
 export const Source = new DataSource({
   type: 'postgres',
   url: process.env.EMPLOYEE_DATABASE_URL,
-  ssl: {
-    rejectUnauthorized: false,
-  },
+  ssl: false,
   synchronize: false,
   entities: [Admin, Employee, Auth, Branch, LeaveApplication, Payroll, Notification],
   poolSize: 1,

@@ -15,9 +15,7 @@ import { DeviceMeterReading } from '../entities/deviceMeterReadingEntity';
 export const Source = new DataSource({
   type: 'postgres',
   url: process.env.BILLING_DATABASE_URL,
-  ssl: {
-    rejectUnauthorized: false,
-  },
+  ssl: false,
   synchronize: false,
   logging: false,
   entities: [
