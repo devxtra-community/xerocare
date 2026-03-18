@@ -1,5 +1,6 @@
 import { UsageRepository } from '../repositories/usageRepository';
 import { InvoiceRepository } from '../repositories/invoiceRepository';
+import { Invoice } from '../entities/invoiceEntity';
 import { AppError } from '../errors/appError';
 import { ReportedBy, UsageRecord } from '../entities/usageRecordEntity';
 import { InvoiceType } from '../entities/enums/invoiceType';
@@ -39,8 +40,13 @@ export class UsageService {
     meterImageUrl?: string;
     reportedBy?: 'CUSTOMER' | 'EMPLOYEE';
     remarks?: string;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    items?: any[];
+    items?: Array<{
+      allocationId: string;
+      endBwA4: number;
+      endBwA3: number;
+      endColorA4: number;
+      endColorA3: number;
+    }>;
   }) {
     // 1. Fetch Contract
     const contract = await this.invoiceRepo.findById(payload.contractId);
@@ -173,8 +179,7 @@ export class UsageService {
           startColorA3 = alloc.initialColorA3 || 0;
         }
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const payloadItem = payload.items?.find((i: any) => i.allocationId === alloc.id);
+        const payloadItem = payload.items?.find((i) => i.allocationId === alloc.id);
 
         if (alloc.status === AllocationStatus.REPLACED) {
           // Replaced machines are now settled at the time of replacement.
@@ -420,8 +425,7 @@ export class UsageService {
         await queryRunner.manager.save(contract); // Save contract status update
 
         const usage = this.usageRepo.create({
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          contract: { id: payload.contractId } as any,
+          contract: { id: payload.contractId } as Invoice,
           billingPeriodStart: new Date(payload.billingPeriodStart),
           billingPeriodEnd: new Date(payload.billingPeriodEnd),
           bwA4Count: totalEndBwA4 || payload.bwA4Count,
@@ -510,8 +514,7 @@ export class UsageService {
     } else {
       // === STANDARD MONTH LOGIC ===
       const usage = this.usageRepo.create({
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        contract: { id: payload.contractId } as any,
+        contract: { id: payload.contractId } as Invoice,
         billingPeriodStart: new Date(payload.billingPeriodStart),
         billingPeriodEnd: new Date(payload.billingPeriodEnd),
         bwA4Count: totalEndBwA4 || payload.bwA4Count,
@@ -553,8 +556,10 @@ export class UsageService {
 
   // Helper: Slab Calculation (Flat-rate)
   // Whichever slab the total count falls into, that rate applies to ALL copies.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private calculateSlabCharge(count: number, slabs: any[] | undefined): number {
+  private calculateSlabCharge(
+    count: number,
+    slabs: Array<{ from: number; rate: number; to?: number }> | undefined,
+  ): number {
     if (!slabs || !Array.isArray(slabs) || slabs.length === 0) return 0;
     if (count <= 0) return 0;
 
@@ -573,8 +578,7 @@ export class UsageService {
   }
 
   // Helper: Next Period
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private calculateNextPeriod(contract: any, currentEnd: Date) {
+  private calculateNextPeriod(contract: Invoice, currentEnd: Date) {
     const nextStart = new Date(currentEnd);
     nextStart.setDate(nextStart.getDate() + 1);
 
@@ -742,7 +746,7 @@ export class UsageService {
    * Triggers the monthly invoice generation based on usage.
    */
   async sendMonthlyInvoice(usageId: string) {
-    const usage = await this.usageRepo.findById(usageId);
+    const usage = await this.usageRepo.findById(usageId, ['items', 'items.allocation']);
     if (!usage) {
       throw new AppError('Usage record not found', 404);
     }
@@ -826,6 +830,7 @@ export class UsageService {
       colorExcessRate: Number(pricingRule?.colorExcessRate || 0),
       combinedExcessRate: Number(pricingRule?.combinedExcessRate || 0),
       rentType: contract.rentType,
+      items: usage.items,
     };
 
     const htmlBody = this.generateUsageEmailBody(
@@ -885,6 +890,7 @@ export class UsageService {
       discountAmount?: number;
       discountBwCopies?: number;
       discountColorCopies?: number;
+      items?: UsageRecordItem[];
     },
     customerName: string,
     periodStart: Date,
@@ -1004,6 +1010,43 @@ export class UsageService {
         `;
     }
 
+    // --- Machine-wise Breakdown Table ---
+    let machineBreakdownTable = '';
+    if (usage.items && usage.items.length > 0) {
+      const machineRows = usage.items
+        .map((item: UsageRecordItem) => {
+          const sn = item.allocation?.serialNumber || 'N/A';
+          const model = item.allocation?.modelId || 'N/A';
+          const bwDelta = (item.deltaBwA4 || 0) + (item.deltaBwA3 || 0) * 2;
+          const clrDelta = (item.deltaColorA4 || 0) + (item.deltaColorA3 || 0) * 2;
+
+          return `
+          <tr style="border-bottom: 1px solid #edf2f7;">
+            <td style="padding: 8px; font-size: 12px; color: #4a5568;">
+              <strong>${sn}</strong><br/><span style="font-size: 10px; color: #718096;">${model}</span>
+            </td>
+            <td style="padding: 8px; text-align: right; font-size: 12px;">${item.startBwA4 || 0} / ${item.endBwA4 || 0}</td>
+            <td style="padding: 8px; text-align: right; font-size: 12px;">${item.startColorA4 || 0} / ${item.endColorA4 || 0}</td>
+            <td style="padding: 8px; text-align: right; font-size: 12px; font-weight: bold;">${bwDelta} BW / ${clrDelta} CLR</td>
+          </tr>
+        `;
+        })
+        .join('');
+
+      machineBreakdownTable = `
+        <h3 style="margin-top:25px; color: #2d3748; border-bottom: 1px solid #e2e8f0; padding-bottom: 5px;">Machine-Wise Readings</h3>
+        <table style="width: 100%; border-collapse: collapse; margin-top: 10px; border: 1px solid #e2e8f0;">
+          <tr style="background-color: #f7fafc; font-size: 11px; color: #718096;">
+            <th style="padding: 8px; text-align: left; border-bottom: 1px solid #e2e8f0;">Machine (SN)</th>
+            <th style="padding: 8px; text-align: right; border-bottom: 1px solid #e2e8f0;">BW Readings</th>
+            <th style="padding: 8px; text-align: right; border-bottom: 1px solid #e2e8f0;">Color Readings</th>
+            <th style="padding: 8px; text-align: right; border-bottom: 1px solid #e2e8f0;">Usage Delta</th>
+          </tr>
+          ${machineRows}
+        </table>
+      `;
+    }
+
     return `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;">
         <h2 style="color: #1a202c; text-align: center;">Monthly Usage Statement</h2>
@@ -1026,6 +1069,8 @@ export class UsageService {
             <td colspan="6" style="border-bottom: 1px solid #cbd5e0;"></td>
           </tr>
         </table>
+
+        ${machineBreakdownTable}
 
         <table style="width: 100%; border-collapse: collapse; margin-top: 20px;">
           <tr>
@@ -1088,15 +1133,29 @@ export class UsageService {
       bwA3Count: number;
       colorA4Count: number;
       colorA3Count: number;
-      billingPeriodEnd: string;
+      billingPeriodEnd?: string;
       discountBwCopies?: number;
       discountColorCopies?: number;
       discountAmount?: number;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      items?: any[];
+      items?: Array<{
+        allocationId: string;
+        endBwA4: number;
+        endBwA3: number;
+        endColorA4: number;
+        endColorA3: number;
+      }>;
     },
   ) {
-    const usage = await this.usageRepo.findById(id);
+    let usage = await this.usageRepo.findById(id);
+
+    // Support passing invoiceId instead of usageRecordId (common in frontend)
+    if (!usage) {
+      const invoice = await this.invoiceRepo.findById(id);
+      if (invoice && invoice.usageRecordId) {
+        usage = await this.usageRepo.findById(invoice.usageRecordId);
+      }
+    }
+
     if (!usage) {
       throw new AppError('Usage record not found', 404);
     }
@@ -1205,7 +1264,9 @@ export class UsageService {
     usage.bwA3Count = payload.bwA3Count;
     usage.colorA4Count = payload.colorA4Count;
     usage.colorA3Count = payload.colorA3Count;
-    usage.billingPeriodEnd = new Date(payload.billingPeriodEnd);
+    if (payload.billingPeriodEnd) {
+      usage.billingPeriodEnd = new Date(payload.billingPeriodEnd);
+    }
 
     // Update UsageRecordItems and pre-emptively update ProductAllocations based on payload.items
     if (payload.items && payload.items.length > 0) {
@@ -1221,8 +1282,8 @@ export class UsageService {
       colorA3Delta = 0;
 
       for (const existingItem of existingItems) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const payloadItem = payload.items.find((i: any) => i.id === existingItem.id);
+        const payloadItem = payload.items.find((i) => i.allocationId === existingItem.allocationId);
+
         if (payloadItem && existingItem.allocation) {
           const alloc = existingItem.allocation;
 

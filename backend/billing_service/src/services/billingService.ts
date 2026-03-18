@@ -19,6 +19,7 @@ import { ContractStatus } from '../entities/enums/contractStatus';
 import { ProductAllocation, AllocationStatus } from '../entities/productAllocationEntity';
 import { DeviceMeterReading, ReadingSource } from '../entities/deviceMeterReadingEntity';
 import { UsageRecord } from '../entities/usageRecordEntity';
+import { UsageService } from './usageService';
 
 const appendOpenEndedSlab = <T extends { from: number; to: number; rate: number }>(
   ranges: T[] | undefined,
@@ -42,6 +43,7 @@ export class BillingService {
   private invoiceRepo = new InvoiceRepository();
   private usageRepo = new UsageRepository();
   private calculator = new BillingCalculationService();
+  private usageService = new UsageService();
 
   // ... existing methods ...
 
@@ -153,14 +155,13 @@ export class BillingService {
 
     // 5. Update linked UsageRecord if it exists
     if (invoice.usageRecordId) {
-      const usage = await this.usageRepo.findById(invoice.usageRecordId);
-      if (usage) {
-        usage.bwA4Count = payload.bwA4Count;
-        usage.bwA3Count = payload.bwA3Count;
-        usage.colorA4Count = payload.colorA4Count;
-        usage.colorA3Count = payload.colorA3Count;
-        await this.usageRepo.save(usage);
-      }
+      await this.usageService.updateUsageRecord(invoice.usageRecordId, {
+        bwA4Count: payload.bwA4Count,
+        bwA3Count: payload.bwA3Count,
+        colorA4Count: payload.colorA4Count,
+        colorA3Count: payload.colorA3Count,
+        billingPeriodEnd: payload.billingPeriodEnd,
+      });
     }
 
     return this.invoiceRepo.saveInvoice(invoice);

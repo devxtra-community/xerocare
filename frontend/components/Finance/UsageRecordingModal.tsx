@@ -55,6 +55,7 @@ const parseSlabs = (ranges: unknown): SlabRange[] => {
   return [];
 };
 
+/*
 interface RecordedUsageData {
   bwA4Count: number;
   bwA3Count: number;
@@ -74,6 +75,7 @@ interface RecordedUsageData {
   additionalCharges?: number;
   additionalChargesRemarks?: string;
 }
+*/
 
 /**
  * Modal dialog for recording new meter readings.
@@ -104,8 +106,8 @@ export default function UsageRecordingModal({
   const [products, setProducts] = useState<Product[]>([]);
   const [estimatedCost, setEstimatedCost] = useState<number>(0);
   const [showPreview, setShowPreview] = useState(false);
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [recordedUsageData, setRecordedUsageData] = useState<RecordedUsageData | null>(null);
+  // const [recordedUsageData, setRecordedUsageData] = useState<RecordedUsageData | null>(null);
+  const isInitialized = React.useRef(false);
 
   const [formData, setFormData] = useState({
     billingPeriodStart: '',
@@ -131,6 +133,7 @@ export default function UsageRecordingModal({
       endColorA4: number;
       startColorA3: number;
       endColorA3: number;
+      status?: string;
     }>,
   });
   const [file, setFile] = useState<File | null>(null);
@@ -140,7 +143,8 @@ export default function UsageRecordingModal({
   React.useEffect(() => {
     if (!isOpen) {
       setShowPreview(false);
-      setRecordedUsageData(null);
+      // setRecordedUsageData(null);
+      isInitialized.current = false;
     }
   }, [isOpen]);
 
@@ -252,7 +256,10 @@ export default function UsageRecordingModal({
   ]);
 
   React.useEffect(() => {
+    if (isInitialized.current || !contract) return;
+
     if (editingInvoice) {
+      // --- Initialization for EDITING ---
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const inv = editingInvoice as any;
       const start = (inv.billingPeriodStart || inv.periodStart || '').split('T')[0];
@@ -292,221 +299,185 @@ export default function UsageRecordingModal({
         })),
       }));
 
-      if (contract) {
-        // Fix formData initialized values if there's exactly one active machine
-        const activeAllocs =
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          contract.productAllocations?.filter((pa: any) => pa.status === 'ALLOCATED') || [];
-        if (activeAllocs.length === 1) {
-          const activeId = activeAllocs[0].id;
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const activeItem = inv.items?.find((i: any) => i.allocationId === activeId);
-          if (activeItem) {
-            setFormData((prev) => ({
-              ...prev,
-              bwA4Count: String(activeItem.endBwA4 || 0),
-              bwA3Count: String(activeItem.endBwA3 || 0),
-              colorA4Count: String(activeItem.endColorA4 || 0),
-              colorA3Count: String(activeItem.endColorA3 || 0),
-            }));
-          }
+      // If exactly one active machine, populate aggregate counts from its specific reading
+      const activeAllocs =
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        contract.productAllocations?.filter((pa: any) => pa.status === 'ALLOCATED') || [];
+      if (activeAllocs.length === 1) {
+        const activeId = activeAllocs[0].id;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const activeItem = inv.items?.find((i: any) => i.allocationId === activeId);
+        if (activeItem) {
+          setFormData((prev) => ({
+            ...prev,
+            bwA4Count: String(activeItem.endBwA4 || 0),
+            bwA3Count: String(activeItem.endBwA3 || 0),
+            colorA4Count: String(activeItem.endColorA4 || 0),
+            colorA3Count: String(activeItem.endColorA3 || 0),
+          }));
         }
       }
-    } else if (contract) {
-      // Use the contract's actual billing period (effectiveFrom to effectiveTo)
-      const startStr = contract.effectiveFrom?.split('T')[0] || '';
-      const endStr = contract.effectiveTo?.split('T')[0] || '';
+      isInitialized.current = true;
+    } else {
+      // --- Initialization for NEW RECORD ---
+      let startStr = '';
+      let endStr = '';
+      let items: Array<(typeof formData.items)[0]> = [];
 
-      setFormData((prev) => ({
-        ...prev,
-        billingPeriodStart: startStr,
-        billingPeriodEnd: endStr,
-        items: (contract.productAllocations || [])
+      if (history.length > 0) {
+        // Option A: Based on History (Next Billing Period)
+        const sorted = [...history].sort(
+          (a, b) => new Date(b.periodEnd).getTime() - new Date(a.periodEnd).getTime(),
+        );
+        const last = sorted[0];
+        const nextStart = new Date(last.periodEnd);
+        nextStart.setDate(nextStart.getDate() + 1);
+
+        const nextEnd = new Date(nextStart);
+        nextEnd.setMonth(nextEnd.getMonth() + 1);
+        nextEnd.setDate(nextEnd.getDate() - 1);
+
+        if (!isNaN(nextStart.getTime()) && !isNaN(nextEnd.getTime())) {
+          startStr = nextStart.toISOString().split('T')[0];
+          endStr = nextEnd.toISOString().split('T')[0];
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          .filter((a: any) => {
-            if (a.status === 'ALLOCATED') return true;
-            if (a.status === 'REPLACED' && a.endTimestamp) {
-              return true;
-            }
-            return false;
-          })
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          .map((a: any) => ({
-            allocationId: a.id,
-            serialNumber: a.serialNumber,
-            modelId: a.modelId,
-            startBwA4:
-              a.status === 'ALLOCATED'
-                ? effectivePrevCounts?.bwA4 || a.initialBwA4 || 0
-                : a.initialBwA4 || 0,
-            endBwA4: a.status === 'ALLOCATED' ? a.currentBwA4 || 0 : a.currentBwA4 || 0,
-            startBwA3:
-              a.status === 'ALLOCATED'
-                ? effectivePrevCounts?.bwA3 || a.initialBwA3 || 0
-                : a.initialBwA3 || 0,
-            endBwA3: a.status === 'ALLOCATED' ? a.currentBwA3 || 0 : a.currentBwA3 || 0,
-            startColorA4:
-              a.status === 'ALLOCATED'
-                ? effectivePrevCounts?.clrA4 || a.initialColorA4 || 0
-                : a.initialColorA4 || 0,
-            endColorA4: a.status === 'ALLOCATED' ? a.currentColorA4 || 0 : a.currentColorA4 || 0,
-            startColorA3:
-              a.status === 'ALLOCATED'
-                ? effectivePrevCounts?.clrA3 || a.initialColorA3 || 0
-                : a.initialColorA3 || 0,
-            endColorA3: a.status === 'ALLOCATED' ? a.currentColorA3 || 0 : a.currentColorA3 || 0,
-          })),
-      }));
-    }
-  }, [contract, editingInvoice, effectivePrevCounts]);
+          items = (last.items || []).map((item: any) => ({
+            allocationId: item.allocationId,
+            serialNumber: item.allocation?.serialNumber,
+            modelId: item.allocation?.modelId,
+            startBwA4: item.endBwA4 || 0,
+            endBwA4: item.endBwA4 || 0,
+            startBwA3: item.endBwA3 || 0,
+            endBwA3: item.endBwA3 || 0,
+            startColorA4: item.endColorA4 || 0,
+            endColorA4: item.endColorA4 || 0,
+            startColorA3: item.endColorA3 || 0,
+            endColorA3: item.endColorA3 || 0,
+          }));
+        }
+      } else if (contract.effectiveFrom) {
+        // Option B: Based on Contract Start
+        const start = new Date(contract.effectiveFrom);
+        const end = new Date(start);
+        end.setMonth(end.getMonth() + 1);
+        end.setDate(end.getDate() - 1);
 
-  React.useEffect(() => {
-    if (editingInvoice) return;
+        if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
+          startStr = start.toISOString().split('T')[0];
+          endStr = end.toISOString().split('T')[0];
+        }
+      }
 
-    if (history.length > 0) {
-      // Sort by end date descending
-      const sorted = [...history].sort(
-        (a, b) => new Date(b.periodEnd).getTime() - new Date(a.periodEnd).getTime(),
-      );
-      const last = sorted[0];
-      const nextStart = new Date(last.periodEnd);
-      nextStart.setDate(nextStart.getDate() + 1);
+      // Merge with any current allocations not in history (or ALL if no history)
+      if (contract.productAllocations) {
+        const startPeriod = startStr ? new Date(startStr).getTime() : 0;
+        const endPeriod = endStr ? new Date(endStr).getTime() : 0;
 
-      const nextEnd = new Date(nextStart);
-      nextEnd.setMonth(nextEnd.getMonth() + 1);
-      nextEnd.setDate(nextEnd.getDate() - 1);
+        contract.productAllocations.forEach((a) => {
+          const alreadyInItems = items.find((it) => it.allocationId === a.id);
+          if (alreadyInItems) return;
 
-      if (isNaN(nextStart.getTime()) || isNaN(nextEnd.getTime())) return;
+          // Check if this allocation was active during the period
+          const allocStartTs = a.startTimestamp ? new Date(a.startTimestamp).getTime() : 0;
+          const allocEndTs = a.endTimestamp ? new Date(a.endTimestamp).getTime() : Infinity;
 
-      setFormData((prev) => ({
-        ...prev,
-        billingPeriodStart: nextStart.toISOString().split('T')[0],
-        billingPeriodEnd: nextEnd.toISOString().split('T')[0],
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        items: (last.items || []).map((item: any) => ({
-          allocationId: item.allocationId,
-          serialNumber: item.allocation?.serialNumber,
-          modelId: item.allocation?.modelId,
-          startBwA4: item.endBwA4 || 0, // previous end is current start
-          endBwA4: item.endBwA4 || 0,
-          startBwA3: item.endBwA3 || 0,
-          endBwA3: item.endBwA3 || 0,
-          startColorA4: item.endColorA4 || 0,
-          endColorA4: item.endColorA4 || 0,
-          startColorA3: item.endColorA3 || 0,
-          endColorA3: item.endColorA3 || 0,
-        })),
-      }));
-    } else if (contract && contract.effectiveFrom) {
-      const start = new Date(contract.effectiveFrom);
-      const end = new Date(start);
-      end.setMonth(end.getMonth() + 1);
-      end.setDate(end.getDate() - 1);
+          const isActiveInPeriod =
+            (allocStartTs <= endPeriod && allocEndTs >= startPeriod) || a.status === 'ALLOCATED';
 
-      if (isNaN(start.getTime()) || isNaN(end.getTime())) return;
-
-      setFormData((prev) => ({
-        ...prev,
-        billingPeriodStart: start.toISOString().split('T')[0],
-        billingPeriodEnd: end.toISOString().split('T')[0],
-      }));
-    }
-  }, [history, contract, editingInvoice]);
-
-  // Calculate usage of any devices that were replaced *during* this billing period
-  const replacedDeltas = React.useMemo(() => {
-    const deltas = {
-      bwA4: 0,
-      bwA3: 0,
-      clrA4: 0,
-      clrA3: 0,
-      machines: [] as Array<{
-        serialNumber: string;
-        bwDelta: number;
-        clrDelta: number;
-        bwA4: number;
-        bwA3: number;
-        clrA4: number;
-        clrA3: number;
-      }>,
-    };
-
-    if (
-      !contract?.productAllocations ||
-      !formData.billingPeriodStart ||
-      !formData.billingPeriodEnd
-    ) {
-      return deltas;
-    }
-
-    const startPeriod = new Date(formData.billingPeriodStart).getTime();
-    const endPeriod = new Date(formData.billingPeriodEnd).getTime();
-
-    contract.productAllocations
-      .filter((a) => {
-        // @ts-expect-error DB field not in frontend type
-        if (a.status !== 'REPLACED' || !a.endTimestamp) return false;
-        // @ts-expect-error DB field not in frontend type
-        const endTs = new Date(a.endTimestamp).getTime();
-        return endTs >= startPeriod && endTs <= endPeriod;
-      })
-      .forEach((allocation) => {
-        // @ts-expect-error DB field not in frontend type
-        const allocStartTs = new Date(allocation.startTimestamp).getTime();
-
-        const startBwA4 =
-          allocStartTs < startPeriod && prevUsage
-            ? prevUsage.bwA4Count
-            : allocation.initialBwA4 || 0;
-        const startBwA3 =
-          allocStartTs < startPeriod && prevUsage
-            ? prevUsage.bwA3Count
-            : allocation.initialBwA3 || 0;
-        const startClrA4 =
-          allocStartTs < startPeriod && prevUsage
-            ? prevUsage.colorA4Count
-            : allocation.initialColorA4 || 0;
-        const startClrA3 =
-          allocStartTs < startPeriod && prevUsage
-            ? prevUsage.colorA3Count
-            : allocation.initialColorA3 || 0;
-
-        const finalBwA4 = allocation.currentBwA4 || 0;
-        const finalBwA3 = allocation.currentBwA3 || 0;
-        const finalClrA4 = allocation.currentColorA4 || 0;
-        const finalClrA3 = allocation.currentColorA3 || 0;
-
-        const mBwA4 = Math.max(0, finalBwA4 - startBwA4);
-        const mBwA3 = Math.max(0, finalBwA3 - startBwA3);
-        const mClrA4 = Math.max(0, finalClrA4 - startClrA4);
-        const mClrA3 = Math.max(0, finalClrA3 - startClrA3);
-
-        const bwDelta = mBwA4 + mBwA3 * 2;
-        const clrDelta = mClrA4 + mClrA3 * 2;
-
-        deltas.bwA4 += mBwA4;
-        deltas.bwA3 += mBwA3;
-        deltas.clrA4 += mClrA4;
-        deltas.clrA3 += mClrA3;
-
-        deltas.machines.push({
-          serialNumber: allocation.serialNumber,
-          bwDelta,
-          clrDelta,
-          bwA4: mBwA4,
-          bwA3: mBwA3,
-          clrA4: mClrA4,
-          clrA3: mClrA3,
+          if (isActiveInPeriod) {
+            items.push({
+              allocationId: a.id,
+              serialNumber: a.serialNumber,
+              modelId: a.modelId,
+              status: a.status, // Preserve status for UI filtering
+              startBwA4:
+                a.status === 'ALLOCATED'
+                  ? effectivePrevCounts?.bwA4 || a.initialBwA4 || 0
+                  : a.initialBwA4 || 0,
+              endBwA4: a.currentBwA4 || 0,
+              startBwA3:
+                a.status === 'ALLOCATED'
+                  ? effectivePrevCounts?.bwA3 || a.initialBwA3 || 0
+                  : a.initialBwA3 || 0,
+              endBwA3: a.currentBwA3 || 0,
+              startColorA4:
+                a.status === 'ALLOCATED'
+                  ? effectivePrevCounts?.clrA4 || a.initialColorA4 || 0
+                  : a.initialColorA4 || 0,
+              endColorA4: a.currentColorA4 || 0,
+              startColorA3:
+                a.status === 'ALLOCATED'
+                  ? effectivePrevCounts?.clrA3 || a.initialColorA3 || 0
+                  : a.initialColorA3 || 0,
+              endColorA3: a.currentColorA3 || 0,
+            });
+          }
         });
-      });
+      }
 
-    return deltas;
-  }, [
-    contract?.productAllocations,
-    formData.billingPeriodStart,
-    formData.billingPeriodEnd,
-    prevUsage,
-  ]);
+      const aggBwA4 = items.reduce(
+        (s, it) => s + (it.status === 'ALLOCATED' ? it.endBwA4 || 0 : 0),
+        0,
+      );
+      const aggBwA3 = items.reduce(
+        (s, it) => s + (it.status === 'ALLOCATED' ? it.endBwA3 || 0 : 0),
+        0,
+      );
+      const aggClrA4 = items.reduce(
+        (s, it) => s + (it.status === 'ALLOCATED' ? it.endColorA4 || 0 : 0),
+        0,
+      );
+      const aggClrA3 = items.reduce(
+        (s, it) => s + (it.status === 'ALLOCATED' ? it.endColorA3 || 0 : 0),
+        0,
+      );
+
+      setFormData((prev) => ({
+        ...prev,
+        billingPeriodStart: startStr || prev.billingPeriodStart,
+        billingPeriodEnd: endStr || prev.billingPeriodEnd,
+        items: items.length > 0 ? items : prev.items,
+        bwA4Count: String(aggBwA4),
+        bwA3Count: String(aggBwA3),
+        colorA4Count: String(aggClrA4),
+        colorA3Count: String(aggClrA3),
+      }));
+
+      isInitialized.current = true;
+    }
+  }, [contract, history, editingInvoice, effectivePrevCounts, formData]);
+
+  const replacedDeltas = React.useMemo(() => {
+    const rItems = formData.items.filter((item) => {
+      const a = contract?.productAllocations?.find((pa) => pa.id === item.allocationId);
+      return a?.status === 'REPLACED';
+    });
+
+    const bwA4 = rItems.reduce((s, i) => s + Math.max(0, (i.endBwA4 || 0) - i.startBwA4), 0);
+    const bwA3 = rItems.reduce((s, i) => s + Math.max(0, (i.endBwA3 || 0) - i.startBwA3), 0);
+    const clrA4 = rItems.reduce((s, i) => s + Math.max(0, (i.endColorA4 || 0) - i.startColorA4), 0);
+    const clrA3 = rItems.reduce((s, i) => s + Math.max(0, (i.endColorA3 || 0) - i.startColorA3), 0);
+
+    return {
+      bwA4,
+      bwA3,
+      clrA4,
+      clrA3,
+      machines: rItems.map((i) => ({
+        serialNumber: i.serialNumber,
+        bwDelta:
+          Math.max(0, (i.endBwA4 || 0) - i.startBwA4) +
+          Math.max(0, (i.endBwA3 || 0) - i.startBwA3) * 2,
+        clrDelta:
+          Math.max(0, (i.endColorA4 || 0) - i.startColorA4) +
+          Math.max(0, (i.endColorA3 || 0) - i.startColorA3) * 2,
+        bwA4: Math.max(0, (i.endBwA4 || 0) - i.startBwA4),
+        bwA3: Math.max(0, (i.endBwA3 || 0) - i.startBwA3),
+        clrA4: Math.max(0, (i.endColorA4 || 0) - i.startColorA4),
+        clrA3: Math.max(0, (i.endColorA3 || 0) - i.startColorA3),
+      })),
+    };
+  }, [formData.items, contract?.productAllocations]);
 
   // Fetch product details when contract changes
   React.useEffect(() => {
@@ -1096,16 +1067,17 @@ export default function UsageRecordingModal({
           payload.append('file', file);
         }
 
-        const response = await recordUsage(payload);
+        // const response = await recordUsage(payload);
+        await recordUsage(payload);
         toast.success('Usage recorded successfully');
 
         toast.success('Usage recorded successfully');
 
+        /*
         const prevBwA4 = effectivePrevCounts.bwA4;
         const prevBwA3 = effectivePrevCounts.bwA3;
         const prevClrA4 = effectivePrevCounts.clrA4;
         const prevClrA3 = effectivePrevCounts.clrA3;
-
         setRecordedUsageData({
           bwA4Count: Number(formData.bwA4Count),
           bwA3Count: Number(formData.bwA3Count),
@@ -1120,6 +1092,7 @@ export default function UsageRecordingModal({
           remarks: formData.remarks,
           meterImageUrl: (response as { meterImageUrl?: string })?.meterImageUrl,
         });
+        */
 
         // setShowPreview(true);
         // We do *not* call onSuccess() here. Calling it triggers the parent to fetch and remount
@@ -1816,192 +1789,226 @@ export default function UsageRecordingModal({
                   <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
                     {formData.items
                       .filter((item) => {
+                        // Show ALLOCATED machines OR REPLACED machines that were active in this period
                         const a = contract?.productAllocations?.find(
                           (pa) => pa.id === item.allocationId,
                         );
-                        return a?.status === 'ALLOCATED';
+                        if (!a) return false;
+                        if (a.status === 'ALLOCATED') return true;
+
+                        // For replaced machines, only show if they were active in this period
+                        const startPeriod = new Date(formData.billingPeriodStart).getTime();
+                        const endPeriod = new Date(formData.billingPeriodEnd).getTime();
+                        const endTs = a.endTimestamp ? new Date(a.endTimestamp).getTime() : 0;
+
+                        return endTs >= startPeriod && endTs <= endPeriod;
                       })
-                      .map((item, idx) => (
-                        <div
-                          key={item.allocationId}
-                          className="bg-white p-3 rounded-lg border border-slate-200 shadow-sm space-y-3"
-                        >
-                          <div className="flex justify-between items-center pb-2 border-b border-slate-100">
-                            <span className="text-xs font-bold text-slate-600">
-                              Machine #{idx + 1}: {item.serialNumber || 'Unknown'}
-                            </span>
-                            <span className="text-[10px] text-slate-400 font-mono">
-                              {item.modelId}
-                            </span>
-                          </div>
-                          <div className="grid grid-cols-2 gap-4">
-                            {/* BW Section */}
-                            <div className="space-y-2">
-                              <Label className="text-[10px] font-bold uppercase text-slate-500">
-                                B&W Readings
-                              </Label>
-                              <div className="space-y-1">
-                                <div className="flex justify-between text-[9px]">
-                                  <span className="text-orange-600">Prev A4: {item.startBwA4}</span>
-                                  <span className="text-green-600 font-bold">
-                                    Delta: {Math.max(0, (item.endBwA4 || 0) - item.startBwA4)}
-                                  </span>
-                                </div>
-                                <Input
-                                  type="number"
-                                  className="h-8 text-xs"
-                                  placeholder="A4 Reading"
-                                  value={item.endBwA4 || ''}
-                                  onChange={(e) => {
-                                    const val = Number(e.target.value || 0);
-                                    setFormData((prev) => {
-                                      const newItems = prev.items.map((it) =>
-                                        it.allocationId === item.allocationId
-                                          ? { ...it, endBwA4: val }
-                                          : it,
-                                      );
-                                      const newSum = newItems.reduce((acc, it) => {
-                                        const a = contract?.productAllocations?.find(
-                                          (pa) => pa.id === it.allocationId,
-                                        );
-                                        return a?.status === 'ALLOCATED'
-                                          ? acc + (it.endBwA4 || 0)
-                                          : acc;
-                                      }, 0);
-                                      return {
-                                        ...prev,
-                                        items: newItems,
-                                        bwA4Count: String(newSum),
-                                      };
-                                    });
-                                  }}
-                                />
+                      .map((item, idx) => {
+                        const allocation = contract?.productAllocations?.find(
+                          (a) => a.id === item.allocationId,
+                        );
+                        const isReplaced = allocation?.status === 'REPLACED';
+
+                        return (
+                          <div
+                            key={item.allocationId}
+                            className={`bg-white p-3 rounded-lg border ${
+                              isReplaced ? 'border-amber-200' : 'border-slate-200 shadow-sm'
+                            } space-y-3 relative overflow-hidden`}
+                          >
+                            {isReplaced && (
+                              <div className="absolute top-0 right-0 px-2 py-0.5 bg-amber-100 text-[8px] font-black text-amber-700 rounded-bl-lg uppercase tracking-wider">
+                                Replaced
                               </div>
-                              <div className="space-y-1">
-                                <div className="flex justify-between text-[9px]">
-                                  <span className="text-orange-600">Prev A3: {item.startBwA3}</span>
-                                  <span className="text-green-600 font-bold">
-                                    Delta: {Math.max(0, (item.endBwA3 || 0) - item.startBwA3)}
-                                  </span>
-                                </div>
-                                <Input
-                                  type="number"
-                                  className="h-8 text-xs"
-                                  placeholder="A3 Reading"
-                                  value={item.endBwA3 || ''}
-                                  onChange={(e) => {
-                                    const val = Number(e.target.value || 0);
-                                    setFormData((prev) => {
-                                      const newItems = prev.items.map((it) =>
-                                        it.allocationId === item.allocationId
-                                          ? { ...it, endBwA3: val }
-                                          : it,
-                                      );
-                                      const newSum = newItems.reduce((acc, it) => {
-                                        const a = contract?.productAllocations?.find(
-                                          (pa) => pa.id === it.allocationId,
+                            )}
+                            <div className="flex justify-between items-center pb-2 border-b border-slate-100">
+                              <span className="text-xs font-bold text-slate-600">
+                                Machine #{idx + 1}: {item.serialNumber || 'Unknown'}
+                              </span>
+                              <span className="text-[10px] text-slate-400 font-mono">
+                                {item.modelId}
+                              </span>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                              {/* BW Section */}
+                              <div className="space-y-2">
+                                <Label className="text-[10px] font-bold uppercase text-slate-500">
+                                  B&W Readings
+                                </Label>
+                                <div className="space-y-1">
+                                  <div className="flex justify-between text-[9px]">
+                                    <span className="text-orange-600">
+                                      Prev A4: {item.startBwA4}
+                                    </span>
+                                    <span className="text-green-600 font-bold">
+                                      Delta: {Math.max(0, (item.endBwA4 || 0) - item.startBwA4)}
+                                    </span>
+                                  </div>
+                                  <Input
+                                    type="number"
+                                    className={`h-8 text-xs ${isReplaced ? 'bg-amber-50/50' : ''}`}
+                                    placeholder="A4 Reading"
+                                    value={item.endBwA4 || ''}
+                                    readOnly={isReplaced}
+                                    onChange={(e) => {
+                                      const val = Number(e.target.value || 0);
+                                      setFormData((prev) => {
+                                        const newItems = prev.items.map((it) =>
+                                          it.allocationId === item.allocationId
+                                            ? { ...it, endBwA4: val }
+                                            : it,
                                         );
-                                        return a?.status === 'ALLOCATED'
-                                          ? acc + (it.endBwA3 || 0)
-                                          : acc;
-                                      }, 0);
-                                      return {
-                                        ...prev,
-                                        items: newItems,
-                                        bwA3Count: String(newSum),
-                                      };
-                                    });
-                                  }}
-                                />
+                                        const newSum = newItems.reduce((acc, it) => {
+                                          const a = contract?.productAllocations?.find(
+                                            (pa) => pa.id === it.allocationId,
+                                          );
+                                          // SUM ALL visible items deltas for the aggregate
+                                          return a?.status === 'ALLOCATED'
+                                            ? acc + (it.endBwA4 || 0)
+                                            : acc;
+                                        }, 0);
+                                        return {
+                                          ...prev,
+                                          items: newItems,
+                                          bwA4Count: String(newSum),
+                                        };
+                                      });
+                                    }}
+                                  />
+                                </div>
+                                <div className="space-y-1">
+                                  <div className="flex justify-between text-[9px]">
+                                    <span className="text-orange-600">
+                                      Prev A3: {item.startBwA3}
+                                    </span>
+                                    <span className="text-green-600 font-bold">
+                                      Delta: {Math.max(0, (item.endBwA3 || 0) - item.startBwA3)}
+                                    </span>
+                                  </div>
+                                  <Input
+                                    type="number"
+                                    className={`h-8 text-xs ${isReplaced ? 'bg-amber-50/50' : ''}`}
+                                    placeholder="A3 Reading"
+                                    value={item.endBwA3 || ''}
+                                    readOnly={isReplaced}
+                                    onChange={(e) => {
+                                      const val = Number(e.target.value || 0);
+                                      setFormData((prev) => {
+                                        const newItems = prev.items.map((it) =>
+                                          it.allocationId === item.allocationId
+                                            ? { ...it, endBwA3: val }
+                                            : it,
+                                        );
+                                        const newSum = newItems.reduce((acc, it) => {
+                                          const a = contract?.productAllocations?.find(
+                                            (pa) => pa.id === it.allocationId,
+                                          );
+                                          return a?.status === 'ALLOCATED'
+                                            ? acc + (it.endBwA3 || 0)
+                                            : acc;
+                                        }, 0);
+                                        return {
+                                          ...prev,
+                                          items: newItems,
+                                          bwA3Count: String(newSum),
+                                        };
+                                      });
+                                    }}
+                                  />
+                                </div>
+                              </div>
+                              {/* Color Section */}
+                              <div className="space-y-2">
+                                <Label className="text-[10px] font-bold uppercase text-rose-500">
+                                  Color Readings
+                                </Label>
+                                <div className="space-y-1">
+                                  <div className="flex justify-between text-[9px]">
+                                    <span className="text-orange-600">
+                                      Prev A4: {item.startColorA4}
+                                    </span>
+                                    <span className="text-green-600 font-bold">
+                                      Delta:{' '}
+                                      {Math.max(0, (item.endColorA4 || 0) - item.startColorA4)}
+                                    </span>
+                                  </div>
+                                  <Input
+                                    type="number"
+                                    className={`h-8 text-xs ${isReplaced ? 'bg-amber-50/50' : ''}`}
+                                    placeholder="A4 Reading"
+                                    value={item.endColorA4 || ''}
+                                    readOnly={isReplaced}
+                                    onChange={(e) => {
+                                      const val = Number(e.target.value || 0);
+                                      setFormData((prev) => {
+                                        const newItems = prev.items.map((it) =>
+                                          it.allocationId === item.allocationId
+                                            ? { ...it, endColorA4: val }
+                                            : it,
+                                        );
+                                        const newSum = newItems.reduce((acc, it) => {
+                                          const a = contract?.productAllocations?.find(
+                                            (pa) => pa.id === it.allocationId,
+                                          );
+                                          return a?.status === 'ALLOCATED'
+                                            ? acc + (it.endColorA4 || 0)
+                                            : acc;
+                                        }, 0);
+                                        return {
+                                          ...prev,
+                                          items: newItems,
+                                          colorA4Count: String(newSum),
+                                        };
+                                      });
+                                    }}
+                                  />
+                                </div>
+                                <div className="space-y-1">
+                                  <div className="flex justify-between text-[9px]">
+                                    <span className="text-orange-600">
+                                      Prev A3: {item.startColorA3}
+                                    </span>
+                                    <span className="text-green-600 font-bold">
+                                      Delta:{' '}
+                                      {Math.max(0, (item.endColorA3 || 0) - item.startColorA3)}
+                                    </span>
+                                  </div>
+                                  <Input
+                                    type="number"
+                                    className={`h-8 text-xs ${isReplaced ? 'bg-amber-50/50' : ''}`}
+                                    placeholder="A3 Reading"
+                                    value={item.endColorA3 || ''}
+                                    readOnly={isReplaced}
+                                    onChange={(e) => {
+                                      const val = Number(e.target.value || 0);
+                                      setFormData((prev) => {
+                                        const newItems = prev.items.map((it) =>
+                                          it.allocationId === item.allocationId
+                                            ? { ...it, endColorA3: val }
+                                            : it,
+                                        );
+                                        const newSum = newItems.reduce((acc, it) => {
+                                          const a = contract?.productAllocations?.find(
+                                            (pa) => pa.id === it.allocationId,
+                                          );
+                                          return a?.status === 'ALLOCATED'
+                                            ? acc + (it.endColorA3 || 0)
+                                            : acc;
+                                        }, 0);
+                                        return {
+                                          ...prev,
+                                          items: newItems,
+                                          colorA3Count: String(newSum),
+                                        };
+                                      });
+                                    }}
+                                  />
+                                </div>
                               </div>
                             </div>
-                            {/* Color Section */}
-                            <div className="space-y-2">
-                              <Label className="text-[10px] font-bold uppercase text-rose-500">
-                                Color Readings
-                              </Label>
-                              <div className="space-y-1">
-                                <div className="flex justify-between text-[9px]">
-                                  <span className="text-orange-600">
-                                    Prev A4: {item.startColorA4}
-                                  </span>
-                                  <span className="text-green-600 font-bold">
-                                    Delta: {Math.max(0, (item.endColorA4 || 0) - item.startColorA4)}
-                                  </span>
-                                </div>
-                                <Input
-                                  type="number"
-                                  className="h-8 text-xs"
-                                  placeholder="A4 Reading"
-                                  value={item.endColorA4 || ''}
-                                  onChange={(e) => {
-                                    const val = Number(e.target.value || 0);
-                                    setFormData((prev) => {
-                                      const newItems = prev.items.map((it) =>
-                                        it.allocationId === item.allocationId
-                                          ? { ...it, endColorA4: val }
-                                          : it,
-                                      );
-                                      const newSum = newItems.reduce((acc, it) => {
-                                        const a = contract?.productAllocations?.find(
-                                          (pa) => pa.id === it.allocationId,
-                                        );
-                                        return a?.status === 'ALLOCATED'
-                                          ? acc + (it.endColorA4 || 0)
-                                          : acc;
-                                      }, 0);
-                                      return {
-                                        ...prev,
-                                        items: newItems,
-                                        colorA4Count: String(newSum),
-                                      };
-                                    });
-                                  }}
-                                />
-                              </div>
-                              <div className="space-y-1">
-                                <div className="flex justify-between text-[9px]">
-                                  <span className="text-orange-600">
-                                    Prev A3: {item.startColorA3}
-                                  </span>
-                                  <span className="text-green-600 font-bold">
-                                    Delta: {Math.max(0, (item.endColorA3 || 0) - item.startColorA3)}
-                                  </span>
-                                </div>
-                                <Input
-                                  type="number"
-                                  className="h-8 text-xs"
-                                  placeholder="A3 Reading"
-                                  value={item.endColorA3 || ''}
-                                  onChange={(e) => {
-                                    const val = Number(e.target.value || 0);
-                                    setFormData((prev) => {
-                                      const newItems = prev.items.map((it) =>
-                                        it.allocationId === item.allocationId
-                                          ? { ...it, endColorA3: val }
-                                          : it,
-                                      );
-                                      const newSum = newItems.reduce((acc, it) => {
-                                        const a = contract?.productAllocations?.find(
-                                          (pa) => pa.id === it.allocationId,
-                                        );
-                                        return a?.status === 'ALLOCATED'
-                                          ? acc + (it.endColorA3 || 0)
-                                          : acc;
-                                      }, 0);
-                                      return {
-                                        ...prev,
-                                        items: newItems,
-                                        colorA3Count: String(newSum),
-                                      };
-                                    });
-                                  }}
-                                />
-                              </div>
-                            </div>
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                   </div>
                 </div>
               )}

@@ -418,18 +418,20 @@ export default function UsageHistoryDialog({
                                   <Send className="h-4 w-4" />
                                 )}
                               </Button>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                className="h-8 w-8 p-0 text-amber-500 hover:text-amber-600 hover:bg-amber-50 rounded-full transition-all"
-                                onClick={() => {
-                                  setEditingRecord(record);
-                                  setIsEditModalOpen(true);
-                                }}
-                                title="Edit Usage Record"
-                              >
-                                <Edit className="h-4 w-4" />
-                              </Button>
+                              {history[0]?.id === record.id && (
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-8 w-8 p-0 text-amber-500 hover:text-amber-600 hover:bg-amber-50 rounded-full transition-all"
+                                  onClick={() => {
+                                    setEditingRecord(record);
+                                    setIsEditModalOpen(true);
+                                  }}
+                                  title="Edit Usage Record"
+                                >
+                                  <Edit className="h-4 w-4" />
+                                </Button>
+                              )}
                             </div>
                           </TableCell>
                         </TableRow>

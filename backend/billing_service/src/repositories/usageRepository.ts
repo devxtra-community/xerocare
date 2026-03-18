@@ -26,8 +26,8 @@ export class UsageRepository {
   /**
    * Finds a usage record by ID.
    */
-  findById(id: string) {
-    return this.repo.findOne({ where: { id } });
+  findById(id: string, relations: string[] = []) {
+    return this.repo.findOne({ where: { id }, relations });
   }
 
   /**

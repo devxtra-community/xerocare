@@ -109,6 +109,8 @@ export interface Invoice {
     currentBwA3?: number;
     currentColorA4?: number;
     currentColorA3?: number;
+    startTimestamp?: string;
+    endTimestamp?: string;
   }>;
 }
 
