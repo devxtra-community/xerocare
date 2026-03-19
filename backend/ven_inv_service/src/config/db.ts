@@ -30,7 +30,7 @@ export const Source = new DataSource({
   type: 'postgres',
   url: process.env.VENDOR_DATABASE_URL,
   ssl: false,
-  synchronize: false, // Connected to pooler, keep sync false
+  synchronize: true, // Enabled for development to allow automatic table creation
   entities: [
     Vendor,
     Model,

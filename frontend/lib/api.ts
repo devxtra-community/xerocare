@@ -129,7 +129,9 @@ api.interceptors.response.use(
 
     // Automatic Re-login: If the temporary ID card expires while the user is active,
     // we try to quickly get a fresh one in the background so they don't get interrupted.
-    if (status === 401 && !originalRequest._retry) {
+    const isLoginRequest = originalRequest.url?.includes('/login');
+
+    if (status === 401 && !originalRequest._retry && !isLoginRequest) {
       if (isRefreshing) {
         return new Promise((resolve, reject) => {
           failedQueue.push({ resolve, reject });

@@ -1,4 +1,5 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, OneToMany } from 'typeorm';
+import { Auth } from './authEntities';
 
 const roleAdmin = 'ADMIN';
 
@@ -15,6 +16,9 @@ export class Admin {
 
   @Column({ type: 'varchar', length: 255, default: roleAdmin })
   role!: string;
+
+  @OneToMany(() => Auth, (auth) => auth.admin)
+  auths!: Auth[];
 
   @CreateDateColumn({ type: 'timestamp with time zone' })
   createdAt!: Date;

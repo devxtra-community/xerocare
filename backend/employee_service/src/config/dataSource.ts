@@ -12,12 +12,13 @@ import { Payroll } from '../entities/payrollEntity'; // [x] Define `Payroll` ent
 import { Notification } from '../entities/notificationEntity';
 
 import { logger } from './logger';
+import { seedAdmin } from '../utils/seedAdmin';
 
 export const Source = new DataSource({
   type: 'postgres',
   url: process.env.EMPLOYEE_DATABASE_URL,
   ssl: false,
-  synchronize: false,
+  synchronize: true,
   entities: [Admin, Employee, Auth, Branch, LeaveApplication, Payroll, Notification],
   poolSize: 1,
   extra: {
@@ -40,6 +41,7 @@ export const connectWithRetry = async (initialDelayMs = 2000): Promise<DataSourc
         logger.info(`Attempting database connection (Attempt ${attempt})...`);
         await Source.initialize();
         logger.info('Database connected successfully.');
+        await seedAdmin(Source);
       }
       return Source;
     } catch (error: unknown) {

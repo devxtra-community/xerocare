@@ -9,7 +9,6 @@ import { connectWithRetry } from './config/dataSource';
 import { getRabbitChannel } from './config/rabbitmq';
 import invoiceRouter from './routes/invoiceRoutes';
 import usageRouter from './routes/usageRoutes';
-import { startEmailWorker } from './workers/emailWorker';
 
 /**
  * This is the main engine for the Billing Service.
@@ -69,9 +68,6 @@ const startServer = async () => {
 
     // Open the communication channel (RabbitMQ)
     await getRabbitChannel();
-
-    // Start the automatic email sender
-    startEmailWorker();
 
     const PORT = process.env.PORT || 3004;
 

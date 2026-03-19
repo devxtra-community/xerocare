@@ -60,7 +60,7 @@ export class RfqService {
     createdBy: string,
     vendorIds: string[],
   ): Promise<Rfq> {
-    const workbook = xlsx.read(buffer, { type: 'buffer' });
+    const workbook = xlsx.read(buffer, { type: 'buffer', cellDates: true });
     const data = xlsx.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]) as Record<
       string,
       unknown
@@ -392,9 +392,10 @@ export class RfqService {
         formulae: [new Date(new Date().setHours(0, 0, 0, 0))],
         errorStyle: 'error',
         errorTitle: 'Invalid Date',
-        error: 'Please enter a valid present or future date.',
+        error: 'Please enter a valid present or future date (YYYY-MM-DD).',
       };
       worksheet.getCell(`K${i}`).numFmt = 'yyyy-mm-dd';
+      worksheet.getCell(`K${i}`).font = { color: { argb: 'FF0000FF' }, underline: true }; // Visual hint for interactable cell
     }
 
     const buffer = await workbook.xlsx.writeBuffer();
@@ -533,9 +534,10 @@ export class RfqService {
         formulae: [new Date(new Date().setHours(0, 0, 0, 0))],
         errorStyle: 'error',
         errorTitle: 'Invalid Date',
-        error: 'Please enter a valid present or future date.',
+        error: 'Please enter a valid present or future date (YYYY-MM-DD).',
       };
       worksheet.getCell(`K${i}`).numFmt = 'yyyy-mm-dd';
+      worksheet.getCell(`K${i}`).font = { color: { argb: 'FF0000FF' }, underline: true }; // Visual hint for interactable cell
     }
 
     const buffer = await workbook.xlsx.writeBuffer();
