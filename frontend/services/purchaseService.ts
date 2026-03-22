@@ -14,9 +14,14 @@ export interface Payment {
   description?: string;
 }
 
-/**
- * Details of a bulk purchase made from a vendor.
- */
+export interface PurchaseCost {
+  id: string;
+  amount: number;
+  costType: string;
+  description?: string;
+  costDate: string;
+}
+
 export interface Purchase {
   id: string;
   purchaseAmount: number;
@@ -39,11 +44,9 @@ export interface Purchase {
   vendor?: Vendor;
   branch?: Branch;
   payments?: Payment[];
+  costs?: PurchaseCost[];
 }
 
-/**
- * Information needed to record a new payment.
- */
 export interface AddPaymentDto {
   amount: number;
   paymentMethod: string;
@@ -52,9 +55,13 @@ export interface AddPaymentDto {
   paymentDate?: string;
 }
 
-/**
- * Details needed to record a brand new bulk purchase.
- */
+export interface AddCostDto {
+  amount: number;
+  costType: string;
+  description?: string;
+  costDate?: string;
+}
+
 export interface CreatePurchaseDTO {
   lotId: string;
   documentationFee: number;
@@ -127,6 +134,14 @@ export const purchaseService = {
    */
   addPayment: async (purchaseId: string, data: AddPaymentDto): Promise<Payment> => {
     const response = await api.post(`/i/purchases/${purchaseId}/payments`, data);
+    return response.data.data;
+  },
+
+  /**
+   * Adds a cost to a purchase.
+   */
+  addCost: async (purchaseId: string, data: AddCostDto): Promise<PurchaseCost> => {
+    const response = await api.post(`/i/purchases/${purchaseId}/costs`, data);
     return response.data.data;
   },
 };

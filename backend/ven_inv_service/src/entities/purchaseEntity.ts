@@ -13,6 +13,7 @@ import { Lot } from './lotEntity';
 import { Vendor } from './vendorEntity';
 import { Branch } from './branchEntity';
 import { PurchasePayment } from './purchasePaymentEntity';
+import { PurchaseCost } from './purchaseCostEntity';
 
 @Entity('purchases')
 export class Purchase {
@@ -75,4 +76,7 @@ export class Purchase {
 
   @OneToMany(() => PurchasePayment, (payment) => payment.purchase)
   payments!: PurchasePayment[];
+
+  @OneToMany(() => PurchaseCost, (cost) => cost.purchase)
+  costs!: PurchaseCost[];
 }

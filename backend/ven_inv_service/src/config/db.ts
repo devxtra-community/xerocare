@@ -23,6 +23,7 @@ import { RfqItem } from '../entities/rfqItemEntity';
 import { RfqVendor } from '../entities/rfqVendorEntity';
 import { RfqVendorItem } from '../entities/rfqVendorItemEntity';
 import { Purchase } from '../entities/purchaseEntity';
+import { PurchaseCost } from '../entities/purchaseCostEntity';
 import { PurchasePayment } from '../entities/purchasePaymentEntity';
 import { SparePartInventory } from '../entities/sparePartInventoryEntity';
 
@@ -48,6 +49,7 @@ export const Source = new DataSource({
     RfqVendor,
     RfqVendorItem,
     Purchase,
+    PurchaseCost,
     PurchasePayment,
     SparePartInventory,
   ],

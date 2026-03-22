@@ -39,6 +39,7 @@ import { purchaseService, Purchase } from '@/services/purchaseService';
 import { Input } from '@/components/ui/input';
 import AddPaymentModal from '../purchaseComponents/AddPaymentModal';
 import AddPurchaseDialog from '../purchaseComponents/AddPurchaseDialog';
+import AddCostModal from '../purchaseComponents/AddCostModal';
 
 interface LotDetailsDialogProps {
   lot: Lot;
@@ -63,6 +64,7 @@ export default function LotDetailsDialog({ lot, onClose }: LotDetailsDialogProps
   const [currentLot, setCurrentLot] = useState<Lot>(lot);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showEditPurchaseModal, setShowEditPurchaseModal] = useState(false);
+  const [showCostModal, setShowCostModal] = useState(false);
 
   useEffect(() => {
     // Initialize receivedItems from lot data
@@ -788,6 +790,33 @@ export default function LotDetailsDialog({ lot, onClose }: LotDetailsDialogProps
                           </div>
                         </div>
                       )}
+
+                      {purchaseRecord.costs && purchaseRecord.costs.length > 0 && (
+                        <div className="pt-3 border-t border-dashed">
+                          <div className="text-[10px] text-emerald-600 uppercase font-bold tracking-wider mb-2">
+                            Additional Dynamic Costs
+                          </div>
+                          <div className="space-y-2">
+                            {purchaseRecord.costs.map((c, i) => (
+                              <div
+                                key={i}
+                                className="flex justify-between items-center p-2 rounded bg-slate-50 border border-slate-100 text-xs"
+                              >
+                                <div className="flex flex-col">
+                                  <span className="font-medium text-slate-700">{c.costType}</span>
+                                  <span className="text-[9px] text-slate-400">
+                                    {format(new Date(c.costDate), 'MMM d, yyyy')}
+                                    {c.description && ` - ${c.description}`}
+                                  </span>
+                                </div>
+                                <span className="font-bold text-slate-700">
+                                  {formatCurrency(Number(c.amount))}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 ) : (
@@ -802,17 +831,26 @@ export default function LotDetailsDialog({ lot, onClose }: LotDetailsDialogProps
 
               {purchaseRecord && (
                 <div className="bg-slate-50 p-4 border-t gap-3 flex flex-col shrink-0">
-                  <Button
-                    variant="default"
-                    className="w-full gap-2 shadow-md bg-primary hover:bg-primary/90"
-                    onClick={() => setShowPaymentModal(true)}
-                    disabled={
-                      (purchaseRecord.payments?.reduce((sum, p) => sum + Number(p.amount), 0) ||
-                        0) >= purchaseRecord.totalAmount
-                    }
-                  >
-                    <Plus size={16} /> Add Payment
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      className="flex-1 gap-2 border-emerald-200 text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700"
+                      onClick={() => setShowCostModal(true)}
+                    >
+                      <Plus size={16} /> Add Cost
+                    </Button>
+                    <Button
+                      variant="default"
+                      className="flex-1 gap-2 shadow-md bg-primary hover:bg-primary/90"
+                      onClick={() => setShowPaymentModal(true)}
+                      disabled={
+                        (purchaseRecord.payments?.reduce((sum, p) => sum + Number(p.amount), 0) ||
+                          0) >= purchaseRecord.totalAmount
+                      }
+                    >
+                      <Plus size={16} /> Add Payment
+                    </Button>
+                  </div>
                 </div>
               )}
             </Card>
@@ -842,6 +880,18 @@ export default function LotDetailsDialog({ lot, onClose }: LotDetailsDialogProps
             onSuccess={() => {
               fetchPurchase();
               setShowEditPurchaseModal(false);
+            }}
+          />
+        )}
+
+        {showCostModal && purchaseRecord && (
+          <AddCostModal
+            open={showCostModal}
+            onOpenChange={(open) => setShowCostModal(open)}
+            purchaseId={purchaseRecord.id}
+            onSuccess={() => {
+              fetchPurchase();
+              setShowCostModal(false);
             }}
           />
         )}
