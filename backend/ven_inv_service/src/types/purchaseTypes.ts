@@ -18,6 +18,14 @@ export interface AddPaymentDto {
   createdBy?: string;
 }
 
+export interface AddCostDto {
+  amount: number;
+  costType: string;
+  description?: string;
+  costDate?: Date;
+  createdBy?: string;
+}
+
 export enum PurchaseStatus {
   UNPAID = 'UNPAID',
   PARTIAL = 'PARTIAL',

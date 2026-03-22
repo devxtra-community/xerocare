@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Search, Plus, Eye, Edit, CreditCard } from 'lucide-react';
+import { Search, Plus, Eye, Edit, CreditCard, Banknote } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -18,6 +18,7 @@ import { formatCurrency } from '@/lib/format';
 import AddPurchaseDialog from './AddPurchaseDialog';
 import EditPurchaseDialog from './EditPurchaseDialog';
 import AddPaymentModal from './AddPaymentModal';
+import AddCostModal from './AddCostModal';
 import ViewPurchaseDialog from './ViewPurchaseDialog';
 import PurchaseStats from './PurchaseStats';
 
@@ -35,6 +36,7 @@ export default function ManagerPurchaseTable() {
   const [editOpen, setEditOpen] = useState(false);
   const [viewOpen, setViewOpen] = useState(false);
   const [paymentOpen, setPaymentOpen] = useState(false);
+  const [costOpen, setCostOpen] = useState(false);
   const [selectedPurchase, setSelectedPurchase] = useState<Purchase | null>(null);
 
   const fetchPurchases = async () => {
@@ -78,6 +80,11 @@ export default function ManagerPurchaseTable() {
   const handleRecordPayment = (purchase: Purchase) => {
     setSelectedPurchase(purchase);
     setPaymentOpen(true);
+  };
+
+  const handleRecordCost = (purchase: Purchase) => {
+    setSelectedPurchase(purchase);
+    setCostOpen(true);
   };
 
   return (
@@ -200,6 +207,12 @@ export default function ManagerPurchaseTable() {
                       </button>
                       <button
                         className="text-emerald-500 hover:text-emerald-600 transition-colors flex items-center gap-1 text-xs font-bold"
+                        onClick={() => handleRecordCost(p)}
+                      >
+                        <Banknote size={16} /> Cost
+                      </button>
+                      <button
+                        className="text-emerald-500 hover:text-emerald-600 transition-colors flex items-center gap-1 text-xs font-bold"
                         onClick={() => handleRecordPayment(p)}
                         disabled={p.status === 'PAID'}
                       >
@@ -230,6 +243,12 @@ export default function ManagerPurchaseTable() {
             purchaseId={selectedPurchase.id}
             totalAmount={selectedPurchase.totalAmount}
             paidAmount={selectedPurchase.paidAmount}
+            onSuccess={fetchPurchases}
+          />
+          <AddCostModal
+            open={costOpen}
+            onOpenChange={setCostOpen}
+            purchaseId={selectedPurchase.id}
             onSuccess={fetchPurchases}
           />
           <ViewPurchaseDialog

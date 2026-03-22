@@ -10,6 +10,7 @@ import {
   ArrowLeft,
   CreditCard,
   Plus,
+  Banknote,
   Calendar,
   FileText,
   User,
@@ -28,6 +29,7 @@ import {
 import { formatCurrency } from '@/lib/format';
 import { toast } from 'sonner';
 import AddPaymentModal from '@/components/ManagerDashboardComponents/purchaseComponents/AddPaymentModal';
+import AddCostModal from '@/components/ManagerDashboardComponents/purchaseComponents/AddCostModal';
 
 export default function PurchaseDetailsPage() {
   const { id } = useParams();
@@ -35,6 +37,7 @@ export default function PurchaseDetailsPage() {
   const [purchase, setPurchase] = useState<Purchase | null>(null);
   const [loading, setLoading] = useState(true);
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
+  const [costModalOpen, setCostModalOpen] = useState(false);
 
   const fetchData = React.useCallback(async () => {
     try {
@@ -112,6 +115,12 @@ export default function PurchaseDetailsPage() {
             {purchase.status}
           </Badge>
           <Button
+            className="bg-emerald-600 text-white font-bold italic px-6 rounded-xl shadow-lg hover:bg-emerald-700 hover:shadow-emerald-600/20"
+            onClick={() => setCostModalOpen(true)}
+          >
+            <Banknote className="mr-2 h-4 w-4" /> Add Cost
+          </Button>
+          <Button
             disabled={purchase.status === 'PAID'}
             className="bg-primary text-white font-bold italic px-6 rounded-xl shadow-lg shadow-primary/20"
             onClick={() => setPaymentModalOpen(true)}
@@ -177,6 +186,33 @@ export default function PurchaseDetailsPage() {
                 />
                 <CostItem icon={Wrench} label="Groundfield" value={purchase.groundfieldCost} />
               </div>
+
+              {purchase.costs && purchase.costs.length > 0 && (
+                <div className="mt-6 pt-6 border-t border-dashed">
+                  <h4 className="text-sm font-bold text-slate-700 mb-4 flex items-center gap-2">
+                    <Banknote className="h-4 w-4 text-emerald-500" /> Dynamic Costs Ledger
+                  </h4>
+                  <div className="space-y-3">
+                    {purchase.costs.map((c, i) => (
+                      <div
+                        key={i}
+                        className="flex items-center justify-between p-3 rounded-lg bg-slate-50 border border-slate-100"
+                      >
+                        <div>
+                          <p className="text-sm font-bold text-slate-700">{c.costType}</p>
+                          <p className="text-xs text-slate-500">
+                            {new Date(c.costDate).toLocaleDateString()}{' '}
+                            {c.description && `• ${c.description}`}
+                          </p>
+                        </div>
+                        <p className="text-sm font-black text-slate-800">
+                          {formatCurrency(c.amount)}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -296,6 +332,12 @@ export default function PurchaseDetailsPage() {
         purchaseId={purchase.id}
         totalAmount={purchase.totalAmount}
         paidAmount={purchase.paidAmount}
+        onSuccess={fetchData}
+      />
+      <AddCostModal
+        open={costModalOpen}
+        onOpenChange={setCostModalOpen}
+        purchaseId={purchase.id}
         onSuccess={fetchData}
       />
     </div>

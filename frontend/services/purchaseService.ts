@@ -9,6 +9,14 @@ export interface Payment {
   description?: string;
 }
 
+export interface PurchaseCost {
+  id: string;
+  amount: number;
+  costType: string;
+  description?: string;
+  costDate: string;
+}
+
 export interface Purchase {
   id: string;
   purchaseAmount: number;
@@ -28,6 +36,7 @@ export interface Purchase {
   createdBy: string;
   createdAt: string;
   payments?: Payment[];
+  costs?: PurchaseCost[];
   vendor?: {
     id: string;
     name: string;
@@ -48,6 +57,13 @@ export interface AddPaymentDto {
   description?: string;
   referenceNumber?: string;
   paymentDate?: string;
+}
+
+export interface AddCostDto {
+  amount: number;
+  costType: string;
+  description?: string;
+  costDate?: string;
 }
 
 export interface CreatePurchaseDTO {
@@ -115,6 +131,14 @@ export const purchaseService = {
    */
   addPayment: async (purchaseId: string, data: AddPaymentDto): Promise<Payment> => {
     const response = await api.post(`/i/purchases/${purchaseId}/payments`, data);
+    return response.data.data;
+  },
+
+  /**
+   * Adds a cost to a purchase.
+   */
+  addCost: async (purchaseId: string, data: AddCostDto): Promise<PurchaseCost> => {
+    const response = await api.post(`/i/purchases/${purchaseId}/costs`, data);
     return response.data.data;
   },
 };

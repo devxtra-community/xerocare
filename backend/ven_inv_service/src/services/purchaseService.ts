@@ -1,11 +1,18 @@
 import { PurchaseRepository } from '../repositories/purchaseRepository';
 import { PurchasePaymentRepository } from '../repositories/purchasePaymentRepository';
-import { AddPaymentDto, CreatePurchaseDto, PurchaseStatus } from '../types/purchaseTypes';
+import { PurchaseCostRepository } from '../repositories/purchaseCostRepository';
+import {
+  AddPaymentDto,
+  AddCostDto,
+  CreatePurchaseDto,
+  PurchaseStatus,
+} from '../types/purchaseTypes';
 import { Purchase } from '../entities/purchaseEntity';
 
 export class PurchaseService {
   private purchaseRepo = new PurchaseRepository();
   private paymentRepo = new PurchasePaymentRepository();
+  private costRepo = new PurchaseCostRepository();
 
   private enrichPurchase(purchase: Purchase) {
     const paidAmount = purchase.payments?.reduce((sum, p) => sum + Number(p.amount), 0) || 0;
@@ -45,6 +52,10 @@ export class PurchaseService {
 
   async addPayment(purchaseId: string, data: AddPaymentDto, branchId: string) {
     return await this.paymentRepo.addPayment(purchaseId, data, branchId);
+  }
+
+  async addCost(purchaseId: string, data: AddCostDto, branchId: string) {
+    return await this.costRepo.addCost(purchaseId, data, branchId);
   }
 
   async updatePurchase(id: string, data: Partial<CreatePurchaseDto>, branchId?: string) {
