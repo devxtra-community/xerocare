@@ -18,13 +18,13 @@ services:
       - '3001' # API Gateway
     depends_on:
       redis:
-        condition: service_started
+        condition: service_healthy
       rabbitmq:
         condition: service_healthy
-    # Fix for Alpine/musl EAI_AGAIN DNS failures on concurrent external lookups
-    dns:
-      - 8.8.8.8
-      - 1.1.1.1
+      postgres:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
     networks:
       - xerocare-network
 
@@ -38,6 +38,12 @@ services:
       - redis_data:/data
     networks:
       - xerocare-network
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
 
   rabbitmq:
     image: rabbitmq:3-management-alpine
@@ -71,6 +77,12 @@ services:
       - postgres_data:/var/lib/postgresql/data
     networks:
       - xerocare-network
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d xerocare']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
 
   mongodb:
     image: mongo:7
@@ -82,6 +94,12 @@ services:
       - mongodb_data:/data/db
     networks:
       - xerocare-network
+    healthcheck:
+      test: ['CMD', 'mongosh', '--eval', 'db.adminCommand("ping")']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
 
 networks:
   xerocare-network:
