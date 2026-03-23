@@ -14,8 +14,8 @@ services:
       RABBITMQ_URL: amqp://rabbitmq:5672
       REDIS_URL: redis://redis:6379
     ports:
-      - '3000:3000' # Frontend (Next.js)
-      - '3001:3001' # API Gateway
+      - '3000' # Frontend (Next.js)
+      - '3001' # API Gateway
     depends_on:
       redis:
         condition: service_started
@@ -37,7 +37,7 @@ services:
     container_name: xerocare-redis
     restart: unless-stopped
     ports:
-      - '6379:6379'
+      - '6379'
     volumes:
       - redis_data:/data
     networks:
@@ -48,8 +48,8 @@ services:
     container_name: xerocare-rabbitmq
     restart: unless-stopped
     ports:
-      - '5672:5672' # AMQP protocol port
-      - '15672:15672' # HTTP Management UI
+      - '5672' # AMQP protocol port
+      - '15672' # HTTP Management UI
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq/mnesia
     networks:
@@ -70,7 +70,7 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
     ports:
-      - '5433:5432'
+      - '5432'
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
@@ -81,7 +81,7 @@ services:
     container_name: xerocare-mongodb
     restart: unless-stopped
     ports:
-      - '27017:27017'
+      - '27017'
     volumes:
       - mongodb_data:/data/db
     networks:
