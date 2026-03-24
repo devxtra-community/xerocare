@@ -1,7 +1,7 @@
 'use client';
 
-import { Search, Bell, HelpCircle, ChevronDown, Menu, LogOut, Key, Monitor } from 'lucide-react';
-import { Input } from '@/components/ui/input';
+import { Bell, HelpCircle, ChevronDown, Menu, LogOut, Key, Monitor } from 'lucide-react';
+
 import { Button } from '@/components/ui/button';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { useEffect, useState } from 'react';
@@ -134,18 +134,6 @@ export default function DashboardHeader({ title = 'Dashboard' }: { title?: strin
             <Menu className="h-5 w-5" />
           </SidebarTrigger>
           <h1 className="text-base sm:text-lg font-semibold">{title}</h1>
-        </div>
-
-        {/* Center: Search bar (hidden on mobile) */}
-        <div className="hidden md:flex flex-1 items-center justify-center px-4">
-          <div className="relative w-full max-w-md">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-            <Input
-              type="search"
-              placeholder="Search"
-              className="w-full pl-10 pr-4 bg-card/10 border-white/20 text-white placeholder:text-gray-300 focus-visible:ring-white/50"
-            />
-          </div>
         </div>
 
         {/* Right: Icons and User Profile */}
