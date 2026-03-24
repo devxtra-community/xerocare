@@ -4,6 +4,7 @@ import { AppError } from '../errors/appError';
 import { LotStatus } from '../entities/lotEntity';
 
 const lotService = new LotService();
+import { getRabbitChannel } from '../config/rabbitmq';
 
 /**
  * Creates a new lot.
@@ -13,6 +14,24 @@ export const createLot = async (req: Request, res: Response, next: NextFunction)
     const branchId = req.user?.branchId;
     const lotData = { ...req.body, branchId };
     const lot = await lotService.createLot(lotData);
+
+    // Dispatch in-app notification to Admins
+    try {
+      const channel = await getRabbitChannel();
+      const payload = {
+        notifyAdmins: true,
+        title: 'New Lot Created',
+        message: `Lot #${lot.lotNumber} has been created in branch ${branchId}.`,
+        type: 'LOT_CREATED',
+        data: { lotId: lot.id, branchId },
+      };
+      channel.sendToQueue('notification_queue', Buffer.from(JSON.stringify(payload)), {
+        persistent: true,
+      });
+    } catch (e) {
+      console.error('Failed to dispatch lot creation notification', e);
+    }
+
     res.status(201).json({ success: true, data: lot });
   } catch (err) {
     next(err);

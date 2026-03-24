@@ -21,6 +21,7 @@ import {
 import { ChangePasswordDialog } from './ChangePasswordDialog';
 import { SessionsDialog } from './SessionsDialog';
 import { SalaryDetailsDialog } from './SalaryDetailsDialog';
+import { HelpGuideDialog } from './HelpGuideDialog';
 
 export interface Notification {
   id: string;
@@ -50,6 +51,7 @@ export default function DashboardHeader({ title = 'Dashboard' }: { title?: strin
   const [isSessionsDialogOpen, setIsSessionsDialogOpen] = useState(false);
   const [selectedPayrollId, setSelectedPayrollId] = useState<string | null>(null);
   const [isSalaryDialogOpen, setIsSalaryDialogOpen] = useState(false);
+  const [isHelpDialogOpen, setIsHelpDialogOpen] = useState(false);
 
   const fetchNotifications = async () => {
     try {
@@ -209,6 +211,8 @@ export default function DashboardHeader({ title = 'Dashboard' }: { title?: strin
             variant="ghost"
             size="icon"
             className="hidden sm:flex text-white hover:bg-card/10"
+            onClick={() => setIsHelpDialogOpen(true)}
+            title="About Xerocare"
           >
             <HelpCircle className="h-5 w-5" />
           </Button>
@@ -287,6 +291,7 @@ export default function DashboardHeader({ title = 'Dashboard' }: { title?: strin
         onOpenChange={setIsSalaryDialogOpen}
         payrollId={selectedPayrollId}
       />
+      <HelpGuideDialog open={isHelpDialogOpen} onOpenChange={setIsHelpDialogOpen} />
     </header>
   );
 }
