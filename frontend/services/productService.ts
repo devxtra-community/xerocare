@@ -15,18 +15,23 @@ export interface Product {
   warehouse?: { id: string; warehouseName: string };
   serial_no: string;
   brand: string;
-  MFD: string;
+  MFD: string; // Manufacturing Date
   tax_rate: number;
   sale_price: number;
+  /** Current state of the item: is it for sale, rented out, or sold? */
   product_status: 'AVAILABLE' | 'RENTED' | 'LEASE' | 'SOLD' | 'DAMAGED';
+  /** Does it print in color or simple black and white? */
   print_colour: 'BLACK_WHITE' | 'COLOUR' | 'BOTH';
   max_discount_amount: number;
   imageUrl?: string;
   stock?: number;
   lot_id?: string;
-  lot?: { lotNumber: string; lot_number?: string };
+  lot?: { lotNumber: string };
 }
 
+/**
+ * Information needed to add a new product to our catalog.
+ */
 export interface CreateProductDTO {
   model_id: string;
   warehouse_id: string;
@@ -44,6 +49,9 @@ export interface CreateProductDTO {
   lot_id?: string;
 }
 
+/**
+ * A simpler way to add many products at once from a list or spreadsheet.
+ */
 export interface BulkProductRow {
   model_no?: string;
   model_id?: string;
@@ -61,12 +69,18 @@ export interface BulkProductRow {
   lot_id?: string;
 }
 
+/**
+ * Result of adding many products at once.
+ */
 export interface BulkCreateResponse {
   success: boolean;
   inserted: number;
   failed: { row: number; error: string }[];
 }
 
+/**
+ * How we handle long lists of data by breaking them into "Pages" (like a book).
+ */
 export interface PaginatedResponse<T> {
   data: T[];
   page: number;
@@ -74,9 +88,14 @@ export interface PaginatedResponse<T> {
   total: number;
 }
 
+/**
+ * The Product Service handles all communication with our database regarding
+ * the machines and items we sell.
+ */
 export const productService = {
   /**
-   * Retrieves all products (paginated).
+   * Get a list of all products. Since the list can be very long,
+   * we show them a few at a time (on different pages).
    */
   getAllProducts: async (params?: {
     page?: number;
@@ -84,7 +103,7 @@ export const productService = {
     search?: string;
   }): Promise<PaginatedResponse<Product>> => {
     const response = await api.get('/i/products', { params });
-    // Handle both new paginated response and old array response for safety during migration
+    // Safety check: ensure we handle the data correctly whether it's one page or many.
     if (response.data.page !== undefined) {
       return response.data;
     }
@@ -97,7 +116,7 @@ export const productService = {
   },
 
   /**
-   * Creates a new product.
+   * Add a brand new product to the list.
    */
   createProduct: async (data: CreateProductDTO | FormData): Promise<Product> => {
     const response = await api.post('/i/products', data);
@@ -105,7 +124,7 @@ export const productService = {
   },
 
   /**
-   * Creates multiple products in bulk.
+   * Add many products at once from a list.
    */
   bulkCreateProducts: async (rows: BulkProductRow[]): Promise<BulkCreateResponse> => {
     const response = await api.post('/i/products/bulk', { rows });
@@ -113,14 +132,14 @@ export const productService = {
   },
 
   /**
-   * Updates a product.
+   * Change the details of an existing product (like its price or status).
    */
   updateProduct: async (id: string, data: Partial<CreateProductDTO> | FormData): Promise<void> => {
     await api.put(`/i/products/${id}`, data);
   },
 
   /**
-   * Deletes a product.
+   * Remove a product from our active list.
    */
   deleteProduct: async (id: string): Promise<void> => {
     await api.delete(`/i/products/${id}`);

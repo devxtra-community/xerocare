@@ -16,22 +16,38 @@ interface AuthError {
   statusCode?: number;
 }
 
+/**
+ * First step of Logging In:
+ * The staff member enters their email and password. If correct, our
+ * system sends a secret 6-digit security code (OTP) to their email
+ * for safety.
+ */
 export const login = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { user } = await authService.login(req.body);
 
-    await otpService.sendOtp(user.email, OtpPurpose.LOGIN);
+    otpService
+      .sendOtp(user.email, OtpPurpose.LOGIN)
+      .then(() => logger.info(`OTP sent successfully to ${user.email} for login`))
+      .catch((err) =>
+        logger.error(`Failed to send OTP to ${user.email}: ${err.message}`, { error: err }),
+      );
 
     return res.json({
       message: 'Otp sent to registered email',
       success: true,
     });
-  } catch (err: unknown) {
-    const error = err as AuthError;
-    next(new AppError(error.message || 'Internal Server Error', error.statusCode || 500));
+  } catch (error) {
+    next(error);
   }
 };
 
+/**
+ * Second step of Logging In:
+ * The staff member enters the secret 6-digit code we sent to their email.
+ * If the code matches, we officially open the office doors for them
+ * (give them access).
+ */
 export const loginVerify = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const email = req.body.email.toLowerCase().trim();
@@ -56,6 +72,11 @@ export const loginVerify = async (req: Request, res: Response, next: NextFunctio
   }
 };
 
+/**
+ * Keep me logged in:
+ * This helps the staff member's computer remember who they are so
+ * they don't have to keep logging back in throughout the day.
+ */
 export const refresh = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const refreshToken = req.cookies.refreshToken;
@@ -78,6 +99,11 @@ export const refresh = async (req: Request, res: Response, next: NextFunction) =
   }
 };
 
+/**
+ * Safely exit the system:
+ * This tells the system that the staff member is leaving and all
+ * active security keys should be disabled.
+ */
 export const logout = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const refreshToken = req.cookies.refreshToken;
@@ -92,6 +118,11 @@ export const logout = async (req: Request, res: Response, next: NextFunction) =>
   }
 };
 
+/**
+ * Change Security Password:
+ * Allows a staff member to set a new password, providing they know
+ * their current one.
+ */
 export const changePassword = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const userId = req.user.userId;
@@ -110,6 +141,11 @@ export const changePassword = async (req: Request, res: Response, next: NextFunc
   }
 };
 
+/**
+ * Forgotten Password:
+ * If a staff member can't remember their password, we send them a
+ * security code to their email so they can reset it.
+ */
 export const forgotPassword = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const email = req.body.email.toLowerCase().trim();
@@ -134,6 +170,11 @@ export const forgotPassword = async (req: Request, res: Response, next: NextFunc
   }
 };
 
+/**
+ * Resetting the Password:
+ * After receiving the security code via email, the staff member
+ * can finally set their new password.
+ */
 export const resetPassword = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const email = req.body.email.toLowerCase().trim();
@@ -161,6 +202,11 @@ export const resetPassword = async (req: Request, res: Response, next: NextFunct
   }
 };
 
+/**
+ * Request a "Magic Link":
+ * Send a special email containing a "one-click" login button.
+ * No password required—it's fast and secure.
+ */
 export const requestMagicLink = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const email = req.body.email.toLowerCase().trim();
@@ -177,6 +223,11 @@ export const requestMagicLink = async (req: Request, res: Response, next: NextFu
   }
 };
 
+/**
+ * Verify "Magic Link":
+ * Confirm that the staff member actually clicked the link we sent to
+ * their email and log them in immediately.
+ */
 export const verifyMagicLink = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const token = req.body.token.trim();
@@ -202,6 +253,12 @@ export const verifyMagicLink = async (req: Request, res: Response, next: NextFun
   }
 };
 
+/**
+ * Stop other devices:
+ * If a staff member thinks their account might be open on a different
+ * computer (like a public one), they can use this to remotely log
+ * out every other device.
+ */
 export const logoutOtherDevices = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const userId = req.user.userId;
@@ -223,6 +280,11 @@ export const logoutOtherDevices = async (req: Request, res: Response, next: Next
   }
 };
 
+/**
+ * See active sessions:
+ * List all the phones and computers currently logged into this account
+ * (e.g., "Logged in via Chrome on Windows").
+ */
 export const getSessions = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const userId = req.user.userId;
@@ -240,6 +302,11 @@ export const getSessions = async (req: Request, res: Response, next: NextFunctio
   }
 };
 
+/**
+ * Log out a specific device:
+ * Pick one phone or computer from the "active sessions" list and force
+ * it to log out.
+ */
 export const logoutSession = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const userId = req.user.userId;
@@ -257,6 +324,11 @@ export const logoutSession = async (req: Request, res: Response, next: NextFunct
   }
 };
 
+/**
+ * Get My Profile:
+ * Retrieve the basic details (name, role, branch) for the staff member
+ * currently using the system.
+ */
 export const getMe = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const userId = req.user.userId || req.user.id;

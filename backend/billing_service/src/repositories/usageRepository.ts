@@ -1,6 +1,7 @@
 import { Repository } from 'typeorm';
 import { UsageRecord } from '../entities/usageRecordEntity';
 import { Source } from '../config/dataSource';
+import { logger } from '../config/logger';
 
 export class UsageRepository {
   private repo: Repository<UsageRecord>;
@@ -75,7 +76,7 @@ export class UsageRepository {
       return isExact || isSubset;
     });
 
-    console.log('[DEBUG] Match Result:', found ? found.id : 'null');
+    logger.info('Match Result', { matchId: found ? found.id : 'null' });
     return found || null;
   }
 

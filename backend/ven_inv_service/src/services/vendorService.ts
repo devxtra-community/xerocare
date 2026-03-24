@@ -5,6 +5,7 @@ import { publishEmailJob } from '../queues/emailPublisher';
 import { VendorRequestRepository } from '../repositories/vendorRequestRepository';
 import { VendorRequest } from '../entities/vendorRequestEntity';
 import { FindOptionsWhere } from 'typeorm';
+import { logger } from '../config/logger';
 
 interface CreateVendorDTO {
   name: string;
@@ -47,12 +48,12 @@ export class VendorService {
 
     const vendor = this.vendorRepo.create(data);
 
-    await publishEmailJob({
-      type: 'VENDOR_WELCOME',
-      email: vendor.email,
-      vendorName: vendor.name,
+    const savedVendor = await this.vendorRepo.save(vendor);
+    logger.info('Vendor created successfully', {
+      vendorId: savedVendor.id,
+      name: savedVendor.name,
     });
-    return this.vendorRepo.save(vendor);
+    return savedVendor;
   }
 
   /**
@@ -106,7 +107,7 @@ export class VendorService {
     vendor.status = VendorStatus.DELETED;
 
     await this.vendorRepo.save(vendor);
-
+    logger.info('Vendor soft-deleted successfully', { vendorId: id });
     return true;
   }
   /**
@@ -158,6 +159,7 @@ export class VendorService {
       message: data.message,
     });
 
+    logger.info('Product request sent to vendor', { vendorId, userId, branchId });
     return { success: true, message: 'Product request email sent' };
   }
 

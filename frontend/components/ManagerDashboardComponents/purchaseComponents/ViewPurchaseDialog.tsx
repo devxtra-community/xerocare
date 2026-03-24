@@ -122,7 +122,7 @@ export default function ViewPurchaseDialog({
                 <ContextItem
                   icon={Boxes}
                   label="Lot Reference"
-                  value={purchase.lot?.lot_number || purchase.lotId.slice(0, 8)}
+                  value={purchase.lot?.lotNumber || purchase.lotId.slice(0, 8)}
                 />
                 <ContextItem
                   icon={User}

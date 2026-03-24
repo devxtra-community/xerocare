@@ -61,7 +61,7 @@ export default function EditSparePartDialog({
   const [vendors, setVendors] = useState<Vendor[]>([]);
 
   const [formData, setFormData] = useState({
-    lot_number: '',
+    lotNumber: '',
     part_name: '',
     brand: '',
     model_id: '',
@@ -108,7 +108,7 @@ export default function EditSparePartDialog({
         }
 
         setFormData({
-          lot_number: product.lot_number || '',
+          lotNumber: product.lotNumber || '',
           part_name: product.part_name,
           brand: product.brand,
           model_id: modelId,
@@ -162,8 +162,8 @@ export default function EditSparePartDialog({
             <div className="space-y-2">
               <Label>Lot / Order Number</Label>
               <Input
-                value={formData.lot_number}
-                onChange={(e) => setFormData({ ...formData, lot_number: e.target.value })}
+                value={formData.lotNumber}
+                onChange={(e) => setFormData({ ...formData, lotNumber: e.target.value })}
               />
             </div>
             {/* Part Name */}

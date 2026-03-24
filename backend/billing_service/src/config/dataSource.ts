@@ -7,14 +7,16 @@ import { Invoice } from '../entities/invoiceEntity';
 import { InvoiceItem } from '../entities/invoiceItemEntity';
 import { UsageRecord } from '../entities/usageRecordEntity';
 import { ProductAllocation } from '../entities/productAllocationEntity';
+
+import { logger } from './logger';
 import { UsageRecordItem } from '../entities/usageRecordItemEntity';
 import { DeviceMeterReading } from '../entities/deviceMeterReadingEntity';
-import { logger } from './logger';
 
 export const Source = new DataSource({
   type: 'postgres',
-  url: process.env.BILLING_DATABASE_URL || process.env.DATABASE_URL,
-  synchronize: true,
+  url: process.env.BILLING_DATABASE_URL,
+  ssl: false,
+  synchronize: false,
   logging: false,
   entities: [
     Invoice,
@@ -24,7 +26,15 @@ export const Source = new DataSource({
     UsageRecordItem,
     DeviceMeterReading,
   ],
-  extra: { max: 2 },
+  poolSize: 1,
+  extra: {
+    max: 1,
+    min: 0,
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 5000,
+    statement_timeout: 10000,
+    keepAlive: true,
+  },
 });
 
 /**

@@ -1,4 +1,5 @@
 import Redis from 'ioredis';
+import { logger } from './logger';
 
 export const redis = new Redis(process.env.REDIS_URL!, {
   maxRetriesPerRequest: null,
@@ -9,5 +10,5 @@ export const redis = new Redis(process.env.REDIS_URL!, {
 });
 
 redis.on('connect', () => {
-  console.log('Redis connected');
+  logger.info('Redis connected');
 });

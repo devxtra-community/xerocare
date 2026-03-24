@@ -6,15 +6,19 @@ import { logger } from './logger';
 
 export const Source = new DataSource({
   type: 'postgres',
-  url: process.env.CRM_DATABASE_URL || process.env.DATABASE_URL,
-  synchronize: true,
+  url: process.env.CRM_DATABASE_URL,
+  ssl: false,
+  synchronize: false,
   logging: false,
   entities: [Customer],
+  poolSize: 1,
   extra: {
     max: 1,
-    ssl: { rejectUnauthorized: false },
+    min: 0,
     connectionTimeoutMillis: 5000,
     keepAlive: true,
+    idleTimeoutMillis: 30000,
+    statement_timeout: 10000,
   },
 });
 

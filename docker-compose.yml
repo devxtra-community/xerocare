@@ -14,13 +14,17 @@ services:
       RABBITMQ_URL: amqp://rabbitmq:5672
       REDIS_URL: redis://redis:6379
     ports:
-      - '3000:3000' # Frontend (Next.js)
-      - '3001:3001' # API Gateway
+      - '3000' # Frontend (Next.js)
+      - '3001' # API Gateway
     depends_on:
       redis:
         condition: service_started
       rabbitmq:
         condition: service_healthy
+      postgres:
+        condition: service_started
+      mongodb:
+        condition: service_started
     # Fix for Alpine/musl EAI_AGAIN DNS failures on concurrent external lookups
     dns:
       - 8.8.8.8
@@ -33,7 +37,7 @@ services:
     container_name: xerocare-redis
     restart: unless-stopped
     ports:
-      - '6379:6379'
+      - '6379'
     volumes:
       - redis_data:/data
     networks:
@@ -44,8 +48,8 @@ services:
     container_name: xerocare-rabbitmq
     restart: unless-stopped
     ports:
-      - '5672:5672' # AMQP protocol port
-      - '15672:15672' # HTTP Management UI
+      - '5672' # AMQP protocol port
+      - '15672' # HTTP Management UI
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq/mnesia
     networks:
@@ -57,6 +61,32 @@ services:
       retries: 5
       start_period: 30s
 
+  postgres:
+    image: postgres:16-alpine
+    container_name: xerocare-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: xerocare
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - '5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - xerocare-network
+
+  mongodb:
+    image: mongo:7
+    container_name: xerocare-mongodb
+    restart: unless-stopped
+    ports:
+      - '27017'
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - xerocare-network
+
 networks:
   xerocare-network:
     driver: bridge
@@ -64,3 +94,5 @@ networks:
 volumes:
   redis_data:
   rabbitmq_data:
+  postgres_data:
+  mongodb_data:

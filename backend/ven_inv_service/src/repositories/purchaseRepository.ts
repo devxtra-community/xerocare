@@ -96,7 +96,7 @@ export class PurchaseRepository {
 
     return this.repo.find({
       where: Object.keys(where).length > 0 ? where : undefined,
-      relations: ['lot', 'vendor', 'branch', 'payments'],
+      relations: ['lot', 'vendor', 'branch', 'payments', 'costs'],
       order: { createdAt: 'DESC' },
     });
   }
@@ -107,7 +107,7 @@ export class PurchaseRepository {
 
     return this.repo.findOne({
       where,
-      relations: ['lot', 'vendor', 'branch', 'payments'],
+      relations: ['lot', 'vendor', 'branch', 'payments', 'costs'],
     });
   }
 
@@ -117,7 +117,7 @@ export class PurchaseRepository {
 
     return this.repo.findOne({
       where,
-      relations: ['lot', 'vendor', 'branch', 'payments'],
+      relations: ['lot', 'vendor', 'branch', 'payments', 'costs'],
     });
   }
 
@@ -132,7 +132,7 @@ export class PurchaseRepository {
 
       const purchase = await manager.findOne(Purchase, {
         where,
-        relations: ['lot', 'lot.items', 'vendor'],
+        relations: ['lot', 'lot.items', 'vendor', 'costs'],
       });
 
       if (!purchase) {
@@ -158,6 +158,10 @@ export class PurchaseRepository {
 
       purchase.purchaseAmount = purchaseAmount;
 
+      const dynamicCostsTotal = purchase.costs
+        ? purchase.costs.reduce((sum, cost) => sum + Number(cost.amount), 0)
+        : 0;
+
       purchase.totalAmount =
         purchaseAmount +
         Number(purchase.documentationFee) +
@@ -165,7 +169,8 @@ export class PurchaseRepository {
         Number(purchase.handlingFee) +
         Number(purchase.transportationCost) +
         Number(purchase.shippingCost) +
-        Number(purchase.groundfieldCost);
+        Number(purchase.groundfieldCost) +
+        dynamicCostsTotal;
 
       return await manager.save(Purchase, purchase);
     });

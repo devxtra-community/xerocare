@@ -1,6 +1,5 @@
 import './env';
 
-import { logger } from './logger';
 import 'reflect-metadata';
 import { DataSource } from 'typeorm';
 import { Vendor } from '../entities/vendorEntity';
@@ -17,21 +16,22 @@ import { Brand } from '../entities/brandEntity';
 import { Lot } from '../entities/lotEntity';
 import { LotItem } from '../entities/lotItemEntity';
 
+import { logger } from './logger';
+
 import { Rfq } from '../entities/rfqEntity';
 import { RfqItem } from '../entities/rfqItemEntity';
 import { RfqVendor } from '../entities/rfqVendorEntity';
 import { RfqVendorItem } from '../entities/rfqVendorItemEntity';
 import { Purchase } from '../entities/purchaseEntity';
+import { PurchaseCost } from '../entities/purchaseCostEntity';
 import { PurchasePayment } from '../entities/purchasePaymentEntity';
 import { SparePartInventory } from '../entities/sparePartInventoryEntity';
 
 export const Source = new DataSource({
   type: 'postgres',
   url: process.env.VENDOR_DATABASE_URL,
-  ssl: {
-    rejectUnauthorized: false,
-  },
-  synchronize: true,
+  ssl: false,
+  synchronize: true, // Enabled for development to allow automatic table creation
   entities: [
     Vendor,
     Model,
@@ -49,13 +49,18 @@ export const Source = new DataSource({
     RfqVendor,
     RfqVendorItem,
     Purchase,
+    PurchaseCost,
     PurchasePayment,
     SparePartInventory,
   ],
+  poolSize: 1,
   extra: {
-    max: 1,
+    max: 20,
     connectionTimeoutMillis: 5000,
     keepAlive: true,
+    min: 0,
+    idleTimeoutMillis: 30000,
+    statement_timeout: 10000,
   },
 });
 

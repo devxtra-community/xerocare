@@ -68,6 +68,24 @@ export class PurchaseController {
     }
   }
 
+  async addCost(req: Request, res: Response, next: NextFunction) {
+    try {
+      const id = String(req.params.id);
+      const branchId = req.user?.branchId;
+      if (!branchId) throw new AppError('Branch ID is required', 400);
+
+      const costData = {
+        ...req.body,
+        createdBy: req.user?.userId,
+      };
+
+      const cost = await purchaseService.addCost(id, costData, branchId);
+      res.status(201).json({ success: true, data: cost });
+    } catch (err) {
+      next(err);
+    }
+  }
+
   async updatePurchase(req: Request, res: Response, next: NextFunction) {
     try {
       const id = String(req.params.id);

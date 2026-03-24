@@ -111,7 +111,7 @@ export class RfqController {
       const vendorId = req.params.vendorId as string;
       const rfqId = req.params.id as string;
 
-      const workbook = xlsx.read(req.file.buffer, { type: 'buffer' });
+      const workbook = xlsx.read(req.file.buffer, { type: 'buffer', cellDates: true });
       const sheetName = workbook.SheetNames[0];
       const data = xlsx.utils.sheet_to_json(workbook.Sheets[sheetName]) as Record<
         string,

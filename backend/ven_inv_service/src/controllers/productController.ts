@@ -9,7 +9,8 @@ import { ProductStatus } from '../entities/productEntity';
 const service = new ProductService();
 
 /**
- * Bulk creates multiple products.
+ * Fast Add: Create many new products at once by providing a list.
+ * Useful when we receive a large shipment of new items.
  */
 export const bulkCreateProducts = async (req: Request, res: Response) => {
   try {
@@ -30,7 +31,8 @@ export const bulkCreateProducts = async (req: Request, res: Response) => {
 };
 
 /**
- * Adds a new product.
+ * Add one single new product to our catalog.
+ * We also save a photo of the product if one is uploaded.
  */
 export const addproduct = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -89,7 +91,10 @@ export const addproduct = async (req: Request, res: Response, next: NextFunction
 };
 
 /**
- * Retrieves all products, optionally filtered by the user's branch.
+ * List all products currently in the company catalog.
+ *
+ * Staff members only see products belonging to their own office branch,
+ * while Administrators can see everything.
  */
 export const getallproducts = async (req: Request, res: Response) => {
   try {
@@ -121,7 +126,9 @@ export const getallproducts = async (req: Request, res: Response) => {
 };
 
 /**
- * Updates an existing product.
+ * Update the information for an existing product (like its price or status).
+ *
+ * Staff can only update products stored in their own local office's warehouse.
  */
 export const updateproduct = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -169,7 +176,7 @@ export const updateproduct = async (req: Request, res: Response, next: NextFunct
 };
 
 /**
- * Deletes a product.
+ * Remove a product from our active catalog.
  */
 export const deleteproduct = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -202,7 +209,7 @@ export const deleteproduct = async (req: Request, res: Response, next: NextFunct
 };
 
 /**
- * Retrieves a single product by ID.
+ * Get the full, specific details of one product.
  */
 export const getproductbyid = async (req: Request, res: Response, next: NextFunction) => {
   try {

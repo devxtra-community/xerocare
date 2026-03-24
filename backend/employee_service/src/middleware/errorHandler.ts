@@ -4,19 +4,27 @@ import { logger } from '../config/logger';
 
 /**
  * Global error handling middleware.
- * Logs errors with full context and sends standardized JSON responses.
+ * Logs errors with full context including masked request details.
  */
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 export const errorHandler = (err: Error, req: Request, res: Response, _next: NextFunction) => {
   const statusCode = err instanceof AppError ? err.statusCode : 500;
 
-  logger.error(`✗ ${req.method} ${req.originalUrl} → ${statusCode} ${err.message}`, {
+  // Mask sensitive information in the body before logging
+  const maskedBody = { ...req.body };
+  const sensitiveFields = ['password', 'otp', 'token', 'newPassword', 'currentPassword'];
+  sensitiveFields.forEach((field) => {
+    if (maskedBody[field]) maskedBody[field] = '********';
+  });
+
+  logger.error(`✗ [ERROR] ${req.method} ${req.originalUrl} → ${statusCode} ${err.message}`, {
     method: req.method,
     url: req.originalUrl,
     statusCode,
     message: err.message,
     stack: err.stack,
-    body: req.body,
+    body: Object.keys(maskedBody).length > 0 ? maskedBody : undefined,
+    query: Object.keys(req.query).length > 0 ? req.query : undefined,
   });
 
   if (err instanceof AppError) {

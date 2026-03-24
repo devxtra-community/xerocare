@@ -19,7 +19,7 @@ export class Auth {
   @JoinColumn({ name: 'employee_id' })
   employee!: Employee | null;
 
-  @ManyToOne(() => Admin, { nullable: true, onDelete: 'CASCADE' })
+  @ManyToOne(() => Admin, (admin) => admin.auths, { nullable: true, onDelete: 'CASCADE' })
   @JoinColumn({ name: 'admin_id' })
   admin!: Admin | null;
 

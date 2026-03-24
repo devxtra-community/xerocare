@@ -1,6 +1,7 @@
 /**
- * Formats a number into a compact string representation (e.g., 1.5k, 1.2M).
- * Uses Intl.NumberFormat for robust, localized formatting.
+ * This tool shortens long numbers into a "human-friendly" format to save space.
+ * For example, it turns "1500" into "1.5k" and "1,200,000" into "1.2M".
+ * This makes it much easier to read large amounts of stock or money at a glance.
  */
 export function formatCompactNumber(num: number | string): string {
   const value = typeof num === 'string' ? parseFloat(num) : num;
@@ -13,14 +14,14 @@ export function formatCompactNumber(num: number | string): string {
 }
 
 /**
- * Formats a number as a currency string with QAR symbol.
- * Uses compact formatting for large numbers.
+ * This tool formats any number into a Currency format (Defaulting to QAR).
+ * It also uses the "Shortening" tool above for very large amounts of money.
  */
 export function formatCurrency(amount: number | string, currency: string = 'QAR'): string {
   const value = typeof amount === 'string' ? parseFloat(amount) : amount;
   if (typeof value !== 'number' || isNaN(value)) return `${currency} 0`;
 
-  // For small numbers, show regular currency format
+  // For smaller amounts, we show the full number with its currency symbol.
   if (Math.abs(value) < 1000) {
     try {
       return new Intl.NumberFormat('en-US', {
@@ -31,12 +32,11 @@ export function formatCurrency(amount: number | string, currency: string = 'QAR'
         .format(value)
         .replace(currency, `${currency} `);
     } catch {
-      // Fallback if currency code is invalid or not supported
       return `${currency} ${value.toLocaleString()}`;
     }
   }
 
-  // For large numbers, use compact notation
+  // For very large amounts, we use the shortening tool (e.g., QAR 2.5M).
   const compactValue = formatCompactNumber(value);
   return `${currency} ${compactValue}`;
 }

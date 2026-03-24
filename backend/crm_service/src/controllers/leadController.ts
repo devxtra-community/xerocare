@@ -9,12 +9,15 @@ export class LeadController {
   }
 
   /**
-   * Creates a new lead.
+   * Record a new potential customer (Lead) in our system.
+   *
+   * If the person adding the lead is a regular employee, the lead
+   * is automatically linked to their specific office.
    */
   createLead = async (req: Request, res: Response, next: NextFunction) => {
     try {
       if (!req.user) {
-        throw new Error('User not authenticated');
+        throw new Error('User not identified');
       }
       const data = { ...req.body };
       if (req.user.role !== 'ADMIN') {
@@ -31,12 +34,16 @@ export class LeadController {
   };
 
   /**
-   * Retrieves all leads, optionally filtering by branch or deletion status.
+   * List every potential customer currently in our pipeline.
+   *
+   * - Administrators can see leads from all offices.
+   * - Regular staff only see leads belonging to their own office.
+   * - "Closed" or "Lost" leads are hidden by default but can be optionally shown.
    */
   getAllLeads = async (req: Request, res: Response, next: NextFunction) => {
     try {
       if (!req.user) {
-        throw new Error('User not authenticated');
+        throw new Error('User not identified');
       }
       const includeDeleted = req.query.includeDeleted === 'true';
       const branchId = req.user.role === 'ADMIN' ? undefined : req.user.branchId;
@@ -56,12 +63,14 @@ export class LeadController {
   };
 
   /**
-   * Retrieves a single lead by ID.
+   * Get the specific details of one potential customer.
+   *
+   * We ensure that staff can only see leads from their own office for safety.
    */
   getLeadById = async (req: Request, res: Response, next: NextFunction) => {
     try {
       if (!req.user) {
-        throw new Error('User not authenticated');
+        throw new Error('User not identified');
       }
       const lead = await this.leadService.getLeadById(
         req.params.id as string,
@@ -69,9 +78,9 @@ export class LeadController {
         req.user.role,
       );
 
-      // Branch isolation check
+      // Security Check: Only allow staff to see leads from their own office.
       if (req.user.role !== 'ADMIN' && lead.branch_id !== req.user.branchId) {
-        throw new Error('Access denied: Lead belongs to another branch');
+        throw new Error('Access denied: This potential customer belongs to another office');
       }
 
       res.status(200).json({
@@ -84,12 +93,15 @@ export class LeadController {
   };
 
   /**
-   * Converts a lead into a customer.
+   * The "Success" moment: Turn a potential customer (Lead) into an official
+   * Customer in our records.
+   *
+   * This is used when a deal is finalized and they are no longer just a "prospect".
    */
   convertLead = async (req: Request, res: Response, next: NextFunction) => {
     try {
       if (!req.user) {
-        throw new Error('User not authenticated');
+        throw new Error('User not identified');
       }
       const lead = await this.leadService.getLeadById(
         req.params.id as string,
@@ -97,9 +109,9 @@ export class LeadController {
         req.user.role,
       );
 
-      // Branch isolation check
+      // Security Check: Only allow staff members from the same office to finalize the deal.
       if (req.user.role !== 'ADMIN' && lead.branch_id !== req.user.branchId) {
-        throw new Error('Access denied: Cannot convert lead from another branch');
+        throw new Error('Access denied: You cannot finalized a deal for another office');
       }
 
       const customerId = await this.leadService.convertLeadToCustomer(
@@ -118,12 +130,15 @@ export class LeadController {
   };
 
   /**
-   * Updates an existing lead.
+   * Update the information we have on a potential customer.
+   *
+   * We check to make sure the staff member is only editing leads
+   * belonging to their own office.
    */
   updateLead = async (req: Request, res: Response, next: NextFunction) => {
     try {
       if (!req.user) {
-        throw new Error('User not authenticated');
+        throw new Error('User not identified');
       }
       const lead = await this.leadService.getLeadById(
         req.params.id as string,
@@ -131,9 +146,9 @@ export class LeadController {
         req.user.role,
       );
 
-      // Branch isolation check
+      // Security Check: Ensure the staff member has permission (same office).
       if (req.user.role !== 'ADMIN' && lead.branch_id !== req.user.branchId) {
-        throw new Error('Access denied: Cannot update lead from another branch');
+        throw new Error('Access denied: You cannot update information for another office');
       }
 
       const updatedLead = await this.leadService.updateLead(
@@ -152,12 +167,12 @@ export class LeadController {
   };
 
   /**
-   * Deletes a lead.
+   * Remove a potential customer from our list if they decide not to proceed.
    */
   deleteLead = async (req: Request, res: Response, next: NextFunction) => {
     try {
       if (!req.user) {
-        throw new Error('User not authenticated');
+        throw new Error('User not identified');
       }
       const lead = await this.leadService.getLeadById(
         req.params.id as string,
@@ -165,15 +180,17 @@ export class LeadController {
         req.user.role,
       );
 
-      // Branch isolation check
+      // Security Check: Only allow removal if the staff member belongs to the same office.
       if (req.user.role !== 'ADMIN' && lead.branch_id !== req.user.branchId) {
-        throw new Error('Access denied: Cannot delete lead from another branch');
+        throw new Error(
+          'Access denied: You cannot remove a potential customer from another office',
+        );
       }
 
       await this.leadService.deleteLead(req.params.id as string, req.user.userId, req.user.role);
       res.status(200).json({
         success: true,
-        message: 'Lead deleted successfully',
+        message: 'Lead information has been moved to our archives',
       });
     } catch (error) {
       next(error);

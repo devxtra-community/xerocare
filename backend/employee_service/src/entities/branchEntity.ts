@@ -1,6 +1,6 @@
 import { Entity, PrimaryColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
 
-@Entity('branches')
+@Entity('branches_mirror')
 export class Branch {
   @PrimaryColumn({ type: 'varchar' })
   branch_id!: string;
