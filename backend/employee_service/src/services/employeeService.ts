@@ -95,13 +95,8 @@ export class EmployeeService {
       throw new AppError('Branch ID is required for HR and MANAGER roles', 400);
     }
 
-    if (branchId) {
-      const branchRepo = Source.getRepository(Branch);
-      const branch = await branchRepo.findOne({ where: { branch_id: branchId } });
-      if (!branch) {
-        throw new AppError('Invalid Branch ID', 400);
-      }
-    }
+    // Note: branchId comes from the admin UI which fetches from the authoritative branch service.
+    // We do not validate against branches_mirror as it may be out of sync.
 
     const prefix =
       roleEnum === EmployeeRole.ADMIN
@@ -295,13 +290,8 @@ export class EmployeeService {
       throw new AppError('Branch ID is required for HR and MANAGER roles', 400);
     }
 
-    if (payload.branchId) {
-      const branchRepo = Source.getRepository(Branch);
-      const branch = await branchRepo.findOne({ where: { branch_id: payload.branchId } });
-      if (!branch) {
-        throw new AppError('Invalid Branch ID', 400);
-      }
-    }
+    // Note: branchId comes from the admin UI which fetches from the authoritative branch service.
+    // We do not validate against branches_mirror as it may be out of sync.
 
     const updated = await this.employeeRepo.updateById(id, {
       ...payload,

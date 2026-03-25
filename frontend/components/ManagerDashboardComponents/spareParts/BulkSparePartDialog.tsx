@@ -39,6 +39,8 @@ interface BulkSparePartRow {
   brand: string;
   model_id: string;
   base_price: number;
+  purchase_price: number;
+  wholesale_price: number;
   quantity: number;
   vendor_id: string;
   warehouse_id: string;
@@ -52,6 +54,8 @@ interface LotSparePartOption {
   brand: string;
   modelId: string;
   basePrice: number;
+  purchasePrice: number;
+  wholesalePrice: number;
   label: string; // "itemCode - partName"
 }
 
@@ -129,6 +133,8 @@ export default function BulkSparePartDialog({
             brand: sp.brand,
             modelId: sp.model_id || '',
             basePrice: item.unitPrice || sp.base_price,
+            purchasePrice: sp.purchase_price || 0,
+            wholesalePrice: sp.wholesale_price || 0,
             label: `${sp.item_code} - ${sp.part_name}`,
           });
         }
@@ -216,7 +222,9 @@ export default function BulkSparePartDialog({
         part_name: getVal(['part_name', 'Item Name', 'Name', 'Part Name']),
         brand: getVal(['brand', 'Brand']),
         model_id: modelId,
-        base_price: Number(getVal(['base_price', 'Price', 'Base Price'])) || 0,
+        base_price: Number(getVal(['base_price', 'Price', 'Base Price', 'Selling Price'])) || 0,
+        purchase_price: Number(getVal(['purchase_price', 'Purchase Price'])) || 0,
+        wholesale_price: Number(getVal(['wholesale_price', 'Wholesale Price'])) || 0,
         quantity: Number(getVal(['quantity', 'Quantity', 'Qty'])) || 0,
         vendor_id: findIdByName(rawVendor, vendors),
         warehouse_id: findIdByName(rawWarehouse, warehouses),
@@ -292,6 +300,8 @@ export default function BulkSparePartDialog({
         ...r,
         model_id: !r.model_id || r.model_id === 'universal' ? undefined : r.model_id,
         base_price: Number(r.base_price),
+        purchase_price: Number(r.purchase_price),
+        wholesale_price: Number(r.wholesale_price),
         quantity: Number(r.quantity),
         lot_id: r.lot_id || selectedLotId || undefined,
       }));
@@ -422,7 +432,9 @@ export default function BulkSparePartDialog({
                   <TableHead className="min-w-[150px]">
                     Brand <span className="text-red-500">*</span>
                   </TableHead>
-                  <TableHead className="min-w-[120px]">Price</TableHead>
+                  <TableHead className="min-w-[120px]">Purchase Price</TableHead>
+                  <TableHead className="min-w-[120px]">Selling Price</TableHead>
+                  <TableHead className="min-w-[120px]">Wholesale Price</TableHead>
                   <TableHead className="min-w-[100px]">Qty</TableHead>
                   <TableHead className="min-w-[200px]">Vendor</TableHead>
                   <TableHead className="min-w-[200px]">Warehouse</TableHead>
@@ -457,9 +469,25 @@ export default function BulkSparePartDialog({
                     <TableCell>
                       <Input
                         type="number"
+                        value={row.purchase_price}
+                        onChange={(e) => updateRow(i, 'purchase_price', Number(e.target.value))}
+                        placeholder="Purchase Price"
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Input
+                        type="number"
                         value={row.base_price}
                         onChange={(e) => updateRow(i, 'base_price', Number(e.target.value))}
-                        placeholder="Base Price"
+                        placeholder="Selling Price"
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Input
+                        type="number"
+                        value={row.wholesale_price}
+                        onChange={(e) => updateRow(i, 'wholesale_price', Number(e.target.value))}
+                        placeholder="Wholesale Price"
                       />
                     </TableCell>
                     <TableCell>
@@ -516,6 +544,8 @@ export default function BulkSparePartDialog({
                             updateRow(i, 'brand', opt.brand);
                             updateRow(i, 'model_id', opt.modelId);
                             updateRow(i, 'base_price', opt.basePrice);
+                            updateRow(i, 'purchase_price', opt.purchasePrice);
+                            updateRow(i, 'wholesale_price', opt.wholesalePrice);
                           } else {
                             updateRow(i, 'item_code', v);
                           }

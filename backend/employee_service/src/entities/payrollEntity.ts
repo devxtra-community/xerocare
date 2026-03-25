@@ -63,7 +63,7 @@ export class Payroll {
   @JoinColumn({ name: 'employee_id' })
   employee!: Employee;
 
-  @ManyToOne(() => Branch)
+  @ManyToOne(() => Branch, { createForeignKeyConstraints: false })
   @JoinColumn({ name: 'branch_id' })
   branch!: Branch;
 }

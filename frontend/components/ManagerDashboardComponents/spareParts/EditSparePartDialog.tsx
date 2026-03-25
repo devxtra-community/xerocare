@@ -66,6 +66,8 @@ export default function EditSparePartDialog({
     brand: '',
     model_id: '',
     base_price: '',
+    purchase_price: '',
+    wholesale_price: '',
     warehouse_id: '',
     vendor_id: '',
     quantity: '',
@@ -113,6 +115,8 @@ export default function EditSparePartDialog({
           brand: product.brand,
           model_id: modelId,
           base_price: String(product.price),
+          purchase_price: String(product.purchase_price || ''),
+          wholesale_price: String(product.wholesale_price || ''),
           warehouse_id: warehouseId,
           vendor_id: vendorId,
           quantity: String(product.quantity),
@@ -137,6 +141,8 @@ export default function EditSparePartDialog({
         warehouse_id: formData.warehouse_id || undefined,
         vendor_id: formData.vendor_id || undefined,
         base_price: Number(formData.base_price),
+        purchase_price: Number(formData.purchase_price),
+        wholesale_price: Number(formData.wholesale_price),
         quantity: Number(formData.quantity),
       });
       toast.success('Spare part updated successfully');
@@ -232,7 +238,23 @@ export default function EditSparePartDialog({
             </div>
             {/* Price */}
             <div className="space-y-2">
-              <Label>Price</Label>
+              <Label>Purchase Price</Label>
+              <Input
+                type="number"
+                value={formData.purchase_price}
+                onChange={(e) => setFormData({ ...formData, purchase_price: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Wholesale Price</Label>
+              <Input
+                type="number"
+                value={formData.wholesale_price}
+                onChange={(e) => setFormData({ ...formData, wholesale_price: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Selling Price</Label>
               <Input
                 type="number"
                 value={formData.base_price}

@@ -80,7 +80,7 @@ export class Employee {
   @Column({ type: 'varchar', length: 255, nullable: true })
   branch_id!: string | null;
 
-  @ManyToOne(() => Branch, { nullable: true })
+  @ManyToOne(() => Branch, { nullable: true, createForeignKeyConstraints: false })
   @JoinColumn({ name: 'branch_id' })
   branch!: Branch | null;
 }

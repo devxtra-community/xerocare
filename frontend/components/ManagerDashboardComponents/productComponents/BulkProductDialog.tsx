@@ -89,6 +89,7 @@ export function BulkProductDialog({ open, onClose, onSuccess }: BulkProductDialo
     tax_rate: 0,
     print_colour: 'BLACK_WHITE',
     max_discount_amount: 0,
+    wholesale_price: 0,
     lot_id: '',
   });
 
@@ -181,6 +182,7 @@ export function BulkProductDialog({ open, onClose, onSuccess }: BulkProductDialo
           Number(
             getVal(['max_discount_amount', 'Max Discount', 'Discount', 'Max Discount Amount']),
           ) || 0,
+        wholesale_price: Number(getVal(['wholesale_price', 'Wholesale Price'])) || 0,
         lot_id: getVal(['lot_id', 'Lot ID', 'Lot']),
       };
     });
@@ -364,6 +366,7 @@ export function BulkProductDialog({ open, onClose, onSuccess }: BulkProductDialo
                     <TableHead className="min-w-[100px]">Tax %</TableHead>
                     <TableHead className="min-w-[140px]">Print Colour</TableHead>
                     <TableHead className="min-w-[130px]">Max Discount</TableHead>
+                    <TableHead className="min-w-[130px]">Wholesale Price</TableHead>
                     <TableHead className="min-w-[60px]"></TableHead>
                   </TableRow>
                 </TableHeader>
@@ -571,6 +574,17 @@ export function BulkProductDialog({ open, onClose, onSuccess }: BulkProductDialo
                             value={row.max_discount_amount}
                             onChange={(e) =>
                               updateRow(i, 'max_discount_amount', Number(e.target.value))
+                            }
+                            placeholder="0"
+                            className="min-w-full"
+                          />
+                        </TableCell>
+                        <TableCell className="min-w-[130px]">
+                          <Input
+                            type="number"
+                            value={row.wholesale_price}
+                            onChange={(e) =>
+                              updateRow(i, 'wholesale_price', Number(e.target.value))
                             }
                             placeholder="0"
                             className="min-w-full"

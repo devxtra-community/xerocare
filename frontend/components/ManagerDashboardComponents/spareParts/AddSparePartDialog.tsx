@@ -47,6 +47,9 @@ export default function AddSparePartDialog({
   interface Model {
     id: string;
     model_name: string;
+    model_no: string;
+    brandRelation?: { id: string; name: string };
+    brand?: { id: string; name: string };
   }
 
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
@@ -60,6 +63,8 @@ export default function AddSparePartDialog({
     brand: '',
     model_ids: [] as string[],
     base_price: '',
+    purchase_price: '',
+    wholesale_price: '',
     warehouse_id: '',
     vendor_id: '',
     quantity: '1',
@@ -74,17 +79,33 @@ export default function AddSparePartDialog({
     }
   }, [open]);
 
+  useEffect(() => {
+    const fetchModelsForBrand = async () => {
+      try {
+        const modelRes = await modelService.getAllModels({
+          search: formData.brand || undefined,
+          limit: 100, // Fetch a reasonable number of models
+        });
+        setModels(modelRes.data || []);
+      } catch (error) {
+        console.error('Failed to fetch models for brand', error);
+      }
+    };
+
+    if (open) {
+      fetchModelsForBrand();
+    }
+  }, [formData.brand, open]);
+
   const loadDependencies = async () => {
     try {
-      const [whRes, modelRes, vendorRes, lotsRes, brandsRes] = await Promise.all([
+      const [whRes, vendorRes, lotsRes, brandsRes] = await Promise.all([
         warehouseService.getWarehousesByBranch(),
-        modelService.getAllModels(),
         vendorService.getVendors(),
         lotService.getAllLots(),
         brandService.getAllBrands(),
       ]);
       setWarehouses(whRes || []);
-      setModels(modelRes.data || []);
       setVendors(vendorRes || []);
       setLots(lotsRes.data || []);
       setBrands(brandsRes || []);
@@ -140,6 +161,8 @@ export default function AddSparePartDialog({
         warehouse_id: formData.warehouse_id || undefined,
         vendor_id: formData.vendor_id || undefined,
         base_price: Number(formData.base_price),
+        purchase_price: Number(formData.purchase_price),
+        wholesale_price: Number(formData.wholesale_price),
         quantity: requestedQuantity,
         lot_id: formData.lot_id,
       });
@@ -152,6 +175,8 @@ export default function AddSparePartDialog({
         brand: '',
         model_ids: [],
         base_price: '',
+        purchase_price: '',
+        wholesale_price: '',
         warehouse_id: '',
         vendor_id: '',
         quantity: '1',
@@ -224,6 +249,8 @@ export default function AddSparePartDialog({
                         part_name: selectedItem.sparePart.part_name,
                         brand: selectedItem.sparePart.brand,
                         base_price: selectedItem.unitPrice.toString(),
+                        purchase_price: selectedItem.unitPrice.toString(),
+                        wholesale_price: selectedItem.sparePart.wholesale_price?.toString() || '',
                         model_ids: selectedItem.sparePart.model_id
                           ? [selectedItem.sparePart.model_id]
                           : [],
@@ -377,18 +404,47 @@ export default function AddSparePartDialog({
                     label: 'Universal (No Model)',
                     description: 'Compatible with all models',
                   },
-                  ...models.map((m) => ({
-                    value: m.id,
-                    label: m.model_name,
-                    description: '',
-                  })),
+                  ...(() => {
+                    const filteredModels = formData.brand
+                      ? models.filter(
+                          (m) =>
+                            m.brandRelation?.name === formData.brand ||
+                            m.brand?.name === formData.brand,
+                        )
+                      : models;
+                    return filteredModels.map((m) => ({
+                      value: m.id,
+                      label: `${m.model_no} - ${m.model_name}`,
+                      description: '',
+                    }));
+                  })(),
                 ]}
                 placeholder="Select Models (Optional)"
                 emptyText="No models found."
               />
             </div>
             <div className="space-y-2">
-              <Label>Base Price</Label>
+              <Label>Purchase Price</Label>
+              <Input
+                required
+                type="number"
+                min="0"
+                value={formData.purchase_price}
+                onChange={(e) => setFormData({ ...formData, purchase_price: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Wholesale Price</Label>
+              <Input
+                required
+                type="number"
+                min="0"
+                value={formData.wholesale_price}
+                onChange={(e) => setFormData({ ...formData, wholesale_price: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Selling Price</Label>
               <Input
                 required
                 type="number"

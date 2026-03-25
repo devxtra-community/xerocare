@@ -100,6 +100,8 @@ export class SparePartRepository {
         'vendor.name AS vendor_name',
         'sp.quantity AS quantity',
         'sp.base_price AS price',
+        'sp.purchase_price AS purchase_price',
+        'sp.wholesale_price AS wholesale_price',
         'sp.image_url AS image_url',
       ])
       .addSelect(

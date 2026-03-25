@@ -7,7 +7,7 @@ import { logger } from './logger';
 export const Source = new DataSource({
   type: 'postgres',
   url: process.env.CRM_DATABASE_URL,
-  ssl: false,
+  ssl: true,
   synchronize: false,
   logging: false,
   entities: [Customer],

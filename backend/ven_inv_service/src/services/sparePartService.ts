@@ -14,6 +14,8 @@ interface BulkUploadRow {
   model_id?: string;
   model_ids?: string[];
   base_price: number;
+  purchase_price?: number;
+  wholesale_price?: number;
   quantity?: number;
   lot_id?: string;
   lot_number?: string;
@@ -144,6 +146,8 @@ export class SparePartService {
       model_id: primaryModelId || undefined,
       models: models.length > 0 ? models : undefined,
       base_price: data.base_price,
+      purchase_price: data.purchase_price || 0,
+      wholesale_price: data.wholesale_price || 0,
       branch_id: branchId,
       quantity: quantity,
       lot_id: lotId,
@@ -176,6 +180,8 @@ export class SparePartService {
       brand: data.brand,
       model_id: primaryModelId,
       base_price: data.base_price,
+      purchase_price: data.purchase_price,
+      wholesale_price: data.wholesale_price,
       models: models,
     };
     Object.keys(updateData).forEach(

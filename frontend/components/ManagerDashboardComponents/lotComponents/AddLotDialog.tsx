@@ -44,7 +44,7 @@ const lotItemSchema = z
     brand: z.string().optional(),
     partName: z.string().optional(),
     quantity: z.coerce.number().min(1, 'Quantity must be at least 1'),
-    unitPrice: z.coerce.number().min(0, 'Price cannot be negative'),
+    unitPrice: z.coerce.number().min(0, 'Purchase Price cannot be negative'),
   })
   .refine(
     (data) => {
@@ -228,7 +228,7 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
       ['Notes', 'Optional notes here'],
       [],
       ['LOT ITEMS'],
-      ['Item Type', 'Item Name', 'Brand', 'Quantity', 'Unit Price'],
+      ['Item Type', 'Item Name', 'Brand', 'Quantity', 'Purchase Price'],
       ['PRODUCT', 'Example Model Name', 'Example Brand', 10, 100],
       ['SPARE PART', 'Example Part Name', 'Example Brand', 5, 50],
     ];
@@ -501,7 +501,7 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
                         <div className="col-span-2">Type</div>
                         <div className="col-span-12 md:col-span-6">Item Details</div>
                         <div className="col-span-1 text-center">Qty</div>
-                        <div className="col-span-2 text-center">Price</div>
+                        <div className="col-span-2 text-center">Purchase Price</div>
                         <div className="col-span-1 text-center">Action</div>
                       </div>
 
@@ -687,7 +687,7 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
                             </div>
                             <div className="col-span-6 md:col-span-2">
                               <div className="text-xs font-semibold text-gray-500 mb-1.5 md:hidden">
-                                Unit Price
+                                Purchase Price
                               </div>
                               <div className="relative">
                                 <span className="absolute left-1 top-1/2 -translate-y-1/2 text-gray-500 text-[9px] font-bold">

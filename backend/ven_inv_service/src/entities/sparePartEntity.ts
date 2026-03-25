@@ -65,6 +65,12 @@ export class SparePart {
   @Column({ name: 'base_price', type: 'decimal', precision: 12, scale: 2, default: 0 })
   base_price!: number;
 
+  @Column({ name: 'purchase_price', type: 'decimal', precision: 12, scale: 2, default: 0 })
+  purchase_price!: number;
+
+  @Column({ name: 'wholesale_price', type: 'decimal', precision: 12, scale: 2, default: 0 })
+  wholesale_price!: number;
+
   @Column({ type: 'int', default: 0 })
   quantity!: number;
 

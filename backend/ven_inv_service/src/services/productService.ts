@@ -100,6 +100,7 @@ export class ProductService {
           product_status: row.product_status,
           print_colour: row.print_colour,
           max_discount_amount: maxDiscount,
+          wholesale_price: row.wholesale_price,
           lot_id: row.lot_id || undefined,
         });
 
@@ -176,6 +177,7 @@ export class ProductService {
         product_status: data.product_status,
         print_colour: data.print_colour,
         max_discount_amount: maxDiscount,
+        wholesale_price: data.wholesale_price,
         imageUrl: data.imageUrl,
         lot_id: data.lot_id,
       });

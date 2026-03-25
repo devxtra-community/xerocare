@@ -299,6 +299,7 @@ function ProductFormModal({
     imageUrl: string;
     print_colour: 'BLACK_WHITE' | 'COLOUR' | 'BOTH';
     max_discount_amount: string | number;
+    wholesale_price: string | number;
     lot_id: string;
   }>({
     name: initialData?.name || '',
@@ -314,6 +315,7 @@ function ProductFormModal({
     imageUrl: initialData?.imageUrl || '',
     print_colour: initialData?.print_colour || 'BLACK_WHITE',
     max_discount_amount: initialData?.max_discount_amount ?? '',
+    wholesale_price: initialData?.wholesale_price ?? '',
     lot_id: initialData?.lot_id || '', // Check if initialData has lot_id support if needed
   });
 
@@ -503,8 +505,8 @@ function ProductFormModal({
               }}
               options={filteredModels.map((m) => ({
                 value: m.id,
-                label: m.model_name,
-                description: `No: ${m.model_no}`,
+                label: `${m.model_no} - ${m.model_name}`,
+                description: `ID: ${m.id}`,
               }))}
               placeholder={selectedBrandId ? 'Select Model' : 'Select Brand First'}
               emptyText="No models found."
@@ -702,6 +704,14 @@ function ProductFormModal({
                 type="number"
                 value={form.max_discount_amount}
                 onChange={(e) => setForm({ ...form, max_discount_amount: Number(e.target.value) })}
+                placeholder="0"
+              />
+            </Field>
+            <Field label="Wholesale Price">
+              <Input
+                type="number"
+                value={form.wholesale_price}
+                onChange={(e) => setForm({ ...form, wholesale_price: Number(e.target.value) })}
                 placeholder="0"
               />
             </Field>

@@ -12,6 +12,8 @@ export interface SparePartInventoryItem {
   quantity: number;
   status: string;
   price: number;
+  purchase_price?: number;
+  wholesale_price?: number;
   image_url?: string;
   branch_name?: string;
   branch_id?: string;

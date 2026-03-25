@@ -12,6 +12,8 @@ export interface SparePart {
   model?: Model; // Populated when joined (e.g. via lot items)
   branch_id?: string;
   base_price: number; // Decimal string or number
+  purchase_price?: number;
+  wholesale_price?: number;
   image_url?: string;
   created_at: string;
   updated_at: string;

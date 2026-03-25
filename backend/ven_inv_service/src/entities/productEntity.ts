@@ -121,6 +121,9 @@ export class Product {
   })
   max_discount_amount!: number | null;
 
+  @Column({ type: 'numeric', precision: 12, scale: 2, nullable: true })
+  wholesale_price!: number;
+
   @Column({ type: 'varchar', length: 1000, nullable: true })
   imageUrl?: string | null;
 
