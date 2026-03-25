@@ -7,6 +7,7 @@ import { SparePart } from '../entities/sparePartEntity';
 import { Vendor } from '../entities/vendorEntity';
 import { AppError } from '../errors/appError';
 import { CreateLotDto } from '../types/lotTypes';
+import { Model } from '../entities/modelEntity';
 import { logger } from '../config/logger';
 
 export class LotRepository {
@@ -63,9 +64,15 @@ export class LotRepository {
               throw new AppError('Branch ID is required to create new spare parts', 400);
             }
 
-            // Determine model ID for spare part (null/undefined/'universal' means Universal)
+            // Determine model IDs for spare part (handle both singular legacy and multi-select)
+            const spModelIds =
+              itemData.modelIds?.filter((id) => id !== 'universal' && id !== 'null') || [];
             const spModelId =
-              itemData.modelId && itemData.modelId !== 'universal' ? itemData.modelId : null;
+              spModelIds.length > 0
+                ? spModelIds[0]
+                : itemData.modelId && itemData.modelId !== 'universal'
+                  ? itemData.modelId
+                  : null;
 
             const partName = itemData.partName?.trim();
             const brand = itemData.brand?.trim();
@@ -136,15 +143,12 @@ export class LotRepository {
 
             if (!sparePart) {
               // AUTOMATICALLY CREATE NEW SPARE PART
-              // User requested seamless addition. If not found, create it.
               sparePart = new SparePart();
-              sparePart.part_name = itemData.partName; // Use original input
+              sparePart.part_name = itemData.partName;
               sparePart.brand = brand;
               sparePart.branch_id = data.branchId;
               sparePart.base_price = itemData.unitPrice || 0;
 
-              // Generate Item Code (Required Field)
-              // Format: SP-{TIMESTAMP}-{RANDOM}
               const timestamp = Date.now().toString(36).toUpperCase();
               const random = Math.random().toString(36).substring(2, 6).toUpperCase();
               sparePart.item_code = `SP-${timestamp}-${random}`;
@@ -153,8 +157,12 @@ export class LotRepository {
                 sparePart.model_id = spModelId;
               }
 
-              sparePart.lot_id = savedLot.id;
+              // Handle multi-model compatibility
+              if (spModelIds.length > 0) {
+                sparePart.models = spModelIds.map((id) => ({ id }) as unknown as Model);
+              }
 
+              sparePart.lot_id = savedLot.id;
               sparePart = await manager.save(SparePart, sparePart);
             }
 

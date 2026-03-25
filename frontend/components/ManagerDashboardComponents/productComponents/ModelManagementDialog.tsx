@@ -1,17 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { StandardTable } from '@/components/table/StandardTable';
 import { usePagination } from '@/hooks/usePagination';
 import { DeleteConfirmDialog } from '@/components/dialogs/DeleteConfirmDialog';
 import { X, Trash2, Edit2, Plus } from 'lucide-react';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 import { Model, CreateModelDTO, modelService } from '@/services/modelService';
 import { getBrands, Brand } from '@/lib/brand';
 import { toast } from 'sonner';
@@ -98,6 +92,12 @@ export function ModelManagementDialog({ open, onClose }: ModelManagementDialogPr
             <StandardTable
               columns={[
                 {
+                  id: 'brand',
+                  header: 'BRAND',
+                  cell: (model: Model) => model.brandRelation?.name || '-',
+                  className: 'font-semibold text-[11px] text-primary uppercase',
+                },
+                {
                   id: 'model_no',
                   header: 'MODEL NO',
                   accessorKey: 'model_no' as keyof Model,
@@ -115,12 +115,6 @@ export function ModelManagementDialog({ open, onClose }: ModelManagementDialogPr
                       </div>
                     </div>
                   ),
-                },
-                {
-                  id: 'brand',
-                  header: 'BRAND',
-                  cell: (model: Model) => model.brandRelation?.name || '-',
-                  className: 'font-semibold text-[11px] text-primary uppercase',
                 },
                 {
                   id: 'hs_code',
@@ -260,14 +254,19 @@ function ModelForm({
         <h3 className="text-lg font-bold mb-4">{initialData ? 'Edit Model' : 'Add New Model'}</h3>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
-            <div>
+            <div className="col-span-2">
               <label className="block text-sm font-medium mb-1">
-                Model No <span className="text-red-500">*</span>
+                Brand <span className="text-red-500">*</span>
               </label>
-              <Input
-                required
-                value={form.model_no}
-                onChange={(e) => setForm({ ...form, model_no: e.target.value })}
+              <SearchableSelect
+                options={brands.map((brand) => ({
+                  value: brand.id,
+                  label: brand.name,
+                }))}
+                value={form.brand_id}
+                onValueChange={(val) => setForm({ ...form, brand_id: val })}
+                placeholder="Select a brand"
+                emptyText="No brands found"
               />
             </div>
             <div>
@@ -282,24 +281,13 @@ function ModelForm({
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">
-                Brand <span className="text-red-500">*</span>
+                Model No <span className="text-red-500">*</span>
               </label>
-              <Select
+              <Input
                 required
-                value={form.brand_id}
-                onValueChange={(value) => setForm({ ...form, brand_id: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a brand" />
-                </SelectTrigger>
-                <SelectContent>
-                  {brands.map((brand) => (
-                    <SelectItem key={brand.id} value={brand.id}>
-                      {brand.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                value={form.model_no}
+                onChange={(e) => setForm({ ...form, model_no: e.target.value })}
+              />
             </div>
             <div className="col-span-2">
               <label className="block text-sm font-medium mb-1">HS Code</label>

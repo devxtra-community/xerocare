@@ -18,6 +18,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 import StatCard from '@/components/StatCard';
 import {
   getWarehouses,
@@ -332,21 +333,16 @@ function WarehouseFormModal({
               <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
                 Branch
               </label>
-              <Select
+              <SearchableSelect
                 value={form.branchId || ''}
                 onValueChange={(value) => setForm({ ...form, branchId: value })}
-              >
-                <SelectTrigger className="h-12 rounded-xl bg-card border-none shadow-sm focus:ring-2 focus:ring-blue-400">
-                  <SelectValue placeholder="Select branch" />
-                </SelectTrigger>
-                <SelectContent className="rounded-xl">
-                  {branches.map((branch) => (
-                    <SelectItem key={branch.id} value={branch.id}>
-                      {branch.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                options={branches.map((branch) => ({
+                  value: branch.id,
+                  label: branch.name,
+                }))}
+                placeholder="Select branch"
+                emptyText="No branches found"
+              />
             </div>
 
             <div className="space-y-2">

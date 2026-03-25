@@ -16,7 +16,7 @@ export const Source = new DataSource({
   type: 'postgres',
   url: process.env.BILLING_DATABASE_URL,
   ssl: false,
-  synchronize: false,
+  synchronize: true,
   logging: false,
   entities: [
     Invoice,

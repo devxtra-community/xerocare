@@ -8,3 +8,18 @@ import { twMerge } from 'tailwind-merge';
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
+
+/**
+ * Generates a unique, alphanumeric Lot ID with format LT-XXXX-XXXX.
+ */
+export function generateLotId() {
+  const chars = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  const segment = () => {
+    let res = '';
+    for (let i = 0; i < 4; i++) {
+      res += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return res;
+  };
+  return `LT-${segment()}-${segment()}`;
+}

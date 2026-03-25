@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Search, Plus, X } from 'lucide-react';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 import {
   Table,
   TableBody,
@@ -24,13 +25,6 @@ import {
 } from '@/lib/model';
 import { getBrands, Brand } from '@/lib/brand';
 import { toast } from 'sonner';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -157,9 +151,9 @@ export default function ManagerModel() {
           <TableHeader>
             <TableRow>
               {[
-                'MODEL NAME',
-                'MODEL NO',
                 'BRAND',
+                'MODEL NO',
+                'MODEL NAME',
                 'HS CODE',
                 'TOTAL',
                 'AVAILABLE',
@@ -182,9 +176,9 @@ export default function ManagerModel() {
             {filtered.length > 0 ? (
               filtered.map((m, i) => (
                 <TableRow key={m.id} className={i % 2 ? 'bg-sky-100/60' : ''}>
-                  <TableCell className="px-4 font-medium text-center">{m.model_name}</TableCell>
-                  <TableCell className="px-4 text-center">{m.model_no}</TableCell>
                   <TableCell className="px-4 text-center">{m.brandRelation?.name || '-'}</TableCell>
+                  <TableCell className="px-4 text-center">{m.model_no}</TableCell>
+                  <TableCell className="px-4 font-medium text-center">{m.model_name}</TableCell>
                   <TableCell className="px-4 text-center">{m.hs_code || '-'}</TableCell>
                   <TableCell className="px-4 font-semibold text-blue-600 text-center">
                     {m.quantity}
@@ -334,6 +328,21 @@ function ModelFormModal({
     <Modal title={initialData ? 'Update Model' : 'Add Model'} onClose={onClose}>
       <form onSubmit={handleSubmit} className="space-y-4 max-h-[70vh] overflow-y-auto px-1">
         <div className="grid grid-cols-2 gap-4">
+          <div className="col-span-2">
+            <label className="block text-sm font-medium mb-1">
+              Brand <span className="text-red-500">*</span>
+            </label>
+            <SearchableSelect
+              options={brands.map((brand) => ({
+                value: brand.id,
+                label: brand.name,
+              }))}
+              value={formData.brand_id}
+              onValueChange={(val) => setFormData({ ...formData, brand_id: val })}
+              placeholder="Select a brand"
+              emptyText="No brands found"
+            />
+          </div>
           <div>
             <label className="block text-sm font-medium mb-1">
               Model Name <span className="text-red-500">*</span>
@@ -355,27 +364,6 @@ function ModelFormModal({
               placeholder="e.g. HP-LJ-1020"
               required
             />
-          </div>
-          <div className="col-span-2">
-            <label className="block text-sm font-medium mb-1">
-              Brand <span className="text-red-500">*</span>
-            </label>
-            <Select
-              required
-              value={formData.brand_id}
-              onValueChange={(value) => setFormData({ ...formData, brand_id: value })}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select a brand" />
-              </SelectTrigger>
-              <SelectContent>
-                {brands.map((brand) => (
-                  <SelectItem key={brand.id} value={brand.id}>
-                    {brand.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
           </div>
           <div className="col-span-2">
             <label className="block text-sm font-medium mb-1">HS Code</label>

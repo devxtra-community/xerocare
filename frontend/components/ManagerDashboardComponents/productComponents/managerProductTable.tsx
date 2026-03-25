@@ -503,8 +503,8 @@ function ProductFormModal({
               }}
               options={filteredModels.map((m) => ({
                 value: m.id,
-                label: m.model_name,
-                description: `No: ${m.model_no}`,
+                label: m.model_no,
+                description: `Name: ${m.model_name}`,
               }))}
               placeholder={selectedBrandId ? 'Select Model' : 'Select Brand First'}
               emptyText="No models found."
@@ -618,7 +618,7 @@ function ProductFormModal({
                             return {
                               value: i.id || mId || String(idx),
                               label: model
-                                ? `${model.model_name} (${model.model_no})`
+                                ? `${model.model_no} (${model.model_name})`
                                 : 'Unknown Model',
                               description: `Available: ${available} / ${i.receivedQuantity}`,
                             };

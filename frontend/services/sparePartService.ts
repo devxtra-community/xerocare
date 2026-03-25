@@ -3,6 +3,7 @@ import api from '@/lib/api';
 export interface SparePartInventoryItem {
   id: string; // Added ID
   item_code: string;
+  lot_number?: string;
   lotNumber: string;
   part_name: string;
   brand: string;
@@ -41,15 +42,26 @@ export const sparePartService = {
     const resData = response.data;
     const coreData = resData.data || resData;
 
+    // Map lot_number to lotNumber for consistency
+    const mapItems = (items: SparePartInventoryItem[]) => {
+      return items.map((item) => ({
+        ...item,
+        lotNumber: item.lotNumber || item.lot_number || '-',
+      }));
+    };
+
     // Support new paginated backend
     if (coreData && coreData.page !== undefined) {
-      return coreData as PaginatedResponse<SparePartInventoryItem>;
+      return {
+        ...coreData,
+        data: mapItems(coreData.data || []),
+      } as PaginatedResponse<SparePartInventoryItem>;
     }
 
     // Fallback if backend still returns array
     const dataArray = Array.isArray(coreData) ? coreData : [];
     return {
-      data: dataArray,
+      data: mapItems(dataArray),
       page: 1,
       limit: 10,
       total: dataArray.length,

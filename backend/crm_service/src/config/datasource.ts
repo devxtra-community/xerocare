@@ -8,7 +8,7 @@ export const Source = new DataSource({
   type: 'postgres',
   url: process.env.CRM_DATABASE_URL,
   ssl: false,
-  synchronize: false,
+  synchronize: true,
   logging: false,
   entities: [Customer],
   poolSize: 1,
