@@ -14,6 +14,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { ImagePlus, FileText, X } from 'lucide-react';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 import { Employee } from '@/lib/employee';
 import { getBranches, Branch } from '@/lib/branch';
 import { getEmployeeJobOptions, EmployeeJob } from '@/lib/employeeJob';
@@ -420,24 +421,17 @@ export default function EmployeeFormDialog({
                 Assigned Branch
               </label>
               {isAdmin || hrNeedsBranchSelect ? (
-                <Select
+                <SearchableSelect
                   value={formData.branchId}
                   onValueChange={(val) => handleSelectChange('branchId', val)}
-                >
-                  <SelectTrigger className="h-12 rounded-xl bg-muted/50 border-none shadow-sm focus:ring-2 focus:ring-blue-400">
-                    <SelectValue placeholder="Select Branch" />
-                  </SelectTrigger>
-                  <SelectContent className="rounded-xl">
-                    {branches.map((branch) => (
-                      <SelectItem
-                        key={branch.id || branch.branch_id}
-                        value={branch.id || branch.branch_id || ''}
-                      >
-                        {branch.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  options={branches.map((branch) => ({
+                    value: branch.id || branch.branch_id || '',
+                    label: branch.name,
+                  }))}
+                  placeholder="Select Branch"
+                  emptyText="No branches found."
+                  className="h-12 rounded-xl bg-muted/50 border-none shadow-sm focus:ring-2 focus:ring-blue-400"
+                />
               ) : (
                 <div className="h-12 rounded-xl bg-gray-100 border-none shadow-sm flex items-center px-4 text-gray-700 font-medium">
                   {currentUserBranch?.name || 'Loading...'}

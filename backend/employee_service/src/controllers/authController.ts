@@ -289,8 +289,9 @@ export const getSessions = async (req: Request, res: Response, next: NextFunctio
   try {
     const userId = req.user.userId;
     const currentToken = req.cookies.refreshToken;
+    const isAdmin = req.user.role === 'ADMIN';
 
-    const sessions = await authService.getSessions(userId, currentToken);
+    const sessions = await authService.getSessions(userId, currentToken, isAdmin);
 
     return res.json({
       data: sessions,

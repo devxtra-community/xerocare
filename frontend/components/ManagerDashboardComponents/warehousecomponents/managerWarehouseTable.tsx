@@ -28,6 +28,7 @@ import {
 } from '@/lib/warehouse';
 import { getBranches, Branch } from '@/lib/branch';
 import { toast } from 'sonner';
+import { getUserFromToken } from '@/lib/auth';
 
 /**
  * Comprehensive Warehouse management dashboard component.
@@ -281,10 +282,11 @@ function WarehouseFormModal({
     if (initialData) {
       setForm(initialData);
     } else {
+      const user = getUserFromToken();
       setForm({
         warehouseName: '',
         warehouseCode: '',
-        branchId: branches[0]?.id || '',
+        branchId: user?.branchId || branches[0]?.id || '',
         location: '',
         address: '',
         capacity: '',
@@ -332,21 +334,9 @@ function WarehouseFormModal({
               <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
                 Branch
               </label>
-              <Select
-                value={form.branchId || ''}
-                onValueChange={(value) => setForm({ ...form, branchId: value })}
-              >
-                <SelectTrigger className="h-12 rounded-xl bg-card border-none shadow-sm focus:ring-2 focus:ring-blue-400">
-                  <SelectValue placeholder="Select branch" />
-                </SelectTrigger>
-                <SelectContent className="rounded-xl">
-                  {branches.map((branch) => (
-                    <SelectItem key={branch.id} value={branch.id}>
-                      {branch.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="h-12 rounded-xl bg-gray-50 border border-gray-100 shadow-sm flex items-center px-4 text-sm font-medium text-gray-700">
+                {branches.find((b) => b.id === form.branchId)?.name || 'N/A'}
+              </div>
             </div>
 
             <div className="space-y-2">

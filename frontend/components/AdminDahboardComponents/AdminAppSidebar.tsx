@@ -8,6 +8,7 @@ import {
   Wallet,
   Truck,
   Boxes,
+  FileText,
 } from 'lucide-react';
 
 import {
@@ -72,6 +73,16 @@ const menuItems = [
     title: 'Purchases',
     icon: Wallet,
     href: '/admin/purchases',
+  },
+  {
+    title: 'Lots',
+    icon: Boxes,
+    href: '/admin/lots',
+  },
+  {
+    title: 'RFQs',
+    icon: FileText,
+    href: '/admin/rfqs',
   },
 ];
 

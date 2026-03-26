@@ -22,7 +22,7 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
-import { Plus, Trash2, Upload, FileSpreadsheet, Download, Loader2 } from 'lucide-react';
+import { Plus, Trash2, Upload, FileSpreadsheet, Download, Loader2, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { LotItemType, lotService, Vendor } from '@/lib/lot';
 import { getAllModels, Model } from '@/lib/model';
@@ -32,14 +32,17 @@ import { getUserFromToken } from '@/lib/auth';
 import { brandService, Brand } from '@/services/brandService';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { getMyBranchWarehouses, Warehouse } from '@/lib/warehouse';
+import { MultiSelect } from '@/components/ui/multi-select';
 import * as XLSX from 'xlsx';
 import { formatCurrency } from '@/lib/format';
+import { generateLotId } from '@/lib/utils';
 
 // --- Schema Definition ---
 const lotItemSchema = z
   .object({
     itemType: z.nativeEnum(LotItemType),
     modelId: z.string().optional(),
+    modelIds: z.array(z.string()).optional(),
     sparePartId: z.string().optional(),
     brand: z.string().optional(),
     partName: z.string().optional(),
@@ -101,7 +104,7 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
     defaultValues: {
       vendorId: '',
       warehouseId: '',
-      lotNumber: '',
+      lotNumber: generateLotId(),
       purchaseDate: new Date().toISOString().split('T')[0],
       notes: '',
       items: [
@@ -110,6 +113,7 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
           quantity: 1,
           unitPrice: 0,
           modelId: '',
+          modelIds: [],
           sparePartId: '',
           brand: '',
           partName: '',
@@ -435,7 +439,24 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
                             Lot / Order Number
                           </FormLabel>
                           <FormControl>
-                            <Input placeholder="PO-2024-001" {...field} className="h-10" />
+                            <div className="flex gap-2">
+                              <Input
+                                placeholder="LT-XXXX-XXXX"
+                                {...field}
+                                className="h-10 bg-gray-50 font-mono"
+                                readOnly
+                              />
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="icon"
+                                onClick={() => form.setValue('lotNumber', generateLotId())}
+                                className="h-10 w-10 shrink-0"
+                                title="Regenerate Lot ID"
+                              >
+                                <RefreshCw className="h-4 w-4" />
+                              </Button>
+                            </div>
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -483,6 +504,7 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
                           quantity: 1,
                           unitPrice: 0,
                           modelId: '',
+                          modelIds: [],
                           sparePartId: '',
                           brand: '',
                           partName: '',
@@ -528,6 +550,7 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
                                         ...currentItem,
                                         itemType: val as LotItemType,
                                         modelId: '',
+                                        modelIds: [],
                                         sparePartId: '',
                                         brand: '',
                                         partName: '',
@@ -560,29 +583,76 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
                                   return (
                                     <>
                                       {type === LotItemType.MODEL ? (
-                                        <FormField
-                                          control={formControl}
-                                          name={`items.${index}.modelId`}
-                                          render={({ field: modelField }) => (
-                                            <FormItem>
-                                              <FormControl>
-                                                <SearchableSelect
-                                                  value={modelField.value}
-                                                  onValueChange={modelField.onChange}
-                                                  options={models.map((m) => ({
-                                                    value: m.id,
-                                                    label: `${m.model_name} (${m.id})`,
-                                                    description: m.model_no,
-                                                  }))}
-                                                  placeholder="Select Model"
-                                                  emptyText="No Model found."
-                                                  className="h-10 text-sm bg-gray-50/50"
-                                                />
-                                              </FormControl>
-                                              <FormMessage />
-                                            </FormItem>
-                                          )}
-                                        />
+                                        <div className="grid grid-cols-12 gap-2 w-full">
+                                          <div className="col-span-6">
+                                            <FormField
+                                              control={formControl}
+                                              name={`items.${index}.brand`}
+                                              render={({ field: brandField }) => (
+                                                <FormItem>
+                                                  <FormControl>
+                                                    <SearchableSelect
+                                                      value={brandField.value}
+                                                      onValueChange={(val) => {
+                                                        brandField.onChange(val);
+                                                        form.setValue(`items.${index}.modelId`, '');
+                                                      }}
+                                                      options={brands.map((brand) => ({
+                                                        value: brand.name,
+                                                        label: brand.name,
+                                                        description: brand.description || '',
+                                                      }))}
+                                                      placeholder="Brand"
+                                                      emptyText="No brands."
+                                                      className="h-10 text-sm bg-gray-50/50"
+                                                    />
+                                                  </FormControl>
+                                                  <FormMessage />
+                                                </FormItem>
+                                              )}
+                                            />
+                                          </div>
+                                          <div className="col-span-6">
+                                            <FormField
+                                              control={formControl}
+                                              name={`items.${index}.modelId`}
+                                              render={({ field: modelField }) => {
+                                                const selectedBrand = form.watch(
+                                                  `items.${index}.brand`,
+                                                );
+                                                const filteredModels = selectedBrand
+                                                  ? models.filter(
+                                                      (m) =>
+                                                        m.brandRelation?.name === selectedBrand,
+                                                    )
+                                                  : [];
+                                                return (
+                                                  <FormItem>
+                                                    <FormControl>
+                                                      <SearchableSelect
+                                                        value={modelField.value}
+                                                        onValueChange={modelField.onChange}
+                                                        options={filteredModels.map((m) => ({
+                                                          value: m.id,
+                                                          label: m.model_no,
+                                                          description: m.model_name,
+                                                        }))}
+                                                        placeholder="Select Model"
+                                                        emptyText={
+                                                          selectedBrand
+                                                            ? 'No Model found.'
+                                                            : 'Select Brand first.'
+                                                        }
+                                                        className="h-10 text-sm bg-gray-50/50"
+                                                      />
+                                                    </FormControl>
+                                                    <FormMessage />
+                                                  </FormItem>
+                                                );
+                                              }}
+                                            />
+                                          </div>
+                                        </div>
                                       ) : (
                                         <div className="grid grid-cols-12 gap-2">
                                           <div className="col-span-4">
@@ -594,7 +664,14 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
                                                   <FormControl>
                                                     <SearchableSelect
                                                       value={brandField.value}
-                                                      onValueChange={brandField.onChange}
+                                                      onValueChange={(val) => {
+                                                        brandField.onChange(val);
+                                                        form.setValue(`items.${index}.modelId`, '');
+                                                        form.setValue(
+                                                          `items.${index}.modelIds`,
+                                                          [],
+                                                        );
+                                                      }}
                                                       options={brands.map((brand) => ({
                                                         value: brand.name,
                                                         label: brand.name,
@@ -613,33 +690,68 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
                                           <div className="col-span-4">
                                             <FormField
                                               control={formControl}
-                                              name={`items.${index}.modelId`} // Reusing modelId for compatible model
-                                              render={({ field: cmField }) => (
-                                                <FormItem>
-                                                  <FormControl>
-                                                    <SearchableSelect
-                                                      value={cmField.value}
-                                                      onValueChange={cmField.onChange}
-                                                      options={[
-                                                        {
-                                                          value: 'universal',
-                                                          label: 'Universal',
-                                                          description: 'Compatible with all',
-                                                        },
-                                                        ...models.map((m) => ({
-                                                          value: m.id,
-                                                          label: m.model_name,
-                                                          description: m.model_no,
-                                                        })),
-                                                      ]}
-                                                      placeholder="Comp. Model"
-                                                      emptyText="No models."
-                                                      className="h-10 text-sm bg-gray-50/50"
-                                                    />
-                                                  </FormControl>
-                                                  <FormMessage />
-                                                </FormItem>
-                                              )}
+                                              name={`items.${index}.modelIds`}
+                                              render={({ field: cmField }) => {
+                                                const selectedBrandForSP = form.watch(
+                                                  `items.${index}.brand`,
+                                                );
+                                                const filteredModelsForSP = selectedBrandForSP
+                                                  ? models.filter(
+                                                      (m) =>
+                                                        m.brandRelation?.name ===
+                                                        selectedBrandForSP,
+                                                    )
+                                                  : [];
+
+                                                return (
+                                                  <FormItem>
+                                                    <FormControl>
+                                                      <MultiSelect
+                                                        values={cmField.value || []}
+                                                        onValuesChange={(newValues) => {
+                                                          // If 'universal' was just added, clear everything else
+                                                          if (
+                                                            newValues.includes('universal') &&
+                                                            !(cmField.value || []).includes(
+                                                              'universal',
+                                                            )
+                                                          ) {
+                                                            cmField.onChange(['universal']);
+                                                          }
+                                                          // If 'universal' was already there and a new specific model was added, remove 'universal'
+                                                          else if (
+                                                            newValues.length > 1 &&
+                                                            newValues.includes('universal')
+                                                          ) {
+                                                            cmField.onChange(
+                                                              newValues.filter(
+                                                                (v) => v !== 'universal',
+                                                              ),
+                                                            );
+                                                          } else {
+                                                            cmField.onChange(newValues);
+                                                          }
+                                                        }}
+                                                        options={[
+                                                          {
+                                                            value: 'universal',
+                                                            label: 'Universal',
+                                                            description: 'Compatible with all',
+                                                          },
+                                                          ...filteredModelsForSP.map((m) => ({
+                                                            value: m.id,
+                                                            label: m.model_no,
+                                                            description: m.model_name,
+                                                          })),
+                                                        ]}
+                                                        placeholder="Comp. Models"
+                                                        className="h-10 text-sm bg-gray-50/50"
+                                                      />
+                                                    </FormControl>
+                                                    <FormMessage />
+                                                  </FormItem>
+                                                );
+                                              }}
                                             />
                                           </div>
                                           <div className="col-span-4">
@@ -733,6 +845,7 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
                                   quantity: 1,
                                   unitPrice: 0,
                                   modelId: '',
+                                  modelIds: [],
                                   sparePartId: '',
                                   brand: '',
                                   partName: '',

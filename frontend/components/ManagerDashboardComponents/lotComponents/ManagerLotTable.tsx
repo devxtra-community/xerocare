@@ -176,7 +176,13 @@ export default function ManagerLotTable() {
         />
       )}
 
-      {selectedLot && <LotDetailsDialog lot={selectedLot} onClose={() => setSelectedLot(null)} />}
+      {selectedLot && (
+        <LotDetailsDialog
+          lot={selectedLot}
+          onClose={() => setSelectedLot(null)}
+          onSuccess={loadLots}
+        />
+      )}
     </div>
   );
 }

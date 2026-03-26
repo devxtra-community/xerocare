@@ -14,7 +14,6 @@ import { getSessions, logoutSession, logoutOtherDevices } from '@/lib/auth';
 import { Laptop, Smartphone, Globe, LogOut, ShieldCheck, Clock } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
-import { Card } from '@/components/ui/card';
 
 interface Session {
   id: string;
@@ -82,10 +81,10 @@ export function SessionsDialog({ open, onOpenChange }: SessionsDialogProps) {
   };
 
   const getDeviceIcon = (userAgent: string | null | undefined) => {
-    if (!userAgent) return <Globe className="h-5 w-5 text-muted-foreground" />;
+    if (!userAgent) return <Globe className="h-5 w-5" />;
     const ua = userAgent.toLowerCase();
     if (ua.includes('mobi') || ua.includes('android') || ua.includes('iphone')) {
-      return <Smartphone className="h-5 w-5 text-blue-500" />;
+      return <Smartphone className="h-5 w-5" />;
     }
     if (
       ua.includes('electron') ||
@@ -94,9 +93,9 @@ export function SessionsDialog({ open, onOpenChange }: SessionsDialogProps) {
       ua.includes('linux') ||
       ua.includes('ubuntu')
     ) {
-      return <Laptop className="h-5 w-5 text-purple-500" />;
+      return <Laptop className="h-5 w-5" />;
     }
-    return <Globe className="h-5 w-5 text-muted-foreground" />;
+    return <Globe className="h-5 w-5" />;
   };
 
   const getDeviceName = (userAgent: string) => {
@@ -142,70 +141,75 @@ export function SessionsDialog({ open, onOpenChange }: SessionsDialogProps) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[550px] p-0 overflow-hidden bg-muted/50/50">
-        <DialogHeader className="p-6 pb-2 bg-card border-b">
-          <div className="flex items-center justify-between">
+      <DialogContent className="sm:max-w-xl">
+        <DialogHeader>
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10">
+              <ShieldCheck className="h-5 w-5 text-primary" />
+            </div>
             <div className="space-y-1">
-              <DialogTitle className="text-xl font-bold text-foreground">
-                Active Sessions
-              </DialogTitle>
-              <DialogDescription>
+              <DialogTitle>Active Sessions</DialogTitle>
+              <DialogDescription className="m-0">
                 Manage devices where your account is currently logged in.
               </DialogDescription>
             </div>
-            <ShieldCheck className="h-8 w-8 text-green-500 opacity-20" />
           </div>
         </DialogHeader>
 
-        <div className="max-h-[60vh] overflow-y-auto p-6">
-          <div className="space-y-4">
+        <div className="max-h-[60vh] overflow-y-auto py-2 pr-2 -mr-2">
+          <div className="space-y-3">
             {loading ? (
-              <div className="text-center py-8 text-muted-foreground">
+              <div className="flex flex-col items-center justify-center py-8 text-sm text-muted-foreground">
+                <Globe className="h-8 w-8 mb-2 animate-pulse text-muted" />
                 Loading active sessions...
               </div>
             ) : sortedSessions.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
+              <div className="text-center py-8 text-sm text-muted-foreground">
                 No active sessions found.
               </div>
             ) : (
               sortedSessions.map((session) => (
-                <Card
+                <div
                   key={session.id}
-                  className={`p-4 flex items-center justify-between transition-all hover:shadow-md ${
+                  className={`flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-xl border p-4 transition-all ${
                     session.isCurrent
-                      ? 'border-blue-200 bg-blue-50/30 ring-1 ring-blue-100'
-                      : 'bg-card'
+                      ? 'bg-primary/5 border-primary/20 shadow-sm'
+                      : 'bg-card hover:border-border/80 hover:bg-accent/10'
                   }`}
                 >
                   <div className="flex items-start gap-4">
                     <div
-                      className={`p-3 rounded-full mt-1 ${session.isCurrent ? 'bg-blue-100' : 'bg-slate-100'}`}
+                      className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${
+                        session.isCurrent
+                          ? 'bg-primary/10 text-primary'
+                          : 'bg-muted text-muted-foreground'
+                      }`}
                     >
                       {getDeviceIcon(session.userAgent)}
                     </div>
 
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <span className="font-semibold text-foreground">
+                    <div className="space-y-1.5">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-semibold tracking-tight text-foreground">
                           {getDeviceName(session.userAgent)}
                         </span>
                         {session.isCurrent && (
                           <Badge
                             variant="secondary"
-                            className="bg-blue-100 text-blue-700 hover:bg-blue-100 text-[10px] h-5"
+                            className="pointer-events-none text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 bg-primary/10 text-primary hover:bg-primary/10 border-primary/20"
                           >
                             Current Device
                           </Badge>
                         )}
                       </div>
 
-                      <div className="flex flex-col text-xs text-muted-foreground gap-1">
+                      <div className="flex flex-col gap-1 text-xs text-muted-foreground sm:text-sm">
                         <span className="flex items-center gap-1.5">
-                          <Globe className="h-3 w-3" />
+                          <Globe className="h-3.5 w-3.5 opacity-70" />
                           {session.ip || 'Unknown IP'}
                         </span>
                         <span className="flex items-center gap-1.5">
-                          <Clock className="h-3 w-3" />
+                          <Clock className="h-3.5 w-3.5 opacity-70" />
                           {session.isCurrent
                             ? 'Active now'
                             : `Last active ${formatDistanceToNow(new Date(session.createdAt), { addSuffix: true })}`}
@@ -219,27 +223,27 @@ export function SessionsDialog({ open, onOpenChange }: SessionsDialogProps) {
                       variant="ghost"
                       size="sm"
                       onClick={() => handleLogoutSession(session.id)}
-                      className="text-slate-400 hover:text-red-600 hover:bg-red-50 ml-2"
-                      title="Log out this device"
+                      className="shrink-0 text-muted-foreground hover:bg-destructive/10 hover:text-destructive w-full sm:w-auto mt-2 sm:mt-0"
                     >
-                      <LogOut className="h-4 w-4" />
+                      <LogOut className="mr-2 h-4 w-4 sm:mr-0" />
+                      <span className="sm:sr-only">Log out</span>
                     </Button>
                   )}
-                </Card>
+                </div>
               ))
             )}
           </div>
         </div>
 
         {sortedSessions.length > 1 && (
-          <div className="p-4 bg-card border-t flex justify-end">
+          <div className="flex justify-end pt-4 mt-2 border-t">
             <Button
-              variant="destructive"
+              variant="outline"
               size="sm"
               onClick={handleLogoutOtherDevices}
-              className="gap-2"
+              className="text-destructive hover:bg-destructive hover:text-destructive-foreground transition-colors"
             >
-              <LogOut className="h-4 w-4" />
+              <LogOut className="mr-2 h-4 w-4" />
               Log out all other devices
             </Button>
           </div>

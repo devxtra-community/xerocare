@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
-import { Upload, Search, Pencil, Trash2 } from 'lucide-react';
+import { Upload, Search, Pencil, Trash2, Copy } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { StandardTable } from '@/components/table/StandardTable';
 import { usePagination } from '@/hooks/usePagination';
@@ -12,6 +12,7 @@ import AddSparePartDialog from '@/components/ManagerDashboardComponents/sparePar
 import BulkSparePartDialog from '@/components/ManagerDashboardComponents/spareParts/BulkSparePartDialog';
 import { toast } from 'sonner';
 import EditSparePartDialog from '@/components/ManagerDashboardComponents/spareParts/EditSparePartDialog';
+import SparePartDetailDialog from '@/components/ManagerDashboardComponents/spareParts/SparePartDetailDialog';
 
 export default function SparePartsPage() {
   const [bulkOpen, setBulkOpen] = useState(false);
@@ -21,6 +22,11 @@ export default function SparePartsPage() {
 
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [partToDelete, setPartToDelete] = useState<{ id: string; name: string } | null>(null);
+
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [selectedPartForDetail, setSelectedPartForDetail] = useState<SparePartInventoryItem | null>(
+    null,
+  );
 
   const { page, limit, total, setPage, setLimit, setTotal } = usePagination(10);
   const [loading, setLoading] = useState(true);
@@ -74,6 +80,11 @@ export default function SparePartsPage() {
     setEditOpen(true);
   };
 
+  const handleOpenDetail = (part: SparePartInventoryItem) => {
+    setSelectedPartForDetail(part);
+    setDetailOpen(true);
+  };
+
   return (
     <div className="bg-blue-100 min-h-screen p-3 sm:p-4 md:p-6 space-y-6">
       <div className="flex justify-between items-center">
@@ -107,9 +118,9 @@ export default function SparePartsPage() {
         <StandardTable
           columns={[
             {
-              id: 'lotNumber',
-              header: 'LOT / ORDER NUMBER',
-              accessorKey: 'lotNumber' as keyof SparePartInventoryItem,
+              id: 'brand',
+              header: 'BRAND',
+              accessorKey: 'brand' as keyof SparePartInventoryItem,
               className: 'font-semibold text-[11px] text-primary uppercase',
             },
             {
@@ -117,18 +128,36 @@ export default function SparePartsPage() {
               header: 'PART NAME',
               accessorKey: 'part_name' as keyof SparePartInventoryItem,
               className: 'font-semibold text-[11px] text-primary uppercase',
+              cell: (item: SparePartInventoryItem) => (
+                <button
+                  onClick={() => handleOpenDetail(item)}
+                  className="hover:text-blue-600 hover:underline transition-colors text-left font-bold"
+                >
+                  {item.part_name}
+                </button>
+              ),
             },
             {
-              id: 'brand',
-              header: 'BRAND',
-              accessorKey: 'brand' as keyof SparePartInventoryItem,
+              id: 'lotNumber',
+              header: 'LOT ID',
+              accessorKey: 'lotNumber' as keyof SparePartInventoryItem,
               className: 'font-semibold text-[11px] text-primary uppercase',
-            },
-            {
-              id: 'compatible',
-              header: 'COMPATIBLE MODEL',
-              cell: (item: SparePartInventoryItem) => item.compatible_model || 'Universal',
-              className: 'font-semibold text-[11px] text-primary uppercase',
+              cell: (item: SparePartInventoryItem) => (
+                <div className="flex items-center gap-2 group">
+                  <span className="font-mono text-[11px]">{item.lotNumber}</span>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      navigator.clipboard.writeText(item.lotNumber);
+                      toast.success('Copied to clipboard');
+                    }}
+                    className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-slate-100 rounded text-slate-400 hover:text-primary"
+                    title="Copy Lot ID"
+                  >
+                    <Copy size={12} />
+                  </button>
+                </div>
+              ),
             },
             {
               id: 'warehouse',
@@ -206,6 +235,10 @@ export default function SparePartsPage() {
           product={selectedPart}
           onSuccess={loadParts}
         />
+      )}
+
+      {detailOpen && selectedPartForDetail && (
+        <SparePartDetailDialog part={selectedPartForDetail} onClose={() => setDetailOpen(false)} />
       )}
 
       <DeleteConfirmDialog

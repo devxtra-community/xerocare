@@ -129,6 +129,20 @@ export function SearchableSelect({
                       handleSelect(option);
                     }
                   }}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (!option.disabled) {
+                      handleSelect(option);
+                    }
+                  }}
+                  onTouchEnd={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (!option.disabled) {
+                      handleSelect(option);
+                    }
+                  }}
                   className={cn(
                     'relative flex select-none items-center rounded-sm px-3 py-2 text-sm outline-none transition-all duration-200 group',
                     option.disabled

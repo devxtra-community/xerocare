@@ -80,7 +80,7 @@ export class LotService {
    */
   async generateProductsExcel(lotId: string): Promise<Buffer> {
     const lot = await this.getLotById(lotId);
-    return this.excelHandler.generateProductsExcel(lot);
+    return await this.excelHandler.generateProductsExcel(lot);
   }
 
   /**

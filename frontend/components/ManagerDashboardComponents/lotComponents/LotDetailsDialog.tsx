@@ -44,6 +44,7 @@ import AddCostModal from '../purchaseComponents/AddCostModal';
 interface LotDetailsDialogProps {
   lot: Lot;
   onClose: () => void;
+  onSuccess?: () => void;
 }
 
 /**
@@ -52,7 +53,7 @@ interface LotDetailsDialogProps {
  * supports exporting lot data (All, Products, Spare Parts) to Excel.
  * Displays associated purchase record if available.
  */
-export default function LotDetailsDialog({ lot, onClose }: LotDetailsDialogProps) {
+export default function LotDetailsDialog({ lot, onClose, onSuccess }: LotDetailsDialogProps) {
   const [purchaseRecord, setPurchaseRecord] = useState<Purchase | null>(null);
   const [loadingPurchase, setLoadingPurchase] = useState(true);
   const [isReceiving, setIsReceiving] = useState(false);
@@ -151,6 +152,7 @@ export default function LotDetailsDialog({ lot, onClose }: LotDetailsDialogProps
       setCurrentLot(updatedLot);
       setIsReceiving(false);
       toast.success('Receiving quantities saved successfully');
+      onSuccess?.();
     } catch (err: unknown) {
       toast.error('Failed to save receiving data', {
         description:
@@ -171,6 +173,7 @@ export default function LotDetailsDialog({ lot, onClose }: LotDetailsDialogProps
       toast.success('Lot confirmed as RECEIVED', {
         description: 'Inventory is now available for this lot.',
       });
+      onSuccess?.();
     } catch (err: unknown) {
       toast.error('Failed to confirm reception', {
         description:
@@ -240,7 +243,7 @@ export default function LotDetailsDialog({ lot, onClose }: LotDetailsDialogProps
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-      <div className="bg-card rounded-2xl w-full max-w-6xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden border">
+      <div className="bg-card rounded-2xl w-full max-w-[95vw] shadow-2xl flex flex-col max-h-[90vh] overflow-hidden border">
         {/* Header Section */}
         <div className="p-6 border-b bg-slate-50/50">
           <div className="flex justify-between items-start">
@@ -501,6 +504,7 @@ export default function LotDetailsDialog({ lot, onClose }: LotDetailsDialogProps
                   <TableRow className="hover:bg-transparent">
                     <TableHead className="w-[100px]">Type</TableHead>
                     <TableHead>Item Name</TableHead>
+                    <TableHead>Item Model</TableHead>
                     <TableHead className="text-right">Expected</TableHead>
                     <TableHead className="text-right">
                       {isReceiving ? 'Received' : 'Rec.'}
@@ -541,21 +545,37 @@ export default function LotDetailsDialog({ lot, onClose }: LotDetailsDialogProps
                           <div className="flex flex-col">
                             <span className="text-sm">
                               {item.itemType === LotItemType.MODEL
-                                ? item.model?.model_name ||
-                                  item.customProductName ||
+                                ? item.customProductName ||
+                                  item.model?.model_name ||
                                   'Unnamed Product'
                                 : item.sparePart?.part_name ||
                                   item.customSparePartName ||
                                   'Unnamed Spare'}
                             </span>
-                            {(item.model?.model_no || item.sparePart?.item_code) && (
-                              <span className="text-[10px] text-slate-400 font-mono">
-                                {item.itemType === LotItemType.MODEL
-                                  ? item.model?.model_no
-                                  : item.sparePart?.item_code}
-                              </span>
-                            )}
+                            {item.itemType === LotItemType.SPARE_PART &&
+                              item.sparePart?.item_code && (
+                                <span className="text-[10px] text-slate-400 font-mono">
+                                  {item.sparePart.item_code}
+                                </span>
+                              )}
                           </div>
+                        </TableCell>
+                        {/* Item Model column */}
+                        <TableCell>
+                          {item.itemType === LotItemType.MODEL ? (
+                            <div className="flex flex-col">
+                              <span className="text-sm font-medium">
+                                {item.model?.model_name || '—'}
+                              </span>
+                              {item.model?.model_no && (
+                                <span className="text-[10px] text-slate-400 font-mono">
+                                  {item.model.model_no}
+                                </span>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-slate-300">—</span>
+                          )}
                         </TableCell>
                         <TableCell className="text-right text-slate-400 font-medium">
                           / {item.expectedQuantity}
