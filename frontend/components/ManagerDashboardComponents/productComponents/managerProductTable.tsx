@@ -53,11 +53,11 @@ export default function ManagerProduct() {
       setLoading(true);
       const res = await productService.getAllProducts({ page, limit, search });
       setProducts(res.data);
-      setTotal(res.total || res.data.length);
+      setTotal(res.total);
 
-      // Keep naive stats calculation based on loaded data since API might not return global stats
+      // Total count from API, others remain naive based on current page
       setStats({
-        total: res.total || res.data.length,
+        total: res.total,
         inStock: res.data.filter((p) => p.product_status === 'AVAILABLE').length,
         rented: res.data.filter((p) => p.product_status === 'RENTED').length,
         sold: res.data.filter((p) => p.product_status === 'SOLD').length,

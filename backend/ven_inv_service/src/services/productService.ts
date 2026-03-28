@@ -218,9 +218,17 @@ export class ProductService {
 
   /**
    * Retrieves all products, optionally filtered by branch, model, and status.
+   * Supports pagination and search.
    */
-  async getAllProducts(branchId?: string, modelId?: string, status?: ProductStatus) {
-    return this.productRepo.getAllProducts(branchId, modelId, status);
+  async getAllProducts(
+    branchId?: string,
+    modelId?: string,
+    status?: ProductStatus,
+    page: number = 1,
+    limit: number = 10,
+    search?: string,
+  ) {
+    return this.productRepo.getAllProducts(branchId, modelId, status, page, limit, search);
   }
 
   /**

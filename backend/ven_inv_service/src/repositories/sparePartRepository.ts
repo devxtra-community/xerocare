@@ -112,6 +112,15 @@ export class SparePartRepository {
         WHERE spm.spare_part_id = sp.id
       ), model.model_name)`,
         'compatible_model',
+      )
+      .addSelect(
+        `(
+        SELECT STRING_AGG(m.id::text, ',')
+        FROM spare_parts_models spm
+        JOIN model m ON m.id = spm.model_id
+        WHERE spm.spare_part_id = sp.id
+      )`,
+        'model_ids',
       );
 
     if (year) {
@@ -189,7 +198,7 @@ export class SparePartRepository {
   async findById(id: string): Promise<SparePart | null> {
     return this.masterRepo.findOne({
       where: { id },
-      relations: { model: true },
+      relations: { model: true, models: true },
     });
   }
 }

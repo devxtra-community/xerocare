@@ -49,6 +49,7 @@ export const addproduct = async (req: Request, res: Response, next: NextFunction
       tax_rate,
       print_colour,
       max_discount_amount,
+      wholesale_price,
       lot_id,
     } = req.body;
 
@@ -76,7 +77,14 @@ export const addproduct = async (req: Request, res: Response, next: NextFunction
       sale_price: sale_price ? Number(sale_price) : 0,
       tax_rate: tax_rate ? Number(tax_rate) : 0,
       print_colour,
-      max_discount_amount: max_discount_amount ? Number(max_discount_amount) : null,
+      max_discount_amount:
+        max_discount_amount !== '' && max_discount_amount !== undefined
+          ? Number(max_discount_amount)
+          : undefined,
+      wholesale_price:
+        wholesale_price !== '' && wholesale_price !== undefined
+          ? Number(wholesale_price)
+          : undefined,
       imageUrl,
       lot_id: lot_id || undefined,
     });
@@ -105,20 +113,31 @@ export const getallproducts = async (req: Request, res: Response) => {
     const filteredBranchId = isAdmin ? undefined : branchId;
     const modelId = req.query.modelId as string | undefined;
     const status = req.query.status as ProductStatus | undefined;
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 10;
+    const search = req.query.search as string | undefined;
 
     logger.info(
-      `Fetching products for branch: ${filteredBranchId || 'All'}, model: ${modelId || 'All'}, status: ${status || 'Any'}`,
+      `Fetching products for branch: ${filteredBranchId || 'All'}, model: ${modelId || 'All'}, status: ${status || 'Any'}, page: ${page}, limit: ${limit}, search: ${search || 'None'}`,
     );
-    const products = await service.getAllProducts(filteredBranchId, modelId, status);
-    logger.info(`Fetched ${products?.length || 0} products`);
+    const { data, total } = await service.getAllProducts(
+      filteredBranchId,
+      modelId,
+      status,
+      page,
+      limit,
+      search,
+    );
+    logger.info(`Fetched ${data?.length || 0} products from total ${total}`);
 
-    if (!products || products.length === 0) {
-      return res.status(200).json({ message: 'No products found', data: [], success: true });
-    }
-
-    res
-      .status(200)
-      .json({ message: 'Fetched all products successfully', data: products, success: true });
+    res.status(200).json({
+      message: 'Fetched all products successfully',
+      data,
+      total,
+      page,
+      limit,
+      success: true,
+    });
   } catch (error) {
     logger.error('Error in getallproducts:', error);
     throw new AppError('Failed to fetch products', 500);
@@ -140,10 +159,14 @@ export const updateproduct = async (req: Request, res: Response, next: NextFunct
 
     const payload = { ...req.body };
 
-    if (payload.sale_price) payload.sale_price = Number(payload.sale_price);
-    if (payload.tax_rate) payload.tax_rate = Number(payload.tax_rate);
-    if (payload.max_discount_amount)
+    if (payload.sale_price !== undefined && payload.sale_price !== '')
+      payload.sale_price = Number(payload.sale_price);
+    if (payload.tax_rate !== undefined && payload.tax_rate !== '')
+      payload.tax_rate = Number(payload.tax_rate);
+    if (payload.max_discount_amount !== undefined && payload.max_discount_amount !== '')
       payload.max_discount_amount = Number(payload.max_discount_amount);
+    if (payload.wholesale_price !== undefined && payload.wholesale_price !== '')
+      payload.wholesale_price = Number(payload.wholesale_price);
 
     const file = req.file as MulterS3File;
     if (file && file.key) {

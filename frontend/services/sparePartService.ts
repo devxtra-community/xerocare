@@ -8,6 +8,7 @@ export interface SparePartInventoryItem {
   part_name: string;
   brand: string;
   compatible_model: string;
+  model_ids?: string;
   warehouse_name: string;
   vendor_name: string;
   quantity: number;
