@@ -17,7 +17,7 @@ import { seedAdmin } from '../utils/seedAdmin';
 export const Source = new DataSource({
   type: 'postgres',
   url: process.env.EMPLOYEE_DATABASE_URL,
-  ssl: true,
+  ssl: false,
   synchronize: true,
   entities: [Admin, Employee, Auth, Branch, LeaveApplication, Payroll, Notification],
   poolSize: 1,
