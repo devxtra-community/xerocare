@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect, useCallback } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Upload, Search, Pencil, Trash2, Copy } from 'lucide-react';
 import { Input } from '@/components/ui/input';
@@ -32,6 +33,9 @@ export default function SparePartsPage() {
   const [loading, setLoading] = useState(true);
   const [parts, setParts] = useState<SparePartInventoryItem[]>([]);
   const [search, setSearch] = useState('');
+  const searchParams = useSearchParams();
+  const [initialLotId, setInitialLotId] = useState<string | undefined>(undefined);
+  const [initialItemId, setInitialItemId] = useState<string | undefined>(undefined);
 
   const loadParts = useCallback(async () => {
     setLoading(true);
@@ -52,6 +56,16 @@ export default function SparePartsPage() {
     }, 500);
     return () => clearTimeout(delayDebounceFn);
   }, [loadParts]);
+
+  useEffect(() => {
+    const lotId = searchParams.get('lotId');
+    const itemId = searchParams.get('itemId');
+    if (lotId) {
+      setInitialLotId(lotId);
+      setInitialItemId(itemId || undefined);
+      setBulkOpen(true);
+    }
+  }, [searchParams]);
 
   const confirmDelete = async () => {
     if (!partToDelete) return;
@@ -221,7 +235,19 @@ export default function SparePartsPage() {
       </div>
 
       {bulkOpen && (
-        <BulkSparePartDialog open={bulkOpen} onOpenChange={setBulkOpen} onSuccess={handleRefresh} />
+        <BulkSparePartDialog
+          open={bulkOpen}
+          onOpenChange={(open) => {
+            setBulkOpen(open);
+            if (!open) {
+              setInitialLotId(undefined);
+              setInitialItemId(undefined);
+            }
+          }}
+          onSuccess={handleRefresh}
+          initialLotId={initialLotId}
+          initialItemId={initialItemId}
+        />
       )}
 
       {addOpen && (

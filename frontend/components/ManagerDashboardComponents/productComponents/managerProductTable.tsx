@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Search, Plus, X, Eye } from 'lucide-react';
+import { useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import {
   Select,
@@ -44,6 +45,9 @@ export default function ManagerProduct() {
   const [deleting, setDeleting] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const searchParams = useSearchParams();
+  const [initialLotId, setInitialLotId] = useState<string | undefined>(undefined);
+  const [initialItemId, setInitialItemId] = useState<string | undefined>(undefined);
 
   const { page, limit, total, setPage, setLimit, setTotal } = usePagination(10);
   const [stats, setStats] = useState({ total: 0, inStock: 0, rented: 0, sold: 0 });
@@ -75,6 +79,16 @@ export default function ManagerProduct() {
     }, 500);
     return () => clearTimeout(delayDebounceFn);
   }, [fetchProducts]);
+
+  useEffect(() => {
+    const lotId = searchParams.get('lotId');
+    const itemId = searchParams.get('itemId');
+    if (lotId) {
+      setInitialLotId(lotId);
+      setInitialItemId(itemId || undefined);
+      setBulkDialogOpen(true);
+    }
+  }, [searchParams]);
 
   // Stats updated conditionally in fetchProducts
 
@@ -242,8 +256,14 @@ export default function ManagerProduct() {
 
       <BulkProductDialog
         open={bulkDialogOpen}
-        onClose={() => setBulkDialogOpen(false)}
+        onClose={() => {
+          setBulkDialogOpen(false);
+          setInitialLotId(undefined);
+          setInitialItemId(undefined);
+        }}
         onSuccess={fetchProducts}
+        initialLotId={initialLotId}
+        initialItemId={initialItemId}
       />
 
       <Dialog open={!!previewImage} onOpenChange={() => setPreviewImage(null)}>
@@ -292,6 +312,7 @@ function ProductFormModal({
     model_id: string;
     vendor_id: string;
     warehouse_id: string;
+    purchase_price: string | number;
     sale_price: string | number;
     tax_rate: string | number;
     MFD: string;
@@ -308,6 +329,7 @@ function ProductFormModal({
     model_id: initialData?.model_id || initialData?.model?.id || '',
     vendor_id: initialData?.vendor_id || initialData?.vendor?.id || '',
     warehouse_id: initialData?.warehouse_id || initialData?.warehouse?.id || '',
+    purchase_price: initialData?.purchase_price ?? '',
     sale_price: initialData?.sale_price ?? '',
     tax_rate: initialData?.tax_rate ?? '',
     MFD: initialData?.MFD ? new Date(initialData.MFD).toISOString().split('T')[0] : '',
@@ -677,7 +699,16 @@ function ProductFormModal({
             />
           </Field>
 
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-3 gap-2">
+            <Field label="Purchase Price">
+              <Input
+                type="number"
+                value={form.purchase_price}
+                onChange={(e) => setForm({ ...form, purchase_price: Number(e.target.value) })}
+                placeholder="0"
+                required
+              />
+            </Field>
             <Field label="Sale Price">
               <Input
                 type="number"
@@ -786,7 +817,7 @@ function Modal({
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="bg-card rounded-2xl w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto">
+      <div className="bg-card rounded-2xl w-full max-w-4xl p-6 max-h-[90vh] overflow-y-auto">
         <div className="flex justify-between mb-4">
           <h2 className="font-semibold text-lg">{title}</h2>
           <button onClick={onClose}>

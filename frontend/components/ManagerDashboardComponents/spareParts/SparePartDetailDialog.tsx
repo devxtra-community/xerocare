@@ -2,7 +2,6 @@
 
 import React, { useState } from 'react';
 import {
-  X,
   Settings,
   Package,
   Warehouse,
@@ -25,14 +24,7 @@ interface SparePartDetailDialogProps {
 }
 
 export default function SparePartDetailDialog({ part, onClose }: SparePartDetailDialogProps) {
-  const [copiedId, setCopiedId] = useState(false);
   const [copiedLot, setCopiedLot] = useState(false);
-
-  const handleCopyId = () => {
-    navigator.clipboard.writeText(part.id);
-    setCopiedId(true);
-    setTimeout(() => setCopiedId(false), 2000);
-  };
 
   const handleCopyLot = () => {
     navigator.clipboard.writeText(part.lotNumber);
@@ -45,13 +37,6 @@ export default function SparePartDetailDialog({ part, onClose }: SparePartDetail
       <DialogContent className="sm:max-w-2xl p-0 overflow-hidden bg-white shadow-2xl rounded-2xl border-none">
         {/* Header Banner */}
         <div className="bg-gradient-to-r from-primary to-blue-600 px-6 py-8 text-white relative">
-          <button
-            onClick={onClose}
-            className="absolute top-4 right-4 p-2 hover:bg-white/20 rounded-full transition-colors"
-          >
-            <X size={20} />
-          </button>
-
           <div className="flex items-center gap-4">
             <div className="h-16 w-16 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center border border-white/30 shadow-inner">
               <Settings size={32} />
@@ -68,7 +53,7 @@ export default function SparePartDetailDialog({ part, onClose }: SparePartDetail
               <h2 className="text-2xl font-bold tracking-tight">{part.part_name}</h2>
               <p className="text-blue-100 text-sm font-medium flex items-center gap-2">
                 <Package size={14} />
-                Item Code: {part.item_code}
+                Lot: {part.lotNumber || 'N/A'}
               </p>
             </div>
           </div>
@@ -139,28 +124,6 @@ export default function SparePartDetailDialog({ part, onClose }: SparePartDetail
                   <p className="text-sm font-semibold text-slate-700 leading-relaxed">
                     {part.compatible_model || 'Universal / Multiple Models'}
                   </p>
-                </div>
-
-                <div>
-                  <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">
-                    System Identifier
-                  </label>
-                  <div className="flex items-center gap-2 group">
-                    <code className="text-[11px] font-mono text-slate-500 bg-white px-2 py-1 rounded border border-slate-200 flex-1 truncate">
-                      {part.id}
-                    </code>
-                    <button
-                      onClick={handleCopyId}
-                      className="text-slate-400 hover:text-primary transition-colors p-1"
-                      title="Copy ID"
-                    >
-                      {copiedId ? (
-                        <Check size={14} className="text-green-500" />
-                      ) : (
-                        <Copy size={14} />
-                      )}
-                    </button>
-                  </div>
                 </div>
               </div>
             </div>

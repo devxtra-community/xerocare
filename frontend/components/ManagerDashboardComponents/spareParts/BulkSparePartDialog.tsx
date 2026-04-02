@@ -31,6 +31,8 @@ interface BulkSparePartDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess: () => void;
+  initialLotId?: string;
+  initialItemId?: string;
 }
 
 interface BulkSparePartRow {
@@ -70,6 +72,8 @@ export default function BulkSparePartDialog({
   open,
   onOpenChange,
   onSuccess,
+  initialLotId,
+  initialItemId,
 }: BulkSparePartDialogProps) {
   const [rows, setRows] = useState<Partial<BulkSparePartRow>[]>([]);
   const [vendors, setVendors] = useState<{ id: string; name: string }[]>([]);
@@ -100,13 +104,78 @@ export default function BulkSparePartDialog({
 
   useEffect(() => {
     if (open) {
-      setRows([]);
       setFile(null);
-      setSelectedLotId('');
-      setLotSparePartOptions([]);
-      loadDependencies();
+      const prepareInitialData = async () => {
+        await loadDependencies();
+
+        if (initialLotId) {
+          // No need to call handleLotSelect here; the lots useEffect will handle it
+        } else {
+          setRows([]);
+          setSelectedLotId('');
+          setLotSparePartOptions([]);
+        }
+      };
+      prepareInitialData();
     }
-  }, [open]);
+  }, [open, initialLotId, initialItemId]);
+
+  // We need to handle the pre-filling after lots and selectedLotId are set
+  useEffect(() => {
+    if (open && initialLotId && lots.length > 0) {
+      const lot = lots.find((l) => l.id === initialLotId);
+      if (lot && lot.items) {
+        let itemsToFill = lot.items.filter(
+          (item) => item.itemType === LotItemType.SPARE_PART && item.sparePart,
+        );
+
+        if (initialItemId) {
+          itemsToFill = itemsToFill.filter((item) => item.id === initialItemId);
+        }
+
+        const newRows = itemsToFill.map((item) => {
+          const sp = item.sparePart!;
+          return {
+            ...createEmptyRow(),
+            lot_id: initialLotId,
+            item_code: sp.item_code,
+            part_name: sp.part_name,
+            brand: sp.brand,
+            model_id: sp.model_id || '',
+            purchase_price: Number(item.unitPrice) || Number(sp.purchase_price) || 0,
+            base_price: Number(sp.base_price) || 0,
+            wholesale_price: Number(sp.wholesale_price) || 0,
+            quantity: Math.max(0, item.receivedQuantity - item.usedQuantity),
+            vendor_id: lot.vendorId || lot.vendor?.id || '',
+            warehouse_id: lot.warehouse_id || '',
+          };
+        });
+        setRows(newRows);
+        setSelectedLotId(initialLotId);
+
+        // Also update spare part options for the dropdowns
+        const sparePartMap = new Map<string, LotSparePartOption>();
+        lot.items
+          .filter((item) => item.itemType === LotItemType.SPARE_PART && item.sparePart)
+          .forEach((item) => {
+            const sp = item.sparePart!;
+            if (sp.item_code && !sparePartMap.has(sp.item_code)) {
+              sparePartMap.set(sp.item_code, {
+                itemCode: sp.item_code,
+                partName: sp.part_name,
+                brand: sp.brand,
+                modelId: sp.model_id || '',
+                purchasePrice: item.unitPrice || sp.purchase_price || 0,
+                basePrice: sp.base_price || 0,
+                wholesalePrice: sp.wholesale_price || 0,
+                label: `${sp.item_code} - ${sp.part_name}`,
+              });
+            }
+          });
+        setLotSparePartOptions(Array.from(sparePartMap.values()));
+      }
+    }
+  }, [lots, initialLotId, initialItemId, open]);
 
   /** When a lot is selected, extract the model options from its spare part items */
   const handleLotSelect = (lotId: string) => {
@@ -132,8 +201,8 @@ export default function BulkSparePartDialog({
             partName: sp.part_name,
             brand: sp.brand,
             modelId: sp.model_id || '',
-            basePrice: item.unitPrice || sp.base_price,
-            purchasePrice: sp.purchase_price || 0,
+            purchasePrice: item.unitPrice || sp.purchase_price || 0,
+            basePrice: sp.base_price || 0,
             wholesalePrice: sp.wholesale_price || 0,
             label: `${sp.item_code} - ${sp.part_name}`,
           });
@@ -159,7 +228,9 @@ export default function BulkSparePartDialog({
     part_name: '',
     brand: '',
     model_id: '',
+    purchase_price: 0,
     base_price: 0,
+    wholesale_price: 0,
     quantity: 0,
     vendor_id: '',
     warehouse_id: '',

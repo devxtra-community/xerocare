@@ -94,6 +94,9 @@ export class Product {
   @Column({ type: 'numeric', precision: 12, scale: 2, nullable: true })
   sale_price!: number;
 
+  @Column({ type: 'numeric', precision: 12, scale: 2, nullable: true })
+  purchase_price?: number;
+
   @Column({
     type: 'enum',
     enum: ProductStatus,

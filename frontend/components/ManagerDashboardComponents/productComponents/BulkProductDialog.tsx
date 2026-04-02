@@ -27,6 +27,8 @@ interface BulkProductDialogProps {
   open: boolean;
   onClose: () => void;
   onSuccess: () => void;
+  initialLotId?: string;
+  initialItemId?: string;
 }
 
 /**
@@ -35,7 +37,13 @@ interface BulkProductDialogProps {
  * Supports adding multiple products at once with details like Model, Serial No, Warehouse, etc.
  * Also supports assigning a Lot and selecting a product model from within that lot.
  */
-export function BulkProductDialog({ open, onClose, onSuccess }: BulkProductDialogProps) {
+export function BulkProductDialog({
+  open,
+  onClose,
+  onSuccess,
+  initialLotId,
+  initialItemId,
+}: BulkProductDialogProps) {
   const [rows, setRows] = useState<Partial<BulkProductRow>[]>([]);
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
@@ -69,11 +77,53 @@ export function BulkProductDialog({ open, onClose, onSuccess }: BulkProductDialo
 
   useEffect(() => {
     if (open) {
-      setRows([]);
       setFile(null);
-      loadDependencies();
+      const prepareInitialData = async () => {
+        await loadDependencies();
+
+        if (initialLotId) {
+          // Find the specific lot and pre-fill rows
+          const lotResponse = await lotService.getLotById(initialLotId);
+          const lot = lotResponse; // getLotById likely returns the lot directly
+
+          if (lot && lot.items) {
+            let itemsToFill = lot.items.filter((item) => item.itemType === LotItemType.MODEL);
+
+            if (initialItemId) {
+              itemsToFill = itemsToFill.filter((item) => item.id === initialItemId);
+            }
+
+            const newRows: Partial<BulkProductRow>[] = [];
+            itemsToFill.forEach((item) => {
+              const qty = Math.max(0, item.receivedQuantity - item.usedQuantity);
+              for (let i = 0; i < qty; i++) {
+                newRows.push({
+                  ...createEmptyRow(),
+                  lot_id: initialLotId,
+                  model_id: item.modelId ?? item.model?.id ?? '',
+                  model_no: item.modelId ?? item.model?.id ?? '',
+                  brand: item.model?.brandRelation?.name || '',
+                  vendor_id: lot.vendorId || lot.vendor?.id || '',
+                  warehouse_id: lot.warehouse_id || '',
+                  // Autofill purchase_price from lot item's unitPrice.
+                  // salePrice is set to 0 to force user to enter a new retail price.
+                  purchase_price: Number(item.unitPrice) || 0,
+                  sale_price: 0,
+                  name: item.model?.model_name || '',
+                });
+              }
+            });
+
+            setRows(newRows);
+          }
+        } else {
+          setRows([]);
+        }
+      };
+
+      prepareInitialData();
     }
-  }, [open]);
+  }, [open, initialLotId, initialItemId]);
 
   const createEmptyRow = (): Partial<BulkProductRow> => ({
     model_id: '',
@@ -85,6 +135,7 @@ export function BulkProductDialog({ open, onClose, onSuccess }: BulkProductDialo
     name: '',
     brand: '',
     MFD: '',
+    purchase_price: 0,
     sale_price: 0,
     tax_rate: 0,
     print_colour: 'BLACK_WHITE',
@@ -175,6 +226,7 @@ export function BulkProductDialog({ open, onClose, onSuccess }: BulkProductDialo
           // If it's already a string date, return as-is
           return raw ? String(raw).split('T')[0] : '';
         })(),
+        purchase_price: Number(getVal(['purchase_price', 'Purchase Price', 'Cost'])) || 0,
         sale_price: Number(getVal(['sale_price', 'Price', 'Sale Price'])) || 0,
         tax_rate: Number(getVal(['tax_rate', 'Tax Rate', 'Tax', 'Tax %'])) || 0,
         print_colour: printColour,
@@ -362,7 +414,8 @@ export function BulkProductDialog({ open, onClose, onSuccess }: BulkProductDialo
                     </TableHead>
                     <TableHead className="min-w-[130px]">Status</TableHead>
                     <TableHead className="min-w-[150px]">MFD</TableHead>
-                    <TableHead className="min-w-[120px]">Price</TableHead>
+                    <TableHead className="min-w-[120px]">Purchase Price</TableHead>
+                    <TableHead className="min-w-[120px]">Sale Price</TableHead>
                     <TableHead className="min-w-[100px]">Tax %</TableHead>
                     <TableHead className="min-w-[140px]">Print Colour</TableHead>
                     <TableHead className="min-w-[130px]">Max Discount</TableHead>
@@ -534,6 +587,14 @@ export function BulkProductDialog({ open, onClose, onSuccess }: BulkProductDialo
                                 : ''
                             }
                             onChange={(e) => updateRow(i, 'MFD', e.target.value)}
+                            className="min-w-full"
+                          />
+                        </TableCell>
+                        <TableCell className="min-w-[120px]">
+                          <Input
+                            type="number"
+                            value={row.purchase_price}
+                            onChange={(e) => updateRow(i, 'purchase_price', Number(e.target.value))}
                             className="min-w-full"
                           />
                         </TableCell>

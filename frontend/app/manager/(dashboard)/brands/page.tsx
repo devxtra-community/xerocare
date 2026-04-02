@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Plus, Loader2, Search, Trash2 } from 'lucide-react';
+import { Plus, Loader2, Search, Trash2, Pencil } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import {
   Table,
@@ -30,7 +30,7 @@ export default function BrandsPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-  // const [editingBrand, setEditingBrand] = useState<Brand | null>(null);
+  const [editingBrand, setEditingBrand] = useState<Brand | null>(null);
   const [deletingBrand, setDeletingBrand] = useState<Brand | null>(null);
 
   const fetchBrands = async () => {
@@ -159,7 +159,15 @@ export default function BrandsPage() {
                   </TableCell>
                   <TableCell className="px-4">
                     <div className="flex gap-3 text-sm">
-                      {/* Edit functionality to be implemented fully if needed, currently reusing AddDialog might require updates to it */}
+                      <button
+                        className="text-blue-600 hover:underline flex items-center gap-1"
+                        onClick={() => {
+                          setEditingBrand(brand);
+                          setIsAddDialogOpen(true);
+                        }}
+                      >
+                        <Pencil size={14} /> Edit
+                      </button>
                       <button
                         className="text-red-600 hover:underline flex items-center gap-1"
                         onClick={() => setDeletingBrand(brand)}
@@ -177,8 +185,12 @@ export default function BrandsPage() {
 
       <AddBrandDialog
         open={isAddDialogOpen}
-        onOpenChange={setIsAddDialogOpen}
+        onOpenChange={(open) => {
+          setIsAddDialogOpen(open);
+          if (!open) setEditingBrand(null);
+        }}
         onSuccess={fetchBrands}
+        initialData={editingBrand}
       />
 
       {deletingBrand && (
