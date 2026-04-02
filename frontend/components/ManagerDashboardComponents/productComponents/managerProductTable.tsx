@@ -620,7 +620,7 @@ function ProductFormModal({
                             return {
                               value: i.id || mId || String(idx),
                               label: model
-                                ? `${model.model_name} (${model.model_no})`
+                                ? `${model.model_no} (${model.model_name})`
                                 : 'Unknown Model',
                               description: `Available: ${available} / ${i.receivedQuantity}`,
                             };

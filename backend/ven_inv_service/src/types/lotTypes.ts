@@ -3,6 +3,7 @@ import { LotItemType } from '../entities/lotItemEntity';
 export interface CreateLotItemDto {
   itemType: LotItemType;
   modelId?: string;
+  modelIds?: string[];
   sparePartId?: string;
   brand?: string;
   partName?: string;

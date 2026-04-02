@@ -640,10 +640,14 @@ export default function RfqCreateForm({ basePath }: RfqCreateFormProps) {
                       </div>
                       <SearchableSelect
                         options={spareParts
-                          .filter(
-                            (spItem: { brand_id?: string }) =>
-                              !item.brandId || spItem.brand_id === item.brandId,
-                          )
+                          .filter((spItem) => {
+                            if (!item.brandId) return true;
+                            const selectedBrandName = brands.find(
+                              (b) => b.id === item.brandId,
+                            )?.name;
+                            if (!selectedBrandName) return true;
+                            return spItem.brand?.toLowerCase() === selectedBrandName.toLowerCase();
+                          })
                           .map(
                             (spItem: { id: string; item_code?: string; part_name?: string }) => ({
                               value: spItem.id,

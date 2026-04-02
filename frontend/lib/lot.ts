@@ -64,6 +64,7 @@ export interface Lot {
 export interface CreateLotItemData {
   itemType: LotItemType;
   modelId?: string;
+  modelIds?: string[];
   sparePartId?: string;
   brand?: string;
   partName?: string;

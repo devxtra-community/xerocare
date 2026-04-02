@@ -82,6 +82,21 @@ export function AddModelDialog({ open, onOpenChange, onSuccess }: AddModelDialog
         </DialogHeader>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 py-4">
           <div className="grid grid-cols-2 gap-4">
+            <div className="col-span-2">
+              <label className="block text-sm font-medium mb-1">
+                Brand <span className="text-red-500">*</span>
+              </label>
+              <SearchableSelect
+                options={brandOptions}
+                value={watch('brand_id')}
+                onValueChange={(val) => setValue('brand_id', val)}
+                placeholder="Select a brand"
+                emptyText="No brands found"
+              />
+              {errors.brand_id && (
+                <p className="text-destructive text-xs mt-1">{errors.brand_id.message}</p>
+              )}
+            </div>
             <div>
               <label className="block text-sm font-medium mb-1">
                 Model Name <span className="text-red-500">*</span>
@@ -98,21 +113,6 @@ export function AddModelDialog({ open, onOpenChange, onSuccess }: AddModelDialog
               <Input {...register('model_no')} placeholder="e.g. HP-LJ-1020" />
               {errors.model_no && (
                 <p className="text-destructive text-xs mt-1">{errors.model_no.message}</p>
-              )}
-            </div>
-            <div className="col-span-2 sm:col-span-1">
-              <label className="block text-sm font-medium mb-1">
-                Brand <span className="text-red-500">*</span>
-              </label>
-              <SearchableSelect
-                options={brandOptions}
-                value={watch('brand_id')}
-                onValueChange={(val) => setValue('brand_id', val)}
-                placeholder="Select a brand"
-                emptyText="No brands found"
-              />
-              {errors.brand_id && (
-                <p className="text-destructive text-xs mt-1">{errors.brand_id.message}</p>
               )}
             </div>
             <div className="col-span-2">

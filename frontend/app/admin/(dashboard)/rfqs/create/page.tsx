@@ -1,0 +1,23 @@
+'use client';
+
+import React from 'react';
+import RfqCreateForm from '@/components/ManagerDashboardComponents/RfqComponents/RfqCreateForm';
+
+export default function RfqCreatePage() {
+  return (
+    <div className="p-3 sm:p-4 md:p-6 space-y-8 sm:space-y-10 bg-blue-100 min-h-screen">
+      <div className="flex justify-between items-center px-4">
+        <div className="space-y-1">
+          <h2 className="text-xl sm:text-2xl font-bold text-primary tracking-tight">Create RFQ</h2>
+          <p className="text-sm text-muted-foreground font-medium">
+            Draft a new request for quotation to send to vendors
+          </p>
+        </div>
+      </div>
+
+      <div className="space-y-4 sm:space-y-6">
+        <RfqCreateForm basePath="/admin" />
+      </div>
+    </div>
+  );
+}

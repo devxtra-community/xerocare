@@ -1,4 +1,5 @@
 import * as XLSX from 'xlsx';
+import { Workbook } from 'exceljs';
 import { AppError } from '../errors/appError';
 import { CreateLotDto, CreateLotItemDto, ExcelLotItemRow } from '../types/lotTypes';
 import { LotItemType } from '../entities/lotItemEntity';
@@ -245,16 +246,17 @@ export class ExcelHandler {
     return XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
   }
 
-  generateProductsExcel(lot: Lot): Buffer {
+  async generateProductsExcel(lot: Lot): Promise<Buffer> {
     const productItems = lot.items.filter((item) => item.itemType === LotItemType.MODEL);
 
     if (productItems.length === 0) {
       throw new AppError('No products found in this lot', 404);
     }
 
-    const rows: string[][] = [];
+    const workbook = new Workbook();
+    const worksheet = workbook.addWorksheet(`Products-${lot.lotNumber.substring(0, 20)}`);
 
-    rows.push([
+    const headers = [
       'model_no',
       'Select Product from Lot',
       'warehouse_id',
@@ -269,7 +271,9 @@ export class ExcelHandler {
       'print_colour',
       'max_discount_amount',
       'lot_id',
-    ]);
+    ];
+
+    worksheet.addRow(headers);
 
     productItems.forEach((item) => {
       const remaining = item.expectedQuantity - item.usedQuantity;
@@ -280,49 +284,60 @@ export class ExcelHandler {
       const selectProductFromLot = `${modelName} (${modelNo})`;
 
       for (let i = 0; i < remaining; i++) {
-        rows.push([
+        worksheet.addRow([
           modelId,
           selectProductFromLot,
           lot.warehouse_id || '',
           lot.vendorId,
           'AVAILABLE',
-          '', // serial_no — user fills in
-          '', // name — user fills in (one model can have different product names)
+          '', // serial_no
+          modelName, // name — autofill with model name
           brandName,
           '',
-          item.unitPrice.toString(),
+          item.unitPrice,
           '',
-          '',
+          '', // print_colour — dropdown added below
           '',
           lot.id,
         ]);
       }
     });
 
-    const workbook = XLSX.utils.book_new();
-    const worksheet = XLSX.utils.aoa_to_sheet(rows);
+    // Add Data Validation (Dropdown) to 'print_colour' column (Column L / Index 12)
+    const printColourOptions = ['both', 'black and white', 'colour'];
+    const rowCount = worksheet.rowCount;
+    if (rowCount > 1) {
+      for (let i = 2; i <= rowCount; i++) {
+        worksheet.getCell(`L${i}`).dataValidation = {
+          type: 'list',
+          allowBlank: true,
+          formulae: [`"${printColourOptions.join(',')}"`],
+          showErrorMessage: true,
+          errorTitle: 'Invalid Option',
+          error: 'Please select an option from the list.',
+        };
+      }
+    }
 
-    const wscols = [
-      { wch: 38 },
-      { wch: 40 },
-      { wch: 38 },
-      { wch: 38 },
-      { wch: 15 },
-      { wch: 20 },
-      { wch: 30 },
-      { wch: 20 },
-      { wch: 12 },
-      { wch: 12 },
-      { wch: 10 },
-      { wch: 15 },
-      { wch: 20 },
-      { wch: 38 },
+    // Set column widths
+    worksheet.columns = [
+      { width: 38 }, // model_no
+      { width: 40 }, // Select Product from Lot
+      { width: 38 }, // warehouse_id
+      { width: 38 }, // vendor_id
+      { width: 15 }, // product_status
+      { width: 20 }, // serial_no
+      { width: 30 }, // name
+      { width: 20 }, // brand
+      { width: 12 }, // MFD
+      { width: 12 }, // sale_price
+      { width: 10 }, // tax_rate
+      { width: 15 }, // print_colour
+      { width: 20 }, // max_discount_amount
+      { width: 38 }, // lot_id
     ];
-    worksheet['!cols'] = wscols;
 
-    XLSX.utils.book_append_sheet(workbook, worksheet, `Products-${lot.lotNumber.substring(0, 20)}`);
-
-    return XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+    return (await workbook.xlsx.writeBuffer()) as unknown as Buffer;
   }
 
   generateSparePartsExcel(lot: Lot): Buffer {

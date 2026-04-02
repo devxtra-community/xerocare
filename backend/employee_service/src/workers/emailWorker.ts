@@ -127,6 +127,41 @@ export const startWorker = async () => {
           await sendWhatsappMessage(recipient, body);
           logger.info(`[Notification Worker] WhatsApp processed for ${recipient}`);
         }
+      } else if (routingKey === 'notification.in_app.request') {
+        const { recipients, notifyAdmins, title, message, type, data } = job;
+
+        const { Source } = await import('../config/dataSource');
+        const { Notification } = await import('../entities/notificationEntity');
+        const repo = Source.getRepository(Notification);
+
+        let targetIds: string[] = [];
+        if (recipients && Array.isArray(recipients)) {
+          targetIds.push(...recipients);
+        }
+
+        if (notifyAdmins) {
+          const { Admin } = await import('../entities/adminEntities');
+          const admins = await Source.getRepository(Admin).find();
+          targetIds.push(...admins.map((a) => a.id));
+        }
+
+        targetIds = [...new Set(targetIds)];
+
+        if (targetIds.length > 0) {
+          const notifications = targetIds.map((empId: string) =>
+            repo.create({
+              employee_id: empId,
+              title,
+              message,
+              type: type || 'INFO',
+              data: data || null,
+            }),
+          );
+          await repo.save(notifications);
+          logger.info(
+            `[Notification Worker] In-app notifications saved for ${targetIds.length} users.`,
+          );
+        }
       }
 
       channel.ack(msg);
