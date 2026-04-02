@@ -2,7 +2,15 @@
 
 import React from 'react';
 
-import { LucideIcon, LayoutDashboard, ShoppingCart, Key, Home, Tag } from 'lucide-react';
+import {
+  LucideIcon,
+  LayoutDashboard,
+  ShoppingCart,
+  Key,
+  Home,
+  Tag,
+  FileQuestion,
+} from 'lucide-react';
 
 import {
   Sidebar,
@@ -74,6 +82,11 @@ export default function FinanceSidebar() {
           title: 'Orders',
           icon: ShoppingCart,
           href: '/finance/orders',
+        },
+        {
+          title: 'Quotations',
+          icon: FileQuestion,
+          href: '/finance/quotations',
         },
       ],
     },

@@ -7,8 +7,8 @@ import { logger } from './logger';
 export const Source = new DataSource({
   type: 'postgres',
   url: process.env.CRM_DATABASE_URL,
-  ssl: true,
-  synchronize: false,
+  ssl: process.env.CRM_DATABASE_URL?.includes('neon.tech') ? { rejectUnauthorized: false } : false,
+  synchronize: true,
   logging: false,
   entities: [Customer],
   poolSize: 1,
@@ -29,7 +29,10 @@ export const connectWithRetry = async (initialDelayMs = 2000): Promise<DataSourc
   while (true) {
     try {
       if (!Source.isInitialized) {
-        logger.info(`Attempting database connection (Attempt ${attempt})...`);
+        const isNeon = process.env.CRM_DATABASE_URL?.includes('neon.tech');
+        logger.info(
+          `Attempting database connection (Attempt ${attempt})... [SSL: ${isNeon ? 'ON' : 'OFF'}]`,
+        );
         await Source.initialize();
         logger.info('Database connected successfully.');
       }

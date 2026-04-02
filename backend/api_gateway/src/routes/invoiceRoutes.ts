@@ -83,7 +83,11 @@ router.get(
 /**
  * List invoices belonging to a specific branch or office.
  */
-router.get('/branch-invoices', requireRole(UserRole.ADMIN, UserRole.MANAGER), getBranchInvoices);
+router.get(
+  '/branch-invoices',
+  requireRole(UserRole.ADMIN, UserRole.MANAGER, UserRole.FINANCE),
+  getBranchInvoices,
+);
 
 /**
  * Count how many tasks are waiting for someone to take action.

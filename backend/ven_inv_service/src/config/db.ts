@@ -30,7 +30,9 @@ import { SparePartInventory } from '../entities/sparePartInventoryEntity';
 export const Source = new DataSource({
   type: 'postgres',
   url: process.env.VENDOR_DATABASE_URL,
-  ssl: false,
+  ssl: process.env.VENDOR_DATABASE_URL?.includes('neon.tech')
+    ? { rejectUnauthorized: false }
+    : false,
   synchronize: true, // Enabled for development to allow automatic table creation
   entities: [
     Vendor,

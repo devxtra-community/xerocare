@@ -10,6 +10,7 @@ import {
   FileText,
   LogOut,
   Calendar,
+  FileQuestion,
 } from 'lucide-react';
 
 import {
@@ -78,6 +79,12 @@ const menuItems = [
     icon: FileText,
     href: '/employee/lease',
     modules: ['lease'],
+  },
+  {
+    title: 'Quotations',
+    icon: FileQuestion,
+    href: '/employee/quotations',
+    modules: ['sales', 'rent', 'lease'],
   },
 ];
 
