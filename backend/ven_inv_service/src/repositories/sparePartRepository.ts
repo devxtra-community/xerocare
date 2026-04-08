@@ -5,6 +5,7 @@ import { Product } from '../entities/productEntity';
 import { Lot } from '../entities/lotEntity';
 import { Vendor } from '../entities/vendorEntity';
 import { Warehouse } from '../entities/warehouseEntity';
+import { LotItem } from '../entities/lotItemEntity';
 
 export class SparePartRepository {
   // Lazy Load Repositories
@@ -19,10 +20,10 @@ export class SparePartRepository {
   // --- Master Data Operations ---
 
   /**
-   * Finds spare part master data by item code.
+   * Finds spare part master data by SKU and lot ID.
    */
-  async findMasterByItemCode(itemCode: string) {
-    return this.masterRepo.find({ where: { item_code: itemCode } });
+  async findMasterBySkuAndLot(sku: string, lotId: string) {
+    return this.masterRepo.findOne({ where: { sku, lot_id: lotId } });
   }
 
   /**
@@ -45,7 +46,13 @@ export class SparePartRepository {
     if (data.brand !== undefined) part.brand = data.brand;
     if (data.model_id !== undefined) part.model_id = data.model_id;
     if (data.base_price !== undefined) part.base_price = data.base_price;
+    if (data.purchase_price !== undefined) part.purchase_price = data.purchase_price;
+    if (data.wholesale_price !== undefined) part.wholesale_price = data.wholesale_price;
     if (data.models !== undefined) part.models = data.models;
+    if (data.sku !== undefined) part.sku = data.sku;
+    if (data.mpn !== undefined) part.mpn = data.mpn;
+    if (data.warehouse_id !== undefined) part.warehouse_id = data.warehouse_id;
+    if (data.vendor_id !== undefined) part.vendor_id = data.vendor_id;
 
     return this.masterRepo.save(part);
   }
@@ -58,17 +65,18 @@ export class SparePartRepository {
   }
 
   /**
-   * Checks if a spare part has inventory.
+   * Checks if a spare part is referenced in any lot items.
    */
-  async hasInventory(sparePartId: string): Promise<boolean> {
-    const part = await this.masterRepo.findOne({
-      where: { id: sparePartId },
-      select: ['quantity'],
+  async hasLotReferences(sparePartId: string): Promise<boolean> {
+    const lotItem = await Source.getRepository(LotItem).findOne({
+      where: { sparePartId: sparePartId },
     });
-    return (part?.quantity || 0) > 0;
+    return !!lotItem;
   }
 
-  // --- Inventory Operations ---
+  /**
+   * --- Inventory Operations ---
+   */
 
   /**
    * Updates stock quantity for a spare part.
@@ -87,22 +95,34 @@ export class SparePartRepository {
       .leftJoin('sp.model', 'model')
       .leftJoin('sp.branch', 'branch')
       .leftJoin(Lot, 'lot', 'lot.id::text = sp.lot_id::text')
-      .leftJoin(Vendor, 'vendor', 'vendor.id::text = lot.vendor_id::text')
-      .leftJoin(Warehouse, 'warehouse', 'warehouse.id::text = lot.warehouse_id::text')
+      .leftJoin(
+        Vendor,
+        'vendor',
+        'vendor.id::text = COALESCE(sp.vendor_id::text, lot.vendor_id::text)',
+      )
+      .leftJoin(
+        Warehouse,
+        'warehouse',
+        'warehouse.id::text = COALESCE(sp.warehouse_id::text, lot.warehouse_id::text)',
+      )
       .select([
         'sp.id AS id',
-        'sp.item_code AS item_code',
+        'sp.sku AS sku',
+        'sp.mpn AS mpn',
         'lot.lotNumber AS lot_number',
         'sp.part_name AS part_name',
         'sp.brand AS brand',
         'warehouse.warehouseName AS warehouse_name',
         'branch.name AS branch_name',
         'vendor.name AS vendor_name',
+        'sp.model_id AS model_id',
         'sp.quantity AS quantity',
         'sp.base_price AS price',
         'sp.purchase_price AS purchase_price',
         'sp.wholesale_price AS wholesale_price',
         'sp.image_url AS image_url',
+        'sp.warehouse_id AS warehouse_id',
+        'sp.vendor_id AS vendor_id',
       ])
       .addSelect(
         `COALESCE((
@@ -114,12 +134,12 @@ export class SparePartRepository {
         'compatible_model',
       )
       .addSelect(
-        `(
+        `COALESCE((
         SELECT STRING_AGG(m.id::text, ',')
         FROM spare_parts_models spm
         JOIN model m ON m.id = spm.model_id
         WHERE spm.spare_part_id = sp.id
-      )`,
+      ), sp.model_id::text)`,
         'model_ids',
       );
 
@@ -133,10 +153,8 @@ export class SparePartRepository {
 
     if (search) {
       qb.andWhere(
-        '(LOWER(sp.part_name) LIKE LOWER(:search) OR LOWER(sp.item_code) LIKE LOWER(:search))',
-        {
-          search: `%${search}%`,
-        },
+        '(sp.part_name ILIKE :search OR sp.sku ILIKE :search OR sp.mpn ILIKE :search OR sp.brand ILIKE :search)',
+        { search: `%${search}%` },
       );
     }
 

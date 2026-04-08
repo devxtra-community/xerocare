@@ -45,7 +45,7 @@ export default function ManagerPurchaseTable() {
       const data = await purchaseService.getAllPurchases();
       setPurchases(data);
     } catch {
-      toast.error('Failed to fetch purchases');
+      toast.error('Failed to fetch lot amounts');
     } finally {
       setLoading(false);
     }
@@ -91,7 +91,7 @@ export default function ManagerPurchaseTable() {
     <div className="bg-slate-50 min-h-screen p-3 sm:p-4 md:p-6 space-y-8">
       <div className="flex justify-between items-center">
         <h3 className="text-2xl font-black text-slate-800 italic tracking-tight">
-          Financial Records
+          Lot Amount Records
         </h3>
       </div>
 
@@ -117,7 +117,7 @@ export default function ManagerPurchaseTable() {
           className="bg-primary hover:bg-primary/90 text-white gap-2 h-11 px-6 rounded-xl font-bold italic shadow-lg shadow-primary/10 transition-all active:scale-95"
           onClick={() => setAddOpen(true)}
         >
-          <Plus size={18} /> Add Purchase
+          <Plus size={18} /> Add Lot Amount
         </Button>
       </div>
 
@@ -157,7 +157,7 @@ export default function ManagerPurchaseTable() {
             ) : filtered.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={7} className="text-center py-12 text-slate-400 italic">
-                  No financial records found matching your search.
+                  No lot amount records found matching your search.
                 </TableCell>
               </TableRow>
             ) : (

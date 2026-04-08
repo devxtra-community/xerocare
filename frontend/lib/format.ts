@@ -22,7 +22,7 @@ export function formatCurrency(amount: number | string, currency: string = 'QAR'
   if (typeof value !== 'number' || isNaN(value)) return `${currency} 0`;
 
   // For smaller amounts, we show the full number with its currency symbol.
-  if (Math.abs(value) < 1000) {
+  if (Math.abs(value) < 100000) {
     try {
       return new Intl.NumberFormat('en-US', {
         style: 'currency',

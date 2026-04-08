@@ -26,6 +26,9 @@ export interface RfqItem {
   customSparePartName?: string;
   customBrandName?: string;
   hsCode?: string;
+  mpn?: string;
+  compatibleModels?: string;
+  modelIds?: string[];
   description?: string;
   quantity: number;
   expectedDeliveryDate?: string;

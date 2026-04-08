@@ -14,6 +14,7 @@ import BulkSparePartDialog from '@/components/ManagerDashboardComponents/sparePa
 import { toast } from 'sonner';
 import EditSparePartDialog from '@/components/ManagerDashboardComponents/spareParts/EditSparePartDialog';
 import SparePartDetailDialog from '@/components/ManagerDashboardComponents/spareParts/SparePartDetailDialog';
+import { ErrorDialog } from '@/components/dialogs/ErrorDialog';
 
 export default function SparePartsPage() {
   const [bulkOpen, setBulkOpen] = useState(false);
@@ -28,6 +29,9 @@ export default function SparePartsPage() {
   const [selectedPartForDetail, setSelectedPartForDetail] = useState<SparePartInventoryItem | null>(
     null,
   );
+
+  const [errorDialogOpen, setErrorDialogOpen] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
   const { page, limit, total, setPage, setLimit, setTotal } = usePagination(10);
   const [loading, setLoading] = useState(true);
@@ -74,11 +78,12 @@ export default function SparePartsPage() {
       toast.success('Spare part deleted successfully');
       loadParts();
     } catch (error: unknown) {
-      console.error(error);
       const msg =
         (error as { response?: { data?: { message?: string } } })?.response?.data?.message ||
         'Failed to delete spare part';
-      toast.error(msg);
+
+      setErrorMessage(msg);
+      setErrorDialogOpen(true);
     } finally {
       setDeleteDialogOpen(false);
       setPartToDelete(null);
@@ -152,6 +157,17 @@ export default function SparePartsPage() {
               ),
             },
             {
+              id: 'sku',
+              header: 'SKU',
+              accessorKey: 'sku' as keyof SparePartInventoryItem,
+              className: 'font-semibold text-[11px] text-primary uppercase',
+              cell: (item: SparePartInventoryItem) => (
+                <span className="font-mono text-[11px] bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+                  {item.sku || '-'}
+                </span>
+              ),
+            },
+            {
               id: 'lotNumber',
               header: 'LOT ID',
               accessorKey: 'lotNumber' as keyof SparePartInventoryItem,
@@ -187,7 +203,7 @@ export default function SparePartsPage() {
             },
             {
               id: 'price',
-              header: 'PRICE',
+              header: 'SELLING PRICE',
               cell: (item: SparePartInventoryItem) => formatCurrency(item.price || 0),
               className: 'font-semibold text-[11px] text-primary uppercase',
             },
@@ -264,7 +280,14 @@ export default function SparePartsPage() {
       )}
 
       {detailOpen && selectedPartForDetail && (
-        <SparePartDetailDialog part={selectedPartForDetail} onClose={() => setDetailOpen(false)} />
+        <SparePartDetailDialog
+          part={selectedPartForDetail}
+          onClose={() => setDetailOpen(false)}
+          onEdit={() => {
+            setDetailOpen(false);
+            handleEdit(selectedPartForDetail);
+          }}
+        />
       )}
 
       <DeleteConfirmDialog
@@ -273,6 +296,12 @@ export default function SparePartsPage() {
         title="Delete Spare Part?"
         itemName={partToDelete?.name}
         onConfirm={confirmDelete}
+      />
+
+      <ErrorDialog
+        open={errorDialogOpen}
+        onOpenChange={setErrorDialogOpen}
+        message={errorMessage}
       />
     </div>
   );

@@ -3,11 +3,14 @@ import type { Model } from './model';
 
 export interface SparePart {
   id: string;
-  item_code: string; // Matches backend entity
+  sku: string; // Matches backend entity
+  mpn?: string;
   part_name: string;
   brand: string;
   brand_id?: string;
   description?: string;
+  compatible_models?: string;
+  model_ids?: string[] | string;
   model_id?: string;
   model?: Model; // Populated when joined (e.g. via lot items)
   branch_id?: string;

@@ -26,6 +26,7 @@ import * as XLSX from 'xlsx';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { AddModelDialog } from '../productComponents/AddModelDialog';
 import { AddBrandDialog } from '../BrandComponents/AddBrandDialog';
+import { MultiSelect } from '@/components/ui/multi-select';
 
 interface ExtendedRfqItem extends RfqItem {
   isRequestingNewProduct?: boolean;
@@ -93,7 +94,7 @@ export default function RfqCreateForm({ basePath }: RfqCreateFormProps) {
   const updateItem = (
     index: number,
     field: keyof ExtendedRfqItem,
-    value: string | number | boolean | ItemType | undefined,
+    value: string | number | boolean | ItemType | string[] | undefined,
   ) => {
     setItems((prev) => {
       const newItems = [...prev];
@@ -120,6 +121,20 @@ export default function RfqCreateForm({ basePath }: RfqCreateFormProps) {
         newItems[index].sparePartId = undefined;
         newItems[index].customSparePartName = undefined;
         newItems[index].isRequestingNewPart = false;
+      }
+      if (field === 'sparePartId' && value) {
+        const sp = spareParts.find((s) => s.id === value);
+        if (sp) {
+          newItems[index].mpn = sp.mpn;
+          newItems[index].compatibleModels = sp.compatible_models;
+          const modelIdsRaw = sp.model_ids;
+          if (modelIdsRaw) {
+            newItems[index].modelIds =
+              typeof modelIdsRaw === 'string' ? modelIdsRaw.split(',') : modelIdsRaw;
+          } else if (sp.model_id) {
+            newItems[index].modelIds = [sp.model_id];
+          }
+        }
       }
       return newItems;
     });
@@ -169,6 +184,8 @@ export default function RfqCreateForm({ basePath }: RfqCreateFormProps) {
       [
         'model_id',
         'hs_code',
+        'mpn',
+        'compatible_models',
         'description',
         'quantity',
         'unit_price',
@@ -283,6 +300,8 @@ export default function RfqCreateForm({ basePath }: RfqCreateFormProps) {
           ...item,
           customSparePartName:
             item.customSparePartName || (!item.sparePartId ? 'Unknown Part' : undefined),
+          mpn: item.mpn,
+          compatibleModels: item.compatibleModels,
         };
       }
     });
@@ -520,33 +539,10 @@ export default function RfqCreateForm({ basePath }: RfqCreateFormProps) {
                 </div>
 
                 {/* Row 2: Product/Part & Quantity & Delete */}
-                <div className="grid grid-cols-[1fr_120px_40px] gap-4 items-end">
-                  {item.itemType === ItemType.PRODUCT ? (
-                    item.isRequestingNewProduct ? (
-                      <div className="space-y-1">
-                        <div className="flex justify-between items-center h-4 mb-1">
-                          <Label className="text-xs text-slate-500 font-medium">
-                            New Product Name
-                          </Label>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              updateItem(index, 'isRequestingNewProduct', false);
-                              updateItem(index, 'customProductName', undefined);
-                            }}
-                            className="text-[10px] text-red-500 hover:text-red-700 font-medium transition-colors"
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                        <Input
-                          placeholder="Custom product name"
-                          value={item.customProductName || ''}
-                          onChange={(e) => updateItem(index, 'customProductName', e.target.value)}
-                          required
-                        />
-                      </div>
-                    ) : (
+                <div className="space-y-4">
+                  {/* Selector Row */}
+                  <div className="grid grid-cols-[1fr_120px_40px] gap-4 items-end">
+                    {item.itemType === ItemType.PRODUCT ? (
                       <div className="space-y-1">
                         <div className="flex justify-between items-center h-4 mb-1">
                           <Label className="text-xs text-slate-500 font-medium">Product</Label>
@@ -582,112 +578,176 @@ export default function RfqCreateForm({ basePath }: RfqCreateFormProps) {
                           disabled={!item.modelId}
                         />
                       </div>
-                    )
-                  ) : item.isRequestingNewPart ? (
-                    <div className="flex gap-4">
-                      <div className="flex-1 space-y-1">
-                        <div className="flex justify-between items-center h-4 mb-1">
-                          <Label className="text-xs text-slate-500 font-medium">
-                            New Part Name
-                          </Label>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              updateItem(index, 'isRequestingNewPart', false);
-                              updateItem(index, 'customSparePartName', undefined);
-                              updateItem(index, 'hsCode', undefined);
-                            }}
-                            className="text-[10px] text-red-500 hover:text-red-700 font-medium transition-colors"
-                          >
-                            Cancel
-                          </button>
+                    ) : item.isRequestingNewPart ? (
+                      <div className="flex gap-4">
+                        <div className="flex-1 space-y-1">
+                          <div className="flex justify-between items-center h-4 mb-1">
+                            <Label className="text-xs text-slate-500 font-medium">
+                              New Part Name
+                            </Label>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                updateItem(index, 'isRequestingNewPart', false);
+                                updateItem(index, 'customSparePartName', undefined);
+                                updateItem(index, 'hsCode', undefined);
+                              }}
+                              className="text-[10px] text-red-500 hover:text-red-700 font-medium transition-colors"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                          <Input
+                            placeholder="Custom part name"
+                            value={item.customSparePartName || ''}
+                            onChange={(e) =>
+                              updateItem(index, 'customSparePartName', e.target.value)
+                            }
+                            required
+                          />
                         </div>
-                        <Input
-                          placeholder="Custom part name"
-                          value={item.customSparePartName || ''}
-                          onChange={(e) => updateItem(index, 'customSparePartName', e.target.value)}
-                          required
-                        />
+                        <div className="w-[120px] space-y-1">
+                          <Label className="text-xs text-slate-500 font-medium h-4 mb-1 block">
+                            HS Code *
+                          </Label>
+                          <Input
+                            placeholder="00.00"
+                            value={item.hsCode || ''}
+                            onChange={(e) => updateItem(index, 'hsCode', e.target.value)}
+                            required={!!item.customSparePartName}
+                          />
+                        </div>
                       </div>
-                      <div className="w-[120px] space-y-1">
-                        <Label className="text-xs text-slate-500 font-medium h-4 mb-1 block">
-                          HS Code *
-                        </Label>
-                        <Input
-                          placeholder="00.00"
-                          value={item.hsCode || ''}
-                          onChange={(e) => updateItem(index, 'hsCode', e.target.value)}
-                          required={!!item.customSparePartName}
-                        />
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="space-y-1">
-                      <div className="flex justify-between items-center h-4 mb-1">
-                        <Label className="text-xs text-slate-500 font-medium">Spare Part</Label>
-                        {item.brandId && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              updateItem(index, 'isRequestingNewPart', true);
-                              updateItem(index, 'sparePartId', undefined);
-                            }}
-                            className="text-[10px] text-blue-600 hover:text-blue-800 font-medium transition-colors"
-                          >
-                            + Request New Spare Part?
-                          </button>
-                        )}
-                      </div>
-                      <SearchableSelect
-                        options={spareParts
-                          .filter((spItem) => {
-                            if (!item.brandId) return true;
-                            const selectedBrandName = brands.find(
-                              (b) => b.id === item.brandId,
-                            )?.name;
-                            if (!selectedBrandName) return true;
-                            return spItem.brand?.toLowerCase() === selectedBrandName.toLowerCase();
-                          })
-                          .map(
-                            (spItem: { id: string; item_code?: string; part_name?: string }) => ({
-                              value: spItem.id,
-                              label: `${spItem.item_code} - ${spItem.part_name}`,
-                            }),
+                    ) : (
+                      <div className="space-y-1">
+                        <div className="flex justify-between items-center h-4 mb-1">
+                          <Label className="text-xs text-slate-500 font-medium">Spare Part</Label>
+                          {item.brandId && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                updateItem(index, 'isRequestingNewPart', true);
+                                updateItem(index, 'sparePartId', undefined);
+                              }}
+                              className="text-[10px] text-blue-600 hover:text-blue-800 font-medium transition-colors"
+                            >
+                              + Request New Spare Part?
+                            </button>
                           )}
-                        value={item.sparePartId || ''}
-                        onValueChange={(val) => updateItem(index, 'sparePartId', val)}
-                        placeholder="Search Part..."
-                        emptyText="No spare parts found"
-                        disabled={!item.brandId}
+                        </div>
+                        <SearchableSelect
+                          options={spareParts
+                            .filter((spItem) => {
+                              if (!item.brandId) return true;
+                              const selectedBrandName = brands.find(
+                                (b) => b.id === item.brandId,
+                              )?.name;
+                              if (!selectedBrandName) return true;
+                              return (
+                                spItem.brand?.toLowerCase() === selectedBrandName.toLowerCase()
+                              );
+                            })
+                            .map((spItem: { id: string; sku?: string; part_name?: string }) => ({
+                              value: spItem.id,
+                              label: `${spItem.sku} - ${spItem.part_name}`,
+                            }))}
+                          value={item.sparePartId || ''}
+                          onValueChange={(val) => updateItem(index, 'sparePartId', val)}
+                          placeholder="Search Part..."
+                          emptyText="No spare parts found"
+                          disabled={!item.brandId}
+                        />
+                      </div>
+                    )}
+
+                    <div className="space-y-1">
+                      <Label className="text-xs text-slate-500 font-medium h-4 mb-1 block text-center">
+                        Quantity
+                      </Label>
+                      <Input
+                        type="number"
+                        min="1"
+                        placeholder="Qty"
+                        className="text-center"
+                        value={item.quantity}
+                        onChange={(e) =>
+                          updateItem(index, 'quantity', parseInt(e.target.value, 10) || 1)
+                        }
+                        required
                       />
                     </div>
-                  )}
 
-                  <div className="space-y-1">
-                    <Label className="text-xs text-slate-500 font-medium h-4 mb-1 block">
-                      Quantity
-                    </Label>
-                    <Input
-                      type="number"
-                      min="1"
-                      placeholder="Qty"
-                      value={item.quantity}
-                      onChange={(e) =>
-                        updateItem(index, 'quantity', parseInt(e.target.value, 10) || 1)
-                      }
-                      required
-                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="text-red-500 hover:text-red-700 hover:bg-red-50 border border-transparent transition-all h-10 w-10 mb-[1px]"
+                      onClick={() => removeItem(index)}
+                    >
+                      <Trash2 className="h-5 w-5" />
+                    </Button>
                   </div>
 
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="text-red-500 hover:text-red-700 hover:bg-red-50 hover:border-red-200 border border-transparent transition-all h-10 w-10 mb-[1px]"
-                    onClick={() => removeItem(index)}
-                  >
-                    <Trash2 className="h-5 w-5" />
-                  </Button>
+                  {/* Metadata Row for Spare Parts */}
+                  {item.itemType === ItemType.SPARE_PART && (
+                    <div className="grid grid-cols-2 gap-4 pb-2 border-b border-dashed border-slate-100">
+                      <div className="space-y-1">
+                        <Label className="text-xs text-slate-500 font-medium">
+                          Manufacturing Part # (MPN)
+                        </Label>
+                        <Input
+                          placeholder="Search or enter MPN..."
+                          value={item.mpn || ''}
+                          className="h-9 text-xs"
+                          onChange={(e) => updateItem(index, 'mpn', e.target.value)}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs text-slate-500 font-medium font-medium">
+                          Compatible Models
+                        </Label>
+                        <MultiSelect
+                          values={item.modelIds || []}
+                          onValuesChange={(newValues) => {
+                            if (
+                              newValues.includes('universal') &&
+                              !(item.modelIds || []).includes('universal')
+                            ) {
+                              updateItem(index, 'modelIds', ['universal']);
+                            } else if (newValues.length > 1 && newValues.includes('universal')) {
+                              updateItem(
+                                index,
+                                'modelIds',
+                                newValues.filter((v) => v !== 'universal'),
+                              );
+                            } else {
+                              updateItem(index, 'modelIds', newValues);
+                            }
+                          }}
+                          options={[
+                            {
+                              value: 'universal',
+                              label: 'Universal',
+                              description: 'Compatible with all',
+                            },
+                            ...models
+                              .filter((m) => {
+                                if (!item.brandId) return false;
+                                return m.brandRelation?.id === item.brandId;
+                              })
+                              .map((m) => ({
+                                value: m.id,
+                                label: m.model_no,
+                                description: m.model_name,
+                              })),
+                          ]}
+                          placeholder="Comp. Models"
+                          className="h-9 text-xs bg-gray-50/30"
+                          disabled={!item.brandId}
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             ))}

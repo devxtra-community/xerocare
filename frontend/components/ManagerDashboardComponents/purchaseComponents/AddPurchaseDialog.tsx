@@ -107,10 +107,10 @@ export default function AddPurchaseDialog({
     try {
       if (editMode && purchaseData) {
         await purchaseService.updatePurchase(purchaseData.id, formData);
-        toast.success('Purchase updated successfully');
+        toast.success('Lot amount updated successfully');
       } else {
         await purchaseService.createPurchase(formData);
-        toast.success('Purchase created successfully');
+        toast.success('Lot amount record created successfully');
       }
       onSuccess();
       onOpenChange(false);
@@ -118,7 +118,7 @@ export default function AddPurchaseDialog({
       const err = error as { response?: { data?: { message?: string } } };
       const msg =
         err.response?.data?.message ||
-        (editMode ? 'Failed to update purchase' : 'Failed to create purchase');
+        (editMode ? 'Failed to update lot amount' : 'Failed to create lot amount record');
       toast.error(msg);
     } finally {
       setLoading(false);
@@ -134,7 +134,7 @@ export default function AddPurchaseDialog({
           </div>
           <div>
             <DialogTitle className="text-xl font-bold text-white">
-              {editMode ? 'Edit Costs' : 'New Purchase Record'}
+              {editMode ? 'Edit Costs' : 'New Lot Amount Record'}
             </DialogTitle>
             <DialogDescription className="text-white/70 text-sm">
               Manage financial tracking for procurement lots.
@@ -168,7 +168,7 @@ export default function AddPurchaseDialog({
               value={formData.lotId}
               onValueChange={(val) => setFormData({ ...formData, lotId: val })}
               placeholder={
-                loadingLots ? 'Loading lots...' : 'Select a Lot to attach this purchase to...'
+                loadingLots ? 'Loading lots...' : 'Select a Lot to attach this record to...'
               }
               emptyText="No lots available for selection."
               disabled={editMode || loadingLots}
@@ -176,7 +176,7 @@ export default function AddPurchaseDialog({
             {!editMode && (
               <p className="text-[10px] text-slate-500 flex items-center gap-1">
                 <Info className="h-3 w-3" />
-                Only lots that don&apos;t already have a purchase record will be processed
+                Only lots that don&apos;t already have a lot amount record will be processed
                 successfully.
               </p>
             )}
@@ -430,7 +430,7 @@ export default function AddPurchaseDialog({
               ) : editMode ? (
                 'Save Changes'
               ) : (
-                'Create Purchase'
+                'Create Lot Amount'
               )}
             </Button>
           </div>

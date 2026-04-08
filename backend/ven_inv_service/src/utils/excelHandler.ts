@@ -56,7 +56,25 @@ export class ExcelHandler {
     for (const row of itemsData) {
       let itemTypeRaw = row['Item Type']?.toString().trim().toUpperCase();
       let itemName = row['Item Name']?.toString().trim();
-      const itemCode = row['Item Code']?.toString().trim();
+      const sku = row['SKU']?.toString().trim();
+      const mpn =
+        row['MPN']?.toString().trim() ||
+        row['mpn']?.toString().trim() ||
+        row['Manufacturing Part Number']?.toString().trim();
+      const compatibleModels =
+        row['Compatible Models']?.toString().trim() ||
+        row['compatible_models']?.toString().trim() ||
+        row['Compatible Model']?.toString().trim() ||
+        row['compatible_model']?.toString().trim();
+      const modelIdsRaw = row['model_ids'] || row['Model IDs'];
+      const modelIds = Array.isArray(modelIdsRaw)
+        ? modelIdsRaw
+        : typeof modelIdsRaw === 'string'
+          ? modelIdsRaw.split(',')
+          : [];
+      const sellingPrice = Number(
+        row['Selling Price'] || row['Retail Price'] || row['selling_price'] || 0,
+      );
 
       if (!itemName) {
         if (row['Part Name']) itemName = row['Part Name'].toString().trim();
@@ -67,7 +85,7 @@ export class ExcelHandler {
 
       if (!itemTypeRaw) {
         if (row['Model Name'] || row['model_no']) itemTypeRaw = 'MODEL';
-        else if (row['Part Name'] || itemCode || row['part_name']) itemTypeRaw = 'SPARE PART';
+        else if (row['Part Name'] || sku || row['part_name']) itemTypeRaw = 'SPARE PART';
       }
 
       let brandFromExcel = row['Brand']?.toString().trim();
@@ -102,6 +120,10 @@ export class ExcelHandler {
         itemType,
         quantity,
         unitPrice,
+        sellingPrice,
+        mpn,
+        compatibleModels,
+        modelIds,
       };
 
       if (itemType === LotItemType.MODEL) {
@@ -117,9 +139,9 @@ export class ExcelHandler {
       } else {
         let sparePart: SparePart | null = null;
 
-        if (itemCode) {
+        if (sku) {
           sparePart = await Source.getRepository(SparePart).findOne({
-            where: { item_code: itemCode },
+            where: { sku: sku },
             relations: { model: true },
           });
         }
@@ -197,6 +219,8 @@ export class ExcelHandler {
       'Type',
       'Name/Model',
       'Brand',
+      'Manufacturing Part Number',
+      'Compatible Models',
       'Quantity (Total)',
       'Quantity (Used)',
       'Remaining',
@@ -218,6 +242,8 @@ export class ExcelHandler {
         item.itemType,
         name || 'N/A',
         brand || 'N/A',
+        item.sparePart?.mpn || item.mpn || 'N/A',
+        item.sparePart?.compatible_models || item.compatibleModels || 'N/A',
         item.expectedQuantity,
         item.usedQuantity,
         remaining,
@@ -233,6 +259,7 @@ export class ExcelHandler {
       { wch: 20 },
       { wch: 30 },
       { wch: 20 },
+      { wch: 20 }, // mpn
       { wch: 15 },
       { wch: 15 },
       { wch: 15 },
@@ -350,12 +377,14 @@ export class ExcelHandler {
     const rows: (string | number)[][] = [];
 
     rows.push([
-      'item_code',
+      'sku',
       'part_name',
       'brand',
+      'Manufacturing Part Number',
       'Select Spare Parts from Lot',
-      'compatible_model',
+      'Compatible Model',
       'model_id',
+      'Compatible Models',
       'base_price',
       'quantity',
       'lot_id',
@@ -364,7 +393,7 @@ export class ExcelHandler {
 
     sparePartItems.forEach((item) => {
       const remaining = item.receivedQuantity - item.usedQuantity;
-      const itemCode = item.sparePart?.item_code || '';
+      const sku = item.sparePart?.sku || '';
       const partName = item.sparePart?.part_name || '';
       const brand = item.sparePart?.brand || '';
       // Use the model linked to the spare part master record (item.sparePart.model),
@@ -373,15 +402,17 @@ export class ExcelHandler {
       const modelId = item.sparePart?.model_id || sparePartModel?.id || '';
 
       // For spare parts, the 'Select Spare Parts from Lot' column should be the part name itself
-      const selectSparePartFromLot = `${itemCode} - ${partName}`;
+      const selectSparePartFromLot = `${sku} - ${partName}`;
 
       rows.push([
-        itemCode,
+        sku,
         partName,
         brand,
+        item.sparePart?.mpn || item.mpn || '',
         selectSparePartFromLot,
-        sparePartModel?.model_name || 'Universal', // Use actual model name
+        sparePartModel?.model_name || 'Universal',
         modelId,
+        item.compatibleModels || '',
         item.unitPrice,
         remaining,
         lot.id,
@@ -393,16 +424,18 @@ export class ExcelHandler {
     const worksheet = XLSX.utils.aoa_to_sheet(rows);
 
     const wscols = [
-      { wch: 15 }, // item_code
-      { wch: 20 },
-      { wch: 30 },
-      { wch: 40 },
-      { wch: 30 }, // compatible_model
-      { wch: 20 },
-      { wch: 15 },
-      { wch: 12 },
-      { wch: 38 },
-      { wch: 38 },
+      { wch: 15 }, // sku
+      { wch: 20 }, // part_name
+      { wch: 15 }, // brand
+      { wch: 20 }, // mpn
+      { wch: 30 }, // Select Spare Parts from Lot
+      { wch: 20 }, // compatible_model
+      { wch: 38 }, // model_id
+      { wch: 40 }, // compatible_models (multi-select text)
+      { wch: 12 }, // base_price
+      { wch: 10 }, // quantity
+      { wch: 38 }, // lot_id
+      { wch: 38 }, // warehouse_id
     ];
     worksheet['!cols'] = wscols;
 

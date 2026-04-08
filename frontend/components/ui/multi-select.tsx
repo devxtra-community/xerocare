@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { Check, ChevronsUpDown, Loader2, Search, X } from 'lucide-react';
+import { Check, ChevronsUpDown, Loader2, Search } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -22,6 +22,7 @@ interface MultiSelectProps {
   placeholder?: string;
   emptyText?: string;
   loading?: boolean;
+  disabled?: boolean;
   className?: string;
 }
 
@@ -32,6 +33,7 @@ export function MultiSelect({
   placeholder = 'Select options...',
   emptyText = 'No results found.',
   loading = false,
+  disabled = false,
   className,
 }: MultiSelectProps) {
   const [open, setOpen] = React.useState(false);
@@ -64,58 +66,43 @@ export function MultiSelect({
     }
   };
 
-  const handleRemove = (valueToRemove: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    onValuesChange(values.filter((v) => v !== valueToRemove));
-  };
-
   return (
-    <Popover open={open} onOpenChange={setOpen} modal={true}>
-      <PopoverTrigger asChild>
+    <Popover open={disabled ? false : open} onOpenChange={setOpen} modal={true}>
+      <PopoverTrigger asChild disabled={disabled}>
         <Button
           variant="outline"
           role="combobox"
           aria-expanded={open}
           className={cn(
-            'w-full justify-between min-h-10 px-3 bg-card hover:bg-muted/50 border-input text-foreground h-auto items-center flex-wrap gap-1 py-1.5',
+            'w-full justify-between h-10 font-normal px-3 bg-card hover:bg-muted/50 border-input text-foreground items-center flex overflow-hidden',
             className,
           )}
         >
-          {selectedOptions.length > 0 ? (
-            <div className="flex flex-wrap gap-1 items-center max-w-[90%] pointer-events-auto">
-              {selectedOptions.map((option) => (
+          <div className="flex items-center gap-1 flex-1 min-w-0 overflow-hidden">
+            {selectedOptions.length > 0 ? (
+              <>
                 <Badge
-                  key={option.value}
                   variant="secondary"
-                  className="mr-1 py-0.5 px-2 text-xs font-normal"
+                  className="mr-1 py-0.5 px-2 text-xs font-normal whitespace-nowrap overflow-hidden text-ellipsis max-w-[70%]"
                 >
-                  {option.label}
-                  <div
-                    role="button"
-                    tabIndex={0}
-                    className="ml-1 rounded-full outline-none ring-offset-background focus:ring-2 focus:ring-ring focus:ring-offset-2 hover:bg-destructive hover:text-destructive-foreground z-10 cursor-pointer"
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        handleRemove(option.value, e as unknown as React.MouseEvent);
-                      }
-                    }}
-                    onMouseDown={(e) => {
-                      e.preventDefault();
-                      handleRemove(option.value, e);
-                    }}
-                  >
-                    <X className="h-3 w-3" />
-                  </div>
+                  {selectedOptions[0].label}
                 </Badge>
-              ))}
-            </div>
-          ) : (
-            <span className="text-muted-foreground font-normal text-sm">{placeholder}</span>
-          )}
+                {selectedOptions.length > 1 && (
+                  <Badge variant="secondary" className="py-0.5 px-2 text-xs font-normal shrink-0">
+                    +{selectedOptions.length - 1}
+                  </Badge>
+                )}
+              </>
+            ) : (
+              <span className="text-muted-foreground font-normal text-sm truncate">
+                {placeholder}
+              </span>
+            )}
+          </div>
           {loading ? (
-            <Loader2 className="ml-2 h-4 w-4 shrink-0 opacity-50 animate-spin" />
+            <Loader2 className="h-4 w-4 shrink-0 opacity-50 animate-spin" />
           ) : (
-            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+            <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50" />
           )}
         </Button>
       </PopoverTrigger>

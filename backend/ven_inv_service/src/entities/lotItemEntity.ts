@@ -81,8 +81,20 @@ export class LotItem {
   @Column({ name: 'custom_spare_part_name', type: 'varchar', nullable: true })
   customSparePartName?: string;
 
+  @Column({ name: 'mpn', type: 'varchar', nullable: true })
+  mpn?: string;
+
+  @Column({ name: 'compatible_models', type: 'text', nullable: true })
+  compatibleModels?: string;
+
+  @Column({ name: 'model_ids', type: 'simple-json', nullable: true })
+  modelIds?: string[];
+
   @Column({ name: 'unit_price', type: 'decimal', precision: 12, scale: 2 })
   unitPrice!: number;
+
+  @Column({ name: 'selling_price', type: 'decimal', precision: 12, scale: 2, default: 0 })
+  sellingPrice!: number;
 
   @Column({ name: 'total_price', type: 'decimal', precision: 12, scale: 2 })
   totalPrice!: number;

@@ -9,7 +9,7 @@ interface PurchaseStatsProps {
 }
 
 /**
- * Component displaying summary statistics for purchases.
+ * Component displaying summary statistics for lot amounts.
  * Visualizes Key Performance Indicators (KPIs) like Total Cost, Vendor Count, and Item Volumes.
  */
 export default function PurchaseStats({
@@ -23,13 +23,13 @@ export default function PurchaseStats({
       <StatCard
         title="Total Cost"
         value={`QAR ${totalCost.toLocaleString()}`}
-        subtitle="All Purchases"
+        subtitle="All Lot Amounts"
       />
       <StatCard title="Total Vendors" value={totalVendors.toString()} subtitle="Active Vendors" />
       <StatCard
-        title="Total Products"
+        title="Total Lot Records"
         value={totalProducts.toString()}
-        subtitle="Items Purchased"
+        subtitle="Records Tracked"
       />
       <StatCard
         title="Total Paid"

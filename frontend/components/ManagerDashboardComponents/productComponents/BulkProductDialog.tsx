@@ -17,9 +17,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 import { productService, BulkProductRow } from '@/services/productService';
 import { commonService, Vendor, Warehouse } from '@/services/commonService';
 import { lotService, Lot, LotItemType } from '@/lib/lot';
+import { modelService, Model } from '@/services/modelService';
+import { getBrands, Brand } from '@/lib/brand';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
 
@@ -48,26 +51,37 @@ export function BulkProductDialog({
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [lots, setLots] = useState<Lot[]>([]);
+  const [models, setModels] = useState<Model[]>([]);
+  const [brands, setBrands] = useState<Brand[]>([]);
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [file, setFile] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const loadDependencies = async () => {
-    const [vResult, wResult, lResult] = await Promise.allSettled([
+    const [vResult, wResult, lResult, mResult, bResult] = await Promise.allSettled([
       commonService.getAllVendors(),
       commonService.getWarehousesByBranch(),
       lotService.getAllLots(),
+      modelService.getAllModels(),
+      getBrands(),
     ]);
 
     if (vResult.status === 'fulfilled') setVendors(vResult.value);
-    else console.error('Failed to load vendors:', vResult.reason);
+    else if (vResult.status === 'rejected')
+      console.error('Failed to load vendors:', vResult.reason);
 
     if (wResult.status === 'fulfilled') setWarehouses(wResult.value);
-    else console.error('Failed to load warehouses:', wResult.reason);
+    else if (wResult.status === 'rejected')
+      console.error('Failed to load warehouses:', wResult.reason);
 
-    if (lResult.status === 'fulfilled') {
-      setLots(lResult.value.data || []);
-    } else console.error('Failed to load lots:', lResult.reason);
+    if (lResult.status === 'fulfilled') setLots(lResult.value.data || []);
+    else if (lResult.status === 'rejected') console.error('Failed to load lots:', lResult.reason);
+
+    if (mResult.status === 'fulfilled') setModels(mResult.value.data || []);
+    else if (mResult.status === 'rejected') console.error('Failed to load models:', mResult.reason);
+
+    if (bResult.status === 'fulfilled' && bResult.value.success) setBrands(bResult.value.data);
+    else if (bResult.status === 'rejected') console.error('Failed to load brands:', bResult.reason);
 
     // Only show a toast if vendors AND warehouses both failed (truly broken)
     if (vResult.status === 'rejected' && wResult.status === 'rejected') {
@@ -296,11 +310,14 @@ export function BulkProductDialog({
     if (!item) return;
 
     const modelUuid = item.modelId ?? item.model?.id ?? '';
+    const relevantModel = models.find((m) => m.id === modelUuid);
     const newRows = [...rows];
     newRows[index] = {
       ...newRows[index],
       model_id: modelUuid,
       model_no: modelUuid, // backend findbyid(row.model_no) expects the UUID
+      brand:
+        relevantModel?.brandRelation?.name || relevantModel?.brand?.name || rows[index].brand || '',
       // name is intentionally NOT auto-filled — user must type their own product name
     };
     setRows(newRows);
@@ -396,6 +413,7 @@ export function BulkProductDialog({
                   <TableRow>
                     <TableHead className="min-w-[180px]">Assign Lot</TableHead>
                     <TableHead className="min-w-[200px]">Select from Lot</TableHead>
+                    <TableHead className="min-w-[140px]">Brand</TableHead>
                     <TableHead className="min-w-[200px]">
                       Model <span className="text-red-500">*</span>
                     </TableHead>
@@ -405,7 +423,6 @@ export function BulkProductDialog({
                     <TableHead className="min-w-[180px]">
                       Name <span className="text-red-500">*</span>
                     </TableHead>
-                    <TableHead className="min-w-[140px]">Brand</TableHead>
                     <TableHead className="min-w-[180px]">
                       Warehouse <span className="text-red-500">*</span>
                     </TableHead>
@@ -416,10 +433,10 @@ export function BulkProductDialog({
                     <TableHead className="min-w-[150px]">MFD</TableHead>
                     <TableHead className="min-w-[120px]">Purchase Price</TableHead>
                     <TableHead className="min-w-[120px]">Sale Price</TableHead>
+                    <TableHead className="min-w-[130px]">Wholesale Price</TableHead>
                     <TableHead className="min-w-[100px]">Tax %</TableHead>
                     <TableHead className="min-w-[140px]">Print Colour</TableHead>
                     <TableHead className="min-w-[130px]">Max Discount</TableHead>
-                    <TableHead className="min-w-[130px]">Wholesale Price</TableHead>
                     <TableHead className="min-w-[60px]"></TableHead>
                   </TableRow>
                 </TableHeader>
@@ -438,64 +455,76 @@ export function BulkProductDialog({
                       <TableRow key={i}>
                         {/* ── Assign Lot ── */}
                         <TableCell className="min-w-[180px]">
-                          <Select
+                          <SearchableSelect
                             value={row.lot_id ?? ''}
                             onValueChange={(v) => handleLotChange(i, v)}
-                          >
-                            <SelectTrigger className="min-w-full">
-                              <SelectValue placeholder="Select Lot" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="__none__">— None —</SelectItem>
-                              {lots.map((l) => (
-                                <SelectItem key={l.id} value={l.id}>
-                                  {l.lotNumber}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                            options={[
+                              { value: '__none__', label: '— None —' },
+                              ...lots.map((l) => ({ value: l.id, label: l.lotNumber })),
+                            ]}
+                            placeholder="Select Lot"
+                            emptyText="No lots"
+                          />
                         </TableCell>
 
                         {/* ── Select Product from Lot ── */}
                         <TableCell className="min-w-[200px]">
-                          <Select
+                          <SearchableSelect
                             value={selectedLotItemId}
                             disabled={!row.lot_id || lotModelItems.length === 0}
                             onValueChange={(v) => handleSelectFromLot(i, v, row.lot_id ?? '')}
-                          >
-                            <SelectTrigger className="min-w-full">
-                              <SelectValue
-                                placeholder={
-                                  !row.lot_id
-                                    ? 'Select a lot first'
-                                    : lotModelItems.length === 0
-                                      ? 'No models in lot'
-                                      : 'Pick model from lot'
-                                }
-                              />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {lotModelItems.map((item) => (
-                                <SelectItem key={item.id} value={item.id}>
-                                  {item.model?.model_name ?? item.modelId ?? item.id}
-                                  {item.receivedQuantity > 0 && (
-                                    <span className="ml-2 text-xs text-muted-foreground">
-                                      (qty: {item.receivedQuantity - item.usedQuantity})
-                                    </span>
-                                  )}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                            options={lotModelItems.map((item) => ({
+                              value: item.id || '',
+                              label: item.model?.model_name || item.modelId || item.id || '',
+                              description:
+                                item.receivedQuantity > 0
+                                  ? `(qty: ${item.receivedQuantity - item.usedQuantity})`
+                                  : undefined,
+                            }))}
+                            placeholder={
+                              !row.lot_id
+                                ? 'Select a lot first'
+                                : lotModelItems.length === 0
+                                  ? 'No models in lot'
+                                  : 'Pick model from lot'
+                            }
+                            emptyText="No models"
+                          />
                         </TableCell>
 
+                        <TableCell className="min-w-[140px]">
+                          <SearchableSelect
+                            value={row.brand || ''}
+                            onValueChange={(v) => {
+                              updateRow(i, 'brand', v);
+                              updateRow(i, 'model_id', '');
+                            }}
+                            options={brands.map((b) => ({
+                              value: b.name || '',
+                              label: b.name || '',
+                            }))}
+                            placeholder="Brand"
+                            emptyText="No brands"
+                          />
+                        </TableCell>
                         {/* ── Model ID ── */}
                         <TableCell className="min-w-[200px]">
-                          <Input
-                            value={row.model_id}
-                            onChange={(e) => updateRow(i, 'model_id', e.target.value)}
-                            placeholder="Model ID (UUID)"
-                            className="min-w-full"
+                          <SearchableSelect
+                            value={row.model_id || ''}
+                            onValueChange={(v) => updateRow(i, 'model_id', v)}
+                            options={models
+                              .filter(
+                                (m) =>
+                                  !row.brand ||
+                                  m.brandRelation?.name === row.brand ||
+                                  m.brand?.name === row.brand,
+                              )
+                              .map((m) => ({
+                                value: m.id || '',
+                                label: `${m.model_no} - ${m.model_name}`,
+                              }))}
+                            placeholder="Model"
+                            emptyText="No models"
                           />
                         </TableCell>
 
@@ -515,47 +544,29 @@ export function BulkProductDialog({
                             className="min-w-full"
                           />
                         </TableCell>
-                        <TableCell className="min-w-[140px]">
-                          <Input
-                            value={row.brand}
-                            onChange={(e) => updateRow(i, 'brand', e.target.value)}
-                            placeholder="Brand"
-                            className="min-w-full"
+                        <TableCell className="min-w-[180px]">
+                          <SearchableSelect
+                            value={row.warehouse_id || ''}
+                            onValueChange={(v) => updateRow(i, 'warehouse_id', v)}
+                            options={warehouses.map((w) => ({
+                              value: w.id || '',
+                              label: w.warehouseName || '',
+                            }))}
+                            placeholder="Select"
+                            emptyText="No warehouses"
                           />
                         </TableCell>
                         <TableCell className="min-w-[180px]">
-                          <Select
-                            value={row.warehouse_id}
-                            onValueChange={(v) => updateRow(i, 'warehouse_id', v)}
-                          >
-                            <SelectTrigger className="min-w-full">
-                              <SelectValue placeholder="Select" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {warehouses.map((w) => (
-                                <SelectItem key={w.id} value={w.id}>
-                                  {w.warehouseName}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </TableCell>
-                        <TableCell className="min-w-[180px]">
-                          <Select
-                            value={String(row.vendor_id)}
+                          <SearchableSelect
+                            value={String(row.vendor_id || '')}
                             onValueChange={(v) => updateRow(i, 'vendor_id', v)}
-                          >
-                            <SelectTrigger className="min-w-full">
-                              <SelectValue placeholder="Select" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {vendors.map((v) => (
-                                <SelectItem key={v.id} value={String(v.id)}>
-                                  {v.name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                            options={vendors.map((v) => ({
+                              value: String(v.id || ''),
+                              label: v.name || '',
+                            }))}
+                            placeholder="Select"
+                            emptyText="No vendors"
+                          />
                         </TableCell>
                         <TableCell className="min-w-[130px]">
                           <Select
@@ -606,6 +617,17 @@ export function BulkProductDialog({
                             className="min-w-full"
                           />
                         </TableCell>
+                        <TableCell className="min-w-[130px]">
+                          <Input
+                            type="number"
+                            value={row.wholesale_price}
+                            onChange={(e) =>
+                              updateRow(i, 'wholesale_price', Number(e.target.value))
+                            }
+                            placeholder="0"
+                            className="min-w-full"
+                          />
+                        </TableCell>
                         <TableCell className="min-w-[100px]">
                           <Input
                             type="number"
@@ -635,17 +657,6 @@ export function BulkProductDialog({
                             value={row.max_discount_amount}
                             onChange={(e) =>
                               updateRow(i, 'max_discount_amount', Number(e.target.value))
-                            }
-                            placeholder="0"
-                            className="min-w-full"
-                          />
-                        </TableCell>
-                        <TableCell className="min-w-[130px]">
-                          <Input
-                            type="number"
-                            value={row.wholesale_price}
-                            onChange={(e) =>
-                              updateRow(i, 'wholesale_price', Number(e.target.value))
                             }
                             placeholder="0"
                             className="min-w-full"

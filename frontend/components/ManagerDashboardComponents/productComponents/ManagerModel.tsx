@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Search, Plus, X } from 'lucide-react';
+import { Search, Plus, X, Copy } from 'lucide-react';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import {
   Table,
@@ -177,7 +177,22 @@ export default function ManagerModel() {
               filtered.map((m, i) => (
                 <TableRow key={m.id} className={i % 2 ? 'bg-sky-100/60' : ''}>
                   <TableCell className="px-4 text-center">{m.brandRelation?.name || '-'}</TableCell>
-                  <TableCell className="px-4 text-center">{m.model_no}</TableCell>
+                  <TableCell className="px-4">
+                    <div className="flex items-center justify-center gap-2 group">
+                      <span className="font-mono text-[13px]">{m.model_no}</span>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigator.clipboard.writeText(m.model_no || '');
+                          toast.success('Copied to clipboard');
+                        }}
+                        className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-slate-100 rounded text-slate-400 hover:text-primary"
+                        title="Copy Model ID"
+                      >
+                        <Copy size={12} />
+                      </button>
+                    </div>
+                  </TableCell>
                   <TableCell className="px-4 font-medium text-center">{m.model_name}</TableCell>
                   <TableCell className="px-4 text-center">{m.hs_code || '-'}</TableCell>
                   <TableCell className="px-4 font-semibold text-blue-600 text-center">

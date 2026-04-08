@@ -237,7 +237,10 @@ export default function InventorySparePartsTable({
                   Part Name
                 </TableHead>
                 <TableHead className="text-xs font-semibold text-primary uppercase px-6">
-                  Item Code
+                  SKU
+                </TableHead>
+                <TableHead className="text-xs font-semibold text-primary uppercase px-6">
+                  MPN
                 </TableHead>
                 <TableHead className="text-xs font-semibold text-primary uppercase px-6">
                   Brand
@@ -252,7 +255,7 @@ export default function InventorySparePartsTable({
                   In Stock
                 </TableHead>
                 <TableHead className="text-xs font-semibold text-primary uppercase px-6 text-center">
-                  Unit Price
+                  SELLING PRICE
                 </TableHead>
                 <TableHead className="text-xs font-semibold text-primary uppercase px-6 text-right pr-6">
                   Actions
@@ -276,7 +279,10 @@ export default function InventorySparePartsTable({
                       {item.part_name}
                     </TableCell>
                     <TableCell className="px-6 py-4 text-gray-600 font-mono text-[11px]">
-                      {item.item_code}
+                      {item.sku}
+                    </TableCell>
+                    <TableCell className="px-6 py-4 text-blue-600 font-mono text-[11px] font-medium">
+                      {item.mpn || '-'}
                     </TableCell>
                     <TableCell className="px-6 py-4 text-gray-600 font-medium">
                       {item.brand}

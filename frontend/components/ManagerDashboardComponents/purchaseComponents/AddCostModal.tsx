@@ -69,11 +69,11 @@ export default function AddCostModal({
           <DialogHeader>
             <DialogTitle className="text-xl font-bold flex items-center gap-2">
               <Banknote className="text-emerald-400" />
-              Add Purchase Cost
+              Add Record Cost
             </DialogTitle>
           </DialogHeader>
           <div className="mt-2 text-slate-400 text-xs">
-            Record additional expenses related to this purchase.
+            Record additional expenses related to this lot amount.
           </div>
         </div>
 

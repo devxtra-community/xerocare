@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Search, Plus, X, Eye } from 'lucide-react';
+import { Search, Plus, X, Eye, Copy } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import {
@@ -185,10 +185,48 @@ export default function ManagerProduct() {
           { id: 'brand', header: 'BRAND', accessorKey: 'brand' as keyof Product },
           {
             id: 'lot',
-            header: 'LOT NUMBER',
-            cell: (p: Product) => p.lot?.lotNumber || '-',
+            header: 'LOT ID',
+            cell: (p: Product) => (
+              <div className="flex items-center gap-2 group">
+                <span className="font-mono text-[11px]">{p.lot?.lotNumber || '-'}</span>
+                {p.lot?.lotNumber && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      navigator.clipboard.writeText(p.lot?.lotNumber || '');
+                      toast.success('Copied to clipboard');
+                    }}
+                    className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-slate-100 rounded text-slate-400 hover:text-primary"
+                    title="Copy Lot ID"
+                  >
+                    <Copy size={12} />
+                  </button>
+                )}
+              </div>
+            ),
           },
-          { id: 'serial', header: 'SERIAL NO', accessorKey: 'serial_no' as keyof Product },
+          {
+            id: 'serial',
+            header: 'SERIAL NO',
+            cell: (p: Product) => (
+              <div className="flex items-center gap-2 group">
+                <span className="font-mono text-[11px]">{p.serial_no || '-'}</span>
+                {p.serial_no && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      navigator.clipboard.writeText(p.serial_no);
+                      toast.success('Copied to clipboard');
+                    }}
+                    className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-slate-100 rounded text-slate-400 hover:text-primary"
+                    title="Copy Serial No"
+                  >
+                    <Copy size={12} />
+                  </button>
+                )}
+              </div>
+            ),
+          },
           { id: 'price', header: 'PRICE', cell: (p: Product) => formatCurrency(p.sale_price) },
           { id: 'color', header: 'PRINT COLOUR', accessorKey: 'print_colour' as keyof Product },
           {

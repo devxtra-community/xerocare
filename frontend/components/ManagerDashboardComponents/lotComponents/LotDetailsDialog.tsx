@@ -19,7 +19,6 @@ import {
   AlertTriangle,
   Plus,
   Pencil,
-  ArrowRight,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
@@ -520,6 +519,7 @@ export default function LotDetailsDialog({ lot, onClose, onSuccess }: LotDetails
                   <TableRow className="hover:bg-transparent">
                     <TableHead className="w-[100px]">Type</TableHead>
                     <TableHead>Item Name</TableHead>
+                    <TableHead>MPN</TableHead>
                     <TableHead>Item Model</TableHead>
                     <TableHead className="text-right">Expected</TableHead>
                     <TableHead className="text-right">
@@ -531,9 +531,6 @@ export default function LotDetailsDialog({ lot, onClose, onSuccess }: LotDetails
                     )}
                     <TableHead className="text-right">Price</TableHead>
                     <TableHead className="text-right">Total</TableHead>
-                    {currentLot.status === LotStatus.RECEIVED && (
-                      <TableHead className="text-center">Inv.</TableHead>
-                    )}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -571,13 +568,17 @@ export default function LotDetailsDialog({ lot, onClose, onSuccess }: LotDetails
                                   item.customSparePartName ||
                                   'Unnamed Spare'}
                             </span>
-                            {item.itemType === LotItemType.SPARE_PART &&
-                              item.sparePart?.item_code && (
-                                <span className="text-[10px] text-slate-400 font-mono">
-                                  {item.sparePart.item_code}
-                                </span>
-                              )}
+                            {item.itemType === LotItemType.SPARE_PART && item.sparePart?.sku && (
+                              <span className="text-[10px] text-slate-400 font-mono">
+                                {item.sparePart.sku}
+                              </span>
+                            )}
                           </div>
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-xs font-mono text-blue-600 font-medium">
+                            {item.sparePart?.mpn || item.mpn || '—'}
+                          </span>
                         </TableCell>
                         {/* Item Model column */}
                         <TableCell>
@@ -597,7 +598,7 @@ export default function LotDetailsDialog({ lot, onClose, onSuccess }: LotDetails
                           )}
                         </TableCell>
                         <TableCell className="text-right text-slate-400 font-medium">
-                          / {item.expectedQuantity}
+                          {item.expectedQuantity}
                         </TableCell>
                         <TableCell className="text-right">
                           {isReceiving ? (
@@ -665,19 +666,6 @@ export default function LotDetailsDialog({ lot, onClose, onSuccess }: LotDetails
                         <TableCell className="text-right font-bold text-slate-900">
                           {formatCurrency(Number(item.totalPrice))}
                         </TableCell>
-                        {currentLot.status === LotStatus.RECEIVED && (
-                          <TableCell className="text-center">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-7 w-7 p-0 text-primary hover:text-primary hover:bg-primary/10 rounded-full"
-                              title="Add to Inventory"
-                              onClick={() => handleAddToInventory(item.id, item.itemType)}
-                            >
-                              <ArrowRight size={14} />
-                            </Button>
-                          </TableCell>
-                        )}
                       </TableRow>
                     );
                   })}
@@ -700,7 +688,7 @@ export default function LotDetailsDialog({ lot, onClose, onSuccess }: LotDetails
                   <Button
                     variant="outline"
                     size="sm"
-                    className="h-7 text-[10px] gap-1.5 border-orange-200 text-orange-700 hover:bg-orange-50"
+                    className="h-7 text-[10px] gap-1.5 border-orange-200 text-orange-700"
                     onClick={() => handleAddToInventory(undefined, LotItemType.SPARE_PART)}
                   >
                     <Plus size={12} /> Add Spare to Inventory

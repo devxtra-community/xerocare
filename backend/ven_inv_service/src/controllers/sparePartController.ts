@@ -148,7 +148,10 @@ export const deleteSparePart = async (req: Request, res: Response) => {
     res.status(200).json(result);
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Internal server error';
-    const status = message.includes('inventory') ? 409 : 500;
+    const status =
+      message.includes('quantity') || message.includes('lot') || message.includes('inventory')
+        ? 400
+        : 500;
     res.status(status).json({ success: false, message });
   }
 };

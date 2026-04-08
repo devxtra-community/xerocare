@@ -1,4 +1,4 @@
-import { DataSource, EntityManager } from 'typeorm';
+import { DataSource, EntityManager, In } from 'typeorm';
 import { Rfq, RfqStatus } from '../entities/rfqEntity';
 import { RfqItem, ItemType } from '../entities/rfqItemEntity';
 import { RfqVendor, RfqVendorStatus } from '../entities/rfqVendorEntity';
@@ -28,6 +28,9 @@ interface CreateRfqDto {
     customSparePartName?: string;
     customBrandName?: string;
     hsCode?: string;
+    mpn?: string;
+    compatibleModels?: string;
+    modelIds?: string[];
     description?: string;
     quantity: number;
     expectedDeliveryDate?: Date;
@@ -105,6 +108,11 @@ export class RfqService {
         let customSparePartName: string | undefined = undefined;
         const customBrandName: string | undefined = row.brand ? String(row.brand) : undefined;
         const hsCode: string | undefined = row.hs_code ? String(row.hs_code) : undefined;
+        const mpn: string | undefined = row.mpn ? String(row.mpn) : undefined;
+        const compatibleModels: string | undefined =
+          row.compatible_models || row.compatible_model
+            ? String(row.compatible_models || row.compatible_model)
+            : undefined;
 
         if (itemType === ItemType.PRODUCT) {
           if (!modelIdRaw && !itemName)
@@ -155,8 +163,8 @@ export class RfqService {
           } else {
             sparePart = await manager.findOne(SparePart, { where: { part_name: searchName } });
             if (!sparePart) {
-              // Also try matching by item_code
-              sparePart = await manager.findOne(SparePart, { where: { item_code: searchName } });
+              // Also try matching by SKU
+              sparePart = await manager.findOne(SparePart, { where: { sku: searchName } });
             }
           }
 
@@ -187,6 +195,8 @@ export class RfqService {
             custom_spare_part_name: customSparePartName,
             custom_brand_name: customBrandName,
             hs_code: hsCode,
+            mpn: mpn,
+            compatible_models: compatibleModels,
             description: description !== itemName ? description : undefined,
             quantity,
           }),
@@ -249,6 +259,9 @@ export class RfqService {
             custom_spare_part_name: i.customSparePartName,
             custom_brand_name: i.customBrandName,
             hs_code: i.hsCode,
+            mpn: i.mpn,
+            compatible_models: i.compatibleModels,
+            modelIds: i.modelIds,
             description: i.description,
             quantity: i.quantity,
             expected_delivery_date: i.expectedDeliveryDate,
@@ -301,7 +314,9 @@ export class RfqService {
       { header: 'item', key: 'item', width: 15 },
       { header: 'model_name', key: 'model_name', width: 20 },
       { header: 'product_name', key: 'product_name', width: 25 },
-      { header: 'hs_code', key: 'hs_code', width: 15 },
+      { header: 'HS Code', key: 'hs_code', width: 15 },
+      { header: 'Manufacturing Part Number', key: 'mpn', width: 20 },
+      { header: 'Compatible Models', key: 'compatible_models', width: 25 },
       { header: 'description', key: 'description', width: 30 },
       { header: 'quantity', key: 'quantity', width: 15 },
       { header: 'unit_price', key: 'unit_price', width: 15 },
@@ -316,6 +331,8 @@ export class RfqService {
     for (const item of rfqWithFullItems.items) {
       let modelId = '';
       let hsCode = '';
+      let mpn = '';
+      let compatibleModels = '';
       let desc = '';
       let partName = '';
 
@@ -349,6 +366,19 @@ export class RfqService {
           modelId = '';
         }
         hsCode = item.hs_code || '';
+        mpn = item.mpn || '';
+        compatibleModels = item.compatible_models || '';
+
+        if (item.modelIds && item.modelIds.length > 0) {
+          if (item.modelIds.includes('universal')) {
+            compatibleModels = 'Universal';
+          } else {
+            const models_records = await modelRepo.find({
+              where: { id: In(item.modelIds) },
+            });
+            compatibleModels = models_records.map((m) => m.model_name || m.model_no).join(', ');
+          }
+        }
       }
 
       if (item.description) {
@@ -360,6 +390,8 @@ export class RfqService {
         model_name: modelId,
         product_name: partName,
         hs_code: hsCode,
+        mpn: mpn,
+        compatible_models: compatibleModels,
         description: desc,
         quantity: item.quantity,
         unit_price: '',
@@ -431,7 +463,9 @@ export class RfqService {
       { header: 'item', key: 'item', width: 15 },
       { header: 'model_name', key: 'model_name', width: 20 },
       { header: 'product_name', key: 'product_name', width: 25 },
-      { header: 'hs_code', key: 'hs_code', width: 15 },
+      { header: 'HS Code', key: 'hs_code', width: 15 },
+      { header: 'Manufacturing Part Number', key: 'mpn', width: 20 },
+      { header: 'Compatible Models', key: 'compatible_models', width: 25 },
       { header: 'description', key: 'description', width: 30 },
       { header: 'quantity', key: 'quantity', width: 15 },
       { header: 'unit_price', key: 'unit_price', width: 15 },
@@ -446,6 +480,8 @@ export class RfqService {
     for (const item of rfq.items) {
       let modelId = '';
       let hsCode = '';
+      let mpn = '';
+      let compatibleModels = '';
       let desc = '';
       let partName = '';
 
@@ -487,6 +523,19 @@ export class RfqService {
           modelId = '';
         }
         hsCode = item.hs_code || '';
+        mpn = item.mpn || '';
+        compatibleModels = item.compatible_models || '';
+
+        if (item.modelIds && item.modelIds.length > 0) {
+          if (item.modelIds.includes('universal')) {
+            compatibleModels = 'Universal';
+          } else {
+            const models_records = await this.dataSource.getRepository(Model).find({
+              where: { id: In(item.modelIds) },
+            });
+            compatibleModels = models_records.map((m) => m.model_name || m.model_no).join(', ');
+          }
+        }
       }
 
       if (item.description) {
@@ -500,6 +549,8 @@ export class RfqService {
         model_name: modelId,
         product_name: partName,
         hs_code: hsCode,
+        mpn: mpn,
+        compatible_models: compatibleModels,
         description: desc,
         quantity: item.quantity,
         unit_price: vendorItem?.unit_price || '',
@@ -879,6 +930,9 @@ export class RfqService {
           sparePartId,
           customProductName,
           customSparePartName,
+          mpn: quotedItem.rfq_item.mpn,
+          compatibleModels: quotedItem.rfq_item.compatible_models,
+          modelIds: quotedItem.rfq_item.modelIds,
           expectedQuantity: quotedItem.available_quantity ?? quotedItem.rfq_item.quantity,
           unitPrice: quotedItem.unit_price,
           totalPrice: quotedItem.total_price,

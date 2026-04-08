@@ -108,7 +108,7 @@ export class InventoryRepository {
         'model.model_no AS model_no',
         'model.model_name AS model_name',
         'spare_part.part_name AS spare_name',
-        'spare_part.item_code AS part_code',
+        'spare_part.sku AS part_code',
         'product.name AS product_name',
         'product.imageUrl AS image_url',
         'brandRelation.name AS brand',
@@ -135,7 +135,7 @@ export class InventoryRepository {
       .addGroupBy('model.model_no')
       .addGroupBy('model.model_name')
       .addGroupBy('spare_part.part_name')
-      .addGroupBy('spare_part.item_code')
+      .addGroupBy('spare_part.sku')
       .addGroupBy('product.name')
       .addGroupBy('product.imageUrl')
       .addGroupBy('product.vendor_id')

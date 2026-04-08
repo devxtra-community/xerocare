@@ -27,8 +27,8 @@ interface EditPurchaseDialogProps {
 }
 
 /**
- * Dialog component for editing an existing purchase record.
- * Pre-fills the form with current purchase data and allows updates to details and status.
+ * Dialog component for editing an existing lot amount record.
+ * Pre-fills the form with current lot amount data and allows updates to details and status.
  */
 export default function EditPurchaseDialog({
   open,
@@ -57,12 +57,12 @@ export default function EditPurchaseDialog({
     setLoading(true);
     try {
       await purchaseService.updatePurchase(purchase.id, formData);
-      toast.success('Purchase updated successfully');
+      toast.success('Lot amount updated successfully');
       onSuccess();
       onOpenChange(false);
     } catch (error: unknown) {
       const err = error as { response?: { data?: { message?: string } } };
-      const msg = err.response?.data?.message || 'Failed to update purchase';
+      const msg = err.response?.data?.message || 'Failed to update lot amount';
       toast.error(msg);
     } finally {
       setLoading(false);
@@ -77,9 +77,11 @@ export default function EditPurchaseDialog({
             <Pencil className="h-6 w-6 text-white" />
           </div>
           <div>
-            <DialogTitle className="text-xl font-bold text-white">Edit Purchase Costs</DialogTitle>
+            <DialogTitle className="text-xl font-bold text-white">
+              Edit Lot Amount Costs
+            </DialogTitle>
             <DialogDescription className="text-white/70 text-sm">
-              Update the financial breakdown for Purchase ID: {purchase.id.slice(0, 8)}
+              Update the financial breakdown for Record ID: {purchase.id.slice(0, 8)}
             </DialogDescription>
           </div>
         </div>

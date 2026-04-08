@@ -13,15 +13,22 @@ import {
 import { Model } from './modelEntity';
 import { Branch } from './branchEntity';
 import { Lot } from './lotEntity';
+import { Warehouse } from './warehouseEntity';
+import { Vendor } from './vendorEntity';
 
 @Entity('spare_parts')
 export class SparePart {
   @PrimaryGeneratedColumn('uuid')
+  @Index()
   id!: string;
 
-  @Column({ name: 'item_code' })
+  @Column({ name: 'sku', nullable: false, unique: true })
   @Index()
-  item_code!: string; // Matches DB column
+  sku!: string;
+
+  @Column({ name: 'mpn', nullable: true })
+  @Index()
+  mpn?: string;
 
   @Column({ name: 'part_name' })
   part_name!: string;
@@ -31,6 +38,9 @@ export class SparePart {
 
   @Column({ type: 'text', nullable: true })
   description?: string;
+
+  @Column({ name: 'compatible_models', type: 'text', nullable: true })
+  compatible_models?: string;
 
   @Column({ name: 'model_id', type: 'uuid', nullable: true }) // Nullable implies universal parts
   model_id?: string;
@@ -61,6 +71,20 @@ export class SparePart {
   @ManyToOne(() => Lot, { nullable: true })
   @JoinColumn({ name: 'lot_id' })
   lot?: Lot;
+
+  @Column({ name: 'warehouse_id', type: 'uuid', nullable: true })
+  warehouse_id?: string;
+
+  @ManyToOne(() => Warehouse, { nullable: true })
+  @JoinColumn({ name: 'warehouse_id' })
+  warehouse?: Warehouse;
+
+  @Column({ name: 'vendor_id', type: 'uuid', nullable: true })
+  vendor_id?: string;
+
+  @ManyToOne(() => Vendor, { nullable: true })
+  @JoinColumn({ name: 'vendor_id' })
+  vendor?: Vendor;
 
   @Column({ name: 'base_price', type: 'decimal', precision: 12, scale: 2, default: 0 })
   base_price!: number;

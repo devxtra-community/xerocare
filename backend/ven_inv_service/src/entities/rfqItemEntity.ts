@@ -60,6 +60,15 @@ export class RfqItem {
   @Column({ type: 'varchar', length: 50, nullable: true })
   hs_code?: string;
 
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  mpn?: string;
+
+  @Column({ type: 'text', nullable: true })
+  compatible_models?: string;
+
+  @Column({ name: 'model_ids', type: 'simple-json', nullable: true })
+  modelIds?: string[];
+
   @Column({ type: 'text', nullable: true })
   description?: string;
 
