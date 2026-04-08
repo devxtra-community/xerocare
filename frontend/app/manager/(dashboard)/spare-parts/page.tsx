@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect, useCallback } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Upload, Search, Pencil, Trash2, Copy } from 'lucide-react';
 import { Input } from '@/components/ui/input';
@@ -13,6 +14,7 @@ import BulkSparePartDialog from '@/components/ManagerDashboardComponents/sparePa
 import { toast } from 'sonner';
 import EditSparePartDialog from '@/components/ManagerDashboardComponents/spareParts/EditSparePartDialog';
 import SparePartDetailDialog from '@/components/ManagerDashboardComponents/spareParts/SparePartDetailDialog';
+import { ErrorDialog } from '@/components/dialogs/ErrorDialog';
 
 export default function SparePartsPage() {
   const [bulkOpen, setBulkOpen] = useState(false);
@@ -28,10 +30,16 @@ export default function SparePartsPage() {
     null,
   );
 
+  const [errorDialogOpen, setErrorDialogOpen] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+
   const { page, limit, total, setPage, setLimit, setTotal } = usePagination(10);
   const [loading, setLoading] = useState(true);
   const [parts, setParts] = useState<SparePartInventoryItem[]>([]);
   const [search, setSearch] = useState('');
+  const searchParams = useSearchParams();
+  const [initialLotId, setInitialLotId] = useState<string | undefined>(undefined);
+  const [initialItemId, setInitialItemId] = useState<string | undefined>(undefined);
 
   const loadParts = useCallback(async () => {
     setLoading(true);
@@ -53,6 +61,16 @@ export default function SparePartsPage() {
     return () => clearTimeout(delayDebounceFn);
   }, [loadParts]);
 
+  useEffect(() => {
+    const lotId = searchParams.get('lotId');
+    const itemId = searchParams.get('itemId');
+    if (lotId) {
+      setInitialLotId(lotId);
+      setInitialItemId(itemId || undefined);
+      setBulkOpen(true);
+    }
+  }, [searchParams]);
+
   const confirmDelete = async () => {
     if (!partToDelete) return;
     try {
@@ -60,11 +78,12 @@ export default function SparePartsPage() {
       toast.success('Spare part deleted successfully');
       loadParts();
     } catch (error: unknown) {
-      console.error(error);
       const msg =
         (error as { response?: { data?: { message?: string } } })?.response?.data?.message ||
         'Failed to delete spare part';
-      toast.error(msg);
+
+      setErrorMessage(msg);
+      setErrorDialogOpen(true);
     } finally {
       setDeleteDialogOpen(false);
       setPartToDelete(null);
@@ -138,6 +157,17 @@ export default function SparePartsPage() {
               ),
             },
             {
+              id: 'sku',
+              header: 'SKU',
+              accessorKey: 'sku' as keyof SparePartInventoryItem,
+              className: 'font-semibold text-[11px] text-primary uppercase',
+              cell: (item: SparePartInventoryItem) => (
+                <span className="font-mono text-[11px] bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+                  {item.sku || '-'}
+                </span>
+              ),
+            },
+            {
               id: 'lotNumber',
               header: 'LOT ID',
               accessorKey: 'lotNumber' as keyof SparePartInventoryItem,
@@ -173,7 +203,7 @@ export default function SparePartsPage() {
             },
             {
               id: 'price',
-              header: 'PRICE',
+              header: 'SELLING PRICE',
               cell: (item: SparePartInventoryItem) => formatCurrency(item.price || 0),
               className: 'font-semibold text-[11px] text-primary uppercase',
             },
@@ -221,7 +251,19 @@ export default function SparePartsPage() {
       </div>
 
       {bulkOpen && (
-        <BulkSparePartDialog open={bulkOpen} onOpenChange={setBulkOpen} onSuccess={handleRefresh} />
+        <BulkSparePartDialog
+          open={bulkOpen}
+          onOpenChange={(open) => {
+            setBulkOpen(open);
+            if (!open) {
+              setInitialLotId(undefined);
+              setInitialItemId(undefined);
+            }
+          }}
+          onSuccess={handleRefresh}
+          initialLotId={initialLotId}
+          initialItemId={initialItemId}
+        />
       )}
 
       {addOpen && (
@@ -238,7 +280,14 @@ export default function SparePartsPage() {
       )}
 
       {detailOpen && selectedPartForDetail && (
-        <SparePartDetailDialog part={selectedPartForDetail} onClose={() => setDetailOpen(false)} />
+        <SparePartDetailDialog
+          part={selectedPartForDetail}
+          onClose={() => setDetailOpen(false)}
+          onEdit={() => {
+            setDetailOpen(false);
+            handleEdit(selectedPartForDetail);
+          }}
+        />
       )}
 
       <DeleteConfirmDialog
@@ -247,6 +296,12 @@ export default function SparePartsPage() {
         title="Delete Spare Part?"
         itemName={partToDelete?.name}
         onConfirm={confirmDelete}
+      />
+
+      <ErrorDialog
+        open={errorDialogOpen}
+        onOpenChange={setErrorDialogOpen}
+        message={errorMessage}
       />
     </div>
   );

@@ -3,7 +3,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Search, Plus, X, Eye } from 'lucide-react';
+import { Search, Plus, X, Eye, Copy } from 'lucide-react';
+import { useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import {
   Select,
@@ -44,6 +45,9 @@ export default function ManagerProduct() {
   const [deleting, setDeleting] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const searchParams = useSearchParams();
+  const [initialLotId, setInitialLotId] = useState<string | undefined>(undefined);
+  const [initialItemId, setInitialItemId] = useState<string | undefined>(undefined);
 
   const { page, limit, total, setPage, setLimit, setTotal } = usePagination(10);
   const [stats, setStats] = useState({ total: 0, inStock: 0, rented: 0, sold: 0 });
@@ -53,11 +57,11 @@ export default function ManagerProduct() {
       setLoading(true);
       const res = await productService.getAllProducts({ page, limit, search });
       setProducts(res.data);
-      setTotal(res.total || res.data.length);
+      setTotal(res.total);
 
-      // Keep naive stats calculation based on loaded data since API might not return global stats
+      // Total count from API, others remain naive based on current page
       setStats({
-        total: res.total || res.data.length,
+        total: res.total,
         inStock: res.data.filter((p) => p.product_status === 'AVAILABLE').length,
         rented: res.data.filter((p) => p.product_status === 'RENTED').length,
         sold: res.data.filter((p) => p.product_status === 'SOLD').length,
@@ -75,6 +79,16 @@ export default function ManagerProduct() {
     }, 500);
     return () => clearTimeout(delayDebounceFn);
   }, [fetchProducts]);
+
+  useEffect(() => {
+    const lotId = searchParams.get('lotId');
+    const itemId = searchParams.get('itemId');
+    if (lotId) {
+      setInitialLotId(lotId);
+      setInitialItemId(itemId || undefined);
+      setBulkDialogOpen(true);
+    }
+  }, [searchParams]);
 
   // Stats updated conditionally in fetchProducts
 
@@ -171,10 +185,48 @@ export default function ManagerProduct() {
           { id: 'brand', header: 'BRAND', accessorKey: 'brand' as keyof Product },
           {
             id: 'lot',
-            header: 'LOT NUMBER',
-            cell: (p: Product) => p.lot?.lotNumber || '-',
+            header: 'LOT ID',
+            cell: (p: Product) => (
+              <div className="flex items-center gap-2 group">
+                <span className="font-mono text-[11px]">{p.lot?.lotNumber || '-'}</span>
+                {p.lot?.lotNumber && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      navigator.clipboard.writeText(p.lot?.lotNumber || '');
+                      toast.success('Copied to clipboard');
+                    }}
+                    className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-slate-100 rounded text-slate-400 hover:text-primary"
+                    title="Copy Lot ID"
+                  >
+                    <Copy size={12} />
+                  </button>
+                )}
+              </div>
+            ),
           },
-          { id: 'serial', header: 'SERIAL NO', accessorKey: 'serial_no' as keyof Product },
+          {
+            id: 'serial',
+            header: 'SERIAL NO',
+            cell: (p: Product) => (
+              <div className="flex items-center gap-2 group">
+                <span className="font-mono text-[11px]">{p.serial_no || '-'}</span>
+                {p.serial_no && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      navigator.clipboard.writeText(p.serial_no);
+                      toast.success('Copied to clipboard');
+                    }}
+                    className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-slate-100 rounded text-slate-400 hover:text-primary"
+                    title="Copy Serial No"
+                  >
+                    <Copy size={12} />
+                  </button>
+                )}
+              </div>
+            ),
+          },
           { id: 'price', header: 'PRICE', cell: (p: Product) => formatCurrency(p.sale_price) },
           { id: 'color', header: 'PRINT COLOUR', accessorKey: 'print_colour' as keyof Product },
           {
@@ -242,8 +294,14 @@ export default function ManagerProduct() {
 
       <BulkProductDialog
         open={bulkDialogOpen}
-        onClose={() => setBulkDialogOpen(false)}
+        onClose={() => {
+          setBulkDialogOpen(false);
+          setInitialLotId(undefined);
+          setInitialItemId(undefined);
+        }}
         onSuccess={fetchProducts}
+        initialLotId={initialLotId}
+        initialItemId={initialItemId}
       />
 
       <Dialog open={!!previewImage} onOpenChange={() => setPreviewImage(null)}>
@@ -292,6 +350,7 @@ function ProductFormModal({
     model_id: string;
     vendor_id: string;
     warehouse_id: string;
+    purchase_price: string | number;
     sale_price: string | number;
     tax_rate: string | number;
     MFD: string;
@@ -308,6 +367,7 @@ function ProductFormModal({
     model_id: initialData?.model_id || initialData?.model?.id || '',
     vendor_id: initialData?.vendor_id || initialData?.vendor?.id || '',
     warehouse_id: initialData?.warehouse_id || initialData?.warehouse?.id || '',
+    purchase_price: initialData?.purchase_price ?? '',
     sale_price: initialData?.sale_price ?? '',
     tax_rate: initialData?.tax_rate ?? '',
     MFD: initialData?.MFD ? new Date(initialData.MFD).toISOString().split('T')[0] : '',
@@ -677,7 +737,16 @@ function ProductFormModal({
             />
           </Field>
 
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-3 gap-2">
+            <Field label="Purchase Price">
+              <Input
+                type="number"
+                value={form.purchase_price}
+                onChange={(e) => setForm({ ...form, purchase_price: Number(e.target.value) })}
+                placeholder="0"
+                required
+              />
+            </Field>
             <Field label="Sale Price">
               <Input
                 type="number"
@@ -786,7 +855,7 @@ function Modal({
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="bg-card rounded-2xl w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto">
+      <div className="bg-card rounded-2xl w-full max-w-4xl p-6 max-h-[90vh] overflow-y-auto">
         <div className="flex justify-between mb-4">
           <h2 className="font-semibold text-lg">{title}</h2>
           <button onClick={onClose}>

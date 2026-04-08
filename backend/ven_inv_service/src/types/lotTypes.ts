@@ -9,6 +9,9 @@ export interface CreateLotItemDto {
   partName?: string;
   quantity: number;
   unitPrice: number;
+  sellingPrice?: number;
+  mpn?: string;
+  compatibleModels?: string;
 }
 
 export interface CreateLotDto {

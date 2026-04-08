@@ -9,6 +9,7 @@ import { AppError } from '../errors/appError';
 import { CreateLotDto } from '../types/lotTypes';
 import { Model } from '../entities/modelEntity';
 import { logger } from '../config/logger';
+import { generateSku } from '../utils/skuGenerator';
 
 export class LotRepository {
   private get repo() {
@@ -49,9 +50,12 @@ export class LotRepository {
         lotItem.receivedQuantity = 0;
         lotItem.damagedQuantity = 0;
         lotItem.returnedQuantity = 0;
-        lotItem.usedQuantity = 0;
         lotItem.unitPrice = itemData.unitPrice;
+        lotItem.sellingPrice = itemData.sellingPrice || itemData.unitPrice;
         lotItem.totalPrice = itemData.quantity * itemData.unitPrice;
+        lotItem.mpn = itemData.mpn;
+        lotItem.compatibleModels = itemData.compatibleModels;
+        lotItem.modelIds = itemData.modelIds;
 
         if (itemData.itemType === LotItemType.MODEL) {
           if (!itemData.modelId) throw new AppError('Model ID required for Model item', 400);
@@ -147,11 +151,9 @@ export class LotRepository {
               sparePart.part_name = itemData.partName;
               sparePart.brand = brand;
               sparePart.branch_id = data.branchId;
-              sparePart.base_price = itemData.unitPrice || 0;
-
-              const timestamp = Date.now().toString(36).toUpperCase();
-              const random = Math.random().toString(36).substring(2, 6).toUpperCase();
-              sparePart.item_code = `SP-${timestamp}-${random}`;
+              sparePart.base_price = itemData.sellingPrice || itemData.unitPrice || 0;
+              sparePart.purchase_price = itemData.unitPrice || 0;
+              sparePart.sku = generateSku();
 
               if (spModelId) {
                 sparePart.model_id = spModelId;
@@ -163,6 +165,8 @@ export class LotRepository {
               }
 
               sparePart.lot_id = savedLot.id;
+              sparePart.mpn = itemData.mpn;
+              sparePart.compatible_models = itemData.compatibleModels;
               sparePart = await manager.save(SparePart, sparePart);
             }
 
@@ -241,7 +245,7 @@ export class LotRepository {
           .innerJoinAndSelect('lotItem.sparePart', 'sparePart')
           .where('lotItem.lotId = :lotId', { lotId })
           .andWhere('lotItem.itemType = :itemType', { itemType })
-          .andWhere('sparePart.item_code = :identifier', { identifier })
+          .andWhere('sparePart.sku = :identifier', { identifier })
           .setLock('pessimistic_write')
           .getOne();
       }

@@ -13,8 +13,11 @@ import {
   Settings,
   Award,
   FileText,
+  ChevronDown,
+  ChevronRight,
 } from 'lucide-react';
 
+import { useState, useEffect } from 'react';
 import {
   Sidebar,
   SidebarContent,
@@ -25,6 +28,9 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarMenuSub,
+  SidebarMenuSubItem,
+  SidebarMenuSubButton,
 } from '@/components/ui/sidebar';
 
 import { logout } from '@/lib/auth';
@@ -63,14 +69,25 @@ const menuItems = [
     href: '/manager/sales',
   },
   {
-    title: 'Vendors',
-    icon: Truck,
-    href: '/manager/vendors',
-  },
-  {
-    title: 'RFQs',
-    icon: FileText,
-    href: '/manager/rfqs',
+    title: 'Purchases',
+    icon: Wallet,
+    subItems: [
+      {
+        title: 'Vendors',
+        icon: Truck,
+        href: '/manager/vendors',
+      },
+      {
+        title: 'RFQs',
+        icon: FileText,
+        href: '/manager/rfqs',
+      },
+      {
+        title: 'Lot Amounts',
+        icon: Wallet,
+        href: '/manager/purchases',
+      },
+    ],
   },
   {
     title: 'Employees',
@@ -95,13 +112,8 @@ const menuItems = [
   },
   {
     title: 'Lots',
-    icon: Boxes, // Fallback to Boxes since we reclaimed Package for Warehouse, adjusting
+    icon: Boxes,
     href: '/manager/lots',
-  },
-  {
-    title: 'Purchases',
-    icon: Wallet,
-    href: '/manager/purchases',
   },
 ];
 
@@ -113,6 +125,24 @@ const menuItems = [
 export default function ManagerSidebar() {
   const router = useRouter();
   const pathname = usePathname();
+  const [openGroups, setOpenGroups] = useState<string[]>([]);
+
+  // Auto-expand groups if child is active
+  useEffect(() => {
+    menuItems.forEach((item) => {
+      if (item.subItems?.some((sub) => pathname === sub.href)) {
+        if (!openGroups.includes(item.title)) {
+          setOpenGroups((prev) => [...prev, item.title]);
+        }
+      }
+    });
+  }, [pathname, openGroups]);
+
+  const toggleGroup = (title: string) => {
+    setOpenGroups((prev: string[]) =>
+      prev.includes(title) ? prev.filter((t: string) => t !== title) : [...prev, title],
+    );
+  };
 
   const handleLogout = async () => {
     try {
@@ -148,25 +178,78 @@ export default function ManagerSidebar() {
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu className="space-y-1 px-2">
-              {menuItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton
-                    asChild
-                    isActive={pathname === item.href}
-                    className={`py-2.5 rounded-md
-                      ${
-                        pathname === item.href
-                          ? 'bg-card text-sidebar'
-                          : 'hover:bg-card/10 text-sidebar-accent-foreground'
-                      }`}
-                  >
-                    <a href={item.href} className="flex items-center gap-3 px-3">
-                      <item.icon className="h-4 w-4" />
-                      <span className="font-medium">{item.title}</span>
-                    </a>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
+              {menuItems.map((item) => {
+                const hasSubItems = item.subItems && item.subItems.length > 0;
+                const isOpen = openGroups.includes(item.title);
+
+                return (
+                  <SidebarMenuItem key={item.title}>
+                    {hasSubItems ? (
+                      <>
+                        <SidebarMenuButton
+                          onClick={() => toggleGroup(item.title)}
+                          className={`py-2.5 rounded-md w-full justify-between
+                            ${
+                              item.subItems?.some((sub) => pathname === sub.href)
+                                ? 'text-card-foreground font-bold'
+                                : 'hover:bg-card/10 text-sidebar-accent-foreground'
+                            }`}
+                        >
+                          <div className="flex items-center gap-3 px-3">
+                            <item.icon className="h-4 w-4" />
+                            <span className="font-medium">{item.title}</span>
+                          </div>
+                          {isOpen ? (
+                            <ChevronDown className="h-4 w-4 opacity-50" />
+                          ) : (
+                            <ChevronRight className="h-4 w-4 opacity-50" />
+                          )}
+                        </SidebarMenuButton>
+
+                        {isOpen && (
+                          <SidebarMenuSub className="mt-1 ml-4 border-l border-card/20 pl-2">
+                            {item.subItems?.map((sub) => (
+                              <SidebarMenuSubItem key={sub.title}>
+                                <SidebarMenuSubButton
+                                  asChild
+                                  isActive={pathname === sub.href}
+                                  className={`rounded-md py-2
+                                    ${
+                                      pathname === sub.href
+                                        ? 'bg-card text-sidebar'
+                                        : 'hover:bg-card/10 text-sidebar-accent-foreground'
+                                    }`}
+                                >
+                                  <a href={sub.href} className="flex items-center gap-3 px-3">
+                                    <sub.icon className="h-3.5 w-3.5" />
+                                    <span>{sub.title}</span>
+                                  </a>
+                                </SidebarMenuSubButton>
+                              </SidebarMenuSubItem>
+                            ))}
+                          </SidebarMenuSub>
+                        )}
+                      </>
+                    ) : (
+                      <SidebarMenuButton
+                        asChild
+                        isActive={pathname === item.href}
+                        className={`py-2.5 rounded-md
+                          ${
+                            pathname === item.href
+                              ? 'bg-card text-sidebar'
+                              : 'hover:bg-card/10 text-sidebar-accent-foreground'
+                          }`}
+                      >
+                        <a href={item.href} className="flex items-center gap-3 px-3">
+                          <item.icon className="h-4 w-4" />
+                          <span className="font-medium">{item.title}</span>
+                        </a>
+                      </SidebarMenuButton>
+                    )}
+                  </SidebarMenuItem>
+                );
+              })}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

@@ -20,6 +20,7 @@ import {
   Plus,
   Pencil,
 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import {
   Table,
@@ -66,6 +67,7 @@ export default function LotDetailsDialog({ lot, onClose, onSuccess }: LotDetails
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showEditPurchaseModal, setShowEditPurchaseModal] = useState(false);
   const [showCostModal, setShowCostModal] = useState(false);
+  const router = useRouter();
 
   useEffect(() => {
     // Initialize receivedItems from lot data
@@ -241,6 +243,19 @@ export default function LotDetailsDialog({ lot, onClose, onSuccess }: LotDetails
     (item) => item.itemType === LotItemType.SPARE_PART,
   );
 
+  const handleAddToInventory = (itemId?: string, type?: LotItemType) => {
+    if (type === LotItemType.MODEL) {
+      const url = `/manager/products?lotId=${currentLot.id}${itemId ? `&itemId=${itemId}` : ''}`;
+      router.push(url);
+    } else if (type === LotItemType.SPARE_PART) {
+      const url = `/manager/spare-parts?lotId=${currentLot.id}${itemId ? `&itemId=${itemId}` : ''}`;
+      router.push(url);
+    } else {
+      // If no type specified, we might need a choice or just do nothing for now
+      // But the global buttons specify type.
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
       <div className="bg-card rounded-2xl w-full max-w-[95vw] shadow-2xl flex flex-col max-h-[90vh] overflow-hidden border">
@@ -289,7 +304,7 @@ export default function LotDetailsDialog({ lot, onClose, onSuccess }: LotDetails
                     variant="outline"
                     size="sm"
                     onClick={handleExportProducts}
-                    className="h-9 gap-2 shadow-sm text-blue-600 border-blue-100 hover:bg-blue-50"
+                    className="h-9 gap-2 shadow-sm text-blue-600 border-blue-100"
                   >
                     <Box size={15} /> Products
                   </Button>
@@ -299,7 +314,7 @@ export default function LotDetailsDialog({ lot, onClose, onSuccess }: LotDetails
                     variant="outline"
                     size="sm"
                     onClick={handleExportSpareParts}
-                    className="h-9 gap-2 shadow-sm text-orange-600 border-orange-100 hover:bg-orange-50"
+                    className="h-9 gap-2 shadow-sm text-orange-600 border-orange-100"
                   >
                     <Settings size={15} /> Spare Parts
                   </Button>
@@ -504,6 +519,7 @@ export default function LotDetailsDialog({ lot, onClose, onSuccess }: LotDetails
                   <TableRow className="hover:bg-transparent">
                     <TableHead className="w-[100px]">Type</TableHead>
                     <TableHead>Item Name</TableHead>
+                    <TableHead>MPN</TableHead>
                     <TableHead>Item Model</TableHead>
                     <TableHead className="text-right">Expected</TableHead>
                     <TableHead className="text-right">
@@ -552,13 +568,17 @@ export default function LotDetailsDialog({ lot, onClose, onSuccess }: LotDetails
                                   item.customSparePartName ||
                                   'Unnamed Spare'}
                             </span>
-                            {item.itemType === LotItemType.SPARE_PART &&
-                              item.sparePart?.item_code && (
-                                <span className="text-[10px] text-slate-400 font-mono">
-                                  {item.sparePart.item_code}
-                                </span>
-                              )}
+                            {item.itemType === LotItemType.SPARE_PART && item.sparePart?.sku && (
+                              <span className="text-[10px] text-slate-400 font-mono">
+                                {item.sparePart.sku}
+                              </span>
+                            )}
                           </div>
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-xs font-mono text-blue-600 font-medium">
+                            {item.sparePart?.mpn || item.mpn || '—'}
+                          </span>
                         </TableCell>
                         {/* Item Model column */}
                         <TableCell>
@@ -578,7 +598,7 @@ export default function LotDetailsDialog({ lot, onClose, onSuccess }: LotDetails
                           )}
                         </TableCell>
                         <TableCell className="text-right text-slate-400 font-medium">
-                          / {item.expectedQuantity}
+                          {item.expectedQuantity}
                         </TableCell>
                         <TableCell className="text-right">
                           {isReceiving ? (
@@ -653,7 +673,28 @@ export default function LotDetailsDialog({ lot, onClose, onSuccess }: LotDetails
               </Table>
             </div>
             <div className="bg-slate-50 border-t p-4 flex justify-between items-center">
-              <span className="text-xs text-slate-500">Aggregated items subtotal</span>
+              <div className="flex gap-2">
+                {currentLot.status === LotStatus.RECEIVED && hasProducts && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 text-[10px] gap-1.5 border-blue-200 text-blue-700 hover:bg-blue-50"
+                    onClick={() => handleAddToInventory(undefined, LotItemType.MODEL)}
+                  >
+                    <Plus size={12} /> Add Products to Inventory
+                  </Button>
+                )}
+                {currentLot.status === LotStatus.RECEIVED && hasSpareParts && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 text-[10px] gap-1.5 border-orange-200 text-orange-700"
+                    onClick={() => handleAddToInventory(undefined, LotItemType.SPARE_PART)}
+                  >
+                    <Plus size={12} /> Add Spare to Inventory
+                  </Button>
+                )}
+              </div>
               <div className="text-sm">
                 Items Total:{' '}
                 <span className="font-bold text-primary text-base">

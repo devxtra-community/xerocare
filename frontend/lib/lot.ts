@@ -42,6 +42,10 @@ export interface LotItem {
   totalPrice: number;
   customProductName?: string;
   customSparePartName?: string;
+  mpn?: string;
+  compatibleModels?: string;
+  modelIds?: string[];
+  selling_price?: number;
 }
 
 export interface Lot {
@@ -70,6 +74,9 @@ export interface CreateLotItemData {
   partName?: string;
   quantity: number;
   unitPrice: number;
+  sellingPrice?: number;
+  mpn?: string;
+  compatibleModels?: string;
 }
 
 export interface CreateLotData {

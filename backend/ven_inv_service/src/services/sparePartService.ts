@@ -6,9 +6,10 @@ import { LotItemType } from '../entities/lotItemEntity';
 import { LotStatus } from '../entities/lotEntity';
 import { getCached, setCached, deleteCached } from '../utils/cacheUtil';
 import { logger } from '../config/logger';
+import { generateSku } from '../utils/skuGenerator';
 
 interface BulkUploadRow {
-  item_code: string;
+  sku?: string;
   part_name: string;
   brand: string;
   model_id?: string;
@@ -21,6 +22,7 @@ interface BulkUploadRow {
   lot_number?: string;
   vendor_id?: string;
   warehouse_id?: string;
+  mpn?: string;
 }
 
 export class SparePartService {
@@ -32,7 +34,11 @@ export class SparePartService {
    * Processes bulk upload of spare parts.
    */
   async bulkUpload(rows: BulkUploadRow[], branchId: string) {
-    const results = { success: 0, failed: 0, errors: [] as { item_code: string; error: string }[] };
+    const results = {
+      success: 0,
+      failed: 0,
+      errors: [] as { identifier: string; error: string }[],
+    };
 
     for (const row of rows) {
       try {
@@ -41,7 +47,7 @@ export class SparePartService {
       } catch (error: unknown) {
         results.failed++;
         const message = error instanceof Error ? error.message : 'Unknown error';
-        results.errors.push({ item_code: row.item_code, error: message });
+        results.errors.push({ identifier: row.sku || row.part_name || 'unknown', error: message });
       }
     }
 
@@ -52,9 +58,8 @@ export class SparePartService {
    * Adds a single spare part, validating model and tracking lot usage.
    */
   async addSingleSparePart(data: BulkUploadRow, branchId: string) {
-    const itemCode = data.item_code?.trim().toUpperCase();
-    // In bulk upload, item_code might be missing as it's generated
-    // if (!itemCode) throw new Error('Item Code is required');
+    // In bulk upload, sku might be missing as it's generated
+    const sku = data.sku?.trim().toUpperCase();
 
     // Handle single model_id or array of model_ids
     let modelIds = data.model_ids || [];
@@ -98,7 +103,7 @@ export class SparePartService {
       }
     }
 
-    if (lotId && itemCode) {
+    if (lotId && sku) {
       // Guard: inventory cannot be created before lot is received
       const lot = await this.lotService.getLotById(lotId);
       if (lot.status !== LotStatus.RECEIVED) {
@@ -106,18 +111,32 @@ export class SparePartService {
           'Inventory cannot be created until the lot is received. Please confirm the lot reception first.',
         );
       }
-      // The lot tracking currently uses item_code.
-      await this.lotService.validateAndTrackUsage(
-        lotId,
-        LotItemType.SPARE_PART,
-        itemCode,
-        quantity,
-      );
+
+      // IMPROVED DUPLICATE DETECTION: If it's the same lot and same sku, it's definitely the same part.
+      // Prioritize sku over fuzzy name matching.
+      const existingByCode = await this.repo.findMasterBySkuAndLot(sku, lotId);
+      if (existingByCode) {
+        await this.repo.updateStock(existingByCode.id, quantity);
+        // Sync models if provided
+        if (models.length > 0) {
+          const partWithModels = await this.repo.findById(existingByCode.id);
+          if (partWithModels && (!partWithModels.models || partWithModels.models.length === 0)) {
+            await this.repo.updateMaster(existingByCode.id, { models });
+          }
+        }
+        await deleteCached(`sparepart:${existingByCode.id}`);
+
+        // Track usage on existing lot item
+        await this.lotService.validateAndTrackUsage(lotId, LotItemType.SPARE_PART, sku, quantity);
+        return { success: true, message: 'Existing spare part updated via SKU' };
+      }
+
+      await this.lotService.validateAndTrackUsage(lotId, LotItemType.SPARE_PART, sku, quantity);
     }
 
-    // Check if a part with same code, model and warehouse already exists
+    // Fallback fuzzy matching by name/model/etc.
     const existingPart = await this.repo.findExistingSparePart(
-      data.part_name,
+      data.part_name?.trim(),
       primaryModelId,
       warehouseId,
       vendorId,
@@ -140,7 +159,6 @@ export class SparePartService {
     }
 
     const sparePart = await this.repo.createMaster({
-      item_code: itemCode,
       part_name: data.part_name,
       brand: data.brand,
       model_id: primaryModelId || undefined,
@@ -151,6 +169,10 @@ export class SparePartService {
       branch_id: branchId,
       quantity: quantity,
       lot_id: lotId,
+      warehouse_id: warehouseId,
+      vendor_id: vendorId,
+      sku: sku || generateSku(),
+      mpn: data.mpn,
     });
 
     await setCached(`sparepart:${sparePart.id}`, sparePart, 3600);
@@ -183,6 +205,10 @@ export class SparePartService {
       purchase_price: data.purchase_price,
       wholesale_price: data.wholesale_price,
       models: models,
+      sku: data.sku,
+      mpn: data.mpn,
+      warehouse_id: data.warehouse_id,
+      vendor_id: data.vendor_id,
     };
     Object.keys(updateData).forEach(
       (key) =>
@@ -201,14 +227,15 @@ export class SparePartService {
    * Deletes a spare part if it has no inventory.
    */
   async deleteSparePart(id: string) {
-    const hasInventory = await this.repo.hasInventory(id);
-    if (hasInventory) {
-      throw new Error('Cannot delete spare part with existing quantity > 0.');
+    const hasLotReferences = await this.repo.hasLotReferences(id);
+    if (hasLotReferences) {
+      throw new Error(
+        'This spare part cannot be deleted because it is already assigned to a lot. Please remove it from the lot items first if you wish to delete it.',
+      );
     }
+
     await this.repo.deleteMaster(id);
-
     await deleteCached(`sparepart:${id}`);
-
     return { success: true, message: 'Spare part deleted' };
   }
 

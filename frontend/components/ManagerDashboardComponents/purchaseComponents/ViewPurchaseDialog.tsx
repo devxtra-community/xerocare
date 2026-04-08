@@ -33,8 +33,8 @@ interface ViewPurchaseDialogProps {
 }
 
 /**
- * Dialog component for viewing detailed purchase information.
- * Read-only view showing all purchase attributes including associated costs and status.
+ * Dialog component for viewing detailed lot amount information.
+ * Read-only view showing all lot amount attributes including associated costs and status.
  */
 export default function ViewPurchaseDialog({
   open,
@@ -63,9 +63,9 @@ export default function ViewPurchaseDialog({
             <FileText className="h-6 w-6 text-white" />
           </div>
           <div>
-            <DialogTitle className="text-xl font-bold text-white">Purchase Summary</DialogTitle>
+            <DialogTitle className="text-xl font-bold text-white">Lot Amount Summary</DialogTitle>
             <DialogDescription className="text-white/70 text-sm">
-              Financial record overview for Purchase #{purchase.id.slice(0, 8)}
+              Financial record overview for Lot Amount #{purchase.id.slice(0, 8)}
             </DialogDescription>
           </div>
           <div className="ml-auto flex gap-2">
@@ -146,7 +146,7 @@ export default function ViewPurchaseDialog({
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-slate-500 flex items-center gap-2">
                     <CreditCard className="h-4 w-4" />
-                    Purchase Amount
+                    Lot Purchase Amount
                   </span>
                   <span className="text-sm font-bold text-slate-800">
                     {formatCurrency(purchase.purchaseAmount)}

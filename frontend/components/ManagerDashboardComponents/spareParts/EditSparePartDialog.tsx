@@ -11,17 +11,12 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 import { modelService } from '@/services/modelService';
 import { sparePartService, SparePartInventoryItem } from '@/services/sparePartService';
 import { warehouseService } from '@/services/warehouseService';
 import { vendorService } from '@/services/vendorService';
+import { MultiSelect } from '@/components/ui/multi-select';
 import { toast } from 'sonner';
 
 interface EditSparePartDialogProps {
@@ -50,6 +45,7 @@ export default function EditSparePartDialog({
   interface Model {
     id: string;
     model_name: string;
+    model_no: string;
   }
   interface Vendor {
     id: string;
@@ -64,7 +60,7 @@ export default function EditSparePartDialog({
     lotNumber: '',
     part_name: '',
     brand: '',
-    model_id: '',
+    model_ids: [] as string[],
     base_price: '',
     purchase_price: '',
     wholesale_price: '',
@@ -89,22 +85,17 @@ export default function EditSparePartDialog({
         setVendors(vens);
 
         // Pre-fill logic
-        let modelId = '';
-        if (product.compatible_model) {
-          const found = (modelRes.data || []).find(
-            (m: Model) => m.model_name === product.compatible_model,
-          );
-          if (found) modelId = found.id;
-        }
+        const model_ids = product.model_ids ? product.model_ids.split(',').filter(Boolean) : [];
+        console.log('Product for edit:', product);
 
-        let warehouseId = '';
-        if (product.warehouse_name) {
+        let warehouseId = product.warehouse_id || '';
+        if (!warehouseId && product.warehouse_name) {
           const found = whs.find((w: Warehouse) => w.warehouseName === product.warehouse_name);
           if (found) warehouseId = found.id;
         }
 
-        let vendorId = '';
-        if (product.vendor_name) {
+        let vendorId = product.vendor_id || '';
+        if (!vendorId && product.vendor_name) {
           const found = vens.find((v: Vendor) => v.name === product.vendor_name);
           if (found) vendorId = found.id;
         }
@@ -113,10 +104,12 @@ export default function EditSparePartDialog({
           lotNumber: product.lotNumber || '',
           part_name: product.part_name,
           brand: product.brand,
-          model_id: modelId,
-          base_price: String(product.price),
-          purchase_price: String(product.purchase_price || ''),
-          wholesale_price: String(product.wholesale_price || ''),
+          model_ids: model_ids,
+          base_price: String(product.price ?? ''),
+          purchase_price:
+            product.purchase_price !== undefined ? String(product.purchase_price) : '',
+          wholesale_price:
+            product.wholesale_price !== undefined ? String(product.wholesale_price) : '',
           warehouse_id: warehouseId,
           vendor_id: vendorId,
           quantity: String(product.quantity),
@@ -136,8 +129,7 @@ export default function EditSparePartDialog({
     try {
       await sparePartService.updateSparePart(product.id, {
         ...formData,
-        model_id:
-          formData.model_id === 'null' || !formData.model_id ? undefined : formData.model_id,
+        model_ids: formData.model_ids.length > 0 ? formData.model_ids : undefined,
         warehouse_id: formData.warehouse_id || undefined,
         vendor_id: formData.vendor_id || undefined,
         base_price: Number(formData.base_price),
@@ -201,40 +193,42 @@ export default function EditSparePartDialog({
             {/* Vendor */}
             <div className="space-y-2">
               <Label>Vendor</Label>
-              <Select
+              <SearchableSelect
                 value={formData.vendor_id}
-                onValueChange={(val) => setFormData({ ...formData, vendor_id: val })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select Vendor (Optional)" />
-                </SelectTrigger>
-                <SelectContent>
-                  {vendors.map((v) => (
-                    <SelectItem key={v.id} value={v.id}>
-                      {v.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                onValueChange={(val) =>
+                  setFormData({ ...formData, vendor_id: val === 'none' ? '' : val })
+                }
+                options={[
+                  { value: 'none', label: 'None', description: 'Clear selection' },
+                  ...vendors.map((v) => ({
+                    value: v.id,
+                    label: v.name,
+                    description: '',
+                  })),
+                ]}
+                placeholder="Select Vendor (Optional)"
+                emptyText="No vendors found."
+              />
             </div>
             {/* Warehouse */}
             <div className="space-y-2">
               <Label>Warehouse</Label>
-              <Select
+              <SearchableSelect
                 value={formData.warehouse_id}
-                onValueChange={(val) => setFormData({ ...formData, warehouse_id: val })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select Warehouse (Optional)" />
-                </SelectTrigger>
-                <SelectContent>
-                  {warehouses.map((w) => (
-                    <SelectItem key={w.id} value={w.id}>
-                      {w.warehouseName}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                onValueChange={(val) =>
+                  setFormData({ ...formData, warehouse_id: val === 'none' ? '' : val })
+                }
+                options={[
+                  { value: 'none', label: 'None', description: 'Clear selection' },
+                  ...warehouses.map((w) => ({
+                    value: w.id,
+                    label: w.warehouseName,
+                    description: '',
+                  })),
+                ]}
+                placeholder="Select Warehouse (Optional)"
+                emptyText="No warehouses found."
+              />
             </div>
             {/* Price */}
             <div className="space-y-2">
@@ -262,24 +256,26 @@ export default function EditSparePartDialog({
               />
             </div>
             {/* Model */}
-            <div className="space-y-2">
-              <Label>Compatible Model</Label>
-              <Select
-                value={formData.model_id}
-                onValueChange={(val) => setFormData({ ...formData, model_id: val })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Universal" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="null">Universal (No Model)</SelectItem>
-                  {models.map((m) => (
-                    <SelectItem key={m.id} value={m.id}>
-                      {m.model_name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <div className="space-y-2 col-span-2">
+              <Label>Compatible Models</Label>
+              <MultiSelect
+                values={formData.model_ids}
+                onValuesChange={(vals) => setFormData({ ...formData, model_ids: vals })}
+                options={[
+                  {
+                    value: 'universal',
+                    label: 'Universal (No Model)',
+                    description: 'Compatible with all models',
+                  },
+                  ...models.map((m) => ({
+                    value: m.id,
+                    label: `${m.model_no} - ${m.model_name}`,
+                    description: '',
+                  })),
+                ]}
+                placeholder="Select Models (Optional)"
+                emptyText="No models found."
+              />
             </div>
           </div>
         </div>

@@ -20,10 +20,14 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { SearchableSelect } from '@/components/ui/searchable-select';
+import { MultiSelect } from '@/components/ui/multi-select';
 import { sparePartService } from '@/services/sparePartService';
 import { warehouseService, Warehouse } from '@/services/warehouseService';
 import { vendorService } from '@/services/vendorService';
 import { lotService, Lot, LotItemType } from '@/lib/lot';
+import { brandService } from '@/services/brandService';
+import { modelService } from '@/services/modelService';
+
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
 
@@ -31,13 +35,15 @@ interface BulkSparePartDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess: () => void;
+  initialLotId?: string;
+  initialItemId?: string;
 }
 
 interface BulkSparePartRow {
-  item_code: string;
+  sku: string;
   part_name: string;
   brand: string;
-  model_id: string;
+  model_ids: string[];
   base_price: number;
   purchase_price: number;
   wholesale_price: number;
@@ -45,18 +51,21 @@ interface BulkSparePartRow {
   vendor_id: string;
   warehouse_id: string;
   lot_id?: string;
+  mpn?: string;
+  model_id?: string;
 }
 
 /** A spare part option derived from the selected lot's spare part items */
 interface LotSparePartOption {
-  itemCode: string;
+  sku: string;
   partName: string;
   brand: string;
-  modelId: string;
+  modelIds: string[];
   basePrice: number;
   purchasePrice: number;
   wholesalePrice: number;
-  label: string; // "itemCode - partName"
+  mpn: string;
+  label: string; // "sku - partName"
 }
 
 /**
@@ -70,29 +79,72 @@ export default function BulkSparePartDialog({
   open,
   onOpenChange,
   onSuccess,
+  initialLotId,
+  initialItemId,
 }: BulkSparePartDialogProps) {
+  interface Model {
+    id: string;
+    model_name: string;
+    model_no: string;
+    brandRelation?: { id: string; name: string };
+    brand?: { id: string; name: string };
+  }
+  interface Brand {
+    id: string;
+    name: string;
+    description?: string;
+  }
+
   const [rows, setRows] = useState<Partial<BulkSparePartRow>[]>([]);
   const [vendors, setVendors] = useState<{ id: string; name: string }[]>([]);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [file, setFile] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Lot state
   const [lots, setLots] = useState<Lot[]>([]);
-  const [selectedLotId, setSelectedLotId] = useState('');
-  const [lotSparePartOptions, setLotSparePartOptions] = useState<LotSparePartOption[]>([]);
+  const [brands, setBrands] = useState<Brand[]>([]);
+  const [models, setModels] = useState<Model[]>([]);
+
+  const getLotSparePartItems = (lotId?: string): LotSparePartOption[] => {
+    if (!lotId) return [];
+    const lot = lots.find((l) => l.id === lotId);
+    if (!lot) return [];
+    const sparePartMap = new Map<string, LotSparePartOption>();
+    lot.items
+      .filter((item) => item.itemType === LotItemType.SPARE_PART && item.sparePart)
+      .forEach((item) => {
+        const sp = item.sparePart!;
+        if (sp.sku && !sparePartMap.has(sp.sku)) {
+          sparePartMap.set(sp.sku, {
+            sku: sp.sku,
+            partName: sp.part_name,
+            brand: sp.brand,
+            modelIds: sp.model_id ? [sp.model_id] : ['universal'],
+            purchasePrice: item.unitPrice || sp.purchase_price || 0,
+            basePrice: sp.base_price || 0,
+            wholesalePrice: sp.wholesale_price || 0,
+            mpn: sp.mpn || '',
+            label: `${sp.sku} - ${sp.part_name}`,
+          });
+        }
+      });
+    return Array.from(sparePartMap.values());
+  };
 
   const loadDependencies = async () => {
     try {
-      const [v, w, l] = await Promise.all([
+      const [v, w, l, b, m] = await Promise.all([
         vendorService.getVendors(),
         warehouseService.getWarehousesByBranch(),
         lotService.getAllLots(),
+        brandService.getAllBrands(),
+        modelService.getAllModels({ limit: 1000 }),
       ]);
       setVendors(v || []);
       setWarehouses(w || []);
       setLots(l.data || []);
+      setBrands(b || []);
+      setModels(m.data || []);
     } catch {
       toast.error('Failed to load dependencies');
     }
@@ -100,70 +152,68 @@ export default function BulkSparePartDialog({
 
   useEffect(() => {
     if (open) {
-      setRows([]);
-      setFile(null);
-      setSelectedLotId('');
-      setLotSparePartOptions([]);
-      loadDependencies();
-    }
-  }, [open]);
+      const prepareInitialData = async () => {
+        await loadDependencies();
 
-  /** When a lot is selected, extract the model options from its spare part items */
-  const handleLotSelect = (lotId: string) => {
-    setSelectedLotId(lotId);
-
-    if (!lotId) {
-      setLotSparePartOptions([]);
-      return;
-    }
-
-    const lot = lots.find((l) => l.id === lotId);
-    if (!lot) return;
-
-    // Collect unique spare parts from spare part items in this lot
-    const sparePartMap = new Map<string, LotSparePartOption>();
-    lot.items
-      .filter((item) => item.itemType === LotItemType.SPARE_PART && item.sparePart)
-      .forEach((item) => {
-        const sp = item.sparePart!;
-        if (sp.item_code && !sparePartMap.has(sp.item_code)) {
-          sparePartMap.set(sp.item_code, {
-            itemCode: sp.item_code,
-            partName: sp.part_name,
-            brand: sp.brand,
-            modelId: sp.model_id || '',
-            basePrice: item.unitPrice || sp.base_price,
-            purchasePrice: sp.purchase_price || 0,
-            wholesalePrice: sp.wholesale_price || 0,
-            label: `${sp.item_code} - ${sp.part_name}`,
-          });
+        if (!initialLotId) {
+          setRows([]);
         }
-      });
+      };
+      prepareInitialData();
+    }
+  }, [open, initialLotId, initialItemId]);
 
-    setLotSparePartOptions(Array.from(sparePartMap.values()));
+  // We need to handle the pre-filling after lots and selectedLotId are set
+  useEffect(() => {
+    if (open && initialLotId && lots.length > 0) {
+      const lot = lots.find((l) => l.id === initialLotId);
+      if (lot && lot.items) {
+        let itemsToFill = lot.items.filter(
+          (item) => item.itemType === LotItemType.SPARE_PART && item.sparePart,
+        );
 
-    // Apply the lot_id to all existing rows
-    // Also auto-fill vendor and warehouse from the selected lot if not already set
-    setRows((prev) =>
-      prev.map((r) => ({
-        ...r,
-        lot_id: lotId,
-        vendor_id: r.vendor_id || lot.vendorId || '',
-        warehouse_id: r.warehouse_id || lot.warehouse_id || '',
-      })),
-    );
-  };
+        if (initialItemId) {
+          itemsToFill = itemsToFill.filter((item) => item.id === initialItemId);
+        }
+
+        const newRows = itemsToFill.map((item) => {
+          const sp = item.sparePart!;
+          return {
+            ...createEmptyRow(),
+            lot_id: initialLotId,
+            sku: sp.sku,
+            part_name: sp.part_name,
+            brand: sp.brand,
+            model_ids: sp.model_id ? [sp.model_id] : ['universal'],
+            purchase_price: Number(item.unitPrice) || Number(sp.purchase_price) || 0,
+            base_price: Number(sp.base_price) || 0,
+            wholesale_price: Number(sp.wholesale_price) || 0,
+            quantity: Math.max(0, item.receivedQuantity - item.usedQuantity),
+            vendor_id: lot.vendorId || lot.vendor?.id || '',
+            warehouse_id: lot.warehouse_id || '',
+            mpn: sp.mpn || '',
+          };
+        });
+        setRows(newRows);
+      }
+    }
+  }, [lots, initialLotId, initialItemId, open]);
+
+  // Removed global handleLotSelect to support per-row selection
 
   const createEmptyRow = (): Partial<BulkSparePartRow> => ({
-    item_code: '',
+    sku: '',
     part_name: '',
     brand: '',
-    model_id: '',
+    model_ids: [],
+    purchase_price: 0,
     base_price: 0,
+    wholesale_price: 0,
     quantity: 0,
     vendor_id: '',
     warehouse_id: '',
-    lot_id: selectedLotId || undefined,
+    lot_id: initialLotId || undefined,
+    mpn: '',
   });
 
   const findIdByName = (
@@ -179,70 +229,77 @@ export default function BulkSparePartDialog({
     return found ? found.id : '';
   };
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const parseExcelData = (data: any[]) => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const parsedRows: Partial<BulkSparePartRow>[] = data.map((row: any) => {
-      const getVal = (keys: string[]) => {
-        for (const k of keys) {
-          if (row[k] !== undefined) return row[k];
-          const lowerK = k.toLowerCase().replace(/\s/g, '');
-          for (const rowKey of Object.keys(row)) {
-            const lowerRowKey = rowKey.toLowerCase().replace(/\s/g, '');
-            if (lowerRowKey === lowerK) return row[rowKey];
+  const parseExcelData = (data: unknown[]) => {
+    const parsedRows: Partial<BulkSparePartRow>[] = (data as Record<string, unknown>[]).map(
+      (row) => {
+        const getVal = (keys: string[]) => {
+          for (const k of keys) {
+            if (row[k] !== undefined) return row[k];
+            const lowerK = k.toLowerCase().replace(/\s/g, '');
+            for (const rowKey of Object.keys(row)) {
+              const lowerRowKey = rowKey.toLowerCase().replace(/\s/g, '');
+              if (lowerRowKey === lowerK) return row[rowKey];
+            }
+          }
+          return '';
+        };
+
+        const rawModel = getVal(['model_ids', 'model_id', 'Model ID', 'Model', 'Compatible Model']);
+        let parsedModelIds: string[] = [];
+        if (rawModel) {
+          if (String(rawModel).toLowerCase().includes('universal')) {
+            parsedModelIds = ['universal'];
+          } else {
+            const parts = String(rawModel)
+              .split(',')
+              .map((s) => s.trim());
+            parsedModelIds = parts.map((p) => findIdByName(p, models)).filter(Boolean);
+            if (parsedModelIds.length === 0) parsedModelIds = ['universal'];
+          }
+        } else {
+          parsedModelIds = ['universal'];
+        }
+
+        const rawVendor = getVal(['vendor_id', 'Vendor ID', 'Vendor']);
+        const rawWarehouse = getVal(['warehouse_id', 'Warehouse ID', 'Warehouse']);
+
+        const rawSku = getVal(['sku', 'SKU', 'item_code', 'Item Code']);
+        let sku = rawSku;
+        const rawSelect = getVal(['Select Spare Parts from Lot', 'Select Product from Lot']);
+
+        if (!sku && rawSelect) {
+          const parts = rawSelect.toString().split(' - ');
+          if (parts.length > 1) {
+            sku = parts[0].trim();
           }
         }
-        return '';
-      };
 
-      const rawModel = getVal(['model_id', 'Model ID', 'Model', 'Compatible Model']);
-      let modelId = findIdByName(rawModel, []);
-      if (!modelId && rawModel) {
-        modelId = rawModel;
-      }
+        const lotIdFromExcel = getVal(['lot_id', 'lotNumber', 'Lot ID', 'Lot', 'lot_number']);
 
-      const rawVendor = getVal(['vendor_id', 'Vendor ID', 'Vendor']);
-      const rawWarehouse = getVal(['warehouse_id', 'Warehouse ID', 'Warehouse']);
-
-      const rawItemCode = getVal(['item_code', 'Item Code']);
-      let itemCode = rawItemCode;
-      const rawSelect = getVal(['Select Spare Parts from Lot', 'Select Product from Lot']);
-
-      if (!itemCode && rawSelect) {
-        const parts = rawSelect.toString().split(' - ');
-        if (parts.length > 1) {
-          itemCode = parts[0].trim();
-        }
-      }
-
-      const lotIdFromExcel = getVal(['lot_id', 'lotNumber', 'Lot ID', 'Lot', 'lot_number']);
-
-      return {
-        item_code: itemCode,
-        part_name: getVal(['part_name', 'Item Name', 'Name', 'Part Name']),
-        brand: getVal(['brand', 'Brand']),
-        model_id: modelId,
-        base_price: Number(getVal(['base_price', 'Price', 'Base Price', 'Selling Price'])) || 0,
-        purchase_price: Number(getVal(['purchase_price', 'Purchase Price'])) || 0,
-        wholesale_price: Number(getVal(['wholesale_price', 'Wholesale Price'])) || 0,
-        quantity: Number(getVal(['quantity', 'Quantity', 'Qty'])) || 0,
-        vendor_id: findIdByName(rawVendor, vendors),
-        warehouse_id: findIdByName(rawWarehouse, warehouses),
-        lot_id: lotIdFromExcel || selectedLotId || undefined,
-      };
-    });
+        return {
+          sku: sku ? String(sku) : '',
+          part_name: String(getVal(['part_name', 'Item Name', 'Name', 'Part Name']) || ''),
+          brand: String(getVal(['brand', 'Brand']) || ''),
+          model_ids: parsedModelIds,
+          base_price: Number(getVal(['base_price', 'Price', 'Base Price', 'Selling Price'])) || 0,
+          purchase_price: Number(getVal(['purchase_price', 'Purchase Price'])) || 0,
+          wholesale_price: Number(getVal(['wholesale_price', 'Wholesale Price'])) || 0,
+          quantity: Number(getVal(['quantity', 'Quantity', 'Qty'])) || 0,
+          vendor_id: findIdByName(String(rawVendor || ''), vendors),
+          warehouse_id: findIdByName(String(rawWarehouse || ''), warehouses),
+          lot_id:
+            (lotIdFromExcel ? String(lotIdFromExcel) : undefined) || initialLotId || undefined,
+          mpn: String(
+            getVal(['mpn', 'MPN', 'Manufacturing Part Number', 'manufacturing_part_number']) || '',
+          ),
+        };
+      },
+    );
 
     if (parsedRows.length === 0) {
       toast.warning('No data found in the file');
     } else {
       setRows(parsedRows);
-
-      // Auto-select lot from Excel's lot_id column if not already selected
-      const firstLotId = parsedRows[0]?.lot_id;
-      if (firstLotId && !selectedLotId) {
-        handleLotSelect(firstLotId);
-      }
-
       toast.success(`Parsed ${parsedRows.length} rows`);
     }
   };
@@ -251,7 +308,6 @@ export default function BulkSparePartDialog({
     const selectedFile = e.target.files?.[0];
     if (!selectedFile) return;
 
-    setFile(selectedFile);
     const reader = new FileReader();
 
     reader.onload = (event) => {
@@ -274,23 +330,26 @@ export default function BulkSparePartDialog({
     setRows(rows.filter((_, i) => i !== index));
   };
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const updateRow = (index: number, field: keyof BulkSparePartRow, value: any) => {
+  const updateRow = (
+    index: number,
+    field: keyof BulkSparePartRow,
+    value: string | number | string[] | undefined,
+  ) => {
     const newRows = [...rows];
     newRows[index] = { ...newRows[index], [field]: value };
     setRows(newRows);
   };
 
   const handleSubmit = async () => {
-    const validRows = rows.filter((r) => r.part_name && r.item_code);
+    const validRows = rows.filter((r) => r.part_name && r.sku);
 
-    if (!selectedLotId && !rows.some((r) => r.lot_id)) {
-      toast.error('Please select a Lot before uploading');
+    if (!rows.some((r) => r.lot_id)) {
+      toast.error('Please assign a Lot to at least one spare part row before uploading');
       return;
     }
 
     if (validRows.length === 0) {
-      toast.error('Please add at least one valid spare part with Item Code and Name');
+      toast.error('Please add at least one valid spare part with SKU and Name');
       return;
     }
 
@@ -298,13 +357,19 @@ export default function BulkSparePartDialog({
     try {
       const payload = validRows.map((r) => ({
         ...r,
-        model_id: !r.model_id || r.model_id === 'universal' ? undefined : r.model_id,
+        model_ids:
+          r.model_ids?.includes('universal') || !r.model_ids?.length ? undefined : r.model_ids,
         base_price: Number(r.base_price),
         purchase_price: Number(r.purchase_price),
         wholesale_price: Number(r.wholesale_price),
         quantity: Number(r.quantity),
-        lot_id: r.lot_id || selectedLotId || undefined,
+        lot_id: r.lot_id || undefined,
       }));
+
+      // Strip model_id key since backend takes model_ids
+      payload.forEach((p) => {
+        if ('model_id' in p) delete p.model_id;
+      });
 
       const result = await sparePartService.bulkUpload(payload);
 
@@ -328,11 +393,9 @@ export default function BulkSparePartDialog({
 
   if (!open) return null;
 
-  const selectedLot = lots.find((l) => l.id === selectedLotId);
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="bg-card rounded-xl w-full max-w-6xl h-[85vh] flex flex-col shadow-2xl">
+      <div className="bg-card rounded-xl w-full max-w-[95vw] h-[85vh] flex flex-col shadow-2xl">
         {/* Header */}
         <div className="p-4 border-b flex justify-between items-center">
           <h2 className="text-xl font-bold flex items-center gap-2">
@@ -371,51 +434,7 @@ export default function BulkSparePartDialog({
           </div>
         </div>
 
-        {/* Lot Selector + Product from Lot info */}
-        <div className="px-4 py-3 bg-white border-b flex flex-wrap gap-4 items-end">
-          {/* Select Lot — searchable, same as AddSparePartDialog */}
-          <div className="w-80">
-            <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">
-              Select Lot <span className="text-red-500">*</span>
-            </label>
-            <SearchableSelect
-              value={selectedLotId}
-              onValueChange={(val) => handleLotSelect(val === 'none' ? '' : val)}
-              options={lots.map((lot) => ({
-                value: lot.id,
-                label: lot.lotNumber,
-                description: lot.vendor?.name || 'Unknown Vendor',
-              }))}
-              placeholder="Search by lot number or vendor…"
-              emptyText="No lots found."
-            />
-          </div>
-
-          {/* Info: available models from this lot */}
-          {selectedLot && (
-            <div className="text-xs text-blue-600 font-medium mt-5">
-              {lotSparePartOptions.length > 0 ? (
-                <>
-                  ✓ {lotSparePartOptions.length} part(s) available from this lot:{' '}
-                  <span className="text-gray-600">
-                    {lotSparePartOptions.map((o) => o.label).join(', ')}
-                  </span>
-                </>
-              ) : (
-                <span className="text-amber-600">
-                  ⚠ No models linked to spare parts in this lot. Parts will be uploaded as
-                  Universal.
-                </span>
-              )}
-            </div>
-          )}
-
-          {!selectedLotId && (
-            <div className="text-xs text-amber-500 mt-5 font-medium">
-              * Select a lot to link spare parts and enable product-from-lot selection.
-            </div>
-          )}
-        </div>
+        {/* Global Lot Selector Removed */}
 
         {/* Table */}
         <div className="flex-1 overflow-auto p-4">
@@ -423,160 +442,244 @@ export default function BulkSparePartDialog({
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="min-w-[200px]">Assign Lot</TableHead>
+                  <TableHead className="min-w-[250px]">Select Spare Parts from Lot</TableHead>
                   <TableHead className="min-w-[180px]">
-                    Item Code <span className="text-red-500">*</span>
-                  </TableHead>
-                  <TableHead className="min-w-[200px]">
-                    Part Name <span className="text-red-500">*</span>
-                  </TableHead>
-                  <TableHead className="min-w-[150px]">
                     Brand <span className="text-red-500">*</span>
                   </TableHead>
+                  <TableHead className="min-w-[250px]">
+                    Part Name <span className="text-red-500">*</span>
+                  </TableHead>
+                  <TableHead className="min-w-[250px]">Compatible Model</TableHead>
+                  <TableHead className="min-w-[180px]">MPN</TableHead>
+                  <TableHead className="min-w-[180px]">
+                    SKU <span className="text-red-500">*</span>
+                  </TableHead>
+                  <TableHead className="min-w-[200px]">Vendor</TableHead>
+                  <TableHead className="min-w-[200px]">Warehouse</TableHead>
                   <TableHead className="min-w-[120px]">Purchase Price</TableHead>
                   <TableHead className="min-w-[120px]">Selling Price</TableHead>
                   <TableHead className="min-w-[120px]">Wholesale Price</TableHead>
                   <TableHead className="min-w-[100px]">Qty</TableHead>
-                  <TableHead className="min-w-[200px]">Vendor</TableHead>
-                  <TableHead className="min-w-[200px]">Warehouse</TableHead>
-                  <TableHead className="min-w-[300px]">Select Spare Parts from Lot</TableHead>
                   <TableHead className="w-[50px]"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {rows.map((row, i) => (
                   <TableRow key={i}>
-                    <TableCell>
-                      <Input
-                        value={row.item_code}
-                        onChange={(e) => updateRow(i, 'item_code', e.target.value)}
-                        placeholder="Code"
+                    <TableCell className="align-top">
+                      <SearchableSelect
+                        value={row.lot_id || 'none'}
+                        onValueChange={(val) => {
+                          const newLotId = val === 'none' ? '' : val;
+                          updateRow(i, 'lot_id', newLotId);
+                          const lot = lots.find((l) => l.id === newLotId);
+                          if (lot && !row.vendor_id) updateRow(i, 'vendor_id', lot.vendorId || '');
+                          if (lot && !row.warehouse_id)
+                            updateRow(i, 'warehouse_id', lot.warehouse_id || '');
+                        }}
+                        options={lots.map((lot) => ({
+                          value: lot.id,
+                          label: lot.lotNumber,
+                          description: lot.vendor?.name || 'Unknown Vendor',
+                        }))}
+                        className="h-10"
+                        placeholder="Search lot..."
+                        emptyText="No lots found."
                       />
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="align-top">
+                      {(() => {
+                        const localOptions = getLotSparePartItems(row.lot_id);
+                        return (
+                          <Select
+                            value={row.sku || ''}
+                            onValueChange={(v) => {
+                              const opt = localOptions.find((o) => o.sku === v);
+                              if (opt) {
+                                updateRow(i, 'sku', opt.sku);
+                                updateRow(i, 'part_name', opt.partName);
+                                updateRow(i, 'brand', opt.brand);
+                                updateRow(i, 'model_ids', opt.modelIds);
+                                updateRow(i, 'base_price', opt.basePrice);
+                                updateRow(i, 'purchase_price', opt.purchasePrice);
+                                updateRow(i, 'wholesale_price', opt.wholesalePrice);
+                                updateRow(i, 'mpn', opt.mpn);
+                              } else {
+                                updateRow(i, 'sku', v);
+                              }
+                            }}
+                          >
+                            <SelectTrigger className="w-full h-10 px-3 bg-card hover:bg-muted/50 border-input text-foreground">
+                              <SelectValue placeholder="Select Part" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="__none__" disabled className="hidden">
+                                Select from lot to auto-fill
+                              </SelectItem>
+                              {localOptions.length > 0 ? (
+                                localOptions.map((opt) => (
+                                  <SelectItem key={opt.sku} value={opt.sku}>
+                                    {opt.label}
+                                  </SelectItem>
+                                ))
+                              ) : (
+                                <SelectItem value="__none__" disabled>
+                                  {row.lot_id ? 'No spare parts in this lot' : 'Select a lot first'}
+                                </SelectItem>
+                              )}
+                            </SelectContent>
+                          </Select>
+                        );
+                      })()}
+                    </TableCell>
+                    <TableCell className="align-top">
+                      <SearchableSelect
+                        value={row.brand || 'none'}
+                        onValueChange={(val) => {
+                          const newBrand = val === 'none' ? '' : val;
+                          updateRow(i, 'brand', newBrand);
+                          // Auto-clear model choice if brand changes
+                          if (
+                            row.model_ids &&
+                            row.model_ids.length > 0 &&
+                            !row.model_ids.includes('universal')
+                          ) {
+                            updateRow(i, 'model_ids', []);
+                          }
+                        }}
+                        options={brands.map((brand) => ({
+                          value: brand.name,
+                          label: brand.name,
+                          description: brand.description || '',
+                        }))}
+                        className="h-10"
+                        placeholder="Select Brand"
+                        emptyText="No brands found."
+                      />
+                    </TableCell>
+                    <TableCell className="align-top">
                       <Input
+                        className="h-10"
                         value={row.part_name}
                         onChange={(e) => updateRow(i, 'part_name', e.target.value)}
                         placeholder="Name"
                       />
                     </TableCell>
-                    <TableCell>
-                      <Input
-                        value={row.brand}
-                        onChange={(e) => updateRow(i, 'brand', e.target.value)}
-                        placeholder="Brand"
+                    <TableCell className="align-top">
+                      <MultiSelect
+                        values={row.model_ids || []}
+                        onValuesChange={(vals) => updateRow(i, 'model_ids', vals)}
+                        options={[
+                          {
+                            value: 'universal',
+                            label: 'Universal (No Model)',
+                            description: 'Compatible with all models',
+                          },
+                          ...(() => {
+                            const filteredModels = row.brand
+                              ? models.filter(
+                                  (m) =>
+                                    m.brandRelation?.name === row.brand ||
+                                    m.brand?.name === row.brand,
+                                )
+                              : models;
+                            return filteredModels.map((m) => ({
+                              value: m.id,
+                              label: `${m.model_no} - ${m.model_name}`,
+                              description: '',
+                            }));
+                          })(),
+                        ]}
+                        className="h-10"
+                        placeholder="Select Models"
+                        emptyText="No models found."
                       />
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="align-top">
                       <Input
+                        className="h-10"
+                        value={row.mpn || ''}
+                        onChange={(e) => updateRow(i, 'mpn', e.target.value)}
+                        placeholder="MPN"
+                      />
+                    </TableCell>
+                    <TableCell className="align-top">
+                      <Input
+                        className="h-10"
+                        value={row.sku}
+                        onChange={(e) => updateRow(i, 'sku', e.target.value)}
+                        placeholder="SKU"
+                      />
+                    </TableCell>
+                    <TableCell className="align-top">
+                      <SearchableSelect
+                        value={row.vendor_id || 'none'}
+                        onValueChange={(v) =>
+                          updateRow(i, 'vendor_id', v === 'none' ? undefined : v)
+                        }
+                        options={vendors.map((v) => ({
+                          value: v.id,
+                          label: v.name,
+                        }))}
+                        className="h-10"
+                        placeholder="Select Vendor"
+                      />
+                    </TableCell>
+                    <TableCell className="align-top">
+                      <SearchableSelect
+                        value={row.warehouse_id || 'none'}
+                        onValueChange={(v) =>
+                          updateRow(i, 'warehouse_id', v === 'none' ? undefined : v)
+                        }
+                        options={warehouses.map((w) => ({
+                          value: w.id,
+                          label: w.warehouseName,
+                        }))}
+                        className="h-10"
+                        placeholder="Select Warehouse"
+                      />
+                    </TableCell>
+                    <TableCell className="align-top">
+                      <Input
+                        className="h-10"
                         type="number"
                         value={row.purchase_price}
                         onChange={(e) => updateRow(i, 'purchase_price', Number(e.target.value))}
-                        placeholder="Purchase Price"
+                        placeholder="0"
                       />
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="align-top">
                       <Input
+                        className="h-10"
                         type="number"
                         value={row.base_price}
                         onChange={(e) => updateRow(i, 'base_price', Number(e.target.value))}
-                        placeholder="Selling Price"
+                        placeholder="0"
                       />
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="align-top">
                       <Input
+                        className="h-10"
                         type="number"
                         value={row.wholesale_price}
                         onChange={(e) => updateRow(i, 'wholesale_price', Number(e.target.value))}
-                        placeholder="Wholesale Price"
+                        placeholder="0"
                       />
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="align-top">
                       <Input
+                        className="h-10"
                         type="number"
                         value={row.quantity}
                         onChange={(e) => updateRow(i, 'quantity', Number(e.target.value))}
                         placeholder="0"
                       />
                     </TableCell>
-                    <TableCell>
-                      <Select
-                        value={row.vendor_id}
-                        onValueChange={(v) => updateRow(i, 'vendor_id', v)}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {vendors.map((v) => (
-                            <SelectItem key={v.id} value={v.id}>
-                              {v.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </TableCell>
-                    <TableCell>
-                      <Select
-                        value={row.warehouse_id}
-                        onValueChange={(v) => updateRow(i, 'warehouse_id', v)}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {warehouses.map((w) => (
-                            <SelectItem key={w.id} value={w.id}>
-                              {w.warehouseName}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </TableCell>
-                    <TableCell>
-                      {/* Select Product from Lot — shows models from the selected lot */}
-                      <Select
-                        value={row.item_code || ''}
-                        onValueChange={(v) => {
-                          const opt = lotSparePartOptions.find((o) => o.itemCode === v);
-                          if (opt) {
-                            updateRow(i, 'item_code', opt.itemCode);
-                            updateRow(i, 'part_name', opt.partName);
-                            updateRow(i, 'brand', opt.brand);
-                            updateRow(i, 'model_id', opt.modelId);
-                            updateRow(i, 'base_price', opt.basePrice);
-                            updateRow(i, 'purchase_price', opt.purchasePrice);
-                            updateRow(i, 'wholesale_price', opt.wholesalePrice);
-                          } else {
-                            updateRow(i, 'item_code', v);
-                          }
-                        }}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select Part" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="__none__" disabled>
-                            Select from lot to auto-fill
-                          </SelectItem>
-                          {lotSparePartOptions.length > 0 ? (
-                            lotSparePartOptions.map((opt) => (
-                              <SelectItem key={opt.itemCode} value={opt.itemCode}>
-                                {opt.label}
-                              </SelectItem>
-                            ))
-                          ) : (
-                            // Fallback: show a disabled hint if no lot selected
-                            <SelectItem value="__none__" disabled>
-                              {selectedLotId ? 'No spare parts in this lot' : 'Select a lot first'}
-                            </SelectItem>
-                          )}
-                        </SelectContent>
-                      </Select>
-                    </TableCell>
-                    <TableCell>
+                    <TableCell className="align-top pt-3 text-center">
                       <button
                         onClick={() => handleRemoveRow(i)}
-                        className="text-red-500 hover:text-red-700"
+                        className="text-red-500 hover:text-red-700 p-2"
                       >
                         <Trash2 size={16} />
                       </button>

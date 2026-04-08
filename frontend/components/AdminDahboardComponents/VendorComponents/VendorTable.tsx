@@ -455,8 +455,9 @@ function VendorFormModal({
   initialData: Vendor | null;
   open: boolean;
   onClose: () => void;
-  onConfirm: (data: VendorFormData) => void;
+  onConfirm: (data: VendorFormData) => Promise<void>;
 }) {
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [form, setForm] = useState<VendorFormData>({
     name: '',
     type: 'Supplier',
@@ -621,15 +622,24 @@ function VendorFormModal({
             <button
               type="button"
               onClick={onClose}
-              className="text-sm font-bold text-foreground hover:text-gray-600 transition-colors"
+              disabled={isSubmitting}
+              className="text-sm font-bold text-foreground hover:text-gray-600 transition-colors disabled:opacity-50"
             >
               Cancel
             </button>
             <Button
               className="h-12 px-10 rounded-xl bg-[#004a8d] text-white hover:bg-[#003f7d] font-bold shadow-lg"
-              onClick={() => onConfirm(form)}
+              disabled={isSubmitting}
+              onClick={async () => {
+                setIsSubmitting(true);
+                try {
+                  await onConfirm(form);
+                } finally {
+                  setIsSubmitting(false);
+                }
+              }}
             >
-              {initialData ? 'Update' : 'Confirm'}
+              {isSubmitting ? 'Saving...' : initialData ? 'Update' : 'Confirm'}
             </Button>
           </div>
         </div>

@@ -18,6 +18,7 @@ export interface Product {
   MFD: string; // Manufacturing Date
   tax_rate: number;
   sale_price: number;
+  purchase_price?: number;
   wholesale_price?: number;
   /** Current state of the item: is it for sale, rented out, or sold? */
   product_status: 'AVAILABLE' | 'RENTED' | 'LEASE' | 'SOLD' | 'DAMAGED';
@@ -43,6 +44,7 @@ export interface CreateProductDTO {
   brand: string;
   MFD: string | Date;
   sale_price: number;
+  purchase_price?: number;
   tax_rate: number;
   print_colour: 'BLACK_WHITE' | 'COLOUR' | 'BOTH';
   max_discount_amount: number;
@@ -65,6 +67,7 @@ export interface BulkProductRow {
   brand: string;
   MFD: string | Date;
   sale_price: number;
+  purchase_price?: number;
   tax_rate: number;
   print_colour: 'BLACK_WHITE' | 'COLOUR' | 'BOTH';
   max_discount_amount: number;

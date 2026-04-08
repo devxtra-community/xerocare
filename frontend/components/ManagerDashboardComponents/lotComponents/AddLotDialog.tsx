@@ -48,6 +48,9 @@ const lotItemSchema = z
     partName: z.string().optional(),
     quantity: z.coerce.number().min(1, 'Quantity must be at least 1'),
     unitPrice: z.coerce.number().min(0, 'Purchase Price cannot be negative'),
+    sellingPrice: z.coerce.number().min(0, 'Selling Price cannot be negative').optional(),
+    mpn: z.string().optional(),
+    compatibleModels: z.string().optional(),
   })
   .refine(
     (data) => {
@@ -117,6 +120,7 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
           sparePartId: '',
           brand: '',
           partName: '',
+          mpn: '',
         },
       ],
     },
@@ -224,6 +228,15 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
   };
 
   const handleDownloadTemplate = () => {
+    const headers = [
+      'Item Type',
+      'Item Name',
+      'Brand',
+      'MPN',
+      'Quantity',
+      'Purchase Price',
+      'Selling Price',
+    ];
     const rows = [
       ['LOT INFORMATION'],
       ['Vendor', 'Example Vendor'],
@@ -232,13 +245,21 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
       ['Notes', 'Optional notes here'],
       [],
       ['LOT ITEMS'],
-      ['Item Type', 'Item Name', 'Brand', 'Quantity', 'Purchase Price'],
-      ['PRODUCT', 'Example Model Name', 'Example Brand', 10, 100],
-      ['SPARE PART', 'Example Part Name', 'Example Brand', 5, 50],
+      headers,
+      ['SPARE PART', 'Oil Filter', 'Toyota', 'OF-12345', '10', '25.50', '45.00'],
+      ['PRODUCT', 'Kyocera TaskAlpha 2554ci', 'Kyocera', '', '1', '4500.00', '5200.00'],
     ];
 
     const ws = XLSX.utils.aoa_to_sheet(rows);
-    const wscols = [{ wch: 20 }, { wch: 30 }, { wch: 20 }, { wch: 15 }, { wch: 15 }];
+    const wscols = [
+      { wch: 20 },
+      { wch: 30 },
+      { wch: 20 },
+      { wch: 15 },
+      { wch: 15 },
+      { wch: 15 },
+      { wch: 15 },
+    ];
     ws['!cols'] = wscols;
 
     const wb = XLSX.utils.book_new();
@@ -508,6 +529,7 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
                           sparePartId: '',
                           brand: '',
                           partName: '',
+                          mpn: '',
                         })
                       }
                       className="h-9 gap-1.5 bg-gray-50 hover:bg-gray-100 text-gray-700 border-gray-200"
@@ -519,11 +541,14 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
                   <div className="flex-1 overflow-hidden px-4 pb-4 pt-0">
                     <div className="h-full border rounded-lg flex flex-col overflow-hidden bg-gray-50/50">
                       {/* Table Header */}
-                      <div className="grid grid-cols-12 gap-4 px-4 py-3 bg-gray-50 border-b text-xs font-bold text-gray-500 uppercase tracking-wider">
-                        <div className="col-span-2">Type</div>
-                        <div className="col-span-12 md:col-span-6">Item Details</div>
+                      <div className="grid grid-cols-12 gap-4 px-4 py-3 bg-gray-50 border-b text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+                        <div className="col-span-1 text-center">Type</div>
+                        <div className="col-span-2">Item Details</div>
+                        <div className="col-span-2">MPN</div>
+                        <div className="col-span-2">Comp. Models</div>
                         <div className="col-span-1 text-center">Qty</div>
-                        <div className="col-span-2 text-center">Purchase Price</div>
+                        <div className="col-span-1 text-center">Purchase</div>
+                        <div className="col-span-2 text-center">Selling Price</div>
                         <div className="col-span-1 text-center">Action</div>
                       </div>
 
@@ -534,8 +559,8 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
                             key={field.id}
                             className="grid grid-cols-12 gap-4 items-start bg-white p-4 rounded-lg border shadow-sm"
                           >
-                            <div className="col-span-12 md:col-span-2">
-                              <div className="text-xs font-semibold text-gray-500 mb-1.5 md:hidden">
+                            <div className="col-span-12 md:col-span-1">
+                              <div className="text-[10px] font-bold text-slate-500 mb-1.5 md:hidden uppercase">
                                 Type
                               </div>
                               <FormField
@@ -554,11 +579,12 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
                                         sparePartId: '',
                                         brand: '',
                                         partName: '',
+                                        compatibleModels: '', // Reset
                                       });
                                     }}
                                     value={field.value}
                                   >
-                                    <SelectTrigger className="h-10 text-sm bg-gray-50/50">
+                                    <SelectTrigger className="h-9 text-xs bg-gray-50/50">
                                       <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -571,8 +597,8 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
                                 )}
                               />
                             </div>
-                            <div className="col-span-12 md:col-span-6">
-                              <div className="text-xs font-semibold text-gray-500 mb-1.5 md:hidden">
+                            <div className="col-span-12 md:col-span-2">
+                              <div className="text-[10px] font-bold text-slate-500 mb-1.5 md:hidden uppercase">
                                 Item Details
                               </div>
                               <FormField
@@ -583,8 +609,8 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
                                   return (
                                     <>
                                       {type === LotItemType.MODEL ? (
-                                        <div className="grid grid-cols-12 gap-2 w-full">
-                                          <div className="col-span-6">
+                                        <div className="grid grid-cols-1 gap-2 w-full">
+                                          <div className="grid grid-cols-2 gap-2">
                                             <FormField
                                               control={formControl}
                                               name={`items.${index}.brand`}
@@ -604,15 +630,13 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
                                                       }))}
                                                       placeholder="Brand"
                                                       emptyText="No brands."
-                                                      className="h-10 text-sm bg-gray-50/50"
+                                                      className="h-9 text-xs bg-gray-50/30"
                                                     />
                                                   </FormControl>
                                                   <FormMessage />
                                                 </FormItem>
                                               )}
                                             />
-                                          </div>
-                                          <div className="col-span-6">
                                             <FormField
                                               control={formControl}
                                               name={`items.${index}.modelId`}
@@ -637,13 +661,13 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
                                                           label: m.model_no,
                                                           description: m.model_name,
                                                         }))}
-                                                        placeholder="Select Model"
+                                                        placeholder="Model"
                                                         emptyText={
                                                           selectedBrand
                                                             ? 'No Model found.'
-                                                            : 'Select Brand first.'
+                                                            : 'Select Brand'
                                                         }
-                                                        className="h-10 text-sm bg-gray-50/50"
+                                                        className="h-9 text-xs bg-gray-50/30"
                                                       />
                                                     </FormControl>
                                                     <FormMessage />
@@ -654,8 +678,8 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
                                           </div>
                                         </div>
                                       ) : (
-                                        <div className="grid grid-cols-12 gap-2">
-                                          <div className="col-span-4">
+                                        <div className="grid grid-cols-1 gap-2 w-full">
+                                          <div className="grid grid-cols-2 gap-2">
                                             <FormField
                                               control={formControl}
                                               name={`items.${index}.brand`}
@@ -679,15 +703,13 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
                                                       }))}
                                                       placeholder="Brand"
                                                       emptyText="No brands."
-                                                      className="h-10 text-sm bg-gray-50/50"
+                                                      className="h-9 text-xs bg-gray-50/30"
                                                     />
                                                   </FormControl>
                                                   <FormMessage />
                                                 </FormItem>
                                               )}
                                             />
-                                          </div>
-                                          <div className="col-span-4">
                                             <FormField
                                               control={formControl}
                                               name={`items.${index}.modelIds`}
@@ -702,14 +724,12 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
                                                         selectedBrandForSP,
                                                     )
                                                   : [];
-
                                                 return (
                                                   <FormItem>
                                                     <FormControl>
                                                       <MultiSelect
                                                         values={cmField.value || []}
                                                         onValuesChange={(newValues) => {
-                                                          // If 'universal' was just added, clear everything else
                                                           if (
                                                             newValues.includes('universal') &&
                                                             !(cmField.value || []).includes(
@@ -717,9 +737,7 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
                                                             )
                                                           ) {
                                                             cmField.onChange(['universal']);
-                                                          }
-                                                          // If 'universal' was already there and a new specific model was added, remove 'universal'
-                                                          else if (
+                                                          } else if (
                                                             newValues.length > 1 &&
                                                             newValues.includes('universal')
                                                           ) {
@@ -745,7 +763,7 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
                                                           })),
                                                         ]}
                                                         placeholder="Comp. Models"
-                                                        className="h-10 text-sm bg-gray-50/50"
+                                                        className="h-9 text-xs bg-gray-50/30"
                                                       />
                                                     </FormControl>
                                                     <FormMessage />
@@ -754,7 +772,7 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
                                               }}
                                             />
                                           </div>
-                                          <div className="col-span-4">
+                                          <div className="w-full">
                                             <FormField
                                               control={formControl}
                                               name={`items.${index}.partName`}
@@ -763,7 +781,7 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
                                                   <FormControl>
                                                     <Input
                                                       placeholder="Part Name"
-                                                      className="h-10 text-sm bg-gray-50/50"
+                                                      className="h-9 text-xs bg-gray-50/30 w-full"
                                                       {...partNameField}
                                                     />
                                                   </FormControl>
@@ -779,8 +797,80 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
                                 }}
                               />
                             </div>
-                            <div className="col-span-6 md:col-span-1">
-                              <div className="text-xs font-semibold text-gray-500 mb-1.5 md:hidden">
+                            <div className="col-span-12 md:col-span-2">
+                              <div className="text-[10px] font-bold text-slate-500 mb-1.5 md:hidden uppercase">
+                                MPN
+                              </div>
+                              <FormField
+                                control={formControl}
+                                name={`items.${index}.mpn`}
+                                render={({ field }) => (
+                                  <Input
+                                    placeholder="Mfg Part #"
+                                    className="h-9 text-[10px] md:text-xs bg-gray-50/30"
+                                    {...field}
+                                  />
+                                )}
+                              />
+                            </div>
+                            <div className="col-span-12 md:col-span-2">
+                              <div className="text-[10px] font-bold text-slate-500 mb-1.5 md:hidden uppercase text-center">
+                                Compatible Models
+                              </div>
+                              <FormField
+                                control={formControl}
+                                name={`items.${index}.modelIds`}
+                                render={({ field: msField }) => {
+                                  const itemBrand = form.watch(`items.${index}.brand`);
+                                  const itemType = form.watch(`items.${index}.itemType`);
+
+                                  return (
+                                    <MultiSelect
+                                      values={msField.value || []}
+                                      onValuesChange={(newValues) => {
+                                        if (
+                                          newValues.includes('universal') &&
+                                          !(msField.value || []).includes('universal')
+                                        ) {
+                                          msField.onChange(['universal']);
+                                        } else if (
+                                          newValues.length > 1 &&
+                                          newValues.includes('universal')
+                                        ) {
+                                          msField.onChange(
+                                            newValues.filter((v) => v !== 'universal'),
+                                          );
+                                        } else {
+                                          msField.onChange(newValues);
+                                        }
+                                      }}
+                                      options={[
+                                        {
+                                          value: 'universal',
+                                          label: 'Universal',
+                                          description: 'Compatible with all',
+                                        },
+                                        ...models
+                                          .filter((m) => {
+                                            if (!itemBrand) return false;
+                                            return m.brandRelation?.name === itemBrand;
+                                          })
+                                          .map((m) => ({
+                                            value: m.id,
+                                            label: m.model_no,
+                                            description: m.model_name,
+                                          })),
+                                      ]}
+                                      placeholder="Comp. Models"
+                                      className="h-9 text-[10px] bg-gray-50/30"
+                                      disabled={itemType === LotItemType.MODEL || !itemBrand}
+                                    />
+                                  );
+                                }}
+                              />
+                            </div>
+                            <div className="col-span-12 md:col-span-1">
+                              <div className="text-[10px] font-bold text-slate-500 mb-1.5 md:hidden uppercase text-center">
                                 Quantity
                               </div>
                               <FormField
@@ -790,45 +880,74 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
                                   <Input
                                     type="number"
                                     min="1"
-                                    className="h-10 text-sm bg-gray-50/50 text-center"
+                                    className="h-9 text-xs bg-gray-50/30 text-center"
                                     placeholder="Qty"
                                     {...field}
                                   />
                                 )}
                               />
                             </div>
-                            <div className="col-span-6 md:col-span-2">
-                              <div className="text-xs font-semibold text-gray-500 mb-1.5 md:hidden">
-                                Purchase Price
+                            <div className="col-span-12 md:col-span-1">
+                              <div className="text-[10px] font-bold text-slate-500 mb-1.5 md:hidden uppercase text-center">
+                                Purchase
                               </div>
-                              <div className="relative">
-                                <span className="absolute left-1 top-1/2 -translate-y-1/2 text-gray-500 text-[9px] font-bold">
-                                  QAR
-                                </span>
-                                <FormField
-                                  control={formControl}
-                                  name={`items.${index}.unitPrice`}
-                                  render={({ field }) => (
+                              <FormField
+                                control={formControl}
+                                name={`items.${index}.unitPrice`}
+                                render={({ field }) => (
+                                  <div className="relative">
+                                    <div className="absolute left-1.5 top-1/2 -translate-y-1/2 text-[10px] font-bold text-gray-400">
+                                      Q
+                                    </div>
                                     <Input
                                       type="number"
                                       min="0"
                                       step="0.01"
-                                      className="h-10 text-sm pl-8 bg-gray-50/50"
-                                      placeholder="0"
+                                      className="h-9 text-[10px] bg-gray-50/30 pl-5 pr-1"
+                                      placeholder="0.00"
                                       {...field}
                                     />
-                                  )}
-                                />
-                              </div>
+                                  </div>
+                                )}
+                              />
                             </div>
-                            <div className="col-span-12 md:col-span-1 flex justify-center pt-2 md:pt-0 items-center h-full">
-                              <button
+                            <div className="col-span-12 md:col-span-2">
+                              <div className="text-[10px] font-bold text-slate-500 mb-1.5 md:hidden uppercase text-center">
+                                Selling
+                              </div>
+                              <FormField
+                                control={formControl}
+                                name={`items.${index}.sellingPrice`}
+                                render={({ field }) => (
+                                  <div className="relative">
+                                    <div className="absolute left-1.5 top-1/2 -translate-y-1/2 text-[10px] font-bold text-gray-400">
+                                      Q
+                                    </div>
+                                    <Input
+                                      type="number"
+                                      min="0"
+                                      step="0.01"
+                                      className="h-9 text-[10px] bg-gray-50/30 pl-5 pr-1 font-bold text-blue-600"
+                                      placeholder="0.00"
+                                      {...field}
+                                    />
+                                  </div>
+                                )}
+                              />
+                            </div>
+                            <div className="col-span-12 md:col-span-1 flex items-center justify-center">
+                              <div className="text-[10px] font-bold text-slate-500 mb-1.5 md:hidden uppercase text-center">
+                                Action
+                              </div>
+                              <Button
                                 type="button"
+                                variant="ghost"
+                                size="icon"
                                 onClick={() => remove(index)}
-                                className="text-gray-400 hover:text-red-500 transition-colors p-2 hover:bg-red-50 rounded-full"
+                                className="h-9 w-9 text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"
                               >
                                 <Trash2 size={18} />
-                              </button>
+                              </Button>
                             </div>
                           </div>
                         ))}

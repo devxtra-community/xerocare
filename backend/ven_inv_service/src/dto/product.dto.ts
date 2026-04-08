@@ -10,6 +10,7 @@ export interface AddProductDTO {
   brand: string;
   MFD: string | Date;
   sale_price: number;
+  purchase_price?: number;
   tax_rate: number;
   print_colour?: PrintColour;
   max_discount_amount?: number | null;
@@ -28,10 +29,12 @@ export interface BulkProductRow {
   brand: string;
   MFD: string | Date;
   sale_price: number;
+  purchase_price?: number;
   tax_rate: number;
   print_colour?: PrintColour;
   max_discount_amount?: number | null;
   wholesale_price?: number;
   imageUrl?: string | null;
   lot_id?: string;
+  model_id?: string;
 }
