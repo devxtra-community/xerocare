@@ -773,3 +773,19 @@ export const getAvailableYears = async (): Promise<number[]> => {
   const response = await api.get('/b/invoices/stats/available-years');
   return response.data.data;
 };
+
+/**
+ * Processes a return credit for an item in an invoice.
+ */
+export const processReturn = async (
+  invoiceId: string,
+  payload: {
+    itemId: string;
+    itemType: 'PRODUCT' | 'SPARE_PART';
+    amount: number;
+    note: string;
+  },
+): Promise<unknown> => {
+  const response = await api.post(`/b/invoices/${invoiceId}/returns`, payload);
+  return response.data.data;
+};

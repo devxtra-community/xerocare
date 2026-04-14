@@ -36,6 +36,9 @@ import { MultiSelect } from '@/components/ui/multi-select';
 import * as XLSX from 'xlsx';
 import { formatCurrency } from '@/lib/format';
 import { generateLotId } from '@/lib/utils';
+import { AddModelDialog } from '../productComponents/AddModelDialog';
+import { AddBrandDialog } from '../BrandComponents/AddBrandDialog';
+import { Label } from '@/components/ui/label';
 
 // --- Schema Definition ---
 const lotItemSchema = z
@@ -46,9 +49,16 @@ const lotItemSchema = z
     sparePartId: z.string().optional(),
     brand: z.string().optional(),
     partName: z.string().optional(),
+    isRequestingNewPart: z.boolean().optional(),
     quantity: z.coerce.number().min(1, 'Quantity must be at least 1'),
-    unitPrice: z.coerce.number().min(0, 'Purchase Price cannot be negative'),
-    sellingPrice: z.coerce.number().min(0, 'Selling Price cannot be negative').optional(),
+    unitPrice: z
+      .any()
+      .transform((val) => (val === '' ? undefined : Number(val)))
+      .pipe(z.number().min(0, 'Purchase Price cannot be negative')),
+    sellingPrice: z
+      .any()
+      .transform((val) => (val === '' ? undefined : Number(val)))
+      .pipe(z.number().min(0, 'Selling Price cannot be negative').optional()),
     mpn: z.string().optional(),
     compatibleModels: z.string().optional(),
   })
@@ -95,12 +105,14 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [models, setModels] = useState<Model[]>([]);
   const [brands, setBrands] = useState<Brand[]>([]);
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+
   const [spareParts, setSpareParts] = useState<SparePart[]>([]);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [isUploadMode, setIsUploadMode] = useState(false);
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [isValidatingLot, setIsValidatingLot] = useState(false);
+  const [modelDialogOpen, setModelDialogOpen] = useState(false);
+  const [brandDialogOpen, setBrandDialogOpen] = useState(false);
 
   const form = useForm<CreateLotFormValues>({
     resolver: zodResolver(createLotSchema) as Resolver<CreateLotFormValues>,
@@ -114,13 +126,15 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
         {
           itemType: LotItemType.MODEL,
           quantity: 1,
-          unitPrice: 0,
+          unitPrice: '' as unknown as number,
+          sellingPrice: '' as unknown as number,
           modelId: '',
           modelIds: [],
           sparePartId: '',
           brand: '',
           partName: '',
           mpn: '',
+          isRequestingNewPart: true,
         },
       ],
     },
@@ -131,26 +145,27 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
     name: 'items',
   });
 
+  const fetchData = async () => {
+    try {
+      const [vData, mData, bData, spData, wData] = await Promise.all([
+        getVendors(),
+        getAllModels(),
+        brandService.getAllBrands(),
+        getAllSpareParts(),
+        getMyBranchWarehouses(),
+      ]);
+      setVendors(vData.data || []);
+      setModels(mData.data || []);
+      setBrands(bData || []);
+      setSpareParts(spData || []);
+      setWarehouses(wData.data || []);
+    } catch {
+      toast.error('Failed to load form data');
+    }
+  };
+
   // Load initial data
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [vData, mData, bData, spData, wData] = await Promise.all([
-          getVendors(),
-          getAllModels(),
-          brandService.getAllBrands(),
-          getAllSpareParts(),
-          getMyBranchWarehouses(),
-        ]);
-        setVendors(vData.data || []);
-        setModels(mData.data || []);
-        setBrands(bData || []);
-        setSpareParts(spData || []);
-        setWarehouses(wData.data || []);
-      } catch {
-        toast.error('Failed to load form data');
-      }
-    };
     fetchData();
   }, []);
 
@@ -287,6 +302,16 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
         showCloseButton={false}
         className="sm:max-w-[80vw] lg:max-w-7xl h-[96vh] flex flex-col p-0 overflow-hidden bg-white shadow-2xl"
       >
+        <AddModelDialog
+          open={modelDialogOpen}
+          onOpenChange={setModelDialogOpen}
+          onSuccess={fetchData}
+        />
+        <AddBrandDialog
+          open={brandDialogOpen}
+          onOpenChange={setBrandDialogOpen}
+          onSuccess={fetchData}
+        />
         <DialogHeader className="px-6 py-3 border-b flex flex-row items-center justify-between space-y-0">
           <div>
             <DialogTitle className="text-xl font-bold">
@@ -523,13 +548,15 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
                         append({
                           itemType: LotItemType.MODEL,
                           quantity: 1,
-                          unitPrice: 0,
+                          unitPrice: '' as unknown as number,
+                          sellingPrice: '' as unknown as number,
                           modelId: '',
                           modelIds: [],
                           sparePartId: '',
                           brand: '',
                           partName: '',
                           mpn: '',
+                          isRequestingNewPart: true,
                         })
                       }
                       className="h-9 gap-1.5 bg-gray-50 hover:bg-gray-100 text-gray-700 border-gray-200"
@@ -539,444 +566,472 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
                   </div>
 
                   <div className="flex-1 overflow-hidden px-4 pb-4 pt-0">
-                    <div className="h-full border rounded-lg flex flex-col overflow-hidden bg-gray-50/50">
-                      {/* Table Header */}
-                      <div className="grid grid-cols-12 gap-4 px-4 py-3 bg-gray-50 border-b text-[10px] font-bold text-gray-500 uppercase tracking-wider">
-                        <div className="col-span-1 text-center">Type</div>
-                        <div className="col-span-2">Item Details</div>
-                        <div className="col-span-2">MPN</div>
-                        <div className="col-span-2">Comp. Models</div>
-                        <div className="col-span-1 text-center">Qty</div>
-                        <div className="col-span-1 text-center">Purchase</div>
-                        <div className="col-span-2 text-center">Selling Price</div>
-                        <div className="col-span-1 text-center">Action</div>
-                      </div>
-
+                    <div className="h-full border border-transparent rounded-lg flex flex-col overflow-hidden bg-transparent">
                       {/* Table Body */}
-                      <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                      <div className="flex-1 overflow-y-auto space-y-3">
                         {fields.map((field, index) => (
                           <div
                             key={field.id}
-                            className="grid grid-cols-12 gap-4 items-start bg-white p-4 rounded-lg border shadow-sm"
+                            className="flex flex-col gap-3 p-4 rounded-lg bg-slate-50 border border-slate-200 shadow-sm"
                           >
-                            <div className="col-span-12 md:col-span-1">
-                              <div className="text-[10px] font-bold text-slate-500 mb-1.5 md:hidden uppercase">
-                                Type
-                              </div>
-                              <FormField
-                                control={formControl}
-                                name={`items.${index}.itemType`}
-                                render={({ field }) => (
-                                  <Select
-                                    onValueChange={(val) => {
-                                      field.onChange(val);
-                                      const currentItem = form.getValues(`items.${index}`);
-                                      update(index, {
-                                        ...currentItem,
-                                        itemType: val as LotItemType,
-                                        modelId: '',
-                                        modelIds: [],
-                                        sparePartId: '',
-                                        brand: '',
-                                        partName: '',
-                                        compatibleModels: '', // Reset
-                                      });
-                                    }}
-                                    value={field.value}
-                                  >
-                                    <SelectTrigger className="h-9 text-xs bg-gray-50/50">
-                                      <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      <SelectItem value={LotItemType.MODEL}>Product</SelectItem>
-                                      <SelectItem value={LotItemType.SPARE_PART}>
-                                        Spare Part
-                                      </SelectItem>
-                                    </SelectContent>
-                                  </Select>
-                                )}
-                              />
-                            </div>
-                            <div className="col-span-12 md:col-span-2">
-                              <div className="text-[10px] font-bold text-slate-500 mb-1.5 md:hidden uppercase">
-                                Item Details
-                              </div>
-                              <FormField
-                                control={formControl}
-                                name={`items.${index}.itemType`}
-                                render={({ field }) => {
-                                  const type = field.value;
-                                  return (
-                                    <>
-                                      {type === LotItemType.MODEL ? (
-                                        <div className="grid grid-cols-1 gap-2 w-full">
-                                          <div className="grid grid-cols-2 gap-2">
-                                            <FormField
-                                              control={formControl}
-                                              name={`items.${index}.brand`}
-                                              render={({ field: brandField }) => (
-                                                <FormItem>
-                                                  <FormControl>
-                                                    <SearchableSelect
-                                                      value={brandField.value}
-                                                      onValueChange={(val) => {
-                                                        brandField.onChange(val);
-                                                        form.setValue(`items.${index}.modelId`, '');
-                                                      }}
-                                                      options={brands.map((brand) => ({
-                                                        value: brand.name,
-                                                        label: brand.name,
-                                                        description: brand.description || '',
-                                                      }))}
-                                                      placeholder="Brand"
-                                                      emptyText="No brands."
-                                                      className="h-9 text-xs bg-gray-50/30"
-                                                    />
-                                                  </FormControl>
-                                                  <FormMessage />
-                                                </FormItem>
-                                              )}
-                                            />
-                                            <FormField
-                                              control={formControl}
-                                              name={`items.${index}.modelId`}
-                                              render={({ field: modelField }) => {
-                                                const selectedBrand = form.watch(
-                                                  `items.${index}.brand`,
-                                                );
-                                                const filteredModels = selectedBrand
-                                                  ? models.filter(
-                                                      (m) =>
-                                                        m.brandRelation?.name === selectedBrand,
-                                                    )
-                                                  : [];
-                                                return (
-                                                  <FormItem>
-                                                    <FormControl>
-                                                      <SearchableSelect
-                                                        value={modelField.value}
-                                                        onValueChange={modelField.onChange}
-                                                        options={filteredModels.map((m) => ({
-                                                          value: m.id,
-                                                          label: m.model_no,
-                                                          description: m.model_name,
-                                                        }))}
-                                                        placeholder="Model"
-                                                        emptyText={
-                                                          selectedBrand
-                                                            ? 'No Model found.'
-                                                            : 'Select Brand'
-                                                        }
-                                                        className="h-9 text-xs bg-gray-50/30"
-                                                      />
-                                                    </FormControl>
-                                                    <FormMessage />
-                                                  </FormItem>
-                                                );
-                                              }}
-                                            />
-                                          </div>
-                                        </div>
-                                      ) : (
-                                        <div className="grid grid-cols-1 gap-2 w-full">
-                                          <div className="grid grid-cols-2 gap-2">
-                                            <FormField
-                                              control={formControl}
-                                              name={`items.${index}.brand`}
-                                              render={({ field: brandField }) => (
-                                                <FormItem>
-                                                  <FormControl>
-                                                    <SearchableSelect
-                                                      value={brandField.value}
-                                                      onValueChange={(val) => {
-                                                        brandField.onChange(val);
-                                                        form.setValue(`items.${index}.modelId`, '');
-                                                        form.setValue(
-                                                          `items.${index}.modelIds`,
-                                                          [],
-                                                        );
-                                                      }}
-                                                      options={brands.map((brand) => ({
-                                                        value: brand.name,
-                                                        label: brand.name,
-                                                        description: brand.description || '',
-                                                      }))}
-                                                      placeholder="Brand"
-                                                      emptyText="No brands."
-                                                      className="h-9 text-xs bg-gray-50/30"
-                                                    />
-                                                  </FormControl>
-                                                  <FormMessage />
-                                                </FormItem>
-                                              )}
-                                            />
-                                            <FormField
-                                              control={formControl}
-                                              name={`items.${index}.modelIds`}
-                                              render={({ field: cmField }) => {
-                                                const selectedBrandForSP = form.watch(
-                                                  `items.${index}.brand`,
-                                                );
-                                                const filteredModelsForSP = selectedBrandForSP
-                                                  ? models.filter(
-                                                      (m) =>
-                                                        m.brandRelation?.name ===
-                                                        selectedBrandForSP,
-                                                    )
-                                                  : [];
-                                                return (
-                                                  <FormItem>
-                                                    <FormControl>
-                                                      <MultiSelect
-                                                        values={cmField.value || []}
-                                                        onValuesChange={(newValues) => {
-                                                          if (
-                                                            newValues.includes('universal') &&
-                                                            !(cmField.value || []).includes(
-                                                              'universal',
-                                                            )
-                                                          ) {
-                                                            cmField.onChange(['universal']);
-                                                          } else if (
-                                                            newValues.length > 1 &&
-                                                            newValues.includes('universal')
-                                                          ) {
-                                                            cmField.onChange(
-                                                              newValues.filter(
-                                                                (v) => v !== 'universal',
-                                                              ),
-                                                            );
-                                                          } else {
-                                                            cmField.onChange(newValues);
-                                                          }
-                                                        }}
-                                                        options={[
-                                                          {
-                                                            value: 'universal',
-                                                            label: 'Universal',
-                                                            description: 'Compatible with all',
-                                                          },
-                                                          ...filteredModelsForSP.map((m) => ({
-                                                            value: m.id,
-                                                            label: m.model_no,
-                                                            description: m.model_name,
-                                                          })),
-                                                        ]}
-                                                        placeholder="Comp. Models"
-                                                        className="h-9 text-xs bg-gray-50/30"
-                                                      />
-                                                    </FormControl>
-                                                    <FormMessage />
-                                                  </FormItem>
-                                                );
-                                              }}
-                                            />
-                                          </div>
-                                          <div className="w-full">
-                                            <FormField
-                                              control={formControl}
-                                              name={`items.${index}.partName`}
-                                              render={({ field: partNameField }) => (
-                                                <FormItem>
-                                                  <FormControl>
-                                                    <Input
-                                                      placeholder="Part Name"
-                                                      className="h-9 text-xs bg-gray-50/30 w-full"
-                                                      {...partNameField}
-                                                    />
-                                                  </FormControl>
-                                                  <FormMessage />
-                                                </FormItem>
-                                              )}
-                                            />
-                                          </div>
-                                        </div>
-                                      )}
-                                    </>
-                                  );
-                                }}
-                              />
-                            </div>
-                            <div className="col-span-12 md:col-span-2">
-                              <div className="text-[10px] font-bold text-slate-500 mb-1.5 md:hidden uppercase">
-                                MPN
-                              </div>
-                              <FormField
-                                control={formControl}
-                                name={`items.${index}.mpn`}
-                                render={({ field }) => (
-                                  <Input
-                                    placeholder="Mfg Part #"
-                                    className="h-9 text-[10px] md:text-xs bg-gray-50/30"
-                                    {...field}
-                                  />
-                                )}
-                              />
-                            </div>
-                            <div className="col-span-12 md:col-span-2">
-                              <div className="text-[10px] font-bold text-slate-500 mb-1.5 md:hidden uppercase text-center">
-                                Compatible Models
-                              </div>
-                              <FormField
-                                control={formControl}
-                                name={`items.${index}.modelIds`}
-                                render={({ field: msField }) => {
-                                  const itemBrand = form.watch(`items.${index}.brand`);
-                                  const itemType = form.watch(`items.${index}.itemType`);
-
-                                  return (
-                                    <MultiSelect
-                                      values={msField.value || []}
-                                      onValuesChange={(newValues) => {
-                                        if (
-                                          newValues.includes('universal') &&
-                                          !(msField.value || []).includes('universal')
-                                        ) {
-                                          msField.onChange(['universal']);
-                                        } else if (
-                                          newValues.length > 1 &&
-                                          newValues.includes('universal')
-                                        ) {
-                                          msField.onChange(
-                                            newValues.filter((v) => v !== 'universal'),
-                                          );
-                                        } else {
-                                          msField.onChange(newValues);
-                                        }
+                            <div className="grid grid-cols-2 gap-4">
+                              <div className="space-y-1">
+                                <Label className="text-xs text-slate-500 font-medium">Type</Label>
+                                <FormField
+                                  control={formControl}
+                                  name={`items.${index}.itemType`}
+                                  render={({ field: typeField }) => (
+                                    <Select
+                                      onValueChange={(val) => {
+                                        typeField.onChange(val);
+                                        const currentItem = form.getValues(`items.${index}`);
+                                        update(index, {
+                                          ...currentItem,
+                                          itemType: val as LotItemType,
+                                          modelId: '',
+                                          modelIds: [],
+                                          sparePartId: '',
+                                          brand: '',
+                                          partName: '',
+                                          compatibleModels: '', // Reset
+                                        });
                                       }}
-                                      options={[
-                                        {
-                                          value: 'universal',
-                                          label: 'Universal',
-                                          description: 'Compatible with all',
-                                        },
-                                        ...models
-                                          .filter((m) => {
-                                            if (!itemBrand) return false;
-                                            return m.brandRelation?.name === itemBrand;
-                                          })
-                                          .map((m) => ({
-                                            value: m.id,
-                                            label: m.model_no,
-                                            description: m.model_name,
-                                          })),
-                                      ]}
-                                      placeholder="Comp. Models"
-                                      className="h-9 text-[10px] bg-gray-50/30"
-                                      disabled={itemType === LotItemType.MODEL || !itemBrand}
-                                    />
-                                  );
-                                }}
-                              />
-                            </div>
-                            <div className="col-span-12 md:col-span-1">
-                              <div className="text-[10px] font-bold text-slate-500 mb-1.5 md:hidden uppercase text-center">
-                                Quantity
+                                      value={typeField.value}
+                                    >
+                                      <SelectTrigger className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm ring-offset-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 transition-colors hover:border-slate-300">
+                                        <SelectValue />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value={LotItemType.MODEL}>Product</SelectItem>
+                                        <SelectItem value={LotItemType.SPARE_PART}>
+                                          Spare Part
+                                        </SelectItem>
+                                      </SelectContent>
+                                    </Select>
+                                  )}
+                                />
                               </div>
+
                               <FormField
                                 control={formControl}
-                                name={`items.${index}.quantity`}
-                                render={({ field }) => (
-                                  <Input
-                                    type="number"
-                                    min="1"
-                                    className="h-9 text-xs bg-gray-50/30 text-center"
-                                    placeholder="Qty"
-                                    {...field}
-                                  />
+                                name={`items.${index}.itemType`}
+                                render={({ field: itemTypeField }) => (
+                                  <>
+                                    {itemTypeField.value === LotItemType.MODEL ? (
+                                      <div className="space-y-1">
+                                        <div className="flex justify-between items-center h-4 mb-1">
+                                          <Label className="text-xs text-slate-500 font-medium">
+                                            Brand *
+                                          </Label>
+                                          <button
+                                            type="button"
+                                            onClick={() => setBrandDialogOpen(true)}
+                                            className="text-[10px] text-blue-600 hover:text-blue-800 font-medium transition-colors"
+                                          >
+                                            + Create Brand?
+                                          </button>
+                                        </div>
+                                        <FormField
+                                          control={formControl}
+                                          name={`items.${index}.brand`}
+                                          render={({ field: brandField }) => (
+                                            <FormItem>
+                                              <FormControl>
+                                                <SearchableSelect
+                                                  options={brands.map((b) => ({
+                                                    value: b.name,
+                                                    label: b.name,
+                                                  }))}
+                                                  value={brandField.value || ''}
+                                                  onValueChange={(val) => {
+                                                    brandField.onChange(val);
+                                                    form.setValue(`items.${index}.modelId`, '');
+                                                  }}
+                                                  placeholder="Search Brand..."
+                                                  emptyText="No brands found"
+                                                />
+                                              </FormControl>
+                                              <FormMessage />
+                                            </FormItem>
+                                          )}
+                                        />
+                                      </div>
+                                    ) : (
+                                      <div className="space-y-1">
+                                        <div className="flex justify-between items-center h-4 mb-1">
+                                          <Label className="text-xs text-slate-500 font-medium">
+                                            Brand *
+                                          </Label>
+                                          <button
+                                            type="button"
+                                            onClick={() => setBrandDialogOpen(true)}
+                                            className="text-[10px] text-blue-600 hover:text-blue-800 font-medium transition-colors"
+                                          >
+                                            + Create Brand?
+                                          </button>
+                                        </div>
+                                        <FormField
+                                          control={formControl}
+                                          name={`items.${index}.brand`}
+                                          render={({ field: brandField }) => (
+                                            <FormItem>
+                                              <FormControl>
+                                                <SearchableSelect
+                                                  options={brands.map((b) => ({
+                                                    value: b.name,
+                                                    label: b.name,
+                                                  }))}
+                                                  value={brandField.value || ''}
+                                                  onValueChange={(val) => {
+                                                    brandField.onChange(val);
+                                                    form.setValue(`items.${index}.modelId`, '');
+                                                    form.setValue(`items.${index}.modelIds`, []);
+                                                  }}
+                                                  placeholder="Search Brand..."
+                                                  emptyText="No brands found"
+                                                />
+                                              </FormControl>
+                                              <FormMessage />
+                                            </FormItem>
+                                          )}
+                                        />
+                                      </div>
+                                    )}
+                                  </>
                                 )}
                               />
                             </div>
-                            <div className="col-span-12 md:col-span-1">
-                              <div className="text-[10px] font-bold text-slate-500 mb-1.5 md:hidden uppercase text-center">
-                                Purchase
-                              </div>
-                              <FormField
-                                control={formControl}
-                                name={`items.${index}.unitPrice`}
-                                render={({ field }) => (
-                                  <div className="relative">
-                                    <div className="absolute left-1.5 top-1/2 -translate-y-1/2 text-[10px] font-bold text-gray-400">
-                                      Q
+
+                            <FormField
+                              control={formControl}
+                              name={`items.${index}.itemType`}
+                              render={({ field: itemTypeField }) => (
+                                <div className="space-y-4">
+                                  <div className="grid grid-cols-[1fr_80px_100px_100px_40px] gap-4 items-end">
+                                    {itemTypeField.value === LotItemType.MODEL ? (
+                                      <div className="space-y-1">
+                                        <div className="flex justify-between items-center h-4 mb-1">
+                                          <Label className="text-xs text-slate-500 font-medium">
+                                            Model *
+                                          </Label>
+                                          <button
+                                            type="button"
+                                            onClick={() => setModelDialogOpen(true)}
+                                            className="text-[10px] text-blue-600 hover:text-blue-800 font-medium transition-colors"
+                                          >
+                                            + Create New Model?
+                                          </button>
+                                        </div>
+                                        <FormField
+                                          control={formControl}
+                                          name={`items.${index}.modelId`}
+                                          render={({ field: modelField }) => {
+                                            const itemBrand = form.watch(`items.${index}.brand`);
+                                            return (
+                                              <FormItem>
+                                                <FormControl>
+                                                  <SearchableSelect
+                                                    options={models
+                                                      .filter(
+                                                        (m) =>
+                                                          !itemBrand ||
+                                                          m.brandRelation?.name === itemBrand,
+                                                      )
+                                                      .map((m) => ({
+                                                        value: m.id,
+                                                        label: `${m.model_no} - ${m.model_name}`,
+                                                      }))}
+                                                    value={modelField.value || ''}
+                                                    onValueChange={modelField.onChange}
+                                                    placeholder="Search Model..."
+                                                    emptyText={
+                                                      itemBrand
+                                                        ? 'No models found for this brand'
+                                                        : 'Select a brand first'
+                                                    }
+                                                  />
+                                                </FormControl>
+                                                <FormMessage />
+                                              </FormItem>
+                                            );
+                                          }}
+                                        />
+                                      </div>
+                                    ) : (
+                                      <div className="space-y-1">
+                                        <div className="flex justify-between items-center h-4 mb-1">
+                                          <Label className="text-xs text-slate-500 font-medium">
+                                            Part Name *
+                                          </Label>
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              const current = form.getValues(
+                                                `items.${index}.isRequestingNewPart`,
+                                              );
+                                              form.setValue(
+                                                `items.${index}.isRequestingNewPart`,
+                                                current === false ? true : false,
+                                              ); // toggle
+                                              form.setValue(`items.${index}.partName`, '');
+                                              form.setValue(`items.${index}.sparePartId`, '');
+                                              form.setValue(`items.${index}.mpn`, '');
+                                              form.setValue(`items.${index}.modelIds`, []);
+                                            }}
+                                            className="text-[10px] text-blue-600 hover:text-blue-800 font-medium transition-colors"
+                                          >
+                                            {form.watch(`items.${index}.isRequestingNewPart`) !==
+                                            false
+                                              ? '+ Existing Spare Part?'
+                                              : '+ New Spare Part?'}
+                                          </button>
+                                        </div>
+                                        {form.watch(`items.${index}.isRequestingNewPart`) !==
+                                        false ? (
+                                          <FormField
+                                            control={formControl}
+                                            name={`items.${index}.partName`}
+                                            render={({ field: partNameField }) => (
+                                              <FormItem>
+                                                <FormControl>
+                                                  <Input
+                                                    placeholder="Enter part name..."
+                                                    {...partNameField}
+                                                    className="h-10"
+                                                  />
+                                                </FormControl>
+                                                <FormMessage />
+                                              </FormItem>
+                                            )}
+                                          />
+                                        ) : (
+                                          <FormField
+                                            control={formControl}
+                                            name={`items.${index}.sparePartId`}
+                                            render={({ field: sparePartField }) => {
+                                              const itemBrand = form.watch(`items.${index}.brand`);
+                                              return (
+                                                <FormItem>
+                                                  <FormControl>
+                                                    <SearchableSelect
+                                                      options={spareParts
+                                                        .filter(
+                                                          (sp) =>
+                                                            !itemBrand || sp.brand === itemBrand,
+                                                        )
+                                                        .map((sp) => ({
+                                                          value: sp.id,
+                                                          label: `${sp.part_name} ${sp.mpn ? `(${sp.mpn})` : ''}`,
+                                                        }))}
+                                                      value={sparePartField.value || ''}
+                                                      onValueChange={(val) => {
+                                                        sparePartField.onChange(val);
+                                                        const sp = spareParts.find(
+                                                          (s) => s.id === val,
+                                                        );
+                                                        if (sp) {
+                                                          form.setValue(
+                                                            `items.${index}.partName`,
+                                                            sp.part_name,
+                                                          );
+                                                          form.setValue(
+                                                            `items.${index}.mpn`,
+                                                            sp.mpn || '',
+                                                          );
+                                                          form.setValue(
+                                                            `items.${index}.modelIds`,
+                                                            Array.isArray(sp.model_ids)
+                                                              ? sp.model_ids
+                                                              : [],
+                                                          );
+                                                        }
+                                                      }}
+                                                      placeholder="Search Existing Part..."
+                                                      emptyText={
+                                                        itemBrand
+                                                          ? 'No parts found for this brand'
+                                                          : 'Select a brand first'
+                                                      }
+                                                    />
+                                                  </FormControl>
+                                                  <FormMessage />
+                                                </FormItem>
+                                              );
+                                            }}
+                                          />
+                                        )}
+                                      </div>
+                                    )}
+
+                                    <div className="space-y-1">
+                                      <Label className="text-xs text-slate-500 font-medium h-4 mb-1 block text-center">
+                                        Qty
+                                      </Label>
+                                      <FormField
+                                        control={formControl}
+                                        name={`items.${index}.quantity`}
+                                        render={({ field: qtyField }) => (
+                                          <Input
+                                            type="number"
+                                            min="1"
+                                            placeholder="Qty"
+                                            {...qtyField}
+                                            className="text-center h-10 bg-white"
+                                          />
+                                        )}
+                                      />
                                     </div>
-                                    <Input
-                                      type="number"
-                                      min="0"
-                                      step="0.01"
-                                      className="h-9 text-[10px] bg-gray-50/30 pl-5 pr-1"
-                                      placeholder="0.00"
-                                      {...field}
-                                    />
-                                  </div>
-                                )}
-                              />
-                            </div>
-                            <div className="col-span-12 md:col-span-2">
-                              <div className="text-[10px] font-bold text-slate-500 mb-1.5 md:hidden uppercase text-center">
-                                Selling
-                              </div>
-                              <FormField
-                                control={formControl}
-                                name={`items.${index}.sellingPrice`}
-                                render={({ field }) => (
-                                  <div className="relative">
-                                    <div className="absolute left-1.5 top-1/2 -translate-y-1/2 text-[10px] font-bold text-gray-400">
-                                      Q
+
+                                    <div className="space-y-1">
+                                      <Label className="text-xs text-slate-500 font-medium h-4 mb-1 block text-center">
+                                        Purchase
+                                      </Label>
+                                      <FormField
+                                        control={formControl}
+                                        name={`items.${index}.unitPrice`}
+                                        render={({ field: buyField }) => (
+                                          <div className="relative">
+                                            <div className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-gray-400">
+                                              Q
+                                            </div>
+                                            <Input
+                                              type="number"
+                                              min="0"
+                                              step="0.01"
+                                              placeholder=""
+                                              {...buyField}
+                                              className="h-10 pl-5 pr-1 text-right bg-white"
+                                            />
+                                          </div>
+                                        )}
+                                      />
                                     </div>
-                                    <Input
-                                      type="number"
-                                      min="0"
-                                      step="0.01"
-                                      className="h-9 text-[10px] bg-gray-50/30 pl-5 pr-1 font-bold text-blue-600"
-                                      placeholder="0.00"
-                                      {...field}
-                                    />
+
+                                    <div className="space-y-1">
+                                      <Label className="text-xs text-slate-500 font-medium h-4 mb-1 block text-center">
+                                        Selling
+                                      </Label>
+                                      <FormField
+                                        control={formControl}
+                                        name={`items.${index}.sellingPrice`}
+                                        render={({ field: sellField }) => (
+                                          <div className="relative">
+                                            <div className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-gray-400">
+                                              Q
+                                            </div>
+                                            <Input
+                                              type="number"
+                                              min="0"
+                                              step="0.01"
+                                              placeholder="0.00"
+                                              {...sellField}
+                                              className="h-10 pl-5 pr-1 text-right font-bold text-blue-600 bg-white"
+                                            />
+                                          </div>
+                                        )}
+                                      />
+                                    </div>
+
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="icon"
+                                      className="text-red-500 hover:text-red-700 hover:bg-red-50 border border-transparent transition-all h-10 w-10 mb-[1px]"
+                                      onClick={() => remove(index)}
+                                    >
+                                      <Trash2 className="h-5 w-5" />
+                                    </Button>
                                   </div>
-                                )}
-                              />
-                            </div>
-                            <div className="col-span-12 md:col-span-1 flex items-center justify-center">
-                              <div className="text-[10px] font-bold text-slate-500 mb-1.5 md:hidden uppercase text-center">
-                                Action
-                              </div>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => remove(index)}
-                                className="h-9 w-9 text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"
-                              >
-                                <Trash2 size={18} />
-                              </Button>
-                            </div>
+
+                                  {itemTypeField.value === LotItemType.SPARE_PART && (
+                                    <div className="grid grid-cols-2 gap-4 pb-2 border-t border-dashed border-slate-200 mt-2 pt-4">
+                                      <div className="space-y-1">
+                                        <Label className="text-xs text-slate-500 font-medium">
+                                          Manufacturing Part # (MPN)
+                                        </Label>
+                                        <FormField
+                                          control={formControl}
+                                          name={`items.${index}.mpn`}
+                                          render={({ field: mpnField }) => (
+                                            <Input
+                                              placeholder="Search or enter MPN..."
+                                              className="h-10 bg-white"
+                                              {...mpnField}
+                                            />
+                                          )}
+                                        />
+                                      </div>
+                                      <div className="space-y-1">
+                                        <Label className="text-xs text-slate-500 font-medium">
+                                          Compatible Models
+                                        </Label>
+                                        <FormField
+                                          control={formControl}
+                                          name={`items.${index}.modelIds`}
+                                          render={({ field: modelIdsField }) => {
+                                            const itemBrand = form.watch(`items.${index}.brand`);
+                                            return (
+                                              <MultiSelect
+                                                values={modelIdsField.value || []}
+                                                onValuesChange={(newValues) => {
+                                                  if (
+                                                    newValues.includes('universal') &&
+                                                    !(modelIdsField.value || []).includes(
+                                                      'universal',
+                                                    )
+                                                  ) {
+                                                    modelIdsField.onChange(['universal']);
+                                                  } else if (
+                                                    newValues.length > 1 &&
+                                                    newValues.includes('universal')
+                                                  ) {
+                                                    modelIdsField.onChange(
+                                                      newValues.filter((v) => v !== 'universal'),
+                                                    );
+                                                  } else {
+                                                    modelIdsField.onChange(newValues);
+                                                  }
+                                                }}
+                                                options={[
+                                                  {
+                                                    value: 'universal',
+                                                    label: 'Universal',
+                                                    description: 'Compatible with all',
+                                                  },
+                                                  ...models
+                                                    .filter((m) =>
+                                                      itemBrand
+                                                        ? m.brandRelation?.name === itemBrand
+                                                        : true,
+                                                    )
+                                                    .map((m) => ({
+                                                      value: m.id,
+                                                      label: m.model_no,
+                                                      description: m.model_name,
+                                                    })),
+                                                ]}
+                                                placeholder="Comp. Models"
+                                                className="bg-white min-h-10 text-xs"
+                                                disabled={!itemBrand}
+                                              />
+                                            );
+                                          }}
+                                        />
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            />
                           </div>
                         ))}
                         {fields.length === 0 && (
-                          <div className="flex flex-col items-center justify-center h-full text-gray-400 gap-3 min-h-[200px]">
-                            <p className="text-base font-medium">No items added yet</p>
-                            <Button
-                              type="button"
-                              variant="default"
-                              size="sm"
-                              onClick={() =>
-                                append({
-                                  itemType: LotItemType.MODEL,
-                                  quantity: 1,
-                                  unitPrice: 0,
-                                  modelId: '',
-                                  modelIds: [],
-                                  sparePartId: '',
-                                  brand: '',
-                                  partName: '',
-                                })
-                              }
-                            >
-                              Add Item
-                            </Button>
+                          <div className="text-center py-6 border-2 border-dashed border-slate-200 rounded-lg text-slate-500 text-sm mt-4">
+                            No items added yet. Click &quot;Add&quot; to begin.
                           </div>
                         )}
                       </div>
-                      <div className="bg-white border-t p-4 text-right flex justify-end items-center gap-2">
+                      <div className="bg-transparent pt-3 text-right flex justify-end items-center gap-2">
                         <span className="text-gray-600 text-sm font-medium">Items Total:</span>
                         <span className="font-bold text-lg text-gray-900">
                           {formatCurrency(calculateItemsTotal())}

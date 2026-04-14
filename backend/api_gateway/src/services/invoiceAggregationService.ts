@@ -220,9 +220,10 @@ export class InvoiceAggregationService {
 
       if (user.role === 'ADMIN' || user.role === 'FINANCE') {
         // No filtering required for ADMIN or FINANCE roles
-      } else if (user.role === 'EMPLOYEE') {
+      } else if (user.role === 'EMPLOYEE' || user.role === 'MANAGER' || user.role === 'HR') {
+        // Branch staff see their own branch invoices
         if (!user.branchId) {
-          throw new AppError('Employee has no branch assigned', 403);
+          throw new AppError('User has no branch assigned', 403);
         }
         invoices = invoices.filter((inv) => inv.branchId === user.branchId);
       } else {
@@ -1405,6 +1406,30 @@ export class InvoiceAggregationService {
         );
       }
       throw new AppError('Internal Gateway Error while fetching allocations', 500);
+    }
+  }
+
+  /**
+   * Proxies a return process request to the billing service.
+   */
+  async processReturn(invoiceId: string, payload: unknown, token: string) {
+    try {
+      const response = await axios.post(
+        `${BILLING_SERVICE_URL}/invoices/${invoiceId}/returns`,
+        payload,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
+      return response.data;
+    } catch (error: unknown) {
+      if (axios.isAxiosError(error)) {
+        throw new AppError(
+          error.response?.data?.message || 'Failed to process return credit',
+          error.response?.status || 500,
+        );
+      }
+      throw new AppError('Internal Gateway Error while processing return', 500);
     }
   }
 }

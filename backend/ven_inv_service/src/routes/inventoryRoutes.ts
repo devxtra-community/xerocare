@@ -5,6 +5,7 @@ import {
   getWarehouseInventory,
   getInventoryStats,
 } from '../controllers/inventoryController';
+import { processInventoryReturn } from '../controllers/inventoryReturnController';
 import { authMiddleware } from '../middlewares/authMiddleware';
 import { roleMiddleware } from '../middlewares/roleMiddleware';
 
@@ -15,5 +16,10 @@ inventoryRouter.get('/', roleMiddleware(['ADMIN']), getGlobalInventory);
 inventoryRouter.get('/branch', roleMiddleware(['MANAGER']), getBranchInventory);
 inventoryRouter.get('/warehouse', getWarehouseInventory);
 inventoryRouter.get('/stats', roleMiddleware(['ADMIN', 'MANAGER']), getInventoryStats);
+inventoryRouter.post(
+  '/returns/process',
+  roleMiddleware(['ADMIN', 'MANAGER', 'SALES']),
+  processInventoryReturn,
+);
 
 export default inventoryRouter;

@@ -11,6 +11,7 @@ import {
   LogOut,
   Calendar,
   FileQuestion,
+  RotateCcw,
 } from 'lucide-react';
 
 import {
@@ -85,6 +86,12 @@ const menuItems = [
     icon: FileQuestion,
     href: '/employee/quotations',
     modules: ['sales', 'rent', 'lease'],
+  },
+  {
+    title: 'Returns',
+    icon: RotateCcw,
+    href: '/employee/sales/returns',
+    modules: ['sales'],
   },
 ];
 
