@@ -229,15 +229,16 @@ export default function SalesSummaryTable({ selectedYear }: { selectedYear: numb
           height: 6px;
         }
         .custom-scrollbar::-webkit-scrollbar-track {
-          background: oklch(var(--muted));
+          background: var(--muted);
           border-radius: 10px;
         }
         .custom-scrollbar::-webkit-scrollbar-thumb {
-          background: oklch(var(--primary));
+          background: var(--primary);
           border-radius: 10px;
         }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-          background: oklch(var(--primary) / 0.8);
+          background: var(--primary);
+          opacity: 0.8;
         }
       `}</style>
     </div>

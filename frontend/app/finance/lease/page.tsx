@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import MonthlyCollectionTable from '@/components/Finance/MonthlyCollectionTable';
 import CompletedCollectionsTable from '@/components/Finance/CompletedCollectionsTable';
 import FinanceApprovalTable from '@/components/Finance/FinanceApprovalTable';
+import FinanceQuotationTable from '@/components/Finance/FinanceQuotationTable';
 
 export default function LeasePage() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
@@ -39,6 +40,7 @@ export default function LeasePage() {
         <Tabs defaultValue="pending" className="w-full space-y-4">
           <TabsList className="bg-card border text-slate-600">
             <TabsTrigger value="pending">Pending Approvals</TabsTrigger>
+            <TabsTrigger value="quotations">All Quotations</TabsTrigger>
             <TabsTrigger value="collection">Monthly Collection</TabsTrigger>
             <TabsTrigger value="completed">Completed Collections</TabsTrigger>
           </TabsList>
@@ -49,6 +51,13 @@ export default function LeasePage() {
             </h3>
             <div className="bg-card rounded-xl shadow-sm border border-slate-100 p-1">
               <FinanceApprovalTable saleType="LEASE" />
+            </div>
+          </TabsContent>
+
+          <TabsContent value="quotations" className="space-y-4">
+            <h3 className="text-xl font-bold text-slate-800 tracking-tight">All Lease Contracts</h3>
+            <div className="bg-card rounded-xl shadow-sm border border-slate-100 p-1">
+              <FinanceQuotationTable saleType="LEASE" />
             </div>
           </TabsContent>
 

@@ -96,6 +96,12 @@ function KPIStats({ selectedYear }: { selectedYear: number | 'all' }) {
   }, [selectedYear]);
 
   const getAmountByType = (type: string) => {
+    if (type === 'SALE') {
+      const saleTypes = ['SALE', 'PRODUCT_SALE', 'SPAREPART_SALE'];
+      return data.salesByType
+        .filter((s) => saleTypes.includes(s.saleType))
+        .reduce((sum, s) => sum + s.total, 0);
+    }
     const item = data.salesByType.find((s) => s.saleType === type);
     return item ? item.total : 0;
   };

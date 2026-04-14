@@ -171,7 +171,9 @@ export class InvoiceRepository {
       new Brackets((innerQb) => {
         innerQb
           .where('invoice.type != :finalType', { finalType: 'FINAL' })
-          .orWhere('invoice.saleType = :saleType', { saleType: 'SALE' });
+          .orWhere('invoice.saleType IN (:...saleTypes)', {
+            saleTypes: [SaleType.SALE, SaleType.PRODUCT_SALE, SaleType.SPAREPART_SALE],
+          });
       }),
     );
 
@@ -202,7 +204,9 @@ export class InvoiceRepository {
       new Brackets((innerQb) => {
         innerQb
           .where('invoice.type != :finalType', { finalType: 'FINAL' })
-          .orWhere('invoice.saleType = :saleType', { saleType: 'SALE' });
+          .orWhere('invoice.saleType IN (:...saleTypes)', {
+            saleTypes: [SaleType.SALE, SaleType.PRODUCT_SALE, SaleType.SPAREPART_SALE],
+          });
       }),
     );
 
@@ -238,7 +242,9 @@ export class InvoiceRepository {
       new Brackets((innerQb) => {
         innerQb
           .where('invoice.type != :finalType', { finalType: 'FINAL' })
-          .orWhere('invoice.saleType = :saleType', { saleType: 'SALE' });
+          .orWhere('invoice.saleType IN (:...saleTypes)', {
+            saleTypes: [SaleType.SALE, SaleType.PRODUCT_SALE, SaleType.SPAREPART_SALE],
+          });
       }),
     );
 
@@ -373,7 +379,13 @@ export class InvoiceRepository {
       .andWhere('invoice.branchId = :branchId', { branchId })
       .andWhere('(invoice.type != :proforma OR invoice.saleType IN (:...saleTypes))', {
         proforma: InvoiceType.PROFORMA,
-        saleTypes: [SaleType.SALE, SaleType.RENT, SaleType.LEASE],
+        saleTypes: [
+          SaleType.SALE,
+          SaleType.PRODUCT_SALE,
+          SaleType.SPAREPART_SALE,
+          SaleType.RENT,
+          SaleType.LEASE,
+        ],
       })
       .andWhere('invoice.createdAt >= :startDate', { startDate });
 
@@ -436,7 +448,13 @@ export class InvoiceRepository {
       })
       .andWhere('(invoice.type != :proforma OR invoice.saleType IN (:...saleTypes))', {
         proforma: InvoiceType.PROFORMA,
-        saleTypes: [SaleType.SALE, SaleType.RENT, SaleType.LEASE],
+        saleTypes: [
+          SaleType.SALE,
+          SaleType.PRODUCT_SALE,
+          SaleType.SPAREPART_SALE,
+          SaleType.RENT,
+          SaleType.LEASE,
+        ],
       })
       .andWhere('invoice.createdAt >= :startDate', { startDate });
 
@@ -499,7 +517,13 @@ export class InvoiceRepository {
       })
       .andWhere('(invoice.type != :proforma OR invoice.saleType IN (:...saleTypes))', {
         proforma: InvoiceType.PROFORMA,
-        saleTypes: [SaleType.SALE, SaleType.RENT, SaleType.LEASE],
+        saleTypes: [
+          SaleType.SALE,
+          SaleType.PRODUCT_SALE,
+          SaleType.SPAREPART_SALE,
+          SaleType.RENT,
+          SaleType.LEASE,
+        ],
       });
 
     if (year) {
@@ -539,7 +563,13 @@ export class InvoiceRepository {
       })
       .andWhere('(invoice.type != :proforma OR invoice.saleType IN (:...saleTypes))', {
         proforma: InvoiceType.PROFORMA,
-        saleTypes: [SaleType.SALE, SaleType.RENT, SaleType.LEASE],
+        saleTypes: [
+          SaleType.SALE,
+          SaleType.PRODUCT_SALE,
+          SaleType.SPAREPART_SALE,
+          SaleType.RENT,
+          SaleType.LEASE,
+        ],
       })
       .groupBy('invoice.saleType');
 
@@ -605,7 +635,13 @@ export class InvoiceRepository {
       .andWhere('invoice.branchId = :branchId', { branchId })
       .andWhere('(invoice.type != :proforma OR invoice.saleType IN (:...saleTypes))', {
         proforma: InvoiceType.PROFORMA,
-        saleTypes: [SaleType.SALE, SaleType.RENT, SaleType.LEASE],
+        saleTypes: [
+          SaleType.SALE,
+          SaleType.PRODUCT_SALE,
+          SaleType.SPAREPART_SALE,
+          SaleType.RENT,
+          SaleType.LEASE,
+        ],
       });
 
     if (year) {
@@ -646,7 +682,13 @@ export class InvoiceRepository {
       .andWhere('invoice.branchId = :branchId', { branchId })
       .andWhere('(invoice.type != :proforma OR invoice.saleType IN (:...saleTypes))', {
         proforma: InvoiceType.PROFORMA,
-        saleTypes: [SaleType.SALE, SaleType.RENT, SaleType.LEASE],
+        saleTypes: [
+          SaleType.SALE,
+          SaleType.PRODUCT_SALE,
+          SaleType.SPAREPART_SALE,
+          SaleType.RENT,
+          SaleType.LEASE,
+        ],
       })
       .groupBy('invoice.saleType');
 
@@ -857,7 +899,9 @@ export class InvoiceRepository {
       .createQueryBuilder('invoice')
       .select('SUM(invoice.totalAmount)', 'totalRevenue')
       .addSelect('COUNT(invoice.id)', 'totalOrders')
-      .where('invoice.saleType = :saleType', { saleType: SaleType.SALE })
+      .where('invoice.saleType IN (:...saleTypes)', {
+        saleTypes: [SaleType.SALE, SaleType.PRODUCT_SALE, SaleType.SPAREPART_SALE],
+      })
       .andWhere('invoice.status IN (:...statuses)', { statuses })
       .getRawOne();
 
@@ -865,7 +909,9 @@ export class InvoiceRepository {
       .createQueryBuilder('item')
       .leftJoin('item.invoice', 'invoice')
       .select('SUM(item.quantity)', 'productsSold')
-      .where('invoice.saleType = :saleType', { saleType: SaleType.SALE })
+      .where('invoice.saleType IN (:...saleTypes)', {
+        saleTypes: [SaleType.SALE, SaleType.PRODUCT_SALE, SaleType.SPAREPART_SALE],
+      })
       .andWhere('invoice.status IN (:...statuses)', { statuses })
       .getRawOne();
 
@@ -874,7 +920,9 @@ export class InvoiceRepository {
       .leftJoin('item.invoice', 'invoice')
       .select('item.description', 'name')
       .addSelect('SUM(item.quantity)', 'qty')
-      .where('invoice.saleType = :saleType', { saleType: SaleType.SALE })
+      .where('invoice.saleType IN (:...saleTypes)', {
+        saleTypes: [SaleType.SALE, SaleType.PRODUCT_SALE, SaleType.SPAREPART_SALE],
+      })
       .andWhere('invoice.status IN (:...statuses)', { statuses })
       .andWhere("item.itemType != 'PRICING_RULE'")
       .groupBy('item.description')
@@ -887,7 +935,9 @@ export class InvoiceRepository {
       .select("TO_CHAR(invoice.createdAt, 'Mon')", 'month')
       .addSelect('SUM(invoice.totalAmount)', 'sales')
       .addSelect('EXTRACT(MONTH FROM invoice.createdAt)', 'month_num')
-      .where('invoice.saleType = :saleType', { saleType: SaleType.SALE })
+      .where('invoice.saleType IN (:...saleTypes)', {
+        saleTypes: [SaleType.SALE, SaleType.PRODUCT_SALE, SaleType.SPAREPART_SALE],
+      })
       .andWhere('invoice.status IN (:...statuses)', { statuses })
       .groupBy("TO_CHAR(invoice.createdAt, 'Mon')")
       .addGroupBy('EXTRACT(MONTH FROM invoice.createdAt)')
@@ -899,7 +949,9 @@ export class InvoiceRepository {
       .leftJoin('item.invoice', 'invoice')
       .select('item.description', 'product')
       .addSelect('SUM(item.quantity)', 'qty')
-      .where('invoice.saleType = :saleType', { saleType: SaleType.SALE })
+      .where('invoice.saleType IN (:...saleTypes)', {
+        saleTypes: [SaleType.SALE, SaleType.PRODUCT_SALE, SaleType.SPAREPART_SALE],
+      })
       .andWhere('invoice.status IN (:...statuses)', { statuses })
       .andWhere("item.itemType != 'PRICING_RULE'")
       .groupBy('item.description')

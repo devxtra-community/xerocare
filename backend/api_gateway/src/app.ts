@@ -90,7 +90,12 @@ app.get('/', (_req: Request, res: Response) => {
  * These routes handle financial documents (invoices).
  * We process these directly here at the gateway for convenience.
  */
-app.use('/b/invoices', express.json(), invoiceRouter);
+app.use(
+  '/b/invoices',
+  express.json({ limit: '50mb' }),
+  express.urlencoded({ limit: '50mb', extended: true }),
+  invoiceRouter,
+);
 
 /**
  * Safety: Prevention of Automated Attacks (Rate Limiting)

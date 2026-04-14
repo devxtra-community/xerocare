@@ -21,7 +21,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
-import { Loader2, CheckCircle, XCircle, Eye, Search, FilePlus2, FileText } from 'lucide-react';
+import { Loader2, CheckCircle, XCircle, Eye, Search, FilePlus2 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   getBranchInvoices,
@@ -30,10 +30,12 @@ import {
   allocateMachinesInvoice,
   Invoice,
 } from '@/lib/invoice';
+
 import { formatCurrency } from '@/lib/format';
 import { usePagination } from '@/hooks/usePagination';
 import Pagination from '@/components/Pagination';
 import StatCard from '@/components/StatCard';
+import { QuotationViewDialog } from '../employeeComponents/QuotationViewDialog';
 
 // ─── Badges ───────────────────────────────────────────────────────────────────
 
@@ -47,13 +49,16 @@ function StatusBadge({ status }: { status: string }) {
   };
   const label: Record<string, string> = {
     EMPLOYEE_APPROVED: 'PENDING REVIEW',
+    FINANCE_APPROVED: 'ALLOCATED',
+    PAID: 'APPROVED/PAID',
+    ACTIVE_LEASE: 'ACTIVE CONTRACT',
     APPROVED: 'APPROVED',
     REJECTED: 'REJECTED',
     DRAFT: 'DRAFT',
   };
   return (
     <Badge
-      className={`rounded-full px-3 py-0.5 text-[10px] font-bold tracking-wider shadow-none ${map[status] ?? 'bg-slate-100 text-slate-600'}`}
+      className={`rounded-full px-3 py-0.5 text-[10px] font-bold tracking-wider shadow-none ${map[status] || (['FINANCE_APPROVED', 'PAID', 'ACTIVE_LEASE'].includes(status) ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-600')}`}
     >
       {label[status] ?? status}
     </Badge>
@@ -76,229 +81,9 @@ function TypeBadge({ type }: { type: string }) {
   );
 }
 
-// ─── View Dialog ──────────────────────────────────────────────────────────────
-
-function QuotationViewDialog({
-  quotation,
-  onClose,
-  onApprove,
-  onReject,
-}: {
-  quotation: Invoice;
-  onClose: () => void;
-  onApprove: () => void;
-  onReject: () => void;
-}) {
-  const canAction = quotation.status === 'EMPLOYEE_APPROVED';
-
-  return (
-    <Dialog open onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="sm:max-w-2xl rounded-2xl border-none shadow-2xl p-0 overflow-hidden">
-        <DialogHeader className="p-6 pb-4 bg-card border-b border-slate-100">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="h-12 w-12 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
-                <FileText size={22} />
-              </div>
-              <div>
-                <DialogTitle className="text-xl font-bold text-slate-800">
-                  {quotation.invoiceNumber}
-                </DialogTitle>
-                <DialogDescription className="text-xs text-slate-400 font-semibold uppercase tracking-widest">
-                  Quotation Details — Finance Review
-                </DialogDescription>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <TypeBadge type={quotation.saleType} />
-              <StatusBadge status={quotation.status} />
-            </div>
-          </div>
-        </DialogHeader>
-
-        <div className="p-6 bg-card/50 space-y-5 overflow-y-auto max-h-[58vh]">
-          {/* Common */}
-          <div className="grid grid-cols-2 gap-3">
-            <InfoRow label="Customer" value={quotation.customerName || 'Walk-in'} />
-            <InfoRow label="Created By" value={quotation.employeeName || 'Unknown'} />
-            <InfoRow
-              label="Date"
-              value={new Date(quotation.createdAt).toLocaleDateString(undefined, {
-                day: '2-digit',
-                month: 'short',
-                year: 'numeric',
-              })}
-            />
-            {quotation.effectiveFrom && (
-              <InfoRow
-                label="Effective From"
-                value={new Date(quotation.effectiveFrom).toLocaleDateString()}
-              />
-            )}
-            {quotation.effectiveTo && (
-              <InfoRow
-                label="Effective To"
-                value={new Date(quotation.effectiveTo).toLocaleDateString()}
-              />
-            )}
-          </div>
-
-          {/* RENT details */}
-          {quotation.saleType === 'RENT' && (
-            <div className="bg-orange-50 border border-orange-100 rounded-xl p-4 space-y-3">
-              <p className="text-[11px] font-bold text-orange-600 uppercase tracking-wider">
-                Rent Details
-              </p>
-              <div className="grid grid-cols-2 gap-3">
-                {quotation.rentType && (
-                  <InfoRow label="Rent Type" value={quotation.rentType.replace(/_/g, ' ')} />
-                )}
-                {quotation.rentPeriod && (
-                  <InfoRow label="Billing Period" value={quotation.rentPeriod} />
-                )}
-                {quotation.monthlyRent != null && (
-                  <InfoRow label="Monthly Rent" value={formatCurrency(quotation.monthlyRent)} />
-                )}
-                {quotation.advanceAmount != null && (
-                  <InfoRow label="Advance" value={formatCurrency(quotation.advanceAmount)} />
-                )}
-                {quotation.discountPercent != null && (
-                  <InfoRow label="Discount" value={`${quotation.discountPercent}%`} />
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* LEASE details */}
-          {quotation.saleType === 'LEASE' && (
-            <div className="bg-purple-50 border border-purple-100 rounded-xl p-4 space-y-3">
-              <p className="text-[11px] font-bold text-purple-600 uppercase tracking-wider">
-                Lease Details
-              </p>
-              <div className="grid grid-cols-2 gap-3">
-                {quotation.leaseType && <InfoRow label="Lease Type" value={quotation.leaseType} />}
-                {quotation.leaseTenureMonths != null && (
-                  <InfoRow label="Tenure" value={`${quotation.leaseTenureMonths} months`} />
-                )}
-                {quotation.totalLeaseAmount != null && (
-                  <InfoRow
-                    label="Total Amount"
-                    value={formatCurrency(quotation.totalLeaseAmount)}
-                  />
-                )}
-                {quotation.monthlyEmiAmount != null && (
-                  <InfoRow label="Monthly EMI" value={formatCurrency(quotation.monthlyEmiAmount)} />
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Items */}
-          {quotation.items && quotation.items.length > 0 && (
-            <div className="bg-card rounded-xl border border-slate-100 overflow-hidden shadow-sm">
-              <div className="px-4 py-3 bg-muted/30 border-b border-slate-100">
-                <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
-                  {quotation.saleType === 'SALE' ? 'Sale Items' : 'Machine Models'}
-                </p>
-              </div>
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-slate-100">
-                    <th className="text-left px-4 py-2 text-xs font-bold text-slate-400 uppercase">
-                      Description
-                    </th>
-                    <th className="text-center px-4 py-2 text-xs font-bold text-slate-400 uppercase">
-                      Qty
-                    </th>
-                    {quotation.saleType === 'SALE' && (
-                      <>
-                        <th className="text-right px-4 py-2 text-xs font-bold text-slate-400 uppercase">
-                          Unit Price
-                        </th>
-                        <th className="text-right px-4 py-2 text-xs font-bold text-slate-400 uppercase">
-                          Total
-                        </th>
-                      </>
-                    )}
-                  </tr>
-                </thead>
-                <tbody>
-                  {quotation.items.map((item, i) => (
-                    <tr
-                      key={i}
-                      className={`border-b border-slate-50 ${i % 2 ? 'bg-slate-50/50' : ''}`}
-                    >
-                      <td className="px-4 py-3 font-medium text-slate-700">{item.description}</td>
-                      <td className="px-4 py-3 text-center text-slate-600">{item.quantity}</td>
-                      {quotation.saleType === 'SALE' && (
-                        <>
-                          <td className="px-4 py-3 text-right text-slate-600">
-                            {formatCurrency(item.unitPrice ?? 0)}
-                          </td>
-                          <td className="px-4 py-3 text-right font-bold">
-                            {formatCurrency((item.quantity ?? 1) * (item.unitPrice ?? 0))}
-                          </td>
-                        </>
-                      )}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              {quotation.saleType === 'SALE' && (
-                <div className="px-4 py-4 flex justify-end border-t border-slate-100 bg-card">
-                  <div className="text-right">
-                    <p className="text-[10px] font-bold text-slate-400 uppercase">Grand Total</p>
-                    <p className="text-2xl font-black text-primary">
-                      {formatCurrency(quotation.totalAmount)}
-                    </p>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-
-        <div className="p-6 border-t border-slate-100 bg-card flex items-center justify-between">
-          <Button variant="outline" onClick={onClose} className="rounded-xl font-bold">
-            Close
-          </Button>
-          {canAction && (
-            <div className="flex gap-3">
-              <Button
-                variant="outline"
-                className="rounded-xl font-bold border-red-200 text-red-600 hover:bg-red-50 gap-2"
-                onClick={onReject}
-              >
-                <XCircle size={15} /> Reject
-              </Button>
-              <Button
-                className="rounded-xl font-bold bg-green-600 hover:bg-green-700 text-white gap-2 shadow-md"
-                onClick={onApprove}
-              >
-                <CheckCircle size={15} /> Approve
-              </Button>
-            </div>
-          )}
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-function InfoRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="bg-card rounded-xl border border-slate-100 p-3 shadow-sm">
-      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">
-        {label}
-      </p>
-      <p className="text-sm font-semibold text-slate-700">{value}</p>
-    </div>
-  );
-}
-
 // ─── Main Finance Quotation Table ─────────────────────────────────────────────
 
-export default function FinanceQuotationTable() {
+export default function FinanceQuotationTable({ saleType }: { saleType?: string }) {
   const [quotations, setQuotations] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -316,7 +101,16 @@ export default function FinanceQuotationTable() {
       const data = await getBranchInvoices();
       // Show employee-approved quotations (type === QUOTATION) needing finance review
       // + already reviewed (APPROVED / REJECTED) for visibility
-      const onlyQuotations = data.filter((inv) => inv.type === 'QUOTATION');
+      let onlyQuotations = data.filter(
+        (inv) =>
+          (inv.type === 'QUOTATION' ||
+            inv.employeeApprovedBy ||
+            inv.invoiceNumber?.startsWith('QT-')) &&
+          !['DRAFT', 'SENT'].includes(inv.status),
+      );
+      if (saleType) {
+        onlyQuotations = onlyQuotations.filter((inv) => inv.saleType === saleType);
+      }
       setQuotations(onlyQuotations);
     } catch (error) {
       console.error(error);
@@ -334,8 +128,12 @@ export default function FinanceQuotationTable() {
   }, [search, setPage]);
 
   // Stats
-  const pending = quotations.filter((q) => q.status === 'EMPLOYEE_APPROVED').length;
-  const approved = quotations.filter((q) => q.status === 'APPROVED').length;
+  const pending = quotations.filter(
+    (q) => q.status === 'EMPLOYEE_APPROVED' || q.status === 'PENDING',
+  ).length;
+  const approved = quotations.filter((q) =>
+    ['APPROVED', 'FINANCE_APPROVED', 'PAID', 'ACTIVE_LEASE', 'ISSUED'].includes(q.status),
+  ).length;
   const rejected = quotations.filter((q) => q.status === 'REJECTED').length;
 
   const filtered = quotations.filter((q) => {

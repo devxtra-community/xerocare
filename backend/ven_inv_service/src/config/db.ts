@@ -33,7 +33,7 @@ export const Source = new DataSource({
   ssl: process.env.VENDOR_DATABASE_URL?.includes('neon.tech')
     ? { rejectUnauthorized: false }
     : false,
-  synchronize: true, // Enabled for development to allow automatic table creation
+  synchronize: false, // Disabled to resolve duplicate_column error during startup
   entities: [
     Vendor,
     Model,

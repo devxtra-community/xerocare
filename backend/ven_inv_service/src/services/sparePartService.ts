@@ -23,6 +23,7 @@ interface BulkUploadRow {
   vendor_id?: string;
   warehouse_id?: string;
   mpn?: string;
+  description?: string;
 }
 
 export class SparePartService {
@@ -173,6 +174,7 @@ export class SparePartService {
       vendor_id: vendorId,
       sku: sku || generateSku(),
       mpn: data.mpn,
+      description: data.description,
     });
 
     await setCached(`sparepart:${sparePart.id}`, sparePart, 3600);
@@ -207,6 +209,7 @@ export class SparePartService {
       models: models,
       sku: data.sku,
       mpn: data.mpn,
+      description: data.description,
       warehouse_id: data.warehouse_id,
       vendor_id: data.vendor_id,
     };

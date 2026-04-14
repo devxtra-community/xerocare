@@ -55,12 +55,13 @@ export default function RevenueBreakdownChart({ selectedYear }: RevenueBreakdown
         salesData.forEach((item) => {
           const date = new Date(item.date);
           const monthName = MONTHS[date.getMonth()];
-          const saleType = item.saleType.toLowerCase() as 'rent' | 'sale' | 'lease';
+          const rawType = item.saleType.toUpperCase();
+          let saleType: 'rent' | 'sale' | 'lease' | null = null;
+          if (rawType === 'RENT') saleType = 'rent';
+          else if (rawType === 'LEASE') saleType = 'lease';
+          else if (['SALE', 'PRODUCT_SALE', 'SPAREPART_SALE'].includes(rawType)) saleType = 'sale';
 
-          if (
-            monthlyData[monthName] &&
-            (saleType === 'rent' || saleType === 'sale' || saleType === 'lease')
-          ) {
+          if (monthlyData[monthName] && saleType) {
             monthlyData[monthName][saleType] += item.totalSales;
           }
         });

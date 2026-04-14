@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Search, Plus, X, Eye, Copy } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
 import Image from 'next/image';
@@ -360,6 +361,7 @@ function ProductFormModal({
     max_discount_amount: string | number;
     wholesale_price: string | number;
     lot_id: string;
+    description: string;
   }>({
     name: initialData?.name || '',
     brand: initialData?.brand || '',
@@ -377,6 +379,7 @@ function ProductFormModal({
     max_discount_amount: initialData?.max_discount_amount ?? '',
     wholesale_price: initialData?.wholesale_price ?? '',
     lot_id: initialData?.lot_id || '', // Check if initialData has lot_id support if needed
+    description: initialData?.description || '',
   });
 
   // Derived state for filtering models
@@ -590,6 +593,16 @@ function ProductFormModal({
               onChange={(e) => setForm({ ...form, serial_no: e.target.value })}
               placeholder="Enter serial number"
               required
+            />
+          </Field>
+
+          <Field label="Description">
+            <Textarea
+              value={form.description}
+              onChange={(e) => setForm({ ...form, description: e.target.value })}
+              placeholder="Enter product description"
+              className="resize-none"
+              rows={3}
             />
           </Field>
         </div>

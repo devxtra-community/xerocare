@@ -93,9 +93,14 @@ export default function DailyRevenueChart({
           // Only include data for the selected month and year
           if (date.getMonth() === monthToUse && date.getFullYear() === yearToUse) {
             const dayIndex = date.getDate() - 1; // 0-based index
-            const saleType = item.saleType.toLowerCase() as 'rent' | 'sale' | 'lease';
+            const rawType = item.saleType.toUpperCase();
+            let saleType: 'rent' | 'sale' | 'lease' | null = null;
+            if (rawType === 'RENT') saleType = 'rent';
+            else if (rawType === 'LEASE') saleType = 'lease';
+            else if (['SALE', 'PRODUCT_SALE', 'SPAREPART_SALE'].includes(rawType))
+              saleType = 'sale';
 
-            if (fullMonthData[dayIndex] && ['rent', 'sale', 'lease'].includes(saleType)) {
+            if (fullMonthData[dayIndex] && saleType) {
               fullMonthData[dayIndex][saleType] += item.totalSales;
             }
           }

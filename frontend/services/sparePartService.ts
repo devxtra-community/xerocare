@@ -21,9 +21,9 @@ export interface SparePartInventoryItem {
   price: number;
   purchase_price?: number;
   wholesale_price?: number;
-  image_url?: string;
   branch_name?: string;
   branch_id?: string;
+  description?: string;
 }
 
 export interface PaginatedResponse<T> {

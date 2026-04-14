@@ -45,7 +45,8 @@ export default function EmployeeSalesStats({
         const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
         const totalOrders = invoices.length;
-        const salesInvoices = invoices.filter((inv) => inv.saleType === 'SALE');
+        const saleTypes = ['SALE', 'PRODUCT_SALE', 'SPAREPART_SALE'];
+        const salesInvoices = invoices.filter((inv) => saleTypes.includes(inv.saleType));
 
         // Only count finance-approved sales (type === PROFORMA means finance approved the quotation)
         const approvedSalesInvoices = salesInvoices.filter(

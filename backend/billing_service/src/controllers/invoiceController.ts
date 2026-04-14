@@ -54,9 +54,9 @@ export const createQuotation = async (req: Request, res: Response, next: NextFun
       throw new AppError('Invalid request payload: customerId and saleType are required', 400);
     }
 
-    if (saleType === 'SALE') {
+    if (['SALE', 'PRODUCT_SALE', 'SPAREPART_SALE'].includes(saleType)) {
       if (!items || !Array.isArray(items) || items.length === 0) {
-        throw new AppError('Invalid request payload: items array is required for SALE', 400);
+        throw new AppError(`Invalid request payload: items array is required for ${saleType}`, 400);
       }
     } else if (saleType === 'LEASE') {
       if (!payload.leaseType || (!payload.leaseTenureMonths && payload.leaseTenureMonths !== 0)) {
@@ -65,13 +65,15 @@ export const createQuotation = async (req: Request, res: Response, next: NextFun
           400,
         );
       }
-    } else {
+    } else if (saleType === 'RENT') {
       if (!pricingItems || !rentType) {
         throw new AppError(
           'Invalid request payload: pricingItems and rentType are required for RENT',
           400,
         );
       }
+    } else {
+      throw new AppError(`Invalid request payload: unsupported saleType ${saleType}`, 400);
     }
 
     const invoice = await billingService.createQuotation({
@@ -749,6 +751,40 @@ export const downloadConsolidatedInvoice = async (
 };
 
 /**
+ * Download a professional premium PDF for a quotation.
+ */
+export const downloadPremiumQuotation = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = req.params.id as string;
+    if (!id) throw new AppError('Quotation ID required', 400);
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename=quotation-${id}.pdf`);
+
+    await reportService.downloadPremiumQuotation(id, res);
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Download a professional premium PDF for an invoice (Sale type).
+ */
+export const downloadPremiumInvoice = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = req.params.id as string;
+    if (!id) throw new AppError('Invoice ID required', 400);
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename=invoice-${id}.pdf`);
+
+    await reportService.downloadPremiumInvoice(id, res);
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
  * Automatically send the final bill to the customer via email or other channels.
  */
 export const sendConsolidatedInvoice = async (req: Request, res: Response, next: NextFunction) => {
@@ -772,13 +808,13 @@ export const sendConsolidatedInvoice = async (req: Request, res: Response, next:
 export const sendEmailNotification = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = req.params.id as string;
-    const { recipient, subject, body } = req.body;
+    const { recipient, subject, body, attachments } = req.body;
 
     if (!body) {
       throw new AppError('Body is required', 400);
     }
 
-    await notificationService.sendEmailNotification(id, recipient, subject, body);
+    await notificationService.sendEmailNotification(id, recipient, subject, body, attachments);
 
     return res.status(200).json({
       success: true,

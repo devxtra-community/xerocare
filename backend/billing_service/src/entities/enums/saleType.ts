@@ -2,4 +2,6 @@ export enum SaleType {
   SALE = 'SALE',
   RENT = 'RENT',
   LEASE = 'LEASE',
+  PRODUCT_SALE = 'PRODUCT_SALE',
+  SPAREPART_SALE = 'SPAREPART_SALE',
 }

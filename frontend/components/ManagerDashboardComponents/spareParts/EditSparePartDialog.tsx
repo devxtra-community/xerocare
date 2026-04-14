@@ -10,6 +10,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { modelService } from '@/services/modelService';
@@ -67,6 +68,7 @@ export default function EditSparePartDialog({
     warehouse_id: '',
     vendor_id: '',
     quantity: '',
+    description: '',
   });
 
   useEffect(() => {
@@ -113,6 +115,7 @@ export default function EditSparePartDialog({
           warehouse_id: warehouseId,
           vendor_id: vendorId,
           quantity: String(product.quantity),
+          description: product.description || '',
         });
       } catch (error) {
         console.error('Failed to load dependencies', error);
@@ -136,6 +139,7 @@ export default function EditSparePartDialog({
         purchase_price: Number(formData.purchase_price),
         wholesale_price: Number(formData.wholesale_price),
         quantity: Number(formData.quantity),
+        description: formData.description,
       });
       toast.success('Spare part updated successfully');
       onSuccess();
@@ -275,6 +279,17 @@ export default function EditSparePartDialog({
                 ]}
                 placeholder="Select Models (Optional)"
                 emptyText="No models found."
+              />
+            </div>
+            {/* Description */}
+            <div className="space-y-2 col-span-2">
+              <Label>Description</Label>
+              <Textarea
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                placeholder="Enter description (Optional)"
+                className="resize-none"
+                rows={3}
               />
             </div>
           </div>

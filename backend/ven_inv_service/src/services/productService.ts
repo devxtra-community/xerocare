@@ -103,6 +103,7 @@ export class ProductService {
           max_discount_amount: maxDiscount,
           wholesale_price: row.wholesale_price,
           lot_id: row.lot_id || undefined,
+          description: row.description,
         });
 
         await this.model.syncModelQuantities(modelDetails.id);
@@ -182,6 +183,7 @@ export class ProductService {
         wholesale_price: data.wholesale_price,
         imageUrl: data.imageUrl,
         lot_id: data.lot_id,
+        description: data.description,
       });
 
       await this.model.syncModelQuantities(modelDetails.id);

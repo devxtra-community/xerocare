@@ -111,12 +111,12 @@ export const startWorker = async () => {
 
     try {
       if (routingKey === 'notification.email.request') {
-        // Payload: { recipient, subject, body, invoiceId... }
-        const { recipient, subject, body } = job;
+        // Payload: { recipient, subject, body, invoiceId, attachments }
+        const { recipient, subject, body, attachments } = job;
         if (recipient && body) {
           // Import dynamically to avoid circular issues if any
           const { sendEmail } = await import('../utils/mailer');
-          await sendEmail(recipient, subject || 'Notification from XeroCare', body);
+          await sendEmail(recipient, subject || 'Notification from XeroCare', body, attachments);
           logger.info(`[Notification Worker] Email sent to ${recipient}`);
         }
       } else if (routingKey === 'notification.whatsapp.request') {

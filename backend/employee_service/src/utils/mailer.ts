@@ -312,12 +312,18 @@ export async function sendProductRequestMail(
   });
 }
 
-export async function sendEmail(to: string, subject: string, html: string) {
+export async function sendEmail(
+  to: string,
+  subject: string,
+  html: string,
+  attachments?: { filename: string; content: Buffer | string; encoding?: string }[],
+) {
   await mailer.sendMail({
     from: process.env.MAIL_USER,
     to,
     subject,
     html,
+    attachments,
   });
 }
 

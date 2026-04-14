@@ -28,6 +28,8 @@ import {
   generateConsolidatedFinalInvoice,
   getCompletedCollections,
   downloadConsolidatedInvoice,
+  downloadPremiumQuotation,
+  downloadPremiumInvoice,
   sendConsolidatedInvoice,
   sendEmailNotification,
   sendWhatsappNotification,
@@ -66,6 +68,12 @@ router.post(
  * Update a price estimate if the customer wants to change something.
  */
 router.put('/quotation/:id', authMiddleware, requireRole(EmployeeRole.EMPLOYEE), updateQuotation);
+
+/**
+ * Download a professional premium PDF for a quotation.
+ */
+router.get('/quotation/:id/download-premium', authMiddleware, downloadPremiumQuotation);
+router.get('/:id/download-premium', authMiddleware, downloadPremiumInvoice);
 
 /**
  * Once a branch employee is happy with a deal, they send it to the

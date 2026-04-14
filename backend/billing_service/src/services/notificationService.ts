@@ -317,6 +317,7 @@ export class NotificationService {
     recipient: string,
     subject: string,
     body: string,
+    attachments?: { filename: string; content: string; encoding: string }[],
   ) {
     const contract = await this.invoiceRepo.findById(contractId);
     if (!contract) throw new AppError('Contract not found', 404);
@@ -328,6 +329,7 @@ export class NotificationService {
       subject,
       body,
       invoiceId: contract.id,
+      attachments,
     });
 
     contract.emailSentAt = new Date();

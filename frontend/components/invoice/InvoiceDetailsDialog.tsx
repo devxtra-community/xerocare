@@ -1,11 +1,5 @@
 import React from 'react';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -17,13 +11,17 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { FileText, Calendar, Coins, Printer, X, Loader2, Mail } from 'lucide-react';
+import { Calendar, Coins, Loader2, Mail } from 'lucide-react';
+import { Input } from '@/components/ui/input';
 import { formatCurrency } from '@/lib/format';
 import { Invoice, getInvoiceById } from '@/lib/invoice';
+import { getProductById } from '@/lib/product';
+import { getAllSpareParts } from '@/lib/spare-part';
 import { differenceInMonths, differenceInDays } from 'date-fns';
 import UsageRecordingModal from '@/components/Finance/UsageRecordingModal';
 import ReplaceDeviceModal from '@/components/Finance/ReplaceDeviceModal';
 import { RefreshCw } from 'lucide-react';
+import { InvoiceViewDialog } from '../employeeComponents/InvoiceViewDialog';
 
 interface InvoiceDetailsDialogProps {
   invoice: Invoice;
@@ -67,6 +65,10 @@ export function InvoiceDetailsDialog({
   onApproveNext,
 }: InvoiceDetailsDialogProps) {
   const [currentInvoice, setCurrentInvoice] = React.useState<Invoice>(invoice);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [productDetails, setProductDetails] = React.useState<Record<string, any>>({});
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [_loadingDetails, setLoadingDetails] = React.useState(false);
   const [rejectReason, setRejectReason] = React.useState('');
   const [rejecting, setRejecting] = React.useState(false);
   const [isLoading, setIsLoading] = React.useState(false);
@@ -85,6 +87,52 @@ export function InvoiceDetailsDialog({
   React.useEffect(() => {
     setCurrentInvoice(invoice);
   }, [invoice]);
+
+  React.useEffect(() => {
+    const fetchFullDetails = async () => {
+      setLoadingDetails(true);
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const details: Record<string, any> = {};
+        if (currentInvoice.items) {
+          const spareParts = await getAllSpareParts().catch(() => []);
+          for (const item of currentInvoice.items) {
+            if (item.productId) {
+              try {
+                const p = await getProductById(item.productId);
+                details[item.productId] = p;
+              } catch (e) {
+                console.error(e);
+              }
+            } else if (item.description) {
+              const sp = spareParts.find(
+                (s) => s.part_name === item.description || s.mpn === item.description,
+              );
+              if (sp) details[item.description] = sp;
+            }
+          }
+        }
+        setProductDetails(details);
+      } catch (err) {
+        console.error('Failed to fetch premium details:', err);
+      } finally {
+        setLoadingDetails(false);
+      }
+    };
+    if (['SALE', 'PRODUCT_SALE', 'SPAREPART_SALE'].includes(currentInvoice.saleType)) {
+      fetchFullDetails();
+    }
+  }, [currentInvoice]);
+
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const enrichedItems = (currentInvoice.items || []).map((item) => ({
+    ...item,
+    metadata: item.productId
+      ? productDetails[item.productId]
+      : item.description
+        ? productDetails[item.description]
+        : null,
+  }));
 
   const handleSelectInvoice = async (id: string) => {
     try {
@@ -281,48 +329,30 @@ export function InvoiceDetailsDialog({
     };
   }, [currentInvoice, excessAmount, grandTotal]);
 
+  const isSaleType = ['SALE', 'PRODUCT_SALE', 'SPAREPART_SALE'].includes(currentInvoice.saleType);
+
+  if (isSaleType) {
+    return (
+      <InvoiceViewDialog
+        invoice={currentInvoice}
+        onClose={onClose}
+        onApprove={onApprove}
+        onReject={onReject}
+      />
+    );
+  }
+
   return (
     <Dialog open={true} onOpenChange={(val) => !val && onClose()}>
-      <DialogContent className="sm:max-w-xl p-0 overflow-y-auto rounded-xl border border-gray-100 shadow-2xl bg-card flex flex-col max-h-[95vh]">
-        <DialogHeader className="p-8 pb-4">
-          <div className="flex items-center gap-4">
-            <div className="h-12 w-12 rounded-xl bg-info/10 text-info flex items-center justify-center shadow-sm">
-              <FileText size={24} />
-            </div>
-            <div className="space-y-1">
-              <DialogTitle className="text-xl font-bold text-primary tracking-tight">
-                {currentInvoice.invoiceNumber}
-              </DialogTitle>
-              <DialogDescription className="text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-none">
-                Invoice Details & Summary
-              </DialogDescription>
-            </div>
-          </div>
-          <div className="absolute top-6 right-6 flex items-center gap-3">
-            <Badge
-              variant="secondary"
-              className={`rounded-full px-3 py-1 text-[10px] font-bold tracking-wider shadow-none
-                ${
-                  currentInvoice.status === 'PAID'
-                    ? 'bg-success/10 text-success border-success/20'
-                    : 'bg-warning/10 text-warning border-warning/20'
-                }`}
-            >
-              {currentInvoice.status}
-            </Badge>
-            <button
-              onClick={onClose}
-              className="p-2 rounded-full bg-muted text-gray-400 hover:bg-muted-foreground/10 hover:text-gray-600 transition-colors"
-            >
-              <X size={18} />
-            </button>
-          </div>
-        </DialogHeader>
-
+      <DialogContent className="p-0 overflow-y-auto rounded-none border-none shadow-2xl bg-white flex flex-col max-h-[95vh] sm:max-w-xl">
+        <DialogTitle className="sr-only">Invoice Details</DialogTitle>
         <div
-          className="p-8 pt-6 space-y-8 overflow-y-auto scrollbar-hide flex-1"
+          className="space-y-8 overflow-y-auto scrollbar-hide flex-1 p-8 pt-6"
           ref={scrollContainerRef}
         >
+          <div className="grid grid-cols-2 gap-x-12 gap-y-6 text-xs uppercase italic font-bold text-gray-500 text-[10px] border-b border-gray-100 pb-2 mb-2 tracking-widest">
+            <span>Client &amp; Type Details</span>
+          </div>
           <div className="grid grid-cols-2 gap-x-12 gap-y-6">
             <div className="space-y-4">
               <div className="space-y-1">
@@ -348,250 +378,6 @@ export function InvoiceDetailsDialog({
             </div>
           </div>
 
-          {/* RENT Details */}
-          {currentInvoice.saleType === 'RENT' && (
-            <div className="grid grid-cols-2 gap-x-12 gap-y-6 p-6 bg-rent/10 rounded-xl border border-rent/20">
-              <div className="space-y-1">
-                <p className="text-[10px] font-bold text-rent uppercase tracking-wider">
-                  Rent Type
-                </p>
-                <div className="flex items-center gap-2 text-gray-700">
-                  <Printer size={14} className="opacity-50" />
-                  <p className="text-xs font-bold">{currentInvoice.rentType?.replace('_', ' ')}</p>
-                </div>
-              </div>
-
-              {/* Monthly Rent Display */}
-              {currentInvoice.monthlyRent !== undefined && currentInvoice.monthlyRent > 0 && (
-                <div className="space-y-1">
-                  <p className="text-[10px] font-bold text-rent uppercase tracking-wider">
-                    Monthly Rent
-                  </p>
-                  <div className="flex items-center gap-2 text-gray-700">
-                    <Coins size={14} className="opacity-50" />
-                    <p className="text-xs font-bold">
-                      {formatCurrency(currentInvoice.monthlyRent)}
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              {/* Show Included Limits / Excess if relevant (simplified view) */}
-              {currentInvoice.items?.some((i) => i.itemType === 'PRICING_RULE') && (
-                <div className="col-span-2 mt-2 pt-4 border-t border-rent/20">
-                  <p className="text-[10px] font-bold text-rent uppercase tracking-wider mb-2">
-                    Pricing Rules
-                  </p>
-                  <div className="text-xs space-y-1 text-gray-600">
-                    {currentInvoice.items
-                      .filter((i) => i.itemType === 'PRICING_RULE')
-                      .map((rule, idx) => (
-                        <div
-                          key={idx}
-                          className="flex flex-col gap-1 pb-3 mb-3 border-b border-rent/10 last:border-0 last:pb-0 last:mb-0"
-                        >
-                          <span className="font-bold text-sm text-gray-800">
-                            {rule.description}
-                          </span>
-
-                          {/* Included Limits (Fixed Models) */}
-                          {rule.bwIncludedLimit || rule.colorIncludedLimit ? (
-                            <div className="flex gap-4 opacity-80 text-xs">
-                              {rule.bwIncludedLimit && (
-                                <span>B/W Included: {rule.bwIncludedLimit}</span>
-                              )}
-                              {rule.colorIncludedLimit && (
-                                <span>Color Included: {rule.colorIncludedLimit}</span>
-                              )}
-                            </div>
-                          ) : null}
-
-                          {/* SLAB RATES DISPLAY */}
-                          {/* 1. Black & White Slabs */}
-                          {rule.bwSlabRanges && rule.bwSlabRanges.length > 0 && (
-                            <div className="mt-1 p-2 bg-card/50 rounded-lg border border-rent/10">
-                              <p className="text-[10px] font-bold text-rent uppercase mb-1">
-                                B&W Slabs
-                              </p>
-                              <div className="text-xs space-y-0.5 text-gray-600">
-                                {rule.bwSlabRanges.map((s, i) => (
-                                  <div
-                                    key={i}
-                                    className="flex justify-between w-full max-w-[200px]"
-                                  >
-                                    <span>
-                                      {s.from} - {s.to}
-                                    </span>
-                                    <span className="font-bold text-gray-800">
-                                      {formatCurrency(s.rate)}
-                                    </span>
-                                  </div>
-                                ))}
-                                {rule.bwExcessRate && (
-                                  <div className="flex justify-between w-full max-w-[200px] border-t border-rent/10 pt-0.5 mt-0.5">
-                                    <span>
-                                      &gt;{' '}
-                                      {Math.max(...rule.bwSlabRanges.map((s) => Number(s.to) || 0))}
-                                    </span>
-                                    <span className="font-bold text-gray-800">
-                                      {formatCurrency(rule.bwExcessRate)}
-                                    </span>
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          )}
-
-                          {/* 2. Color Slabs */}
-                          {rule.colorSlabRanges && rule.colorSlabRanges.length > 0 && (
-                            <div className="mt-1 p-2 bg-card/50 rounded-lg border border-rent/10">
-                              <p className="text-[10px] font-bold text-rent uppercase mb-1">
-                                Color Slabs
-                              </p>
-                              <div className="text-xs space-y-0.5 text-gray-600">
-                                {rule.colorSlabRanges.map((s, i) => (
-                                  <div
-                                    key={i}
-                                    className="flex justify-between w-full max-w-[200px]"
-                                  >
-                                    <span>
-                                      {s.from} - {s.to}
-                                    </span>
-                                    <span className="font-bold text-gray-800">
-                                      {formatCurrency(s.rate)}
-                                    </span>
-                                  </div>
-                                ))}
-                                {rule.colorExcessRate && (
-                                  <div className="flex justify-between w-full max-w-[200px] border-t border-rent/10 pt-0.5 mt-0.5">
-                                    <span>
-                                      &gt;{' '}
-                                      {Math.max(
-                                        ...rule.colorSlabRanges.map((s) => Number(s.to) || 0),
-                                      )}
-                                    </span>
-                                    <span className="font-bold text-gray-800">
-                                      {formatCurrency(rule.colorExcessRate)}
-                                    </span>
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          )}
-
-                          {/* 3. Combined Slabs */}
-                          {rule.comboSlabRanges && rule.comboSlabRanges.length > 0 && (
-                            <div className="mt-1 p-2 bg-card/50 rounded-lg border border-rent/10">
-                              <p className="text-[10px] font-bold text-rent uppercase mb-1">
-                                Combined Slabs
-                              </p>
-                              <div className="text-xs space-y-0.5 text-gray-600">
-                                {rule.comboSlabRanges.map((s, i) => (
-                                  <div
-                                    key={i}
-                                    className="flex justify-between w-full max-w-[200px]"
-                                  >
-                                    <span>
-                                      {s.from} - {s.to}
-                                    </span>
-                                    <span className="font-bold text-gray-800">
-                                      {formatCurrency(s.rate)}
-                                    </span>
-                                  </div>
-                                ))}
-                                {rule.combinedExcessRate && (
-                                  <div className="flex justify-between w-full max-w-[200px] border-t border-rent/10 pt-0.5 mt-0.5">
-                                    <span>
-                                      &gt;{' '}
-                                      {Math.max(
-                                        ...rule.comboSlabRanges.map((s) => Number(s.to) || 0),
-                                      )}
-                                    </span>
-                                    <span className="font-bold text-gray-800">
-                                      {formatCurrency(rule.combinedExcessRate)}
-                                    </span>
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Fallback Base Rate if NO Slabs */}
-                          {!rule.bwSlabRanges?.length &&
-                            !rule.colorSlabRanges?.length &&
-                            !rule.comboSlabRanges?.length &&
-                            (rule.bwExcessRate ||
-                              rule.colorExcessRate ||
-                              rule.combinedExcessRate) && (
-                              <div className="mt-1 text-xs grid grid-cols-2 gap-2 opacity-80">
-                                {rule.bwExcessRate && (
-                                  <div>
-                                    B/W Rate: <strong>{formatCurrency(rule.bwExcessRate)}</strong>
-                                  </div>
-                                )}
-                                {rule.colorExcessRate && (
-                                  <div>
-                                    Color Rate:{' '}
-                                    <strong>{formatCurrency(rule.colorExcessRate)}</strong>
-                                  </div>
-                                )}
-                                {rule.combinedExcessRate && (
-                                  <div>
-                                    Combined Rate:{' '}
-                                    <strong>{formatCurrency(rule.combinedExcessRate)}</strong>
-                                  </div>
-                                )}
-                              </div>
-                            )}
-                        </div>
-                      ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* LEASE Details */}
-          {currentInvoice.saleType === 'LEASE' && (
-            <div className="grid grid-cols-2 gap-x-12 gap-y-6 p-6 bg-lease/10 rounded-xl border border-lease/20">
-              <div className="space-y-1">
-                <p className="text-[10px] font-bold text-lease uppercase tracking-wider">
-                  Lease Type
-                </p>
-                <p className="text-xs font-bold text-gray-700">{currentInvoice.leaseType}</p>
-              </div>
-              <div className="space-y-1">
-                <p className="text-[10px] font-bold text-lease uppercase tracking-wider">Tenure</p>
-                <p className="text-xs font-bold text-gray-700">
-                  {currentInvoice.leaseTenureMonths} Months
-                </p>
-              </div>
-              {(currentInvoice.monthlyEmiAmount || currentInvoice.monthlyLeaseAmount) && (
-                <div className="space-y-1">
-                  <p className="text-[10px] font-bold text-lease uppercase tracking-wider">
-                    {currentInvoice.leaseType === 'FSM' ? 'Monthly Lease Amount' : 'Monthly EMI'}
-                  </p>
-                  <p className="text-xs font-bold text-gray-700">
-                    {formatCurrency(
-                      currentInvoice.leaseType === 'FSM'
-                        ? currentInvoice.monthlyLeaseAmount || currentInvoice.monthlyEmiAmount || 0
-                        : currentInvoice.monthlyEmiAmount || 0,
-                    )}
-                  </p>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* SALE Details - Warranty placeholder if needed */}
-          {currentInvoice.saleType === 'SALE' && (
-            <div className="p-4 bg-sale/10 rounded-xl border border-sale/20">
-              <p className="text-[10px] font-bold text-sale uppercase tracking-wider">Sale Order</p>
-              <p className="text-xs text-muted-foreground mt-1">
-                Standard product sale terms apply.
-              </p>
-            </div>
-          )}
           {(currentInvoice.saleType === 'RENT' || currentInvoice.saleType === 'LEASE') &&
             (currentInvoice.startDate ||
               currentInvoice.endDate ||
@@ -1378,6 +1164,46 @@ export function InvoiceDetailsDialog({
                     </Button>
                   </>
                 )
+              ) : mode === 'EMPLOYEE' &&
+                (currentInvoice.status === 'DRAFT' || currentInvoice.status === 'SENT') ? (
+                rejecting ? (
+                  <div className="flex items-center gap-2 w-full">
+                    <Input
+                      placeholder="Reason for rejection..."
+                      className="flex-1 h-10 text-xs bg-slate-50 border-slate-200"
+                      value={rejectReason}
+                      onChange={(e) => setRejectReason(e.target.value)}
+                      autoFocus
+                    />
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setRejecting(false)}
+                      className="h-10"
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      size="sm"
+                      className="h-10 bg-danger text-white"
+                      onClick={handleReject}
+                      disabled={isLoading}
+                    >
+                      Confirm
+                    </Button>
+                  </div>
+                ) : (
+                  <>
+                    <Button
+                      variant="outline"
+                      className="flex-1 sm:flex-none rounded-xl h-10 px-6 font-bold text-danger border-danger/20 hover:bg-danger/10"
+                      onClick={() => setRejecting(true)}
+                      disabled={isLoading}
+                    >
+                      Reject
+                    </Button>
+                  </>
+                )
               ) : mode === 'FINANCE' &&
                 (currentInvoice.saleType === 'RENT' ||
                   currentInvoice.saleType === 'LEASE') ? null : onApprove &&
@@ -1403,13 +1229,15 @@ export function InvoiceDetailsDialog({
                   )}
                 </div>
               ) : (
-                <Button
-                  variant="ghost"
-                  className="flex-1 sm:flex-none rounded-xl h-10 px-6 font-bold text-muted-foreground hover:bg-gray-100"
-                  onClick={onClose}
-                >
-                  Close
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="ghost"
+                    className="flex-1 sm:flex-none rounded-xl h-10 px-6 font-bold text-muted-foreground hover:bg-gray-100"
+                    onClick={onClose}
+                  >
+                    Close
+                  </Button>
+                </div>
               )}
 
               {/* Notification Actions for Draft/Sent/Approved Invoices */}

@@ -9,6 +9,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { sparePartService } from '@/services/sparePartService';
@@ -70,6 +71,7 @@ export default function AddSparePartDialog({
     quantity: '1',
     lot_id: '',
     mpn: '',
+    description: '',
   });
 
   const [selectedLotItemId, setSelectedLotItemId] = useState<string>('');
@@ -179,6 +181,7 @@ export default function AddSparePartDialog({
         quantity: requestedQuantity,
         lot_id: isNoLot ? undefined : formData.lot_id,
         mpn: formData.mpn,
+        description: formData.description,
       });
       console.log(respo);
       toast.success('Spare part added successfully');
@@ -196,6 +199,7 @@ export default function AddSparePartDialog({
         quantity: '1',
         lot_id: '',
         mpn: '',
+        description: '',
       });
       setSelectedLotItemId('');
     } catch (error: unknown) {
@@ -236,6 +240,7 @@ export default function AddSparePartDialog({
                       purchase_price: '',
                       wholesale_price: '',
                       mpn: '',
+                      description: '',
                       model_ids: [],
                     });
                   } else {
@@ -293,6 +298,7 @@ export default function AddSparePartDialog({
                           ? [selectedItem.sparePart.model_id]
                           : [],
                         mpn: selectedItem.sparePart.mpn || '',
+                        description: selectedItem.sparePart.description || '',
                       });
                     }
                   }}
@@ -509,6 +515,16 @@ export default function AddSparePartDialog({
               {selectedLotItemId && !isNoLot && (
                 <p className="text-xs text-muted-foreground mt-1">Auto-filled from lot item</p>
               )}
+            </div>
+            <div className="space-y-2 col-span-2">
+              <Label>Description</Label>
+              <Textarea
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                placeholder="Enter description (Optional)"
+                className="resize-none"
+                rows={3}
+              />
             </div>
           </div>
           <DialogFooter>

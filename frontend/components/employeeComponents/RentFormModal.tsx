@@ -58,14 +58,17 @@ export default function RentFormModal({
   onConfirm,
   defaultSaleType = 'RENT',
   lockSaleType = false,
+  isQuotation = false,
 }: {
   initialData?: Invoice;
   onClose: () => void;
   onConfirm: (data: CreateInvoicePayload) => Promise<void> | void;
   defaultSaleType?: 'RENT' | 'LEASE';
   lockSaleType?: boolean;
+  isQuotation?: boolean;
 }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const isEditing = !!initialData && !!initialData.id;
 
   // Initialize state. Use '' or undefined for numbers to avoid "0"
   const [form, setForm] = useState<{
@@ -816,12 +819,16 @@ export default function RentFormModal({
             </div>
             <div className="space-y-1">
               <DialogTitle className="text-xl font-bold text-slate-800 tracking-tight">
-                {initialData
+                {isEditing
                   ? `Edit ${form.saleType === 'LEASE' ? 'Lease' : 'Rent'} Contract`
-                  : `New ${form.saleType === 'LEASE' ? 'Lease' : 'Rent'} Contract`}
+                  : `New ${form.saleType === 'LEASE' ? 'Lease' : 'Rent'} ${isQuotation ? 'Quotation' : 'Contract'}`}
               </DialogTitle>
               <DialogDescription className="text-xs font-semibold text-slate-400 uppercase tracking-widest">
-                {initialData ? `Inv #${initialData.invoiceNumber}` : 'Quotation Configuration'}
+                {isEditing
+                  ? `Inv #${initialData.invoiceNumber}`
+                  : isQuotation
+                    ? 'Quotation Configuration'
+                    : 'Contract Configuration'}
               </DialogDescription>
             </div>
           </div>
@@ -862,7 +869,7 @@ export default function RentFormModal({
                 <label className="text-[11px] font-bold text-muted-foreground uppercase">
                   Customer
                 </label>
-                {initialData ? (
+                {isEditing ? (
                   <Input
                     value={initialData.customerName}
                     disabled
@@ -1521,7 +1528,7 @@ export default function RentFormModal({
               className="bg-blue-600 text-white font-bold px-8 shadow-lg shadow-blue-100 hover:bg-blue-700 hover:shadow-blue-200 transition-all flex items-center gap-2"
             >
               {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
-              {initialData ? 'Update Contract' : 'Create Contract'}
+              {isEditing ? 'Update Contract' : isQuotation ? 'Create Quotation' : 'Create Contract'}
             </Button>
           </section>
         </div>

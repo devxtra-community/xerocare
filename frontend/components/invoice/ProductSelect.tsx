@@ -9,13 +9,14 @@ export type SelectableItem = Product | SparePart;
 
 interface ProductSelectProps {
   onSelect: (item: SelectableItem) => void;
+  mode?: 'PRODUCT' | 'SPAREPART' | 'BOTH';
 }
 
 /**
  * Unified searchable select for Products and Spare Parts.
  * Fetches both resources and allows selection for invoice line items.
  */
-export function ProductSelect({ onSelect }: ProductSelectProps) {
+export function ProductSelect({ onSelect, mode = 'BOTH' }: ProductSelectProps) {
   const [items, setItems] = useState<SelectableItem[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -23,10 +24,15 @@ export function ProductSelect({ onSelect }: ProductSelectProps) {
     const fetchData = async () => {
       setLoading(true);
       try {
-        const [productsData, sparePartsData] = await Promise.all([
-          getAllProducts(),
-          getAllSpareParts(),
-        ]);
+        let productsData: Product[] = [];
+        let sparePartsData: SparePart[] = [];
+
+        if (mode === 'PRODUCT' || mode === 'BOTH') {
+          productsData = await getAllProducts();
+        }
+        if (mode === 'SPAREPART' || mode === 'BOTH') {
+          sparePartsData = await getAllSpareParts();
+        }
 
         setItems([...productsData, ...sparePartsData]);
       } catch (error) {
@@ -36,7 +42,7 @@ export function ProductSelect({ onSelect }: ProductSelectProps) {
       }
     };
     fetchData();
-  }, []);
+  }, [mode]);
 
   const handleValueChange = (val: string) => {
     const selected = items.find((item) => item.id === val);

@@ -22,7 +22,8 @@ const app = express();
  * - express.json(): Helps the server understand the data customers send to it.
  * - httpLogger: Keeps a diary of who visits the server and why.
  */
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 app.use(httpLogger);
 
 /**

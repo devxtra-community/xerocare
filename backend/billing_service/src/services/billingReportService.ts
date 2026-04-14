@@ -28,9 +28,18 @@ export class BillingReportService {
     };
 
     stats.forEach((s) => {
-      result[s.saleType] = s.count;
-      result.SALE_TODAY += s.todayCount;
-      result.SALE_THIS_MONTH += s.monthCount;
+      // Aggregate subtypes PRODUCT_SALE and SPAREPART_SALE into the SALE bucket
+      if (
+        s.saleType === 'PRODUCT_SALE' ||
+        s.saleType === 'SPAREPART_SALE' ||
+        s.saleType === 'SALE'
+      ) {
+        result.SALE += s.count;
+        result.SALE_TODAY += s.todayCount;
+        result.SALE_THIS_MONTH += s.monthCount;
+      } else if (result[s.saleType] !== undefined) {
+        result[s.saleType] = s.count;
+      }
     });
 
     return result;
@@ -427,6 +436,112 @@ export class BillingReportService {
     }
   }
 
+  private async getEmployeeDetails(employeeId: string) {
+    try {
+      const employeeServiceUrl = process.env.EMPLOYEE_SERVICE_URL || 'http://localhost:3002';
+      const { sign } = await import('jsonwebtoken');
+      const token = sign(
+        { userId: 'billing_service', role: 'ADMIN' },
+        process.env.ACCESS_SECRET as string,
+        { expiresIn: '1m' },
+      );
+
+      const response = await fetch(`${employeeServiceUrl}/employees/${employeeId}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) return null;
+      const data = await response.json();
+      return data.data;
+    } catch {
+      return null;
+    }
+  }
+
+  private async getProductDetails(productId: string) {
+    try {
+      const inventoryServiceUrl = process.env.INVENTORY_SERVICE_URL || 'http://localhost:3003';
+      const { sign } = await import('jsonwebtoken');
+      const token = sign(
+        { userId: 'billing_service', role: 'ADMIN' },
+        process.env.ACCESS_SECRET as string,
+        { expiresIn: '1m' },
+      );
+
+      const response = await fetch(`${inventoryServiceUrl}/products/${productId}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) return null;
+      const data = await response.json();
+      return data.data;
+    } catch {
+      return null;
+    }
+  }
+
+  private async getModelDetails(modelId: string) {
+    try {
+      const inventoryServiceUrl = process.env.INVENTORY_SERVICE_URL || 'http://localhost:3003';
+      const { sign } = await import('jsonwebtoken');
+      const token = sign(
+        { userId: 'billing_service', role: 'ADMIN' },
+        process.env.ACCESS_SECRET as string,
+        { expiresIn: '1m' },
+      );
+
+      const response = await fetch(`${inventoryServiceUrl}/models/${modelId}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) return null;
+      const data = await response.json();
+      return data.data;
+    } catch {
+      return null;
+    }
+  }
+
+  private async getSparePartDetails(sparePartId: string) {
+    try {
+      const inventoryServiceUrl = process.env.INVENTORY_SERVICE_URL || 'http://localhost:3003';
+      const { sign } = await import('jsonwebtoken');
+      const token = sign(
+        { userId: 'billing_service', role: 'ADMIN' },
+        process.env.ACCESS_SECRET as string,
+        { expiresIn: '1m' },
+      );
+
+      // Spare parts might not have a direct ID route yet, but usually they do or we can filter
+      // For now, assume /spare-parts/:id exists based on pattern or I will add it
+      const response = await fetch(`${inventoryServiceUrl}/spare-parts/${sparePartId}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) return null;
+      const data = await response.json();
+      return data.data;
+    } catch {
+      return null;
+    }
+  }
+
   /**
    * Retrieves detailed financial report.
    */
@@ -753,6 +868,761 @@ export class BillingReportService {
 
     doc.end();
   }
+
+  /**
+   * Generates a premium PDF for a quotation and streams it to the response.
+   */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  async downloadPremiumQuotation(quotationId: string, res: any) {
+    const { default: PDFDocument } = await import('pdfkit');
+
+    const quotation = await this.invoiceRepo.findById(quotationId);
+    if (!quotation) throw new AppError('Quotation not found', 404);
+
+    const [customer, employee] = await Promise.all([
+      this.getCustomerDetails(quotation.customerId),
+      this.getEmployeeDetails(quotation.createdBy),
+    ]);
+
+    // Enrich items with product/spare part details
+    const enrichedItems = await Promise.all(
+      (quotation.items || []).map(async (item) => {
+        let metadata = null;
+        if (item.productId) {
+          metadata = await this.getProductDetails(item.productId);
+        } else if (item.description && !item.productId) {
+          // Could be a spare part if not a pricing rule
+          // In some cases, we might need a specific sparePartId in InvoiceItem
+        }
+        return { ...item, metadata };
+      }),
+    );
+
+    const doc = new PDFDocument({ margin: 40, size: 'A4' });
+    doc.pipe(res);
+
+    // --- Background/Header Banner ---
+    doc.save();
+    doc.fillColor('#f1f5f9').rect(0, 0, 595, 130).fill(); // Light slate background for header
+    doc.fillColor('#dc2626').rect(0, 126, 595, 4).fill(); // Corporate Red bottom border
+
+    // Mascot Placeholder (Styled Box)
+    doc
+      .fillColor('#ffffff')
+      .roundedRect(40, 25, 80, 80, 10)
+      .fill()
+      .strokeColor('#cbd5e1')
+      .lineWidth(1)
+      .stroke();
+    doc
+      .fillColor('#dc2626')
+      .font('Helvetica-Bold')
+      .fontSize(10)
+      .text('XC', 60, 50, { width: 40, align: 'center' });
+    doc.fontSize(7).text('XEROCARE', 60, 62, { width: 40, align: 'center' });
+
+    // Branding Text
+    doc
+      .fillColor('#dc2626')
+      .font('Helvetica-Bold')
+      .fontSize(36)
+      .text('xerocare', 135, 35, { characterSpacing: -1 });
+    doc
+      .fillColor('#475569')
+      .font('Helvetica-Bold')
+      .fontSize(10)
+      .text('TRADING & SERVICES W.L.L', 137, 72, { characterSpacing: 1.5 });
+
+    doc.fillColor('#64748b').font('Helvetica').fontSize(9);
+    doc.text('Fareej Al Manseer, Furousiya street, Doha-Qatar', 137, 90);
+    doc.text('+974-70717282 | mail@xerocare.com | www.xerocare.com', 137, 104);
+
+    // Right Side Metadata Boxes
+    doc
+      .fillColor('#b91c1c')
+      .font('Helvetica-Bold')
+      .fontSize(16)
+      .text('ESTIMATE JOB REPORT', 375, 40, { align: 'right', width: 180 });
+
+    // Date & No Boxes
+    const boxWidth = 85;
+    const boxHeight = 35;
+    const boxY = 70;
+
+    // Date Box
+    doc
+      .fillColor('#ffffff')
+      .roundedRect(375, boxY, boxWidth, boxHeight, 6)
+      .fill()
+      .strokeColor('#fee2e2')
+      .stroke();
+    doc
+      .fillColor('#64748b')
+      .font('Helvetica-Bold')
+      .fontSize(8)
+      .text('DATE', 375, boxY + 5, { width: boxWidth, align: 'center' });
+    doc
+      .fillColor('#1e293b')
+      .fontSize(10)
+      .text(new Date(quotation.createdAt).toLocaleDateString(), 375, boxY + 16, {
+        width: boxWidth,
+        align: 'center',
+      });
+
+    // Estimate No Box
+    doc
+      .fillColor('#ffffff')
+      .roundedRect(470, boxY, boxWidth, boxHeight, 6)
+      .fill()
+      .strokeColor('#dc2626')
+      .lineWidth(1.5)
+      .stroke();
+    doc
+      .fillColor('#dc2626')
+      .font('Helvetica-Bold')
+      .fontSize(8)
+      .text('ESTIMATE NO.', 470, boxY + 5, { width: boxWidth, align: 'center' });
+    doc
+      .fillColor('#b91c1c')
+      .fontSize(11)
+      .text(quotation.invoiceNumber.split('-').pop() || '000', 470, boxY + 16, {
+        width: boxWidth,
+        align: 'center',
+      });
+
+    doc.restore();
+    doc.moveDown(6);
+
+    const startY = doc.y;
+
+    // --- Customer Info ---
+    // --- Customer & Rep Info ---
+    doc
+      .fillColor('#94a3b8')
+      .font('Helvetica-Bold')
+      .fontSize(8)
+      .text('CUSTOMER NAME / ADDRESS', 40, startY + 15);
+    doc
+      .fillColor('#1e293b')
+      .font('Helvetica-Bold')
+      .fontSize(12)
+      .text(
+        customer
+          ? `${customer.firstName} ${customer.lastName || ''}`.toUpperCase()
+          : 'WALKING CUSTOMER',
+        40,
+        startY + 28,
+      );
+    doc
+      .fillColor('#64748b')
+      .font('Helvetica')
+      .fontSize(8)
+      .text(customer?.email || 'mail@customer.com', 40, startY + 41);
+    doc.text(customer?.phone || '+974-0000-0000', 40, startY + 50);
+    doc
+      .font('Helvetica-Oblique')
+      .fontSize(9)
+      .text('DOHA, QATAR', 40, startY + 62);
+
+    // Sales Rep & Payment (Boxes or styled text)
+    const infoX = 350;
+    doc
+      .fillColor('#f8fafc')
+      .roundedRect(infoX, startY + 15, 210, 50, 8)
+      .fill()
+      .strokeColor('#e2e8f0')
+      .stroke();
+
+    doc
+      .fillColor('#94a3b8')
+      .font('Helvetica-Bold')
+      .fontSize(7)
+      .text('PAYMENT METHOD', infoX + 15, startY + 25);
+    doc
+      .fillColor('#334155')
+      .fontSize(9)
+      .text('Due on receipt', infoX + 15, startY + 35);
+
+    doc.fillColor('#94a3b8').text('SALES REP', infoX + 90, startY + 25);
+    doc
+      .fillColor('#334155')
+      .fontSize(9)
+      .text(
+        employee ? `${employee.first_name[0]}${employee.last_name[0]}`.toUpperCase() : 'RSHD',
+        infoX + 90,
+        startY + 35,
+      );
+
+    doc.fillColor('#94a3b8').text('DUE DATE', infoX + 150, startY + 25);
+    doc
+      .fillColor('#334155')
+      .fontSize(9)
+      .text(new Date(quotation.createdAt).toLocaleDateString(), infoX + 150, startY + 35);
+
+    doc.moveDown(4);
+
+    // --- Product Metadata Line (Brand/Model/SL No) ---
+    if (enrichedItems.length > 0 && enrichedItems[0].metadata) {
+      const meta = enrichedItems[0].metadata;
+      const metaY = doc.y;
+      doc
+        .fillColor('#f8fafc')
+        .rect(40, metaY - 5, 520, 25)
+        .fill();
+      doc
+        .fillColor('#dc2626')
+        .rect(40, metaY - 5, 520, 1)
+        .fill();
+      doc
+        .fillColor('#dc2626')
+        .rect(40, metaY + 19, 520, 1)
+        .fill();
+
+      doc
+        .fillColor('#94a3b8')
+        .font('Helvetica-Bold')
+        .fontSize(8)
+        .text('BRAND', 60, metaY + 5);
+      doc
+        .fillColor('#1e293b')
+        .font('Helvetica-BoldOblique')
+        .fontSize(10)
+        .text((meta.brand || 'KYOCERA').toUpperCase(), 100, metaY + 4);
+
+      doc.fillColor('#94a3b8').text('MODEL NO', 220, metaY + 5);
+      doc
+        .fillColor('#1e293b')
+        .text((meta.model?.model_name || '4053').toUpperCase(), 280, metaY + 4);
+
+      doc.fillColor('#94a3b8').text('SL NO', 420, metaY + 5);
+      doc.fillColor('#1e293b').text((meta.serial_no || 'N/A').toUpperCase(), 460, metaY + 4);
+
+      doc.moveDown(2);
+    }
+
+    // --- Table Header ---
+    const tableTop = doc.y;
+    const mpnX = 40;
+    const descX = 100;
+    const qtyX = 380;
+    const rateX = 440;
+    const totalX = 510;
+
+    doc
+      .fillColor('#b91c1c')
+      .rect(40, tableTop - 5, 520, 25)
+      .fill(); // Corporate Red Header
+    doc.fillColor('#ffffff').font('Helvetica-Bold').fontSize(9);
+    doc.text('MPN', mpnX + 5, tableTop);
+    doc.text('DESCRIPTION', descX, tableTop);
+    doc.text('QTY', qtyX, tableTop);
+    doc.text('RATE', rateX, tableTop);
+    doc.text('TOTAL', totalX, tableTop);
+
+    let currentY = tableTop + 30;
+    doc.font('Helvetica').fontSize(9);
+
+    // --- Table Content ---
+    for (const item of enrichedItems) {
+      const itemHeight = 60;
+
+      // Row Border
+      doc
+        .rect(40, currentY - 5, 520, itemHeight)
+        .strokeColor('#fee2e2')
+        .lineWidth(0.5)
+        .stroke();
+      doc.rect(40, currentY - 5, 55, itemHeight).stroke(); // MPN col border
+      doc.rect(qtyX - 10, currentY - 5, 45, itemHeight).stroke(); // Qty col border
+      doc.rect(rateX - 10, currentY - 5, 75, itemHeight).stroke(); // Rate col border
+
+      const mpn = item.metadata?.mpn || ' ';
+      const productName = (item.metadata?.name || item.description || 'ITEM').toUpperCase();
+      const description =
+        item.description && item.description !== productName
+          ? item.description
+          : 'Standard specification as per brand guidelines.';
+
+      doc.fillColor('#475569').text(mpn, mpnX + 5, currentY + 5, { width: 50 });
+
+      doc
+        .fillColor('#1e293b')
+        .font('Helvetica-Bold')
+        .text(productName, descX, currentY + 5);
+      doc
+        .fillColor('#64748b')
+        .font('Helvetica')
+        .fontSize(8)
+        .text(description, descX, currentY + 18, { width: 270 });
+
+      doc
+        .fillColor('#1e293b')
+        .font('Helvetica-Bold')
+        .fontSize(10)
+        .text(String(item.quantity || 1), qtyX, currentY + 15, { width: 30, align: 'center' });
+      doc
+        .font('Helvetica')
+        .fontSize(9)
+        .text(
+          Number(item.unitPrice || 0).toLocaleString(undefined, { minimumFractionDigits: 2 }),
+          rateX,
+          currentY + 15,
+          { width: 60, align: 'right' },
+        );
+
+      const rowTotal = (item.quantity || 1) * (item.unitPrice || 0);
+      doc
+        .font('Helvetica-Bold')
+        .text(
+          rowTotal.toLocaleString(undefined, { minimumFractionDigits: 2 }),
+          totalX,
+          currentY + 15,
+          { width: 50, align: 'right' },
+        );
+
+      currentY += itemHeight;
+
+      if (currentY > 700) {
+        doc.addPage();
+        currentY = 50;
+      }
+    }
+
+    // --- Subtotal / Grand Total ---
+    doc.moveDown(1);
+    const totalsX = 350;
+    const totalsWidth = 210;
+
+    doc.fillColor('#dc2626').rect(totalsX, doc.y, totalsWidth, 35).fill();
+    doc
+      .fillColor('#ffffff')
+      .font('Helvetica-Bold')
+      .fontSize(14)
+      .text('TOTAL', totalsX + 20, doc.y + 10);
+    doc
+      .fontSize(16)
+      .text(
+        `QAR ${Number(quotation.totalAmount).toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
+        totalsX,
+        doc.y - 12,
+        { width: totalsWidth - 20, align: 'right' },
+      );
+
+    doc.moveDown(4);
+
+    // --- Terms & Conditions ---
+    const termsY = doc.y;
+    doc
+      .fillColor('#94a3b8')
+      .font('Helvetica-Bold')
+      .fontSize(8)
+      .text('TERMS & CONDITIONS', 40, termsY);
+    doc
+      .fillColor('#94a3b8')
+      .rect(40, termsY + 12, 100, 1)
+      .fill();
+
+    doc.fillColor('#64748b').font('Helvetica-Oblique').fontSize(8);
+    const terms = [
+      '• Delivery: 7-10 days normal working days after confirmed LPO',
+      '• Payment: CASH or PDC (Management approved for the credit terms)',
+      '• Warranty: 30 days in service of the parts, not covered the consumables.',
+      '• Validity: 15 days estimated will valid. If not approved within 15 days will not be valid.',
+    ];
+    let ty = termsY + 20;
+    terms.forEach((t) => {
+      doc.text(t, 40, ty);
+      ty += 12;
+    });
+
+    // Best Regards section
+    const regardsX = 350;
+    doc
+      .fillColor('#1e293b')
+      .font('Helvetica')
+      .fontSize(9)
+      .text(
+        'We trust you will find our offer competitive and look forward to hearing from you at the earliest.',
+        regardsX,
+        termsY + 10,
+        { width: 210 },
+      );
+    doc
+      .fillColor('#94a3b8')
+      .font('Helvetica-Bold')
+      .fontSize(8)
+      .text('BEST REGARDS,', regardsX, termsY + 45);
+    doc
+      .fillColor('#b91c1c')
+      .fontSize(10)
+      .text('XEROCARE TRADING & SERVICES WLL', regardsX, termsY + 58);
+
+    // --- Bottom Partner Brands ---
+    const footerY = 740;
+    doc.fillColor('#f8fafc').rect(0, footerY, 612, 100).fill();
+    doc.fillColor('#e2e8f0').rect(0, footerY, 612, 1).fill();
+
+    doc
+      .fillColor('#94a3b8')
+      .font('Helvetica-Bold')
+      .fontSize(7)
+      .text('PARTNERED WITH', 40, footerY + 15);
+    const brands = ['Brother', 'Canon', 'Toshiba', 'Kyocera', 'Ricoh', 'Sharp'];
+    let bx = 110;
+    brands.forEach((b) => {
+      doc
+        .fillColor('#64748b')
+        .font('Helvetica-BoldOblique')
+        .text(b.toUpperCase(), bx, footerY + 15);
+      bx += 50;
+      doc.fillColor('#cbd5e1').text('|', bx - 10, footerY + 15);
+    });
+
+    doc
+      .fillColor('#94a3b8')
+      .font('Helvetica-Bold')
+      .fontSize(8)
+      .text('© 2026 Xerocare Trading & Services WLL. All rights reserved.', 40, footerY + 45);
+
+    doc.end();
+  }
+
+  /**
+   * Generates a premium PDF for an invoice (Sale type) and streams it to the response.
+   */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  async downloadPremiumInvoice(invoiceId: string, res: any) {
+    const { default: PDFDocument } = await import('pdfkit');
+
+    const invoice = await this.invoiceRepo.findById(invoiceId);
+    if (!invoice) throw new AppError('Invoice not found', 404);
+
+    const [customer, employee] = await Promise.all([
+      this.getCustomerDetails(invoice.customerId),
+      this.getEmployeeDetails(invoice.createdBy),
+    ]);
+
+    // Enrich items with product/spare part details
+    const enrichedItems = await Promise.all(
+      (invoice.items || []).map(async (item) => {
+        let metadata = null;
+        if (item.productId) {
+          metadata = await this.getProductDetails(item.productId);
+        }
+        return { ...item, metadata };
+      }),
+    );
+
+    const doc = new PDFDocument({ margin: 40, size: 'A4' });
+    doc.pipe(res);
+
+    // --- Background/Header Banner ---
+    doc.save();
+    doc.fillColor('#f1f5f9').rect(0, 0, 595, 130).fill(); // Light slate background for header
+    doc.fillColor('#dc2626').rect(0, 126, 595, 4).fill(); // Corporate Red bottom border
+
+    // Mascot Placeholder (Styled Box)
+    doc
+      .fillColor('#ffffff')
+      .roundedRect(40, 25, 80, 80, 10)
+      .fill()
+      .strokeColor('#cbd5e1')
+      .lineWidth(1)
+      .stroke();
+    doc
+      .fillColor('#dc2626')
+      .font('Helvetica-Bold')
+      .fontSize(10)
+      .text('XC', 60, 50, { width: 40, align: 'center' });
+    doc.fontSize(7).text('XEROCARE', 60, 62, { width: 40, align: 'center' });
+
+    // Branding Text
+    doc
+      .fillColor('#dc2626')
+      .font('Helvetica-Bold')
+      .fontSize(36)
+      .text('xerocare', 135, 35, { characterSpacing: -1 });
+    doc
+      .fillColor('#475569')
+      .font('Helvetica-Bold')
+      .fontSize(10)
+      .text('TRADING & SERVICES W.L.L', 137, 72, { characterSpacing: 1.5 });
+
+    doc.fillColor('#64748b').font('Helvetica').fontSize(9);
+    doc.text('Fareej Al Manseer, Furousiya street, Doha-Qatar', 137, 90);
+    doc.text('+974-70717282 | mail@xerocare.com | www.xerocare.com', 137, 104);
+
+    // Right Side Metadata Boxes
+    doc
+      .fillColor('#b91c1c')
+      .font('Helvetica-Bold')
+      .fontSize(16)
+      .text('INVOICE JOB REPORT', 375, 40, { align: 'right', width: 180 });
+
+    // Date & No Boxes
+    const boxWidth = 85;
+    const boxHeight = 35;
+    const boxY = 70;
+
+    // Date Box
+    doc
+      .fillColor('#ffffff')
+      .roundedRect(375, boxY, boxWidth, boxHeight, 6)
+      .fill()
+      .strokeColor('#fee2e2')
+      .stroke();
+    doc
+      .fillColor('#64748b')
+      .font('Helvetica-Bold')
+      .fontSize(8)
+      .text('DATE', 375, boxY + 5, { width: boxWidth, align: 'center' });
+    doc
+      .fillColor('#1e293b')
+      .fontSize(10)
+      .text(new Date(invoice.createdAt).toLocaleDateString(), 375, boxY + 16, {
+        width: boxWidth,
+        align: 'center',
+      });
+
+    // Invoice No Box
+    doc
+      .fillColor('#ffffff')
+      .roundedRect(470, boxY, boxWidth, boxHeight, 6)
+      .fill()
+      .strokeColor('#dc2626')
+      .lineWidth(1.5)
+      .stroke();
+    doc
+      .fillColor('#dc2626')
+      .font('Helvetica-Bold')
+      .fontSize(8)
+      .text('INVOICE NO.', 470, boxY + 5, { width: boxWidth, align: 'center' });
+    doc
+      .fillColor('#b91c1c')
+      .fontSize(11)
+      .text(invoice.invoiceNumber.split('-').pop() || '000', 470, boxY + 16, {
+        width: boxWidth,
+        align: 'center',
+      });
+
+    doc.restore();
+    doc.moveDown(6);
+
+    const startY = doc.y;
+
+    // --- Customer Info ---
+    doc
+      .fillColor('#94a3b8')
+      .font('Helvetica-Bold')
+      .fontSize(8)
+      .text('CUSTOMER NAME / ADDRESS', 40, startY + 15);
+    doc
+      .fillColor('#1e293b')
+      .font('Helvetica-Bold')
+      .fontSize(12)
+      .text(
+        customer
+          ? `${customer.firstName} ${customer.lastName || ''}`.toUpperCase()
+          : 'WALKING CUSTOMER',
+        40,
+        startY + 28,
+      );
+    doc
+      .fillColor('#64748b')
+      .font('Helvetica')
+      .fontSize(8)
+      .text(customer?.email || 'mail@customer.com', 40, startY + 41);
+    doc.text(customer?.phone || '+974-0000-0000', 40, startY + 50);
+    doc
+      .font('Helvetica-Oblique')
+      .fontSize(9)
+      .text('DOHA, QATAR', 40, startY + 62);
+
+    // Sales Rep & Payment
+    const infoX = 350;
+    doc
+      .fillColor('#f8fafc')
+      .roundedRect(infoX, startY + 15, 210, 50, 8)
+      .fill()
+      .strokeColor('#e2e8f0')
+      .stroke();
+
+    doc
+      .fillColor('#94a3b8')
+      .font('Helvetica-Bold')
+      .fontSize(7)
+      .text('PAYMENT METHOD', infoX + 15, startY + 25);
+    doc
+      .fillColor('#334155')
+      .fontSize(9)
+      .text('Due on receipt', infoX + 15, startY + 35);
+
+    doc.fillColor('#94a3b8').text('SALES REP', infoX + 90, startY + 25);
+    doc
+      .fillColor('#334155')
+      .font('Helvetica-Bold')
+      .fontSize(9)
+      .text(
+        employee
+          ? `${employee.firstName} ${employee.lastName || ''}`.toUpperCase()
+          : 'SERVICE AGENT',
+        infoX + 90,
+        startY + 35,
+      );
+
+    // Brand / Model Box
+    const modelY = startY + 80;
+    doc.fillColor('#fef2f2').rect(40, modelY, 520, 25).fill();
+    doc.fillColor('#dc2626').rect(40, modelY, 3, 25).fill();
+
+    const allocation = invoice.productAllocations?.[0];
+    const brandLabel = allocation?.modelId || 'N/A';
+    const serialNo = allocation?.serialNumber || 'OFFICIAL PRODUCT';
+
+    doc
+      .fillColor('#991b1b')
+      .font('Helvetica-Bold')
+      .fontSize(8)
+      .text('EQUIPMENT SPECIFICATION:', 50, modelY + 8);
+    doc
+      .fillColor('#1e293b')
+      .text(
+        `BRAND: ${brandLabel}   |   MODEL: PREMIUM SERIES   |   SL NO: ${serialNo}`,
+        175,
+        modelY + 8,
+      );
+
+    // --- Items Table ---
+    let currentY = modelY + 40;
+    const mpnX = 40;
+    const descX = 105;
+    const qtyX = 380;
+    const rateX = 420;
+    const totalX = 505;
+
+    // Table Header
+    doc.fillColor('#dc2626').rect(40, currentY, 520, 25).fill();
+    doc.fillColor('#ffffff').font('Helvetica-Bold').fontSize(8);
+    doc.text('MPN', mpnX + 5, currentY + 8);
+    doc.text('ITEMS / DESCRIPTION', descX, currentY + 8);
+    doc.text('QTY', qtyX, currentY + 8, { width: 30, align: 'center' });
+    doc.text('RATE (QAR)', rateX, currentY + 8, { width: 75, align: 'right' });
+    doc.text('TOTAL (QAR)', totalX, currentY + 8, { width: 50, align: 'right' });
+
+    currentY += 30;
+
+    for (const item of enrichedItems) {
+      const itemHeight = 40;
+      doc
+        .rect(40, currentY - 5, 520, itemHeight)
+        .strokeColor('#fee2e2')
+        .lineWidth(0.5)
+        .stroke();
+      doc.rect(40, currentY - 5, 55, itemHeight).stroke();
+      doc.rect(qtyX - 10, currentY - 5, 45, itemHeight).stroke();
+      doc.rect(rateX - 10, currentY - 5, 75, itemHeight).stroke();
+
+      const mpn = item.metadata?.mpn || ' ';
+      const productName = (item.metadata?.name || item.description || 'ITEM').toUpperCase();
+      const description = 'Official Xerocare verified equipment and services';
+
+      doc
+        .fillColor('#475569')
+        .font('Helvetica')
+        .fontSize(8)
+        .text(mpn, mpnX + 5, currentY + 5, { width: 50 });
+      doc
+        .fillColor('#1e293b')
+        .font('Helvetica-Bold')
+        .fontSize(9)
+        .text(productName, descX, currentY + 5);
+      doc
+        .fillColor('#64748b')
+        .font('Helvetica')
+        .fontSize(7)
+        .text(description, descX, currentY + 18, { width: 270 });
+
+      doc
+        .fillColor('#1e293b')
+        .font('Helvetica-Bold')
+        .fontSize(10)
+        .text(String(item.quantity || 1), qtyX, currentY + 15, { width: 30, align: 'center' });
+      doc
+        .font('Helvetica')
+        .fontSize(9)
+        .text(
+          Number(item.unitPrice || 0).toLocaleString(undefined, { minimumFractionDigits: 2 }),
+          rateX,
+          currentY + 15,
+          { width: 60, align: 'right' },
+        );
+
+      const rowTotal = (item.quantity || 1) * (item.unitPrice || 0);
+      doc
+        .font('Helvetica-Bold')
+        .text(
+          rowTotal.toLocaleString(undefined, { minimumFractionDigits: 2 }),
+          totalX,
+          currentY + 15,
+          { width: 50, align: 'right' },
+        );
+
+      currentY += itemHeight;
+      if (currentY > 700) {
+        doc.addPage();
+        currentY = 50;
+      }
+    }
+
+    // --- Totals ---
+    const totalsX_ = 350;
+    const totalsWidth_ = 210;
+    doc
+      .fillColor('#dc2626')
+      .rect(totalsX_, doc.y + 10, totalsWidth_, 35)
+      .fill();
+    doc
+      .fillColor('#ffffff')
+      .font('Helvetica-Bold')
+      .fontSize(14)
+      .text('TOTAL', totalsX_ + 20, doc.y + 20);
+    doc
+      .fontSize(16)
+      .text(
+        `QAR ${Number(invoice.totalAmount).toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
+        totalsX_,
+        doc.y - 12,
+        { width: totalsWidth_ - 20, align: 'right' },
+      );
+
+    // --- Footer Brands ---
+    const footerY_ = 740;
+    doc.fillColor('#f8fafc').rect(0, footerY_, 612, 100).fill();
+    doc.fillColor('#e2e8f0').rect(0, footerY_, 612, 1).fill();
+    doc
+      .fillColor('#94a3b8')
+      .font('Helvetica-Bold')
+      .fontSize(7)
+      .text('PARTNERED WITH', 40, footerY_ + 15);
+    const brands_ = ['Brother', 'Canon', 'Toshiba', 'Kyocera', 'Ricoh', 'Sharp'];
+    let bx_ = 110;
+    brands_.forEach((b) => {
+      doc
+        .fillColor('#64748b')
+        .font('Helvetica-BoldOblique')
+        .text(b.toUpperCase(), bx_, footerY_ + 15);
+      bx_ += 50;
+      doc.fillColor('#cbd5e1').text('|', bx_ - 10, footerY_ + 15);
+    });
+    doc
+      .fillColor('#94a3b8')
+      .font('Helvetica-Bold')
+      .fontSize(8)
+      .text('© 2026 Xerocare Trading & Services WLL. All rights reserved.', 40, footerY_ + 45);
+
+    doc.end();
+  }
+
   /**
    * Retrieves distinct years available for filtering.
    */

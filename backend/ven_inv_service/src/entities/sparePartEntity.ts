@@ -22,7 +22,7 @@ export class SparePart {
   @Index()
   id!: string;
 
-  @Column({ name: 'sku', nullable: false, unique: true })
+  @Column({ name: 'item_code', nullable: false, unique: true })
   @Index()
   sku!: string;
 

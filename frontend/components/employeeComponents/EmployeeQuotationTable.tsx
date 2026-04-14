@@ -11,11 +11,9 @@ import {
   Plus,
   Search,
   Loader2,
-  FileText,
   Eye,
   Trash2,
   FilePlus2,
-  Send,
   ShoppingCart,
   Key,
   FileSignature,
@@ -46,8 +44,7 @@ import {
 } from '@/components/ui/select';
 import { CustomerSelect } from '@/components/invoice/CustomerSelect';
 import { ProductSelect, SelectableItem } from '@/components/invoice/ProductSelect';
-import { ModelSelect } from '@/components/invoice/ModelSelect';
-import { Model } from '@/lib/model';
+
 import { usePagination } from '@/hooks/usePagination';
 import Pagination from '@/components/Pagination';
 import {
@@ -59,9 +56,12 @@ import {
   CreateInvoicePayload,
 } from '@/lib/invoice';
 
+import { QuotationViewDialog } from './QuotationViewDialog';
+import RentFormModal from './RentFormModal';
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type QuotationType = 'SALE' | 'RENT' | 'LEASE';
+type QuotationType = 'RENT' | 'LEASE' | 'PRODUCT_SALE' | 'SPAREPART_SALE';
 
 interface SaleItem {
   description: string;
@@ -73,6 +73,12 @@ interface SaleItem {
   isManual: boolean;
   productId?: string;
   isEditable: boolean;
+  bwIncludedLimit?: number;
+  colorIncludedLimit?: number;
+  combinedIncludedLimit?: number;
+  bwExcessRate?: number;
+  colorExcessRate?: number;
+  combinedExcessRate?: number;
 }
 
 // ─── Status Badge ─────────────────────────────────────────────────────────────
@@ -98,7 +104,8 @@ function StatusBadge({ status }: { status: string }) {
 
 function TypeBadge({ type }: { type: string }) {
   const map: Record<string, string> = {
-    SALE: 'bg-blue-50 text-blue-600 border-blue-200',
+    PRODUCT_SALE: 'bg-cyan-50 text-cyan-600 border-cyan-200',
+    SPAREPART_SALE: 'bg-teal-50 text-teal-600 border-teal-200',
     RENT: 'bg-orange-50 text-orange-600 border-orange-200',
     LEASE: 'bg-purple-50 text-purple-600 border-purple-200',
   };
@@ -118,6 +125,11 @@ export default function EmployeeQuotationTable() {
   const [quotations, setQuotations] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [formOpen, setFormOpen] = useState(false);
+  const [rentLeaseModal, setRentLeaseModal] = useState<{
+    open: boolean;
+    type: 'RENT' | 'LEASE';
+    customerId: string;
+  }>({ open: false, type: 'RENT', customerId: '' });
   const [viewOpen, setViewOpen] = useState(false);
   const [selectedQ, setSelectedQ] = useState<Invoice | null>(null);
   const [search, setSearch] = useState('');
@@ -130,10 +142,11 @@ export default function EmployeeQuotationTable() {
 
   // Compute which quotation types this employee can create
   const allowedTypes = useMemo((): QuotationType[] => {
-    if (employeeJob === EmployeeJob.MANAGER) return ['SALE', 'RENT', 'LEASE'];
-    if (employeeJob === EmployeeJob.SALES) return ['SALE'];
+    if (employeeJob === EmployeeJob.MANAGER)
+      return ['PRODUCT_SALE', 'SPAREPART_SALE', 'RENT', 'LEASE'];
+    if (employeeJob === EmployeeJob.SALES) return ['PRODUCT_SALE', 'SPAREPART_SALE'];
     if (employeeJob === EmployeeJob.RENT_AND_LEASE) return ['RENT', 'LEASE'];
-    return ['SALE', 'RENT', 'LEASE']; // fallback (manager or unknown)
+    return ['PRODUCT_SALE', 'SPAREPART_SALE', 'RENT', 'LEASE']; // fallback
   }, [employeeJob]);
 
   const { page, limit, total, setPage, setTotal, totalPages } = usePagination(10);
@@ -348,6 +361,25 @@ export default function EmployeeQuotationTable() {
           allowedTypes={allowedTypes}
           onClose={() => setFormOpen(false)}
           onConfirm={handleCreate}
+          onRentLeaseNext={(type, customerId) => {
+            setFormOpen(false);
+            setRentLeaseModal({ open: true, type, customerId });
+          }}
+        />
+      )}
+      {rentLeaseModal.open && (
+        <RentFormModal
+          onClose={() => setRentLeaseModal({ ...rentLeaseModal, open: false })}
+          onConfirm={handleCreate}
+          defaultSaleType={rentLeaseModal.type}
+          lockSaleType={true}
+          initialData={
+            rentLeaseModal.customerId
+              ? // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                ({ customerId: rentLeaseModal.customerId } as any)
+              : undefined
+          }
+          isQuotation={true}
         />
       )}
       {viewOpen && selectedQ && (
@@ -363,17 +395,50 @@ export default function EmployeeQuotationTable() {
 
 // ─── Quotation Form Modal ─────────────────────────────────────────────────────
 
+interface CategoryCardProps {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  icon: any;
+  label: string;
+  desc: string;
+  color: string;
+  onClick: () => void;
+}
+
+function CategoryCard({ icon: Icon, label, desc, color, onClick }: CategoryCardProps) {
+  return (
+    <div
+      onClick={onClick}
+      className={`border-2 rounded-xl p-4 cursor-pointer transition-all duration-300 hover:shadow-md hover:-translate-y-0.5 bg-card flex flex-col gap-3 ${color}`}
+    >
+      <div className="h-10 w-10 shrink-0 rounded-lg bg-slate-50 flex items-center justify-center text-slate-700">
+        <Icon size={20} strokeWidth={2.5} />
+      </div>
+      <div>
+        <h4 className="font-bold text-sm text-slate-800">{label}</h4>
+        <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider mt-1">
+          {desc}
+        </p>
+      </div>
+    </div>
+  );
+}
+
 function QuotationFormModal({
   onClose,
   onConfirm,
   allowedTypes,
+  onRentLeaseNext,
 }: {
   onClose: () => void;
   onConfirm: (data: CreateInvoicePayload) => Promise<void>;
   allowedTypes: QuotationType[];
+  onRentLeaseNext?: (type: 'RENT' | 'LEASE', customerId: string) => void;
 }) {
   const [step, setStep] = useState<1 | 2>(1);
-  const [quotationType, setQuotationType] = useState<QuotationType>(allowedTypes[0] ?? 'SALE');
+  const [activeCategory, setActiveCategory] = useState<'SALE' | 'RENT' | 'LEASE' | null>(null);
+  const [quotationType, setQuotationType] = useState<QuotationType>(
+    allowedTypes[0] ?? 'PRODUCT_SALE',
+  );
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // ── SALE state ──────────────────────────────────────────────────────────
@@ -384,7 +449,6 @@ function QuotationFormModal({
   const [validDays, setValidDays] = useState(30);
 
   // ── RENT state ──────────────────────────────────────────────────────────
-  const [selectedModels, setSelectedModels] = useState<(Model & { quantity: number })[]>([]);
   const [rentType, setRentType] = useState('FIXED_LIMIT');
   const [rentPeriod, setRentPeriod] = useState('MONTHLY');
   const [monthlyRent, setMonthlyRent] = useState('');
@@ -472,6 +536,17 @@ function QuotationFormModal({
       } else if (field === 'basePrice' && item.isEditable) {
         const b = Number(value);
         items[index] = { ...item, basePrice: b, unitPrice: b - item.discount };
+      } else if (
+        [
+          'bwIncludedLimit',
+          'colorIncludedLimit',
+          'combinedIncludedLimit',
+          'bwExcessRate',
+          'colorExcessRate',
+          'combinedExcessRate',
+        ].includes(field as string)
+      ) {
+        items[index] = { ...item, [field]: Number(value) };
       }
       return items;
     });
@@ -488,7 +563,7 @@ function QuotationFormModal({
 
     let payload: CreateInvoicePayload;
 
-    if (quotationType === 'SALE') {
+    if (['PRODUCT_SALE', 'SPAREPART_SALE'].includes(quotationType)) {
       if (saleItems.length === 0) {
         toast.error('Please add at least one item.');
         return;
@@ -496,7 +571,8 @@ function QuotationFormModal({
       const totalDiscount = saleItems.reduce((s, it) => s + (it.discount || 0) * it.quantity, 0);
       payload = {
         customerId,
-        saleType: 'SALE',
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        saleType: quotationType as any,
         discountAmount: totalDiscount,
         items: saleItems.map((it) => ({
           description: it.description,
@@ -506,8 +582,8 @@ function QuotationFormModal({
         })),
       };
     } else if (quotationType === 'RENT') {
-      if (selectedModels.length === 0) {
-        toast.error('Please add at least one machine model.');
+      if (saleItems.length === 0) {
+        toast.error('Please add at least one specific machine (Product).');
         return;
       }
       payload = {
@@ -520,25 +596,29 @@ function QuotationFormModal({
         discountPercent: discountPercent ? Number(discountPercent) : undefined,
         effectiveFrom,
         effectiveTo: effectiveTo || undefined,
-        items: selectedModels.map((m) => ({
-          description: m.model_name,
-          quantity: m.quantity,
+        items: saleItems.map((it) => ({
+          description: it.description,
+          quantity: it.quantity,
           unitPrice: 0,
           itemType: 'PRODUCT' as const,
-          modelId: m.id,
+          productId: it.productId,
         })),
-        pricingItems: selectedModels.map((m) => ({
-          description: m.model_name,
-          bwIncludedLimit: 0,
-          colorIncludedLimit: 0,
-          bwExcessRate: 0,
-          colorExcessRate: 0,
+        pricingItems: saleItems.map((it) => ({
+          description: it.description,
+          bwIncludedLimit: rentType === 'FIXED_LIMIT' ? it.bwIncludedLimit || 0 : 0,
+          colorIncludedLimit: rentType === 'FIXED_LIMIT' ? it.colorIncludedLimit || 0 : 0,
+          combinedIncludedLimit: rentType === 'FIXED_COMBO' ? it.combinedIncludedLimit || 0 : 0,
+          bwExcessRate: rentType === 'FIXED_LIMIT' || rentType === 'CPC' ? it.bwExcessRate || 0 : 0,
+          colorExcessRate:
+            rentType === 'FIXED_LIMIT' || rentType === 'CPC' ? it.colorExcessRate || 0 : 0,
+          combinedExcessRate:
+            rentType === 'FIXED_COMBO' || rentType === 'CPC_COMBO' ? it.combinedExcessRate || 0 : 0,
         })),
       };
     } else {
       // LEASE
-      if (selectedModels.length === 0) {
-        toast.error('Please add at least one machine model.');
+      if (saleItems.length === 0) {
+        toast.error('Please add at least one specific machine (Product).');
         return;
       }
       payload = {
@@ -549,16 +629,39 @@ function QuotationFormModal({
         totalLeaseAmount: totalLeaseAmount ? Number(totalLeaseAmount) : undefined,
         monthlyEmiAmount:
           leaseType === 'EMI' && monthlyEmiAmount ? Number(monthlyEmiAmount) : undefined,
+        // For FSM Leases, we need rentType and monthly rent mapped dynamically
+        rentType: leaseType === 'FSM' ? (rentType as CreateInvoicePayload['rentType']) : undefined,
+        monthlyRent: leaseType === 'FSM' && monthlyRent ? Number(monthlyRent) : undefined,
+        monthlyLeaseAmount:
+          leaseType === 'FSM' && totalLeaseAmount ? Number(totalLeaseAmount) : undefined,
         effectiveFrom,
         effectiveTo: effectiveTo || undefined,
         discountPercent: discountPercent ? Number(discountPercent) : undefined,
-        items: selectedModels.map((m) => ({
-          description: m.model_name,
-          quantity: m.quantity,
+        items: saleItems.map((it) => ({
+          description: it.description,
+          quantity: it.quantity,
           unitPrice: 0,
           itemType: 'PRODUCT' as const,
-          modelId: m.id,
+          productId: it.productId,
         })),
+        pricingItems:
+          leaseType === 'FSM'
+            ? saleItems.map((it) => ({
+                description: it.description,
+                bwIncludedLimit: rentType === 'FIXED_LIMIT' ? it.bwIncludedLimit || 0 : 0,
+                colorIncludedLimit: rentType === 'FIXED_LIMIT' ? it.colorIncludedLimit || 0 : 0,
+                combinedIncludedLimit:
+                  rentType === 'FIXED_COMBO' ? it.combinedIncludedLimit || 0 : 0,
+                bwExcessRate:
+                  rentType === 'FIXED_LIMIT' || rentType === 'CPC' ? it.bwExcessRate || 0 : 0,
+                colorExcessRate:
+                  rentType === 'FIXED_LIMIT' || rentType === 'CPC' ? it.colorExcessRate || 0 : 0,
+                combinedExcessRate:
+                  rentType === 'FIXED_COMBO' || rentType === 'CPC_COMBO'
+                    ? it.combinedExcessRate || 0
+                    : 0,
+              }))
+            : [],
       };
     }
 
@@ -571,11 +674,17 @@ function QuotationFormModal({
   };
 
   const typeConfig = {
-    SALE: {
+    PRODUCT_SALE: {
       icon: ShoppingCart,
-      label: 'Sales Quotation',
+      label: 'Product Sale',
       color: 'bg-blue-600',
-      desc: 'Products & spare parts for direct sale',
+      desc: 'Direct sale of full machines & products',
+    },
+    SPAREPART_SALE: {
+      icon: ShoppingCart,
+      label: 'Spare Part Sale',
+      color: 'bg-cyan-600',
+      desc: 'Sale of spare parts and components',
     },
     RENT: {
       icon: Key,
@@ -641,61 +750,128 @@ function QuotationFormModal({
                 <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
                   Quotation Type
                 </label>
-                {allowedTypes.length === 1 ? (
-                  <div className="bg-card p-4 rounded-xl border border-primary/30 flex items-center gap-4">
-                    {(() => {
-                      const Icon = typeConfig[allowedTypes[0]].icon;
-                      return <Icon size={20} className="text-primary" />;
-                    })()}
-                    <div>
-                      <p className="text-sm font-bold text-primary">
-                        {typeConfig[allowedTypes[0]].label}
-                      </p>
-                      <p className="text-[10px] text-muted-foreground">
-                        {typeConfig[allowedTypes[0]].desc}
-                      </p>
+                <div className="space-y-4">
+                  {!activeCategory ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <CategoryCard
+                        icon={ShoppingCart}
+                        label="Sales Quotation"
+                        desc="Products and Spare Parts"
+                        color="border-blue-200 hover:border-blue-400"
+                        onClick={() => {
+                          setActiveCategory('SALE');
+                          if (allowedTypes.includes('PRODUCT_SALE')) {
+                            setQuotationType('PRODUCT_SALE');
+                          } else if (allowedTypes.includes('SPAREPART_SALE')) {
+                            setQuotationType('SPAREPART_SALE');
+                          }
+                        }}
+                      />
+                      <CategoryCard
+                        icon={Key}
+                        label="Rent Quotation"
+                        desc="Machine Rental Plans"
+                        color="border-orange-200 hover:border-orange-400"
+                        onClick={() => {
+                          setActiveCategory('RENT');
+                          setQuotationType('RENT');
+                        }}
+                      />
+                      <CategoryCard
+                        icon={FileSignature}
+                        label="Lease Quotation"
+                        desc="EMI and FSM Options"
+                        color="border-purple-200 hover:border-purple-400"
+                        onClick={() => {
+                          setActiveCategory('LEASE');
+                          setQuotationType('LEASE');
+                        }}
+                      />
                     </div>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    {(Object.keys(typeConfig) as QuotationType[])
-                      .filter((t) => allowedTypes.includes(t))
-                      .map((type) => {
-                        const Icon = typeConfig[type].icon;
-                        const selected = quotationType === type;
-                        const colors = {
-                          SALE: selected
-                            ? 'border-blue-500 bg-blue-50 text-blue-700'
-                            : 'border-slate-200 hover:border-blue-300',
-                          RENT: selected
-                            ? 'border-orange-500 bg-orange-50 text-orange-700'
-                            : 'border-slate-200 hover:border-orange-300',
-                          LEASE: selected
-                            ? 'border-purple-500 bg-purple-50 text-purple-700'
-                            : 'border-slate-200 hover:border-purple-300',
-                        };
-                        return (
-                          <button
-                            key={type}
-                            onClick={() => setQuotationType(type)}
-                            className={`border-2 rounded-xl p-4 flex flex-col items-start gap-2 transition-all ${colors[type]}`}
+                  ) : activeCategory === 'SALE' ? (
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setActiveCategory(null)}
+                          className="text-[10px] font-bold uppercase tracking-widest text-slate-400 hover:text-primary h-7"
+                        >
+                          ← Back to Categories
+                        </Button>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <button
+                          onClick={() => setQuotationType('PRODUCT_SALE')}
+                          className={`border-2 rounded-xl p-4 flex flex-col items-start gap-2 transition-all ${
+                            quotationType === 'PRODUCT_SALE'
+                              ? 'border-blue-500 bg-blue-50 text-blue-700'
+                              : 'border-slate-200 hover:border-blue-300'
+                          }`}
+                        >
+                          <div
+                            className={`p-2 rounded-lg ${quotationType === 'PRODUCT_SALE' ? 'bg-white/60' : 'bg-slate-50'}`}
                           >
-                            <div
-                              className={`p-2 rounded-lg ${selected ? 'bg-white/60' : 'bg-slate-50'}`}
-                            >
-                              <Icon size={18} />
-                            </div>
-                            <div className="text-left">
-                              <p className="text-sm font-bold">{typeConfig[type].label}</p>
-                              <p className="text-[10px] opacity-70 mt-0.5">
-                                {typeConfig[type].desc}
-                              </p>
-                            </div>
-                          </button>
-                        );
-                      })}
-                  </div>
-                )}
+                            <ShoppingCart size={18} />
+                          </div>
+                          <div className="text-left">
+                            <p className="text-sm font-bold">Product Sale</p>
+                            <p className="text-[10px] opacity-70 mt-0.5">
+                              Full machines and equipments
+                            </p>
+                          </div>
+                        </button>
+                        <button
+                          onClick={() => setQuotationType('SPAREPART_SALE')}
+                          className={`border-2 rounded-xl p-4 flex flex-col items-start gap-2 transition-all ${
+                            quotationType === 'SPAREPART_SALE'
+                              ? 'border-cyan-500 bg-cyan-50 text-cyan-700'
+                              : 'border-slate-200 hover:border-cyan-300'
+                          }`}
+                        >
+                          <div
+                            className={`p-2 rounded-lg ${quotationType === 'SPAREPART_SALE' ? 'bg-white/60' : 'bg-slate-50'}`}
+                          >
+                            <ShoppingCart size={18} />
+                          </div>
+                          <div className="text-left">
+                            <p className="text-sm font-bold">Spare Part Sale</p>
+                            <p className="text-[10px] opacity-70 mt-0.5">
+                              Individual components and parts
+                            </p>
+                          </div>
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="bg-card p-4 rounded-xl border border-primary/30 flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        {(() => {
+                          const Icon = activeCategory === 'RENT' ? Key : FileSignature;
+                          return <Icon size={20} className="text-primary" />;
+                        })()}
+                        <div>
+                          <p className="text-sm font-bold text-primary">
+                            {activeCategory === 'RENT' ? 'Rent Quotation' : 'Lease Quotation'}
+                          </p>
+                          <p className="text-[10px] text-muted-foreground">
+                            {activeCategory === 'RENT'
+                              ? 'Machine rental plan'
+                              : 'Long-term lease option'}
+                          </p>
+                        </div>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setActiveCategory(null)}
+                        className="text-[10px] font-bold uppercase text-slate-400"
+                      >
+                        Change
+                      </Button>
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Customer */}
@@ -707,7 +883,7 @@ function QuotationFormModal({
               </div>
 
               {/* Validity & Notes (Sale only) */}
-              {quotationType === 'SALE' && (
+              {['PRODUCT_SALE', 'SPAREPART_SALE'].includes(quotationType) && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="bg-card p-4 rounded-xl border border-slate-100 shadow-sm space-y-2">
                     <label className="text-[11px] font-bold text-muted-foreground uppercase">
@@ -781,11 +957,16 @@ function QuotationFormModal({
               {/* ── STEP 2: Type-specific fields ─────────────────────────── */}
 
               {/* ── SALE FIELDS ──────────────────────────────────────────── */}
-              {quotationType === 'SALE' && (
+              {['SALE', 'PRODUCT_SALE', 'SPAREPART_SALE'].includes(quotationType) && (
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full bg-blue-400" /> Products & Items
+                      <span className="w-2 h-2 rounded-full bg-blue-400" />{' '}
+                      {quotationType === 'PRODUCT_SALE'
+                        ? 'Products'
+                        : quotationType === 'SPAREPART_SALE'
+                          ? 'Spare Parts'
+                          : 'Items'}
                     </h4>
                     {!manualItemOpen && (
                       <Button
@@ -799,7 +980,16 @@ function QuotationFormModal({
                     )}
                   </div>
                   <div className="bg-card p-2 rounded-xl border border-border shadow-sm focus-within:ring-2 focus-within:ring-primary/20 transition-all">
-                    <ProductSelect onSelect={addItem} />
+                    <ProductSelect
+                      onSelect={addItem}
+                      mode={
+                        quotationType === 'PRODUCT_SALE'
+                          ? 'PRODUCT'
+                          : quotationType === 'SPAREPART_SALE'
+                            ? 'SPAREPART'
+                            : 'BOTH'
+                      }
+                    />
                   </div>
                   {manualItemOpen && (
                     <div className="flex justify-end">
@@ -919,54 +1109,154 @@ function QuotationFormModal({
 
               {/* ── RENT FIELDS ───────────────────────────────────────────── */}
               {quotationType === 'RENT' && (
-                <div className="space-y-5">
+                <div className="space-y-5 mb-6">
                   {/* Machines */}
                   <div className="bg-card p-5 rounded-xl border border-slate-100 shadow-sm space-y-3">
                     <label className="text-[11px] font-bold text-muted-foreground uppercase flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full bg-orange-400" /> Machine Models
+                      <span className="w-2 h-2 rounded-full bg-orange-400" /> Specific Machines
+                      (Products)
                     </label>
-                    <ModelSelect
-                      onSelect={(m) => {
-                        if (selectedModels.find((x) => x.id === m.id)) return;
-                        setSelectedModels((prev) => [...prev, { ...m, quantity: 1 }]);
+                    <ProductSelect
+                      mode="PRODUCT"
+                      onSelect={(item) => {
+                        if (saleItems.find((x) => x.productId === item.id)) return;
+                        addItem(item);
                       }}
                     />
-                    {selectedModels.length > 0 && (
-                      <div className="space-y-2 mt-2">
-                        {selectedModels.map((m) => (
+                    {saleItems.length > 0 && (
+                      <div className="space-y-4 mt-2">
+                        {saleItems.map((m, index) => (
                           <div
-                            key={m.id}
-                            className="flex items-center justify-between bg-orange-50 border border-orange-100 rounded-lg px-3 py-2"
+                            key={m.productId || index}
+                            className="flex flex-col gap-3 bg-orange-50 border border-orange-100 rounded-lg px-4 py-3"
                           >
-                            <span className="text-sm font-bold text-slate-700">{m.model_name}</span>
-                            <div className="flex items-center gap-3">
-                              <div className="flex items-center gap-2">
-                                <label className="text-[10px] text-slate-400 font-bold">QTY</label>
-                                <Input
-                                  type="number"
-                                  min="1"
-                                  value={m.quantity}
-                                  onChange={(e) =>
-                                    setSelectedModels((prev) =>
-                                      prev.map((x) =>
-                                        x.id === m.id
-                                          ? { ...x, quantity: Number(e.target.value) }
-                                          : x,
-                                      ),
-                                    )
-                                  }
-                                  className="h-7 w-16 text-center text-xs font-bold"
-                                />
+                            <div className="flex items-center justify-between">
+                              <span className="text-sm font-black text-slate-800">
+                                {m.description}
+                              </span>
+                              <div className="flex items-center gap-3">
+                                <div className="flex items-center gap-2">
+                                  <label className="text-[10px] text-slate-500 font-bold">
+                                    QTY
+                                  </label>
+                                  <Input
+                                    type="number"
+                                    min="1"
+                                    value={m.quantity}
+                                    onChange={(e) => updateItem(index, 'quantity', e.target.value)}
+                                    className="h-8 w-16 text-center text-xs font-bold"
+                                  />
+                                </div>
+                                <button
+                                  onClick={() => removeItem(index)}
+                                  className="text-slate-400 hover:text-red-600 transition-colors bg-white hover:bg-red-50 p-1 rounded"
+                                >
+                                  <Trash2 size={16} />
+                                </button>
                               </div>
-                              <button
-                                onClick={() =>
-                                  setSelectedModels((p) => p.filter((x) => x.id !== m.id))
-                                }
-                                className="text-slate-300 hover:text-red-500 transition-colors"
-                              >
-                                <Trash2 size={14} />
-                              </button>
                             </div>
+
+                            {/* Dynamic Pricing Inputs Based on Rent Type */}
+                            {rentType !== 'FIXED_FLAT' && (
+                              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 bg-white p-3 rounded border border-orange-100 shadow-sm">
+                                {rentType === 'FIXED_LIMIT' && (
+                                  <div className="space-y-1">
+                                    <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">
+                                      B/W Limit
+                                    </label>
+                                    <Input
+                                      type="number"
+                                      placeholder="Copies"
+                                      value={m.bwIncludedLimit || ''}
+                                      onChange={(e) =>
+                                        updateItem(index, 'bwIncludedLimit', e.target.value)
+                                      }
+                                      className="h-8 text-[11px] font-bold"
+                                    />
+                                  </div>
+                                )}
+                                {rentType === 'FIXED_COMBO' && (
+                                  <div className="space-y-1">
+                                    <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">
+                                      Combo Limit
+                                    </label>
+                                    <Input
+                                      type="number"
+                                      placeholder="Copies"
+                                      value={m.combinedIncludedLimit || ''}
+                                      onChange={(e) =>
+                                        updateItem(index, 'combinedIncludedLimit', e.target.value)
+                                      }
+                                      className="h-8 text-[11px] font-bold"
+                                    />
+                                  </div>
+                                )}
+                                {rentType === 'FIXED_LIMIT' && (
+                                  <div className="space-y-1">
+                                    <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">
+                                      Color Limit
+                                    </label>
+                                    <Input
+                                      type="number"
+                                      placeholder="Copies"
+                                      value={m.colorIncludedLimit || ''}
+                                      onChange={(e) =>
+                                        updateItem(index, 'colorIncludedLimit', e.target.value)
+                                      }
+                                      className="h-8 text-[11px] font-bold"
+                                    />
+                                  </div>
+                                )}
+                                {(rentType === 'FIXED_LIMIT' || rentType === 'CPC') && (
+                                  <div className="space-y-1">
+                                    <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">
+                                      B/W Excess Rate
+                                    </label>
+                                    <Input
+                                      type="number"
+                                      placeholder="Rate"
+                                      value={m.bwExcessRate || ''}
+                                      onChange={(e) =>
+                                        updateItem(index, 'bwExcessRate', e.target.value)
+                                      }
+                                      className="h-8 text-[11px] font-bold"
+                                    />
+                                  </div>
+                                )}
+                                {(rentType === 'FIXED_LIMIT' || rentType === 'CPC') && (
+                                  <div className="space-y-1">
+                                    <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">
+                                      Color Excess Rate
+                                    </label>
+                                    <Input
+                                      type="number"
+                                      placeholder="Rate"
+                                      value={m.colorExcessRate || ''}
+                                      onChange={(e) =>
+                                        updateItem(index, 'colorExcessRate', e.target.value)
+                                      }
+                                      className="h-8 text-[11px] font-bold"
+                                    />
+                                  </div>
+                                )}
+                                {(rentType === 'FIXED_COMBO' || rentType === 'CPC_COMBO') && (
+                                  <div className="space-y-1">
+                                    <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">
+                                      Combo Excess Rate
+                                    </label>
+                                    <Input
+                                      type="number"
+                                      placeholder="Rate"
+                                      value={m.combinedExcessRate || ''}
+                                      onChange={(e) =>
+                                        updateItem(index, 'combinedExcessRate', e.target.value)
+                                      }
+                                      className="h-8 text-[11px] font-bold"
+                                    />
+                                  </div>
+                                )}
+                              </div>
+                            )}
                           </div>
                         ))}
                       </div>
@@ -1054,47 +1344,149 @@ function QuotationFormModal({
                   {/* Machines */}
                   <div className="bg-card p-5 rounded-xl border border-slate-100 shadow-sm space-y-3">
                     <label className="text-[11px] font-bold text-muted-foreground uppercase flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full bg-purple-400" /> Machine Models
+                      <span className="w-2 h-2 rounded-full bg-purple-400" /> Specific Machines
+                      (Products)
                     </label>
-                    <ModelSelect
-                      onSelect={(m) => {
-                        if (selectedModels.find((x) => x.id === m.id)) return;
-                        setSelectedModels((prev) => [...prev, { ...m, quantity: 1 }]);
+                    <ProductSelect
+                      mode="PRODUCT"
+                      onSelect={(item) => {
+                        if (saleItems.find((x) => x.productId === item.id)) return;
+                        addItem(item);
                       }}
                     />
-                    {selectedModels.length > 0 && (
+                    {saleItems.length > 0 && (
                       <div className="space-y-2 mt-2">
-                        {selectedModels.map((m) => (
+                        {saleItems.map((m, index) => (
                           <div
-                            key={m.id}
-                            className="flex items-center justify-between bg-purple-50 border border-purple-100 rounded-lg px-3 py-2"
+                            key={m.productId || index}
+                            className="flex flex-col gap-3 bg-purple-50 border border-purple-100 rounded-lg px-4 py-3"
                           >
-                            <span className="text-sm font-bold text-slate-700">{m.model_name}</span>
-                            <div className="flex items-center gap-3">
-                              <Input
-                                type="number"
-                                min="1"
-                                value={m.quantity}
-                                onChange={(e) =>
-                                  setSelectedModels((prev) =>
-                                    prev.map((x) =>
-                                      x.id === m.id
-                                        ? { ...x, quantity: Number(e.target.value) }
-                                        : x,
-                                    ),
-                                  )
-                                }
-                                className="h-7 w-16 text-center text-xs font-bold"
-                              />
-                              <button
-                                onClick={() =>
-                                  setSelectedModels((p) => p.filter((x) => x.id !== m.id))
-                                }
-                                className="text-slate-300 hover:text-red-500 transition-colors"
-                              >
-                                <Trash2 size={14} />
-                              </button>
+                            <div className="flex items-center justify-between">
+                              <span className="text-sm font-black text-slate-800">
+                                {m.description}
+                              </span>
+                              <div className="flex items-center gap-3">
+                                <div className="flex items-center gap-2">
+                                  <label className="text-[10px] text-slate-500 font-bold">
+                                    QTY
+                                  </label>
+                                  <Input
+                                    type="number"
+                                    min="1"
+                                    value={m.quantity}
+                                    onChange={(e) => updateItem(index, 'quantity', e.target.value)}
+                                    className="h-8 w-16 text-center text-xs font-bold"
+                                  />
+                                </div>
+                                <button
+                                  onClick={() => removeItem(index)}
+                                  className="text-slate-400 hover:text-red-600 transition-colors bg-white hover:bg-red-50 p-1 rounded"
+                                >
+                                  <Trash2 size={16} />
+                                </button>
+                              </div>
                             </div>
+                            {/* Dynamic Pricing Inputs for Lease FSM */}
+                            {leaseType === 'FSM' && rentType !== 'FIXED_FLAT' && (
+                              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 bg-white p-3 rounded border border-purple-100 shadow-sm">
+                                {rentType === 'FIXED_LIMIT' && (
+                                  <div className="space-y-1">
+                                    <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">
+                                      B/W Limit
+                                    </label>
+                                    <Input
+                                      type="number"
+                                      placeholder="Copies"
+                                      value={m.bwIncludedLimit || ''}
+                                      onChange={(e) =>
+                                        updateItem(index, 'bwIncludedLimit', e.target.value)
+                                      }
+                                      className="h-8 text-[11px] font-bold"
+                                    />
+                                  </div>
+                                )}
+                                {rentType === 'FIXED_COMBO' && (
+                                  <div className="space-y-1">
+                                    <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">
+                                      Combo Limit
+                                    </label>
+                                    <Input
+                                      type="number"
+                                      placeholder="Copies"
+                                      value={m.combinedIncludedLimit || ''}
+                                      onChange={(e) =>
+                                        updateItem(index, 'combinedIncludedLimit', e.target.value)
+                                      }
+                                      className="h-8 text-[11px] font-bold"
+                                    />
+                                  </div>
+                                )}
+                                {rentType === 'FIXED_LIMIT' && (
+                                  <div className="space-y-1">
+                                    <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">
+                                      Color Limit
+                                    </label>
+                                    <Input
+                                      type="number"
+                                      placeholder="Copies"
+                                      value={m.colorIncludedLimit || ''}
+                                      onChange={(e) =>
+                                        updateItem(index, 'colorIncludedLimit', e.target.value)
+                                      }
+                                      className="h-8 text-[11px] font-bold"
+                                    />
+                                  </div>
+                                )}
+                                {(rentType === 'FIXED_LIMIT' || rentType === 'CPC') && (
+                                  <div className="space-y-1">
+                                    <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">
+                                      B/W Excess Rate
+                                    </label>
+                                    <Input
+                                      type="number"
+                                      placeholder="Rate"
+                                      value={m.bwExcessRate || ''}
+                                      onChange={(e) =>
+                                        updateItem(index, 'bwExcessRate', e.target.value)
+                                      }
+                                      className="h-8 text-[11px] font-bold"
+                                    />
+                                  </div>
+                                )}
+                                {(rentType === 'FIXED_LIMIT' || rentType === 'CPC') && (
+                                  <div className="space-y-1">
+                                    <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">
+                                      Color Excess Rate
+                                    </label>
+                                    <Input
+                                      type="number"
+                                      placeholder="Rate"
+                                      value={m.colorExcessRate || ''}
+                                      onChange={(e) =>
+                                        updateItem(index, 'colorExcessRate', e.target.value)
+                                      }
+                                      className="h-8 text-[11px] font-bold"
+                                    />
+                                  </div>
+                                )}
+                                {(rentType === 'FIXED_COMBO' || rentType === 'CPC_COMBO') && (
+                                  <div className="space-y-1">
+                                    <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">
+                                      Combo Excess Rate
+                                    </label>
+                                    <Input
+                                      type="number"
+                                      placeholder="Rate"
+                                      value={m.combinedExcessRate || ''}
+                                      onChange={(e) =>
+                                        updateItem(index, 'combinedExcessRate', e.target.value)
+                                      }
+                                      className="h-8 text-[11px] font-bold"
+                                    />
+                                  </div>
+                                )}
+                              </div>
+                            )}
                           </div>
                         ))}
                       </div>
@@ -1120,6 +1512,26 @@ function QuotationFormModal({
                         </SelectContent>
                       </Select>
                     </div>
+
+                    {leaseType === 'FSM' && (
+                      <div className="bg-card p-4 rounded-xl border border-slate-100 shadow-sm space-y-2">
+                        <label className="text-[11px] font-bold text-muted-foreground uppercase">
+                          Service Billing Type (FSM)
+                        </label>
+                        <Select value={rentType} onValueChange={setRentType}>
+                          <SelectTrigger className="h-9 text-sm">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="FIXED_LIMIT">Fixed Limit (BW + Color)</SelectItem>
+                            <SelectItem value="FIXED_COMBO">Fixed Combo (Combined)</SelectItem>
+                            <SelectItem value="FIXED_FLAT">Fixed Flat Rate</SelectItem>
+                            <SelectItem value="CPC">CPC (Cost Per Copy)</SelectItem>
+                            <SelectItem value="CPC_COMBO">CPC Combo</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
                     <div className="bg-card p-4 rounded-xl border border-slate-100 shadow-sm space-y-2">
                       <label className="text-[11px] font-bold text-muted-foreground uppercase">
                         Tenure (months)
@@ -1181,280 +1593,56 @@ function QuotationFormModal({
           <button
             onClick={onClose}
             className="text-sm font-bold text-slate-400 hover:text-slate-600 transition-colors"
+            disabled={isSubmitting}
           >
             Discard
           </button>
-          <div className="flex gap-3">
+
+          <div className="flex gap-3 items-center">
             {step === 2 && (
-              <Button variant="outline" onClick={() => setStep(1)} className="rounded-xl font-bold">
-                ← Back
+              <Button
+                variant="outline"
+                className="h-10 px-6 font-bold text-[11px] uppercase tracking-wider"
+                onClick={() => setStep(1)}
+              >
+                Back
               </Button>
             )}
+
             {step === 1 ? (
               <Button
-                className="h-11 px-8 rounded-xl bg-primary text-white font-bold shadow-lg"
+                className="h-10 px-8 bg-blue-600 hover:bg-blue-700 text-white font-bold text-[11px] uppercase tracking-widest shadow-md shadow-blue-200"
                 onClick={() => {
                   if (!customerId) {
-                    toast.error('Please select a customer first.');
+                    toast.error('Please select a customer first');
+                    return;
+                  }
+                  if (!quotationType) {
+                    toast.error('Please select a quotation category');
+                    return;
+                  }
+                  if ((quotationType === 'RENT' || quotationType === 'LEASE') && onRentLeaseNext) {
+                    onRentLeaseNext(quotationType, customerId);
                     return;
                   }
                   setStep(2);
                 }}
               >
-                Next → Details
+                Next Step
               </Button>
             ) : (
               <Button
-                className="h-11 px-8 rounded-xl bg-primary text-white font-bold shadow-lg disabled:opacity-50 flex items-center gap-2"
-                disabled={isSubmitting}
+                className="h-10 px-8 bg-black hover:bg-slate-800 text-white font-bold text-[11px] uppercase tracking-widest shadow-md"
                 onClick={handleSubmit}
+                disabled={isSubmitting}
               >
-                {isSubmitting ? (
-                  <Loader2 size={16} className="animate-spin" />
-                ) : (
-                  <FilePlus2 size={16} />
-                )}
-                {isSubmitting ? 'Creating...' : 'Create Quotation'}
+                {isSubmitting ? <Loader2 className="animate-spin w-4 h-4 mr-2" /> : null}
+                Create Quotation
               </Button>
             )}
           </div>
         </div>
       </DialogContent>
     </Dialog>
-  );
-}
-
-// ─── Quotation View Dialog ────────────────────────────────────────────────────
-
-function QuotationViewDialog({
-  quotation,
-  onClose,
-  onSendToFinance,
-}: {
-  quotation: Invoice;
-  onClose: () => void;
-  onSendToFinance: (id: string) => Promise<void>;
-}) {
-  const [sending, setSending] = useState(false);
-  const canSend = quotation.status === 'DRAFT' || quotation.status === 'SENT';
-
-  const handleSend = async () => {
-    setSending(true);
-    try {
-      await onSendToFinance(quotation.id);
-    } finally {
-      setSending(false);
-    }
-  };
-
-  return (
-    <Dialog open onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="sm:max-w-2xl rounded-2xl border-none shadow-2xl p-0 overflow-hidden">
-        <DialogHeader className="p-6 pb-4 bg-card border-b border-slate-100">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="h-12 w-12 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
-                <FileText size={24} />
-              </div>
-              <div>
-                <DialogTitle className="text-xl font-bold text-slate-800">
-                  {quotation.invoiceNumber}
-                </DialogTitle>
-                <DialogDescription className="text-xs text-slate-400 font-semibold uppercase tracking-widest">
-                  Quotation Details
-                </DialogDescription>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <TypeBadge type={quotation.saleType} />
-              <StatusBadge status={quotation.status} />
-            </div>
-          </div>
-        </DialogHeader>
-
-        <div className="p-6 bg-card/50 space-y-5 overflow-y-auto max-h-[60vh]">
-          {/* Common Info */}
-          <div className="grid grid-cols-2 gap-3">
-            <InfoRow label="Customer" value={quotation.customerName || 'Walk-in'} />
-            <InfoRow
-              label="Date"
-              value={new Date(quotation.createdAt).toLocaleDateString(undefined, {
-                day: '2-digit',
-                month: 'short',
-                year: 'numeric',
-              })}
-            />
-            {quotation.effectiveFrom && (
-              <InfoRow
-                label="Effective From"
-                value={new Date(quotation.effectiveFrom).toLocaleDateString()}
-              />
-            )}
-            {quotation.effectiveTo && (
-              <InfoRow
-                label="Effective To"
-                value={new Date(quotation.effectiveTo).toLocaleDateString()}
-              />
-            )}
-          </div>
-
-          {/* RENT specific */}
-          {quotation.saleType === 'RENT' && (
-            <div className="bg-orange-50 border border-orange-100 rounded-xl p-4 space-y-3">
-              <p className="text-[11px] font-bold text-orange-600 uppercase tracking-wider">
-                Rent Details
-              </p>
-              <div className="grid grid-cols-2 gap-3">
-                {quotation.rentType && (
-                  <InfoRow label="Rent Type" value={quotation.rentType.replace(/_/g, ' ')} />
-                )}
-                {quotation.rentPeriod && (
-                  <InfoRow label="Billing Period" value={quotation.rentPeriod} />
-                )}
-                {quotation.monthlyRent != null && (
-                  <InfoRow label="Monthly Rent" value={formatCurrency(quotation.monthlyRent)} />
-                )}
-                {quotation.advanceAmount != null && (
-                  <InfoRow label="Advance" value={formatCurrency(quotation.advanceAmount)} />
-                )}
-                {quotation.discountPercent != null && (
-                  <InfoRow label="Discount" value={`${quotation.discountPercent}%`} />
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* LEASE specific */}
-          {quotation.saleType === 'LEASE' && (
-            <div className="bg-purple-50 border border-purple-100 rounded-xl p-4 space-y-3">
-              <p className="text-[11px] font-bold text-purple-600 uppercase tracking-wider">
-                Lease Details
-              </p>
-              <div className="grid grid-cols-2 gap-3">
-                {quotation.leaseType && <InfoRow label="Lease Type" value={quotation.leaseType} />}
-                {quotation.leaseTenureMonths != null && (
-                  <InfoRow label="Tenure" value={`${quotation.leaseTenureMonths} months`} />
-                )}
-                {quotation.totalLeaseAmount != null && (
-                  <InfoRow
-                    label="Total Amount"
-                    value={formatCurrency(quotation.totalLeaseAmount)}
-                  />
-                )}
-                {quotation.monthlyEmiAmount != null && (
-                  <InfoRow label="Monthly EMI" value={formatCurrency(quotation.monthlyEmiAmount)} />
-                )}
-                {quotation.discountPercent != null && (
-                  <InfoRow label="Discount" value={`${quotation.discountPercent}%`} />
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Items table */}
-          {quotation.items && quotation.items.length > 0 && (
-            <div className="bg-card rounded-xl border border-slate-100 overflow-hidden shadow-sm">
-              <div className="px-4 py-3 bg-muted/30 border-b border-slate-100">
-                <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
-                  {quotation.saleType === 'SALE' ? 'Items' : 'Machine Models'}
-                </p>
-              </div>
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-slate-100">
-                    <th className="text-left px-4 py-2 text-xs font-bold text-slate-400 uppercase">
-                      Description
-                    </th>
-                    <th className="text-center px-4 py-2 text-xs font-bold text-slate-400 uppercase">
-                      Qty
-                    </th>
-                    {quotation.saleType === 'SALE' && (
-                      <>
-                        <th className="text-right px-4 py-2 text-xs font-bold text-slate-400 uppercase">
-                          Unit Price
-                        </th>
-                        <th className="text-right px-4 py-2 text-xs font-bold text-slate-400 uppercase">
-                          Total
-                        </th>
-                      </>
-                    )}
-                  </tr>
-                </thead>
-                <tbody>
-                  {quotation.items.map((item, i) => (
-                    <tr
-                      key={i}
-                      className={`border-b border-slate-50 ${i % 2 ? 'bg-slate-50/50' : ''}`}
-                    >
-                      <td className="px-4 py-3 font-medium text-slate-700">{item.description}</td>
-                      <td className="px-4 py-3 text-center text-slate-600">{item.quantity}</td>
-                      {quotation.saleType === 'SALE' && (
-                        <>
-                          <td className="px-4 py-3 text-right text-slate-600">
-                            {formatCurrency(item.unitPrice ?? 0)}
-                          </td>
-                          <td className="px-4 py-3 text-right font-bold text-slate-800">
-                            {formatCurrency((item.quantity ?? 1) * (item.unitPrice ?? 0))}
-                          </td>
-                        </>
-                      )}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              {quotation.saleType === 'SALE' && (
-                <div className="px-4 py-4 flex justify-end border-t border-slate-100 bg-card">
-                  <div className="text-right">
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                      Grand Total
-                    </p>
-                    <p className="text-2xl font-black text-primary">
-                      {formatCurrency(quotation.totalAmount)}
-                    </p>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Finance remarks if rejected */}
-          {quotation.financeRemarks && (
-            <div className="bg-red-50 border border-red-100 rounded-xl p-4">
-              <p className="text-[11px] font-bold text-red-600 uppercase tracking-wider mb-1">
-                Finance Remarks
-              </p>
-              <p className="text-sm text-red-700">{quotation.financeRemarks}</p>
-            </div>
-          )}
-        </div>
-
-        <div className="p-6 border-t border-slate-100 bg-card flex items-center justify-between">
-          <Button variant="outline" onClick={onClose} className="rounded-xl font-bold">
-            Close
-          </Button>
-          {canSend && (
-            <Button
-              className="rounded-xl font-bold bg-primary text-white gap-2 shadow-md hover:shadow-lg transition-all"
-              disabled={sending}
-              onClick={handleSend}
-            >
-              {sending ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}
-              {sending ? 'Sending...' : 'Send to Finance'}
-            </Button>
-          )}
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-function InfoRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="bg-card rounded-xl border border-slate-100 p-3 shadow-sm">
-      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">
-        {label}
-      </p>
-      <p className="text-sm font-semibold text-slate-700">{value}</p>
-    </div>
   );
 }

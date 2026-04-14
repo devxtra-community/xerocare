@@ -25,4 +25,5 @@ export interface NotificationRequestEvent {
   body: string; // Message content or PDF link
   invoiceId?: string; // Useful for linking
   attachmentUrl?: string; // Link to Invoice PDF
+  attachments?: { filename: string; content: string; encoding: string }[]; // Base64 Buffer attachments
 }

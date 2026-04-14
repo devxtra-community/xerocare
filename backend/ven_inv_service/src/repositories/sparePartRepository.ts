@@ -51,6 +51,7 @@ export class SparePartRepository {
     if (data.models !== undefined) part.models = data.models;
     if (data.sku !== undefined) part.sku = data.sku;
     if (data.mpn !== undefined) part.mpn = data.mpn;
+    if (data.description !== undefined) part.description = data.description;
     if (data.warehouse_id !== undefined) part.warehouse_id = data.warehouse_id;
     if (data.vendor_id !== undefined) part.vendor_id = data.vendor_id;
 

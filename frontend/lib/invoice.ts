@@ -181,7 +181,7 @@ export const sendMonthlyUsageInvoice = async (usageId: string): Promise<unknown>
 
 export interface CreateInvoicePayload {
   customerId: string;
-  saleType: 'SALE' | 'RENT' | 'LEASE';
+  saleType: 'SALE' | 'RENT' | 'LEASE' | 'PRODUCT_SALE' | 'SPAREPART_SALE';
 
   // Rent Fields
   rentType?: 'FIXED_LIMIT' | 'FIXED_COMBO' | 'FIXED_FLAT' | 'CPC' | 'CPC_COMBO';
@@ -772,4 +772,36 @@ export const sendWhatsappNotification = async (
 export const getAvailableYears = async (): Promise<number[]> => {
   const response = await api.get('/b/invoices/stats/available-years');
   return response.data.data;
+};
+
+/**
+ * Downloads a premium styled quotation PDF.
+ */
+export const downloadPremiumQuotation = async (id: string): Promise<void> => {
+  const response = await api.get(`/b/invoices/${id}/download-premium`, {
+    responseType: 'blob',
+  });
+  const url = window.URL.createObjectURL(new Blob([response.data]));
+  const link = document.createElement('a');
+  link.href = url;
+  link.setAttribute('download', `Quotation-${id}.pdf`);
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+};
+
+/**
+ * Downloads a premium styled invoice PDF.
+ */
+export const downloadPremiumInvoice = async (id: string): Promise<void> => {
+  const response = await api.get(`/b/invoices/${id}/download-premium`, {
+    responseType: 'blob',
+  });
+  const url = window.URL.createObjectURL(new Blob([response.data]));
+  const link = document.createElement('a');
+  link.href = url;
+  link.setAttribute('download', `Invoice-${id}.pdf`);
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
 };

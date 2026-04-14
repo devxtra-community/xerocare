@@ -84,7 +84,9 @@ export class BillingService {
       monthlyRent:
         payload.monthlyRent !== undefined
           ? Number(payload.monthlyRent)
-          : contract.saleType === SaleType.LEASE && contract.leaseType === LeaseType.FSM
+          : [SaleType.LEASE, SaleType.PRODUCT_SALE, SaleType.SPAREPART_SALE].includes(
+                contract.saleType as SaleType,
+              ) && contract.leaseType === LeaseType.FSM
             ? Number(contract.monthlyLeaseAmount || 0)
             : Number(contract.monthlyRent || 0),
       discountPercent: Number(contract.discountPercent || 0),
@@ -251,7 +253,10 @@ export class BillingService {
     );
     logger.info(`DEBUG_FINALIZATION: Contract SaleType is ${contract.saleType}`);
 
-    if (contract.saleType === SaleType.RENT && allocations.length > 0) {
+    if (
+      [SaleType.RENT, SaleType.PRODUCT_SALE, SaleType.SPAREPART_SALE].includes(contract.saleType) &&
+      allocations.length > 0
+    ) {
       logger.info(
         `DEBUG_FINALIZATION: Updating ALLOCATED to RETURNED for rent contract ${contract.id}`,
       );
@@ -432,7 +437,10 @@ export class BillingService {
     }
 
     // 2. Handle Pricing Rules (Rent Specific)
-    if (payload.pricingItems && payload.saleType !== SaleType.SALE) {
+    if (
+      payload.pricingItems &&
+      ![SaleType.SALE, SaleType.PRODUCT_SALE, SaleType.SPAREPART_SALE].includes(payload.saleType)
+    ) {
       const ruleItems = payload.pricingItems.map((item) => {
         const invoiceItem = new InvoiceItem();
         invoiceItem.itemType = ItemType.PRICING_RULE;
@@ -498,7 +506,9 @@ export class BillingService {
     });
 
     // 3. Finalize Amounts for SALE / LEASE / RENT
-    if (payload.saleType === SaleType.SALE) {
+    if (
+      [SaleType.SALE, SaleType.PRODUCT_SALE, SaleType.SPAREPART_SALE].includes(payload.saleType)
+    ) {
       const discAmount = Number(payload.discountAmount || 0);
       const discPercent = Number(payload.discountPercent || 0);
 
@@ -692,7 +702,9 @@ export class BillingService {
     }
 
     // Recalculate Total Amount for Quotation Phase
-    if (invoice.saleType === SaleType.SALE) {
+    if (
+      [SaleType.SALE, SaleType.PRODUCT_SALE, SaleType.SPAREPART_SALE].includes(invoice.saleType)
+    ) {
       let calculatedTotal = 0;
       if (invoice.items && invoice.items.length > 0) {
         calculatedTotal = invoice.items.reduce(
@@ -1087,16 +1099,24 @@ export class BillingService {
   private async emitProductStatusUpdates(
     invoice: Invoice,
     userId: string,
-    overrideStatus?: 'SALE' | 'RENT' | 'LEASE' | 'RETURNED',
+    overrideStatus?: 'SALE' | 'RENT' | 'LEASE' | 'RETURNED' | 'PRODUCT_SALE' | 'SPAREPART_SALE',
   ) {
     if (!invoice.items) return;
 
     for (const item of invoice.items) {
       if (item.productId && item.itemType === 'PRODUCT') {
         try {
+          // Type-safe mapping for the inventory event
+          const rawType = overrideStatus || invoice.saleType;
+          let billType: 'SALE' | 'RENT' | 'LEASE' | 'RETURNED' = 'SALE';
+          if (rawType === 'RENT') billType = 'RENT';
+          else if (rawType === 'LEASE') billType = 'LEASE';
+          else if (rawType === 'RETURNED') billType = 'RETURNED';
+          else billType = 'SALE';
+
           await emitProductStatusUpdate({
             productId: item.productId,
-            billType: overrideStatus || (invoice.saleType as 'SALE' | 'RENT' | 'LEASE'),
+            billType,
             invoiceId: invoice.id,
             approvedBy: userId,
             approvedAt: invoice.financeApprovedAt || new Date(),
@@ -1441,24 +1461,6 @@ export class BillingService {
       throw new AppError('Recipient email is required and could not be fetched from CRM', 400);
     }
 
-    // Construct Detailed HTML Body
-    const itemsHtml = contract.items
-      ?.map(
-        (item) => `
-      <tr>
-        <td style="border: 1px solid #ddd; padding: 8px;">${item.description}</td>
-        <td style="border: 1px solid #ddd; padding: 8px; text-align: center;">${item.quantity || 1}</td>
-        <td style="border: 1px solid #ddd; padding: 8px; text-align: center;">${item.bwIncludedLimit ?? '-'}</td>
-        <td style="border: 1px solid #ddd; padding: 8px; text-align: center;">${item.colorIncludedLimit ?? '-'}</td>
-        <td style="border: 1px solid #ddd; padding: 8px; text-align: center;">${item.bwExcessRate ?? '-'}</td>
-        <td style="border: 1px solid #ddd; padding: 8px; text-align: center;">${item.colorExcessRate ?? '-'}</td>
-        <td style="border: 1px solid #ddd; padding: 8px; text-align: right;">${item.unitPrice || 0}</td>
-        <td style="border: 1px solid #ddd; padding: 8px; text-align: right;">${(item.quantity || 1) * (item.unitPrice || 0)}</td>
-      </tr>
-    `,
-      )
-      .join('');
-
     // helper to display fields if they exist
     const showRow = (label: string, value: string | number | undefined | null) => {
       if (value === undefined || value === null) return '';
@@ -1473,52 +1475,70 @@ export class BillingService {
     // const pricingRule = contract.items?.find((i) => i.itemType === ItemType.PRICING_RULE) || contract.items?.[0];
 
     const htmlBody = `
-      <div style="font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; border: 1px solid #eee; padding: 20px;">
-        <h2 style="color: #333;">Quotation / Invoice Details</h2>
-        <p>${body}</p>
+      <div style="font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; padding: 24px; color: #1e293b; line-height: 1.5;">
+        <h2 style="color: #0f172a; margin-top: 0;">Quotation / Invoice Details</h2>
+        <div style="font-size: 15px; color: #475569; margin-bottom: 24px;">
+          ${body}
+        </div>
         
-        <div style="background-color: #f8f9fa; padding: 15px; border-radius: 5px; margin-bottom: 20px;">
-          <h3 style="margin-top: 0; color: #555;">Contract Overview</h3>
-          <table style="width: 100%; border-collapse: collapse;">
+        <div style="background-color: #f8fafc; padding: 20px; border-radius: 12px; margin-bottom: 24px; border: 1px solid #f1f5f9;">
+          <h3 style="margin-top: 0; color: #dc2626; font-size: 14px; text-transform: uppercase; letter-spacing: 0.05em;">Contract Overview</h3>
+          <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
             ${showRow('Invoice Number', contract.invoiceNumber)}
             ${showRow('Date', new Date(contract.createdAt).toLocaleDateString())}
             ${showRow('Type', contract.saleType)}
-            ${showRow('Advance Amount', contract.advanceAmount)}
-            ${showRow('Monthly Rent', contract.monthlyRent)}
+            ${showRow('Advance Amount', contract.advanceAmount ? `QAR ${contract.advanceAmount}` : undefined)}
+            ${showRow('Monthly Rent', contract.monthlyRent ? `QAR ${contract.monthlyRent}` : undefined)}
             ${showRow('Rent Period', contract.rentPeriod)}
             ${showRow('Billing Cycle', contract.billingCycleInDays ? `${contract.billingCycleInDays} Days` : undefined)}
           </table>
         </div>
 
-        <div style="margin-bottom: 20px; overflow-x: auto;">
-          <h3 style="color: #555;">Itemized Breakdown & Usage Limits</h3>
-          <table style="width: 100%; border-collapse: collapse; border: 1px solid #ddd; font-size: 13px;">
-            <thead style="background-color: #f2f2f2;">
-              <tr>
-                <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Description</th>
-                <th style="border: 1px solid #ddd; padding: 8px; text-align: center;">Qty</th>
-                <th style="border: 1px solid #ddd; padding: 8px; text-align: center;">B&W Limit</th>
-                <th style="border: 1px solid #ddd; padding: 8px; text-align: center;">Color Limit</th>
-                <th style="border: 1px solid #ddd; padding: 8px; text-align: center;">B&W Excess</th>
-                <th style="border: 1px solid #ddd; padding: 8px; text-align: center;">Color Excess</th>
-                <th style="border: 1px solid #ddd; padding: 8px; text-align: right;">Unit Price</th>
-                <th style="border: 1px solid #ddd; padding: 8px; text-align: right;">Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${itemsHtml || '<tr><td colspan="8" style="text-align: center; padding: 10px;">No Items</td></tr>'}
-            </tbody>
-            <tfoot>
-               <tr>
-                 <td colspan="7" style="border: 1px solid #ddd; padding: 8px; text-align: right; font-weight: bold;">Total Amount</td>
-                 <td style="border: 1px solid #ddd; padding: 8px; text-align: right; font-weight: bold;">${contract.totalAmount}</td>
-               </tr>
-            </tfoot>
-          </table>
-          <p style="font-size: 11px; color: #666; margin-top: 5px;">* Limits are included in the rental. Excess rates apply after limits are crossed.</p>
+        <div style="margin-bottom: 24px;">
+          <h3 style="color: #dc2626; font-size: 14px; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 12px;">Itemized Breakdown</h3>
+          <div style="overflow-x: auto; border: 1px solid #e2e8f0; border-radius: 8px;">
+            <table style="width: 100%; border-collapse: collapse; font-size: 12px; min-width: 500px;">
+              <thead style="background-color: #f8fafc; border-bottom: 2px solid #e2e8f0;">
+                <tr>
+                  <th style="padding: 12px 8px; text-align: left; color: #64748b;">Description</th>
+                  <th style="padding: 12px 8px; text-align: center; color: #64748b;">Qty</th>
+                  <th style="padding: 12px 8px; text-align: right; color: #64748b;">Total</th>
+                </tr>
+              </thead>
+              <tbody style="color: #1e293b;">
+                ${
+                  contract.items
+                    ?.map(
+                      (item) => `
+                  <tr>
+                    <td style="border-bottom: 1px solid #f1f5f9; padding: 12px 8px;">
+                      <div style="font-weight: bold;">${item.description}</div>
+                      ${item.bwIncludedLimit ? `<div style="font-size: 10px; color: #94a3b8;">Limit: ${item.bwIncludedLimit} B&W / ${item.colorIncludedLimit || 0} Color</div>` : ''}
+                    </td>
+                    <td style="border-bottom: 1px solid #f1f5f9; padding: 12px 8px; text-align: center;">${item.quantity || 1}</td>
+                    <td style="border-bottom: 1px solid #f1f5f9; padding: 12px 8px; text-align: right; font-weight: bold;">QAR ${((item.quantity || 1) * (item.unitPrice || 0)).toFixed(2)}</td>
+                  </tr>
+                `,
+                    )
+                    .join('') ||
+                  '<tr><td colspan="3" style="text-align: center; padding: 20px;">No Items</td></tr>'
+                }
+              </tbody>
+              <tfoot style="background-color: #f8fafc; font-weight: bold; font-size: 14px;">
+                 <tr>
+                   <td colspan="2" style="padding: 12px 8px; text-align: right;">Total Amount</td>
+                   <td style="padding: 12px 8px; text-align: right; color: #dc2626;">QAR ${Number(contract.totalAmount).toFixed(2)}</td>
+                 </tr>
+              </tfoot>
+            </table>
+          </div>
+          <p style="font-size: 11px; color: #94a3b8; margin-top: 8px; font-style: italic;">* Detailed usage limits and terms are provided in the attached PDF report.</p>
         </div>
         
-        <p style="font-size: 12px; color: #888;">Thank you for choosing XeroCare.</p>
+        <div style="border-top: 1px solid #e2e8f0; padding-top: 20px; text-align: center;">
+          <p style="font-size: 14px; font-weight: bold; color: #0f172a; margin-bottom: 4px;">Thank you for choosing XeroCare</p>
+          <p style="font-size: 12px; color: #64748b;">This is an automated notification. Please do not reply directly to this email.</p>
+        </div>
       </div>
     `;
 

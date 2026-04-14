@@ -78,8 +78,8 @@ export default function EmployeeSalesTable({ mode = 'EMPLOYEE' }: EmployeeSalesT
         // Using getBranchInvoices from lib
         const { getBranchInvoices } = await import('@/lib/invoice');
         data = await getBranchInvoices();
-        // Filter out unapproved records for Finance View
-        data = data.filter((inv) => !['DRAFT', 'SENT'].includes(inv.status));
+        // Only show definitively approved or completed records for the Finance Sales tracker
+        data = data.filter((inv) => ['APPROVED', 'FINANCE_APPROVED', 'FINAL'].includes(inv.status));
       } else {
         data = await getMyInvoices();
       }
@@ -110,13 +110,22 @@ export default function EmployeeSalesTable({ mode = 'EMPLOYEE' }: EmployeeSalesT
   };
 
   const filteredInvoices = invoices
-    .filter((inv) => inv.saleType === 'SALE') // Only show SALE type, exclude RENT and LEASE
+    .filter(
+      (inv) =>
+        inv.saleType === 'SALE' ||
+        inv.saleType === 'PRODUCT_SALE' ||
+        inv.saleType === 'SPAREPART_SALE',
+    ) // Show all SALE types
     .filter((inv) => {
       const matchesSearch =
         inv.invoiceNumber.toLowerCase().includes(search.toLowerCase()) ||
         inv.customerName?.toLowerCase().includes(search.toLowerCase()) ||
         inv.items?.some((item) => item.description.toLowerCase().includes(search.toLowerCase()));
-      const matchesFilter = filterType === 'All' || inv.saleType === filterType;
+      const matchesFilter =
+        filterType === 'All' ||
+        inv.saleType === filterType ||
+        (filterType === 'SALE' &&
+          (inv.saleType === 'PRODUCT_SALE' || inv.saleType === 'SPAREPART_SALE'));
       return matchesSearch && matchesFilter;
     });
 
@@ -218,7 +227,9 @@ export default function EmployeeSalesTable({ mode = 'EMPLOYEE' }: EmployeeSalesT
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="All">All Types</SelectItem>
-                <SelectItem value="SALE">Sale</SelectItem>
+                <SelectItem value="PRODUCT_SALE">Product Sale</SelectItem>
+                <SelectItem value="SPAREPART_SALE">Spare Part Sale</SelectItem>
+                <SelectItem value="SALE">Legacy Sale</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -292,14 +303,18 @@ export default function EmployeeSalesTable({ mode = 'EMPLOYEE' }: EmployeeSalesT
                         variant="outline"
                         className={`rounded-full px-3 py-0.5 text-[10px] font-bold tracking-wider
                         ${
-                          inv.saleType === 'SALE'
+                          ['SALE', 'PRODUCT_SALE', 'SPAREPART_SALE'].includes(inv.saleType)
                             ? 'border-blue-200 text-blue-600 bg-blue-50'
                             : inv.saleType === 'RENT'
                               ? 'border-orange-200 text-orange-600 bg-orange-50'
                               : 'border-purple-200 text-purple-600 bg-purple-50'
                         }`}
                       >
-                        {inv.saleType}
+                        {inv.saleType === 'PRODUCT_SALE'
+                          ? 'PRODUCT SALE'
+                          : inv.saleType === 'SPAREPART_SALE'
+                            ? 'SPARE PART SALE'
+                            : inv.saleType}
                       </Badge>
                     </TableCell>
 

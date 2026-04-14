@@ -121,22 +121,8 @@ export function SearchableSelect({
               filteredOptions.map((option) => (
                 <div
                   key={option.value}
-                  // Robust Mouse Handler: onMouseDown handles selection immediately and reliably
-                  onMouseDown={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    if (!option.disabled) {
-                      handleSelect(option);
-                    }
-                  }}
+                  // Selection handler
                   onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    if (!option.disabled) {
-                      handleSelect(option);
-                    }
-                  }}
-                  onTouchEnd={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
                     if (!option.disabled) {

@@ -62,66 +62,66 @@
   --radius: 0.625rem;
 
   /* Page background (light blue) */
-  --background: oklch(0.93 0.02 230);
-  --foreground: oklch(0.23 0 0);
+  --background: #eff6ff;
+  --foreground: #374151;
 
   /* Cards (PURE WHITE) */
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.23 0 0);
+  --card: #ffffff;
+  --card-foreground: #374151;
 
   --primary: #1e3a8a;
-  --primary-foreground: oklch(1 0 0);
+  --primary-foreground: #ffffff;
 
-  --secondary: oklch(0.95 0.01 230);
-  --secondary-foreground: oklch(0.23 0 0);
+  --secondary: #f8fafc;
+  --secondary-foreground: #374151;
 
-  --muted: oklch(0.96 0 0);
-  --muted-foreground: oklch(0.56 0 0);
+  --muted: #f9fafb;
+  --muted-foreground: #6b7280;
 
-  --accent: oklch(0.72 0.18 45);
-  --accent-foreground: oklch(1 0 0);
+  --accent: #f97316;
+  --accent-foreground: #ffffff;
 
-  --border: oklch(0.9 0 0);
-  --input: oklch(0.9 0 0);
+  --border: #e5e7eb;
+  --input: #e5e7eb;
   --ring: #1e3a8a;
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.23 0 0);
-  --row-mixed: oklch(0.92 0.04 250);
+  --popover: #ffffff;
+  --popover-foreground: #374151;
+  --row-mixed: #f0f9ff;
 
   --sidebar: #1e3a8a;
-  --sidebar-foreground: oklch(0.98 0 0);
+  --sidebar-foreground: #fcfcfc;
 
   --sidebar-primary: #1e3a8a;
-  --sidebar-primary-foreground: oklch(1 0 0);
+  --sidebar-primary-foreground: #ffffff;
 
-  --sidebar-accent: oklch(0.48 0.12 250);
-  --sidebar-accent-foreground: oklch(1 0 0);
+  --sidebar-accent: #0ea5e9;
+  --sidebar-accent-foreground: #ffffff;
 
-  --sidebar-border: oklch(0.38 0.09 250);
-  --sidebar-ring: oklch(0.72 0.19 250);
+  --sidebar-border: #0284c7;
+  --sidebar-ring: #38bdf8;
 
   /* Semantic mappings */
-  --bg-muted: oklch(0.93 0.02 230);
+  --bg-muted: #eff6ff;
   /* Light blue background */
 
-  --success: oklch(0.55 0.15 150);
-  --success-foreground: oklch(0.25 0.05 150);
+  --success: #22c55e;
+  --success-foreground: #14532d;
 
-  --danger: oklch(0.6 0.18 25);
-  --danger-foreground: oklch(0.3 0.05 25);
+  --danger: #ef4444;
+  --danger-foreground: #7f1d1d;
 
-  --warning: oklch(0.75 0.15 65);
-  --warning-foreground: oklch(0.35 0.05 65);
+  --warning: #f59e0b;
+  --warning-foreground: #78350f;
 
-  --info: oklch(0.65 0.15 250);
-  --info-foreground: oklch(0.3 0.05 250);
+  --info: #3b82f6;
+  --info-foreground: #1e3a8a;
 
   /* Sale Type Colors (Legacy fallback or specific overrides) */
-  --rent: oklch(0.7 0.15 45);
+  --rent: #f97316;
   /* Orange */
-  --lease: oklch(0.6 0.15 290);
+  --lease: #a855f7;
   /* Purple */
-  --sale: oklch(0.65 0.15 250);
+  --sale: #3b82f6;
   /* Blue */
 
   /* Chart & UI Accent Variables */

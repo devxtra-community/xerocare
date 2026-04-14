@@ -29,6 +29,7 @@ export interface Product {
   stock?: number;
   lot_id?: string;
   lot?: { lotNumber: string };
+  description?: string;
 }
 
 /**
@@ -51,6 +52,7 @@ export interface CreateProductDTO {
   wholesale_price?: number;
   imageUrl?: string;
   lot_id?: string;
+  description?: string;
 }
 
 /**
@@ -73,6 +75,7 @@ export interface BulkProductRow {
   max_discount_amount: number;
   wholesale_price?: number;
   lot_id?: string;
+  description?: string;
 }
 
 /**

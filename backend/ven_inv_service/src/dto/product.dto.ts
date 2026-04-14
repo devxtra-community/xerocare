@@ -17,6 +17,7 @@ export interface AddProductDTO {
   wholesale_price?: number;
   imageUrl?: string | null;
   lot_id?: string;
+  description?: string;
 }
 
 export interface BulkProductRow {
@@ -37,4 +38,5 @@ export interface BulkProductRow {
   imageUrl?: string | null;
   lot_id?: string;
   model_id?: string;
+  description?: string;
 }

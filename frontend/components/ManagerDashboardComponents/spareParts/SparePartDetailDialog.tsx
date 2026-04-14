@@ -177,6 +177,20 @@ export default function SparePartDetailDialog({
                 )}
               </div>
             </div>
+
+            {/* Description Section */}
+            {part.description && (
+              <div className="space-y-3 col-span-2">
+                <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">
+                  Product Description
+                </h3>
+                <div className="bg-slate-50/50 rounded-xl p-4 border border-slate-100">
+                  <p className="text-sm text-slate-600 leading-relaxed whitespace-pre-wrap">
+                    {part.description}
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 

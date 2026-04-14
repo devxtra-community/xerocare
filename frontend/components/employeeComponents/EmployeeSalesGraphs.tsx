@@ -195,9 +195,10 @@ export default function EmployeeSalesGraphs({
           );
         }
 
-        // Only include finance-approved sales (PROFORMA = finance approved, FINAL = completed)
+        const saleTypes = ['SALE', 'PRODUCT_SALE', 'SPAREPART_SALE'];
         const salesInvoices = invoices.filter(
-          (inv) => inv.saleType === 'SALE' && (inv.type === 'PROFORMA' || inv.type === 'FINAL'),
+          (inv) =>
+            saleTypes.includes(inv.saleType) && (inv.type === 'PROFORMA' || inv.type === 'FINAL'),
         );
 
         // Initialize Monthly Data
