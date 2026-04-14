@@ -8,6 +8,7 @@ import { AppError } from '../errors/appError';
 import { BillingCalculationService } from './billingCalculationService';
 import { UsageRepository } from '../repositories/usageRepository';
 import { SecurityDepositMode, Invoice } from '../entities/invoiceEntity';
+import { ReturnCreditRepository } from '../repositories/returnCreditRepository';
 import { logger } from '../config/logger';
 import { RentType } from '../entities/enums/rentType';
 import { RentPeriod } from '../entities/enums/rentPeriod';
@@ -44,6 +45,7 @@ export class BillingService {
   private usageRepo = new UsageRepository();
   private calculator = new BillingCalculationService();
   private usageService = new UsageService();
+  private returnCreditRepo = new ReturnCreditRepository();
 
   // ... existing methods ...
 
@@ -1808,5 +1810,67 @@ export class BillingService {
     } finally {
       await queryRunner.release();
     }
+  }
+
+  /**
+   * Processes a return credit for an invoice item.
+   */
+  async processReturn(
+    invoiceId: string,
+    payload: {
+      itemId: string;
+      itemType: 'PRODUCT' | 'SPARE_PART';
+      amount: number;
+      note: string;
+      createdBy: string;
+    },
+  ) {
+    const invoice = await this.invoiceRepo.findById(invoiceId);
+    if (!invoice) throw new AppError('Invoice not found', 404);
+
+    // 1. Create Return Credit record
+    const returnCredit = await this.returnCreditRepo.createReturnCredit({
+      invoiceId,
+      branchId: invoice.branchId,
+      amount: payload.amount,
+      note: payload.note,
+      returnedItemId: payload.itemId,
+      returnedItemType: payload.itemType,
+      createdBy: payload.createdBy,
+    });
+
+    // 2. Call Inventory Service to update status/quantity
+    try {
+      const inventoryServiceUrl = process.env.INVENTORY_SERVICE_URL || 'http://localhost:3003';
+      const { sign } = await import('jsonwebtoken');
+      const token = sign(
+        { userId: 'billing_service', role: 'ADMIN' },
+        process.env.ACCESS_SECRET as string,
+        { expiresIn: '5m' },
+      );
+
+      const response = await fetch(`${inventoryServiceUrl}/inventory/returns/process`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          itemType: payload.itemType,
+          itemId: payload.itemId,
+          quantity: 1, // Currently assumed 1 for sales returns per item
+        }),
+      });
+
+      if (!response.ok) {
+        const errData = await response.json();
+        logger.error('Inventory service return failed', errData);
+        // We still keep the credit record as it represents the financial return
+      }
+    } catch (err) {
+      logger.error('Failed to connect to inventory service for return', err);
+    }
+
+    return returnCredit;
   }
 }

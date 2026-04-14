@@ -30,6 +30,7 @@ import {
   sendWhatsappNotification,
   uploadContractConfirmation,
   replaceDeviceAllocation,
+  processReturn,
 } from '../controllers/invoiceController';
 import { authMiddleware } from '../middleware/authMiddleware';
 import { requireRole } from '../middleware/roleMiddleware';
@@ -248,6 +249,15 @@ router.post(
   '/settlements/next-month',
   requireRole(UserRole.ADMIN, UserRole.FINANCE),
   createNextMonthInvoice,
+);
+
+/**
+ * Accept a return credit for an invoice item.
+ */
+router.post(
+  '/:id/returns',
+  requireRole(UserRole.ADMIN, UserRole.FINANCE, UserRole.MANAGER, UserRole.EMPLOYEE),
+  processReturn,
 );
 
 /**

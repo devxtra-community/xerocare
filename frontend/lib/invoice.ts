@@ -805,3 +805,19 @@ export const downloadPremiumInvoice = async (id: string): Promise<void> => {
   link.click();
   link.remove();
 };
+
+/**
+ * Processes a return credit for an item in an invoice.
+ */
+export const processReturn = async (
+  invoiceId: string,
+  payload: {
+    itemId: string;
+    itemType: 'PRODUCT' | 'SPARE_PART';
+    amount: number;
+    note: string;
+  },
+): Promise<unknown> => {
+  const response = await api.post(`/b/invoices/${invoiceId}/returns`, payload);
+  return response.data.data;
+};

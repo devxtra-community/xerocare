@@ -37,6 +37,7 @@ import {
   uploadContractConfirmation,
   replaceDeviceAllocation,
   getContractAllocations,
+  processReturn,
 } from '../controllers/invoiceController';
 import { uploadMeterImage } from '../middlewares/uploadMiddleware';
 import { authMiddleware } from '../middlewares/authMiddleware';
@@ -262,6 +263,21 @@ router.post(
   authMiddleware,
   requireRole(EmployeeRole.ADMIN, EmployeeRole.FINANCE),
   sendConsolidatedInvoice,
+);
+
+/**
+ * Accept a return credit for an invoice item.
+ */
+router.post(
+  '/:id/returns',
+  authMiddleware,
+  requireRole(
+    EmployeeRole.ADMIN,
+    EmployeeRole.MANAGER,
+    EmployeeRole.FINANCE,
+    EmployeeRole.EMPLOYEE,
+  ),
+  processReturn,
 );
 
 // --- 6. Branch and History ---

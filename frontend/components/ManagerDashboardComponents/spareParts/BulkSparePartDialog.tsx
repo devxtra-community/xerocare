@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { X, Upload, Save, Trash2, Plus, FileSpreadsheet, Loader2 } from 'lucide-react';
 import {
@@ -163,6 +163,24 @@ export default function BulkSparePartDialog({
     }
   }, [open, initialLotId, initialItemId]);
 
+  const createEmptyRow = useCallback(
+    (): Partial<BulkSparePartRow> => ({
+      sku: '',
+      part_name: '',
+      brand: '',
+      model_ids: [],
+      purchase_price: 0,
+      base_price: 0,
+      wholesale_price: 0,
+      quantity: 0,
+      vendor_id: '',
+      warehouse_id: '',
+      lot_id: initialLotId || undefined,
+      mpn: '',
+    }),
+    [initialLotId],
+  );
+
   // We need to handle the pre-filling after lots and selectedLotId are set
   useEffect(() => {
     if (open && initialLotId && lots.length > 0) {
@@ -197,24 +215,7 @@ export default function BulkSparePartDialog({
         setRows(newRows);
       }
     }
-  }, [lots, initialLotId, initialItemId, open]);
-
-  // Removed global handleLotSelect to support per-row selection
-
-  const createEmptyRow = (): Partial<BulkSparePartRow> => ({
-    sku: '',
-    part_name: '',
-    brand: '',
-    model_ids: [],
-    purchase_price: 0,
-    base_price: 0,
-    wholesale_price: 0,
-    quantity: 0,
-    vendor_id: '',
-    warehouse_id: '',
-    lot_id: initialLotId || undefined,
-    mpn: '',
-  });
+  }, [lots, initialLotId, initialItemId, open, createEmptyRow]);
 
   const findIdByName = (
     name: string,
