@@ -362,6 +362,13 @@ export class BillingService {
       colorSlabRanges?: Array<{ from: number; to: number; rate: number }>;
       comboSlabRanges?: Array<{ from: number; to: number; rate: number }>;
     }[];
+
+    // Security Deposit Fields
+    securityDepositAmount?: number;
+    securityDepositMode?: SecurityDepositMode;
+    securityDepositReference?: string;
+    securityDepositDate?: string;
+    securityDepositBank?: string;
   }) {
     // 1. Validation Logic
     if (payload.rentType === RentType.FIXED_LIMIT || payload.rentType === RentType.FIXED_COMBO) {
@@ -501,6 +508,17 @@ export class BillingService {
       monthlyEmiAmount: payload.monthlyEmiAmount,
       monthlyLeaseAmount: payload.monthlyLeaseAmount,
 
+      // Security Deposit (NEW)
+      securityDepositAmount: payload.securityDepositAmount
+        ? Number(payload.securityDepositAmount)
+        : undefined,
+      securityDepositMode: payload.securityDepositMode,
+      securityDepositReference: payload.securityDepositReference,
+      securityDepositDate: payload.securityDepositDate
+        ? new Date(payload.securityDepositDate)
+        : undefined,
+      securityDepositBank: payload.securityDepositBank,
+
       totalAmount: 0, // Placeholder
       items: invoiceItems,
     });
@@ -583,6 +601,13 @@ export class BillingService {
         productId?: string;
         modelId?: string;
       }[];
+
+      // Security Deposit Fields
+      securityDepositAmount?: number;
+      securityDepositMode?: SecurityDepositMode;
+      securityDepositReference?: string;
+      securityDepositDate?: string;
+      securityDepositBank?: string;
     },
   ) {
     const invoice = await this.invoiceRepo.findById(id);
@@ -611,6 +636,25 @@ export class BillingService {
     if (payload.effectiveTo) invoice.effectiveTo = new Date(payload.effectiveTo);
     if (payload.billingCycleInDays !== undefined) {
       invoice.billingCycleInDays = payload.billingCycleInDays;
+    }
+
+    // Security Deposit Update
+    if (payload.securityDepositAmount !== undefined) {
+      invoice.securityDepositAmount = payload.securityDepositAmount;
+    }
+    if (payload.securityDepositMode !== undefined) {
+      invoice.securityDepositMode = payload.securityDepositMode;
+    }
+    if (payload.securityDepositReference !== undefined) {
+      invoice.securityDepositReference = payload.securityDepositReference;
+    }
+    if (payload.securityDepositDate !== undefined) {
+      invoice.securityDepositDate = payload.securityDepositDate
+        ? new Date(payload.securityDepositDate)
+        : undefined;
+    }
+    if (payload.securityDepositBank !== undefined) {
+      invoice.securityDepositBank = payload.securityDepositBank;
     }
 
     // Validation update: If switching to CUSTOM, check validity

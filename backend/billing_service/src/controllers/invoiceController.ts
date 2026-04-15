@@ -97,6 +97,13 @@ export const createQuotation = async (req: Request, res: Response, next: NextFun
       monthlyEmiAmount: payload.monthlyEmiAmount,
       totalLeaseAmount: payload.totalLeaseAmount,
       monthlyLeaseAmount: payload.monthlyLeaseAmount,
+
+      // Security Deposit
+      securityDepositAmount: req.body.securityDepositAmount,
+      securityDepositMode: req.body.securityDepositMode,
+      securityDepositReference: req.body.securityDepositReference,
+      securityDepositDate: req.body.securityDepositDate,
+      securityDepositBank: req.body.securityDepositBank,
     });
 
     return res.status(201).json({
@@ -146,6 +153,13 @@ export const updateQuotation = async (req: Request, res: Response, next: NextFun
       monthlyEmiAmount: req.body.monthlyEmiAmount,
       totalLeaseAmount: req.body.totalLeaseAmount,
       monthlyLeaseAmount: req.body.monthlyLeaseAmount,
+
+      // Security Deposit
+      securityDepositAmount: req.body.securityDepositAmount,
+      securityDepositMode: req.body.securityDepositMode,
+      securityDepositReference: req.body.securityDepositReference,
+      securityDepositDate: req.body.securityDepositDate,
+      securityDepositBank: req.body.securityDepositBank,
     });
 
     return res.status(200).json({

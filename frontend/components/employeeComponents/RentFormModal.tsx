@@ -484,7 +484,31 @@ export default function RentFormModal({
       }
     });
 
-    if (models.length === 0) newItems = [];
+    if (models.length === 0) {
+      // If no models, provide generic rules based on type
+      if (isCombo) {
+        newItems = [
+          {
+            description: 'Combined Usage Rules (General)',
+            combinedIncludedLimit: '',
+            combinedExcessRate: '',
+          },
+        ];
+      } else {
+        newItems = [
+          {
+            description: 'Black & White Usage Rules (General)',
+            bwIncludedLimit: '',
+            bwExcessRate: '',
+          },
+          {
+            description: 'Color Usage Rules (General)',
+            colorIncludedLimit: '',
+            colorExcessRate: '',
+          },
+        ];
+      }
+    }
 
     setForm((prev) => ({
       ...prev,
@@ -835,7 +859,188 @@ export default function RentFormModal({
         </DialogHeader>
 
         <div className="p-6 space-y-8 overflow-y-auto grow scrollbar-hide bg-card/50">
-          {/* Section 1: Contract Terms */}
+          {/* Section 1: Pricing Model (Moved to Top for Context) */}
+          <section className="space-y-4">
+            <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-indigo-400" /> Pricing Model
+            </h4>
+
+            <div className="p-5 rounded-xl bg-card border border-indigo-100 shadow-sm space-y-6 bg-indigo-50/20">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <label className="text-[11px] font-bold text-indigo-600/60 uppercase">
+                    Model Type
+                  </label>
+                  {form.saleType === 'LEASE' ? (
+                    <select
+                      className="w-full h-10 rounded-lg border border-indigo-100 bg-card px-3 text-sm font-semibold text-indigo-700 focus:ring-2 focus:ring-indigo-100 outline-none"
+                      value={form.leaseType}
+                      onChange={(e) => {
+                        const newLeaseType = e.target.value as 'EMI' | 'FSM';
+                        setForm({ ...form, leaseType: newLeaseType });
+                        if (newLeaseType === 'FSM') {
+                          updateUsageRules(selectedModels, form.rentType);
+                        }
+                      }}
+                    >
+                      <option value="EMI">EMI Based Lease</option>
+                      <option value="FSM">Lease + Full Service Maintenance (FSM)</option>
+                    </select>
+                  ) : (
+                    <div className="hidden" />
+                  )}
+
+                  {(form.saleType === 'RENT' ||
+                    (form.saleType === 'LEASE' && form.leaseType === 'FSM')) && (
+                    <select
+                      className="w-full h-10 rounded-lg border border-indigo-100 bg-card px-3 text-sm font-semibold text-indigo-700 focus:ring-2 focus:ring-indigo-100 outline-none"
+                      value={form.rentType}
+                      onChange={(e) => handleRentTypeChange(e.target.value)}
+                    >
+                      <option value="FIXED_LIMIT">Fixed Rent + Individual Limit</option>
+                      <option value="FIXED_COMBO">Fixed Rent + Combined Limit</option>
+                      <option value="FIXED_FLAT">Fixed Flat Rent (No Limits)</option>
+                      <option value="CPC">CPC (Individual)</option>
+                      <option value="CPC_COMBO">CPC (Combined)</option>
+                    </select>
+                  )}
+                </div>
+              </div>
+
+              {form.saleType === 'LEASE' && (
+                <div className="grid grid-cols-2 gap-6 pt-4 border-t border-indigo-100/50">
+                  {form.leaseType === 'EMI' ? (
+                    <>
+                      <div className="space-y-2">
+                        <label className="text-[11px] font-bold text-muted-foreground uppercase">
+                          Total Lease Amount
+                        </label>
+                        <Input
+                          type="number"
+                          value={form.totalLeaseAmount}
+                          onChange={(e) =>
+                            setForm({
+                              ...form,
+                              totalLeaseAmount: handleNumberInput(e.target.value),
+                            })
+                          }
+                          className="font-bold text-slate-800"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[11px] font-bold text-muted-foreground uppercase flex items-center gap-1">
+                          Monthly EMI
+                          <span className="text-[9px] text-green-600 font-bold bg-green-50 px-1.5 rounded-full">
+                            AUTO
+                          </span>
+                        </label>
+                        <Input
+                          type="number"
+                          value={form.monthlyEmiAmount}
+                          readOnly
+                          className="font-bold text-slate-800 bg-slate-50 cursor-not-allowed"
+                          placeholder={
+                            form.totalLeaseAmount && form.leaseTenureMonths
+                              ? 'Calculating...'
+                              : 'Enter total & tenure first'
+                          }
+                        />
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="space-y-2">
+                        <label className="text-[11px] font-bold text-muted-foreground uppercase">
+                          Total Lease Amount
+                        </label>
+                        <Input
+                          type="number"
+                          value={form.totalLeaseAmount}
+                          onChange={(e) =>
+                            setForm({
+                              ...form,
+                              totalLeaseAmount: handleNumberInput(e.target.value),
+                            })
+                          }
+                          className="font-bold text-slate-800"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[11px] font-bold text-muted-foreground uppercase flex items-center gap-1">
+                          Monthly Lease Amount
+                          <span className="text-[9px] text-green-600 font-bold bg-green-50 px-1.5 rounded-full">
+                            AUTO
+                          </span>
+                        </label>
+                        <Input
+                          type="number"
+                          value={form.monthlyLeaseAmount}
+                          readOnly
+                          className="font-bold text-slate-800 bg-slate-50 cursor-not-allowed"
+                          placeholder={
+                            form.totalLeaseAmount && form.leaseTenureMonths
+                              ? 'Calculating...'
+                              : 'Enter total & tenure first'
+                          }
+                        />
+                      </div>
+                    </>
+                  )}
+                  <div className="space-y-2">
+                    <label className="text-[11px] font-bold text-muted-foreground uppercase">
+                      Advance Amount
+                    </label>
+                    <Input
+                      type="number"
+                      value={form.advanceAmount}
+                      onChange={(e) =>
+                        setForm({
+                          ...form,
+                          advanceAmount: handleNumberInput(e.target.value),
+                        })
+                      }
+                      className="font-bold text-slate-800"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {form.saleType === 'RENT' && isFixed && (
+                <div className="grid grid-cols-2 gap-6 pt-4 border-t border-indigo-100/50">
+                  <div className="space-y-2">
+                    <label className="text-[11px] font-bold text-muted-foreground uppercase">
+                      Monthly Rent (QAR)
+                    </label>
+                    <Input
+                      type="number"
+                      placeholder="0"
+                      value={form.monthlyRent}
+                      onChange={(e) =>
+                        setForm({ ...form, monthlyRent: handleNumberInput(e.target.value) })
+                      }
+                      className="font-bold text-slate-800 border-border focus:border-indigo-400"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[11px] font-bold text-muted-foreground uppercase">
+                      Advance (QAR)
+                    </label>
+                    <Input
+                      type="number"
+                      placeholder="0"
+                      value={form.advanceAmount}
+                      onChange={(e) =>
+                        setForm({ ...form, advanceAmount: handleNumberInput(e.target.value) })
+                      }
+                      className="font-bold text-slate-800"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+          </section>
+
+          {/* Section 2: Contract Terms */}
           <section className="space-y-4">
             <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-blue-400" /> Contract Terms
@@ -1051,198 +1256,6 @@ export default function RentFormModal({
                   )}
                 </div>
               </div>
-            </div>
-          </section>
-
-          {/* Section 3: Pricing Model */}
-          <section className="space-y-4">
-            <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-indigo-400" /> Pricing Model
-            </h4>
-
-            <div className="p-5 rounded-xl bg-card border border-slate-100 shadow-sm space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <label className="text-[11px] font-bold text-muted-foreground uppercase">
-                    Model Type
-                  </label>
-                  {form.saleType === 'LEASE' ? (
-                    <select
-                      className="w-full h-10 rounded-lg border border-border bg-card px-3 text-sm font-semibold text-indigo-600 focus:ring-2 focus:ring-indigo-100 outline-none"
-                      value={form.leaseType}
-                      onChange={(e) => {
-                        const newLeaseType = e.target.value as 'EMI' | 'FSM';
-                        setForm({ ...form, leaseType: newLeaseType });
-                        // If switching to FSM, ensure rules are populated based on current Rent Type
-                        if (newLeaseType === 'FSM') {
-                          // Allow state update to settle? No, use current products
-                          // But we need to pass the *new* lease type context or just force update
-                          console.log('Switching to FSM, updating rules...');
-                          updateUsageRules(selectedModels, form.rentType);
-                        }
-                      }}
-                    >
-                      <option value="EMI">EMI Based Lease</option>
-                      <option value="FSM">Lease + Full Service Maintenance (FSM)</option>
-                    </select>
-                  ) : (
-                    <div className="hidden" />
-                  )}
-
-                  {(form.saleType === 'RENT' ||
-                    (form.saleType === 'LEASE' && form.leaseType === 'FSM')) && (
-                    <select
-                      className="w-full h-10 rounded-lg border border-border bg-card px-3 text-sm font-semibold text-indigo-600 focus:ring-2 focus:ring-indigo-100 outline-none"
-                      value={form.rentType}
-                      onChange={(e) => handleRentTypeChange(e.target.value)}
-                    >
-                      <option value="FIXED_LIMIT">Fixed Rent + Individual Limit</option>
-                      {selectedModels.length > 0 && (
-                        // selectedModels.every((p) => p.print_colour === 'BOTH') && (
-                        <option value="FIXED_COMBO">Fixed Rent + Combined Limit</option>
-                      )}
-                      <option value="FIXED_FLAT">Fixed Flat Rent (No Limits)</option>
-                      <option value="CPC">CPC (Individual)</option>
-                      {selectedModels.length > 0 && (
-                        // selectedModels.every((p) => p.print_colour === 'BOTH') && (
-                        <option value="CPC_COMBO">CPC (Combined)</option>
-                      )}
-                    </select>
-                  )}
-                </div>
-              </div>
-
-              {form.saleType === 'LEASE' && (
-                <div className="grid grid-cols-2 gap-6 pt-4 border-t border-slate-50">
-                  {form.leaseType === 'EMI' ? (
-                    <>
-                      <div className="space-y-2">
-                        <label className="text-[11px] font-bold text-muted-foreground uppercase">
-                          Total Lease Amount
-                        </label>
-                        <Input
-                          type="number"
-                          value={form.totalLeaseAmount}
-                          onChange={(e) =>
-                            setForm({
-                              ...form,
-                              totalLeaseAmount: handleNumberInput(e.target.value),
-                            })
-                          }
-                          className="font-bold text-slate-800"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-[11px] font-bold text-muted-foreground uppercase flex items-center gap-1">
-                          Monthly EMI
-                          <span className="text-[9px] text-green-600 font-bold bg-green-50 px-1.5 rounded-full">
-                            AUTO
-                          </span>
-                        </label>
-                        <Input
-                          type="number"
-                          value={form.monthlyEmiAmount}
-                          readOnly
-                          className="font-bold text-slate-800 bg-slate-50 cursor-not-allowed"
-                          placeholder={
-                            form.totalLeaseAmount && form.leaseTenureMonths
-                              ? 'Calculating...'
-                              : 'Enter total & tenure first'
-                          }
-                        />
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      <div className="space-y-2">
-                        <label className="text-[11px] font-bold text-muted-foreground uppercase">
-                          Total Lease Amount
-                        </label>
-                        <Input
-                          type="number"
-                          value={form.totalLeaseAmount}
-                          onChange={(e) =>
-                            setForm({
-                              ...form,
-                              totalLeaseAmount: handleNumberInput(e.target.value),
-                            })
-                          }
-                          className="font-bold text-slate-800"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-[11px] font-bold text-muted-foreground uppercase flex items-center gap-1">
-                          Monthly Lease Amount
-                          <span className="text-[9px] text-green-600 font-bold bg-green-50 px-1.5 rounded-full">
-                            AUTO
-                          </span>
-                        </label>
-                        <Input
-                          type="number"
-                          value={form.monthlyLeaseAmount}
-                          readOnly
-                          className="font-bold text-slate-800 bg-slate-50 cursor-not-allowed"
-                          placeholder={
-                            form.totalLeaseAmount && form.leaseTenureMonths
-                              ? 'Calculating...'
-                              : 'Enter total & tenure first'
-                          }
-                        />
-                      </div>
-                    </>
-                  )}
-                  {/* Advance Amount for Lease */}
-                  <div className="space-y-2">
-                    <label className="text-[11px] font-bold text-muted-foreground uppercase">
-                      Advance Amount
-                    </label>
-                    <Input
-                      type="number"
-                      value={form.advanceAmount}
-                      onChange={(e) =>
-                        setForm({
-                          ...form,
-                          advanceAmount: handleNumberInput(e.target.value),
-                        })
-                      }
-                      className="font-bold text-slate-800"
-                    />
-                  </div>
-                </div>
-              )}
-
-              {form.saleType === 'RENT' && isFixed && (
-                <div className="grid grid-cols-2 gap-6 pt-4 border-t border-slate-50">
-                  <div className="space-y-2">
-                    <label className="text-[11px] font-bold text-muted-foreground uppercase">
-                      Monthly Rent (QAR)
-                    </label>
-                    <Input
-                      type="number"
-                      placeholder="0"
-                      value={form.monthlyRent}
-                      onChange={(e) =>
-                        setForm({ ...form, monthlyRent: handleNumberInput(e.target.value) })
-                      }
-                      className="font-bold text-slate-800 border-border focus:border-indigo-400"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-[11px] font-bold text-muted-foreground uppercase">
-                      Advance (QAR)
-                    </label>
-                    <Input
-                      type="number"
-                      placeholder="0"
-                      value={form.advanceAmount}
-                      onChange={(e) =>
-                        setForm({ ...form, advanceAmount: handleNumberInput(e.target.value) })
-                      }
-                      className="font-bold text-slate-800"
-                    />
-                  </div>
-                </div>
-              )}
             </div>
           </section>
 

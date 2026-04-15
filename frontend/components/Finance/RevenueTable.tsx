@@ -61,7 +61,10 @@ export default function RevenueTable() {
   // Move filteredRows and useEffect up before early return
   // Flatten invoices to rows (one row per item)
   const rows = invoices.flatMap((invoice) => {
-    if (!invoice.items || invoice.items.length === 0) {
+    // Filter out PRICING_RULE items because they are metadata/config, not separate revenue products
+    const productItems = (invoice.items || []).filter((item) => item.itemType !== 'PRICING_RULE');
+
+    if (productItems.length === 0) {
       return [
         {
           id: `${invoice.id}-no-items`,
@@ -77,7 +80,7 @@ export default function RevenueTable() {
         },
       ];
     }
-    return invoice.items.map((item, index) => ({
+    return productItems.map((item, index) => ({
       id: `${invoice.id}-${index}`,
       invoiceNumber: invoice.invoiceNumber,
       customerName: invoice.customerName,
@@ -91,8 +94,7 @@ export default function RevenueTable() {
       amount:
         Number(item.unitPrice) > 0
           ? Number(item.unitPrice) * (item.quantity || 1)
-          : (Number(invoice.displayAmount) || Number(invoice.totalAmount)) /
-            (invoice.items?.length || 1),
+          : (Number(invoice.displayAmount) || Number(invoice.totalAmount)) / productItems.length,
     }));
   });
 

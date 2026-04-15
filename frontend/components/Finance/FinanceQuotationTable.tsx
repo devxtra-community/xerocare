@@ -376,6 +376,7 @@ export default function FinanceQuotationTable({ saleType }: { saleType?: string 
           onClose={() => setViewQuotation(null)}
           onApprove={() => handleApprove(viewQuotation)}
           onReject={() => openReject(viewQuotation)}
+          showDistribution={true}
         />
       )}
 

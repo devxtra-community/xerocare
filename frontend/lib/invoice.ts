@@ -19,6 +19,7 @@ export interface InvoiceItem {
   // Legacy
   quantity?: number;
   unitPrice?: number;
+  discount?: number;
   productId?: string;
   modelId?: string; // Added for finance flow
   initialBwCount?: number;
@@ -223,6 +224,13 @@ export interface CreateInvoicePayload {
   startDate?: string;
   endDate?: string;
   billingCycleInDays?: number;
+
+  // Security Deposit (NEW)
+  securityDepositAmount?: number;
+  securityDepositMode?: 'CASH' | 'CHEQUE' | 'UPI' | 'BANK_TRANSFER';
+  securityDepositReference?: string;
+  securityDepositDate?: string;
+  securityDepositBank?: string;
 }
 
 /**

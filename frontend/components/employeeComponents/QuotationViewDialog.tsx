@@ -16,6 +16,7 @@ interface QuotationViewDialogProps {
   onSendToFinance?: (id: string) => Promise<void>;
   onApprove?: () => void;
   onReject?: () => void;
+  showDistribution?: boolean;
 }
 
 export function QuotationViewDialog({
@@ -24,6 +25,7 @@ export function QuotationViewDialog({
   onSendToFinance,
   onApprove,
   onReject,
+  showDistribution = false,
 }: QuotationViewDialogProps) {
   const [sending, setSending] = useState(false);
   const [isSendingCustomer, setIsSendingCustomer] = useState(false);
@@ -492,15 +494,33 @@ export function QuotationViewDialog({
                         <th className="text-center py-4 px-6 text-[12px] font-black uppercase tracking-widest border-r border-red-600/40">
                           Qty
                         </th>
-                        <th className="text-center py-4 px-6 text-[12px] font-black uppercase tracking-widest border-r border-red-600/40">
-                          Limit (B/W/Comb)
-                        </th>
-                        <th className="text-center py-4 px-6 text-[12px] font-black uppercase tracking-widest border-r border-red-600/40">
-                          Col Lmt
-                        </th>
-                        <th className="text-center py-4 pr-10 text-[12px] font-black uppercase tracking-widest">
-                          Exc Rate (B/C/Comb)
-                        </th>
+                        {quotation.rentType === 'FIXED_COMBO' ||
+                        quotation.rentType === 'CPC_COMBO' ? (
+                          <>
+                            <th className="text-center py-4 px-6 text-[12px] font-black uppercase tracking-widest border-r border-red-600/40">
+                              Combo Limit
+                            </th>
+                            <th className="text-center py-4 pr-10 text-[12px] font-black uppercase tracking-widest">
+                              Combo Rate
+                            </th>
+                          </>
+                        ) : quotation.rentType === 'FIXED_FLAT' ? (
+                          <th className="text-center py-4 pr-10 text-[12px] font-black uppercase tracking-widest">
+                            Billing
+                          </th>
+                        ) : (
+                          <>
+                            <th className="text-center py-4 px-6 text-[12px] font-black uppercase tracking-widest border-r border-red-600/40">
+                              B/W Limit
+                            </th>
+                            <th className="text-center py-4 px-6 text-[12px] font-black uppercase tracking-widest border-r border-red-600/40">
+                              Color Limit
+                            </th>
+                            <th className="text-center py-4 pr-10 text-[12px] font-black uppercase tracking-widest">
+                              Excess (B/C)
+                            </th>
+                          </>
+                        )}
                       </tr>
                     )}
                   </thead>
@@ -512,82 +532,173 @@ export function QuotationViewDialog({
                       const productName =
                         detail?.name || detail?.part_name || item.description || 'N/A';
                       const productDesc =
-                        detail?.description ||
-                        detail?.inventory?.[0]?.description ||
-                        (item.description && item.description !== productName
-                          ? item.description
-                          : 'Standard specification as per brand guidelines.');
+                        detail?.description || 'Standard specification as per brand guidelines.';
 
                       return (
-                        <tr
-                          key={idx}
-                          className="group hover:bg-red-50/40 transition-all duration-300"
-                        >
-                          <td className="py-3 px-4 border-r-2 border-red-50 align-top relative">
-                            <span className="text-[12px] font-black text-slate-800">{mpn}</span>
-                          </td>
-                          <td className="py-3 px-4 border-r-2 border-red-50 relative w-1/4">
-                            <div className="relative z-10 space-y-1">
-                              <p className="text-[13px] font-black text-slate-900 uppercase tracking-tight leading-snug">
-                                {productName}
-                              </p>
-                            </div>
-                          </td>
-                          <td className="py-3 px-4 border-r-2 border-red-50 align-top relative w-1/4">
-                            <div className="flex gap-4">
-                              {image && (
-                                <img
-                                  src={image}
-                                  alt="Product"
-                                  crossOrigin="anonymous"
-                                  onError={(e) => (e.currentTarget.style.display = 'none')}
-                                  className="w-[100px] h-[100px] object-contain mix-blend-multiply shrink-0 opacity-100"
-                                />
-                              )}
-                              <p className="text-[11px] text-slate-500 leading-relaxed font-bold opacity-90 uppercase mt-1">
-                                {productDesc}
-                              </p>
-                            </div>
-                          </td>
-                          <td className="py-3 px-3 text-center border-r-2 border-red-50 align-top font-black text-slate-900 text-sm">
-                            {item.quantity}
-                          </td>
-                          {isSale && (
-                            <>
-                              <td className="py-3 px-3 text-center border-r-2 border-red-50 align-top font-black text-slate-900 text-sm">
-                                {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                                {(item as any).discount ? `${(item as any).discount}%` : '0%'}
+                        <React.Fragment key={idx}>
+                          <tr className="group hover:bg-red-50/40 transition-all duration-300">
+                            <td className="py-3 px-4 border-r-2 border-red-50 align-top relative">
+                              <span className="text-[12px] font-black text-slate-800">{mpn}</span>
+                            </td>
+                            <td className="py-3 px-4 border-r-2 border-red-50 relative w-1/4">
+                              <div className="relative z-10 space-y-1">
+                                <p className="text-[13px] font-black text-slate-900 uppercase tracking-tight leading-snug">
+                                  {productName}
+                                </p>
+                              </div>
+                            </td>
+                            <td className="py-3 px-4 border-r-2 border-red-50 align-top relative w-1/4">
+                              <div className="flex gap-4">
+                                {image && (
+                                  <img
+                                    src={image}
+                                    alt="Product"
+                                    crossOrigin="anonymous"
+                                    className="w-[100px] h-[100px] object-contain mix-blend-multiply shrink-0 opacity-100"
+                                  />
+                                )}
+                                <p className="text-[11px] text-slate-500 leading-relaxed font-bold opacity-90 uppercase mt-1">
+                                  {productDesc}
+                                </p>
+                              </div>
+                            </td>
+                            <td className="py-3 px-3 text-center border-r-2 border-red-50 align-top font-black text-slate-900 text-sm">
+                              {item.quantity}
+                            </td>
+                            {isSale && (
+                              <>
+                                <td className="py-3 px-3 text-center border-r-2 border-red-50 align-top font-black text-slate-900 text-sm">
+                                  {item.discount ? `${item.discount}%` : '0%'}
+                                </td>
+                                <td className="py-3 px-4 text-right border-r-2 border-red-50 align-top font-black text-slate-800 text-sm">
+                                  {Number(item.unitPrice || 0).toLocaleString(undefined, {
+                                    minimumFractionDigits: 2,
+                                  })}
+                                </td>
+                                <td className="py-3 pr-10 text-right align-top font-black text-slate-900 text-sm whitespace-nowrap">
+                                  {((item.quantity || 0) * (item.unitPrice || 0)).toLocaleString()}
+                                </td>
+                              </>
+                            )}
+                            {(isRent || isLease) && (
+                              <>
+                                {quotation.rentType === 'FIXED_COMBO' ||
+                                quotation.rentType === 'CPC_COMBO' ? (
+                                  <>
+                                    <td className="py-3 px-3 text-center border-r-2 border-red-50 align-top font-black text-slate-900 text-sm">
+                                      {item.combinedIncludedLimit || 0}
+                                    </td>
+                                    <td className="py-3 pr-10 text-center align-top font-black text-slate-900 text-sm whitespace-nowrap">
+                                      {Number(item.combinedExcessRate || 0).toFixed(3)}
+                                    </td>
+                                  </>
+                                ) : quotation.rentType === 'FIXED_FLAT' ? (
+                                  <td className="py-3 pr-10 text-center align-top font-black text-slate-900 text-sm italic opacity-50">
+                                    Included
+                                  </td>
+                                ) : (
+                                  <>
+                                    <td className="py-3 px-3 text-center border-r-2 border-red-50 align-top font-black text-slate-900 text-sm">
+                                      {item.bwIncludedLimit || 0}
+                                    </td>
+                                    <td className="py-3 px-3 text-center border-r-2 border-red-50 align-top font-black text-slate-900 text-sm">
+                                      {item.colorIncludedLimit || 0}
+                                    </td>
+                                    <td className="py-3 pr-10 text-center align-top font-black text-slate-900 text-sm whitespace-nowrap">
+                                      {(Number(item.bwExcessRate) || 0).toFixed(3)} /{' '}
+                                      {(Number(item.colorExcessRate) || 0).toFixed(3)}
+                                    </td>
+                                  </>
+                                )}
+                              </>
+                            )}
+                          </tr>
+                          {item.bwSlabRanges?.length ||
+                          item.colorSlabRanges?.length ||
+                          item.comboSlabRanges?.length ? (
+                            <tr className="bg-red-50/10 border-b-2 border-red-50">
+                              <td colSpan={7} className="py-3 px-8">
+                                <div className="grid grid-cols-3 gap-6 bg-white p-4 rounded-xl border border-red-100 shadow-[inset_0_2px_10px_rgba(0,0,0,0.02)]">
+                                  {item.bwSlabRanges && item.bwSlabRanges.length > 0 && (
+                                    <div>
+                                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 border-b-2 border-red-50 pb-1">
+                                        Black & White Slabs
+                                      </p>
+                                      {item.bwSlabRanges.map(
+                                        (
+                                          slab: { from: number; to: number; rate: number },
+                                          sIdx: number,
+                                        ) => (
+                                          <div
+                                            key={sIdx}
+                                            className="flex justify-between text-[11px] font-bold text-slate-700 py-1"
+                                          >
+                                            <span>
+                                              {slab.from} - {slab.to || '∞'} copies
+                                            </span>
+                                            <span className="text-red-700">
+                                              {Number(slab.rate).toFixed(3)} QAR
+                                            </span>
+                                          </div>
+                                        ),
+                                      )}
+                                    </div>
+                                  )}
+                                  {item.colorSlabRanges && item.colorSlabRanges.length > 0 && (
+                                    <div>
+                                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 border-b-2 border-red-50 pb-1">
+                                        Color Slabs
+                                      </p>
+                                      {item.colorSlabRanges.map(
+                                        (
+                                          slab: { from: number; to: number; rate: number },
+                                          sIdx: number,
+                                        ) => (
+                                          <div
+                                            key={sIdx}
+                                            className="flex justify-between text-[11px] font-bold text-slate-700 py-1"
+                                          >
+                                            <span>
+                                              {slab.from} - {slab.to || '∞'} copies
+                                            </span>
+                                            <span className="text-red-700">
+                                              {Number(slab.rate).toFixed(3)} QAR
+                                            </span>
+                                          </div>
+                                        ),
+                                      )}
+                                    </div>
+                                  )}
+                                  {item.comboSlabRanges && item.comboSlabRanges.length > 0 && (
+                                    <div>
+                                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 border-b-2 border-red-50 pb-1">
+                                        Combined Slabs
+                                      </p>
+                                      {item.comboSlabRanges.map(
+                                        (
+                                          slab: { from: number; to: number; rate: number },
+                                          sIdx: number,
+                                        ) => (
+                                          <div
+                                            key={sIdx}
+                                            className="flex justify-between text-[11px] font-bold text-slate-700 py-1"
+                                          >
+                                            <span>
+                                              {slab.from} - {slab.to || '∞'} copies
+                                            </span>
+                                            <span className="text-red-700">
+                                              {Number(slab.rate).toFixed(3)} QAR
+                                            </span>
+                                          </div>
+                                        ),
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
                               </td>
-                              <td className="py-3 px-4 text-right border-r-2 border-red-50 align-top font-black text-slate-800 text-sm">
-                                {Number(item.unitPrice || 0).toLocaleString(undefined, {
-                                  minimumFractionDigits: 2,
-                                })}
-                              </td>
-                              <td className="py-3 pr-10 text-right align-top font-black text-slate-900 text-sm whitespace-nowrap">
-                                {((item.quantity || 0) * (item.unitPrice || 0)).toLocaleString()}
-                              </td>
-                            </>
-                          )}
-                          {(isRent || isLease) && (
-                            <>
-                              <td className="py-3 px-3 text-center border-r-2 border-red-50 align-top font-black text-slate-900 text-sm">
-                                {item.combinedIncludedLimit
-                                  ? `${item.combinedIncludedLimit}`
-                                  : item.bwIncludedLimit || 0}
-                              </td>
-                              <td className="py-3 px-3 text-center border-r-2 border-red-50 align-top font-black text-slate-900 text-sm">
-                                {item.combinedIncludedLimit
-                                  ? 'Combo'
-                                  : item.colorIncludedLimit || 0}
-                              </td>
-                              <td className="py-3 pr-10 text-center align-top font-black text-slate-900 text-sm whitespace-nowrap">
-                                {item.combinedExcessRate
-                                  ? `${Number(item.combinedExcessRate).toFixed(3)} (Combo)`
-                                  : `${(Number(item.bwExcessRate) || 0).toFixed(3)} / ${(Number(item.colorExcessRate) || 0).toFixed(3)}`}
-                              </td>
-                            </>
-                          )}
-                        </tr>
+                            </tr>
+                          ) : null}
+                        </React.Fragment>
                       );
                     })}
                     {/* Padding rows exactly like reference to fill the box */}
@@ -713,16 +824,16 @@ export function QuotationViewDialog({
 
               {isLease && (
                 <div className="flex justify-between items-start mt-0 overflow-hidden pl-12 pr-0">
-                  <div className="border-[3px] border-t-0 border-red-700 rounded-b-3xl px-6 py-3 bg-white flex flex-col shadow-[0_20px_50px_-12px_rgba(185,28,28,0.2)] min-w-[400px]">
+                  <div className="border-[3px] border-t-0 border-red-700 rounded-b-3xl px-6 py-3 bg-white flex flex-col shadow-[0_20px_50px_-12px_rgba(185,28,28,0.2)] min-w-[500px]">
                     <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest border-b-2 border-red-50 flex pb-1.5 mb-2">
                       Lease Contract Frame
                     </p>
-                    <div className="grid grid-cols-4 gap-6">
+                    <div className="grid grid-cols-6 gap-4">
                       <div>
                         <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
                           Type
                         </p>
-                        <p className="text-sm font-black text-slate-800 uppercase">
+                        <p className="text-[12px] font-black text-slate-800 uppercase leading-none mt-1">
                           {quotation.leaseType || 'EMI'}
                         </p>
                       </div>
@@ -730,7 +841,7 @@ export function QuotationViewDialog({
                         <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
                           Tenure
                         </p>
-                        <p className="text-sm font-black text-slate-800 uppercase">
+                        <p className="text-[12px] font-black text-slate-800 uppercase leading-none mt-1">
                           {quotation.leaseTenureMonths} Months
                         </p>
                       </div>
@@ -738,21 +849,44 @@ export function QuotationViewDialog({
                         <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
                           Advance
                         </p>
-                        <p className="text-sm font-black text-slate-800">
+                        <p className="text-[12px] font-black text-slate-800 leading-none mt-1">
                           QAR {(quotation.advanceAmount || 0).toLocaleString()}
                         </p>
                       </div>
                       <div>
                         <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
-                          Total Value
+                          Deposit
                         </p>
-                        <p className="text-sm font-black text-slate-800">
-                          QAR{' '}
-                          {(
-                            quotation.totalLeaseAmount ||
-                            quotation.totalAmount ||
-                            0
-                          ).toLocaleString()}
+                        <p className="text-[12px] font-black text-slate-800 leading-none mt-1">
+                          QAR {(quotation.securityDepositAmount || 0).toLocaleString()}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
+                          Start Date
+                        </p>
+                        <p className="text-[12px] font-black text-slate-800 leading-none mt-1">
+                          {quotation.effectiveFrom
+                            ? new Date(quotation.effectiveFrom).toLocaleDateString(undefined, {
+                                day: '2-digit',
+                                month: '2-digit',
+                                year: 'numeric',
+                              })
+                            : 'N/A'}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
+                          End Date
+                        </p>
+                        <p className="text-[12px] font-black text-slate-800 leading-none mt-1">
+                          {quotation.effectiveTo
+                            ? new Date(quotation.effectiveTo).toLocaleDateString(undefined, {
+                                day: '2-digit',
+                                month: '2-digit',
+                                year: 'numeric',
+                              })
+                            : 'N/A'}
                         </p>
                       </div>
                     </div>
@@ -861,40 +995,42 @@ export function QuotationViewDialog({
               Close
             </Button>
 
-            {/* Send PDF to Customer Actions - Visible in all views */}
-            <div className="flex gap-2 border-l border-slate-300 pl-4 ml-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handleSendCustomer('EMAIL')}
-                disabled={isSendingCustomer}
-                className="h-9 px-4 rounded-md font-black uppercase text-[11px] tracking-widest border-red-200 text-red-700 hover:bg-red-50 gap-2"
-              >
-                <Mail size={14} /> Gmail
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handleSendCustomer('WHATSAPP')}
-                disabled={isSendingCustomer}
-                className="h-9 px-4 rounded-md font-black uppercase text-[11px] tracking-widest border-green-200 text-emerald-700 hover:bg-green-50 gap-2"
-              >
-                <Phone size={14} /> WhatsApp
-              </Button>
-              <Button
-                size="sm"
-                onClick={() => handleSendCustomer('BOTH')}
-                disabled={isSendingCustomer}
-                className="h-9 px-6 rounded-md font-black uppercase text-[11px] tracking-widest bg-slate-800 hover:bg-slate-900 text-white gap-2"
-              >
-                {isSendingCustomer ? (
-                  <Loader2 size={14} className="animate-spin" />
-                ) : (
-                  <Share2 size={14} />
-                )}
-                Both
-              </Button>
-            </div>
+            {/* Send PDF to Customer Actions - Only visible if showDistribution is true */}
+            {showDistribution && (
+              <div className="flex gap-2 border-l border-slate-300 pl-4 ml-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleSendCustomer('EMAIL')}
+                  disabled={isSendingCustomer}
+                  className="h-9 px-4 rounded-md font-black uppercase text-[11px] tracking-widest border-red-200 text-red-700 hover:bg-red-50 gap-2"
+                >
+                  <Mail size={14} /> Gmail
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleSendCustomer('WHATSAPP')}
+                  disabled={isSendingCustomer}
+                  className="h-9 px-4 rounded-md font-black uppercase text-[11px] tracking-widest border-green-200 text-emerald-700 hover:bg-green-50 gap-2"
+                >
+                  <Phone size={14} /> WhatsApp
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={() => handleSendCustomer('BOTH')}
+                  disabled={isSendingCustomer}
+                  className="h-9 px-6 rounded-md font-black uppercase text-[11px] tracking-widest bg-slate-800 hover:bg-slate-900 text-white gap-2"
+                >
+                  {isSendingCustomer ? (
+                    <Loader2 size={14} className="animate-spin" />
+                  ) : (
+                    <Share2 size={14} />
+                  )}
+                  Both
+                </Button>
+              </div>
+            )}
 
             {onApprove && onReject && (
               <div className="flex gap-3 border-l border-slate-300 pl-4 ml-2">
