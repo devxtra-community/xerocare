@@ -678,7 +678,7 @@ export default function LotDetailsDialog({ lot, onClose, onSuccess }: LotDetails
                   <Button
                     variant="outline"
                     size="sm"
-                    className="h-7 text-[10px] gap-1.5 border-blue-200 text-blue-700 hover:bg-blue-50"
+                    className="h-7 text-[10px] gap-1.5 border-blue-200 text-blue-700"
                     onClick={() => handleAddToInventory(undefined, LotItemType.MODEL)}
                   >
                     <Plus size={12} /> Add Products to Inventory

@@ -1,5 +1,6 @@
 import { InvoiceRepository } from '../repositories/invoiceRepository';
 import { UsageRepository } from '../repositories/usageRepository';
+import { ReturnCreditRepository } from '../repositories/returnCreditRepository';
 import { InvoiceType } from '../entities/enums/invoiceType';
 import { ContractStatus } from '../entities/enums/contractStatus';
 import { AppError } from '../errors/appError';
@@ -8,6 +9,7 @@ import { logger } from '../config/logger';
 export class BillingReportService {
   private invoiceRepo = new InvoiceRepository();
   private usageRepo = new UsageRepository();
+  private returnCreditRepo = new ReturnCreditRepository();
 
   /**
    * Calculates dashboard statistics (total sales, count, etc.).
@@ -74,7 +76,20 @@ export class BillingReportService {
    * Retrieves total sales figures for a branch.
    */
   async getBranchSalesTotals(branchId: string, year?: number) {
-    return await this.invoiceRepo.getBranchSalesTotals(branchId, year);
+    const sales = await this.invoiceRepo.getBranchSalesTotals(branchId, year);
+    const returns = await this.returnCreditRepo.getReturnTotalsByBranch(branchId, year);
+
+    if (returns.totalReturns > 0) {
+      sales.totalSales -= returns.totalReturns;
+      const saleStat = sales.salesByType.find((s) => s.saleType === 'SALE');
+      if (saleStat) {
+        saleStat.total -= returns.totalReturns;
+      } else {
+        sales.salesByType.push({ saleType: 'SALE', total: -returns.totalReturns });
+      }
+    }
+
+    return sales;
   }
 
   /**
@@ -132,7 +147,20 @@ export class BillingReportService {
    * Retrieves global sales total figures.
    */
   async getGlobalSalesTotals(year?: number) {
-    return await this.invoiceRepo.getGlobalSalesTotals(year);
+    const sales = await this.invoiceRepo.getGlobalSalesTotals(year);
+    const returns = await this.returnCreditRepo.getGlobalReturnTotals(year);
+
+    if (returns.totalReturns > 0) {
+      sales.totalSales -= returns.totalReturns;
+      const saleStat = sales.salesByType.find((s) => s.saleType === 'SALE');
+      if (saleStat) {
+        saleStat.total -= returns.totalReturns;
+      } else {
+        sales.salesByType.push({ saleType: 'SALE', total: -returns.totalReturns });
+      }
+    }
+
+    return sales;
   }
 
   /**
@@ -590,6 +618,23 @@ export class BillingReportService {
         existing.income = (existing.income || 0) + (item.income || 0);
         existing.count = (existing.count || 0) + (item.count || 0);
         existing.source = 'All';
+      }
+    });
+
+    const returnData = await this.returnCreditRepo.getMonthlyReturns(filter);
+    returnData.forEach((item: { month: string; totalAmount: number }) => {
+      if (invoiceByMonth.has(item.month)) {
+        const existing = invoiceByMonth.get(item.month);
+        existing.income = (existing.income || 0) - (item.totalAmount || 0);
+        existing.grossIncome = (existing.grossIncome || 0) - (item.totalAmount || 0);
+      } else {
+        invoiceByMonth.set(item.month, {
+          month: item.month,
+          income: -item.totalAmount,
+          grossIncome: -item.totalAmount,
+          count: 0,
+          source: 'All',
+        });
       }
     });
 

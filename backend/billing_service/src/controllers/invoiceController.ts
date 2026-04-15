@@ -911,3 +911,37 @@ export const getContractAllocations = async (req: Request, res: Response, next: 
     next(error);
   }
 };
+
+/**
+ * Accept a return credit for an invoice item.
+ */
+export const processReturn = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const invoiceId = req.params.id as string;
+    const { itemId, itemType, amount, note } = req.body;
+
+    if (!invoiceId || !itemId || !itemType || amount === undefined) {
+      throw new AppError('invoiceId, itemId, itemType, and amount are required', 400);
+    }
+
+    if (!req.user || !req.user.userId) {
+      throw new AppError('User context missing', 401);
+    }
+
+    const result = await billingService.processReturn(invoiceId, {
+      itemId,
+      itemType,
+      amount: Number(amount),
+      note: note || '',
+      createdBy: req.user.userId,
+    });
+
+    return res.status(201).json({
+      success: true,
+      data: result,
+      message: 'Return processed successfully and earning reduced',
+    });
+  } catch (error) {
+    next(error);
+  }
+};

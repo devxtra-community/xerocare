@@ -9,6 +9,7 @@ import {
   Truck,
   Boxes,
   FileText,
+  RotateCcw,
   ChevronDown,
   ChevronRight,
 } from 'lucide-react';
@@ -41,7 +42,18 @@ const menuItems = [
   {
     title: 'Sales',
     icon: ShoppingCart,
-    href: '/admin/sales',
+    subItems: [
+      {
+        title: 'Overview',
+        icon: ShoppingCart,
+        href: '/admin/sales',
+      },
+      {
+        title: 'Returns',
+        icon: RotateCcw,
+        href: '/admin/sales/returns',
+      },
+    ],
   },
   {
     title: 'Branch',
@@ -83,17 +95,17 @@ const menuItems = [
         icon: Wallet,
         href: '/admin/purchases',
       },
+      {
+        title: 'Lots',
+        icon: Boxes,
+        href: '/admin/lots',
+      },
     ],
   },
   {
     title: 'Inventory',
     icon: Boxes,
     href: '/admin/inventory',
-  },
-  {
-    title: 'Lots',
-    icon: Boxes,
-    href: '/admin/lots',
   },
 ];
 
@@ -110,12 +122,15 @@ export default function AppSidebar() {
   useEffect(() => {
     menuItems.forEach((item) => {
       if (item.subItems?.some((sub) => pathname === sub.href)) {
-        if (!openGroups.includes(item.title)) {
-          setOpenGroups((prev) => [...prev, item.title]);
-        }
+        setOpenGroups((prev) => {
+          if (!prev.includes(item.title)) {
+            return [...prev, item.title];
+          }
+          return prev;
+        });
       }
     });
-  }, [pathname, openGroups]);
+  }, [pathname]);
 
   const toggleGroup = (title: string) => {
     setOpenGroups((prev: string[]) =>
@@ -170,12 +185,10 @@ export default function AppSidebar() {
                           disabled={item.disabled}
                           className={`
                             py-2.5 rounded-md w-full justify-between
-                            !text-sidebar-accent-foreground
-                            [&_svg]:!text-sidebar-accent-foreground
+                            !text-white hover:bg-transparent
+                            [&_svg]:!text-white
                             ${
-                              item.subItems?.some((sub) => pathname === sub.href)
-                                ? 'bg-card/5 font-bold'
-                                : 'hover:bg-card/10'
+                              item.subItems?.some((sub) => pathname === sub.href) ? 'font-bold' : ''
                             }
                           `}
                         >

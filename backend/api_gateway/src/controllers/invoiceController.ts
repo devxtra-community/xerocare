@@ -591,3 +591,17 @@ export const replaceDeviceAllocation = async (req: Request, res: Response, next:
     next(error);
   }
 };
+
+/**
+ * Accept a return credit for an invoice item.
+ */
+export const processReturn = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = req.params.id as string;
+    const token = req.headers.authorization?.split(' ')[1] || '';
+    const result = await invoiceAggregationService.processReturn(id, req.body, token);
+    return res.status(201).json(result);
+  } catch (error) {
+    next(error);
+  }
+};

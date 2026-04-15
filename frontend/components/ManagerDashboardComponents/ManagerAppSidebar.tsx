@@ -13,6 +13,7 @@ import {
   Settings,
   Award,
   FileText,
+  RotateCcw,
   ChevronDown,
   ChevronRight,
 } from 'lucide-react';
@@ -66,7 +67,18 @@ const menuItems = [
   {
     title: 'Sales',
     icon: ShoppingCart,
-    href: '/manager/sales',
+    subItems: [
+      {
+        title: 'Overview',
+        icon: ShoppingCart,
+        href: '/manager/sales',
+      },
+      {
+        title: 'Returns',
+        icon: RotateCcw,
+        href: '/manager/sales/returns',
+      },
+    ],
   },
   {
     title: 'Purchases',
@@ -86,6 +98,11 @@ const menuItems = [
         title: 'Lot Amounts',
         icon: Wallet,
         href: '/manager/purchases',
+      },
+      {
+        title: 'Lots',
+        icon: Boxes,
+        href: '/manager/lots',
       },
     ],
   },
@@ -110,11 +127,6 @@ const menuItems = [
     icon: Package,
     href: '/manager/warehouse',
   },
-  {
-    title: 'Lots',
-    icon: Boxes,
-    href: '/manager/lots',
-  },
 ];
 
 /**
@@ -131,12 +143,15 @@ export default function ManagerSidebar() {
   useEffect(() => {
     menuItems.forEach((item) => {
       if (item.subItems?.some((sub) => pathname === sub.href)) {
-        if (!openGroups.includes(item.title)) {
-          setOpenGroups((prev) => [...prev, item.title]);
-        }
+        setOpenGroups((prev) => {
+          if (!prev.includes(item.title)) {
+            return [...prev, item.title];
+          }
+          return prev;
+        });
       }
     });
-  }, [pathname, openGroups]);
+  }, [pathname]);
 
   const toggleGroup = (title: string) => {
     setOpenGroups((prev: string[]) =>
@@ -188,11 +203,9 @@ export default function ManagerSidebar() {
                       <>
                         <SidebarMenuButton
                           onClick={() => toggleGroup(item.title)}
-                          className={`py-2.5 rounded-md w-full justify-between
+                          className={`py-2.5 rounded-md w-full justify-between !text-white hover:bg-transparent
                             ${
-                              item.subItems?.some((sub) => pathname === sub.href)
-                                ? 'text-card-foreground font-bold'
-                                : 'hover:bg-card/10 text-sidebar-accent-foreground'
+                              item.subItems?.some((sub) => pathname === sub.href) ? 'font-bold' : ''
                             }`}
                         >
                           <div className="flex items-center gap-3 px-3">
