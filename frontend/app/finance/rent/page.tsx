@@ -64,7 +64,7 @@ export default function RentPage() {
           <TabsContent value="quotations" className="space-y-4">
             <h3 className="text-xl font-bold text-slate-800 tracking-tight">All Rent Contracts</h3>
             <div className="bg-card rounded-xl shadow-sm border border-slate-100 p-1">
-              <FinanceQuotationTable saleType="RENT" />
+              <FinanceQuotationTable saleType="RENT" hideActions={true} />
             </div>
           </TabsContent>
 

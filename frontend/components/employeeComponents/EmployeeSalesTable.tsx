@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Plus, Search, Loader2, Trash2, Eye, FileText, Coins } from 'lucide-react';
+import { Plus, Search, Loader2, Eye, FileText } from 'lucide-react';
 import { formatCurrency } from '@/lib/format';
 import { toast } from 'sonner';
 import {
@@ -22,15 +22,12 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import {
-  getMyInvoices,
-  createInvoice,
-  Invoice,
-  CreateInvoicePayload,
   getInvoiceById,
   employeeApproveInvoice,
+  getBranchInvoices,
+  getMyInvoices,
+  Invoice,
 } from '@/lib/invoice';
-import { CustomerSelect } from '@/components/invoice/CustomerSelect';
-import { ProductSelect, SelectableItem } from '@/components/invoice/ProductSelect';
 
 import {
   Dialog,
@@ -55,11 +52,13 @@ interface EmployeeSalesTableProps {
 export default function EmployeeSalesTable({ mode = 'EMPLOYEE' }: EmployeeSalesTableProps) {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
-  const [formOpen, setFormOpen] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [search, setSearch] = useState('');
   const [filterType, setFilterType] = useState<string>('All');
+  const [isConverterOpen, setIsConverterOpen] = useState(false);
+  const [pendingQuotations, setPendingQuotations] = useState<Invoice[]>([]);
+  const [loadingQuotations, setLoadingQuotations] = useState(false);
 
   const { page, limit, total, setPage, setTotal, totalPages } = usePagination(10);
 
@@ -79,9 +78,19 @@ export default function EmployeeSalesTable({ mode = 'EMPLOYEE' }: EmployeeSalesT
         const { getBranchInvoices } = await import('@/lib/invoice');
         data = await getBranchInvoices();
         // Only show definitively approved or completed records for the Finance Sales tracker
-        data = data.filter((inv) => ['APPROVED', 'FINANCE_APPROVED', 'FINAL'].includes(inv.status));
+        data = data.filter((inv) =>
+          ['APPROVED', 'FINANCE_APPROVED', 'FINAL', 'TRANSACTION_COMPLETED'].includes(inv.status),
+        );
       } else {
-        data = await getMyInvoices();
+        const myData = await getMyInvoices();
+        // Show Proformas, Finals, and any quotations that have been converted to transactions
+        data = myData.filter(
+          (inv) =>
+            inv.type !== 'QUOTATION' ||
+            inv.status === 'TRANSACTION_COMPLETED' ||
+            inv.status === 'EMPLOYEE_APPROVED' ||
+            inv.status === 'FINANCE_REJECTED',
+        );
       }
       setInvoices(data);
     } catch (error) {
@@ -135,16 +144,48 @@ export default function EmployeeSalesTable({ mode = 'EMPLOYEE' }: EmployeeSalesT
 
   const paginatedInvoices = filteredInvoices.slice((page - 1) * limit, page * limit);
 
-  const handleCreate = async (data: CreateInvoicePayload) => {
+  const fetchPendingQuotations = async () => {
     try {
-      const newInvoice = await createInvoice(data);
-      setInvoices((prev) => [newInvoice, ...prev]);
-      setFormOpen(false);
-      toast.success('Invoice created successfully.');
+      setLoadingQuotations(true);
+      let data: Invoice[] = [];
+      try {
+        data = await getBranchInvoices();
+      } catch (err) {
+        console.error('getBranchInvoices failed, falling back to getMyInvoices:', err);
+        data = await getMyInvoices();
+      }
+
+      const pending = data.filter(
+        (inv) =>
+          inv.type === 'QUOTATION' &&
+          inv.status !== 'TRANSACTION_COMPLETED' &&
+          inv.status !== 'REJECTED' &&
+          inv.status !== 'CUSTOMER_REJECTED' &&
+          (inv.saleType === 'SALE' ||
+            inv.saleType === 'PRODUCT_SALE' ||
+            inv.saleType === 'SPAREPART_SALE'),
+      );
+      setPendingQuotations(pending);
+      setIsConverterOpen(true);
     } catch (error: unknown) {
-      console.error('Failed to create invoice:', error);
+      console.error(error);
       const err = error as { response?: { data?: { message?: string } } };
-      toast.error(err.response?.data?.message || 'Failed to create invoice.');
+      const msg = err.response?.data?.message || 'Failed to fetch pending quotations';
+      toast.error(msg);
+    } finally {
+      setLoadingQuotations(false);
+    }
+  };
+
+  const handleConvertQuotation = async (qId: string) => {
+    try {
+      await employeeApproveInvoice(qId);
+      toast.success('Quotation converted and sent for Finance approval!');
+      setIsConverterOpen(false);
+      fetchInvoices();
+    } catch (error) {
+      console.error(error);
+      toast.error('Failed to convert quotation');
     }
   };
 
@@ -155,9 +196,11 @@ export default function EmployeeSalesTable({ mode = 'EMPLOYEE' }: EmployeeSalesT
       toast.success('Sent for Finance Approval');
       setDetailsOpen(false);
       fetchInvoices();
-    } catch (error) {
+    } catch (error: unknown) {
       console.error(error);
-      toast.error('Failed to send for approval');
+      const err = error as { response?: { data?: { message?: string } } };
+      const msg = err.response?.data?.message || 'Failed to send for approval';
+      toast.error(msg);
     }
   };
 
@@ -192,9 +235,7 @@ export default function EmployeeSalesTable({ mode = 'EMPLOYEE' }: EmployeeSalesT
         {mode === 'EMPLOYEE' && (
           <Button
             className="bg-primary text-white gap-2 shadow-md hover:shadow-lg transition-all"
-            onClick={() => {
-              setFormOpen(true);
-            }}
+            onClick={fetchPendingQuotations}
           >
             <Plus size={16} /> New Sale
           </Button>
@@ -322,14 +363,25 @@ export default function EmployeeSalesTable({ mode = 'EMPLOYEE' }: EmployeeSalesT
                       <Badge
                         className={`rounded-full px-3 py-0.5 text-[10px] font-bold tracking-wider shadow-none
                         ${
-                          inv.status === 'PAID'
+                          inv.status === 'PAID' || inv.status === 'FINANCE_APPROVED'
                             ? 'bg-green-100 text-green-700 hover:bg-green-100'
-                            : inv.status === 'PENDING'
-                              ? 'bg-yellow-100 text-yellow-700 hover:bg-yellow-100'
-                              : 'bg-red-100 text-red-700 hover:bg-red-100'
+                            : inv.status === 'PENDING' ||
+                                inv.status === 'TRANSACTION_COMPLETED' ||
+                                inv.status === 'EMPLOYEE_APPROVED'
+                              ? 'bg-blue-100 text-blue-700 hover:bg-blue-100'
+                              : inv.status === 'FINANCE_REJECTED' || inv.status === 'REJECTED'
+                                ? 'bg-red-100 text-red-700 hover:bg-red-100'
+                                : 'bg-slate-100 text-slate-700 hover:bg-slate-100'
                         }`}
                       >
-                        {inv.status}
+                        {inv.status === 'TRANSACTION_COMPLETED' ||
+                        inv.status === 'EMPLOYEE_APPROVED'
+                          ? 'PENDING FINANCE'
+                          : inv.status === 'FINANCE_REJECTED'
+                            ? 'FINANCE REJECTED'
+                            : inv.status === 'FINANCE_APPROVED'
+                              ? 'APPROVED'
+                              : inv.status}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-muted-foreground text-sm font-medium">
@@ -366,50 +418,23 @@ export default function EmployeeSalesTable({ mode = 'EMPLOYEE' }: EmployeeSalesT
         )}
       </div>
 
-      {formOpen && <SaleFormModal onClose={() => setFormOpen(false)} onConfirm={handleCreate} />}
+      {/* formOpen rendering logic removed, sale forms now go through quotient conversion only */}
 
       {detailsOpen && selectedInvoice && (
         <InvoiceDetailsDialog
           invoice={selectedInvoice}
           onClose={() => setDetailsOpen(false)}
-          // EMPLOYEE Mode Action
           onApprove={
-            mode === 'EMPLOYEE'
+            mode === 'EMPLOYEE' &&
+            (selectedInvoice.status === 'DRAFT' ||
+              selectedInvoice.status === 'SENT' ||
+              selectedInvoice.status === 'FINANCE_REJECTED')
               ? handleSendForApproval
-              : async () => {
-                  // FINANCE Mode Approve
-                  try {
-                    const { allocateMachinesInvoice } = await import('@/lib/invoice');
-                    await allocateMachinesInvoice(selectedInvoice.id, {});
-                    toast.success('Approved');
-                    setDetailsOpen(false);
-                    fetchInvoices();
-                  } catch (err: unknown) {
-                    console.error(err);
-                    const error = err as { response?: { data?: { message?: string } } };
-                    toast.error(error.response?.data?.message || 'Failed to approve');
-                  }
-                }
-          }
-          // FINANCE Mode Reject
-          onReject={
-            mode === 'FINANCE'
-              ? async (reason) => {
-                  try {
-                    const { financeRejectInvoice } = await import('@/lib/invoice');
-                    await financeRejectInvoice(selectedInvoice.id, reason);
-                    toast.success('Invoice Rejected');
-                    setDetailsOpen(false);
-                    fetchInvoices();
-                  } catch (err: unknown) {
-                    console.error(err);
-                    const error = err as { response?: { data?: { message?: string } } };
-                    toast.error(error.response?.data?.message || 'Failed to reject');
-                  }
-                }
               : undefined
           }
-          approveLabel={mode === 'EMPLOYEE' ? 'Send for Finance Approval' : 'Approve'}
+          // FINANCE Mode Reject
+          onReject={undefined}
+          approveLabel={mode === 'EMPLOYEE' ? 'Send to Finance' : 'Approve'}
           mode={mode}
           onSuccess={() => {
             setDetailsOpen(false);
@@ -417,416 +442,156 @@ export default function EmployeeSalesTable({ mode = 'EMPLOYEE' }: EmployeeSalesT
           }}
         />
       )}
+
+      {isConverterOpen && (
+        <QuotationConverterDialog
+          open={isConverterOpen}
+          onClose={() => setIsConverterOpen(false)}
+          quotations={pendingQuotations}
+          loading={loadingQuotations}
+          onSelect={handleConvertQuotation}
+          // Scratch creation logic removed
+          title="Convert Quotation to Sale"
+        />
+      )}
     </div>
   );
 }
 
-function SaleFormModal({
-  onClose,
-  onConfirm,
-}: {
+interface QuotationConverterDialogProps {
+  open: boolean;
   onClose: () => void;
-  onConfirm: (data: CreateInvoicePayload) => Promise<void>;
-}) {
-  // Extended Item interface for local state
-  interface ExtendedItem {
-    description: string;
-    quantity: number;
-    unitPrice: number; // This is the Net Price (Base - Discount)
-    basePrice: number; // Original Price
-    discount: number;
-    maxDiscount: number;
-    isManual: boolean;
-    productId?: string; // Product ID for status updates
-    isEditable: boolean; // Allow editing price (e.g. for Spare Parts or 0-price items)
-  }
+  quotations: Invoice[];
+  loading: boolean;
+  onSelect: (id: string) => void;
+  title: string;
+}
 
-  const [form, setForm] = useState<{
-    customerId: string;
-    saleType: 'SALE';
-    items: ExtendedItem[];
-  }>({
-    customerId: '',
-    saleType: 'SALE',
-    items: [],
-  });
+function QuotationConverterDialog({
+  open,
+  onClose,
+  quotations,
+  loading,
+  onSelect,
+  title,
+}: QuotationConverterDialogProps) {
+  const [search, setSearch] = useState('');
 
-  const [manualItemOpen, setManualItemOpen] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
-  const addItem = (item: SelectableItem) => {
-    let description = '';
-    let basePrice = 0;
-    let maxDiscount = 0;
-    let productId: string | undefined;
-
-    if ('part_name' in item) {
-      // SparePart
-      description = item.part_name;
-      basePrice = Number(item.base_price) || 0;
-      maxDiscount = 0;
-      productId = undefined; // Spare parts don't have productId
-    } else {
-      // Product
-      description = item.name;
-      basePrice = item.sale_price || 0;
-      maxDiscount = item.max_discount_amount || 0;
-      productId = item.id; // CRITICAL: Store product ID
-    }
-
-    const newItem: ExtendedItem = {
-      description,
-      quantity: 1,
-      basePrice,
-      discount: 0,
-      unitPrice: basePrice, // Initially same as base
-      maxDiscount,
-      isManual: false,
-      productId, // CRITICAL: Include productId
-      isEditable: !productId || basePrice === 0, // Editable if No Product ID (Spare Part) OR Price is 0
-    };
-
-    setForm({
-      ...form,
-      items: [...form.items, newItem],
-    });
-    toast.success(`Added ${description}`);
-  };
-
-  const addManualItem = () => {
-    setForm({
-      ...form,
-      items: [
-        ...form.items,
-        {
-          description: '',
-          quantity: 1,
-          basePrice: 0,
-          discount: 0,
-          unitPrice: 0,
-          maxDiscount: 999999,
-          isManual: true,
-          isEditable: true,
-        },
-      ],
-    });
-    setManualItemOpen(false);
-  };
-
-  const removeItem = (index: number) => {
-    const newItems = form.items.filter((_, i) => i !== index);
-    setForm({ ...form, items: newItems });
-  };
-
-  const updateItem = (index: number, field: keyof ExtendedItem, value: string | number) => {
-    const newItems = [...form.items];
-    const prevItem = newItems[index];
-    const safeValue = typeof value === 'string' ? value : Number(value);
-
-    if (field === 'quantity') {
-      newItems[index] = { ...prevItem, quantity: Number(safeValue) };
-    } else if (field === 'description') {
-      newItems[index] = { ...prevItem, description: String(safeValue) };
-    } else if (field === 'discount') {
-      const discountVal = Number(safeValue);
-      // Removed strict return to allow showing error state inline
-
-      // Also discount shouldn't be > basePrice
-      if (discountVal > prevItem.basePrice) {
-        toast.error(`Discount cannot exceed base price`);
-        return;
-      }
-
-      newItems[index] = {
-        ...prevItem,
-        discount: discountVal,
-        unitPrice: prevItem.basePrice - discountVal,
-      };
-    } else if (field === 'basePrice' && prevItem.isEditable) {
-      const base = Number(safeValue);
-      newItems[index] = {
-        ...prevItem,
-        basePrice: base,
-        unitPrice: base - prevItem.discount,
-      };
-    }
-
-    setForm({ ...form, items: newItems });
-  };
-
-  const totalAmount = form.items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
+  const filtered = quotations.filter(
+    (q) =>
+      q.invoiceNumber.toLowerCase().includes(search.toLowerCase()) ||
+      q.customerName?.toLowerCase().includes(search.toLowerCase()),
+  );
 
   return (
-    <Dialog open={true} onOpenChange={(val) => !val && onClose()}>
-      <DialogContent className="sm:max-w-3xl p-0 overflow-hidden rounded-2xl border-none shadow-2xl bg-muted/50/50 backdrop-blur-sm h-[90vh] flex flex-col">
-        <DialogHeader className="p-6 pb-4 bg-card border-b border-slate-100 shrink-0">
-          <div className="flex items-center gap-4">
-            <div className="h-12 w-12 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-lg shadow-blue-200">
-              <Coins size={24} />
-            </div>
-            <div className="space-y-1">
-              <DialogTitle className="text-xl font-bold text-slate-800 tracking-tight">
-                New Sale Invoice
-              </DialogTitle>
-              <DialogDescription className="text-xs font-semibold text-slate-400 uppercase tracking-widest">
-                Create a new transaction record
-              </DialogDescription>
-            </div>
-          </div>
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col p-0 overflow-hidden">
+        <DialogHeader className="p-6 pb-2">
+          <DialogTitle className="text-xl font-bold text-primary tracking-tight">
+            {title}
+          </DialogTitle>
+          <DialogDescription className="text-xs">
+            Select an accepted quotation to convert it into a formal transaction.
+          </DialogDescription>
         </DialogHeader>
 
-        <div className="p-6 space-y-8 overflow-y-auto grow scrollbar-hide bg-card/50">
-          {/* Customer Section */}
-          <div className="space-y-2 bg-card p-5 rounded-xl border border-slate-100 shadow-sm">
-            <label className="text-[11px] font-bold text-muted-foreground uppercase flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-blue-400" /> Customer Details
-            </label>
-            <div className="w-full">
-              <CustomerSelect
-                value={form.customerId}
-                onChange={(id) => setForm({ ...form, customerId: id })}
-              />
-            </div>
+        <div className="px-6 pb-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <Input
+              placeholder="Search quotation number or customer..."
+              className="pl-9 h-10 bg-slate-50 border-slate-100 rounded-xl font-bold text-xs"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
           </div>
+        </div>
 
-          {/* Items Section */}
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-emerald-400" /> Order Items
-              </h4>
-              {!manualItemOpen && (
+        <div className="flex-1 overflow-y-auto p-6 pt-0">
+          {loading ? (
+            <div className="flex justify-center p-12">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+          ) : filtered.length === 0 ? (
+            <div className="text-center py-12 text-muted-foreground bg-slate-50/50 rounded-2xl border-2 border-dashed border-slate-200">
+              <FileText className="h-10 w-10 mx-auto mb-3 opacity-20" />
+              <p className="font-bold text-slate-900 text-sm">
+                {search ? 'No matching quotations found.' : 'No pending quotations found.'}
+              </p>
+              <p className="text-[11px] mt-1">
+                {search
+                  ? 'Try a different search term.'
+                  : 'Create a quotation first to convert it.'}
+              </p>
+              {search && (
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => setManualItemOpen(true)}
-                  className="text-[10px] font-bold uppercase tracking-widest text-slate-400 hover:text-primary transition-colors h-7"
+                  className="mt-4 text-[10px] font-black uppercase tracking-widest text-primary"
+                  onClick={() => setSearch('')}
                 >
-                  + Manual Entry
+                  Clear Search
                 </Button>
               )}
             </div>
-
-            {/* Search Logic */}
-            <div className="bg-card p-2 rounded-xl border border-border shadow-sm focus-within:ring-2 focus-within:ring-primary/20 transition-all">
-              <ProductSelect onSelect={addItem} />
-            </div>
-            {/* Secondary Manual Add */}
-            {manualItemOpen && (
-              <div className="flex justify-end mt-2 animate-in fade-in slide-in-from-top-1">
-                <Button
-                  onClick={addManualItem}
-                  size="sm"
-                  variant="secondary"
-                  className="text-xs font-bold"
-                >
-                  Add Custom Item Row
-                </Button>
-              </div>
-            )}
-
-            {/* List of Added Items */}
-            <div className="space-y-3 mt-4">
-              {form.items.length === 0 && (
-                <div className="text-center py-12 border-2 border-dashed border-border rounded-xl">
-                  <p className="text-sm font-bold text-slate-400">No items added.</p>
-                  <p className="text-xs text-slate-300 mt-1">Search above to add products.</p>
-                </div>
-              )}
-
-              {form.items.map((item, index) => (
+          ) : (
+            <div className="space-y-3">
+              {filtered.map((q) => (
                 <div
-                  key={index}
-                  className="group relative bg-card border border-border rounded-xl p-4 shadow-sm hover:shadow-md hover:border-blue-300 transition-all"
+                  key={q.id}
+                  className="flex items-center justify-between p-4 bg-white border border-slate-100 rounded-2xl hover:border-blue-500 hover:shadow-xl transition-all group cursor-pointer active:scale-95"
+                  onClick={() => onSelect(q.id)}
                 >
-                  <div className="absolute top-2 right-2">
-                    <button
-                      onClick={() => removeItem(index)}
-                      className="p-2 text-slate-300 hover:text-red-500 transition-colors"
-                    >
-                      <Trash2 size={16} />
-                    </button>
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-black text-slate-900 tracking-tight text-sm group-hover:text-blue-600">
+                        {q.invoiceNumber}
+                      </span>
+                      <Badge
+                        variant="secondary"
+                        className="text-[9px] uppercase font-black px-2 py-0 bg-slate-100 text-slate-600 shadow-none border-none"
+                      >
+                        {q.saleType}
+                      </Badge>
+                    </div>
+                    <p className="text-xs font-bold text-slate-500">
+                      {q.customerName || 'Walk-in'}
+                    </p>
+                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">
+                      {new Date(q.createdAt || '').toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric',
+                      })}
+                    </p>
                   </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
-                    {/* Description */}
-                    <div className="md:col-span-4 space-y-1">
-                      <label className="text-[9px] font-bold text-slate-400 uppercase">
-                        Description
-                      </label>
-                      <Input
-                        value={item.description}
-                        onChange={(e) => updateItem(index, 'description', e.target.value)}
-                        readOnly={!item.isManual}
-                        className={`h-9 font-bold text-sm ${!item.isManual ? 'bg-muted/50 border-transparent' : 'bg-card'}`}
-                      />
-                    </div>
-
-                    {/* Qty */}
-                    <div className="md:col-span-2 space-y-1">
-                      <label className="text-[9px] font-bold text-slate-400 uppercase text-center block">
-                        Qty
-                      </label>
-                      <Input
-                        type="number"
-                        min="1"
-                        value={item.quantity}
-                        onChange={(e) => updateItem(index, 'quantity', e.target.value)}
-                        className="h-9 text-center font-bold"
-                      />
-                    </div>
-
-                    {/* Base Price */}
-                    <div className="md:col-span-2 space-y-1">
-                      <label className="text-[9px] font-bold text-slate-400 uppercase text-right block">
-                        Rate
-                      </label>
-                      <div className="relative">
-                        <Input
-                          type="number"
-                          value={item.basePrice}
-                          readOnly={!item.isEditable}
-                          onChange={(e) => updateItem(index, 'basePrice', e.target.value)}
-                          className={`h-9 text-right font-bold pr-1 ${!item.isManual ? 'bg-muted/50 text-muted-foreground' : ''}`}
-                        />
-                        <span className="absolute left-1 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">
-                          QAR
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Discount */}
-                    <div className="md:col-span-2 space-y-1">
-                      <label className="text-[9px] font-bold text-slate-400 uppercase text-center block">
-                        Discount
-                      </label>
-                      <div className="relative">
-                        {!item.productId && !item.isManual ? (
-                          <div className="h-9 flex items-center justify-center text-slate-300 font-bold text-xs bg-slate-50 rounded-md border border-transparent cursor-not-allowed">
-                            N/A
-                          </div>
-                        ) : (
-                          <Input
-                            type="number"
-                            min="0"
-                            // Remove max attribute to allow typing higher values
-                            value={item.discount === 0 ? '' : item.discount}
-                            placeholder="0"
-                            onChange={(e) => updateItem(index, 'discount', e.target.value)}
-                            className={`h-9 text-center font-bold border-2 focus:ring-2 transition-all ${
-                              !item.isManual &&
-                              item.maxDiscount > 0 &&
-                              item.discount > item.maxDiscount
-                                ? 'text-red-600 border-red-200 bg-red-50 focus:border-red-500 focus:ring-red-200'
-                                : 'text-emerald-600 border-emerald-100 bg-emerald-50/30 focus:border-emerald-400 focus:ring-emerald-200'
-                            }`}
-                          />
-                        )}
-                      </div>
-                      {/* Warning Text only for non-spare-parts */}
-                      {item.productId &&
-                        !item.isManual &&
-                        item.maxDiscount > 0 &&
-                        item.discount > item.maxDiscount && (
-                          <p className="text-[9px] font-bold text-red-500 text-center animate-pulse mt-1">
-                            Max Allowed: {formatCurrency(item.maxDiscount)}
-                          </p>
-                        )}
-                    </div>
-
-                    {/* Total Row */}
-                    <div className="md:col-span-2 flex flex-col items-end justify-center h-9 mt-auto">
-                      <p className="text-[9px] font-bold text-slate-400 uppercase">Net</p>
-                      <p className="font-extrabold text-foreground">
-                        {formatCurrency(item.quantity * item.unitPrice)}
-                      </p>
-                    </div>
+                  <div className="text-right">
+                    <p className="font-black text-slate-900 text-sm tracking-tight mb-2">
+                      {formatCurrency(q.totalAmount || 0)}
+                    </p>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      className="h-7 px-3 text-[10px] font-black uppercase tracking-widest text-blue-600 bg-blue-50 border-none hover:bg-blue-600 hover:text-white transition-colors"
+                    >
+                      Convert
+                    </Button>
                   </div>
                 </div>
               ))}
             </div>
-          </div>
+          )}
         </div>
 
-        {/* Footer */}
-        <div className="p-6 bg-card border-t border-slate-100 flex items-center justify-between shrink-0">
-          <div>
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider leading-none mb-1">
-              Grand Total
-            </p>
-            <p className="text-3xl font-black text-primary tracking-tight">
-              {formatCurrency(totalAmount)}
-            </p>
-          </div>
-          <div className="flex gap-4 items-center">
-            <button
-              onClick={onClose}
-              className="text-sm font-bold text-slate-400 hover:text-slate-600 transition-colors"
-            >
-              Discard
-            </button>
-            <Button
-              className="h-12 px-10 rounded-xl bg-blue-600 text-white hover:bg-blue-700 font-bold shadow-lg shadow-blue-200 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-              disabled={isSubmitting}
-              onClick={async () => {
-                if (!form.customerId) {
-                  toast.error('Please select a customer.');
-                  return;
-                }
-                if (form.items.length === 0) {
-                  toast.error('Please add at least one item.');
-                  return;
-                }
-
-                // Validation check for Max Discount
-                const hasInvalidDiscount = form.items.some(
-                  (item) =>
-                    !item.isManual && item.maxDiscount > 0 && item.discount > item.maxDiscount,
-                );
-                if (hasInvalidDiscount) {
-                  toast.error('Please fix invalid discounts before proceeding.');
-                  return;
-                }
-
-                setIsSubmitting(true);
-                try {
-                  const totalDiscount = form.items.reduce(
-                    (sum, it) => sum + (it.discount || 0) * it.quantity,
-                    0,
-                  );
-
-                  const finalPayload: CreateInvoicePayload = {
-                    customerId: form.customerId,
-                    saleType: form.saleType,
-                    discountAmount: totalDiscount,
-                    items: form.items.map((it) => ({
-                      description: it.description,
-                      quantity: it.quantity,
-                      // We send the GROSS/BASE unit price to backend as 'unitPrice'
-                      // so the line items show the original price, and discount is subtracted in summary.
-                      unitPrice: it.basePrice,
-                      productId: it.productId,
-                    })),
-                  };
-
-                  await onConfirm(finalPayload);
-                } catch (error) {
-                  console.error(error);
-                } finally {
-                  setIsSubmitting(false);
-                }
-              }}
-            >
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Processing...
-                </>
-              ) : (
-                'Confirm Sale'
-              )}
-            </Button>
-          </div>
+        <div className="p-4 bg-slate-50/50 border-t border-slate-100 flex justify-end items-center">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onClose}
+            className="font-black text-[10px] uppercase tracking-widest text-slate-500"
+          >
+            Cancel
+          </Button>
         </div>
       </DialogContent>
     </Dialog>

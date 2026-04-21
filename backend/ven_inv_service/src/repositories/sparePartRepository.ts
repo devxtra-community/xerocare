@@ -110,7 +110,9 @@ export class SparePartRepository {
         'sp.id AS id',
         'sp.sku AS sku',
         'sp.mpn AS mpn',
+        'sp.lot_id AS lot_id',
         'lot.lotNumber AS lot_number',
+        'lot.lotNumber AS lotNumber', // Frontend consistency
         'sp.part_name AS part_name',
         'sp.brand AS brand',
         'warehouse.warehouseName AS warehouse_name',
@@ -119,6 +121,7 @@ export class SparePartRepository {
         'sp.model_id AS model_id',
         'sp.quantity AS quantity',
         'sp.base_price AS price',
+        'sp.base_price AS base_price', // Frontend consistency
         'sp.purchase_price AS purchase_price',
         'sp.wholesale_price AS wholesale_price',
         'sp.image_url AS image_url',

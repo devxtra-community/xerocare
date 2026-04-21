@@ -86,7 +86,7 @@ router.get(
  */
 router.get(
   '/branch-invoices',
-  requireRole(UserRole.ADMIN, UserRole.MANAGER, UserRole.FINANCE),
+  requireRole(UserRole.ADMIN, UserRole.MANAGER, UserRole.FINANCE, UserRole.EMPLOYEE),
   getBranchInvoices,
 );
 

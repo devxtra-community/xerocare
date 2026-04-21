@@ -11,16 +11,15 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import {
-  getMyInvoices,
-  Invoice,
-  createInvoice,
-  CreateInvoicePayload,
-  updateQuotation,
-  employeeApproveInvoice,
-} from '@/lib/invoice';
-import RentFormModal from './RentFormModal';
+import { getMyInvoices, getBranchInvoices, Invoice, employeeApproveInvoice } from '@/lib/invoice';
 import UsageRecordingModal from '../Finance/UsageRecordingModal';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog';
 
 import { Badge } from '@/components/ui/badge';
 import { usePagination } from '@/hooks/usePagination';
@@ -54,14 +53,15 @@ export default function EmployeeLeaseTable({
 }: EmployeeLeaseTableProps) {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
-  const [formOpen, setFormOpen] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false); // Changed from useState(false) to useState(false) to allow state change
   const [approveOpen, setApproveOpen] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
-  const [editInvoice, setEditInvoice] = useState<Invoice | undefined>(undefined);
   const [isUsageModalOpen, setIsUsageModalOpen] = useState(false);
   const [editingUsage] = useState<Invoice | null>(null);
   const [search, setSearch] = useState('');
+  const [isConverterOpen, setIsConverterOpen] = useState(false);
+  const [pendingQuotations, setPendingQuotations] = useState<Invoice[]>([]);
+  const [loadingQuotations, setLoadingQuotations] = useState(false);
 
   const { page, limit, total, setPage, setTotal, totalPages } = usePagination(10);
 
@@ -79,7 +79,15 @@ export default function EmployeeLeaseTable({
         // Filter out unapproved records for Finance View
         data = data.filter((inv) => !['DRAFT', 'SENT'].includes(inv.status));
       } else {
-        data = await getMyInvoices();
+        const myData = await getMyInvoices();
+        // Show Proformas, Finals, and any quotations that have been converted to transactions
+        data = myData.filter(
+          (inv) =>
+            inv.type !== 'QUOTATION' ||
+            inv.status === 'TRANSACTION_COMPLETED' ||
+            inv.status === 'EMPLOYEE_APPROVED' ||
+            inv.status === 'FINANCE_REJECTED',
+        );
       }
       setInvoices(data.filter((inv) => inv.saleType === 'LEASE'));
     } catch (error) {
@@ -92,39 +100,6 @@ export default function EmployeeLeaseTable({
   useEffect(() => {
     fetchInvoices();
   }, [fetchInvoices]);
-
-  const handleCreateOrUpdate = async (data: CreateInvoicePayload) => {
-    try {
-      if (editInvoice) {
-        // Update Mode
-        const updated = await updateQuotation(editInvoice.id, data);
-        setInvoices((prev) => prev.map((inv) => (inv.id === updated.id ? updated : inv)));
-        toast.success('Lease updated successfully.');
-      } else {
-        // Create Mode
-        const newInvoice = await createInvoice(data);
-        setInvoices((prev) => [newInvoice, ...prev]);
-        toast.success('Lease record created successfully.');
-      }
-      setFormOpen(false);
-      setEditInvoice(undefined);
-      onRefresh?.();
-    } catch (error: unknown) {
-      console.error('Failed to save lease record:', error);
-      const err = error as { response?: { data?: { message?: string } } };
-      toast.error(err.response?.data?.message || 'Failed to save lease record.');
-    }
-  };
-
-  const openCreateModal = () => {
-    setEditInvoice(undefined);
-    setFormOpen(true);
-  };
-
-  const openEditModal = (invoice: Invoice) => {
-    setEditInvoice(invoice);
-    setFormOpen(true);
-  };
 
   const handleViewDetails = (id: string) => {
     const invoice = invoices.find((i) => i.id === id);
@@ -142,9 +117,56 @@ export default function EmployeeLeaseTable({
       setDetailsOpen(false);
       fetchInvoices();
       onRefresh?.();
-    } catch (error) {
+    } catch (error: unknown) {
       console.error(error);
-      toast.error('Failed to send for approval');
+      const err = error as { response?: { data?: { message?: string } } };
+      const msg = err.response?.data?.message || 'Failed to send for approval';
+      toast.error(msg);
+    }
+  };
+
+  const fetchPendingQuotations = async () => {
+    try {
+      setLoadingQuotations(true);
+      let data: Invoice[] = [];
+      try {
+        data = await getBranchInvoices();
+      } catch (err) {
+        console.error('getBranchInvoices failed, falling back to getMyInvoices:', err);
+        data = await getMyInvoices();
+      }
+
+      const pending = data.filter(
+        (inv) =>
+          inv.type === 'QUOTATION' &&
+          inv.status !== 'TRANSACTION_COMPLETED' &&
+          inv.status !== 'REJECTED' &&
+          inv.status !== 'CUSTOMER_REJECTED' &&
+          inv.saleType === 'LEASE',
+      );
+      setPendingQuotations(pending);
+      setIsConverterOpen(true);
+    } catch (error: unknown) {
+      console.error(error);
+      const err = error as { response?: { data?: { message?: string } } };
+      const msg = err.response?.data?.message || 'Failed to fetch pending quotations';
+      toast.error(msg);
+    } finally {
+      setLoadingQuotations(false);
+    }
+  };
+
+  const handleConvertQuotation = async (qId: string) => {
+    try {
+      await employeeApproveInvoice(qId);
+      toast.success('Quotation converted and sent for Finance approval!');
+      setIsConverterOpen(false);
+      fetchInvoices();
+    } catch (error: unknown) {
+      console.error('Conversion failed:', error);
+      const err = error as { response?: { data?: { message?: string } } };
+      const errorMsg = err.response?.data?.message || 'Failed to convert quotation';
+      toast.error(errorMsg);
     }
   };
 
@@ -193,7 +215,7 @@ export default function EmployeeLeaseTable({
         {mode === 'EMPLOYEE' && (
           <Button
             className="bg-primary text-white gap-2 shadow-md hover:shadow-lg transition-all"
-            onClick={openCreateModal}
+            onClick={fetchPendingQuotations}
           >
             <Plus size={16} /> New Lease
           </Button>
@@ -327,14 +349,23 @@ export default function EmployeeLeaseTable({
                         <span
                           className={`inline-flex px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide
                           ${
-                            inv.status === 'PAID'
+                            inv.status === 'PAID' || inv.status === 'FINANCE_APPROVED'
                               ? 'bg-green-100 text-green-600'
-                              : inv.status === 'PENDING'
-                                ? 'bg-yellow-100 text-yellow-600'
-                                : 'bg-red-100 text-red-600'
+                              : inv.status === 'PENDING' ||
+                                  inv.status === 'TRANSACTION_COMPLETED' ||
+                                  inv.status === 'EMPLOYEE_APPROVED'
+                                ? 'bg-blue-100 text-blue-600'
+                                : inv.status === 'FINANCE_REJECTED' || inv.status === 'REJECTED'
+                                  ? 'bg-red-100 text-red-600'
+                                  : 'bg-slate-100 text-slate-600'
                           }`}
                         >
-                          {inv.status}
+                          {inv.status === 'TRANSACTION_COMPLETED' ||
+                          inv.status === 'EMPLOYEE_APPROVED'
+                            ? 'PENDING FINANCE'
+                            : inv.status === 'FINANCE_REJECTED'
+                              ? 'FINANCE REJECTED'
+                              : inv.status}
                         </span>
                       )}
                     </TableCell>
@@ -357,21 +388,7 @@ export default function EmployeeLeaseTable({
                           <Eye className="h-4 w-4" />
                         </Button>
 
-                        {mode === 'EMPLOYEE' && (
-                          <>
-                            {(inv.status === 'DRAFT' || inv.status === 'SENT') && (
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8 text-slate-400 hover:text-orange-600 hover:bg-orange-50"
-                                onClick={() => openEditModal(inv)}
-                                title="Edit"
-                              >
-                                <FileText className="h-4 w-4" />
-                              </Button>
-                            )}
-                          </>
-                        )}
+                        {/* Edit button removed to enforce quotation-to-transaction workflow */}
                       </div>
                     </TableCell>
                   </TableRow>
@@ -391,60 +408,22 @@ export default function EmployeeLeaseTable({
         )}
       </div>
 
-      {formOpen && (
-        <RentFormModal
-          initialData={editInvoice}
-          defaultSaleType="LEASE"
-          lockSaleType={true}
-          onClose={() => setFormOpen(false)}
-          onConfirm={handleCreateOrUpdate}
-        />
-      )}
+      {/* lease form modal removed to prevent scratch creation */}
 
       {detailsOpen && selectedInvoice && (
         <InvoiceDetailsDialog
           invoice={selectedInvoice}
           onClose={() => setDetailsOpen(false)}
-          // EMPLOYEE Mode
           onApprove={
-            mode === 'EMPLOYEE'
+            mode === 'EMPLOYEE' &&
+            (selectedInvoice.status === 'DRAFT' ||
+              selectedInvoice.status === 'SENT' ||
+              selectedInvoice.status === 'FINANCE_REJECTED')
               ? handleSendForApproval
-              : async () => {
-                  // FINANCE Mode Approve
-                  try {
-                    const { allocateMachinesInvoice } = await import('@/lib/invoice');
-                    await allocateMachinesInvoice(selectedInvoice.id, {});
-                    toast.success('Lease Agreement Approved');
-                    setDetailsOpen(false);
-                    fetchInvoices();
-                    onRefresh?.();
-                  } catch (err: unknown) {
-                    console.error(err);
-                    const error = err as { response?: { data?: { message?: string } } };
-                    toast.error(error.response?.data?.message || 'Failed to approve');
-                  }
-                }
-          }
-          // FINANCE Mode Reject
-          onReject={
-            mode === 'FINANCE'
-              ? async (reason) => {
-                  try {
-                    const { financeRejectInvoice } = await import('@/lib/invoice');
-                    await financeRejectInvoice(selectedInvoice.id, reason);
-                    toast.success('Lease Agreement Rejected');
-                    setDetailsOpen(false);
-                    fetchInvoices();
-                    onRefresh?.();
-                  } catch (err: unknown) {
-                    console.error(err);
-                    const error = err as { response?: { data?: { message?: string } } };
-                    toast.error(error.response?.data?.message || 'Failed to reject');
-                  }
-                }
               : undefined
           }
-          approveLabel={mode === 'EMPLOYEE' ? 'Send for Finance Approval' : 'Approve'}
+          onReject={undefined}
+          approveLabel={mode === 'EMPLOYEE' ? 'Send to Finance' : 'Approve'}
           mode={mode}
           onSuccess={() => {
             setDetailsOpen(false);
@@ -479,7 +458,158 @@ export default function EmployeeLeaseTable({
           }}
         />
       )}
+      {isConverterOpen && (
+        <QuotationConverterDialog
+          open={isConverterOpen}
+          onClose={() => setIsConverterOpen(false)}
+          quotations={pendingQuotations}
+          loading={loadingQuotations}
+          onSelect={handleConvertQuotation}
+          // Scratch form removed
+          title="Convert Quotation to Lease"
+        />
+      )}
     </div>
+  );
+}
+
+interface QuotationConverterDialogProps {
+  open: boolean;
+  onClose: () => void;
+  quotations: Invoice[];
+  loading: boolean;
+  onSelect: (id: string) => void;
+  title: string;
+}
+
+function QuotationConverterDialog({
+  open,
+  onClose,
+  quotations,
+  loading,
+  onSelect,
+  title,
+}: QuotationConverterDialogProps) {
+  const [search, setSearch] = useState('');
+
+  const filtered = quotations.filter(
+    (q) =>
+      q.invoiceNumber.toLowerCase().includes(search.toLowerCase()) ||
+      q.customerName?.toLowerCase().includes(search.toLowerCase()),
+  );
+
+  return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col p-0 overflow-hidden">
+        <DialogHeader className="p-6 pb-2">
+          <DialogTitle className="text-xl font-bold text-primary tracking-tight">
+            {title}
+          </DialogTitle>
+          <DialogDescription className="text-xs">
+            Select an accepted quotation to convert it into a formal transaction.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="px-6 pb-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <Input
+              placeholder="Search quotation number or customer..."
+              className="pl-9 h-10 bg-slate-50 border-slate-100 rounded-xl font-bold text-xs"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-6 pt-0">
+          {loading ? (
+            <div className="flex justify-center p-12">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+          ) : filtered.length === 0 ? (
+            <div className="text-center py-12 text-muted-foreground bg-slate-50/50 rounded-2xl border-2 border-dashed border-slate-200">
+              <FileText className="h-10 w-10 mx-auto mb-3 opacity-20" />
+              <p className="font-bold text-slate-900 text-sm">
+                {search ? 'No matching quotations found.' : 'No pending quotations found.'}
+              </p>
+              <p className="text-[11px] mt-1">
+                {search
+                  ? 'Try a different search term.'
+                  : 'Create a quotation first to convert it.'}
+              </p>
+              {search && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="mt-4 text-[10px] font-black uppercase tracking-widest text-primary"
+                  onClick={() => setSearch('')}
+                >
+                  Clear Search
+                </Button>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {filtered.map((q) => (
+                <div
+                  key={q.id}
+                  className="flex items-center justify-between p-4 bg-white border border-slate-100 rounded-2xl hover:border-blue-500 hover:shadow-xl transition-all group cursor-pointer active:scale-95"
+                  onClick={() => onSelect(q.id)}
+                >
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-black text-slate-900 tracking-tight text-sm group-hover:text-blue-600">
+                        {q.invoiceNumber}
+                      </span>
+                      <Badge
+                        variant="secondary"
+                        className="text-[9px] uppercase font-black px-2 py-0 bg-slate-100 text-slate-600 shadow-none border-none"
+                      >
+                        {q.saleType}
+                      </Badge>
+                    </div>
+                    <p className="text-xs font-bold text-slate-500">
+                      {q.customerName || 'Walk-in'}
+                    </p>
+                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">
+                      {new Date(q.createdAt || '').toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric',
+                      })}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-black text-slate-900 text-sm tracking-tight mb-2">
+                      {formatCurrency(q.totalAmount || 0)}
+                    </p>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      className="h-7 px-3 text-[10px] font-black uppercase tracking-widest text-blue-600 bg-blue-50 border-none hover:bg-blue-600 hover:text-white transition-colors"
+                    >
+                      Convert
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="p-4 bg-slate-50/50 border-t border-slate-100 flex justify-end items-center">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onClose}
+            className="font-black text-[10px] uppercase tracking-widest text-slate-500"
+          >
+            Cancel
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 // Local LeaseFormModal removed in favor of shared RentFormModal

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Loader2, Send, Mail, Phone, Share2 } from 'lucide-react';
+import { Loader2, Send, Mail, Phone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { getProductById, getAllProducts } from '@/lib/product';
@@ -10,12 +10,28 @@ import { getAllModels } from '@/lib/model';
 import { Invoice, sendEmailNotification, sendWhatsappNotification } from '@/lib/invoice';
 import { toast } from 'sonner';
 
+interface ProductMeta {
+  brandRelation?: { name?: string };
+  brand?: string;
+  model?: { model_name?: string; id?: string };
+  model_name?: string;
+  serial_no?: string;
+  imageUrl?: string;
+  image_url?: string;
+  mpn?: string;
+  name?: string;
+  part_name?: string;
+  description?: string;
+  inventory?: { description?: string }[];
+}
+
 interface QuotationViewDialogProps {
   quotation: Invoice;
   onClose: () => void;
   onSendToFinance?: (id: string) => Promise<void>;
   onApprove?: () => void;
   onReject?: () => void;
+  onStatusChange?: (status: string) => Promise<void>;
   showDistribution?: boolean;
 }
 
@@ -25,21 +41,17 @@ export function QuotationViewDialog({
   onSendToFinance,
   onApprove,
   onReject,
+  onStatusChange,
   showDistribution = false,
 }: QuotationViewDialogProps) {
   const [sending, setSending] = useState(false);
   const [isSendingCustomer, setIsSendingCustomer] = useState(false);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [productDetails, setProductDetails] = useState<Record<string, any>>({});
+  const [productDetails, setProductDetails] = useState<Record<string, ProductMeta>>({});
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [_loadingDetails, setLoadingDetails] = useState(false);
-  const canSend =
-    quotation.status === 'DRAFT' ||
-    quotation.status === 'SENT' ||
-    quotation.status === 'EMPLOYEE_APPROVED';
 
   // We determine if we are in finance view by checking if they can approve/reject, OR if the status is already finalized
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+
   const _isFinanceView =
     !!(onApprove && onReject) ||
     quotation.status === 'FINAL' ||
@@ -49,8 +61,7 @@ export function QuotationViewDialog({
     const fetchFullDetails = async () => {
       setLoadingDetails(true);
       try {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const details: Record<string, any> = {};
+        const details: Record<string, ProductMeta> = {};
         if (quotation.items) {
           const [spareParts, modelsRes] = await Promise.all([
             getAllSpareParts().catch(() => []),
@@ -65,54 +76,52 @@ export function QuotationViewDialog({
 
             if (targetProductId) {
               try {
-                const p = await getProductById(targetProductId);
+                const p = (await getProductById(targetProductId)) as unknown as ProductMeta;
                 details[targetProductId] = p;
               } catch (e) {
                 console.error(e);
               }
             }
             if (item.modelId) {
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              const m = models.find((m: any) => m.id === item.modelId);
+              const m = models.find((m: { id: string }) => m.id === item.modelId);
               if (m) {
                 try {
                   const productsForModel = await getAllProducts({ modelId: m.id }).catch(() => []);
 
                   const productWithImage = productsForModel.find(
-                    /* eslint-disable @typescript-eslint/no-explicit-any */
-                    (p) => p.imageUrl || (p as any).image_url,
-                    /* eslint-enable @typescript-eslint/no-explicit-any */
+                    (p: { imageUrl?: string; image_url?: string }) => p.imageUrl || p.image_url,
                   );
                   if (productWithImage) {
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    (m as any).imageUrl =
-                      /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
-                      productWithImage.imageUrl || (productWithImage as any).image_url;
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    if (!m.description && (productWithImage as any).description) {
-                      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                      m.description = (productWithImage as any).description;
+                    const typedM = m as unknown as ProductMeta;
+                    typedM.imageUrl =
+                      productWithImage.imageUrl ||
+                      (productWithImage as { image_url?: string }).image_url;
+                    if (
+                      !typedM.description &&
+                      (productWithImage as { description?: string }).description
+                    ) {
+                      typedM.description = (
+                        productWithImage as { description?: string }
+                      ).description;
                     }
                   }
                 } catch (e) {
                   console.error('Failed to fetch product for model image', e);
                 }
-                details[item.modelId] = m;
+                details[item.modelId] = m as unknown as ProductMeta;
               }
             } else if (item.description) {
               const m = models.find(
-                /* eslint-disable @typescript-eslint/no-explicit-any */
-                (m: any) =>
+                (m: { model_name?: string; product_name?: string }) =>
                   m.model_name === item.description || m.product_name === item.description,
-                /* eslint-enable @typescript-eslint/no-explicit-any */
               );
               if (m) {
-                details[item.description] = m;
+                details[item.description] = m as unknown as ProductMeta;
               } else {
                 const sp = spareParts.find(
                   (s) => s.part_name === item.description || s.mpn === item.description,
                 );
-                if (sp) details[item.description] = sp;
+                if (sp) details[item.description] = sp as unknown as ProductMeta;
               }
             }
           }
@@ -208,8 +217,7 @@ export function QuotationViewDialog({
 
       if (!base64Data) throw new Error('Generated PDF data is empty');
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const attachments: any[] = [
+      const attachments: { filename: string; content: string; encoding: string }[] = [
         {
           filename: `Quotation-${quotation.invoiceNumber}.pdf`,
           content: base64Data,
@@ -252,11 +260,14 @@ export function QuotationViewDialog({
       }
 
       toast.success('Sent successfully', { description: `Quotation sent via ${type}` });
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } catch (error: any) {
-      console.error('Failed to send to customer:', error);
+      if (onStatusChange) {
+        onStatusChange('SENT_TO_CUSTOMER');
+      }
+    } catch (error: unknown) {
+      const err = error as { message?: string };
+      console.error('Failed to send to customer:', err);
       toast.error('Failed to send', {
-        description: error.message || 'An error occurred while generating or sending the document',
+        description: err.message || 'An error occurred while generating or sending the document',
       });
     } finally {
       setIsSendingCustomer(false);
@@ -266,8 +277,9 @@ export function QuotationViewDialog({
   const allocs = quotation.productAllocations || [];
   const enrichedItems = (quotation.items || [])
     .map((item) => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const alloc = item.modelId ? allocs.find((a: any) => a.modelId === item.modelId) : null;
+      const alloc = item.modelId
+        ? allocs.find((a: { modelId: string }) => a.modelId === item.modelId)
+        : null;
       const targetProductId = item.productId || alloc?.productId;
 
       const meta =
@@ -995,7 +1007,28 @@ export function QuotationViewDialog({
               Close
             </Button>
 
-            {/* Send PDF to Customer Actions - Only visible if showDistribution is true */}
+            {!_isFinanceView && onStatusChange && quotation.status === 'SENT' && (
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => onStatusChange('ACCEPTED')}
+                  className="h-9 text-[11px] font-black uppercase tracking-widest border-green-200 text-green-700 hover:bg-green-50"
+                >
+                  Mark as Accepted
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => onStatusChange('REJECTED')}
+                  className="h-9 text-[11px] font-black uppercase tracking-widest border-red-200 text-red-700 hover:bg-red-50"
+                >
+                  Mark as Rejected
+                </Button>
+              </>
+            )}
+
+            {/* Distribution buttons - Gmail and WhatsApp restored, Both remains removed as per request */}
             {showDistribution && (
               <div className="flex gap-2 border-l border-slate-300 pl-4 ml-2">
                 <Button
@@ -1016,19 +1049,6 @@ export function QuotationViewDialog({
                 >
                   <Phone size={14} /> WhatsApp
                 </Button>
-                <Button
-                  size="sm"
-                  onClick={() => handleSendCustomer('BOTH')}
-                  disabled={isSendingCustomer}
-                  className="h-9 px-6 rounded-md font-black uppercase text-[11px] tracking-widest bg-slate-800 hover:bg-slate-900 text-white gap-2"
-                >
-                  {isSendingCustomer ? (
-                    <Loader2 size={14} className="animate-spin" />
-                  ) : (
-                    <Share2 size={14} />
-                  )}
-                  Both
-                </Button>
               </div>
             )}
 
@@ -1047,12 +1067,12 @@ export function QuotationViewDialog({
                   className="h-9 px-10 rounded-md font-black uppercase text-[11px] tracking-widest bg-emerald-600 hover:bg-emerald-700 text-white gap-2 shadow-lg shadow-emerald-100"
                   onClick={onApprove}
                 >
-                  Approve
+                  Accept
                 </Button>
               </div>
             )}
 
-            {!onApprove && onSendToFinance && canSend && (
+            {!onApprove && onSendToFinance && (
               <Button
                 onClick={handleSend}
                 disabled={sending}

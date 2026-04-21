@@ -845,17 +845,56 @@ export class BillingService {
   }
 
   /**
+   * Customer accepts or rejects a quotation from email/WhatsApp link.
+   * Sets status to CUSTOMER_ACCEPTED or CUSTOMER_REJECTED.
+   */
+  async customerRespond(id: string, action: 'accept' | 'reject') {
+    const invoice = await this.invoiceRepo.findById(id);
+    if (!invoice) throw new AppError('Quotation not found', 404);
+
+    // Only allow response on quotations that have been sent to the customer
+    const respondableStatuses = [
+      InvoiceStatus.SENT_TO_CUSTOMER,
+      InvoiceStatus.DRAFT,
+      InvoiceStatus.SENT,
+    ];
+    if (!respondableStatuses.includes(invoice.status as InvoiceStatus)) {
+      throw new AppError(
+        `This quotation cannot be responded to. Current status: ${invoice.status}`,
+        400,
+      );
+    }
+
+    invoice.status =
+      action === 'accept' ? InvoiceStatus.CUSTOMER_ACCEPTED : InvoiceStatus.CUSTOMER_REJECTED;
+
+    return this.invoiceRepo.save(invoice);
+  }
+
+  /**
    * Employee marks a quotation as ready for Finance review.
    */
   async employeeApprove(id: string, userId: string) {
     const invoice = await this.invoiceRepo.findById(id);
     if (!invoice) throw new AppError('Quotation not found', 404);
 
-    if (invoice.status !== InvoiceStatus.DRAFT && invoice.status !== InvoiceStatus.SENT) {
-      throw new AppError('Only DRAFT or SENT quotations can be submitted for approval', 400);
+    if (invoice.type !== InvoiceType.QUOTATION) {
+      throw new AppError('Only quotations can be converted to transactions', 400);
     }
 
-    invoice.status = InvoiceStatus.EMPLOYEE_APPROVED;
+    if (
+      invoice.status === InvoiceStatus.TRANSACTION_COMPLETED ||
+      invoice.status === InvoiceStatus.REJECTED ||
+      invoice.status === InvoiceStatus.CUSTOMER_REJECTED ||
+      invoice.status === InvoiceStatus.CANCELLED
+    ) {
+      throw new AppError(
+        'This quotation has already been converted or is in a terminal state (Cancelled/Rejected)',
+        400,
+      );
+    }
+
+    invoice.status = InvoiceStatus.TRANSACTION_COMPLETED;
     invoice.employeeApprovedBy = userId;
     invoice.employeeApprovedAt = new Date();
 
@@ -883,8 +922,15 @@ export class BillingService {
       });
 
       if (!invoice) throw new AppError('Quotation not found', 404);
-      if (invoice.status !== InvoiceStatus.EMPLOYEE_APPROVED) {
-        throw new AppError('Only Employee Approved quotations can be allocated by Finance', 400);
+      if (
+        invoice.status !== InvoiceStatus.EMPLOYEE_APPROVED &&
+        invoice.status !== InvoiceStatus.TRANSACTION_COMPLETED &&
+        invoice.status !== InvoiceStatus.SENT // Allow sent quotations if converted directly
+      ) {
+        throw new AppError(
+          'Quotation must be Approved or Converted by Employee before Finance allocation',
+          400,
+        );
       }
 
       // Check that all machines are allocated
@@ -1188,11 +1234,17 @@ export class BillingService {
     const invoice = await this.invoiceRepo.findById(id);
     if (!invoice) throw new AppError('Quotation not found', 404);
 
-    if (invoice.status !== InvoiceStatus.EMPLOYEE_APPROVED) {
-      throw new AppError('Only Employee Approved quotations can be rejected by Finance', 400);
+    if (
+      invoice.status !== InvoiceStatus.EMPLOYEE_APPROVED &&
+      invoice.status !== InvoiceStatus.TRANSACTION_COMPLETED
+    ) {
+      throw new AppError(
+        'Only Employee Approved or Converted quotations can be rejected by Finance',
+        400,
+      );
     }
 
-    invoice.status = InvoiceStatus.REJECTED;
+    invoice.status = InvoiceStatus.FINANCE_REJECTED;
     invoice.financeApprovedBy = userId; // Record who rejected
     invoice.financeApprovedAt = new Date();
     invoice.financeRemarks = reason;
@@ -1516,9 +1568,11 @@ export class BillingService {
       </tr>`;
     };
 
-    // Extract Limit/Excess info from the first pricing rule or item (assuming uniform for quotation usually, or list them)
-    // For simplicity in summary, we check if there's a pricing rule.
-    // const pricingRule = contract.items?.find((i) => i.itemType === ItemType.PRICING_RULE) || contract.items?.[0];
+    // Build Accept/Reject response URL (public endpoint, no auth needed)
+    const billingBaseUrl =
+      process.env.BILLING_SERVICE_PUBLIC_URL || `http://localhost:${process.env.PORT || 3004}`;
+    const acceptUrl = `${billingBaseUrl}/invoices/${contract.id}/respond?action=accept`;
+    const rejectUrl = `${billingBaseUrl}/invoices/${contract.id}/respond?action=reject`;
 
     const htmlBody = `
       <div style="font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; padding: 24px; color: #1e293b; line-height: 1.5;">
@@ -1580,6 +1634,23 @@ export class BillingService {
           </div>
           <p style="font-size: 11px; color: #94a3b8; margin-top: 8px; font-style: italic;">* Detailed usage limits and terms are provided in the attached PDF report.</p>
         </div>
+
+        <!-- ── Customer Response Buttons ───────────────────────────────────── -->
+        <div style="background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%); border: 1px solid #e2e8f0; border-radius: 16px; padding: 28px 24px; margin-bottom: 24px; text-align: center;">
+          <p style="font-size: 15px; font-weight: 700; color: #0f172a; margin: 0 0 6px 0;">Ready to proceed?</p>
+          <p style="font-size: 13px; color: #64748b; margin: 0 0 24px 0;">Please review the quotation and click one of the buttons below to let us know your decision.</p>
+          <div style="display: flex; gap: 16px; justify-content: center; flex-wrap: wrap;">
+            <a href="${acceptUrl}"
+               style="display: inline-block; background: linear-gradient(135deg, #16a34a 0%, #15803d 100%); color: white; padding: 14px 36px; border-radius: 12px; text-decoration: none; font-size: 15px; font-weight: 800; letter-spacing: 0.02em; box-shadow: 0 4px 14px rgba(22,163,74,0.3);">
+              ✅ &nbsp; Accept Quotation
+            </a>
+            <a href="${rejectUrl}"
+               style="display: inline-block; background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%); color: white; padding: 14px 36px; border-radius: 12px; text-decoration: none; font-size: 15px; font-weight: 800; letter-spacing: 0.02em; box-shadow: 0 4px 14px rgba(220,38,38,0.3);">
+              ❌ &nbsp; Reject Quotation
+            </a>
+          </div>
+          <p style="font-size: 11px; color: #94a3b8; margin: 18px 0 0 0;">Ref: ${contract.invoiceNumber} &nbsp;|&nbsp; This link is valid once only per action.</p>
+        </div>
         
         <div style="border-top: 1px solid #e2e8f0; padding-top: 20px; text-align: center;">
           <p style="font-size: 14px; font-weight: bold; color: #0f172a; margin-bottom: 4px;">Thank you for choosing XeroCare</p>
@@ -1597,6 +1668,17 @@ export class BillingService {
       body: htmlBody, // Sending HTML as body
       invoiceId: contract.id,
     });
+
+    // Mark quotation as "Sent to Customer" so employees can track it
+    if (
+      contract.status === 'DRAFT' ||
+      contract.status === 'SENT' ||
+      contract.status === 'SENT_TO_CUSTOMER'
+    ) {
+      contract.status = InvoiceStatus.SENT_TO_CUSTOMER;
+      contract.emailSentAt = new Date();
+      await this.invoiceRepo.save(contract);
+    }
   }
 
   async sendWhatsappNotification(contractId: string, recipient: string | undefined, body: string) {
@@ -1621,6 +1703,12 @@ export class BillingService {
     }
 
     const { NotificationPublisher } = await import('../events/publisher/notificationPublisher');
+
+    // Build Accept/Reject response URL (public endpoint, no auth needed)
+    const billingBaseUrl =
+      process.env.BILLING_SERVICE_PUBLIC_URL || `http://localhost:${process.env.PORT || 3004}`;
+    const acceptUrl = `${billingBaseUrl}/invoices/${contract.id}/respond?action=accept`;
+    const rejectUrl = `${billingBaseUrl}/invoices/${contract.id}/respond?action=reject`;
 
     // Construct Detailed WhatsApp Message
     let details = `*Invoice:* ${contract.invoiceNumber}\n`;
@@ -1650,13 +1738,25 @@ export class BillingService {
       details += `----------------\n`;
     }
 
-    const fullBody = `${body}\n\n${details}\n_Thank you, XeroCare_`;
+    const responseSection = `\n✅ *Accept Quotation:*\n${acceptUrl}\n\n❌ *Reject Quotation:*\n${rejectUrl}`;
+    const fullBody = `${body}\n\n${details}\n${responseSection}\n\n_Thank you, XeroCare_`;
 
     await NotificationPublisher.publishWhatsappRequest({
       recipient: finalRecipient,
       body: fullBody,
       invoiceId: contract.id,
     });
+
+    // Mark quotation as "Sent to Customer" so employees can track it
+    if (
+      contract.status === 'DRAFT' ||
+      contract.status === 'SENT' ||
+      contract.status === 'SENT_TO_CUSTOMER'
+    ) {
+      contract.status = InvoiceStatus.SENT_TO_CUSTOMER;
+      contract.whatsappSentAt = new Date();
+      await this.invoiceRepo.save(contract);
+    }
   }
 
   /**

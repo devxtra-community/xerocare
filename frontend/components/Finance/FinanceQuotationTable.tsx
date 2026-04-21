@@ -48,12 +48,14 @@ function StatusBadge({ status }: { status: string }) {
     PENDING: 'bg-yellow-100 text-yellow-700',
   };
   const label: Record<string, string> = {
-    EMPLOYEE_APPROVED: 'PENDING REVIEW',
-    FINANCE_APPROVED: 'ALLOCATED',
-    PAID: 'APPROVED/PAID',
+    EMPLOYEE_APPROVED: 'PENDING FINANCE REVIEW',
+    FINANCE_APPROVED: 'ALLOCATED/APPROVED',
+    PAID: 'PROCESSED/PAID',
     ACTIVE_LEASE: 'ACTIVE CONTRACT',
     APPROVED: 'APPROVED',
+    FINANCE_REJECTED: 'FINANCE REJECTED',
     REJECTED: 'REJECTED',
+    TRANSACTION_COMPLETED: 'PENDING FINANCE REVIEW',
     DRAFT: 'DRAFT',
   };
   return (
@@ -83,7 +85,13 @@ function TypeBadge({ type }: { type: string }) {
 
 // ─── Main Finance Quotation Table ─────────────────────────────────────────────
 
-export default function FinanceQuotationTable({ saleType }: { saleType?: string }) {
+export default function FinanceQuotationTable({
+  saleType,
+  hideActions = false,
+}: {
+  saleType?: string;
+  hideActions?: boolean;
+}) {
   const [quotations, setQuotations] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -283,7 +291,8 @@ export default function FinanceQuotationTable({ saleType }: { saleType?: string 
                 </TableRow>
               ) : (
                 paginated.map((q, index) => {
-                  const isPending = q.status === 'EMPLOYEE_APPROVED';
+                  const isPending =
+                    q.status === 'EMPLOYEE_APPROVED' || q.status === 'TRANSACTION_COMPLETED';
                   return (
                     <TableRow
                       key={q.id}
@@ -326,8 +335,8 @@ export default function FinanceQuotationTable({ saleType }: { saleType?: string 
                           >
                             <Eye className="h-4 w-4" />
                           </Button>
-                          {/* Inline approve/reject only if pending */}
-                          {isPending && (
+                          {/* Inline approve/reject only if pending and not hidden */}
+                          {isPending && !hideActions && (
                             <>
                               <Button
                                 variant="ghost"
@@ -374,8 +383,20 @@ export default function FinanceQuotationTable({ saleType }: { saleType?: string 
         <QuotationViewDialog
           quotation={viewQuotation}
           onClose={() => setViewQuotation(null)}
-          onApprove={() => handleApprove(viewQuotation)}
-          onReject={() => openReject(viewQuotation)}
+          onApprove={
+            !hideActions &&
+            (viewQuotation.status === 'EMPLOYEE_APPROVED' ||
+              viewQuotation.status === 'TRANSACTION_COMPLETED')
+              ? () => handleApprove(viewQuotation)
+              : undefined
+          }
+          onReject={
+            !hideActions &&
+            (viewQuotation.status === 'EMPLOYEE_APPROVED' ||
+              viewQuotation.status === 'TRANSACTION_COMPLETED')
+              ? () => openReject(viewQuotation)
+              : undefined
+          }
           showDistribution={true}
         />
       )}

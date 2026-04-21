@@ -173,6 +173,20 @@ export const updateQuotation = async (req: Request, res: Response, next: NextFun
 };
 
 /**
+ * Generic status update for an invoice or quotation.
+ */
+export const updateStatus = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = req.params.id as string;
+    const { status } = req.body;
+    const result = await billingService.updateStatus(id, status);
+    return res.status(200).json({ success: true, data: result });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
  * Move a price estimate forward to the next stage (Proforma Invoice).
  * This usually happens after we've confirmed the customer paid their initial deposit.
  */
@@ -419,12 +433,19 @@ export const getMyInvoices = async (req: Request, res: Response, next: NextFunct
 export const getBranchInvoices = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const branchId = req.user?.branchId;
+    const role = req.user?.role;
 
-    if (!branchId) {
-      throw new AppError('Branch ID not found in user context', 400);
+    let invoices;
+    if (role === EmployeeRole.ADMIN || role === EmployeeRole.FINANCE) {
+      // Finance and Admin can see all branch invoices for unified approval
+      invoices = await billingService.getAllInvoices();
+    } else {
+      if (!branchId) {
+        throw new AppError('Branch ID not found in user context', 400);
+      }
+      invoices = await billingService.getBranchInvoices(branchId);
     }
 
-    const invoices = await billingService.getBranchInvoices(branchId);
     return res.status(200).json({
       success: true,
       data: invoices,
@@ -941,6 +962,81 @@ export const processReturn = async (req: Request, res: Response, next: NextFunct
       data: result,
       message: 'Return processed successfully and earning reduced',
     });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Public endpoint: Customer accepts or rejects a quotation via email/WhatsApp link.
+ * No authentication required — the quotation ID is sufficient for the action.
+ */
+export const customerRespond = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = req.params.id as string;
+    const action = req.query.action as string;
+
+    if (!id) throw new AppError('Quotation ID is required', 400);
+    if (action !== 'accept' && action !== 'reject') {
+      throw new AppError('Invalid action. Must be "accept" or "reject"', 400);
+    }
+
+    const result = await billingService.customerRespond(id, action);
+
+    // Serve a friendly HTML response page
+    const isAccepted = action === 'accept';
+    const html = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>${isAccepted ? 'Quotation Accepted' : 'Quotation Rejected'} – XeroCare</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: ${isAccepted ? 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)' : 'linear-gradient(135deg, #fff5f5 0%, #fee2e2 100%)'};
+    }
+    .card {
+      background: white;
+      border-radius: 24px;
+      padding: 48px 40px;
+      max-width: 480px;
+      width: 90%;
+      text-align: center;
+      box-shadow: 0 25px 50px rgba(0,0,0,0.08);
+      border: 1px solid ${isAccepted ? '#bbf7d0' : '#fecaca'};
+    }
+    .icon { width: 80px; height: 80px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 24px; font-size: 36px; background: ${isAccepted ? '#dcfce7' : '#fee2e2'}; }
+    h1 { font-size: 26px; font-weight: 900; color: #0f172a; margin-bottom: 12px; }
+    p { font-size: 15px; color: #64748b; line-height: 1.6; }
+    .ref { margin-top: 24px; padding: 14px 20px; background: #f8fafc; border-radius: 12px; font-size: 13px; color: #475569; font-weight: 600; }
+    .badge { display: inline-block; margin-top: 20px; padding: 6px 18px; border-radius: 999px; font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; background: ${isAccepted ? '#16a34a' : '#dc2626'}; color: white; }
+    .brand { margin-top: 32px; font-size: 11px; color: #94a3b8; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon">${isAccepted ? '&#10004;' : '&#10008;'}</div>
+    <h1>${isAccepted ? 'Quotation Accepted!' : 'Quotation Rejected'}</h1>
+    <p>${
+      isAccepted
+        ? 'Thank you! Your acceptance has been recorded. Our team will contact you shortly to proceed with the next steps.'
+        : 'Your response has been recorded. Please feel free to contact us if you have any questions or would like to discuss further.'
+    }</p>
+    <div class="ref">Reference: ${result.invoiceNumber}</div>
+    <span class="badge">${isAccepted ? 'Accepted' : 'Rejected'}</span>
+    <p class="brand">XeroCare Trading &amp; Services W.L.L</p>
+  </div>
+</body>
+</html>`;
+
+    return res.status(200).send(html);
   } catch (error) {
     next(error);
   }

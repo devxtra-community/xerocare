@@ -69,6 +69,7 @@ export default function FinanceApprovalTable({ saleType }: FinanceApprovalTableP
         (inv) =>
           inv.status === 'EMPLOYEE_APPROVED' ||
           inv.status === 'APPROVED' ||
+          inv.status === 'TRANSACTION_COMPLETED' ||
           inv.contractStatus === 'PENDING_CONFIRMATION',
       );
 

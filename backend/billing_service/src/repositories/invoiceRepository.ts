@@ -367,6 +367,7 @@ export class InvoiceRepository {
       )
       .where('invoice.status IN (:...statuses)', {
         statuses: [
+          InvoiceStatus.TRANSACTION_COMPLETED,
           InvoiceStatus.PAID,
           InvoiceStatus.ISSUED,
           InvoiceStatus.FINANCE_APPROVED,
@@ -437,6 +438,7 @@ export class InvoiceRepository {
       )
       .where('invoice.status IN (:...statuses)', {
         statuses: [
+          InvoiceStatus.TRANSACTION_COMPLETED,
           InvoiceStatus.PAID,
           InvoiceStatus.ISSUED,
           InvoiceStatus.FINANCE_APPROVED,
@@ -506,6 +508,7 @@ export class InvoiceRepository {
       .addSelect('COUNT(invoice.id)', 'totalInvoices')
       .where('invoice.status IN (:...statuses)', {
         statuses: [
+          InvoiceStatus.TRANSACTION_COMPLETED,
           InvoiceStatus.PAID,
           InvoiceStatus.ISSUED,
           InvoiceStatus.FINANCE_APPROVED,
@@ -552,6 +555,7 @@ export class InvoiceRepository {
       )
       .where('invoice.status IN (:...statuses)', {
         statuses: [
+          InvoiceStatus.TRANSACTION_COMPLETED,
           InvoiceStatus.PAID,
           InvoiceStatus.ISSUED,
           InvoiceStatus.FINANCE_APPROVED,
@@ -623,6 +627,7 @@ export class InvoiceRepository {
       .addSelect('COUNT(invoice.id)', 'totalInvoices')
       .where('invoice.status IN (:...statuses)', {
         statuses: [
+          InvoiceStatus.TRANSACTION_COMPLETED,
           InvoiceStatus.PAID,
           InvoiceStatus.ISSUED,
           InvoiceStatus.FINANCE_APPROVED,
@@ -670,6 +675,7 @@ export class InvoiceRepository {
       )
       .where('invoice.status IN (:...statuses)', {
         statuses: [
+          InvoiceStatus.TRANSACTION_COMPLETED,
           InvoiceStatus.PAID,
           InvoiceStatus.ISSUED,
           InvoiceStatus.FINANCE_APPROVED,
@@ -830,6 +836,7 @@ export class InvoiceRepository {
       .addSelect('COUNT(invoice.id)', 'count')
       .where('invoice.status IN (:...includedStatuses)', {
         includedStatuses: [
+          InvoiceStatus.TRANSACTION_COMPLETED,
           InvoiceStatus.FINANCE_APPROVED,
           InvoiceStatus.ACTIVE_LEASE,
           InvoiceStatus.ISSUED,
@@ -902,7 +909,9 @@ export class InvoiceRepository {
       .where('invoice.saleType IN (:...saleTypes)', {
         saleTypes: [SaleType.SALE, SaleType.PRODUCT_SALE, SaleType.SPAREPART_SALE],
       })
-      .andWhere('invoice.status IN (:...statuses)', { statuses })
+      .andWhere('invoice.status IN (:...statuses)', {
+        statuses: [...statuses, InvoiceStatus.TRANSACTION_COMPLETED],
+      })
       .getRawOne();
 
     const itemsStats = await Source.getRepository(InvoiceItem)

@@ -61,7 +61,10 @@ export const connectWithRetry = async (initialDelayMs = 2000): Promise<DataSourc
       return Source;
     } catch (error: unknown) {
       const err = error as Error & { code?: string };
-      logger.error(`Database connection failed on attempt ${attempt}: ${err.code || err.message}`);
+      logger.error(
+        `Database connection failed on attempt ${attempt}: ${err.code} - ${err.message}`,
+        err,
+      );
 
       logger.info(`Waiting ${delay / 1000} seconds before retrying...`);
       // Wait safely without blocking Node loop

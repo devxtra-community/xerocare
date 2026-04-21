@@ -57,7 +57,7 @@ export default function LeasePage() {
           <TabsContent value="quotations" className="space-y-4">
             <h3 className="text-xl font-bold text-slate-800 tracking-tight">All Lease Contracts</h3>
             <div className="bg-card rounded-xl shadow-sm border border-slate-100 p-1">
-              <FinanceQuotationTable saleType="LEASE" />
+              <FinanceQuotationTable saleType="LEASE" hideActions={true} />
             </div>
           </TabsContent>
 

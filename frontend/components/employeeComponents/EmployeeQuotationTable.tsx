@@ -52,6 +52,7 @@ import {
   getMyInvoices,
   getInvoiceById,
   employeeApproveInvoice,
+  updateInvoiceStatus,
   Invoice,
   CreateInvoicePayload,
 } from '@/lib/invoice';
@@ -90,22 +91,31 @@ function StatusBadge({ status }: { status: string }) {
   const map: Record<string, string> = {
     DRAFT: 'bg-slate-100 text-slate-600',
     SENT: 'bg-blue-100 text-blue-600',
+    SENT_TO_CUSTOMER: 'bg-blue-100 text-blue-600',
     ACCEPTED: 'bg-green-100 text-green-700',
+    CUSTOMER_ACCEPTED: 'bg-green-100 text-green-700',
     APPROVED: 'bg-green-100 text-green-700',
     FINANCE_APPROVED: 'bg-green-100 text-green-700',
     EMPLOYEE_APPROVED: 'bg-yellow-100 text-yellow-700',
     REJECTED: 'bg-red-100 text-red-700',
+    CUSTOMER_REJECTED: 'bg-red-100 text-red-700',
     EXPIRED: 'bg-orange-100 text-orange-700',
     PENDING: 'bg-yellow-100 text-yellow-700',
     PAID: 'bg-green-100 text-green-700',
     ACTIVE_LEASE: 'bg-green-100 text-green-700',
+    TRANSACTION_COMPLETED: 'bg-green-100 text-green-700 font-bold border-green-200',
   };
 
   const label: Record<string, string> = {
+    DRAFT: 'PENDING',
     EMPLOYEE_APPROVED: 'SENT TO FINANCE',
-    FINANCE_APPROVED: 'ACCEPTED',
+    FINANCE_APPROVED: 'VERIFIED',
+    SENT_TO_CUSTOMER: 'SENT FOR APPROVAL',
+    CUSTOMER_ACCEPTED: 'ACCEPTED BY CUSTOMER',
+    CUSTOMER_REJECTED: 'REJECTED BY CUSTOMER',
     APPROVED: 'ACCEPTED',
     ACTIVE_LEASE: 'ACTIVE',
+    TRANSACTION_COMPLETED: 'TRANSACTION COMPLETED',
   };
 
   return (
@@ -193,9 +203,19 @@ export default function EmployeeQuotationTable() {
   // Stats
   const total_q = quotations.length;
   const accepted_q = quotations.filter((q) =>
-    ['ACCEPTED', 'APPROVED', 'FINANCE_APPROVED', 'PAID', 'ACTIVE_LEASE'].includes(q.status),
+    [
+      'ACCEPTED',
+      'CUSTOMER_ACCEPTED',
+      'APPROVED',
+      'FINANCE_APPROVED',
+      'PAID',
+      'ACTIVE_LEASE',
+      'TRANSACTION_COMPLETED',
+    ].includes(q.status),
   ).length;
-  const rejected_q = quotations.filter((q) => q.status === 'REJECTED').length;
+  const rejected_q = quotations.filter(
+    (q) => q.status === 'REJECTED' || q.status === 'CUSTOMER_REJECTED',
+  ).length;
 
   // Filter
   const filtered = quotations.filter((q) => {
@@ -244,6 +264,19 @@ export default function EmployeeQuotationTable() {
     } catch (error: unknown) {
       const err = error as { response?: { data?: { message?: string } } };
       toast.error(err.response?.data?.message || 'Failed to send to finance.');
+    }
+  };
+
+  const handleStatusChange = async (status: string) => {
+    if (!selectedQ) return;
+    try {
+      await updateInvoiceStatus(selectedQ.id, status);
+      toast.success(`Quotation marked as ${status}`);
+      setViewOpen(false);
+      fetchQuotations();
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { message?: string } } };
+      toast.error(err.response?.data?.message || `Failed to update status to ${status}`);
     }
   };
 
@@ -401,7 +434,9 @@ export default function EmployeeQuotationTable() {
         <QuotationViewDialog
           quotation={selectedQ}
           onClose={() => setViewOpen(false)}
+          onStatusChange={handleStatusChange}
           onSendToFinance={handleSendToFinance}
+          showDistribution={true}
         />
       )}
     </div>

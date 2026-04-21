@@ -329,15 +329,22 @@ export function InvoiceDetailsDialog({
     };
   }, [currentInvoice, excessAmount, grandTotal]);
 
-  const isSaleType = ['SALE', 'PRODUCT_SALE', 'SPAREPART_SALE'].includes(currentInvoice.saleType);
+  const isTemplateType = ['SALE', 'RENT', 'LEASE', 'PRODUCT_SALE', 'SPAREPART_SALE'].includes(
+    currentInvoice.saleType,
+  );
+  const isFinalInvoice = currentInvoice.type === 'FINAL';
 
-  if (isSaleType) {
+  // For regular quotations/contracts, use the premium template.
+  // We exclude FINAL invoices (monthly collections) if they should stay in the breakdown view,
+  // but usually users want the premium look for all documents.
+  if (isTemplateType && !isFinalInvoice) {
     return (
       <InvoiceViewDialog
         invoice={currentInvoice}
         onClose={onClose}
         onApprove={onApprove}
         onReject={onReject}
+        approveLabel={approveLabel}
       />
     );
   }

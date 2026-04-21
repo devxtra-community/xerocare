@@ -1,12 +1,19 @@
 export enum InvoiceStatus {
   DRAFT = 'DRAFT',
   SENT = 'SENT',
+  SENT_TO_CUSTOMER = 'SENT_TO_CUSTOMER', // Customer has been sent the quotation for approval
   APPROVED = 'APPROVED', // @deprecated - use EMPLOYEE_APPROVED or FINANCE_APPROVED
   EMPLOYEE_APPROVED = 'EMPLOYEE_APPROVED',
   FINANCE_APPROVED = 'FINANCE_APPROVED',
   ACTIVE_LEASE = 'ACTIVE_LEASE',
   REJECTED = 'REJECTED',
+  ACCEPTED = 'ACCEPTED',
+  CUSTOMER_ACCEPTED = 'CUSTOMER_ACCEPTED', // Customer accepted the quotation via email/whatsapp link
+  CUSTOMER_REJECTED = 'CUSTOMER_REJECTED', // Customer rejected the quotation via email/whatsapp link
   ISSUED = 'ISSUED',
   PAID = 'PAID',
   CANCELLED = 'CANCELLED',
+  PENDING = 'PENDING', // @deprecated - added to fix db sync issue
+  TRANSACTION_COMPLETED = 'TRANSACTION_COMPLETED',
+  FINANCE_REJECTED = 'FINANCE_REJECTED',
 }

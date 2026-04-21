@@ -829,3 +829,11 @@ export const processReturn = async (
   const response = await api.post(`/b/invoices/${invoiceId}/returns`, payload);
   return response.data.data;
 };
+
+/**
+ * Update the status of an invoice or quotation.
+ */
+export const updateInvoiceStatus = async (id: string, status: string): Promise<Invoice> => {
+  const response = await api.put(`/b/invoices/${id}/status`, { status });
+  return response.data.data;
+};

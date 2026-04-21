@@ -38,6 +38,8 @@ import {
   replaceDeviceAllocation,
   getContractAllocations,
   processReturn,
+  updateStatus,
+  customerRespond,
 } from '../controllers/invoiceController';
 import { uploadMeterImage } from '../middlewares/uploadMiddleware';
 import { authMiddleware } from '../middlewares/authMiddleware';
@@ -118,6 +120,11 @@ router.post('/:id/finance-reject', authMiddleware, financeReject);
  * Record a deposit or initial payment from the customer.
  */
 router.put('/:id/approve', authMiddleware, approveQuotation);
+
+/**
+ * Generic status update for an invoice or quotation.
+ */
+router.put('/:id/status', authMiddleware, updateStatus);
 
 // --- 3. Lists and Statistics for Staff ---
 
@@ -333,6 +340,12 @@ router.post('/:id/notify/whatsapp', authMiddleware, sendWhatsappNotification);
  * See which machines are currently assigned to a specific contract.
  */
 router.get('/:contractId/allocations', authMiddleware, getContractAllocations);
+
+/**
+ * Public: Customer accepts or rejects a quotation via email/WhatsApp link.
+ * No authentication required.
+ */
+router.get('/:id/respond', customerRespond);
 
 /**
  * Find one specific bill using its unique ID number.

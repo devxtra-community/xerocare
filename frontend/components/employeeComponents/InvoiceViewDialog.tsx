@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Download } from 'lucide-react';
+import { Download, Send } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { getProductById } from '@/lib/product';
@@ -9,22 +9,41 @@ import { getAllSpareParts } from '@/lib/spare-part';
 import { getAllModels } from '@/lib/model';
 import { Invoice, downloadPremiumInvoice } from '@/lib/invoice';
 
+interface ProductMeta {
+  brandRelation?: { name?: string };
+  brand?: string;
+  model?: { model_name?: string };
+  model_name?: string;
+  serial_no?: string;
+  imageUrl?: string;
+  image_url?: string;
+  mpn?: string;
+  name?: string;
+  part_name?: string;
+  description?: string;
+  inventory?: { description?: string }[];
+}
+
 interface InvoiceViewDialogProps {
   invoice: Invoice;
   onClose: () => void;
   onApprove?: () => Promise<void> | void;
   onReject?: (reason: string) => Promise<void> | void;
+  approveLabel?: string;
 }
 
-export function InvoiceViewDialog({ invoice, onClose }: InvoiceViewDialogProps) {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [productDetails, setProductDetails] = useState<Record<string, any>>({});
+export function InvoiceViewDialog({
+  invoice,
+  onClose,
+  onApprove,
+  approveLabel = 'Approve',
+}: InvoiceViewDialogProps) {
+  const [productDetails, setProductDetails] = useState<Record<string, ProductMeta>>({});
 
   useEffect(() => {
     const fetchFullDetails = async () => {
       try {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const details: Record<string, any> = {};
+        const details: Record<string, ProductMeta> = {};
         if (invoice.items) {
           const [spareParts, modelsRes] = await Promise.all([
             getAllSpareParts().catch(() => []),
@@ -39,30 +58,27 @@ export function InvoiceViewDialog({ invoice, onClose }: InvoiceViewDialogProps) 
 
             if (targetProductId) {
               try {
-                const p = await getProductById(targetProductId);
+                const p = (await getProductById(targetProductId)) as unknown as ProductMeta;
                 details[targetProductId] = p;
               } catch (e) {
                 console.error(e);
               }
             }
             if (item.modelId) {
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              const m = models.find((m: any) => m.id === item.modelId);
-              if (m) details[item.modelId] = m;
+              const m = models.find((m: { id: string }) => m.id === item.modelId);
+              if (m) details[item.modelId] = m as unknown as ProductMeta;
             } else if (item.description) {
-              /* eslint-disable @typescript-eslint/no-explicit-any */
               const m = models.find(
-                (m: any) =>
+                (m: { model_name?: string; product_name?: string }) =>
                   m.model_name === item.description || m.product_name === item.description,
               );
-              /* eslint-enable @typescript-eslint/no-explicit-any */
               if (m) {
-                details[item.description] = m;
+                details[item.description] = m as unknown as ProductMeta;
               } else {
                 const sp = spareParts.find(
                   (s) => s.part_name === item.description || s.mpn === item.description,
                 );
-                if (sp) details[item.description] = sp;
+                if (sp) details[item.description] = sp as unknown as ProductMeta;
               }
             }
           }
@@ -78,17 +94,18 @@ export function InvoiceViewDialog({ invoice, onClose }: InvoiceViewDialogProps) 
   const allocs = invoice.productAllocations || [];
   const enrichedItems = (invoice.items || [])
     .map((item) => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const alloc = item.modelId ? allocs.find((a: any) => a.modelId === item.modelId) : null;
+      const alloc = item.modelId
+        ? allocs.find((a: { modelId: string }) => a.modelId === item.modelId)
+        : null;
       const targetProductId = item.productId || alloc?.productId;
 
       const meta =
-        targetProductId && productDetails[targetProductId]
-          ? productDetails[targetProductId]
-          : item.modelId && productDetails[item.modelId]
-            ? productDetails[item.modelId]
-            : item.description && productDetails[item.description]
-              ? productDetails[item.description]
+        targetProductId && productDetails[targetProductId as string]
+          ? productDetails[targetProductId as string]
+          : item.modelId && productDetails[item.modelId as string]
+            ? productDetails[item.modelId as string]
+            : item.description && productDetails[item.description as string]
+              ? productDetails[item.description as string]
               : null;
 
       return {
@@ -110,8 +127,8 @@ export function InvoiceViewDialog({ invoice, onClose }: InvoiceViewDialogProps) 
         <div className="flex flex-col h-full max-h-[90vh]">
           {/* ═══ HEADER — Xerocare Job Report ═══════════════════════════════ */}
           <div
-            className="relative flex justify-between shrink-0 overflow-hidden"
-            style={{ height: '130px' }}
+            className="relative flex justify-between shrink-0 overflow-hidden bg-slate-50/10"
+            style={{ height: '110px' }}
           >
             {/* Left: mascot on diamond pattern */}
             <div className="w-1/2 h-full">
@@ -194,51 +211,45 @@ export function InvoiceViewDialog({ invoice, onClose }: InvoiceViewDialogProps) 
                     </p>
                   </div>
                 </div>
-                <div className="flex gap-8 text-[12px] font-black text-slate-600 uppercase tracking-tight mt-1 px-4">
-                  <p>
+                <div className="flex flex-wrap justify-end gap-x-6 gap-y-1 text-[11px] font-black text-slate-600 uppercase tracking-tight mt-1 px-4">
+                  <p className="whitespace-nowrap">
                     Payment Method - <span className="text-red-700">Due on receipt</span>
                   </p>
-                  <p>
+                  <p className="whitespace-nowrap">
                     Rep - <span className="text-red-700">{invoice.employeeName || 'RSHD'}</span>
                   </p>
-                </div>
-                <div className="flex gap-10 text-[12px] font-black text-slate-600 uppercase tracking-tight px-4">
-                  <p>
-                    Status{' '}
-                    <span className="text-red-700 ml-8 font-black uppercase tracking-widest">
-                      {invoice.status}
-                    </span>
+                  <p className="whitespace-nowrap">
+                    Status -{' '}
+                    <span className="text-red-700 uppercase tracking-widest">{invoice.status}</span>
                   </p>
                 </div>
               </div>
             </div>
 
             {/* Brand / Model / Sl No - Large Row exactly like image */}
-            <div className="flex justify-center gap-16 py-4 border-b border-slate-100 uppercase">
-              <div className="flex gap-4 items-center">
-                <span className="text-base font-black text-slate-900 tracking-widest">BRAND</span>
-                <span className="text-base font-bold text-slate-600 italic leading-none">
+            <div className="flex flex-wrap justify-center gap-x-12 gap-y-4 py-6 border-b-2 border-red-50 uppercase bg-slate-50/20 rounded-xl">
+              <div className="flex gap-3 items-center">
+                <span className="text-sm font-black text-slate-900 tracking-widest">BRAND</span>
+                <span className="text-sm font-bold text-red-700 italic leading-none border-l-2 border-red-100 pl-3">
                   {enrichedItems[0]?.metadata?.brandRelation?.name ||
                     enrichedItems[0]?.metadata?.brand ||
                     'N/A'}
                 </span>
               </div>
-              <div className="flex gap-4 items-center">
-                <span className="text-base font-black text-slate-900 tracking-widest">
-                  MODEL NO
-                </span>
-                <span className="text-base font-bold text-slate-600 italic leading-none">
+              <div className="flex gap-3 items-center">
+                <span className="text-sm font-black text-slate-900 tracking-widest">MODEL NO</span>
+                <span className="text-sm font-bold text-red-700 italic leading-none border-l-2 border-red-100 pl-3">
                   {enrichedItems[0]?.metadata?.model?.model_name ||
                     enrichedItems[0]?.metadata?.model_name ||
                     'N/A'}
                 </span>
               </div>
-              <div className="flex gap-4 items-center">
-                <span className="text-base font-black text-slate-900 tracking-widest">SL NO</span>
-                <span className="text-base font-bold text-slate-600 italic leading-none">
+              <div className="flex gap-3 items-center">
+                <span className="text-sm font-black text-slate-900 tracking-widest">SL NO</span>
+                <span className="text-sm font-bold text-red-700 italic leading-none border-l-2 border-red-100 pl-3">
                   {enrichedItems[0]?.allocation?.serialNumber ||
                     enrichedItems[0]?.metadata?.serial_no ||
-                    (!isRent && !isLease ? 'N/A' : 'TBD UPON DISPATCH')}
+                    (!isRent && !isLease ? 'N/A' : 'TBD')}
                 </span>
               </div>
             </div>
@@ -261,51 +272,51 @@ export function InvoiceViewDialog({ invoice, onClose }: InvoiceViewDialogProps) 
                   <thead>
                     {isSale && (
                       <tr className="bg-red-700 text-white">
-                        <th className="text-left py-4 px-8 text-[12px] font-black uppercase tracking-widest border-r border-red-600/40">
+                        <th className="text-left py-4 px-4 text-[11px] font-black uppercase tracking-widest border-r border-red-600/40 w-[12%]">
                           MPN
                         </th>
-                        <th className="text-left py-4 px-8 text-[12px] font-black uppercase tracking-widest border-r border-red-600/40">
+                        <th className="text-left py-4 px-4 text-[11px] font-black uppercase tracking-widest border-r border-red-600/40 w-[20%]">
                           Product Name
                         </th>
-                        <th className="text-left py-4 px-8 text-[12px] font-black uppercase tracking-widest border-r border-red-600/40">
+                        <th className="text-left py-4 px-4 text-[11px] font-black uppercase tracking-widest border-r border-red-600/40 w-[30%]">
                           Description
                         </th>
-                        <th className="text-center py-4 px-6 text-[12px] font-black uppercase tracking-widest border-r border-red-600/40">
-                          Quantity
+                        <th className="text-center py-4 px-2 text-[11px] font-black uppercase tracking-widest border-r border-red-600/40 w-[8%]">
+                          QTY
                         </th>
-                        <th className="text-center py-4 px-6 text-[12px] font-black uppercase tracking-widest border-r border-red-600/40">
-                          Discount
+                        <th className="text-center py-4 px-2 text-[11px] font-black uppercase tracking-widest border-r border-red-600/40 w-[8%]">
+                          DISC
                         </th>
-                        <th className="text-right py-4 px-8 text-[12px] font-black uppercase tracking-widest border-r border-red-600/40">
+                        <th className="text-right py-4 px-4 text-[11px] font-black uppercase tracking-widest border-r border-red-600/40 w-[11%]">
                           Rate
                         </th>
-                        <th className="text-right py-4 px-8 text-[12px] font-black uppercase tracking-widest">
+                        <th className="text-right py-4 px-4 text-[11px] font-black uppercase tracking-widest w-[11%]">
                           Total
                         </th>
                       </tr>
                     )}
                     {(isRent || isLease) && (
                       <tr className="bg-red-700 text-white">
-                        <th className="text-left py-4 px-8 text-[12px] font-black uppercase tracking-widest border-r border-red-600/40">
+                        <th className="text-left py-4 px-4 text-[11px] font-black uppercase tracking-widest border-r border-red-600/40 w-[10%]">
                           MPN
                         </th>
-                        <th className="text-left py-4 px-8 text-[12px] font-black uppercase tracking-widest border-r border-red-600/40">
+                        <th className="text-left py-4 px-4 text-[11px] font-black uppercase tracking-widest border-r border-red-600/40 w-[20%]">
                           Product Name
                         </th>
-                        <th className="text-left py-4 px-8 text-[12px] font-black uppercase tracking-widest border-r border-red-600/40">
+                        <th className="text-left py-4 px-4 text-[11px] font-black uppercase tracking-widest border-r border-red-600/40 w-[25%]">
                           Description
                         </th>
-                        <th className="text-center py-4 px-6 text-[12px] font-black uppercase tracking-widest border-r border-red-600/40">
+                        <th className="text-center py-4 px-2 text-[11px] font-black uppercase tracking-widest border-r border-red-600/40 w-[8%]">
                           Qty
                         </th>
-                        <th className="text-center py-4 px-6 text-[12px] font-black uppercase tracking-widest border-r border-red-600/40">
-                          Limit (B/W/Comb)
+                        <th className="text-center py-4 px-2 text-[11px] font-black uppercase tracking-widest border-r border-red-600/40 w-[12%]">
+                          Limits
                         </th>
-                        <th className="text-center py-4 px-6 text-[12px] font-black uppercase tracking-widest border-r border-red-600/40">
+                        <th className="text-center py-4 px-2 text-[11px] font-black uppercase tracking-widest border-r border-red-600/40 w-[12%]">
                           Col Lmt
                         </th>
-                        <th className="text-center py-4 px-4 text-[12px] font-black uppercase tracking-widest">
-                          Exc Rate (B/C/Comb)
+                        <th className="text-center py-4 px-2 text-[11px] font-black uppercase tracking-widest w-[13%]">
+                          Exc Rate
                         </th>
                       </tr>
                     )}
@@ -332,14 +343,14 @@ export function InvoiceViewDialog({ invoice, onClose }: InvoiceViewDialogProps) 
                           <td className="py-3 px-4 border-r-2 border-red-50 align-top relative">
                             <span className="text-[12px] font-black text-slate-800">{mpn}</span>
                           </td>
-                          <td className="py-3 px-4 border-r-2 border-red-50 relative w-1/4">
+                          <td className="py-3 px-4 border-r-2 border-red-50 relative">
                             <div className="relative z-10 space-y-1">
                               <p className="text-[13px] font-black text-slate-900 uppercase tracking-tight leading-snug">
                                 {productName}
                               </p>
                             </div>
                           </td>
-                          <td className="py-3 px-4 border-r-2 border-red-50 align-top relative w-1/4">
+                          <td className="py-3 px-4 border-r-2 border-red-50 align-top relative">
                             <div className="flex gap-4">
                               {image && (
                                 <img
@@ -359,8 +370,9 @@ export function InvoiceViewDialog({ invoice, onClose }: InvoiceViewDialogProps) 
                           {isSale && (
                             <>
                               <td className="py-3 px-3 text-center border-r-2 border-red-50 align-top font-black text-slate-900 text-sm">
-                                {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                                {(item as any).discount ? `${(item as any).discount}%` : '0%'}
+                                {(item as { discount?: number }).discount
+                                  ? `${(item as { discount?: number }).discount}%`
+                                  : '0%'}
                               </td>
                               <td className="py-3 px-4 text-right border-r-2 border-red-50 align-top font-black text-slate-800 text-sm">
                                 {Number(item.unitPrice || 0).toLocaleString(undefined, {
@@ -612,10 +624,22 @@ export function InvoiceViewDialog({ invoice, onClose }: InvoiceViewDialogProps) 
                       variant="ghost"
                       size="sm"
                       onClick={onClose}
-                      className="h-8 text-[11px] font-black uppercase tracking-widest text-slate-400 hover:text-red-600"
+                      className="h-9 text-[11px] font-black uppercase tracking-widest text-slate-400 hover:text-red-600"
                     >
                       Close
                     </Button>
+
+                    {onApprove && (
+                      <Button
+                        onClick={() => onApprove()}
+                        size="sm"
+                        className="h-10 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[11px] uppercase tracking-widest px-8 gap-2 shadow-lg shadow-emerald-100 rounded-full"
+                      >
+                        <Send size={14} />
+                        {approveLabel}
+                      </Button>
+                    )}
+
                     <Button
                       onClick={() => downloadPremiumInvoice(invoice.id)}
                       size="sm"
