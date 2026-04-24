@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Plus, Search, Loader2, Eye, FileText } from 'lucide-react';
+import { Plus, Search, Loader2, Eye, FileText, Send } from 'lucide-react';
 import { formatCurrency } from '@/lib/format';
 import { toast } from 'sonner';
 import {
@@ -22,10 +22,11 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import {
-  getInvoiceById,
-  employeeApproveInvoice,
   getBranchInvoices,
   getMyInvoices,
+  convertToTransaction,
+  getInvoiceById,
+  employeeApproveInvoice,
   Invoice,
 } from '@/lib/invoice';
 
@@ -78,19 +79,16 @@ export default function EmployeeSalesTable({ mode = 'EMPLOYEE' }: EmployeeSalesT
         const { getBranchInvoices } = await import('@/lib/invoice');
         data = await getBranchInvoices();
         // Only show definitively approved or completed records for the Finance Sales tracker
-        data = data.filter((inv) =>
-          ['APPROVED', 'FINANCE_APPROVED', 'FINAL', 'TRANSACTION_COMPLETED'].includes(inv.status),
+        data = data.filter(
+          (inv) =>
+            ['APPROVED', 'FINANCE_APPROVED', 'FINAL', 'TRANSACTION_COMPLETED'].includes(
+              inv.status,
+            ) && inv.type !== 'QUOTATION',
         );
       } else {
         const myData = await getMyInvoices();
         // Show Proformas, Finals, and any quotations that have been converted to transactions
-        data = myData.filter(
-          (inv) =>
-            inv.type !== 'QUOTATION' ||
-            inv.status === 'TRANSACTION_COMPLETED' ||
-            inv.status === 'EMPLOYEE_APPROVED' ||
-            inv.status === 'FINANCE_REJECTED',
-        );
+        data = myData.filter((inv) => inv.type !== 'QUOTATION');
       }
       setInvoices(data);
     } catch (error) {
@@ -158,9 +156,7 @@ export default function EmployeeSalesTable({ mode = 'EMPLOYEE' }: EmployeeSalesT
       const pending = data.filter(
         (inv) =>
           inv.type === 'QUOTATION' &&
-          inv.status !== 'TRANSACTION_COMPLETED' &&
-          inv.status !== 'REJECTED' &&
-          inv.status !== 'CUSTOMER_REJECTED' &&
+          (inv.status === 'FINANCE_APPROVED' || inv.status === 'CUSTOMER_ACCEPTED') &&
           (inv.saleType === 'SALE' ||
             inv.saleType === 'PRODUCT_SALE' ||
             inv.saleType === 'SPAREPART_SALE'),
@@ -179,8 +175,8 @@ export default function EmployeeSalesTable({ mode = 'EMPLOYEE' }: EmployeeSalesT
 
   const handleConvertQuotation = async (qId: string) => {
     try {
-      await employeeApproveInvoice(qId);
-      toast.success('Quotation converted and sent for Finance approval!');
+      await convertToTransaction(qId);
+      toast.success('Quotation converted to transaction successfully!');
       setIsConverterOpen(false);
       fetchInvoices();
     } catch (error) {
@@ -392,14 +388,31 @@ export default function EmployeeSalesTable({ mode = 'EMPLOYEE' }: EmployeeSalesT
                       })}
                     </TableCell>
                     <TableCell className="text-center">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-8 w-8 p-0 text-blue-500 hover:text-blue-600 hover:bg-blue-50"
-                        onClick={() => handleViewDetails(inv.id)}
-                      >
-                        <Eye className="h-4 w-4" />
-                      </Button>
+                      <div className="flex items-center justify-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 w-8 p-0 text-blue-500 hover:text-blue-600 hover:bg-blue-50"
+                          onClick={() => handleViewDetails(inv.id)}
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+
+                        {inv.status === 'DRAFT' && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-emerald-600 hover:bg-emerald-50"
+                            onClick={() => {
+                              setSelectedInvoice(inv);
+                              handleSendForApproval();
+                            }}
+                            title="Send to Finance"
+                          >
+                            <Send className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))

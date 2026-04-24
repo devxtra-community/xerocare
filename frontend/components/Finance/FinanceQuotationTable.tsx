@@ -27,7 +27,7 @@ import {
   getBranchInvoices,
   getInvoiceById,
   financeRejectInvoice,
-  allocateMachinesInvoice,
+  financeApproveQuotation,
   Invoice,
 } from '@/lib/invoice';
 
@@ -43,20 +43,28 @@ function StatusBadge({ status }: { status: string }) {
   const map: Record<string, string> = {
     DRAFT: 'bg-slate-100 text-slate-600',
     EMPLOYEE_APPROVED: 'bg-blue-100 text-blue-600',
+    FINANCE_APPROVED: 'bg-green-100 text-green-700',
+    FINANCE_REJECTED: 'bg-red-100 text-red-700',
     APPROVED: 'bg-green-100 text-green-700',
     REJECTED: 'bg-red-100 text-red-700',
     PENDING: 'bg-yellow-100 text-yellow-700',
   };
   const label: Record<string, string> = {
+    DRAFT: 'DRAFT (IN PREPARATION)',
+    SENT: 'SENT TO CUSTOMER',
+    SENT_TO_CUSTOMER: 'SENT TO CUSTOMER',
     EMPLOYEE_APPROVED: 'PENDING FINANCE REVIEW',
-    FINANCE_APPROVED: 'ALLOCATED/APPROVED',
+    FINANCE_APPROVED: 'QUOTATION APPROVED',
+    FINANCE_REJECTED: 'QUOTATION REJECTED',
+    CUSTOMER_ACCEPTED: 'ACCEPTED BY CUSTOMER',
+    CUSTOMER_REJECTED: 'REJECTED BY CUSTOMER',
+    ACCEPTED: 'APPROVED',
+    APPROVED: 'APPROVED',
+    REJECTED: 'REJECTED',
+    PENDING_CONFIRMATION: 'WAITING FOR ALLOCATION',
     PAID: 'PROCESSED/PAID',
     ACTIVE_LEASE: 'ACTIVE CONTRACT',
-    APPROVED: 'APPROVED',
-    FINANCE_REJECTED: 'FINANCE REJECTED',
-    REJECTED: 'REJECTED',
     TRANSACTION_COMPLETED: 'PENDING FINANCE REVIEW',
-    DRAFT: 'DRAFT',
   };
   return (
     <Badge
@@ -110,14 +118,17 @@ export default function FinanceQuotationTable({
       // Show employee-approved quotations (type === QUOTATION) needing finance review
       // + already reviewed (APPROVED / REJECTED) for visibility
       let onlyQuotations = data.filter(
-        (inv) =>
-          (inv.type === 'QUOTATION' ||
-            inv.employeeApprovedBy ||
-            inv.invoiceNumber?.startsWith('QT-')) &&
-          !['DRAFT', 'SENT'].includes(inv.status),
+        (inv) => inv.type === 'QUOTATION' || inv.type === 'PROFORMA',
       );
       if (saleType) {
-        onlyQuotations = onlyQuotations.filter((inv) => inv.saleType === saleType);
+        onlyQuotations = onlyQuotations.filter((inv) => {
+          const type = inv.saleType?.toString().toUpperCase();
+          const target = saleType.toUpperCase();
+          if (target === 'SALE') {
+            return ['SALE', 'PRODUCT_SALE', 'SPAREPART_SALE'].includes(type || '');
+          }
+          return type === target;
+        });
       }
       setQuotations(onlyQuotations);
     } catch (error) {
@@ -140,9 +151,25 @@ export default function FinanceQuotationTable({
     (q) => q.status === 'EMPLOYEE_APPROVED' || q.status === 'PENDING',
   ).length;
   const approved = quotations.filter((q) =>
-    ['APPROVED', 'FINANCE_APPROVED', 'PAID', 'ACTIVE_LEASE', 'ISSUED'].includes(q.status),
+    [
+      'APPROVED',
+      'FINANCE_APPROVED',
+      'ACCEPTED',
+      'CUSTOMER_ACCEPTED',
+      'SENT_TO_CUSTOMER',
+      'PAID',
+      'ACTIVE_LEASE',
+      'ISSUED',
+      'TRANSACTION_COMPLETED',
+      'PENDING_CONFIRMATION',
+    ].includes(q.status),
   ).length;
-  const rejected = quotations.filter((q) => q.status === 'REJECTED').length;
+  const rejected = quotations.filter(
+    (q) =>
+      q.status === 'REJECTED' ||
+      q.status === 'FINANCE_REJECTED' ||
+      q.status === 'CUSTOMER_REJECTED',
+  ).length;
 
   const filtered = quotations.filter((q) => {
     const s = search.toLowerCase();
@@ -172,8 +199,8 @@ export default function FinanceQuotationTable({
   const handleApprove = async (inv: Invoice) => {
     setActionLoading(true);
     try {
-      await allocateMachinesInvoice(inv.id, {});
-      toast.success('Quotation approved successfully!');
+      await financeApproveQuotation(inv.id);
+      toast.success('Quotation pricing approved successfully!');
       setViewQuotation(null);
       fetchQuotations();
     } catch (error: unknown) {
@@ -383,20 +410,6 @@ export default function FinanceQuotationTable({
         <QuotationViewDialog
           quotation={viewQuotation}
           onClose={() => setViewQuotation(null)}
-          onApprove={
-            !hideActions &&
-            (viewQuotation.status === 'EMPLOYEE_APPROVED' ||
-              viewQuotation.status === 'TRANSACTION_COMPLETED')
-              ? () => handleApprove(viewQuotation)
-              : undefined
-          }
-          onReject={
-            !hideActions &&
-            (viewQuotation.status === 'EMPLOYEE_APPROVED' ||
-              viewQuotation.status === 'TRANSACTION_COMPLETED')
-              ? () => openReject(viewQuotation)
-              : undefined
-          }
           showDistribution={true}
         />
       )}

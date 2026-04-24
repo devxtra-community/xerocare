@@ -7,6 +7,8 @@ import {
   allocateMachines,
   activateContract,
   financeReject,
+  financeApproveQuotation,
+  convertToTransaction,
   generateFinalInvoice,
   getAllInvoices,
   getInvoiceById,
@@ -115,6 +117,16 @@ router.post(
  * If something is wrong with a deal, the Finance team can reject it and send it back.
  */
 router.post('/:id/finance-reject', authMiddleware, financeReject);
+
+/**
+ * Finance approves the quotation pricing.
+ */
+router.post('/:id/finance-approve-quotation', authMiddleware, financeApproveQuotation);
+
+/**
+ * Employee converts a finance-approved quotation to a transaction.
+ */
+router.post('/:id/convert-to-transaction', authMiddleware, convertToTransaction);
 
 /**
  * Record a deposit or initial payment from the customer.

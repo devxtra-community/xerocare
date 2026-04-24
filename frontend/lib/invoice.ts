@@ -2,7 +2,7 @@ import api from './api';
 
 export interface InvoiceItem {
   id?: string;
-  itemType?: 'PRICING_RULE' | 'PRODUCT';
+  itemType?: 'PRICING_RULE' | 'PRODUCT' | 'SPAREPART';
   description: string;
   // Fixed
   bwIncludedLimit?: number;
@@ -219,7 +219,7 @@ export interface CreateInvoicePayload {
     description: string;
     quantity: number;
     unitPrice: number;
-    itemType?: 'PRODUCT' | 'PRICING_RULE';
+    itemType?: 'PRODUCT' | 'PRICING_RULE' | 'SPAREPART';
   }[];
   startDate?: string;
   endDate?: string;
@@ -835,5 +835,21 @@ export const processReturn = async (
  */
 export const updateInvoiceStatus = async (id: string, status: string): Promise<Invoice> => {
   const response = await api.put(`/b/invoices/${id}/status`, { status });
+  return response.data.data;
+};
+
+/**
+ * Finance approves a quotation pricing.
+ */
+export const financeApproveQuotation = async (id: string): Promise<Invoice> => {
+  const response = await api.post(`/b/invoices/${id}/finance-approve-quotation`);
+  return response.data.data;
+};
+
+/**
+ * Converts an approved quotation into a transaction (Proforma).
+ */
+export const convertToTransaction = async (id: string): Promise<Invoice> => {
+  const response = await api.post(`/b/invoices/${id}/convert-to-transaction`);
   return response.data.data;
 };

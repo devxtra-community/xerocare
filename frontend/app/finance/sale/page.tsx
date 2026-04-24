@@ -1,9 +1,11 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import EmployeeSalesTable from '@/components/employeeComponents/EmployeeSalesTable';
 import EmployeeSalesStats from '@/components/employeeComponents/EmployeeSalesStats';
 import EmployeeSalesGraphs from '@/components/employeeComponents/EmployeeSalesGraphs';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import FinanceApprovalTable from '@/components/Finance/FinanceApprovalTable';
+import FinanceQuotationTable from '@/components/Finance/FinanceQuotationTable';
 import { getBranchInvoices, Invoice } from '@/lib/invoice';
 
 export default function SalePage() {
@@ -32,12 +34,28 @@ export default function SalePage() {
         <EmployeeSalesStats invoices={invoices} />
         <EmployeeSalesGraphs invoices={invoices} />
 
-        <div className="space-y-4">
-          <h3 className="text-xl font-bold text-slate-800 tracking-tight">All Sales</h3>
-          <div className="bg-card rounded-xl shadow-sm border border-slate-100 p-1">
-            <EmployeeSalesTable mode="FINANCE" />
-          </div>
-        </div>
+        <Tabs defaultValue="pending" className="w-full space-y-4">
+          <TabsList className="bg-card border text-slate-600">
+            <TabsTrigger value="pending">Pending Approvals</TabsTrigger>
+            <TabsTrigger value="history">Sale History</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="pending" className="space-y-4">
+            <h3 className="text-xl font-bold text-slate-800 tracking-tight">
+              Pending Finance Approval
+            </h3>
+            <div className="bg-card rounded-xl shadow-sm border border-slate-100 p-1">
+              <FinanceApprovalTable saleType="SALE" />
+            </div>
+          </TabsContent>
+
+          <TabsContent value="history" className="space-y-4">
+            <h3 className="text-xl font-bold text-slate-800 tracking-tight">Processed Sales</h3>
+            <div className="bg-card rounded-xl shadow-sm border border-slate-100 p-1">
+              <FinanceQuotationTable saleType="SALE" hideActions={true} />
+            </div>
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );

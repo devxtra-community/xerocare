@@ -33,3 +33,19 @@ export const getAllSpareParts = async (): Promise<SparePart[]> => {
   const response = await api.get<ApiResponse<SparePart[]>>('/i/spare-parts/');
   return response.data.data || [];
 };
+
+/**
+ * Filters available spare parts by their associated model ID.
+ */
+export const getAvailableSparePartsByModel = async (modelId: string): Promise<SparePart[]> => {
+  const all = await getAllSpareParts();
+  return all.filter((p) => {
+    // Exact model_id match
+    if (p.model_id === modelId) return true;
+    // Check compatible_models string
+    if (p.compatible_models?.toLowerCase().includes(modelId.toLowerCase())) return true;
+    // Check model_ids array
+    if (Array.isArray(p.model_ids) && p.model_ids.includes(modelId)) return true;
+    return false;
+  });
+};

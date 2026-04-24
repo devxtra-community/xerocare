@@ -87,6 +87,7 @@ interface ApiResponse<T> {
 export const getAllProducts = async (params?: {
   status?: string;
   modelId?: string;
+  limit?: number;
 }): Promise<Product[]> => {
   const response = await api.get<ApiResponse<Product[]>>('/i/products/', { params });
   return response.data.data || [];
@@ -98,11 +99,9 @@ export const getAllProducts = async (params?: {
  * @returns Array of available products for the specified model
  */
 export const getAvailableProductsByModel = async (modelId: string): Promise<Product[]> => {
-  const allProducts = await getAllProducts();
+  const allProducts = await getAllProducts({ modelId, limit: 1000 });
   return allProducts.filter(
-    (p) =>
-      (p.model?.id === modelId || (p.model as { model_id?: string })?.model_id === modelId) &&
-      (p.product_status === ProductStatus.AVAILABLE || p.product_status === ProductStatus.LEASE),
+    (p) => p.product_status === ProductStatus.AVAILABLE || p.product_status === ProductStatus.LEASE,
   );
 };
 

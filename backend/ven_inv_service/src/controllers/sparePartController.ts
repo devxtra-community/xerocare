@@ -90,6 +90,23 @@ export const listSpareParts = async (req: Request, res: Response) => {
 };
 
 /**
+ * Gets a single spare part by ID.
+ */
+export const getSparePartById = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params as { id: string };
+    const sparePart = await service.findById(id);
+    if (!sparePart) {
+      return res.status(404).json({ success: false, message: 'Spare part not found' });
+    }
+    res.status(200).json({ success: true, data: sparePart });
+  } catch (error: unknown) {
+    logger.error('Error in getSparePartById:', error);
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+};
+
+/**
  * Updates a spare part.
  */
 export const updateSparePart = async (req: Request, res: Response) => {

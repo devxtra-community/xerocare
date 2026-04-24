@@ -17,6 +17,7 @@ import {
   getBranchInvoices,
   Invoice,
   financeRejectInvoice,
+  financeApproveQuotation,
   sendEmailNotification,
   InvoiceItem,
 } from '@/lib/invoice';
@@ -67,16 +68,22 @@ export default function FinanceApprovalTable({ saleType }: FinanceApprovalTableP
       const data = await getBranchInvoices();
       let filtered = data.filter(
         (inv) =>
-          inv.status === 'EMPLOYEE_APPROVED' ||
-          inv.status === 'APPROVED' ||
-          inv.status === 'TRANSACTION_COMPLETED' ||
-          inv.contractStatus === 'PENDING_CONFIRMATION',
+          inv.type !== 'QUOTATION' &&
+          (inv.status === 'EMPLOYEE_APPROVED' ||
+            inv.status === 'FINANCE_APPROVED' ||
+            inv.status === 'APPROVED' ||
+            inv.contractStatus === 'PENDING_CONFIRMATION'),
       );
 
       if (saleType) {
-        filtered = filtered.filter(
-          (inv) => inv.saleType?.toString().toUpperCase() === saleType.toUpperCase(),
-        );
+        filtered = filtered.filter((inv) => {
+          const type = inv.saleType?.toString().toUpperCase();
+          const target = saleType.toUpperCase();
+          if (target === 'SALE') {
+            return ['SALE', 'PRODUCT_SALE', 'SPAREPART_SALE'].includes(type || '');
+          }
+          return type === target;
+        });
       }
       return filtered;
     },
@@ -277,6 +284,17 @@ export default function FinanceApprovalTable({ saleType }: FinanceApprovalTableP
     }
   };
 
+  const handleAccept = async (inv: Invoice) => {
+    try {
+      await financeApproveQuotation(inv.id);
+      toast.success('Transaction pricing accepted by finance!');
+      refetch();
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { message?: string } } };
+      toast.error(err.response?.data?.message || 'Failed to accept transaction');
+    }
+  };
+
   const handleReject = async () => {
     if (!selectedInvoice) return;
     if (!rejectReason.trim()) {
@@ -362,7 +380,17 @@ export default function FinanceApprovalTable({ saleType }: FinanceApprovalTableP
                 <TableCell>{inv.employeeName || 'Unknown'}</TableCell>
                 <TableCell className="text-center">
                   <div className="flex justify-center gap-2">
-                    {inv.contractStatus === 'PENDING_CONFIRMATION' ? (
+                    {inv.status === 'EMPLOYEE_APPROVED' ? (
+                      <Button
+                        size="sm"
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm gap-1.5"
+                        onClick={() => handleAccept(inv)}
+                        title="Accept Transaction Pricing"
+                      >
+                        <CheckCircle className="h-4 w-4" />
+                        <span>Accept</span>
+                      </Button>
+                    ) : inv.contractStatus === 'PENDING_CONFIRMATION' ? (
                       <>
                         <Button
                           size="sm"
@@ -404,15 +432,24 @@ export default function FinanceApprovalTable({ saleType }: FinanceApprovalTableP
                           <CheckCircle className="h-4 w-4 mr-1" /> Activate
                         </Button>
                       </>
-                    ) : (
+                    ) : inv.status !== 'TRANSACTION_COMPLETED' &&
+                      inv.contractStatus !== 'COMPLETED' &&
+                      inv.contractStatus !== 'ACTIVE' ? (
                       <Button
                         size="sm"
-                        className="bg-green-600 hover:bg-green-700 text-white shadow-green-200 shadow-sm"
+                        className="bg-orange-600 hover:bg-orange-700 text-white shadow-orange-200 shadow-sm"
                         onClick={() => handleAllocateClick(inv)}
                         title="Allocate Machines"
                       >
                         <CheckCircle className="h-4 w-4 mr-1" /> Allocate
                       </Button>
+                    ) : (
+                      <Badge
+                        variant="outline"
+                        className="bg-green-50 text-green-700 border-green-200"
+                      >
+                        Processed
+                      </Badge>
                     )}
                     <Button
                       size="sm"

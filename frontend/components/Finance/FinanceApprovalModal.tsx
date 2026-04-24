@@ -12,6 +12,7 @@ import { toast } from 'sonner';
 import { Loader2, Box } from 'lucide-react';
 import { Invoice, allocateMachinesInvoice } from '@/lib/invoice';
 import { Product, getAvailableProductsByModel } from '@/lib/product';
+import { SparePart, getAvailableSparePartsByModel, getAllSpareParts } from '@/lib/spare-part';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { SearchableSelect } from '@/components/ui/searchable-select';
@@ -31,53 +32,98 @@ export function FinanceApprovalModal({ invoice, onClose, onSuccess }: FinanceApp
   const queryClient = useQueryClient();
 
   const getAllocatableItems = () => {
-    return invoice.items?.filter((i) => i.itemType === 'PRODUCT' && i.id) || [];
+    return (
+      invoice.items?.filter(
+        (i) => (i.itemType === 'PRODUCT' || i.itemType === 'SPAREPART') && i.id,
+      ) || []
+    );
   };
 
   // Map of InvoiceItemId -> Selected ProductId (Serial Number)
   const [allocations, setAllocations] = useState<Record<string, string>>(() => {
     const initial: Record<string, string> = {};
     invoice.items?.forEach((item) => {
-      if (item.itemType === 'PRODUCT' && item.id && item.productId) {
+      if (
+        (item.itemType === 'PRODUCT' || item.itemType === 'SPAREPART') &&
+        item.id &&
+        item.productId
+      ) {
         initial[item.id] = item.productId;
       }
     });
     return initial;
   });
 
-  // Cache of available products by ModelId
-  const [availableProducts, setAvailableProducts] = useState<Record<string, Product[]>>({});
+  // Cache of available items by ModelId
+  const [availableItems, setAvailableItems] = useState<Record<string, (Product | SparePart)[]>>({});
   const [isLoadingProducts, setIsLoadingProducts] = useState(false);
 
   useEffect(() => {
-    const fetchProducts = async () => {
+    const fetchInventory = async () => {
       setIsLoadingProducts(true);
+
+      // Collect all possible keys: modelIds and also productIds (for parts that might not have a model)
       const uniqueModelIds = Array.from(
+        new Set(invoice.items?.filter((i) => i.modelId).map((i) => i.modelId!) || []),
+      );
+      const sparePartIds = Array.from(
         new Set(
           invoice.items
-            ?.filter((i) => i.modelId) // Fetch for ALL items with a modelId
-            .map((i) => i.modelId!),
+            ?.filter((i) => i.itemType === 'SPAREPART' && i.productId)
+            .map((i) => i.productId!) || [],
         ),
       );
 
-      const productMap: Record<string, Product[]> = {};
+      const itemsMap: Record<string, (Product | SparePart)[]> = {};
       try {
+        // 1. Fetch by ModelId
         await Promise.all(
           uniqueModelIds.map(async (mid) => {
-            const products = await getAvailableProductsByModel(mid);
-            productMap[mid] = products;
+            const itemTypes = new Set(
+              invoice.items?.filter((i) => i.modelId === mid).map((i) => i.itemType),
+            );
+            let combined: (Product | SparePart)[] = [];
+            if (itemTypes.has('PRODUCT')) {
+              const products = await getAvailableProductsByModel(mid);
+              combined = [...combined, ...products];
+            }
+            if (itemTypes.has('SPAREPART')) {
+              const parts = await getAvailableSparePartsByModel(mid);
+              combined = [...combined, ...parts];
+            }
+            if (combined.length === 0) {
+              const products = await getAvailableProductsByModel(mid);
+              combined = [...combined, ...products];
+              const parts = await getAvailableSparePartsByModel(mid);
+              combined = [...combined, ...parts];
+            }
+            itemsMap[mid] = combined;
           }),
         );
-        setAvailableProducts(productMap);
+
+        // 2. Fetch specific Spare Parts by ProductId (if modelId was missing or for direct matching)
+        if (sparePartIds.length > 0) {
+          const allParts = await getAllSpareParts();
+          sparePartIds.forEach((pid) => {
+            const matches = allParts.filter((p) => p.id === pid);
+            if (matches.length > 0) {
+              // If this PID isn't already handled by a modelId key, we can store it under its own PID
+              // But items search by item.modelId. Let's make sure we have a key for whatever the item has.
+              itemsMap[pid] = matches;
+            }
+          });
+        }
+
+        setAvailableItems(itemsMap);
       } catch (error) {
-        console.error('Failed to fetch products', error);
+        console.error('Failed to fetch items', error);
         toast.error('Failed to load available inventory. Please retry.');
       } finally {
         setIsLoadingProducts(false);
       }
     };
 
-    if (invoice.items) fetchProducts();
+    if (invoice.items) fetchInventory();
   }, [invoice]);
 
   const handleSubmit = async () => {
@@ -127,9 +173,11 @@ export function FinanceApprovalModal({ invoice, onClose, onSuccess }: FinanceApp
             <span className="bg-blue-100 text-blue-700 p-1.5 rounded-lg">
               <Box className="w-5 h-5" />
             </span>
-            Allocate Machines - #{invoice.invoiceNumber}
+            Allocate Products or Spareparts - #{invoice.invoiceNumber}
           </DialogTitle>
-          <DialogDescription>Select specific serial numbers for each item.</DialogDescription>
+          <DialogDescription>
+            Select specific serial numbers or lot IDs for each item.
+          </DialogDescription>
         </DialogHeader>
 
         <div className="flex flex-col">
@@ -142,7 +190,9 @@ export function FinanceApprovalModal({ invoice, onClose, onSuccess }: FinanceApp
                 </div>
               ) : (
                 getAllocatableItems().map((item) => {
-                  const available = availableProducts[item.modelId!] || [];
+                  // Fallback lookup: try modelId first, then productId
+                  const available =
+                    availableItems[item.modelId!] || availableItems[item.productId!] || [];
                   const selected = allocations[item.id!];
 
                   return (
@@ -187,7 +237,8 @@ export function FinanceApprovalModal({ invoice, onClose, onSuccess }: FinanceApp
                               );
                               return {
                                 value: p.id,
-                                label: p.serial_no || 'Unknown',
+                                label:
+                                  'serial_no' in p ? p.serial_no : `${p.sku} (Lot: ${p.lotNumber})`,
                                 description: isTaken
                                   ? 'Currently allocated to another item'
                                   : undefined,
@@ -198,8 +249,8 @@ export function FinanceApprovalModal({ invoice, onClose, onSuccess }: FinanceApp
                             onValueChange={(val) =>
                               setAllocations({ ...allocations, [item.id!]: val })
                             }
-                            placeholder="Search serial number..."
-                            emptyText="No machines found"
+                            placeholder="Search product or sparepart..."
+                            emptyText="No items found"
                             className="bg-white"
                           />
                         </div>

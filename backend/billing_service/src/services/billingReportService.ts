@@ -180,9 +180,14 @@ export class BillingReportService {
       LEASE: 0,
       SALE: 0,
     };
+    let totalQuotations = 0;
     counts.forEach((c) => {
-      if (c.saleType) result[c.saleType] = c.count;
+      if (c.saleType) {
+        result[c.saleType] = c.count;
+        totalQuotations += c.count;
+      }
     });
+    result['QUOTATIONS'] = totalQuotations;
     return result;
   }
 

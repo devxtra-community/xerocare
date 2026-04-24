@@ -73,6 +73,8 @@ interface SaleItem {
   maxDiscount: number;
   isManual: boolean;
   productId?: string;
+  modelId?: string;
+  itemType: 'PRODUCT' | 'SPAREPART';
   isEditable: boolean;
   bwIncludedLimit?: number;
   colorIncludedLimit?: number;
@@ -98,6 +100,7 @@ function StatusBadge({ status }: { status: string }) {
     FINANCE_APPROVED: 'bg-green-100 text-green-700',
     EMPLOYEE_APPROVED: 'bg-yellow-100 text-yellow-700',
     REJECTED: 'bg-red-100 text-red-700',
+    FINANCE_REJECTED: 'bg-red-100 text-red-700',
     CUSTOMER_REJECTED: 'bg-red-100 text-red-700',
     EXPIRED: 'bg-orange-100 text-orange-700',
     PENDING: 'bg-yellow-100 text-yellow-700',
@@ -107,15 +110,21 @@ function StatusBadge({ status }: { status: string }) {
   };
 
   const label: Record<string, string> = {
-    DRAFT: 'PENDING',
+    DRAFT: 'DRAFT (IN PREPARATION)',
+    SENT: 'SENT TO CUSTOMER',
+    SENT_TO_CUSTOMER: 'SENT TO CUSTOMER',
     EMPLOYEE_APPROVED: 'SENT TO FINANCE',
-    FINANCE_APPROVED: 'VERIFIED',
-    SENT_TO_CUSTOMER: 'SENT FOR APPROVAL',
+    FINANCE_APPROVED: 'APPROVED BY FINANCE',
+    FINANCE_REJECTED: 'REJECTED BY FINANCE',
     CUSTOMER_ACCEPTED: 'ACCEPTED BY CUSTOMER',
     CUSTOMER_REJECTED: 'REJECTED BY CUSTOMER',
-    APPROVED: 'ACCEPTED',
+    ACCEPTED: 'APPROVED',
+    APPROVED: 'APPROVED',
+    REJECTED: 'REJECTED',
+    PENDING_CONFIRMATION: 'PENDING ALLOCATION',
+    TRANSACTION_COMPLETED: 'ACCOUNTING COMPLETED',
+    PAID: 'FULLY PAID',
     ACTIVE_LEASE: 'ACTIVE',
-    TRANSACTION_COMPLETED: 'TRANSACTION COMPLETED',
   };
 
   return (
@@ -211,10 +220,15 @@ export default function EmployeeQuotationTable() {
       'PAID',
       'ACTIVE_LEASE',
       'TRANSACTION_COMPLETED',
+      'PENDING_CONFIRMATION',
+      'SENT_TO_CUSTOMER',
     ].includes(q.status),
   ).length;
   const rejected_q = quotations.filter(
-    (q) => q.status === 'REJECTED' || q.status === 'CUSTOMER_REJECTED',
+    (q) =>
+      q.status === 'REJECTED' ||
+      q.status === 'CUSTOMER_REJECTED' ||
+      q.status === 'FINANCE_REJECTED',
   ).length;
 
   // Filter
@@ -492,7 +506,6 @@ function QuotationFormModal({
   // ── SALE state ──────────────────────────────────────────────────────────
   const [customerId, setCustomerId] = useState('');
   const [saleItems, setSaleItems] = useState<SaleItem[]>([]);
-  const [manualItemOpen, setManualItemOpen] = useState(false);
   const [notes, setNotes] = useState('');
   const [validDays, setValidDays] = useState(30);
 
@@ -594,15 +607,25 @@ function QuotationFormModal({
     let description = '',
       basePrice = 0,
       maxDiscount = 0,
-      productId: string | undefined;
+      productId: string | undefined,
+      modelId: string | undefined,
+      itemType: 'PRODUCT' | 'SPAREPART' = 'PRODUCT';
     if ('part_name' in item) {
       description = item.part_name;
       basePrice = Number(item.base_price) || 0;
+      modelId = item.model_id || item.model?.id;
+      productId = item.id;
+      itemType = 'SPAREPART';
     } else {
       description = item.name;
       basePrice = item.sale_price || 0;
       maxDiscount = item.max_discount_amount || 0;
       productId = item.id;
+      modelId =
+        (item as { model_id?: string }).model_id ||
+        (item.model as { id?: string })?.id ||
+        (item.model as { model_id?: string })?.model_id;
+      itemType = 'PRODUCT';
     }
     setSaleItems((prev) => [
       ...prev,
@@ -615,6 +638,8 @@ function QuotationFormModal({
         maxDiscount,
         isManual: false,
         productId,
+        modelId,
+        itemType,
         isEditable: !productId || basePrice === 0,
         bwSlabRanges: [],
         colorSlabRanges: [],
@@ -682,6 +707,10 @@ function QuotationFormModal({
           toast.error('Discount cannot exceed price');
           return prev;
         }
+        if (item.maxDiscount > 0 && d > item.maxDiscount) {
+          toast.error(`Maximum discount allowed is ${item.maxDiscount}`);
+          return prev;
+        }
         items[index] = { ...item, discount: d, unitPrice: item.basePrice - d };
       } else if (field === 'basePrice' && item.isEditable) {
         const b = Number(value);
@@ -729,6 +758,8 @@ function QuotationFormModal({
           quantity: it.quantity,
           unitPrice: it.basePrice,
           productId: it.productId,
+          modelId: it.modelId,
+          itemType: it.itemType,
         })),
       };
     } else if (quotationType === 'RENT') {
@@ -757,8 +788,9 @@ function QuotationFormModal({
           description: it.description,
           quantity: it.quantity,
           unitPrice: 0,
-          itemType: 'PRODUCT' as const,
+          itemType: it.itemType,
           productId: it.productId,
+          modelId: it.modelId,
           bwIncludedLimit: rentType === 'FIXED_LIMIT' ? it.bwIncludedLimit || 0 : 0,
           colorIncludedLimit: rentType === 'FIXED_LIMIT' ? it.colorIncludedLimit || 0 : 0,
           combinedIncludedLimit: rentType === 'FIXED_COMBO' ? it.combinedIncludedLimit || 0 : 0,
@@ -861,8 +893,9 @@ function QuotationFormModal({
           description: it.description,
           quantity: it.quantity,
           unitPrice: 0,
-          itemType: 'PRODUCT' as const,
+          itemType: it.itemType,
           productId: it.productId,
+          modelId: it.modelId,
           ...(leaseType === 'FSM'
             ? {
                 bwIncludedLimit: rentType === 'FIXED_LIMIT' ? it.bwIncludedLimit || 0 : 0,
@@ -1213,16 +1246,6 @@ function QuotationFormModal({
                           ? 'Spare Parts'
                           : 'Items'}
                     </h4>
-                    {!manualItemOpen && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setManualItemOpen(true)}
-                        className="text-[10px] font-bold uppercase tracking-widest text-slate-400 hover:text-primary h-7"
-                      >
-                        + Manual Entry
-                      </Button>
-                    )}
                   </div>
                   <div className="bg-card p-2 rounded-xl border border-border shadow-sm focus-within:ring-2 focus-within:ring-primary/20 transition-all">
                     <ProductSelect
@@ -1234,35 +1257,16 @@ function QuotationFormModal({
                             ? 'SPAREPART'
                             : 'BOTH'
                       }
+                      placeholder={
+                        quotationType === 'PRODUCT_SALE'
+                          ? 'Select Product'
+                          : quotationType === 'SPAREPART_SALE'
+                            ? 'Select Spare Part'
+                            : 'Select Product or Spare Part'
+                      }
                     />
                   </div>
-                  {manualItemOpen && (
-                    <div className="flex justify-end">
-                      <Button
-                        onClick={() => {
-                          setSaleItems((p) => [
-                            ...p,
-                            {
-                              description: '',
-                              quantity: 1,
-                              basePrice: 0,
-                              discount: 0,
-                              unitPrice: 0,
-                              maxDiscount: 999999,
-                              isManual: true,
-                              isEditable: true,
-                            },
-                          ]);
-                          setManualItemOpen(false);
-                        }}
-                        size="sm"
-                        variant="secondary"
-                        className="text-xs font-bold"
-                      >
-                        Add Custom Row
-                      </Button>
-                    </div>
-                  )}
+
                   <div className="space-y-3">
                     {saleItems.length === 0 ? (
                       <div className="text-center py-10 border-2 border-dashed border-border rounded-xl">
@@ -1293,18 +1297,7 @@ function QuotationFormModal({
                                 className={`h-9 font-bold text-sm ${!item.isManual ? 'bg-muted/50 border-transparent' : ''}`}
                               />
                             </div>
-                            <div className="md:col-span-2 space-y-1">
-                              <label className="text-[9px] font-bold text-slate-400 uppercase text-center block">
-                                Qty
-                              </label>
-                              <Input
-                                type="number"
-                                min="1"
-                                value={item.quantity}
-                                onChange={(e) => updateItem(index, 'quantity', e.target.value)}
-                                className="h-9 text-center font-bold"
-                              />
-                            </div>
+
                             <div className="md:col-span-2 space-y-1">
                               <label className="text-[9px] font-bold text-slate-400 uppercase text-right block">
                                 Rate (QAR)
@@ -1403,6 +1396,7 @@ function QuotationFormModal({
                         if (saleItems.find((x) => x.productId === item.id)) return;
                         addItem(item);
                       }}
+                      placeholder="Select Product"
                     />
                     {saleItems.length > 0 && (
                       <div className="space-y-4 mt-2">
@@ -1416,18 +1410,6 @@ function QuotationFormModal({
                                 {m.description}
                               </span>
                               <div className="flex items-center gap-3">
-                                <div className="flex items-center gap-2">
-                                  <label className="text-[10px] text-slate-500 font-bold">
-                                    QTY
-                                  </label>
-                                  <Input
-                                    type="number"
-                                    min="1"
-                                    value={m.quantity}
-                                    onChange={(e) => updateItem(index, 'quantity', e.target.value)}
-                                    className="h-8 w-16 text-center text-xs font-bold"
-                                  />
-                                </div>
                                 <button
                                   onClick={() => removeItem(index)}
                                   className="text-slate-400 hover:text-red-600 transition-colors bg-white hover:bg-red-50 p-1 rounded"
@@ -2000,6 +1982,7 @@ function QuotationFormModal({
                         if (saleItems.find((x) => x.productId === item.id)) return;
                         addItem(item);
                       }}
+                      placeholder="Select Product"
                     />
                     {saleItems.length > 0 && (
                       <div className="space-y-2 mt-2">
@@ -2013,18 +1996,6 @@ function QuotationFormModal({
                                 {m.description}
                               </span>
                               <div className="flex items-center gap-3">
-                                <div className="flex items-center gap-2">
-                                  <label className="text-[10px] text-slate-500 font-bold">
-                                    QTY
-                                  </label>
-                                  <Input
-                                    type="number"
-                                    min="1"
-                                    value={m.quantity}
-                                    onChange={(e) => updateItem(index, 'quantity', e.target.value)}
-                                    className="h-8 w-16 text-center text-xs font-bold"
-                                  />
-                                </div>
                                 <button
                                   onClick={() => removeItem(index)}
                                   className="text-slate-400 hover:text-red-600 transition-colors bg-white hover:bg-red-50 p-1 rounded"

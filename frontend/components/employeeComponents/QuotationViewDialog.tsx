@@ -47,8 +47,6 @@ export function QuotationViewDialog({
   const [sending, setSending] = useState(false);
   const [isSendingCustomer, setIsSendingCustomer] = useState(false);
   const [productDetails, setProductDetails] = useState<Record<string, ProductMeta>>({});
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [_loadingDetails, setLoadingDetails] = useState(false);
 
   // We determine if we are in finance view by checking if they can approve/reject, OR if the status is already finalized
 
@@ -59,7 +57,6 @@ export function QuotationViewDialog({
 
   useEffect(() => {
     const fetchFullDetails = async () => {
-      setLoadingDetails(true);
       try {
         const details: Record<string, ProductMeta> = {};
         if (quotation.items) {
@@ -129,8 +126,6 @@ export function QuotationViewDialog({
         setProductDetails(details);
       } catch (err) {
         console.error('Failed to fetch premium details:', err);
-      } finally {
-        setLoadingDetails(false);
       }
     };
     fetchFullDetails();
@@ -145,6 +140,18 @@ export function QuotationViewDialog({
       setSending(false);
     }
   };
+
+  /* 
+  const handleConvert = async () => {
+    if (!onConvertToTransaction) return;
+    setConverting(true);
+    try {
+      await onConvertToTransaction(quotation.id);
+    } finally {
+      setConverting(false);
+    }
+  };
+  */
 
   const handleSendCustomer = async (type: 'EMAIL' | 'WHATSAPP' | 'BOTH') => {
     setIsSendingCustomer(true);
@@ -993,8 +1000,39 @@ export function QuotationViewDialog({
 
         {/* Footer Actions Row - OUTSIDE Print Content wrapper */}
         <div className="px-6 pb-4 pt-4 bg-slate-50 shrink-0 border-t border-slate-200 mt-0 z-20 flex justify-between items-center">
-          <div className="flex items-center gap-4 text-slate-400">
-            {/* Decorative or future secondary elements can go here */}
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 px-3 py-1 bg-white border border-slate-200 rounded-full shadow-sm">
+              <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">
+                Status:
+              </span>
+              <span
+                className={`text-[9px] font-black uppercase tracking-widest ${
+                  quotation.status === 'FINANCE_APPROVED' ||
+                  [
+                    'ACCEPTED',
+                    'APPROVED',
+                    'SENT_TO_CUSTOMER',
+                    'CUSTOMER_ACCEPTED',
+                    'TRANSACTION_COMPLETED',
+                    'PAID',
+                    'ACTIVE_LEASE',
+                    'ISSUED',
+                  ].includes(quotation.status)
+                    ? 'text-emerald-600'
+                    : quotation.status === 'FINANCE_REJECTED' ||
+                        quotation.status === 'REJECTED' ||
+                        quotation.status === 'CUSTOMER_REJECTED'
+                      ? 'text-red-600'
+                      : 'text-blue-600'
+                }`}
+              >
+                {quotation.status === 'FINANCE_APPROVED'
+                  ? 'Approved by Finance'
+                  : quotation.status === 'FINANCE_REJECTED'
+                    ? 'Rejected by Finance'
+                    : quotation.status?.replace(/_/g, ' ')}
+              </span>
+            </div>
           </div>
 
           <div className="flex gap-3 items-center">
@@ -1028,29 +1066,42 @@ export function QuotationViewDialog({
               </>
             )}
 
-            {/* Distribution buttons - Gmail and WhatsApp restored, Both remains removed as per request */}
-            {showDistribution && (
-              <div className="flex gap-2 border-l border-slate-300 pl-4 ml-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleSendCustomer('EMAIL')}
-                  disabled={isSendingCustomer}
-                  className="h-9 px-4 rounded-md font-black uppercase text-[11px] tracking-widest border-red-200 text-red-700 hover:bg-red-50 gap-2"
-                >
-                  <Mail size={14} /> Gmail
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleSendCustomer('WHATSAPP')}
-                  disabled={isSendingCustomer}
-                  className="h-9 px-4 rounded-md font-black uppercase text-[11px] tracking-widest border-green-200 text-emerald-700 hover:bg-green-50 gap-2"
-                >
-                  <Phone size={14} /> WhatsApp
-                </Button>
-              </div>
-            )}
+            {/* Distribution buttons - Visible only after Finance Approval / Completion */}
+            {showDistribution &&
+              [
+                'FINANCE_APPROVED',
+                'ACCEPTED',
+                'APPROVED',
+                'PENDING_CONFIRMATION',
+                'SENT_TO_CUSTOMER',
+                'CUSTOMER_ACCEPTED',
+                'CUSTOMER_REJECTED',
+                'TRANSACTION_COMPLETED',
+                'PAID',
+                'ACTIVE_LEASE',
+                'ISSUED',
+              ].includes(quotation.status) && (
+                <div className="flex gap-2 border-l border-slate-300 pl-4 ml-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleSendCustomer('EMAIL')}
+                    disabled={isSendingCustomer}
+                    className="h-9 px-4 rounded-md font-black uppercase text-[11px] tracking-widest border-red-200 text-red-700 hover:bg-red-50 gap-2"
+                  >
+                    <Mail size={14} /> Gmail
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleSendCustomer('WHATSAPP')}
+                    disabled={isSendingCustomer}
+                    className="h-9 px-4 rounded-md font-black uppercase text-[11px] tracking-widest border-green-200 text-emerald-700 hover:bg-green-50 gap-2"
+                  >
+                    <Phone size={14} /> WhatsApp
+                  </Button>
+                </div>
+              )}
 
             {onApprove && onReject && (
               <div className="flex gap-3 border-l border-slate-300 pl-4 ml-2">
@@ -1072,17 +1123,19 @@ export function QuotationViewDialog({
               </div>
             )}
 
-            {!onApprove && onSendToFinance && (
-              <Button
-                onClick={handleSend}
-                disabled={sending}
-                size="sm"
-                className="h-9 bg-red-700 hover:bg-red-800 text-white font-black text-[11px] uppercase tracking-widest px-10 gap-2 shadow-lg shadow-red-100 rounded-md ml-2"
-              >
-                {sending ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
-                Send to Finance
-              </Button>
-            )}
+            {!onApprove &&
+              onSendToFinance &&
+              (quotation.status === 'DRAFT' || quotation.status === 'FINANCE_REJECTED') && (
+                <Button
+                  onClick={handleSend}
+                  disabled={sending}
+                  size="sm"
+                  className="h-9 bg-red-700 hover:bg-red-800 text-white font-black text-[11px] uppercase tracking-widest px-10 gap-2 shadow-lg shadow-red-100 rounded-md ml-2"
+                >
+                  {sending ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+                  Send to Finance
+                </Button>
+              )}
           </div>
         </div>
       </DialogContent>

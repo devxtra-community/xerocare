@@ -231,6 +231,46 @@ export const employeeApprove = async (req: Request, res: Response, next: NextFun
 };
 
 /**
+ * Finance reviews and approves the pricing/terms of a quotation.
+ */
+export const financeApproveQuotation = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = req.params.id as string;
+    if (!req.user || !req.user.userId) throw new AppError('User context missing', 401);
+
+    const invoice = await billingService.financeApproveQuotation(id, req.user.userId);
+
+    return res.status(200).json({
+      success: true,
+      data: invoice,
+      message: 'Quotation pricing approved by Finance',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Employee converts an approved quotation into an active Sale/Rent/Lease transaction.
+ */
+export const convertToTransaction = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = req.params.id as string;
+    if (!req.user || !req.user.userId) throw new AppError('User context missing', 401);
+
+    const invoice = await billingService.convertToTransaction(id);
+
+    return res.status(200).json({
+      success: true,
+      data: invoice,
+      message: 'Quotation converted to transaction successfully',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
  * Step 1 of the Finance Check:
  * The Finance team picks out the specific physical machines that will be
  * sent to the customer.

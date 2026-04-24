@@ -29,8 +29,8 @@ export class ProductAllocation {
   @JoinColumn({ name: 'contractId' })
   contract!: Invoice;
 
-  @Column({ type: 'uuid' })
-  modelId!: string;
+  @Column({ type: 'uuid', nullable: true })
+  modelId?: string;
 
   @Column({ type: 'uuid', nullable: true })
   @Index()

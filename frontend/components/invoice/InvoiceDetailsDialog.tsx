@@ -344,6 +344,25 @@ export function InvoiceDetailsDialog({
         onClose={onClose}
         onApprove={onApprove}
         onReject={onReject}
+        onEmail={
+          currentInvoice.customerEmail
+            ? () => {
+                // Logic already exists in button below, but we need to trigger it
+                // Actually, I should probably extract the email logic into a shared function
+                // or just define it here.
+                const emailBtn = document.getElementById('details-email-btn');
+                if (emailBtn) emailBtn.click();
+              }
+            : undefined
+        }
+        onWhatsApp={
+          currentInvoice.customerPhone
+            ? () => {
+                const waBtn = document.getElementById('details-wa-btn');
+                if (waBtn) waBtn.click();
+              }
+            : undefined
+        }
         approveLabel={approveLabel}
       />
     );
@@ -1248,12 +1267,13 @@ export function InvoiceDetailsDialog({
               )}
 
               {/* Notification Actions for Draft/Sent/Approved Invoices */}
-              {(currentInvoice.status === 'DRAFT' ||
-                currentInvoice.status === 'SENT' ||
-                currentInvoice.status === 'APPROVED' ||
-                currentInvoice.status === 'FINANCE_APPROVED') && (
+              {(currentInvoice.status === 'APPROVED' ||
+                currentInvoice.status === 'ACCEPTED' ||
+                currentInvoice.status === 'FINANCE_APPROVED' ||
+                currentInvoice.status === 'PENDING_CONFIRMATION') && (
                 <div className="flex gap-2">
                   <Button
+                    id="details-email-btn"
                     variant="outline"
                     className="sm:flex-none rounded-xl h-10 px-5 font-bold text-gray-700 border-gray-200 hover:bg-gray-50 hover:text-primary gap-2 transition-all shadow-sm"
                     title="Send via Email"
@@ -1438,6 +1458,27 @@ export function InvoiceDetailsDialog({
                       <Mail size={16} />
                     )}
                     Email
+                  </Button>
+                  <Button
+                    id="details-wa-btn"
+                    variant="outline"
+                    className="sm:flex-none rounded-xl h-10 px-5 font-bold text-gray-700 border-gray-200 hover:bg-gray-50 hover:text-green-600 gap-2 transition-all shadow-sm"
+                    title="Send via WhatsApp"
+                    disabled={isLoading}
+                    onClick={() => {
+                      const phone = currentInvoice.customerPhone;
+                      if (!phone) {
+                        toast.error('No phone number found for this customer');
+                        return;
+                      }
+                      const text = `Hello ${currentInvoice.customerName}, please find your quotation ${currentInvoice.invoiceNumber} here. Total: ${currentInvoice.totalAmount}`;
+                      window.open(
+                        `https://wa.me/${phone.replace(/\D/g, '')}?text=${encodeURIComponent(text)}`,
+                      );
+                    }}
+                  >
+                    <img src="/icons/whatsapp.png" alt="WA" className="w-4 h-4" />
+                    WhatsApp
                   </Button>
                 </div>
               )}

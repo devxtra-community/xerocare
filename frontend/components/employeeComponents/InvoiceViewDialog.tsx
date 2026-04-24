@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Download, Send } from 'lucide-react';
+import { Download, Send, Mail } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { getProductById } from '@/lib/product';
@@ -29,6 +29,8 @@ interface InvoiceViewDialogProps {
   onClose: () => void;
   onApprove?: () => Promise<void> | void;
   onReject?: (reason: string) => Promise<void> | void;
+  onEmail?: () => Promise<void> | void;
+  onWhatsApp?: () => Promise<void> | void;
   approveLabel?: string;
 }
 
@@ -36,9 +38,14 @@ export function InvoiceViewDialog({
   invoice,
   onClose,
   onApprove,
+  onReject,
+  onEmail,
+  onWhatsApp,
   approveLabel = 'Approve',
 }: InvoiceViewDialogProps) {
   const [productDetails, setProductDetails] = useState<Record<string, ProductMeta>>({});
+  const [isRejecting, setIsRejecting] = useState(false);
+  const [rejectReason, setRejectReason] = useState('');
 
   useEffect(() => {
     const fetchFullDetails = async () => {
@@ -620,6 +627,29 @@ export function InvoiceViewDialog({
                   </div>
 
                   <div className="flex gap-4 items-center">
+                    {onEmail && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={onEmail}
+                        className="h-9 px-4 text-[10px] font-black uppercase tracking-widest text-slate-600 border-slate-200 hover:bg-slate-50 gap-2 rounded-full"
+                      >
+                        <Mail size={14} className="text-red-600" />
+                        Email
+                      </Button>
+                    )}
+                    {onWhatsApp && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={onWhatsApp}
+                        className="h-9 px-4 text-[10px] font-black uppercase tracking-widest text-slate-600 border-slate-200 hover:bg-slate-50 gap-2 rounded-full"
+                      >
+                        <img src="/icons/whatsapp.png" alt="WA" className="w-4 h-4" />
+                        WhatsApp
+                      </Button>
+                    )}
+
                     <Button
                       variant="ghost"
                       size="sm"
@@ -629,15 +659,63 @@ export function InvoiceViewDialog({
                       Close
                     </Button>
 
-                    {onApprove && (
-                      <Button
-                        onClick={() => onApprove()}
-                        size="sm"
-                        className="h-10 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[11px] uppercase tracking-widest px-8 gap-2 shadow-lg shadow-emerald-100 rounded-full"
-                      >
-                        <Send size={14} />
-                        {approveLabel}
-                      </Button>
+                    {!isRejecting ? (
+                      <>
+                        {onReject && (
+                          <Button
+                            onClick={() => setIsRejecting(true)}
+                            size="sm"
+                            className="h-10 bg-white border-2 border-red-600 text-red-600 hover:bg-red-50 font-black text-[11px] uppercase tracking-widest px-8 rounded-full"
+                          >
+                            Reject
+                          </Button>
+                        )}
+
+                        {onApprove && (
+                          <Button
+                            onClick={() => onApprove()}
+                            size="sm"
+                            className="h-10 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[11px] uppercase tracking-widest px-8 gap-2 shadow-lg shadow-emerald-100 rounded-full"
+                          >
+                            <Send size={14} />
+                            {approveLabel}
+                          </Button>
+                        )}
+                      </>
+                    ) : (
+                      <div className="flex items-center gap-2 bg-slate-50 p-1 rounded-full border border-slate-200">
+                        <input
+                          type="text"
+                          placeholder="Rejection Reason..."
+                          className="bg-transparent border-none focus:ring-0 text-xs px-4 w-48 font-bold"
+                          value={rejectReason}
+                          onChange={(e) => setRejectReason(e.target.value)}
+                        />
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => {
+                            setIsRejecting(false);
+                            setRejectReason('');
+                          }}
+                          className="h-8 w-8 p-0 rounded-full text-slate-400 hover:text-slate-600"
+                        >
+                          ✕
+                        </Button>
+                        <Button
+                          size="sm"
+                          onClick={() => {
+                            if (rejectReason.trim()) {
+                              onReject?.(rejectReason);
+                              setIsRejecting(false);
+                              setRejectReason('');
+                            }
+                          }}
+                          className="h-8 bg-red-600 hover:bg-red-700 text-white px-4 rounded-full text-[10px] font-black uppercase tracking-widest"
+                        >
+                          Confirm Reject
+                        </Button>
+                      </div>
                     )}
 
                     <Button

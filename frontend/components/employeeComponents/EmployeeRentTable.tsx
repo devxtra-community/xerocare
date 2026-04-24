@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Search, Loader2, Eye, FileText, Plus } from 'lucide-react';
+import { Search, Loader2, Eye, FileText, Plus, Send } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import {
@@ -12,7 +12,13 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { getMyInvoices, getBranchInvoices, Invoice, employeeApproveInvoice } from '@/lib/invoice';
+import {
+  getMyInvoices,
+  getBranchInvoices,
+  Invoice,
+  employeeApproveInvoice,
+  convertToTransaction,
+} from '@/lib/invoice';
 import { Badge } from '@/components/ui/badge';
 import { ApproveQuotationDialog } from '@/components/invoice/ApproveQuotationDialog';
 import { InvoiceDetailsDialog } from '@/components/invoice/InvoiceDetailsDialog';
@@ -84,19 +90,15 @@ export default function EmployeeRentTable({
       if (mode === 'FINANCE') {
         const { getBranchInvoices } = await import('@/lib/invoice');
         data = await getBranchInvoices();
-        // Filter out unapproved records for Finance View
-        data = data.filter((inv) => !['DRAFT', 'SENT'].includes(inv.status));
+        // Filter out unapproved records and Quotations for Finance View
+        data = data.filter(
+          (inv) => !['DRAFT', 'SENT'].includes(inv.status) && inv.type !== 'QUOTATION',
+        );
         console.log('Finance Rent Invoices:', data);
       } else {
         const myData = await getMyInvoices();
         // Show Proformas, Finals, and any quotations that have been converted to transactions
-        data = myData.filter(
-          (inv) =>
-            inv.type !== 'QUOTATION' ||
-            inv.status === 'TRANSACTION_COMPLETED' ||
-            inv.status === 'EMPLOYEE_APPROVED' ||
-            inv.status === 'FINANCE_REJECTED',
-        );
+        data = myData.filter((inv) => inv.type !== 'QUOTATION');
       }
       setInvoices(data.filter((i) => i.saleType === 'RENT'));
     } catch (error) {
@@ -146,9 +148,7 @@ export default function EmployeeRentTable({
       const pending = data.filter(
         (inv) =>
           inv.type === 'QUOTATION' &&
-          inv.status !== 'TRANSACTION_COMPLETED' &&
-          inv.status !== 'REJECTED' &&
-          inv.status !== 'CUSTOMER_REJECTED' &&
+          (inv.status === 'FINANCE_APPROVED' || inv.status === 'CUSTOMER_ACCEPTED') &&
           inv.saleType === 'RENT',
       );
       setPendingQuotations(pending);
@@ -165,8 +165,8 @@ export default function EmployeeRentTable({
 
   const handleConvertQuotation = async (qId: string) => {
     try {
-      await employeeApproveInvoice(qId);
-      toast.success('Quotation converted and sent for Finance approval!');
+      await convertToTransaction(qId);
+      toast.success('Quotation converted to transaction successfully!');
       setIsConverterOpen(false);
       fetchInvoices();
     } catch (error: unknown) {
@@ -373,6 +373,21 @@ export default function EmployeeRentTable({
                         >
                           <Eye className="h-4 w-4" />
                         </Button>
+
+                        {inv.status === 'DRAFT' && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-emerald-600 hover:bg-emerald-50"
+                            onClick={() => {
+                              setSelectedInvoice(inv);
+                              handleSendForApproval();
+                            }}
+                            title="Send to Finance"
+                          >
+                            <Send className="h-4 w-4" />
+                          </Button>
+                        )}
 
                         {/* Edit button removed to enforce quotation-to-transaction workflow */}
                       </div>

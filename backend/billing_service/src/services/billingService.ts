@@ -876,25 +876,19 @@ export class BillingService {
    */
   async employeeApprove(id: string, userId: string) {
     const invoice = await this.invoiceRepo.findById(id);
-    if (!invoice) throw new AppError('Quotation not found', 404);
-
-    if (invoice.type !== InvoiceType.QUOTATION) {
-      throw new AppError('Only quotations can be converted to transactions', 400);
-    }
+    if (!invoice) throw new AppError('Document not found', 404);
 
     if (
-      invoice.status === InvoiceStatus.TRANSACTION_COMPLETED ||
+      invoice.status === InvoiceStatus.EMPLOYEE_APPROVED ||
+      invoice.status === InvoiceStatus.FINANCE_APPROVED ||
       invoice.status === InvoiceStatus.REJECTED ||
-      invoice.status === InvoiceStatus.CUSTOMER_REJECTED ||
+      invoice.status === InvoiceStatus.FINANCE_REJECTED ||
       invoice.status === InvoiceStatus.CANCELLED
     ) {
-      throw new AppError(
-        'This quotation has already been converted or is in a terminal state (Cancelled/Rejected)',
-        400,
-      );
+      throw new AppError('This document is already in a terminal or pending state', 400);
     }
 
-    invoice.status = InvoiceStatus.TRANSACTION_COMPLETED;
+    invoice.status = InvoiceStatus.EMPLOYEE_APPROVED;
     invoice.employeeApprovedBy = userId;
     invoice.employeeApprovedAt = new Date();
 
@@ -902,7 +896,53 @@ export class BillingService {
   }
 
   /**
-   * Step 1: Finance allocates machines for the quotation.
+   * Finance approves the quotation pricing.
+   */
+  async financeApproveQuotation(id: string, userId: string) {
+    const invoice = await this.invoiceRepo.findById(id);
+    if (!invoice) throw new AppError('Quotation not found', 404);
+
+    if (invoice.status !== InvoiceStatus.EMPLOYEE_APPROVED) {
+      throw new AppError('Quotation must be approved by employee before finance approval', 400);
+    }
+
+    invoice.status = InvoiceStatus.FINANCE_APPROVED;
+    invoice.financeApprovedBy = userId;
+    invoice.financeApprovedAt = new Date();
+
+    return this.invoiceRepo.save(invoice);
+  }
+
+  /**
+   * Employee converts a finance-approved quotation into a transaction (Proforma).
+   */
+  async convertToTransaction(id: string) {
+    const invoice = await this.invoiceRepo.findById(id);
+    if (!invoice) throw new AppError('Quotation not found', 404);
+
+    if (
+      invoice.status !== InvoiceStatus.FINANCE_APPROVED &&
+      invoice.status !== InvoiceStatus.CUSTOMER_ACCEPTED
+    ) {
+      throw new AppError(
+        'Only finance-approved or customer-accepted quotations can be converted',
+        400,
+      );
+    }
+
+    if (invoice.type !== InvoiceType.QUOTATION) {
+      throw new AppError('Only quotations can be converted', 400);
+    }
+
+    // Convert to Proforma and set to EMPLOYEE_APPROVED so it shows up on Finance side for Accept/Reject
+    invoice.type = InvoiceType.PROFORMA;
+    invoice.status = InvoiceStatus.DRAFT;
+
+    return this.invoiceRepo.save(invoice);
+  }
+
+  /**
+   * Step 1: Finance allocates machines for the transaction (Proforma).
    * Finalizes as a PROFORMA contract pending customer confirmation.
    */
   async allocateMachines(
@@ -921,31 +961,39 @@ export class BillingService {
         relations: ['items'],
       });
 
-      if (!invoice) throw new AppError('Quotation not found', 404);
-      if (
-        invoice.status !== InvoiceStatus.EMPLOYEE_APPROVED &&
-        invoice.status !== InvoiceStatus.TRANSACTION_COMPLETED &&
-        invoice.status !== InvoiceStatus.SENT // Allow sent quotations if converted directly
-      ) {
+      if (!invoice) throw new AppError('Quotation/Transaction not found', 404);
+
+      // Ensure we are operating on a PROFORMA (Transaction) that was sent for approval
+      if (invoice.type !== InvoiceType.PROFORMA) {
         throw new AppError(
-          'Quotation must be Approved or Converted by Employee before Finance allocation',
+          'Only converted transactions (Proforma) can have machines allocated',
           400,
         );
       }
 
-      // Check that all machines are allocated
-      const productItems = invoice.items.filter(
-        (item) => item.itemType === 'PRODUCT' && item.modelId,
+      if (
+        invoice.status !== InvoiceStatus.EMPLOYEE_APPROVED &&
+        invoice.status !== InvoiceStatus.TRANSACTION_COMPLETED &&
+        invoice.status !== InvoiceStatus.FINANCE_APPROVED
+      ) {
+        throw new AppError('Transaction must be sent for Finance Approval before allocation', 400);
+      }
+
+      // Check that all machines and spare parts are allocated
+      const allocatableItems = invoice.items.filter(
+        (item) =>
+          (item.itemType === 'PRODUCT' || item.itemType === 'SPAREPART') &&
+          (item.modelId || item.productId),
       );
       const updatesMap = new Map<string, { id: string; productId: string }>();
       if (itemUpdates) itemUpdates.forEach((u) => updatesMap.set(String(u.id).toLowerCase(), u));
 
-      for (const item of productItems) {
+      for (const item of allocatableItems) {
         const update = updatesMap.get(String(item.id).toLowerCase());
         const isAllocated = !!(item.productId || update?.productId);
         if (!isAllocated) {
           throw new AppError(
-            `Machine allocation (Serial Number) is required for: ${item.description}`,
+            `Allocation (Serial/Lot Number) is required for: ${item.description}`,
             400,
           );
         }
@@ -958,27 +1006,37 @@ export class BillingService {
           if (item && update.productId) {
             let product;
             try {
-              const response = await fetch(`${inventoryServiceUrl}/products/${update.productId}`, {
-                headers: { Authorization: token, 'Content-Type': 'application/json' },
-              });
+              const endpoint = item.itemType === 'SPAREPART' ? 'spare-parts' : 'products';
+              const response = await fetch(
+                `${inventoryServiceUrl}/${endpoint}/${update.productId}`,
+                {
+                  headers: { Authorization: token, 'Content-Type': 'application/json' },
+                },
+              );
               if (!response.ok) throw new Error(response.statusText);
               const data = await response.json();
               product = data.data;
             } catch (error) {
-              logger.error(`Product validation failed: ${update.productId}`, error);
-              throw new AppError(`Failed to validate product ${update.productId}`, 500);
+              logger.error(`Item validation failed: ${update.productId}`, error);
+              throw new AppError(`Failed to validate inventory item ${update.productId}`, 500);
             }
 
-            if (!product) throw new AppError(`Product ${update.productId} not found`, 404);
+            if (!product) throw new AppError(`Item ${update.productId} not found`, 404);
 
             item.productId = update.productId;
+
+            // Use serial number for products, lot ID/SKU for spare parts
+            const serialNo =
+              item.itemType === 'SPAREPART'
+                ? product.sku || product.lot_id || 'Part'
+                : product.serial_no || 'Unknown';
 
             // Create basic allocation record without meter readings yet
             await queryRunner.manager.insert(ProductAllocation, {
               contractId: invoice.id,
               modelId: item.modelId,
               productId: update.productId,
-              serialNumber: product.serial_no || 'Unknown',
+              serialNumber: serialNo,
               status: AllocationStatus.ALLOCATED,
               initialBwA4: 0,
               initialBwA3: 0,

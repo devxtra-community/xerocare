@@ -16,7 +16,11 @@ interface ProductSelectProps {
  * Unified searchable select for Products and Spare Parts.
  * Fetches both resources and allows selection for invoice line items.
  */
-export function ProductSelect({ onSelect, mode = 'BOTH' }: ProductSelectProps) {
+export function ProductSelect({
+  onSelect,
+  mode = 'BOTH',
+  placeholder,
+}: ProductSelectProps & { placeholder?: string }) {
   const [items, setItems] = useState<SelectableItem[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -90,7 +94,7 @@ export function ProductSelect({ onSelect, mode = 'BOTH' }: ProductSelectProps) {
       onValueChange={handleValueChange}
       options={options}
       loading={loading}
-      placeholder="Select Product or Spare Part"
+      placeholder={placeholder || 'Select Product or Spare Part'}
       emptyText="No items found."
     />
   );
