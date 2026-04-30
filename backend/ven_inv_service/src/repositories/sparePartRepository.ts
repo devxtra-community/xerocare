@@ -52,6 +52,7 @@ export class SparePartRepository {
     if (data.sku !== undefined) part.sku = data.sku;
     if (data.mpn !== undefined) part.mpn = data.mpn;
     if (data.description !== undefined) part.description = data.description;
+    if (data.yield !== undefined) part.yield = data.yield;
     if (data.warehouse_id !== undefined) part.warehouse_id = data.warehouse_id;
     if (data.vendor_id !== undefined) part.vendor_id = data.vendor_id;
 
@@ -125,6 +126,8 @@ export class SparePartRepository {
         'sp.purchase_price AS purchase_price',
         'sp.wholesale_price AS wholesale_price',
         'sp.image_url AS image_url',
+        'sp.description AS description',
+        'sp.yield AS yield',
         'sp.warehouse_id AS warehouse_id',
         'sp.vendor_id AS vendor_id',
       ])

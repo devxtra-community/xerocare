@@ -332,12 +332,9 @@ export function InvoiceDetailsDialog({
   const isTemplateType = ['SALE', 'RENT', 'LEASE', 'PRODUCT_SALE', 'SPAREPART_SALE'].includes(
     currentInvoice.saleType,
   );
-  const isFinalInvoice = currentInvoice.type === 'FINAL';
 
-  // For regular quotations/contracts, use the premium template.
-  // We exclude FINAL invoices (monthly collections) if they should stay in the breakdown view,
-  // but usually users want the premium look for all documents.
-  if (isTemplateType && !isFinalInvoice) {
+  // For regular quotations/contracts and final invoices, use the premium template.
+  if (isTemplateType) {
     return (
       <InvoiceViewDialog
         invoice={currentInvoice}

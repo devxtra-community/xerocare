@@ -25,6 +25,7 @@ import {
 } from '@/lib/model';
 import { getBrands, Brand } from '@/lib/brand';
 import { toast } from 'sonner';
+import { BulletDescriptionInput } from '@/components/ui/bullet-description-input';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -389,12 +390,11 @@ function ModelFormModal({
             />
           </div>
           <div className="col-span-2">
-            <label className="block text-sm font-medium mb-1">Description</label>
-            <textarea
-              className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-              value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              placeholder="A reliable laser printer suitable for small offices."
+            <BulletDescriptionInput
+              label="Model Specifications (Bullet Points)"
+              value={formData.description || ''}
+              onChange={(val) => setFormData({ ...formData, description: val })}
+              placeholder="Ex. 20 PPM Print Speed"
             />
           </div>
         </div>

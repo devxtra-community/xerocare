@@ -42,6 +42,9 @@ export class SparePart {
   @Column({ name: 'compatible_models', type: 'text', nullable: true })
   compatible_models?: string;
 
+  @Column({ name: 'yield', type: 'text', nullable: true })
+  yield?: string;
+
   @Column({ name: 'model_id', type: 'uuid', nullable: true }) // Nullable implies universal parts
   model_id?: string;
 

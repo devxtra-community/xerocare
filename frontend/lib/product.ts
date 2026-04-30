@@ -27,6 +27,7 @@ export interface Product {
   print_colour?: 'BLACK_WHITE' | 'COLOUR' | 'BOTH';
   max_discount_amount?: number;
   imageUrl?: string;
+  description?: string;
   created_at: string;
   inventory?: {
     id: string;

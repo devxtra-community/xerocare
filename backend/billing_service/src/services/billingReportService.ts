@@ -179,15 +179,28 @@ export class BillingReportService {
       RENT: 0,
       LEASE: 0,
       SALE: 0,
+      QUOTATIONS: 0,
     };
-    let totalQuotations = 0;
+
     counts.forEach((c) => {
-      if (c.saleType) {
-        result[c.saleType] = c.count;
-        totalQuotations += c.count;
+      if (c.type === InvoiceType.QUOTATION) {
+        result.QUOTATIONS += c.count;
+      } else {
+        // Only count PROFORMA/FINAL in the specific operational buckets
+        if (c.saleType === 'RENT') {
+          result.RENT += c.count;
+        } else if (c.saleType === 'LEASE') {
+          result.LEASE += c.count;
+        } else if (
+          c.saleType === 'SALE' ||
+          c.saleType === 'PRODUCT_SALE' ||
+          c.saleType === 'SPAREPART_SALE'
+        ) {
+          result.SALE += c.count;
+        }
       }
     });
-    result['QUOTATIONS'] = totalQuotations;
+
     return result;
   }
 

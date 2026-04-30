@@ -101,6 +101,7 @@ interface AggregatedInvoice extends Invoice {
   customerName: string;
   customerPhone?: string;
   customerEmail?: string;
+  customerAddress?: string;
 }
 
 const employeeCache = new Map<string, { name: string; timestamp: number }>();
@@ -108,7 +109,7 @@ const branchCache = new Map<string, { name: string; timestamp: number }>();
 
 const customerCache = new Map<
   string,
-  { name: string; phone?: string; email?: string; timestamp: number }
+  { name: string; phone?: string; email?: string; address?: string; timestamp: number }
 >();
 const CACHE_TTL = 10 * 60 * 1000; // 5 minutes
 
@@ -140,14 +141,14 @@ const fetchCustomerDetails = async (
   id: string | undefined,
   url: string,
   token: string,
-): Promise<{ name: string; phone?: string; email?: string }> => {
+): Promise<{ name: string; phone?: string; email?: string; address?: string }> => {
   const defaultRes = { name: 'Walk-in Customer', phone: 'N/A', email: '' };
   if (!id) return defaultRes;
 
   // Check Local Cache
   const cached = customerCache.get(id);
   if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
-    return { name: cached.name, phone: cached.phone, email: cached.email };
+    return { name: cached.name, phone: cached.phone, email: cached.email, address: cached.address };
   }
 
   // Try Redis first
@@ -155,15 +156,22 @@ const fetchCustomerDetails = async (
     const cachedName = await redis.get(`customer:${id}:name`);
     const cachedPhone = await redis.get(`customer:${id}:phone`);
     const cachedEmail = await redis.get(`customer:${id}:email`);
+    const cachedAddress = await redis.get(`customer:${id}:address`);
     if (cachedName) {
       // Refresh local cache if found in Redis
       customerCache.set(id, {
         name: cachedName,
         phone: cachedPhone || undefined,
         email: cachedEmail || undefined,
+        address: cachedAddress || undefined,
         timestamp: Date.now(),
       });
-      return { name: cachedName, phone: cachedPhone || undefined, email: cachedEmail || undefined };
+      return {
+        name: cachedName,
+        phone: cachedPhone || undefined,
+        email: cachedEmail || undefined,
+        address: cachedAddress || undefined,
+      };
     }
   } catch (err) {
     logger.error('Redis get error', err);
@@ -171,24 +179,27 @@ const fetchCustomerDetails = async (
 
   // Fetch from Service
   try {
-    const res = await axios.get<{ data: { name: string; phone?: string; email?: string } }>(url, {
+    const res = await axios.get<{
+      data: { name: string; phone?: string; email?: string; address?: string };
+    }>(url, {
       headers: { Authorization: `Bearer ${token}` },
     });
-    const { name, phone, email } = res.data.data;
+    const { name, phone, email, address } = res.data.data;
 
     // Store in Redis
     try {
       await redis.set(`customer:${id}:name`, name, 'EX', 3600);
       if (phone) await redis.set(`customer:${id}:phone`, phone, 'EX', 3600);
       if (email) await redis.set(`customer:${id}:email`, email, 'EX', 3600);
+      if (address) await redis.set(`customer:${id}:address`, address, 'EX', 3600);
     } catch (err) {
       logger.error('Redis set error', err);
     }
 
     // Store in Local Cache
-    customerCache.set(id, { name, phone, email, timestamp: Date.now() });
+    customerCache.set(id, { name, phone, email, address, timestamp: Date.now() });
 
-    return { name, phone, email };
+    return { name, phone, email, address };
   } catch (error: unknown) {
     const err = error as { message?: string; response?: { status?: number; data?: unknown } };
     logger.error(`Failed to fetch customer details for ID: ${id}`, {
@@ -264,6 +275,7 @@ export class InvoiceAggregationService {
               customerName: customerDetails.name,
               customerPhone: customerDetails.phone,
               customerEmail: customerDetails.email,
+              customerAddress: customerDetails.address,
               startDate: inv.effectiveFrom || inv.createdAt,
               endDate: inv.effectiveTo,
             };
@@ -275,6 +287,7 @@ export class InvoiceAggregationService {
               customerName: 'Unknown',
               customerPhone: 'N/A',
               customerEmail: '',
+              customerAddress: '',
             };
           }
         }),
@@ -332,6 +345,7 @@ export class InvoiceAggregationService {
             customerName: customerDetails.name,
             customerPhone: customerDetails.phone,
             customerEmail: customerDetails.email,
+            customerAddress: customerDetails.address,
             startDate: inv.effectiveFrom || inv.createdAt,
             endDate: inv.effectiveTo,
           };
@@ -392,6 +406,7 @@ export class InvoiceAggregationService {
             customerName: customerDetails.name,
             customerPhone: customerDetails.phone,
             customerEmail: customerDetails.email,
+            customerAddress: customerDetails.address,
             startDate: inv.effectiveFrom || inv.createdAt,
             endDate: inv.effectiveTo,
           };
@@ -456,6 +471,7 @@ export class InvoiceAggregationService {
         customerName: customerDetails.name,
         customerPhone: customerDetails.phone,
         customerEmail: customerDetails.email,
+        customerAddress: customerDetails.address,
         startDate: invoice.effectiveFrom,
         endDate: invoice.effectiveTo,
       };
@@ -533,6 +549,7 @@ export class InvoiceAggregationService {
         customerName: customerDetails.name,
         customerPhone: customerDetails.phone,
         customerEmail: customerDetails.email,
+        customerAddress: customerDetails.address,
         startDate: invoice.effectiveFrom,
         endDate: invoice.effectiveTo,
       };
@@ -606,6 +623,7 @@ export class InvoiceAggregationService {
         customerName: customerDetails.name,
         customerPhone: customerDetails.phone,
         customerEmail: customerDetails.email,
+        customerAddress: customerDetails.address,
         startDate: invoice.effectiveFrom,
         endDate: invoice.effectiveTo,
       };

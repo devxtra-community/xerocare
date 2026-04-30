@@ -1,18 +1,19 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Download, Send, Mail } from 'lucide-react';
+import { Send, Mail, Phone, Globe } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
-import { getProductById } from '@/lib/product';
+import { getProductById, getAllProducts } from '@/lib/product';
 import { getAllSpareParts } from '@/lib/spare-part';
 import { getAllModels } from '@/lib/model';
-import { Invoice, downloadPremiumInvoice } from '@/lib/invoice';
+import { Invoice, sendEmailNotification, sendWhatsappNotification } from '@/lib/invoice';
+import { toast } from 'sonner';
 
 interface ProductMeta {
   brandRelation?: { name?: string };
   brand?: string;
-  model?: { model_name?: string };
+  model?: { model_name?: string; id?: string; description?: string };
   model_name?: string;
   serial_no?: string;
   imageUrl?: string;
@@ -21,6 +22,9 @@ interface ProductMeta {
   name?: string;
   part_name?: string;
   description?: string;
+  yield?: string;
+  sku?: string;
+  compatible_model?: string;
   inventory?: { description?: string }[];
 }
 
@@ -39,10 +43,9 @@ export function InvoiceViewDialog({
   onClose,
   onApprove,
   onReject,
-  onEmail,
-  onWhatsApp,
   approveLabel = 'Approve',
 }: InvoiceViewDialogProps) {
+  const [isSendingCustomer, setIsSendingCustomer] = useState(false);
   const [productDetails, setProductDetails] = useState<Record<string, ProductMeta>>({});
   const [isRejecting, setIsRejecting] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
@@ -63,27 +66,56 @@ export function InvoiceViewDialog({
             const alloc = item.modelId ? allocs.find((a) => a.modelId === item.modelId) : null;
             const targetProductId = item.productId || alloc?.productId;
 
-            if (targetProductId) {
+            if (targetProductId && targetProductId !== 'N/A') {
               try {
-                const p = (await getProductById(targetProductId)) as unknown as ProductMeta;
-                details[targetProductId] = p;
+                const p = await getProductById(targetProductId).catch(() => null);
+                if (p) {
+                  details[targetProductId] = p as unknown as ProductMeta;
+                }
               } catch (e) {
-                console.error(e);
+                console.warn(`Product ${targetProductId} not found:`, e);
               }
             }
             if (item.modelId) {
               const m = models.find((m: { id: string }) => m.id === item.modelId);
-              if (m) details[item.modelId] = m as unknown as ProductMeta;
+              if (m) {
+                try {
+                  const productsForModel = await getAllProducts({ modelId: m.id }).catch(() => []);
+                  const productWithImage = productsForModel.find(
+                    (p: { imageUrl?: string; image_url?: string }) => p.imageUrl || p.image_url,
+                  );
+                  if (productWithImage) {
+                    const typedM = m as unknown as ProductMeta;
+                    typedM.imageUrl =
+                      productWithImage.imageUrl ||
+                      (productWithImage as { image_url?: string }).image_url;
+                    if (
+                      !typedM.description &&
+                      (productWithImage as { description?: string }).description
+                    ) {
+                      typedM.description = (
+                        productWithImage as { description?: string }
+                      ).description;
+                    }
+                  }
+                } catch (e) {
+                  console.error(e);
+                }
+                details[item.modelId] = m as unknown as ProductMeta;
+              }
             } else if (item.description) {
               const m = models.find(
                 (m: { model_name?: string; product_name?: string }) =>
                   m.model_name === item.description || m.product_name === item.description,
               );
-              if (m) {
-                details[item.description] = m as unknown as ProductMeta;
-              } else {
+              if (m) details[item.description] = m as unknown as ProductMeta;
+              else {
+                const term = item.description?.toLowerCase().trim();
                 const sp = spareParts.find(
-                  (s) => s.part_name === item.description || s.mpn === item.description,
+                  (s) =>
+                    s.part_name?.toLowerCase().trim() === term ||
+                    s.mpn?.toLowerCase().trim() === term ||
+                    s.sku?.toLowerCase().trim() === term,
                 );
                 if (sp) details[item.description] = sp as unknown as ProductMeta;
               }
@@ -92,11 +124,101 @@ export function InvoiceViewDialog({
         }
         setProductDetails(details);
       } catch (err) {
-        console.error('Failed to fetch premium details:', err);
+        console.error('Failed to fetch details:', err);
       }
     };
     fetchFullDetails();
   }, [invoice]);
+
+  const handleSendCustomer = async (type: 'EMAIL' | 'WHATSAPP' | 'BOTH') => {
+    setIsSendingCustomer(true);
+    try {
+      const { toPng } = await import('html-to-image');
+      const { jsPDF } = await import('jspdf');
+
+      const element = document.getElementById('invoice-print-content');
+      if (!element) throw new Error('Document content not found');
+
+      const TARGET_WIDTH = 900;
+      const originalStyle = element.getAttribute('style') || '';
+      element.setAttribute(
+        'style',
+        `${originalStyle}; width: ${TARGET_WIDTH}px !important; max-width: ${TARGET_WIDTH}px !important; overflow: visible !important;`,
+      );
+      await new Promise<void>((r) => setTimeout(r, 120));
+
+      let dataUrl: string;
+      try {
+        dataUrl = await toPng(element, {
+          quality: 1,
+          pixelRatio: 2,
+          backgroundColor: '#ffffff',
+          width: TARGET_WIDTH,
+        });
+      } finally {
+        element.setAttribute('style', originalStyle);
+      }
+
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const imgProps = pdf.getImageProperties(dataUrl);
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfPageHeight = pdf.internal.pageSize.getHeight();
+      const imgAspectRatio = imgProps.height / imgProps.width;
+      const totalImgHeightInMm = pdfWidth * imgAspectRatio;
+
+      let remainingHeight = totalImgHeightInMm;
+      let position = 0;
+      while (remainingHeight > 0) {
+        pdf.addImage(
+          dataUrl,
+          'PNG',
+          0,
+          position === 0 ? 0 : -(totalImgHeightInMm - remainingHeight),
+          pdfWidth,
+          totalImgHeightInMm,
+          undefined,
+          'FAST',
+        );
+        remainingHeight -= pdfPageHeight;
+        position += pdfPageHeight;
+        if (remainingHeight > 0) pdf.addPage();
+      }
+
+      const pdfBase64 = pdf.output('datauristring');
+      const base64Data = pdfBase64.split(',')[1];
+      const attachments = [
+        {
+          filename: `Invoice-${invoice.invoiceNumber}.pdf`,
+          content: base64Data,
+          encoding: 'base64',
+        },
+      ];
+
+      if (type === 'EMAIL' || type === 'BOTH') {
+        if (!invoice.customerEmail) throw new Error('Customer Email is missing');
+        await sendEmailNotification(invoice.id, {
+          recipient: invoice.customerEmail,
+          subject: `Invoice - ${invoice.invoiceNumber}`,
+          body: `<p>Please find attached your invoice.</p>`,
+          attachments: attachments,
+        });
+      }
+      if (type === 'WHATSAPP' || type === 'BOTH') {
+        if (!invoice.customerPhone) throw new Error('Customer Phone is missing');
+        await sendWhatsappNotification(invoice.id, {
+          recipient: invoice.customerPhone,
+          body: `Your invoice ${invoice.invoiceNumber} is ready.`,
+          attachments: attachments,
+        });
+      }
+      toast.success('Sent successfully');
+    } catch (error: unknown) {
+      const err = error as Error;
+      toast.error('Failed to send: ' + err.message);
+    } finally {
+      setIsSendingCustomer(false);
+    }
+  };
 
   const allocs = invoice.productAllocations || [];
   const enrichedItems = (invoice.items || [])
@@ -105,631 +227,523 @@ export function InvoiceViewDialog({
         ? allocs.find((a: { modelId: string }) => a.modelId === item.modelId)
         : null;
       const targetProductId = item.productId || alloc?.productId;
-
       const meta =
-        targetProductId && productDetails[targetProductId as string]
-          ? productDetails[targetProductId as string]
-          : item.modelId && productDetails[item.modelId as string]
-            ? productDetails[item.modelId as string]
-            : item.description && productDetails[item.description as string]
-              ? productDetails[item.description as string]
+        targetProductId && productDetails[targetProductId]
+          ? productDetails[targetProductId]
+          : item.modelId && productDetails[item.modelId]
+            ? productDetails[item.modelId]
+            : item.description && productDetails[item.description]
+              ? productDetails[item.description]
               : null;
-
-      return {
-        ...item,
-        metadata: meta,
-        allocation: alloc,
-      };
+      return { ...item, metadata: meta, allocation: alloc };
     })
     .filter((item) => item.quantity && item.quantity > 0);
 
   const isRent = invoice.saleType === 'RENT';
   const isLease = invoice.saleType === 'LEASE';
-  const isSale = !isRent && !isLease;
+  const isSparePartSale = invoice.saleType === 'SPAREPART_SALE';
+
+  const firstModelName =
+    enrichedItems.find(
+      (item) => item.metadata?.model?.model_name || item.metadata?.compatible_model,
+    )?.metadata?.model?.model_name ||
+    enrichedItems.find((item) => item.metadata?.compatible_model)?.metadata?.compatible_model ||
+    'Machine';
 
   return (
     <Dialog open onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="sm:max-w-4xl rounded-none border-none shadow-2xl p-0 overflow-hidden bg-white">
+      <DialogContent className="sm:max-w-5xl rounded-none border-none shadow-2xl p-0 overflow-hidden bg-white flex flex-col h-[98vh]">
         <DialogTitle className="sr-only">Invoice Document</DialogTitle>
-        <div className="flex flex-col h-full max-h-[90vh]">
-          {/* ═══ HEADER — Xerocare Job Report ═══════════════════════════════ */}
-          <div
-            className="relative flex justify-between shrink-0 overflow-hidden bg-slate-50/10"
-            style={{ height: '110px' }}
-          >
-            {/* Left: mascot on diamond pattern */}
-            <div className="w-1/2 h-full">
+        <div
+          id="invoice-print-content"
+          className="flex-1 overflow-y-auto scrollbar-hide flex flex-col bg-white"
+        >
+          {/* Header */}
+          <div className="relative flex justify-between items-center px-12 pt-6 pb-4 shrink-0 bg-white">
+            <div className="flex flex-col">
+              <h1 className="text-5xl font-[900] text-[#D41B22] tracking-[-0.051em] leading-[0.7] font-sans lowercase">
+                xerocare
+              </h1>
+              <p className="text-[11px] font-bold text-[#AAAAAA] tracking-[0.25em] mt-2 uppercase">
+                TRADING & SERVICES W.L.L
+              </p>
+            </div>
+            <div className="absolute left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2 flex items-center justify-center pt-2 bg-transparent">
               <img
-                src="/branding/header_left.png"
-                alt="Header Left"
-                className="h-full w-full object-contain object-left select-none p-1"
+                src="/quatationlogo/quatationlogo.png"
+                alt="logo"
+                className="w-[90px] h-[90px] object-contain"
               />
             </div>
-            {/* Right: xerocare logo + contact */}
-            <div className="w-1/2 h-full flex justify-end">
-              <img
-                src="/branding/header_right.png"
-                alt="Header Right"
-                className="h-full max-w-full object-contain object-right select-none p-2"
-              />
+            <div className="flex flex-col items-end">
+              <h1 className="text-5xl font-[900] text-[#D41B22] leading-[0.7] mb-1" dir="rtl">
+                زيرو كير
+              </h1>
+              <p className="text-[14px] font-black text-[#AAAAAA] tracking-tight mt-2" dir="rtl">
+                للتجارة والخدمات ذ.م.م
+              </p>
             </div>
-            {/* Red bottom stripe */}
-            <div className="absolute bottom-0 left-0 right-0 h-[4px] bg-red-600 z-10" />
           </div>
 
-          <div className="p-4 space-y-4 overflow-y-auto custom-scrollbar flex-grow bg-white">
-            {/* Customer & Job Info Section Top Row */}
-            <div className="flex items-start justify-between">
-              {/* Left: Project Bar */}
-              <div className="grid grid-cols-1 gap-2 flex-grow max-w-[450px]">
-                <div className="flex">
-                  <div className="bg-slate-50 border-x border-t border-slate-200 px-8 py-1 rounded-t-lg">
-                    <p className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">
-                      Project
-                    </p>
-                  </div>
-                </div>
-                <div className="border border-slate-200 rounded-b-2xl rounded-tr-2xl p-4 bg-white shadow-xl flex flex-col gap-1 -mt-[1px]">
-                  <p className="text-[11px] font-black text-slate-400 uppercase tracking-tight">
-                    Name/Address
+          <div className="px-12 pb-6 space-y-4 bg-white flex-1 overflow-visible">
+            <div className="flex justify-between items-start pt-1">
+              <div className="space-y-0 text-black">
+                <h3 className="text-[17px] font-black uppercase leading-tight">
+                  {invoice.customerName || 'N/A'}
+                </h3>
+                {invoice.customerAddress ? (
+                  <h3 className="text-[17px] font-black leading-tight uppercase">
+                    {invoice.customerAddress}
+                  </h3>
+                ) : null}
+                {invoice.customerEmail && (
+                  <p className="text-[14px] font-bold text-gray-700 leading-tight">
+                    Email: {invoice.customerEmail}
                   </p>
-                  <div className="border-l-[4px] border-red-600 pl-4">
-                    <p className="text-xl font-black text-slate-800 uppercase leading-tight tracking-tight">
-                      {invoice.customerName || 'N/A'}
-                    </p>
-                    <p className="text-xs font-black text-slate-600 uppercase tracking-tight mt-0.5">
-                      {invoice.customerEmail || 'No Email'}
-                    </p>
-                    <p className="text-xs font-black text-slate-600 uppercase tracking-tight mt-0.5">
-                      {invoice.customerPhone || 'No Phone'}
-                    </p>
-                  </div>
-                </div>
+                )}
+                {invoice.customerPhone && (
+                  <p className="text-[14px] font-bold text-gray-700 leading-tight">
+                    Phone: {invoice.customerPhone}
+                  </p>
+                )}
               </div>
-
-              {/* Right: Invoice Info */}
-              <div className="flex flex-col items-end gap-5 lg:min-w-[320px]">
-                <h2 className="text-[20px] font-black text-red-700 uppercase tracking-tighter italic mr-4">
-                  {invoice.saleType
-                    ? `${invoice.saleType.replace(/_/g, ' ')} INVOICE`
-                    : invoice.type
-                      ? `${invoice.type} INVOICE`
-                      : 'INVOICE'}
-                </h2>
-                <div className="flex gap-0 border-2 border-red-700 rounded-3xl overflow-hidden shadow-xl">
-                  <div className="bg-red-50/50 border-r-2 border-red-700 px-8 py-2 min-w-[140px] text-center">
-                    <p className="text-[12px] font-black text-red-700 uppercase mb-1">Date</p>
-                    <p className="text-sm font-black text-slate-800">
-                      {new Date(invoice.createdAt)
-                        .toLocaleDateString(undefined, {
-                          day: '2-digit',
-                          month: '2-digit',
-                          year: 'numeric',
-                        })
-                        .replace(/\//g, '-')}
-                    </p>
-                  </div>
-                  <div className="bg-white px-8 py-2 min-w-[140px] text-center">
-                    <p className="text-[12px] font-black text-red-700 uppercase mb-1">
-                      Invoice No.
-                    </p>
-                    <p className="text-sm font-black text-slate-800">
-                      {invoice.invoiceNumber.split('-').pop()}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex flex-wrap justify-end gap-x-6 gap-y-1 text-[11px] font-black text-slate-600 uppercase tracking-tight mt-1 px-4">
-                  <p className="whitespace-nowrap">
-                    Payment Method - <span className="text-red-700">Due on receipt</span>
-                  </p>
-                  <p className="whitespace-nowrap">
-                    Rep - <span className="text-red-700">{invoice.employeeName || 'RSHD'}</span>
-                  </p>
-                  <p className="whitespace-nowrap">
-                    Status -{' '}
-                    <span className="text-red-700 uppercase tracking-widest">{invoice.status}</span>
-                  </p>
-                </div>
+              <div className="text-right space-y-0 text-black">
+                <p className="text-[16px] font-black">
+                  DATE:{' '}
+                  {new Date(invoice.createdAt).toLocaleDateString('en-US', {
+                    month: 'long',
+                    day: 'numeric',
+                    year: 'numeric',
+                  })}
+                </p>
+                <p className="text-[16px] font-black uppercase">
+                  REF NO {invoice.invoiceNumber.split('-').pop()}/
+                  {new Date().getFullYear().toString().slice(-2)}
+                </p>
               </div>
             </div>
 
-            {/* Brand / Model / Sl No - Large Row exactly like image */}
-            <div className="flex flex-wrap justify-center gap-x-12 gap-y-4 py-6 border-b-2 border-red-50 uppercase bg-slate-50/20 rounded-xl">
-              <div className="flex gap-3 items-center">
-                <span className="text-sm font-black text-slate-900 tracking-widest">BRAND</span>
-                <span className="text-sm font-bold text-red-700 italic leading-none border-l-2 border-red-100 pl-3">
-                  {enrichedItems[0]?.metadata?.brandRelation?.name ||
-                    enrichedItems[0]?.metadata?.brand ||
-                    'N/A'}
-                </span>
-              </div>
-              <div className="flex gap-3 items-center">
-                <span className="text-sm font-black text-slate-900 tracking-widest">MODEL NO</span>
-                <span className="text-sm font-bold text-red-700 italic leading-none border-l-2 border-red-100 pl-3">
-                  {enrichedItems[0]?.metadata?.model?.model_name ||
-                    enrichedItems[0]?.metadata?.model_name ||
-                    'N/A'}
-                </span>
-              </div>
-              <div className="flex gap-3 items-center">
-                <span className="text-sm font-black text-slate-900 tracking-widest">SL NO</span>
-                <span className="text-sm font-bold text-red-700 italic leading-none border-l-2 border-red-100 pl-3">
-                  {enrichedItems[0]?.allocation?.serialNumber ||
-                    enrichedItems[0]?.metadata?.serial_no ||
-                    (!isRent && !isLease ? 'N/A' : 'TBD')}
-                </span>
-              </div>
-            </div>
-
-            {/* Greeting Section */}
-            <div className="text-[12px] font-black text-slate-800 space-y-2 leading-relaxed opacity-90">
-              <p>Dear Sir/ Madam</p>
-              <p>Thanks for your valuable inquiry .</p>
-              <p>
-                As we discussed please find the maintenance for printers/copiers with special price
-                , All details are mentioned in the quotation . If any clarification please do call
-                and let me know the status .
+            <div className="relative flex items-center bg-[#CCCCCC] border border-black shadow-[2px_2px_0px_rgba(0,0,0,0.1)]">
+              <div className="absolute left-0 top-0 bottom-0 w-3 bg-gray-500 border-r border-black"></div>
+              <p className="w-full py-1.5 px-4 text-center text-[13px] font-black text-black uppercase tracking-tight ml-3">
+                Sub:{' '}
+                {isSparePartSale
+                  ? `Invoice for Replacement Consumables for ${firstModelName}`
+                  : `${invoice.saleType?.replace(/_/g, ' ')} Invoice for ${enrichedItems[0]?.metadata?.name || enrichedItems[0]?.description || 'Equipment'}`}
               </p>
             </div>
 
-            {/* Main Items Table */}
-            <div className="space-y-0">
-              <div className="border-[3px] border-red-700 rounded-t-2xl overflow-hidden shadow-2xl bg-white">
-                <table className="w-full">
-                  <thead>
-                    {isSale && (
-                      <tr className="bg-red-700 text-white">
-                        <th className="text-left py-4 px-4 text-[11px] font-black uppercase tracking-widest border-r border-red-600/40 w-[12%]">
-                          MPN
+            <div className="space-y-6">
+              {isSparePartSale ? (
+                <div className="border-[2px] border-black overflow-hidden bg-white">
+                  <table className="w-full border-collapse">
+                    <thead>
+                      <tr className="bg-[#D1E5F4] border-b-[2px] border-black">
+                        <th className="text-center py-2 px-4 text-[13px] font-black border-r-[2px] border-black w-[25%]">
+                          PART NAME
                         </th>
-                        <th className="text-left py-4 px-4 text-[11px] font-black uppercase tracking-widest border-r border-red-600/40 w-[20%]">
-                          Product Name
+                        <th className="text-center py-2 px-4 text-[13px] font-black border-r-[2px] border-black w-[40%]">
+                          DESCRIPTION
                         </th>
-                        <th className="text-left py-4 px-4 text-[11px] font-black uppercase tracking-widest border-r border-red-600/40 w-[30%]">
-                          Description
+                        <th className="text-center py-2 px-4 text-[13px] font-black border-r-[2px] border-black w-[20%]">
+                          YIELD*
                         </th>
-                        <th className="text-center py-4 px-2 text-[11px] font-black uppercase tracking-widest border-r border-red-600/40 w-[8%]">
-                          QTY
-                        </th>
-                        <th className="text-center py-4 px-2 text-[11px] font-black uppercase tracking-widest border-r border-red-600/40 w-[8%]">
-                          DISC
-                        </th>
-                        <th className="text-right py-4 px-4 text-[11px] font-black uppercase tracking-widest border-r border-red-600/40 w-[11%]">
-                          Rate
-                        </th>
-                        <th className="text-right py-4 px-4 text-[11px] font-black uppercase tracking-widest w-[11%]">
-                          Total
+                        <th className="text-center py-2 px-4 text-[13px] font-black w-[15%] underline">
+                          Price(Qr)
                         </th>
                       </tr>
-                    )}
-                    {(isRent || isLease) && (
-                      <tr className="bg-red-700 text-white">
-                        <th className="text-left py-4 px-4 text-[11px] font-black uppercase tracking-widest border-r border-red-600/40 w-[10%]">
-                          MPN
-                        </th>
-                        <th className="text-left py-4 px-4 text-[11px] font-black uppercase tracking-widest border-r border-red-600/40 w-[20%]">
-                          Product Name
-                        </th>
-                        <th className="text-left py-4 px-4 text-[11px] font-black uppercase tracking-widest border-r border-red-600/40 w-[25%]">
-                          Description
-                        </th>
-                        <th className="text-center py-4 px-2 text-[11px] font-black uppercase tracking-widest border-r border-red-600/40 w-[8%]">
-                          Qty
-                        </th>
-                        <th className="text-center py-4 px-2 text-[11px] font-black uppercase tracking-widest border-r border-red-600/40 w-[12%]">
-                          Limits
-                        </th>
-                        <th className="text-center py-4 px-2 text-[11px] font-black uppercase tracking-widest border-r border-red-600/40 w-[12%]">
-                          Col Lmt
-                        </th>
-                        <th className="text-center py-4 px-2 text-[11px] font-black uppercase tracking-widest w-[13%]">
-                          Exc Rate
-                        </th>
-                      </tr>
-                    )}
-                  </thead>
-                  <tbody className="divide-y-2 divide-red-50">
-                    {enrichedItems.map((item, idx) => {
-                      const detail = item.metadata;
-                      const image = detail?.imageUrl || detail?.image_url;
-                      const mpn = detail?.mpn || ' ';
-                      const productName =
-                        detail?.name || detail?.part_name || item.description || 'N/A';
-                      const productDesc =
-                        detail?.description ||
-                        detail?.inventory?.[0]?.description ||
-                        (item.description && item.description !== productName
-                          ? item.description
-                          : 'Standard specification as per brand guidelines.');
+                    </thead>
+                    <tbody>
+                      {enrichedItems.map((item, idx) => {
+                        const detail = item.metadata;
+                        const partName = detail?.mpn || detail?.sku || item.description || 'N/A';
+                        const description =
+                          detail?.description ||
+                          detail?.model?.description ||
+                          detail?.part_name ||
+                          item.description ||
+                          'N/A';
+                        const yieldSpec = detail?.yield || '';
+                        const priceValue =
+                          Number(item.quantity || 1) * Number(item.unitPrice || 0) -
+                          Number(item.discount || 0);
 
-                      return (
-                        <tr
-                          key={idx}
-                          className="group hover:bg-red-50/40 transition-all duration-300"
-                        >
-                          <td className="py-3 px-4 border-r-2 border-red-50 align-top relative">
-                            <span className="text-[12px] font-black text-slate-800">{mpn}</span>
-                          </td>
-                          <td className="py-3 px-4 border-r-2 border-red-50 relative">
-                            <div className="relative z-10 space-y-1">
-                              <p className="text-[13px] font-black text-slate-900 uppercase tracking-tight leading-snug">
-                                {productName}
-                              </p>
-                            </div>
-                          </td>
-                          <td className="py-3 px-4 border-r-2 border-red-50 align-top relative">
-                            <div className="flex gap-4">
-                              {image && (
-                                <img
-                                  src={image}
-                                  alt="Product"
-                                  className="w-[100px] h-[100px] object-contain mix-blend-multiply shrink-0 opacity-100"
-                                />
-                              )}
-                              <p className="text-[11px] text-slate-500 leading-relaxed font-bold opacity-90 uppercase mt-1">
-                                {productDesc}
-                              </p>
-                            </div>
-                          </td>
-                          <td className="py-3 px-3 text-center border-r-2 border-red-50 align-top font-black text-slate-900 text-sm">
-                            {item.quantity}
-                          </td>
-                          {isSale && (
-                            <>
-                              <td className="py-3 px-3 text-center border-r-2 border-red-50 align-top font-black text-slate-900 text-sm">
-                                {(item as { discount?: number }).discount
-                                  ? `${(item as { discount?: number }).discount}%`
-                                  : '0%'}
-                              </td>
-                              <td className="py-3 px-4 text-right border-r-2 border-red-50 align-top font-black text-slate-800 text-sm">
-                                {Number(item.unitPrice || 0).toLocaleString(undefined, {
-                                  minimumFractionDigits: 2,
+                        return (
+                          <tr key={idx} className="border-b border-black last:border-b-0">
+                            <td className="border-r-[2px] border-black p-3 text-[12px] font-black text-center uppercase">
+                              {partName}
+                            </td>
+                            <td className="border-r-[2px] border-black p-3 text-[12px] align-top text-left">
+                              <div className="space-y-1.5">
+                                {description.split('\n').map((line: string, i: number) => {
+                                  const trimmedLine = line.trim();
+                                  if (!trimmedLine) return null;
+                                  const isRed = i % 2 === 0;
+                                  return (
+                                    <p
+                                      key={i}
+                                      className={`flex gap-2 items-start ${isRed ? 'font-black text-[#D41B22]' : 'font-bold text-black'}`}
+                                    >
+                                      <span
+                                        className={`${isRed ? 'text-[#D41B22]' : 'text-gray-900'} mt-0.5`}
+                                      >
+                                        ➤
+                                      </span>
+                                      <span className="uppercase">{trimmedLine}</span>
+                                    </p>
+                                  );
                                 })}
-                              </td>
-                              <td className="py-3 px-4 text-right align-top font-black text-slate-900 text-sm">
-                                {((item.quantity || 0) * (item.unitPrice || 0)).toLocaleString()}
-                              </td>
-                            </>
-                          )}
-                          {(isRent || isLease) && (
-                            <>
-                              <td className="py-3 px-3 text-center border-r-2 border-red-50 align-top font-black text-slate-900 text-sm">
-                                {item.combinedIncludedLimit
-                                  ? `${item.combinedIncludedLimit}`
-                                  : item.bwIncludedLimit || 0}
-                              </td>
-                              <td className="py-3 px-3 text-center border-r-2 border-red-50 align-top font-black text-slate-900 text-sm">
-                                {item.combinedIncludedLimit
-                                  ? 'Combo'
-                                  : item.colorIncludedLimit || 0}
-                              </td>
-                              <td className="py-3 px-3 text-center align-top font-black text-slate-900 text-sm">
-                                {item.combinedExcessRate
-                                  ? `${Number(item.combinedExcessRate).toFixed(3)} (Combo)`
-                                  : `${(Number(item.bwExcessRate) || 0).toFixed(3)} / ${(Number(item.colorExcessRate) || 0).toFixed(3)}`}
-                              </td>
-                            </>
-                          )}
-                        </tr>
-                      );
-                    })}
-                    {/* Padding rows exactly like reference to fill the box */}
-                    {Array.from({ length: Math.max(0, 5 - enrichedItems.length) }).map((_, i) => (
-                      <tr key={`empty-${i}`} className="h-8">
-                        <td className="border-r-2 border-red-50 bg-slate-50/[0.02]" />
-                        <td className="border-r-2 border-red-50" />
-                        <td className="border-r-2 border-red-50 bg-slate-50/[0.02]" />
-                        <td className="border-r-2 border-red-50" />
-                        {isSale && (
-                          <>
-                            <td className="border-r-2 border-red-50 bg-slate-50/[0.02]" />
-                            <td className="border-r-2 border-red-50" />
-                            <td className="bg-slate-50/[0.02]" />
-                          </>
-                        )}
-                        {isRent && (
-                          <>
-                            <td className="border-r-2 border-red-50 bg-slate-50/[0.02]" />
-                            <td className="border-r-2 border-red-50" />
-                            <td className="bg-slate-50/[0.02]" />
-                          </>
-                        )}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              {/* Fixed Total Box precisely connected and styled */}
-              {isSale && (
-                <div className="flex justify-end mt-0">
-                  <div className="border-[3px] border-t-0 border-red-700 rounded-b-3xl px-8 py-2 bg-white flex items-center gap-8 shadow-[0_20px_50px_-12px_rgba(185,28,28,0.2)]">
-                    <p className="text-lg font-black text-red-700 uppercase tracking-[0.2em] border-r-2 border-red-100 pr-8 leading-none">
-                      Total
-                    </p>
-                    <p className="text-2xl font-black text-slate-900 leading-none">
-                      QAR {Number(invoice.totalAmount || 0).toLocaleString()}
-                    </p>
-                  </div>
+                              </div>
+                            </td>
+                            <td className="border-r-[2px] border-black p-3 text-[12px] font-black text-center uppercase">
+                              {yieldSpec}
+                            </td>
+                            <td className="p-3 text-[12px] font-black text-center">
+                              {priceValue.toLocaleString(undefined, {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2,
+                              })}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
                 </div>
-              )}
+              ) : (
+                enrichedItems.map((item, idx) => {
+                  const detail = item.metadata;
+                  const image = detail?.imageUrl || detail?.image_url;
+                  const productName =
+                    detail?.name || detail?.part_name || item.description || 'N/A';
+                  const productDesc =
+                    detail?.description || detail?.model?.description || item.description || '';
+                  return (
+                    <div key={idx} className="space-y-4 relative">
+                      <div className="pl-2">
+                        <h4 className="text-[16px] font-black text-black border-b-2 border-black inline-block pb-0.5">
+                          {idx + 1}. {productName}
+                        </h4>
+                      </div>
+                      <div className="border-[2px] border-black overflow-hidden bg-white">
+                        <table className="w-full border-collapse">
+                          <thead>
+                            <tr className="bg-[#D1E5F4] border-b-[2px] border-black">
+                              <th className="text-center py-2 px-4 text-[13px] font-black border-r-[2px] border-black w-[65%]">
+                                Description
+                              </th>
+                              <th className="text-center py-2 px-2 text-[13px] font-black border-r-[2px] border-black w-[7.5%] underline">
+                                Qty.
+                              </th>
+                              <th className="text-center py-2 px-4 text-[13px] font-black border-r-[2px] border-black w-[13.75%] underline">
+                                Unit Price <br /> (Qr.)
+                              </th>
+                              <th className="text-center py-2 px-4 text-[13px] font-black w-[13.75%] underline">
+                                Total <br /> (Qr.)
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <tr>
+                              <td
+                                rowSpan={2}
+                                className="border-r-[2px] border-black align-top p-5"
+                                style={{ width: '65%' }}
+                              >
+                                <p className="text-[15px] font-black text-black underline uppercase mb-3">
+                                  {productName}
+                                </p>
+                                <div className="text-[12px] text-black space-y-1.5 font-bold leading-relaxed">
+                                  {productDesc ? (
+                                    productDesc.split('\n').map((line: string, i: number) => {
+                                      const trimmedLine = line.trim();
+                                      if (!trimmedLine) return null;
+                                      const isHeader =
+                                        trimmedLine.endsWith(':') ||
+                                        trimmedLine.match(/^[A-Z\s]+$/);
+                                      const isKeywordRed =
+                                        trimmedLine.includes('+') ||
+                                        trimmedLine.includes('Machine') ||
+                                        trimmedLine.includes('trays') ||
+                                        trimmedLine.includes('Toner') ||
+                                        trimmedLine.startsWith('Warranty');
 
-              {isRent && (
-                <div className="flex justify-between items-start mt-0 pl-12 pr-0">
-                  <div className="border-[3px] border-t-0 border-red-700 rounded-b-3xl px-6 py-3 bg-white flex flex-col shadow-[0_20px_50px_-12px_rgba(185,28,28,0.2)] min-w-[400px]">
-                    <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest border-b-2 border-red-50 flex pb-1.5 mb-2">
-                      Rent Agreement Details
-                    </p>
-                    <div className="grid grid-cols-4 gap-6">
-                      <div>
-                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
-                          Type
-                        </p>
-                        <p className="text-sm font-black text-slate-800 uppercase">
-                          {invoice.rentType?.replace('_', ' ') || 'N/A'}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
-                          Period
-                        </p>
-                        <p className="text-sm font-black text-slate-800 uppercase">
-                          {invoice.rentPeriod?.replace('_', ' ') || 'MONTHLY'}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
-                          Advance
-                        </p>
-                        <p className="text-sm font-black text-slate-800">
-                          QAR {(invoice.advanceAmount || 0).toLocaleString()}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
-                          Deposit
-                        </p>
-                        <p className="text-sm font-black text-slate-800">
-                          QAR {(invoice.securityDepositAmount || 0).toLocaleString()}
-                        </p>
+                                      // Pattern: 1st Red, 2nd Black, 3rd Red...
+                                      const isPatternRed = i % 2 === 0;
+                                      const shouldBeRed = isPatternRed || isKeywordRed || isHeader;
+
+                                      return (
+                                        <p
+                                          key={i}
+                                          className={`flex gap-2 ${shouldBeRed ? 'font-black text-[#D41B22]' : 'font-bold text-black'}`}
+                                        >
+                                          <span
+                                            className={`${shouldBeRed ? 'text-[#D41B22]' : 'text-gray-900'} mt-0.5`}
+                                          >
+                                            ➤
+                                          </span>
+                                          <span
+                                            className={isHeader ? 'underline decoration-black' : ''}
+                                          >
+                                            {trimmedLine}
+                                          </span>
+                                        </p>
+                                      );
+                                    })
+                                  ) : (
+                                    <p className="flex gap-2">
+                                      <span className="text-gray-900 mt-0.5">➤</span>
+                                      <span>Standard specification as per brand guidelines.</span>
+                                    </p>
+                                  )}
+                                </div>
+                              </td>
+                              <td
+                                colSpan={3}
+                                className="border-b-[2px] border-black text-center p-4"
+                                style={{ height: '360px' }}
+                              >
+                                {image ? (
+                                  <img
+                                    src={image}
+                                    alt="product"
+                                    className="max-w-full max-h-[320px] object-contain mx-auto"
+                                  />
+                                ) : (
+                                  <div className="h-full" />
+                                )}
+                              </td>
+                            </tr>
+                            <tr>
+                              <td className="text-center align-middle py-5 border-r-[2px] border-black font-black text-black">
+                                <p className="text-[15px] font-black text-black">
+                                  {String(item.quantity || 1).padStart(2, '0')}
+                                </p>
+                              </td>
+                              <td className="text-center align-middle py-5 border-r-[2px] border-black font-black text-black">
+                                <p className="text-[15px] font-black text-black">
+                                  {Number(item.unitPrice || 0).toLocaleString(undefined, {
+                                    minimumFractionDigits: 2,
+                                  })}
+                                </p>
+                              </td>
+                              <td className="text-center align-middle py-5 font-black text-black">
+                                <p className="text-[15px] font-black text-black">
+                                  {Number(
+                                    (item.quantity || 1) * (item.unitPrice || 0),
+                                  ).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                </p>
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>
                       </div>
                     </div>
-                  </div>
-                  <div className="border-[3px] border-t-0 border-red-700 rounded-b-3xl px-8 py-2 bg-white flex items-center gap-6 shadow-[0_20px_50px_-12px_rgba(185,28,28,0.2)]">
-                    <p className="text-lg font-black text-red-700 uppercase tracking-[0.1em] border-r-2 border-red-100 pr-6 leading-none">
-                      Monthly Rent
-                    </p>
-                    <p className="text-xl font-black text-slate-900 leading-none">
-                      QAR {Number(invoice.monthlyRent || 0).toLocaleString()}
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              {isLease && (
-                <div className="flex justify-between items-start mt-0 overflow-hidden pl-12 pr-0">
-                  <div className="border-[3px] border-t-0 border-red-700 rounded-b-3xl px-6 py-3 bg-white flex flex-col shadow-[0_20px_50px_-12px_rgba(185,28,28,0.2)] min-w-[400px]">
-                    <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest border-b-2 border-red-50 flex pb-1.5 mb-2">
-                      Lease Contract Frame
-                    </p>
-                    <div className="grid grid-cols-4 gap-6">
-                      <div>
-                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
-                          Type
-                        </p>
-                        <p className="text-sm font-black text-slate-800 uppercase">
-                          {invoice.leaseType || 'EMI'}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
-                          Tenure
-                        </p>
-                        <p className="text-sm font-black text-slate-800 uppercase">
-                          {invoice.leaseTenureMonths} Months
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
-                          Advance
-                        </p>
-                        <p className="text-sm font-black text-slate-800">
-                          QAR {(invoice.advanceAmount || 0).toLocaleString()}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
-                          Total Value
-                        </p>
-                        <p className="text-sm font-black text-slate-800">
-                          QAR{' '}
-                          {(invoice.totalLeaseAmount || invoice.totalAmount || 0).toLocaleString()}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="border-[3px] border-t-0 border-red-700 rounded-b-3xl px-8 py-2 bg-white flex items-center gap-6 shadow-[0_20px_50px_-12px_rgba(185,28,28,0.2)]">
-                    <p className="text-lg font-black text-red-700 uppercase tracking-[0.1em] border-r-2 border-red-100 pr-6 leading-none">
-                      Monthly EMI
-                    </p>
-                    <p className="text-xl font-black text-slate-900 leading-none">
-                      QAR {Number(invoice.monthlyEmiAmount || 0).toLocaleString()}
-                    </p>
-                  </div>
-                </div>
+                  );
+                })
               )}
             </div>
 
-            {/* Footer Content precisely from reference */}
-            <div className="grid grid-cols-2 gap-12 mt-8 pt-6 border-t border-slate-100 px-4">
-              <div className="text-[11px] font-black text-slate-800 space-y-2 leading-relaxed opacity-80">
-                <p>Delivery : 7-10 days normal working days , After conformed LPO</p>
-                <p>Payment : CASH or PDC (Management approved for the credit terms)</p>
-                <p>
-                  Warranty : 30 days in service of the parts , Not covered the of the consumables
-                  items ,
-                </p>
-                <p>
-                  Validity : 15 days estimated will valid , If not approved / paid with in 15 days
-                  will not be valid , re-estimate will be charged .
-                </p>
-                <p className="mt-6 font-black text-slate-800 italic leading-relaxed opacity-100">
-                  We trust you will find our offer competitive and look forward to hearing from you
-                  at the earliest .<br />
-                  Thanking you assuring you of our best attention all.
-                </p>
-              </div>
-
-              <div className="flex flex-col justify-end items-end space-y-8">
-                <div className="text-right">
-                  <p className="text-[12px] font-black text-slate-950 uppercase tracking-widest mb-1 italic">
-                    Customer Sing: ..............................................................
-                  </p>
-                </div>
-                <div className="text-right">
-                  <p className="text-[11px] font-black text-slate-900 uppercase tracking-tight opacity-70">
-                    Best Regards,
-                  </p>
-                  <p className="text-[13px] font-black text-red-700 uppercase tracking-tight italic mt-1">
-                    XEROCARE TRADING & SERVICES WLL
-                  </p>
-                  <p className="text-[11px] font-black text-slate-800 uppercase mt-2">
-                    P.O.BOX 37494, DOHA-QATAR
-                  </p>
-                  <p className="text-[11px] font-black text-slate-800 uppercase">MOB: 7071 7282</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Brand Logo Row */}
-            <div className="px-0 pb-6 pt-4 bg-white shrink-0 border-t border-slate-100 mt-8">
-              <div className="flex flex-col gap-6">
-                <div className="flex justify-between items-center opacity-30 grayscale saturate-0">
-                  <div className="flex flex-wrap gap-x-10 gap-y-4">
-                    {[
-                      'brother',
-                      'Canon',
-                      'TOSHIBA',
-                      'EPSON',
-                      'OKI',
-                      'RICOH',
-                      'kyocera',
-                      'LEXMARK',
-                      'SHARP',
-                    ].map((p) => (
-                      <span
-                        key={p}
-                        className="text-[11px] font-black uppercase tracking-widest italic text-slate-900 whitespace-nowrap"
-                      >
-                        {p}
-                      </span>
-                    ))}
+            <div className="space-y-8 mt-6">
+              <div className="pl-1">
+                <h4 className="text-[14px] font-black text-black underline mb-3 uppercase tracking-wider">
+                  TERMS AND CONDITIONS
+                </h4>
+                <div className="space-y-1 text-[13px] font-bold text-black">
+                  <div className="flex gap-4">
+                    <span className="w-28 uppercase">1) PAYMENT</span>
+                    <span>: CONFIRMED LPO</span>
                   </div>
+                  <div className="flex gap-4">
+                    <span className="w-28 uppercase">2) PRICES</span>
+                    <span>: INCLUSIVE OF DELIVERY & INSTALLATION AT YOUR SITE</span>
+                  </div>
+                  <div className="flex gap-4">
+                    <span className="w-28 uppercase">3) DELIVERY</span>
+                    <span>
+                      :{' '}
+                      <span className="underline font-black italic">
+                        EX STOCK, SUBJECT TO AVAILABILITY
+                      </span>{' '}
+                      OR 30 DAYS FROM ORDER DATE
+                    </span>
+                  </div>
+                  <div className="flex gap-4">
+                    <span className="w-28 uppercase">5) VALIDITY</span>
+                    <span>: 30 Days</span>
+                  </div>
+                </div>
+              </div>
 
-                  <div className="flex gap-4 items-center">
-                    {onEmail && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={onEmail}
-                        className="h-9 px-4 text-[10px] font-black uppercase tracking-widest text-slate-600 border-slate-200 hover:bg-slate-50 gap-2 rounded-full"
-                      >
-                        <Mail size={14} className="text-red-600" />
-                        Email
-                      </Button>
-                    )}
-                    {onWhatsApp && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={onWhatsApp}
-                        className="h-9 px-4 text-[10px] font-black uppercase tracking-widest text-slate-600 border-slate-200 hover:bg-slate-50 gap-2 rounded-full"
-                      >
-                        <img src="/icons/whatsapp.png" alt="WA" className="w-4 h-4" />
-                        WhatsApp
-                      </Button>
-                    )}
-
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={onClose}
-                      className="h-9 text-[11px] font-black uppercase tracking-widest text-slate-400 hover:text-red-600"
-                    >
-                      Close
-                    </Button>
-
-                    {!isRejecting ? (
-                      <>
-                        {onReject && (
-                          <Button
-                            onClick={() => setIsRejecting(true)}
-                            size="sm"
-                            className="h-10 bg-white border-2 border-red-600 text-red-600 hover:bg-red-50 font-black text-[11px] uppercase tracking-widest px-8 rounded-full"
-                          >
-                            Reject
-                          </Button>
-                        )}
-
-                        {onApprove && (
-                          <Button
-                            onClick={() => onApprove()}
-                            size="sm"
-                            className="h-10 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[11px] uppercase tracking-widest px-8 gap-2 shadow-lg shadow-emerald-100 rounded-full"
-                          >
-                            <Send size={14} />
-                            {approveLabel}
-                          </Button>
-                        )}
-                      </>
-                    ) : (
-                      <div className="flex items-center gap-2 bg-slate-50 p-1 rounded-full border border-slate-200">
-                        <input
-                          type="text"
-                          placeholder="Rejection Reason..."
-                          className="bg-transparent border-none focus:ring-0 text-xs px-4 w-48 font-bold"
-                          value={rejectReason}
-                          onChange={(e) => setRejectReason(e.target.value)}
-                        />
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => {
-                            setIsRejecting(false);
-                            setRejectReason('');
-                          }}
-                          className="h-8 w-8 p-0 rounded-full text-slate-400 hover:text-slate-600"
-                        >
-                          ✕
-                        </Button>
-                        <Button
-                          size="sm"
-                          onClick={() => {
-                            if (rejectReason.trim()) {
-                              onReject?.(rejectReason);
-                              setIsRejecting(false);
-                              setRejectReason('');
-                            }
-                          }}
-                          className="h-8 bg-red-600 hover:bg-red-700 text-white px-4 rounded-full text-[10px] font-black uppercase tracking-widest"
-                        >
-                          Confirm Reject
-                        </Button>
-                      </div>
-                    )}
-
-                    <Button
-                      onClick={() => downloadPremiumInvoice(invoice.id)}
-                      size="sm"
-                      className="h-10 bg-red-700 hover:bg-red-800 text-white font-black text-[11px] uppercase tracking-widest px-10 gap-2 shadow-lg shadow-red-100 rounded-full"
-                    >
-                      <Download size={14} />
-                      Download PDF
-                    </Button>
+              <div className="pl-1 space-y-4">
+                <p className="text-[13px] font-bold text-black">
+                  For any further clarifications please feel free to contact the undersigned on Mob:
+                  70717282 or Email: mail@xerocare.com
+                </p>
+                <div className="space-y-1">
+                  <p className="text-[13px] font-bold text-black">With warm regards,</p>
+                  <div className="pt-2">
+                    <p className="text-[13px] font-black text-black uppercase">For</p>
+                    <p className="text-[13px] font-black text-black uppercase">
+                      XEROCARE TRADING & SERVICES WLL
+                    </p>
+                    <p className="text-[13px] font-black text-black uppercase">DOHA QATAR</p>
                   </div>
                 </div>
               </div>
             </div>
+
+            <div className="relative flex justify-end px-4 -mt-36 z-50 pointer-events-none pr-20">
+              <img
+                src="/seel/seel1.png"
+                alt="Seal"
+                className="w-56 h-56 object-contain rotate-[-12deg]"
+                style={{ mixBlendMode: 'multiply', filter: 'contrast(1.1)' }}
+              />
+            </div>
+
+            {/* Maintenance Summary */}
+            {(isRent || isLease) && (
+              <div className="border-[2px] border-black p-4 bg-white mt-10">
+                <h4 className="text-[14px] font-black text-black underline uppercase mb-3 text-center">
+                  Contract Terms Summary
+                </h4>
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 text-center">
+                  <div>
+                    <p className="text-[10px] font-black text-gray-500 uppercase">Advance</p>
+                    <p className="text-sm font-black text-black">
+                      QAR {(invoice.advanceAmount || 0).toLocaleString()}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-black text-gray-500 uppercase">Deposit</p>
+                    <p className="text-sm font-black text-black">
+                      QAR {(invoice.securityDepositAmount || 0).toLocaleString()}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-black text-gray-500 uppercase">Period</p>
+                    <p className="text-sm font-black text-black">
+                      {invoice.effectiveFrom
+                        ? new Date(invoice.effectiveFrom).toLocaleDateString()
+                        : 'N/A'}{' '}
+                      -{' '}
+                      {invoice.effectiveTo
+                        ? new Date(invoice.effectiveTo).toLocaleDateString()
+                        : 'N/A'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-black text-gray-500 uppercase">Monthly</p>
+                    <p className="text-sm font-black text-black">
+                      QAR{' '}
+                      {(invoice.monthlyRent || invoice.monthlyLeaseAmount || 0).toLocaleString()}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="flex justify-end pt-2">
+              <div className="border-[2px] border-black px-8 py-3 bg-[#D1E5F4] shadow-[4px_4px_0px_rgba(0,0,0,1)]">
+                <p className="text-xl font-black text-black uppercase tracking-tight">
+                  Total: QAR{' '}
+                  {Number(invoice.totalAmount || 0).toLocaleString(undefined, {
+                    minimumFractionDigits: 2,
+                  })}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="px-12 pb-10 pt-4 bg-white shrink-0 border-t-[2px] border-black mt-auto">
+            <div className="flex justify-between items-center py-6">
+              <div className="flex items-center gap-3">
+                <div className="bg-zinc-900 p-2 rounded-md">
+                  <Mail size={16} className="text-white" />
+                </div>
+                <span className="text-[12px] font-black text-black">mail@xerocare.com</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="bg-zinc-900 p-2 rounded-md">
+                  <Phone size={16} className="text-white" />
+                </div>
+                <span className="text-[12px] font-black text-black">+974 7071 7282</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="bg-zinc-900 p-2 rounded-md">
+                  <Send size={16} className="text-white" />
+                </div>
+                <span className="text-[12px] font-black text-black">Doha-Qatar</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="bg-zinc-900 p-2 rounded-md">
+                  <Globe size={16} className="text-white" />
+                </div>
+                <span className="text-[12px] font-black text-black">www.xerocare.com</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Footer Actions */}
+        <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 flex justify-between items-center">
+          <div className="flex items-center gap-4">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onClose}
+              className="font-black text-[11px] uppercase tracking-widest text-slate-500"
+            >
+              Close
+            </Button>
+          </div>
+          <div className="flex gap-2">
+            {onReject && !isRejecting && (
+              <Button
+                variant="outline"
+                className="text-red-600 border-red-200"
+                onClick={() => setIsRejecting(true)}
+              >
+                Reject
+              </Button>
+            )}
+            {isRejecting && (
+              <div className="flex items-center gap-2">
+                <input
+                  placeholder="Reason..."
+                  className="h-9 border border-red-200 rounded px-2 text-xs"
+                  value={rejectReason}
+                  onChange={(e) => setRejectReason(e.target.value)}
+                />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setIsRejecting(false);
+                    if (onReject) onReject(rejectReason);
+                  }}
+                >
+                  Confirm
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => setIsRejecting(false)}>
+                  Cancel
+                </Button>
+              </div>
+            )}
+            {onApprove && (
+              <Button className="bg-emerald-600 text-white font-bold" onClick={onApprove}>
+                {approveLabel}
+              </Button>
+            )}
+            <Button
+              variant="outline"
+              onClick={() => handleSendCustomer('BOTH')}
+              disabled={isSendingCustomer}
+              className="border-red-200 text-red-700 font-bold"
+            >
+              Email/WA
+            </Button>
           </div>
         </div>
       </DialogContent>

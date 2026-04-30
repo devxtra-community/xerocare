@@ -17,7 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Loader2, User, Mail, Phone, Save } from 'lucide-react';
+import { Loader2, User, Mail, Save, MapPin } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 
 import { Customer, CreateCustomerData } from '@/lib/customer';
@@ -44,6 +44,7 @@ export default function CustomerFormDialog({
     name: '',
     email: '',
     phone: '',
+    address: '',
     status: 'ACTIVE',
   });
 
@@ -54,6 +55,7 @@ export default function CustomerFormDialog({
         name: customer.name,
         email: customer.email,
         phone: customer.phone,
+        address: customer.address || '',
         status: customer.isActive ? 'ACTIVE' : 'INACTIVE',
       });
     } else {
@@ -61,6 +63,7 @@ export default function CustomerFormDialog({
         name: '',
         email: '',
         phone: '',
+        address: '',
         status: 'ACTIVE',
       });
     }
@@ -157,8 +160,22 @@ export default function CustomerFormDialog({
                     placeholder="+1 234 567 890"
                     className="h-12 rounded-xl bg-muted/50 border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400 pl-11"
                   />
-                  <Phone className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                 </div>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider pl-1">
+                Full Address
+              </Label>
+              <div className="relative">
+                <Input
+                  name="address"
+                  value={formData.address || ''}
+                  onChange={handleChange}
+                  placeholder="Ex. 123 Building, Doha, Qatar"
+                  className="h-12 rounded-xl bg-muted/50 border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400 pl-11"
+                />
+                <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
               </div>
             </div>
 

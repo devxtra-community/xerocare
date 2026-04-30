@@ -1294,10 +1294,11 @@ export class BillingService {
 
     if (
       invoice.status !== InvoiceStatus.EMPLOYEE_APPROVED &&
-      invoice.status !== InvoiceStatus.TRANSACTION_COMPLETED
+      invoice.status !== InvoiceStatus.TRANSACTION_COMPLETED &&
+      invoice.status !== InvoiceStatus.FINANCE_APPROVED
     ) {
       throw new AppError(
-        'Only Employee Approved or Converted quotations can be rejected by Finance',
+        'Only Employee Approved, Finance Approved, or Converted quotations can be rejected by Finance',
         400,
       );
     }
@@ -1972,7 +1973,7 @@ export class BillingService {
           // If the new product has a different model, update it
           item.modelId = oldAllocation.modelId; // Assuming model stays same for now, but we can update if needed
           // Description might need update if it contains the old Serial Number
-          if (item.description.includes(oldAllocation.serialNumber)) {
+          if (item.description && item.description.includes(oldAllocation.serialNumber)) {
             item.description = item.description.replace(
               oldAllocation.serialNumber,
               newSerialNumber,

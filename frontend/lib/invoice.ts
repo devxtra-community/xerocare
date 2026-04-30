@@ -62,6 +62,7 @@ export interface Invoice {
   customerName: string;
   customerPhone?: string;
   customerEmail?: string;
+  customerAddress?: string;
   items?: InvoiceItem[];
   startDate?: string;
   endDate?: string;
@@ -752,12 +753,14 @@ export const sendConsolidatedInvoice = async (contractId: string): Promise<unkno
   return response.data;
 };
 
-/**
- * Sends an email notification related to a specific invoice.
- */
 export const sendEmailNotification = async (
   id: string,
-  payload: { recipient: string; subject: string; body: string },
+  payload: {
+    recipient: string;
+    subject: string;
+    body: string;
+    attachments?: { filename: string; content: string; encoding: string }[];
+  },
 ): Promise<unknown> => {
   const response = await api.post(`/b/invoices/${id}/notify/email`, payload);
   return response.data;
@@ -768,7 +771,11 @@ export const sendEmailNotification = async (
  */
 export const sendWhatsappNotification = async (
   id: string,
-  payload: { recipient: string; body: string },
+  payload: {
+    recipient: string;
+    body: string;
+    attachments?: { filename: string; content: string; encoding: string }[];
+  },
 ): Promise<unknown> => {
   const response = await api.post(`/b/invoices/${id}/notify/whatsapp`, payload);
   return response.data;

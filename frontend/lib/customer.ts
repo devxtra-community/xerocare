@@ -5,6 +5,7 @@ export interface Customer {
   name: string;
   email?: string;
   phone?: string;
+  address?: string;
 
   isActive: boolean;
   createdAt: string;
@@ -59,6 +60,7 @@ export interface CreateCustomerData {
   name: string;
   email?: string;
   phone?: string;
+  address?: string;
   source?: string;
   totalPurchase?: number;
   status?: 'ACTIVE' | 'INACTIVE';

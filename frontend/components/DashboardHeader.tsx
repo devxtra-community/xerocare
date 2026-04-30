@@ -130,8 +130,11 @@ export default function DashboardHeader({ title = 'Dashboard' }: { title?: strin
 
   return (
     <header className="sticky top-0 z-50 w-full bg-sidebar text-white">
-      <div className="flex h-14 sm:h-16 items-center justify-between px-3 sm:px-6 gap-2">
-        <div className="flex items-center gap-2">
+      <div
+        className="flex h-14 sm:h-16 items-center justify-between px-3 sm:px-6 gap-2"
+        suppressHydrationWarning
+      >
+        <div className="flex items-center gap-2" suppressHydrationWarning>
           <SidebarTrigger className="lg:hidden text-white hover:bg-card/10">
             <Menu className="h-5 w-5" />
           </SidebarTrigger>
@@ -139,7 +142,7 @@ export default function DashboardHeader({ title = 'Dashboard' }: { title?: strin
         </div>
 
         {/* Right: Icons and User Profile */}
-        <div className="flex items-center gap-2 sm:gap-4">
+        <div className="flex items-center gap-2 sm:gap-4" suppressHydrationWarning>
           {/* Notifications */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild id="notification-trigger">
@@ -225,10 +228,16 @@ export default function DashboardHeader({ title = 'Dashboard' }: { title?: strin
                 className="flex items-center gap-2 sm:gap-3 pl-2 sm:pl-4 border-l border-white/20 hover:bg-card/5 py-2 px-1 rounded transition-colors h-auto"
                 suppressHydrationWarning
               >
-                <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-full bg-white/20 flex items-center justify-center text-xs sm:text-sm font-medium shrink-0">
+                <div
+                  className="h-7 w-7 sm:h-8 sm:w-8 rounded-full bg-white/20 flex items-center justify-center text-xs sm:text-sm font-medium shrink-0"
+                  suppressHydrationWarning
+                >
                   {user.initial}
                 </div>
-                <div className="hidden sm:flex flex-col min-w-0 items-start">
+                <div
+                  className="hidden sm:flex flex-col min-w-0 items-start"
+                  suppressHydrationWarning
+                >
                   <span className="text-sm font-medium truncate">{user.name}</span>
                   <span className="text-xs text-sidebar-foreground/70 truncate">{user.email}</span>
                 </div>

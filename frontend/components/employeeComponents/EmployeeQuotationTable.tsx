@@ -44,6 +44,8 @@ import {
 } from '@/components/ui/select';
 import { CustomerSelect } from '@/components/invoice/CustomerSelect';
 import { ProductSelect, SelectableItem } from '@/components/invoice/ProductSelect';
+import { Product } from '@/lib/product';
+import { SparePart } from '@/lib/spare-part';
 
 import { usePagination } from '@/hooks/usePagination';
 import Pagination from '@/components/Pagination';
@@ -610,21 +612,44 @@ function QuotationFormModal({
       productId: string | undefined,
       modelId: string | undefined,
       itemType: 'PRODUCT' | 'SPAREPART' = 'PRODUCT';
+
     if ('part_name' in item) {
-      description = item.part_name;
-      basePrice = Number(item.base_price) || 0;
-      modelId = item.model_id || item.model?.id;
-      productId = item.id;
+      // Spare Part logic: Construct from Brand, Model, and Part Name
+      const sp = item as SparePart;
+      const brand = sp.brand || sp.model?.brandRelation?.name || '';
+      // Use raw compatible_model string if available (from backend raw query)
+      const modelName = sp.compatible_model || sp.model?.model_name || '';
+      const partName = sp.part_name || '';
+
+      description = `${brand} ${modelName} ${partName}`.trim().replace(/\s+/g, ' ');
+
+      // Fallback if built name is empty
+      if (!description) {
+        description = sp.description || 'Spare Part';
+      }
+
+      basePrice = Number(sp.base_price) || 0;
+      modelId = sp.model_id || sp.model?.id;
+      productId = sp.id;
       itemType = 'SPAREPART';
     } else {
-      description = item.name;
-      basePrice = item.sale_price || 0;
-      maxDiscount = item.max_discount_amount || 0;
-      productId = item.id;
-      modelId =
-        (item as { model_id?: string }).model_id ||
-        (item.model as { id?: string })?.id ||
-        (item.model as { model_id?: string })?.model_id;
+      // Product logic: Construct from Brand, Model, and Product Name
+      const pr = item as Product;
+      const brand = pr.brand || pr.model?.brandRelation?.name || '';
+      const modelName = pr.model?.model_name || pr.model?.model_no || '';
+      const productName = pr.name || '';
+
+      description = `${brand} ${modelName} ${productName}`.trim().replace(/\s+/g, ' ');
+
+      // Fallback if built name is empty
+      if (!description) {
+        description = pr.description || pr.model?.description || 'Product';
+      }
+
+      basePrice = pr.sale_price || 0;
+      maxDiscount = pr.max_discount_amount || 0;
+      productId = pr.id;
+      modelId = pr.model?.id;
       itemType = 'PRODUCT';
     }
     setSaleItems((prev) => [
@@ -1288,7 +1313,7 @@ function QuotationFormModal({
                           <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
                             <div className="md:col-span-4 space-y-1">
                               <label className="text-[9px] font-bold text-slate-400 uppercase">
-                                Description
+                                Product / Item Name
                               </label>
                               <Input
                                 value={item.description}

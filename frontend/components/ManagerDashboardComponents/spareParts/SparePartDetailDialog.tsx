@@ -167,6 +167,16 @@ export default function SparePartDetailDialog({
                     {part.compatible_model || 'Universal / Multiple Models'}
                   </p>
                 </div>
+                {part.yield && (
+                  <div className="pt-2 border-t border-slate-100">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">
+                      Yield / Life Specification
+                    </label>
+                    <p className="text-sm font-semibold text-emerald-700 leading-relaxed">
+                      {part.yield}
+                    </p>
+                  </div>
+                )}
                 {part.mpn && (
                   <div className="pt-2 border-t border-slate-100">
                     <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">
@@ -184,10 +194,13 @@ export default function SparePartDetailDialog({
                 <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">
                   Product Description
                 </h3>
-                <div className="bg-slate-50/50 rounded-xl p-4 border border-slate-100">
-                  <p className="text-sm text-slate-600 leading-relaxed whitespace-pre-wrap">
-                    {part.description}
-                  </p>
+                <div className="bg-slate-50/50 rounded-xl p-4 border border-slate-100 space-y-1.5">
+                  {part.description.split('\n').map((line, i) => (
+                    <p key={i} className="text-sm text-slate-600 leading-relaxed flex gap-2">
+                      <span className="text-primary mt-1">➤</span>
+                      <span>{line.trim()}</span>
+                    </p>
+                  ))}
                 </div>
               </div>
             )}

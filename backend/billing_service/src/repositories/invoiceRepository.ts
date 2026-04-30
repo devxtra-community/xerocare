@@ -721,6 +721,7 @@ export class InvoiceRepository {
     const qb = this.repo
       .createQueryBuilder('invoice')
       .select('invoice.saleType', 'saleType')
+      .addSelect('invoice.type', 'type')
       .addSelect('COUNT(invoice.id)', 'count')
       .where('invoice.status = :status', { status: InvoiceStatus.EMPLOYEE_APPROVED });
 
@@ -728,11 +729,12 @@ export class InvoiceRepository {
       qb.andWhere('invoice.branchId = :branchId', { branchId });
     }
 
-    const results = await qb.groupBy('invoice.saleType').getRawMany();
+    const results = await qb.groupBy('invoice.saleType').addGroupBy('invoice.type').getRawMany();
     logger.info('InvoiceRepo: getPendingCounts results', { results });
 
     return results.map((r) => ({
-      saleType: r.saleType || r.saletype, // Handle potential lowercase alias from Postgres
+      saleType: r.saleType || r.saletype,
+      type: r.type,
       count: Number(r.count),
     }));
   }

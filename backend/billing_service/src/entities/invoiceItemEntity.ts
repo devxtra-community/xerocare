@@ -7,8 +7,8 @@ export class InvoiceItem {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
 
-  @Column()
-  description!: string;
+  @Column({ type: 'text', nullable: true, default: '' })
+  description?: string;
 
   @Column({
     type: 'enum',

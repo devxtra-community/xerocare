@@ -327,7 +327,7 @@ export default function FinanceApprovalTable({ saleType }: FinanceApprovalTableP
 
   if (loading && invoices.length === 0) {
     return (
-      <div className="flex justify-center p-8">
+      <div className="flex justify-center p-8" suppressHydrationWarning>
         <Loader2 className="h-6 w-6 animate-spin text-primary" />
       </div>
     );
@@ -335,15 +335,18 @@ export default function FinanceApprovalTable({ saleType }: FinanceApprovalTableP
 
   if (invoices.length === 0) {
     return (
-      <div className="text-center p-8 border-2 border-dashed border-border rounded-xl bg-muted/30">
+      <div
+        className="text-center p-8 border-2 border-dashed border-border rounded-xl bg-muted/30"
+        suppressHydrationWarning
+      >
         <p className="text-muted-foreground font-medium">No pending approvals.</p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
+    <div className="space-y-4" suppressHydrationWarning>
+      <div className="flex items-center justify-between" suppressHydrationWarning>
         <h3 className="text-lg font-bold text-foreground">Waiting for Finance Confirmation</h3>
         <Badge variant="secondary" className="bg-primary/10 text-primary">
           {paginatedInvoices.length} Pending

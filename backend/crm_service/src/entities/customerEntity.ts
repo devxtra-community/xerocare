@@ -26,6 +26,9 @@ export class Customer {
   @Column({ type: 'varchar', length: 255, nullable: true })
   location!: string | null;
 
+  @Column({ type: 'text', nullable: true })
+  address!: string | null;
+
   @Column({ default: true })
   isActive!: boolean;
 

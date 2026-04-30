@@ -1,11 +1,11 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Loader2, Send, Mail, Phone } from 'lucide-react';
+import { Loader2, Send, Mail, Phone, Globe } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { getProductById, getAllProducts } from '@/lib/product';
-import { getAllSpareParts } from '@/lib/spare-part';
+import { getAllSpareParts, getSparePartById } from '@/lib/spare-part';
 import { getAllModels } from '@/lib/model';
 import { Invoice, sendEmailNotification, sendWhatsappNotification } from '@/lib/invoice';
 import { toast } from 'sonner';
@@ -13,7 +13,7 @@ import { toast } from 'sonner';
 interface ProductMeta {
   brandRelation?: { name?: string };
   brand?: string;
-  model?: { model_name?: string; id?: string };
+  model?: { model_name?: string; id?: string; description?: string };
   model_name?: string;
   serial_no?: string;
   imageUrl?: string;
@@ -22,6 +22,9 @@ interface ProductMeta {
   name?: string;
   part_name?: string;
   description?: string;
+  yield?: string;
+  sku?: string;
+  compatible_model?: string;
   inventory?: { description?: string }[];
 }
 
@@ -71,20 +74,40 @@ export function QuotationViewDialog({
             const alloc = item.modelId ? allocs.find((a) => a.modelId === item.modelId) : null;
             const targetProductId = item.productId || alloc?.productId;
 
-            if (targetProductId) {
-              try {
-                const p = (await getProductById(targetProductId)) as unknown as ProductMeta;
-                details[targetProductId] = p;
-              } catch (e) {
-                console.error(e);
+            // 1. Try resolving by productId first (check spare parts then products)
+            if (targetProductId && targetProductId !== 'N/A') {
+              // 1a. Check if it's in the pre-fetched spare parts list (fast)
+              const spLocal = spareParts.find((s) => s.id === targetProductId);
+              if (spLocal) {
+                details[targetProductId] = spLocal as unknown as ProductMeta;
+              } else {
+                // 1b. Not in the list, try fetching directly from spare-part service
+                try {
+                  const spDetail = await getSparePartById(targetProductId).catch(() => null);
+                  if (spDetail) {
+                    details[targetProductId] = spDetail as unknown as ProductMeta;
+                  } else {
+                    // 1c. If not a spare part, try product service
+                    const p = await getProductById(targetProductId).catch(() => null);
+                    if (p) {
+                      details[targetProductId] = p as unknown as ProductMeta;
+                    }
+                  }
+                } catch (e) {
+                  console.warn(
+                    `Product/Sparepart ${targetProductId} not found or error loading:`,
+                    e,
+                  );
+                }
               }
             }
+
+            // 2. Try resolving by modelId
             if (item.modelId) {
               const m = models.find((m: { id: string }) => m.id === item.modelId);
               if (m) {
                 try {
                   const productsForModel = await getAllProducts({ modelId: m.id }).catch(() => []);
-
                   const productWithImage = productsForModel.find(
                     (p: { imageUrl?: string; image_url?: string }) => p.imageUrl || p.image_url,
                   );
@@ -107,7 +130,14 @@ export function QuotationViewDialog({
                 }
                 details[item.modelId] = m as unknown as ProductMeta;
               }
-            } else if (item.description) {
+            }
+
+            // 3. Fallback: Resolve by description if metadata still missing for this item
+            if (
+              item.description &&
+              !details[targetProductId || ''] &&
+              !details[item.modelId || '']
+            ) {
               const m = models.find(
                 (m: { model_name?: string; product_name?: string }) =>
                   m.model_name === item.description || m.product_name === item.description,
@@ -115,8 +145,12 @@ export function QuotationViewDialog({
               if (m) {
                 details[item.description] = m as unknown as ProductMeta;
               } else {
+                const term = item.description?.toLowerCase().trim();
                 const sp = spareParts.find(
-                  (s) => s.part_name === item.description || s.mpn === item.description,
+                  (s) =>
+                    s.part_name?.toLowerCase().trim() === term ||
+                    s.mpn?.toLowerCase().trim() === term ||
+                    s.sku?.toLowerCase().trim() === term,
                 );
                 if (sp) details[item.description] = sp as unknown as ProductMeta;
               }
@@ -309,693 +343,725 @@ export function QuotationViewDialog({
   const isRent = quotation.saleType === 'RENT';
   const isLease = quotation.saleType === 'LEASE';
   const isSale = !isRent && !isLease;
+  const isSparePartSale = quotation.saleType === 'SPAREPART_SALE';
+
+  const firstBrandName =
+    enrichedItems.find((item) => item.metadata?.brand || item.metadata?.brandRelation?.name)
+      ?.metadata?.brand ||
+    enrichedItems.find((item) => item.metadata?.brandRelation?.name)?.metadata?.brandRelation
+      ?.name ||
+    'N/A';
+
+  const firstModelName =
+    enrichedItems.find((item) => item.metadata?.model?.model_name)?.metadata?.model?.model_name ||
+    enrichedItems.find((item) => item.metadata?.compatible_model)?.metadata?.compatible_model ||
+    'Universal';
+
+  const firstSerialNo =
+    enrichedItems.find((item) => item.metadata?.serial_no)?.metadata?.serial_no || 'N/A';
 
   return (
     <Dialog open onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="sm:max-w-4xl rounded-none border-none shadow-2xl p-0 overflow-hidden bg-white flex flex-col max-h-[90vh]">
+      <DialogContent className="sm:max-w-5xl rounded-none border-none shadow-2xl p-0 overflow-hidden bg-white flex flex-col h-[98vh]">
         <DialogTitle className="sr-only">Quotation Document</DialogTitle>
         <div
           id="quotation-print-content"
           className="flex-1 overflow-y-auto scrollbar-hide flex flex-col bg-white"
         >
-          {/* ═══ HEADER — Xerocare Job Report ═══════════════════════════════ */}
-          <div
-            className="relative flex justify-between shrink-0 overflow-hidden"
-            style={{ height: '130px' }}
-          >
-            {/* Left: mascot on diamond pattern image */}
-            <div className="w-1/2 h-full">
+          {/* ═══ HEADER — Specialized for Spare Parts or Default ═══════════════════════════════════════════ */}
+          {isSparePartSale ? (
+            <div className="w-full shrink-0">
               <img
-                src="/branding/header_left.png"
-                alt="Header Left"
-                className="h-full w-full object-contain object-left select-none p-1"
+                src="/sparepartsquatation/sparepartquatationheader.png"
+                alt="Quotation Header"
+                className="w-full h-auto object-cover"
               />
             </div>
-            {/* Right: xerocare logo + contact image */}
-            <div className="w-1/2 h-full flex justify-end">
-              <img
-                src="/branding/header_right.png"
-                alt="Header Right"
-                className="h-full max-w-full object-contain object-right select-none p-2"
-              />
-            </div>
-            {/* Red bottom stripe */}
-            <div className="absolute bottom-0 left-0 right-0 h-[4px] bg-red-600 z-10" />
-          </div>
+          ) : (
+            <div className="relative flex justify-between items-center px-12 pt-6 pb-4 shrink-0 bg-white">
+              {/* Left: English Branding */}
+              <div className="flex flex-col">
+                <h1 className="text-5xl font-[900] text-[#D41B22] tracking-[-0.051em] leading-[0.7] font-sans lowercase">
+                  xerocare
+                </h1>
+                <p className="text-[11px] font-bold text-[#AAAAAA] tracking-[0.25em] mt-2 uppercase">
+                  TRADING & SERVICES W.L.L
+                </p>
+              </div>
 
-          <div className="p-4 space-y-4 bg-white">
-            {/* Customer & Job Info Section Top Row */}
-            <div className="flex items-start justify-between">
-              {/* Left: Project Bar */}
-              <div className="grid grid-cols-1 gap-2 flex-grow max-w-[450px]">
-                <div className="flex">
-                  <div className="bg-slate-50 border-x border-t border-slate-200 px-8 py-1 rounded-t-lg">
-                    <p className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">
-                      Project
-                    </p>
-                  </div>
-                </div>
-                <div className="border border-slate-200 rounded-b-2xl rounded-tr-2xl p-4 bg-white shadow-xl flex flex-col gap-1 -mt-[1px]">
-                  <p className="text-[11px] font-black text-slate-400 uppercase tracking-tight">
-                    Name/Address
-                  </p>
-                  <div className="border-l-[4px] border-red-600 pl-4">
-                    <p className="text-xl font-black text-slate-800 uppercase leading-tight tracking-tight">
+              {/* Center Logo */}
+              <div className="absolute left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2 flex items-center justify-center pt-2 bg-transparent">
+                <img
+                  src="/quatationlogo/quatationlogo.png"
+                  alt="xerocare logo"
+                  className="w-[90px] h-[90px] object-contain border-none outline-none shadow-none"
+                />
+              </div>
+
+              {/* Right: Arabic Branding */}
+              <div className="flex flex-col items-end">
+                <h1 className="text-5xl font-[900] text-[#D41B22] leading-[0.7] mb-1" dir="rtl">
+                  زيرو كير
+                </h1>
+                <p className="text-[14px] font-black text-[#AAAAAA] tracking-tight mt-2" dir="rtl">
+                  للتجارة والخدمات ذ.م.م
+                </p>
+              </div>
+            </div>
+          )}
+
+          <div className="px-12 pb-6 space-y-4 bg-white flex-1 overflow-visible">
+            {isSparePartSale ? (
+              <div className="space-y-4">
+                {/* Job Report Title Row */}
+                <div className="flex justify-between items-end pb-2">
+                  <div className="pl-1">
+                    <p className="text-[14px] font-bold text-black uppercase">Name/Address</p>
+                    <h3 className="text-[17px] font-black uppercase leading-tight mt-1">
                       {quotation.customerName || 'N/A'}
-                    </p>
-                    <p className="text-xs font-black text-slate-600 uppercase tracking-tight mt-0.5">
-                      {quotation.customerEmail || 'No Email'}
-                    </p>
-                    <p className="text-xs font-black text-slate-600 uppercase tracking-tight mt-0.5">
-                      {quotation.customerPhone || 'No Phone'}
-                    </p>
+                    </h3>
+                    {quotation.customerAddress && (
+                      <h3 className="text-[17px] font-black leading-tight uppercase">
+                        {quotation.customerAddress}
+                      </h3>
+                    )}
+                  </div>
+                  <div className="flex flex-col items-end">
+                    <h2 className="text-[20px] font-black text-[#B24A4D] uppercase tracking-wide mb-2 italic">
+                      Quotation - <span className="text-[18px]">Estimate job Report</span>
+                    </h2>
+                    <div className="border-[1.5px] border-[#B24A4D] rounded-2xl overflow-hidden flex min-w-[300px]">
+                      <div className="flex-1 bg-[#EEF2F5] border-r border-[#B24A4D] text-center py-1">
+                        <p className="text-[10px] font-bold text-[#B24A4D] uppercase tracking-tighter">
+                          Date
+                        </p>
+                        <p className="text-[13px] font-black text-black">
+                          {new Date(quotation.createdAt).toLocaleDateString()}
+                        </p>
+                      </div>
+                      <div className="flex-1 bg-[#F5D8D9] text-center py-1">
+                        <p className="text-[10px] font-bold text-[#B24A4D] uppercase tracking-tighter">
+                          Estimate No.
+                        </p>
+                        <p className="text-[13px] font-black text-black">
+                          {quotation.invoiceNumber.split('-').pop()}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="mt-3 flex gap-6 text-[12px] font-bold text-black uppercase">
+                      <p>
+                        Payment Method - &nbsp;{' '}
+                        <span className="font-medium text-gray-600">Due on receipt</span>
+                      </p>
+                      <p>
+                        Rep &nbsp; <span className="font-medium text-gray-600">Admin</span>
+                      </p>
+                    </div>
+                    <div className="mt-2 text-[12px] font-black text-black uppercase flex gap-2">
+                      <span>Due Date</span>
+                      <span className="font-bold border-b border-black min-w-[80px] text-center">
+                        {new Date(quotation.createdAt).toLocaleDateString()}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Brand / Model / Sl No Row */}
+                <div className="flex justify-center gap-16 py-4 text-[13px] font-black text-black uppercase">
+                  <div className="flex gap-2">
+                    <span className="text-gray-900">BRAND</span>
+                    <span className="font-medium uppercase text-gray-600">{firstBrandName}</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <span className="text-gray-900">MODEL NO</span>
+                    <span className="font-medium text-gray-600 uppercase">{firstModelName}</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <span className="text-gray-900">SL NO</span>
+                    <span className="font-medium text-gray-600">{firstSerialNo}</span>
                   </div>
                 </div>
               </div>
+            ) : (
+              <>
+                <div className="flex justify-between items-start pt-1">
+                  {/* Left: Customer Info (AGRICO style) */}
+                  <div className="space-y-0 text-black">
+                    <h3 className="text-[17px] font-black uppercase leading-tight">
+                      {quotation.customerName || 'N/A'}
+                    </h3>
+                    {quotation.customerAddress ? (
+                      <h3 className="text-[17px] font-black leading-tight uppercase">
+                        {quotation.customerAddress}
+                      </h3>
+                    ) : null}
+                    {quotation.customerEmail && (
+                      <p className="text-[14px] font-bold text-gray-700 leading-tight">
+                        Email: {quotation.customerEmail}
+                      </p>
+                    )}
+                    {quotation.customerPhone && (
+                      <p className="text-[14px] font-bold text-gray-700 leading-tight">
+                        Phone: {quotation.customerPhone}
+                      </p>
+                    )}
+                  </div>
 
-              {/* Right: Quotation Info */}
-              <div className="flex flex-col items-end gap-5 lg:min-w-[320px]">
-                <h2 className="text-[20px] font-black text-red-700 uppercase tracking-tighter italic mr-4">
-                  {quotation.saleType
-                    ? `${quotation.saleType.replace(/_/g, ' ')} QUOTATION`
-                    : 'QUOTATION'}
-                </h2>
-                <div className="flex gap-0 border-2 border-red-700 rounded-3xl overflow-hidden shadow-xl">
-                  <div className="bg-red-50/50 border-r-2 border-red-700 px-6 py-2 min-w-[140px] text-center">
-                    <p className="text-[11px] font-black text-red-700 uppercase mb-0">Date</p>
-                    <p className="text-sm font-black text-slate-800">
-                      {new Date(quotation.createdAt)
-                        .toLocaleDateString(undefined, {
-                          day: '2-digit',
-                          month: '2-digit',
-                          year: 'numeric',
-                        })
-                        .replace(/\//g, '-')}
+                  {/* Right: Date & Ref */}
+                  <div className="text-right space-y-0 text-black">
+                    <p className="text-[16px] font-black">
+                      DATE:{' '}
+                      {new Date(quotation.createdAt).toLocaleDateString('en-US', {
+                        month: 'long',
+                        day: 'numeric',
+                        year: 'numeric',
+                      })}
+                    </p>
+                    <p className="text-[16px] font-black uppercase">
+                      REF NO {quotation.invoiceNumber.split('-').pop()}/
+                      {new Date().getFullYear().toString().slice(-2)}
                     </p>
                   </div>
-                  <div className="bg-white px-6 py-2 min-w-[140px] text-center">
-                    <p className="text-[11px] font-black text-red-700 uppercase mb-0">
-                      Estimate No.
+                </div>
+
+                {/* Subject Bar with Left Accent */}
+                <div className="relative flex items-center bg-[#CCCCCC] border border-black shadow-[2px_2px_0px_rgba(0,0,0,0.1)]">
+                  {/* The dark grey accent bar on the left */}
+                  <div className="absolute left-0 top-0 bottom-0 w-3 bg-gray-500 border-r border-black"></div>
+                  <p className="w-full py-1.5 px-4 text-center text-[13px] font-black text-black uppercase tracking-tight ml-3">
+                    Sub:{' '}
+                    {isSparePartSale
+                      ? `Quotation for Replacement Consumables for ${firstModelName}`
+                      : `Quotation for ${enrichedItems[0]?.metadata?.name || enrichedItems[0]?.description || 'Equipment'}`}
+                  </p>
+                </div>
+              </>
+            )}
+
+            {/* Greeting */}
+            <div
+              className={`text-sm text-black space-y-4 font-semibold pl-1 ${isSparePartSale ? 'pt-4' : ''}`}
+            >
+              <div className="space-y-1">
+                <p>Dear Sir/ Madam,</p>
+                {isSparePartSale ? (
+                  <>
+                    <p>Thanks for your valuable inquiry.</p>
+                    <p className="text-[12px] font-medium leading-tight text-gray-900 mt-2">
+                      As we discussed please find the maintenance for printers/copiers with special
+                      price. All details are mentioned in the quotation. If any clarification please
+                      do call and let me know the status.
                     </p>
-                    <p className="text-sm font-black text-slate-800">
-                      {quotation.invoiceNumber.split('-').pop()}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex gap-8 text-[12px] font-black text-slate-600 uppercase tracking-tight mt-1 px-4">
+                  </>
+                ) : (
                   <p>
-                    Payment Method - <span className="text-red-700">Due on receipt</span>
+                    Thank you for your valuable enquiry, please find our best competitive offers
+                    below.
                   </p>
-                  <p>
-                    Rep - <span className="text-red-700">{quotation.employeeName || 'RSHD'}</span>
-                  </p>
-                </div>
-                <div className="flex gap-10 text-[12px] font-black text-slate-600 uppercase tracking-tight px-4">
-                  <span className="opacity-0">Placeholder</span>
-                  <p>
-                    Due Date{' '}
-                    <span className="text-red-700 ml-8 font-black">
-                      {new Date(quotation.createdAt)
-                        .toLocaleDateString(undefined, {
-                          day: '2-digit',
-                          month: '2-digit',
-                          year: 'numeric',
-                        })
-                        .replace(/\//g, '-')}
-                    </span>
-                  </p>
-                </div>
+                )}
               </div>
             </div>
 
-            {/* Brand / Model / Sl No - Large Row exactly like image */}
-            <div className="flex justify-center gap-16 py-4 border-b border-slate-100 uppercase">
-              <div className="flex gap-4 items-center">
-                <span className="text-base font-black text-slate-900 tracking-widest">BRAND</span>
-                <span className="text-base font-bold text-slate-600 italic leading-none">
-                  {enrichedItems[0]?.metadata?.brandRelation?.name ||
-                    enrichedItems[0]?.metadata?.brand ||
-                    'N/A'}
-                </span>
-              </div>
-              <div className="flex gap-4 items-center">
-                <span className="text-base font-black text-slate-900 tracking-widest">
-                  MODEL NO
-                </span>
-                <span className="text-base font-bold text-slate-600 italic leading-none">
-                  {enrichedItems[0]?.metadata?.model?.model_name ||
-                    enrichedItems[0]?.metadata?.model_name ||
-                    'N/A'}
-                </span>
-              </div>
-              <div className="flex gap-4 items-center">
-                <span className="text-base font-black text-slate-900 tracking-widest">SL NO</span>
-                <span className="text-base font-bold text-slate-600 italic leading-none">
-                  {enrichedItems[0]?.allocation?.serialNumber ||
-                    enrichedItems[0]?.metadata?.serial_no ||
-                    (!isRent && !isLease ? 'N/A' : 'TBD UPON DISPATCH')}
-                </span>
-              </div>
-            </div>
-
-            {/* Greeting Section */}
-            <div className="text-[12px] font-black text-slate-800 space-y-2 leading-relaxed opacity-90">
-              <p>Dear Sir/ Madam</p>
-              <p>Thanks for your valuable inquiry .</p>
-              <p>
-                As we discussed please find the maintenance for printers/copiers with special price
-                , All details are mentioned in the quotation . If any clarification please do call
-                and let me know the status .
-              </p>
-            </div>
-
-            {/* Main Items Table */}
-            <div className="space-y-0">
-              <div className="border-[3px] border-red-700 rounded-t-2xl overflow-hidden shadow-2xl bg-white">
-                <table className="w-full">
-                  <thead>
-                    {isSale && (
-                      <tr className="bg-red-700 text-white">
-                        <th className="text-left py-4 px-8 text-[12px] font-black uppercase tracking-widest border-r border-red-600/40">
+            {/* Machine Details Table */}
+            <div className="space-y-6">
+              {isSparePartSale ? (
+                <div className="border-[1.5px] border-[#B24A4D] rounded-3xl overflow-hidden bg-white shadow-sm">
+                  <table className="w-full border-collapse">
+                    <thead>
+                      <tr className="bg-[#B24A4D] border-b-[1.5px] border-[#B24A4D]">
+                        <th className="text-center py-2.5 px-4 text-[14px] font-black text-white w-[15%] uppercase tracking-widest border-r border-[#ffffff20]">
                           MPN
                         </th>
-                        <th className="text-left py-4 px-8 text-[12px] font-black uppercase tracking-widest border-r border-red-600/40">
-                          Product Name
-                        </th>
-                        <th className="text-left py-4 px-8 text-[12px] font-black uppercase tracking-widest border-r border-red-600/40">
+                        <th className="text-center py-2.5 px-4 text-[14px] font-black text-white w-[50%] uppercase tracking-widest border-r border-[#ffffff20]">
                           Description
                         </th>
-                        <th className="text-center py-4 px-6 text-[12px] font-black uppercase tracking-widest border-r border-red-600/40">
-                          Quantity
+                        <th className="text-center py-2.5 px-4 text-[14px] font-black text-white w-[10%] uppercase tracking-widest border-r border-[#ffffff20]">
+                          Qty
                         </th>
-                        <th className="text-center py-4 px-6 text-[12px] font-black uppercase tracking-widest border-r border-red-600/40">
-                          Discount
-                        </th>
-                        <th className="text-right py-4 px-8 text-[12px] font-black uppercase tracking-widest border-r border-red-600/40">
+                        <th className="text-center py-2.5 px-4 text-[14px] font-black text-white w-[12.5%] uppercase tracking-widest border-r border-[#ffffff20]">
                           Rate
                         </th>
-                        <th className="text-right py-4 pr-10 text-[12px] font-black uppercase tracking-widest">
+                        <th className="text-center py-2.5 px-4 text-[14px] font-black text-white w-[12.5%] uppercase tracking-widest">
                           Total
                         </th>
                       </tr>
-                    )}
-                    {(isRent || isLease) && (
-                      <tr className="bg-red-700 text-white">
-                        <th className="text-left py-4 px-8 text-[12px] font-black uppercase tracking-widest border-r border-red-600/40">
-                          MPN
-                        </th>
-                        <th className="text-left py-4 px-8 text-[12px] font-black uppercase tracking-widest border-r border-red-600/40">
-                          Product Name
-                        </th>
-                        <th className="text-left py-4 px-8 text-[12px] font-black uppercase tracking-widest border-r border-red-600/40">
-                          Description
-                        </th>
-                        <th className="text-center py-4 px-6 text-[12px] font-black uppercase tracking-widest border-r border-red-600/40">
-                          Qty
-                        </th>
-                        {quotation.rentType === 'FIXED_COMBO' ||
-                        quotation.rentType === 'CPC_COMBO' ? (
-                          <>
-                            <th className="text-center py-4 px-6 text-[12px] font-black uppercase tracking-widest border-r border-red-600/40">
-                              Combo Limit
-                            </th>
-                            <th className="text-center py-4 pr-10 text-[12px] font-black uppercase tracking-widest">
-                              Combo Rate
-                            </th>
-                          </>
-                        ) : quotation.rentType === 'FIXED_FLAT' ? (
-                          <th className="text-center py-4 pr-10 text-[12px] font-black uppercase tracking-widest">
-                            Billing
-                          </th>
-                        ) : (
-                          <>
-                            <th className="text-center py-4 px-6 text-[12px] font-black uppercase tracking-widest border-r border-red-600/40">
-                              B/W Limit
-                            </th>
-                            <th className="text-center py-4 px-6 text-[12px] font-black uppercase tracking-widest border-r border-red-600/40">
-                              Color Limit
-                            </th>
-                            <th className="text-center py-4 pr-10 text-[12px] font-black uppercase tracking-widest">
-                              Excess (B/C)
-                            </th>
-                          </>
-                        )}
-                      </tr>
-                    )}
-                  </thead>
-                  <tbody className="divide-y-2 divide-red-50">
-                    {enrichedItems.map((item, idx) => {
-                      const detail = item.metadata;
-                      const image = detail?.imageUrl || detail?.image_url;
-                      const mpn = detail?.mpn || ' ';
-                      const productName =
-                        detail?.name || detail?.part_name || item.description || 'N/A';
-                      const productDesc =
-                        detail?.description || 'Standard specification as per brand guidelines.';
+                    </thead>
+                    <tbody className="min-h-[400px]">
+                      {enrichedItems.map((item, idx) => {
+                        const detail = item.metadata;
+                        const isSparePart = item.itemType === 'SPAREPART';
 
-                      return (
-                        <React.Fragment key={idx}>
-                          <tr className="group hover:bg-red-50/40 transition-all duration-300">
-                            <td className="py-3 px-4 border-r-2 border-red-50 align-top relative">
-                              <span className="text-[12px] font-black text-slate-800">{mpn}</span>
+                        const partName =
+                          detail?.mpn ||
+                          detail?.sku ||
+                          (isSparePart ? detail?.part_name : null) ||
+                          (item.description !== 'N/A' && item.description !== ''
+                            ? item.description
+                            : 'N/A');
+
+                        const description =
+                          (detail?.description &&
+                          detail.description !== 'N/A' &&
+                          detail.description !== ''
+                            ? detail.description
+                            : null) ||
+                          detail?.model?.description ||
+                          detail?.part_name ||
+                          (item.description !== 'N/A' && item.description !== ''
+                            ? item.description
+                            : 'N/A');
+
+                        const rate = Number(item.unitPrice || 0);
+                        const quantity = Number(item.quantity || 1);
+                        const total = rate * quantity;
+
+                        return (
+                          <tr key={idx} className="border-b border-gray-100 last:border-b-0">
+                            <td className="border-r border-[#F3A3A5] p-3 text-[11px] font-black text-center text-gray-400 uppercase">
+                              {partName === 'N/A' ? '' : partName}
                             </td>
-                            <td className="py-3 px-4 border-r-2 border-red-50 relative w-1/4">
-                              <div className="relative z-10 space-y-1">
-                                <p className="text-[13px] font-black text-slate-900 uppercase tracking-tight leading-snug">
+                            <td className="border-r border-[#F3A3A5] p-3 text-[12px] align-top text-left">
+                              <div className="space-y-1.5">
+                                <p className="font-black text-black uppercase leading-tight mb-1">
+                                  {description.split('\n')[0]}
+                                </p>
+                                {description
+                                  .split('\n')
+                                  .slice(1)
+                                  .map((line: string, i: number) => {
+                                    const trimmed = line.trim();
+                                    if (!trimmed) return null;
+                                    return (
+                                      <p key={i} className="flex gap-2 text-[10px] items-start">
+                                        <span className="text-[#B24A4D] font-black mt-0.5">➤</span>
+                                        <span className="font-bold text-gray-500 uppercase leading-[1.3]">
+                                          {trimmed}
+                                        </span>
+                                      </p>
+                                    );
+                                  })}
+                              </div>
+                            </td>
+                            <td className="border-r border-[#F3A3A5] p-3 text-[13px] font-black text-center text-black">
+                              {quantity}
+                            </td>
+                            <td className="border-r border-[#F3A3A5] p-3 text-[12px] font-black text-center text-gray-500">
+                              {rate.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                            </td>
+                            <td className="p-3 text-[13px] font-black text-center text-black">
+                              {total.toLocaleString()}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                      {/* Empty rows to maintain height */}
+                      {Array.from({ length: Math.max(0, 10 - enrichedItems.length) }).map(
+                        (_, i) => (
+                          <tr key={`empty-${i}`} className="border-b border-gray-100 h-10">
+                            <td className="border-r border-[#F3A3A5]"></td>
+                            <td className="border-r border-[#F3A3A5]"></td>
+                            <td className="border-r border-[#F3A3A5]"></td>
+                            <td className="border-r border-[#F3A3A5]"></td>
+                            <td></td>
+                          </tr>
+                        ),
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                enrichedItems.map((item, idx) => {
+                  const detail = item.metadata;
+                  const image = detail?.imageUrl || detail?.image_url;
+                  const productName =
+                    detail?.name || detail?.part_name || item.description || 'N/A';
+                  const productDesc =
+                    detail?.description || detail?.model?.description || item.description || '';
+
+                  return (
+                    <div key={idx} className="space-y-4 relative">
+                      <div className="pl-2">
+                        <h4 className="text-[16px] font-black text-black border-b-2 border-black inline-block pb-0.5">
+                          {idx + 1}. {productName}
+                        </h4>
+                      </div>
+
+                      {/* Table wrapper */}
+                      <div className="border-[2px] border-black overflow-hidden bg-white">
+                        <table className="w-full border-collapse">
+                          <thead>
+                            <tr className="bg-[#D1E5F4] border-b-[2px] border-black">
+                              <th className="text-center py-2 px-4 text-[13px] font-black border-r-[2px] border-black w-[65%]">
+                                Description
+                              </th>
+                              <th className="text-center py-2 px-2 text-[13px] font-black border-r-[2px] border-black w-[7.5%] underline">
+                                Qty.
+                              </th>
+                              <th className="text-center py-2 px-4 text-[13px] font-black border-r-[2px] border-black w-[13.75%] underline">
+                                Unit Price <br /> (Qr.)
+                              </th>
+                              <th className="text-center py-2 px-4 text-[13px] font-black w-[13.75%] underline">
+                                Special Price <br /> (Qr.)
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {/* Row 1: Description (spans 2 rows) | Image (spans 3 right cols) */}
+                            <tr>
+                              <td
+                                rowSpan={2}
+                                className="border-r-[2px] border-black align-top p-5"
+                                style={{ width: '65%' }}
+                              >
+                                <p className="text-[15px] font-black text-black underline uppercase mb-3">
                                   {productName}
                                 </p>
-                              </div>
-                            </td>
-                            <td className="py-3 px-4 border-r-2 border-red-50 align-top relative w-1/4">
-                              <div className="flex gap-4">
-                                {image && (
-                                  <img
-                                    src={image}
-                                    alt="Product"
-                                    crossOrigin="anonymous"
-                                    className="w-[100px] h-[100px] object-contain mix-blend-multiply shrink-0 opacity-100"
-                                  />
-                                )}
-                                <p className="text-[11px] text-slate-500 leading-relaxed font-bold opacity-90 uppercase mt-1">
-                                  {productDesc}
-                                </p>
-                              </div>
-                            </td>
-                            <td className="py-3 px-3 text-center border-r-2 border-red-50 align-top font-black text-slate-900 text-sm">
-                              {item.quantity}
-                            </td>
-                            {isSale && (
-                              <>
-                                <td className="py-3 px-3 text-center border-r-2 border-red-50 align-top font-black text-slate-900 text-sm">
-                                  {item.discount ? `${item.discount}%` : '0%'}
-                                </td>
-                                <td className="py-3 px-4 text-right border-r-2 border-red-50 align-top font-black text-slate-800 text-sm">
-                                  {Number(item.unitPrice || 0).toLocaleString(undefined, {
-                                    minimumFractionDigits: 2,
-                                  })}
-                                </td>
-                                <td className="py-3 pr-10 text-right align-top font-black text-slate-900 text-sm whitespace-nowrap">
-                                  {((item.quantity || 0) * (item.unitPrice || 0)).toLocaleString()}
-                                </td>
-                              </>
-                            )}
-                            {(isRent || isLease) && (
-                              <>
-                                {quotation.rentType === 'FIXED_COMBO' ||
-                                quotation.rentType === 'CPC_COMBO' ? (
-                                  <>
-                                    <td className="py-3 px-3 text-center border-r-2 border-red-50 align-top font-black text-slate-900 text-sm">
-                                      {item.combinedIncludedLimit || 0}
-                                    </td>
-                                    <td className="py-3 pr-10 text-center align-top font-black text-slate-900 text-sm whitespace-nowrap">
-                                      {Number(item.combinedExcessRate || 0).toFixed(3)}
-                                    </td>
-                                  </>
-                                ) : quotation.rentType === 'FIXED_FLAT' ? (
-                                  <td className="py-3 pr-10 text-center align-top font-black text-slate-900 text-sm italic opacity-50">
-                                    Included
-                                  </td>
-                                ) : (
-                                  <>
-                                    <td className="py-3 px-3 text-center border-r-2 border-red-50 align-top font-black text-slate-900 text-sm">
-                                      {item.bwIncludedLimit || 0}
-                                    </td>
-                                    <td className="py-3 px-3 text-center border-r-2 border-red-50 align-top font-black text-slate-900 text-sm">
-                                      {item.colorIncludedLimit || 0}
-                                    </td>
-                                    <td className="py-3 pr-10 text-center align-top font-black text-slate-900 text-sm whitespace-nowrap">
-                                      {(Number(item.bwExcessRate) || 0).toFixed(3)} /{' '}
-                                      {(Number(item.colorExcessRate) || 0).toFixed(3)}
-                                    </td>
-                                  </>
-                                )}
-                              </>
-                            )}
-                          </tr>
-                          {item.bwSlabRanges?.length ||
-                          item.colorSlabRanges?.length ||
-                          item.comboSlabRanges?.length ? (
-                            <tr className="bg-red-50/10 border-b-2 border-red-50">
-                              <td colSpan={7} className="py-3 px-8">
-                                <div className="grid grid-cols-3 gap-6 bg-white p-4 rounded-xl border border-red-100 shadow-[inset_0_2px_10px_rgba(0,0,0,0.02)]">
-                                  {item.bwSlabRanges && item.bwSlabRanges.length > 0 && (
-                                    <div>
-                                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 border-b-2 border-red-50 pb-1">
-                                        Black & White Slabs
-                                      </p>
-                                      {item.bwSlabRanges.map(
-                                        (
-                                          slab: { from: number; to: number; rate: number },
-                                          sIdx: number,
-                                        ) => (
-                                          <div
-                                            key={sIdx}
-                                            className="flex justify-between text-[11px] font-bold text-slate-700 py-1"
+                                <div className="text-[12px] text-black space-y-1.5 font-bold leading-relaxed">
+                                  {productDesc ? (
+                                    productDesc.split('\n').map((line: string, i: number) => {
+                                      const trimmedLine = line.trim();
+                                      if (!trimmedLine) return null;
+                                      const isHeader =
+                                        trimmedLine.endsWith(':') ||
+                                        trimmedLine.match(/^[A-Z\s]+$/);
+                                      const isKeywordRed =
+                                        trimmedLine.includes('+') ||
+                                        trimmedLine.includes('Machine') ||
+                                        trimmedLine.includes('trays') ||
+                                        trimmedLine.includes('Toner') ||
+                                        trimmedLine.startsWith('Warranty');
+
+                                      // Pattern: 1st Red, 2nd Black, 3rd Red... (i.e. even indices are red)
+                                      const isPatternRed = i % 2 === 0;
+                                      const shouldBeRed = isPatternRed || isKeywordRed || isHeader;
+
+                                      return (
+                                        <p
+                                          key={i}
+                                          className={`flex gap-2 ${shouldBeRed ? 'font-black text-[#D41B22]' : 'font-bold text-black'}`}
+                                        >
+                                          <span
+                                            className={`${shouldBeRed ? 'text-[#D41B22]' : 'text-gray-900'} mt-0.5`}
                                           >
-                                            <span>
-                                              {slab.from} - {slab.to || '∞'} copies
-                                            </span>
-                                            <span className="text-red-700">
-                                              {Number(slab.rate).toFixed(3)} QAR
-                                            </span>
-                                          </div>
-                                        ),
-                                      )}
-                                    </div>
-                                  )}
-                                  {item.colorSlabRanges && item.colorSlabRanges.length > 0 && (
-                                    <div>
-                                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 border-b-2 border-red-50 pb-1">
-                                        Color Slabs
-                                      </p>
-                                      {item.colorSlabRanges.map(
-                                        (
-                                          slab: { from: number; to: number; rate: number },
-                                          sIdx: number,
-                                        ) => (
-                                          <div
-                                            key={sIdx}
-                                            className="flex justify-between text-[11px] font-bold text-slate-700 py-1"
+                                            ➤
+                                          </span>
+                                          <span
+                                            className={isHeader ? 'underline decoration-black' : ''}
                                           >
-                                            <span>
-                                              {slab.from} - {slab.to || '∞'} copies
-                                            </span>
-                                            <span className="text-red-700">
-                                              {Number(slab.rate).toFixed(3)} QAR
-                                            </span>
-                                          </div>
-                                        ),
-                                      )}
-                                    </div>
-                                  )}
-                                  {item.comboSlabRanges && item.comboSlabRanges.length > 0 && (
-                                    <div>
-                                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 border-b-2 border-red-50 pb-1">
-                                        Combined Slabs
+                                            {trimmedLine}
+                                          </span>
+                                        </p>
+                                      );
+                                    })
+                                  ) : (
+                                    <>
+                                      <p className="flex gap-2 font-black text-[#D41B22]">
+                                        <span className="text-[#D41B22] mt-0.5">➤</span>
+                                        Print/Scan/ Copy
                                       </p>
-                                      {item.comboSlabRanges.map(
-                                        (
-                                          slab: { from: number; to: number; rate: number },
-                                          sIdx: number,
-                                        ) => (
-                                          <div
-                                            key={sIdx}
-                                            className="flex justify-between text-[11px] font-bold text-slate-700 py-1"
-                                          >
-                                            <span>
-                                              {slab.from} - {slab.to || '∞'} copies
-                                            </span>
-                                            <span className="text-red-700">
-                                              {Number(slab.rate).toFixed(3)} QAR
-                                            </span>
-                                          </div>
-                                        ),
-                                      )}
-                                    </div>
+                                      <p className="flex gap-2 font-bold text-black">
+                                        <span className="text-gray-900 mt-0.5">➤</span>
+                                        Type: Professional multifunctional device.
+                                      </p>
+                                      <p className="flex gap-2 font-black text-[#D41B22]">
+                                        <span className="text-[#D41B22] mt-0.5">➤</span>
+                                        Price Includes Machine + Auto Document Feeder+
+                                      </p>
+                                    </>
                                   )}
                                 </div>
                               </td>
+                              {/* Image spanning all 3 right columns */}
+                              <td
+                                colSpan={3}
+                                className="border-b-[2px] border-black text-center p-4"
+                                style={{ height: '360px' }}
+                              >
+                                {image ? (
+                                  <img
+                                    src={image}
+                                    alt="product"
+                                    className="max-w-full max-h-[320px] object-contain drop-shadow-xl mx-auto"
+                                  />
+                                ) : (
+                                  <div className="h-full" />
+                                )}
+                              </td>
                             </tr>
-                          ) : null}
-                        </React.Fragment>
-                      );
-                    })}
-                    {/* Padding rows exactly like reference to fill the box */}
-                    {Array.from({ length: Math.max(0, 5 - enrichedItems.length) }).map((_, i) => (
-                      <tr key={`empty-${i}`} className="h-8">
-                        <td className="border-r-2 border-red-50 bg-slate-50/[0.02]" />
-                        <td className="border-r-2 border-red-50" />
-                        <td className="border-r-2 border-red-50 bg-slate-50/[0.02]" />
-                        <td className="border-r-2 border-red-50" />
-                        {isSale && (
-                          <>
-                            <td className="border-r-2 border-red-50 bg-slate-50/[0.02]" />
-                            <td className="border-r-2 border-red-50" />
-                            <td className="bg-slate-50/[0.02]" />
-                          </>
-                        )}
-                        {isRent && (
-                          <>
-                            <td className="border-r-2 border-red-50 bg-slate-50/[0.02]" />
-                            <td className="border-r-2 border-red-50" />
-                            <td className="bg-slate-50/[0.02]" />
-                          </>
-                        )}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                            {/* Row 2: Qty | Unit Price | Special Price */}
+                            <tr>
+                              <td className="text-center align-middle py-5 border-r-[2px] border-black font-black text-black">
+                                <p className="text-[15px] font-black text-black">
+                                  {String(item.quantity || 1).padStart(2, '0')}
+                                </p>
+                              </td>
+                              <td className="text-center align-middle py-5 border-r-[2px] border-black font-black text-black">
+                                <p className="text-[15px] font-black text-black">
+                                  {Number(
+                                    isSale
+                                      ? item.unitPrice
+                                      : item.combinedExcessRate || item.bwExcessRate || 0,
+                                  ).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                </p>
+                              </td>
+                              <td className="text-center align-middle py-5 font-black text-black">
+                                <p className="text-[15px] font-black text-black">
+                                  {Number(isSale ? item.unitPrice : 0).toLocaleString(undefined, {
+                                    minimumFractionDigits: 2,
+                                  })}
+                                </p>
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
 
-              {/* Fixed Total Box precisely connected and styled */}
-              {isSale && (
-                <div className="flex justify-end mt-0">
-                  <div className="border-[3px] border-t-0 border-red-700 rounded-b-3xl px-8 py-2 bg-white flex items-center gap-8 shadow-[0_20px_50px_-12px_rgba(185,28,28,0.2)]">
-                    <p className="text-lg font-black text-red-700 uppercase tracking-[0.2em] border-r-2 border-red-100 pr-8 leading-none">
-                      Total
+            {isSparePartSale ? (
+              <div className="space-y-6">
+                {/* Terms and Total Row */}
+                <div className="flex justify-between items-start pt-2">
+                  <div className="text-[10px] font-bold text-gray-700 leading-[1.3] max-w-[500px] uppercase">
+                    <p>Delivery: 7-10 days normal working days. After conformed LPO</p>
+                    <p>Payment: CASH or PDC (Management approved for the credit terms)</p>
+                    <p>
+                      Warranty: 30 days in service of the parts. Not covered the consumables items.
                     </p>
-                    <p className="text-2xl font-black text-slate-900 leading-none">
+                    <p>
+                      Validity: 15 days estimated will valid. If not approved /paid within 15 days
+                      will not be valid, re-estimate will be charged.
+                    </p>
+                  </div>
+                  <div className="flex items-center border-[2.5px] border-[#B24A4D] rounded-xl px-12 py-3 bg-white min-w-[300px] justify-between relative overflow-hidden">
+                    <div className="absolute left-0 top-0 bottom-0 w-32 bg-[#B24A4D] flex items-center justify-center">
+                      <span className="text-white font-black text-[16px] uppercase italic">
+                        Total
+                      </span>
+                    </div>
+                    <div className="w-32"></div> {/* Spacer for absolute box */}
+                    <p className="text-[20px] font-black text-black uppercase tracking-tight">
                       QAR {Number(quotation.totalAmount || 0).toLocaleString()}
                     </p>
                   </div>
                 </div>
-              )}
 
-              {isRent && (
-                <div className="flex justify-between items-start mt-0 pl-12 pr-0">
-                  <div className="border-[3px] border-t-0 border-red-700 rounded-b-3xl px-6 py-3 bg-white flex flex-col shadow-[0_20px_50px_-12px_rgba(185,28,28,0.2)] min-w-[500px]">
-                    <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest border-b-2 border-red-50 flex pb-1.5 mb-2">
-                      Rent Agreement Details
-                    </p>
-                    <div className="grid grid-cols-6 gap-4">
-                      <div>
-                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
-                          Type
-                        </p>
-                        <p className="text-[12px] font-black text-slate-800 uppercase leading-none mt-1">
-                          {quotation.rentType?.replace('_', ' ') || 'N/A'}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
-                          Period
-                        </p>
-                        <p className="text-[12px] font-black text-slate-800 uppercase leading-none mt-1">
-                          {quotation.rentPeriod?.replace('_', ' ') || 'MONTHLY'}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
-                          Advance
-                        </p>
-                        <p className="text-[12px] font-black text-slate-800 leading-none mt-1">
-                          QAR {(quotation.advanceAmount || 0).toLocaleString()}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
-                          Deposit
-                        </p>
-                        <p className="text-[12px] font-black text-slate-800 leading-none mt-1">
-                          QAR {(quotation.securityDepositAmount || 0).toLocaleString()}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
-                          Start Date
-                        </p>
-                        <p className="text-[12px] font-black text-slate-800 leading-none mt-1">
-                          {quotation.effectiveFrom
-                            ? new Date(quotation.effectiveFrom).toLocaleDateString(undefined, {
-                                day: '2-digit',
-                                month: '2-digit',
-                                year: 'numeric',
-                              })
-                            : 'N/A'}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
-                          End Date
-                        </p>
-                        <p className="text-[12px] font-black text-slate-800 leading-none mt-1">
-                          {quotation.effectiveTo
-                            ? new Date(quotation.effectiveTo).toLocaleDateString(undefined, {
-                                day: '2-digit',
-                                month: '2-digit',
-                                year: 'numeric',
-                              })
-                            : 'N/A'}
-                        </p>
-                      </div>
-                    </div>
+                <div className="pt-2 text-[11px] font-bold text-gray-800 italic leading-tight">
+                  <p>
+                    We trust you will find our offer competitive and look forward to hearing from at
+                    the earliest.
+                  </p>
+                  <p>Thanking you assuring you of our best attention all.</p>
+                </div>
+
+                <div className="flex justify-between items-end pt-4">
+                  <div className="text-[12px] font-black text-black space-y-0.5 uppercase">
+                    <p>Best Regards,</p>
+                    <p>XEROCARE TRADING & SERVICES WLL</p>
+                    <p>P.O.BOX 37494</p>
+                    <p>DOHA - QATAR</p>
+                    <p>MOB: 7071 7282</p>
                   </div>
-                  <div className="border-[3px] border-t-0 border-red-700 rounded-b-3xl px-8 py-2 bg-white flex items-center gap-6 shadow-[0_20px_50px_-12px_rgba(185,28,28,0.2)]">
-                    <p className="text-lg font-black text-red-700 uppercase tracking-[0.1em] border-r-2 border-red-100 pr-6 leading-none">
-                      Monthly Rent
-                    </p>
-                    <p className="text-xl font-black text-slate-900 leading-none">
-                      QAR {Number(quotation.monthlyRent || 0).toLocaleString()}
+                  <div className="pb-2">
+                    <p className="text-[12px] font-bold text-black italic">
+                      Customer Sing:
+                      ........................................................................................................
                     </p>
                   </div>
                 </div>
-              )}
-
-              {isLease && (
-                <div className="flex justify-between items-start mt-0 overflow-hidden pl-12 pr-0">
-                  <div className="border-[3px] border-t-0 border-red-700 rounded-b-3xl px-6 py-3 bg-white flex flex-col shadow-[0_20px_50px_-12px_rgba(185,28,28,0.2)] min-w-[500px]">
-                    <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest border-b-2 border-red-50 flex pb-1.5 mb-2">
-                      Lease Contract Frame
-                    </p>
-                    <div className="grid grid-cols-6 gap-4">
-                      <div>
-                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
-                          Type
-                        </p>
-                        <p className="text-[12px] font-black text-slate-800 uppercase leading-none mt-1">
-                          {quotation.leaseType || 'EMI'}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
-                          Tenure
-                        </p>
-                        <p className="text-[12px] font-black text-slate-800 uppercase leading-none mt-1">
-                          {quotation.leaseTenureMonths} Months
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
-                          Advance
-                        </p>
-                        <p className="text-[12px] font-black text-slate-800 leading-none mt-1">
-                          QAR {(quotation.advanceAmount || 0).toLocaleString()}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
-                          Deposit
-                        </p>
-                        <p className="text-[12px] font-black text-slate-800 leading-none mt-1">
-                          QAR {(quotation.securityDepositAmount || 0).toLocaleString()}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
-                          Start Date
-                        </p>
-                        <p className="text-[12px] font-black text-slate-800 leading-none mt-1">
-                          {quotation.effectiveFrom
-                            ? new Date(quotation.effectiveFrom).toLocaleDateString(undefined, {
-                                day: '2-digit',
-                                month: '2-digit',
-                                year: 'numeric',
-                              })
-                            : 'N/A'}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
-                          End Date
-                        </p>
-                        <p className="text-[12px] font-black text-slate-800 leading-none mt-1">
-                          {quotation.effectiveTo
-                            ? new Date(quotation.effectiveTo).toLocaleDateString(undefined, {
-                                day: '2-digit',
-                                month: '2-digit',
-                                year: 'numeric',
-                              })
-                            : 'N/A'}
-                        </p>
-                      </div>
+              </div>
+            ) : (
+              <>
+                <div className="pl-1">
+                  <h4 className="text-[14px] font-black text-black underline mb-3 uppercase tracking-wider">
+                    TERMS AND CONDITIONS
+                  </h4>
+                  <div className="space-y-1 text-[13px] font-bold text-black">
+                    <div className="flex gap-4">
+                      <span className="w-28 uppercase">1) PAYMENT</span>
+                      <span>: CONFIRMED LPO</span>
+                    </div>
+                    <div className="flex gap-4">
+                      <span className="w-28 uppercase">2) PRICES</span>
+                      <span>: INCLUSIVE OF DELIVERY & INSTALLATION AT YOUR SITE</span>
+                    </div>
+                    <div className="flex gap-4">
+                      <span className="w-28 uppercase">3) DELIVERY</span>
+                      <span>
+                        :{' '}
+                        <span className="underline font-black italic">
+                          EX STOCK, SUBJECT TO AVAILABILITY
+                        </span>{' '}
+                        OR 30 DAYS FROM ORDER DATE
+                      </span>
+                    </div>
+                    <div className="flex gap-4">
+                      <span className="w-28 uppercase">5) VALIDITY</span>
+                      <span>: 30 Days</span>
                     </div>
                   </div>
-                  <div className="border-[3px] border-t-0 border-red-700 rounded-b-3xl px-8 py-2 bg-white flex items-center gap-6 shadow-[0_20px_50px_-12px_rgba(185,28,28,0.2)]">
-                    <p className="text-lg font-black text-red-700 uppercase tracking-[0.1em] border-r-2 border-red-100 pr-6 leading-none">
-                      {quotation.leaseType === 'FSM' ? 'Monthly Lease' : 'Monthly EMI'}
+                </div>
+
+                <div className="pl-1 space-y-4">
+                  <p className="text-[13px] font-bold text-black">
+                    For any further clarifications please feel free to contact the undersigned on
+                    Mob: 70717282 or Email: mail@xerocare.com
+                  </p>
+                  <div className="space-y-1">
+                    <p className="text-[13px] font-bold text-black">With warm regards,</p>
+                    <div className="pt-2">
+                      <p className="text-[13px] font-black text-black uppercase">For</p>
+                      <p className="text-[13px] font-black text-black uppercase">
+                        XEROCARE TRADING & SERVICES WLL
+                      </p>
+                      <p className="text-[13px] font-black text-black uppercase">DOHA QATAR</p>
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
+
+            <div className="relative flex justify-end px-4 -mt-36 z-50 pointer-events-none pr-20">
+              <img
+                src="/seel/seel1.png"
+                alt="Official Seal"
+                className="w-56 h-56 object-contain rotate-[-12deg]"
+                style={{ mixBlendMode: 'multiply', filter: 'contrast(1.1)' }}
+              />
+            </div>
+
+            {/* Maintenance Summary (Rental/Lease) if applicable */}
+            {(isRent || isLease) && (
+              <div className="border-[2px] border-black p-4 bg-white mt-10">
+                <h4 className="text-[14px] font-black text-black underline uppercase mb-3 text-center">
+                  Rental & Lease Terms Summary
+                </h4>
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
+                  <div>
+                    <p className="text-[10px] font-black text-gray-500 uppercase tracking-wider mb-1">
+                      Advance Amount
                     </p>
-                    <p className="text-xl font-black text-slate-900 leading-none">
+                    <p className="text-sm font-black text-black">
+                      QAR {(quotation.advanceAmount || 0).toLocaleString()}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-black text-gray-500 uppercase tracking-wider mb-1">
+                      Sec. Deposit
+                    </p>
+                    <p className="text-sm font-black text-black">
+                      QAR {(quotation.securityDepositAmount || 0).toLocaleString()}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-black text-gray-500 uppercase tracking-wider mb-1">
+                      Validity Period
+                    </p>
+                    <p className="text-sm font-black text-black">
+                      {quotation.effectiveFrom
+                        ? new Date(quotation.effectiveFrom).toLocaleDateString()
+                        : 'N/A'}{' '}
+                      -{' '}
+                      {quotation.effectiveTo
+                        ? new Date(quotation.effectiveTo).toLocaleDateString()
+                        : 'N/A'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-black text-gray-500 uppercase tracking-wider mb-1">
+                      Monthly Cost
+                    </p>
+                    <p className="text-sm font-black text-black">
                       QAR{' '}
-                      {Number(
-                        quotation.leaseType === 'FSM'
-                          ? quotation.monthlyLeaseAmount || 0
-                          : quotation.monthlyEmiAmount || 0,
+                      {(
+                        quotation.monthlyRent ||
+                        quotation.monthlyLeaseAmount ||
+                        0
                       ).toLocaleString()}
                     </p>
                   </div>
                 </div>
-              )}
-            </div>
-
-            {/* Footer Content precisely from reference */}
-            <div className="grid grid-cols-2 gap-8 mt-4 pt-4 border-t border-slate-100 px-4">
-              <div className="text-[10px] font-black text-slate-800 space-y-1.5 leading-relaxed opacity-80">
-                <p>Delivery : 7-10 days normal working days , After conformed LPO</p>
-                <p>Payment : CASH or PDC (Management approved for the credit terms)</p>
-                <p>
-                  Warranty : 30 days in service of the parts , Not covered the of the consumables
-                  items ,
-                </p>
-                <p>
-                  Validity : 15 days estimated will valid , If not approved / paid with in 15 days
-                  will not be valid , re-estimate will be charged .
-                </p>
-                <p className="mt-4 font-black text-slate-800 italic leading-relaxed opacity-100">
-                  We trust you will find our offer competitive and look forward to hearing from you
-                  at the earliest .<br />
-                  Thanking you assuring you of our best attention all.
-                </p>
               </div>
+            )}
 
-              <div className="flex flex-col justify-end items-end space-y-6">
-                <div className="text-right">
-                  <p className="text-[11px] font-black text-slate-950 uppercase tracking-widest mb-1 italic">
-                    Customer Sing: ..............................................................
+            {/* Grand Total for Sale */}
+            {isSale && (
+              <div className="flex justify-end pt-2">
+                <div className="border-[2px] border-black px-8 py-3 bg-[#D1E5F4] shadow-[4px_4px_0px_rgba(0,0,0,1)]">
+                  <p className="text-xl font-black text-black uppercase tracking-tight">
+                    Total: QAR{' '}
+                    {Number(quotation.totalAmount || 0).toLocaleString(undefined, {
+                      minimumFractionDigits: 2,
+                    })}
                   </p>
                 </div>
-                <div className="text-right">
-                  <p className="text-[10px] font-black text-slate-900 uppercase tracking-tight opacity-70">
-                    Best Regards,
-                  </p>
-                  <p className="text-[12px] font-black text-red-700 uppercase tracking-tight italic mt-1">
-                    XEROCARE TRADING & SERVICES WLL
-                  </p>
-                  <p className="text-[10px] font-black text-slate-800 uppercase mt-2">
-                    P.O.BOX 37494, DOHA-QATAR
-                  </p>
-                  <p className="text-[10px] font-black text-slate-800 uppercase">MOB: 7071 7282</p>
-                </div>
               </div>
-            </div>
+            )}
+          </div>
 
-            {/* Brand Logo Row */}
-            <div className="px-0 pb-4 pt-3 bg-white shrink-0 border-t border-slate-100 mt-6">
-              <div className="flex flex-col gap-4">
-                <div className="flex justify-between items-center opacity-30 grayscale saturate-0">
-                  <div className="flex flex-wrap gap-x-8 gap-y-2">
-                    {[
-                      'brother',
-                      'Canon',
-                      'TOSHIBA',
-                      'EPSON',
-                      'OKI',
-                      'RICOH',
-                      'kyocera',
-                      'LEXMARK',
-                      'SHARP',
-                    ].map((p) => (
-                      <span
-                        key={p}
-                        className="text-[10px] font-black uppercase tracking-widest italic text-slate-900 whitespace-nowrap"
-                      >
-                        {p}
-                      </span>
-                    ))}
+          {/* Footer Bar: Specialized for Spare Parts or Default */}
+          {isSparePartSale ? (
+            <div className="w-full shrink-0 pt-10">
+              <img
+                src="/sparepartsquatation/footersparepartsquatation.png"
+                alt="Quotation Footer"
+                className="w-full h-auto object-cover"
+              />
+            </div>
+          ) : (
+            <div className="px-12 pb-10 pt-4 bg-white shrink-0">
+              <div className="flex justify-between items-center py-6 border-t-[2px] border-black">
+                {/* Email */}
+                <div className="flex items-center gap-3">
+                  <div className="bg-zinc-900 p-2.5 rounded-md shadow-sm">
+                    <Mail size={18} className="text-white" />
+                  </div>
+                  <span className="text-[13px] font-black text-black">mail@xerocare.com</span>
+                </div>
+
+                {/* Phone */}
+                <div className="flex items-center gap-3 border-l border-gray-200 pl-6">
+                  <div className="bg-zinc-900 p-2.5 rounded-md shadow-sm">
+                    <Phone size={18} className="text-white" />
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-[13px] font-black text-black tracking-tight">
+                      +974 7071 7282
+                    </span>
+                    <span className="text-[13px] font-black text-black tracking-tight" dir="rtl">
+                      +٩٧٤ ٧٠٧١ ٧٢٨٢
+                    </span>
                   </div>
                 </div>
+
+                {/* Address */}
+                <div className="flex items-center gap-3 border-l border-gray-200 pl-6">
+                  <div className="bg-zinc-900 p-2.5 rounded-md shadow-sm">
+                    <Send size={18} className="text-white" />
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-[13px] font-black text-black tracking-tight">
+                      37494, Doha-Qatar
+                    </span>
+                    <span className="text-[13px] font-black text-black tracking-tight" dir="rtl">
+                      ٣٧٤٩٤, الدوحة-قطر
+                    </span>
+                  </div>
+                </div>
+
+                {/* Website */}
+                <div className="flex items-center gap-3 border-l border-gray-200 pl-6">
+                  <div className="bg-zinc-900 p-2.5 rounded-md shadow-sm">
+                    <Globe size={18} className="text-white" />
+                  </div>
+                  <span className="text-[13px] font-black text-black">www.xerocare.com</span>
+                </div>
               </div>
             </div>
-          </div>
+          )}
         </div>
 
         {/* Footer Actions Row - OUTSIDE Print Content wrapper */}

@@ -64,7 +64,7 @@ function StatusBadge({ status }: { status: string }) {
     PENDING_CONFIRMATION: 'WAITING FOR ALLOCATION',
     PAID: 'PROCESSED/PAID',
     ACTIVE_LEASE: 'ACTIVE CONTRACT',
-    TRANSACTION_COMPLETED: 'PENDING FINANCE REVIEW',
+    TRANSACTION_COMPLETED: 'ACCOUNTING COMPLETED',
   };
   return (
     <Badge
@@ -148,21 +148,27 @@ export default function FinanceQuotationTable({
 
   // Stats
   const pending = quotations.filter(
-    (q) => q.status === 'EMPLOYEE_APPROVED' || q.status === 'PENDING',
+    (q) =>
+      q.type === 'QUOTATION' &&
+      (q.status === 'EMPLOYEE_APPROVED' ||
+        q.status === 'PENDING' ||
+        q.status === 'TRANSACTION_COMPLETED'),
   ).length;
-  const approved = quotations.filter((q) =>
-    [
-      'APPROVED',
-      'FINANCE_APPROVED',
-      'ACCEPTED',
-      'CUSTOMER_ACCEPTED',
-      'SENT_TO_CUSTOMER',
-      'PAID',
-      'ACTIVE_LEASE',
-      'ISSUED',
-      'TRANSACTION_COMPLETED',
-      'PENDING_CONFIRMATION',
-    ].includes(q.status),
+  const approved = quotations.filter(
+    (q) =>
+      q.type === 'PROFORMA' ||
+      [
+        'APPROVED',
+        'FINANCE_APPROVED',
+        'ACCEPTED',
+        'CUSTOMER_ACCEPTED',
+        'SENT_TO_CUSTOMER',
+        'PAID',
+        'ACTIVE_LEASE',
+        'ISSUED',
+        'TRANSACTION_COMPLETED',
+        'PENDING_CONFIRMATION',
+      ].includes(q.status),
   ).length;
   const rejected = quotations.filter(
     (q) =>
@@ -243,7 +249,10 @@ export default function FinanceQuotationTable({
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center h-64 space-y-4">
+      <div
+        className="flex flex-col items-center justify-center h-64 space-y-4"
+        suppressHydrationWarning
+      >
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
         <p className="text-sm text-muted-foreground">Loading quotations...</p>
       </div>
@@ -319,7 +328,10 @@ export default function FinanceQuotationTable({
               ) : (
                 paginated.map((q, index) => {
                   const isPending =
-                    q.status === 'EMPLOYEE_APPROVED' || q.status === 'TRANSACTION_COMPLETED';
+                    q.type === 'QUOTATION' &&
+                    (q.status === 'EMPLOYEE_APPROVED' ||
+                      q.status === 'PENDING' ||
+                      q.status === 'TRANSACTION_COMPLETED');
                   return (
                     <TableRow
                       key={q.id}

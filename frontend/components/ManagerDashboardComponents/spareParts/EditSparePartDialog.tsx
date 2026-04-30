@@ -10,7 +10,6 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { modelService } from '@/services/modelService';
@@ -19,6 +18,7 @@ import { warehouseService } from '@/services/warehouseService';
 import { vendorService } from '@/services/vendorService';
 import { MultiSelect } from '@/components/ui/multi-select';
 import { toast } from 'sonner';
+import { BulletDescriptionInput } from '@/components/ui/bullet-description-input';
 
 interface EditSparePartDialogProps {
   open: boolean;
@@ -69,6 +69,7 @@ export default function EditSparePartDialog({
     vendor_id: '',
     quantity: '',
     description: '',
+    yield: '',
   });
 
   useEffect(() => {
@@ -116,6 +117,7 @@ export default function EditSparePartDialog({
           vendor_id: vendorId,
           quantity: String(product.quantity),
           description: product.description || '',
+          yield: product.yield || '',
         });
       } catch (error) {
         console.error('Failed to load dependencies', error);
@@ -140,6 +142,7 @@ export default function EditSparePartDialog({
         wholesale_price: Number(formData.wholesale_price),
         quantity: Number(formData.quantity),
         description: formData.description,
+        yield: formData.yield,
       });
       toast.success('Spare part updated successfully');
       onSuccess();
@@ -283,13 +286,19 @@ export default function EditSparePartDialog({
             </div>
             {/* Description */}
             <div className="space-y-2 col-span-2">
-              <Label>Description</Label>
-              <Textarea
+              <BulletDescriptionInput
+                label="Spare Part Details (Bullet Points)"
                 value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                placeholder="Enter description (Optional)"
-                className="resize-none"
-                rows={3}
+                onChange={(val) => setFormData({ ...formData, description: val })}
+                placeholder="Ex. High quality replacement fuser"
+              />
+            </div>
+            <div className="space-y-2 col-span-2">
+              <Label>Yield Specification (Optional)</Label>
+              <Input
+                value={formData.yield}
+                onChange={(e) => setFormData({ ...formData, yield: e.target.value })}
+                placeholder="Ex. 36,000 pages @ 5% coverage"
               />
             </div>
           </div>

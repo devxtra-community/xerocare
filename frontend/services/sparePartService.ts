@@ -24,6 +24,7 @@ export interface SparePartInventoryItem {
   branch_name?: string;
   branch_id?: string;
   description?: string;
+  yield?: string;
 }
 
 export interface PaginatedResponse<T> {

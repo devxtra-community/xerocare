@@ -9,6 +9,7 @@ export interface SparePart {
   brand: string;
   brand_id?: string;
   description?: string;
+  yield?: string;
   compatible_models?: string;
   model_ids?: string[] | string;
   model_id?: string;
@@ -21,6 +22,7 @@ export interface SparePart {
   created_at: string;
   updated_at: string;
   lotNumber?: string;
+  compatible_model?: string;
 }
 
 interface ApiResponse<T> {
@@ -48,4 +50,15 @@ export const getAvailableSparePartsByModel = async (modelId: string): Promise<Sp
     if (Array.isArray(p.model_ids) && p.model_ids.includes(modelId)) return true;
     return false;
   });
+};
+
+/**
+ * Retrieves a single spare part by its ID.
+ */
+export const getSparePartById = async (id: string): Promise<SparePart> => {
+  const response = await api.get<ApiResponse<SparePart>>(`/i/spare-parts/${id}`);
+  if (!response.data.data) {
+    throw new Error('Spare part not found');
+  }
+  return response.data.data;
 };

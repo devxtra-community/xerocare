@@ -6,12 +6,17 @@ import FinanceSidebar from '@/components/Finance/financeSidebar';
 export default function FinanceLayout({ children }: { children: React.ReactNode }) {
   return (
     <SidebarProvider>
-      <div className="flex min-h-screen w-full">
+      <div className="flex min-h-screen w-full" suppressHydrationWarning>
         <FinanceSidebar />
 
-        <SidebarInset className="bg-background min-h-screen w-full flex flex-col">
+        <SidebarInset
+          className="bg-background min-h-screen w-full flex flex-col"
+          suppressHydrationWarning
+        >
           <DashboardHeader title="Finance Dashboard" />
-          <div className="flex-1 overflow-auto">{children}</div>
+          <div className="flex-1 overflow-auto" suppressHydrationWarning>
+            {children}
+          </div>
         </SidebarInset>
       </div>
     </SidebarProvider>

@@ -136,9 +136,10 @@ export default function FinanceSidebar() {
         console.error('Failed to fetch sidebar counts', err);
       }
     };
+
     fetchCounts();
-    // Poll every 30s? Or just once on mount. Assuming once on mount is enough for now.
-    // Or maybe refresh when pathname changes?
+    const interval = setInterval(fetchCounts, 30000); // Poll every 30s for live updates
+    return () => clearInterval(interval);
   }, [pathname]); // Refresh counts on navigation too, ensuring updates after approvals
 
   return (
