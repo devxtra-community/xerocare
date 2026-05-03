@@ -133,6 +133,9 @@ export class Product {
   @Column({ type: 'text', nullable: true })
   description?: string;
 
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  hs_code?: string;
+
   @CreateDateColumn()
   created_at!: Date;
 }

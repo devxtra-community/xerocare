@@ -49,14 +49,14 @@ export function DeleteConfirmDialog({
 
   return (
     <AlertDialog open={open} onOpenChange={isDeleting ? undefined : onOpenChange}>
-      <AlertDialogContent className="max-w-md">
+      <AlertDialogContent>
         <AlertDialogHeader>
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 min-w-10 items-center justify-center rounded-full bg-red-100 text-red-600">
               <AlertCircle size={20} />
             </div>
             <div>
-              <AlertDialogTitle className="text-lg">{title}</AlertDialogTitle>
+              <AlertDialogTitle>{title}</AlertDialogTitle>
               <AlertDialogDescription className="mt-2 text-sm text-muted-foreground">
                 {description}
                 {itemName && (
@@ -68,7 +68,7 @@ export function DeleteConfirmDialog({
             </div>
           </div>
         </AlertDialogHeader>
-        <AlertDialogFooter className="mt-6 border-t pt-4">
+        <AlertDialogFooter>
           <AlertDialogCancel disabled={isDeleting} onClick={() => onOpenChange(false)}>
             Cancel
           </AlertDialogCancel>
@@ -76,7 +76,7 @@ export function DeleteConfirmDialog({
             variant="destructive"
             onClick={handleConfirm}
             disabled={isDeleting}
-            className="gap-2 bg-red-600 hover:bg-red-700 w-full sm:w-auto"
+            className="gap-2 w-full sm:w-auto"
           >
             {isDeleting ? (
               <>

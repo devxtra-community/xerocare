@@ -898,19 +898,37 @@ export class BillingService {
   /**
    * Finance approves the quotation pricing.
    */
-  async financeApproveQuotation(id: string, userId: string) {
+  async financeApproveQuotation(id: string, userId: string, payload?: { effectiveTo?: Date }) {
     const invoice = await this.invoiceRepo.findById(id);
     if (!invoice) throw new AppError('Quotation not found', 404);
 
-    if (invoice.status !== InvoiceStatus.EMPLOYEE_APPROVED) {
-      throw new AppError('Quotation must be approved by employee before finance approval', 400);
+    if (
+      invoice.status !== InvoiceStatus.EMPLOYEE_APPROVED &&
+      invoice.status !== InvoiceStatus.VALIDITY_EXTENSION_REQUESTED
+    ) {
+      throw new AppError('Quotation must be in a pending approval state', 400);
     }
 
     invoice.status = InvoiceStatus.FINANCE_APPROVED;
     invoice.financeApprovedBy = userId;
     invoice.financeApprovedAt = new Date();
 
+    if (payload?.effectiveTo) {
+      invoice.effectiveTo = payload.effectiveTo;
+    }
+
     return this.invoiceRepo.save(invoice);
+  }
+
+  /**
+   * Request validity extension for an expired quotation.
+   */
+  async requestValidityExtension(id: string): Promise<Invoice> {
+    const invoice = await this.invoiceRepo.findById(id);
+    if (!invoice) throw new AppError('Quotation not found', 404);
+
+    invoice.status = InvoiceStatus.VALIDITY_EXTENSION_REQUESTED;
+    return await this.invoiceRepo.save(invoice);
   }
 
   /**
@@ -972,11 +990,12 @@ export class BillingService {
       }
 
       if (
+        invoice.status !== InvoiceStatus.DRAFT &&
         invoice.status !== InvoiceStatus.EMPLOYEE_APPROVED &&
         invoice.status !== InvoiceStatus.TRANSACTION_COMPLETED &&
         invoice.status !== InvoiceStatus.FINANCE_APPROVED
       ) {
-        throw new AppError('Transaction must be sent for Finance Approval before allocation', 400);
+        throw new AppError('Transaction must be in a valid state for allocation', 400);
       }
 
       // Check that all machines and spare parts are allocated

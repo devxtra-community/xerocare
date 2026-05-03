@@ -154,7 +154,6 @@ export default function ManagerModel() {
                 'BRAND',
                 'MODEL NO',
                 'MODEL NAME',
-                'HS CODE',
                 'TOTAL',
                 'AVAILABLE',
                 'RENTED',
@@ -194,7 +193,6 @@ export default function ManagerModel() {
                     </div>
                   </TableCell>
                   <TableCell className="px-4 font-medium text-center">{m.model_name}</TableCell>
-                  <TableCell className="px-4 text-center">{m.hs_code || '-'}</TableCell>
                   <TableCell className="px-4 font-semibold text-blue-600 text-center">
                     {m.quantity}
                   </TableCell>
@@ -241,7 +239,7 @@ export default function ManagerModel() {
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={9} className="text-center py-6 text-muted-foreground">
+                <TableCell colSpan={8} className="text-center py-6 text-muted-foreground">
                   No models found
                 </TableCell>
               </TableRow>
@@ -315,7 +313,6 @@ function ModelFormModal({
     model_name: initialData?.model_name || '',
     model_no: initialData?.model_no || '',
     brand_id: initialData?.brandRelation?.id || '',
-    hs_code: initialData?.hs_code || '',
     description: initialData?.description || '',
   });
   const [brands, setBrands] = useState<Brand[]>([]);
@@ -378,14 +375,6 @@ function ModelFormModal({
               onChange={(e) => setFormData({ ...formData, model_no: e.target.value })}
               placeholder="e.g. HP-LJ-1020"
               required
-            />
-          </div>
-          <div className="col-span-2">
-            <label className="block text-sm font-medium mb-1">HS Code</label>
-            <Input
-              value={formData.hs_code || ''}
-              onChange={(e) => setFormData({ ...formData, hs_code: e.target.value })}
-              placeholder="e.g. 84433100"
             />
           </div>
           <div className="col-span-2">

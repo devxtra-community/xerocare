@@ -340,12 +340,12 @@ export class RfqService {
         if (item.model_id) {
           const model = await modelRepo.findOne({ where: { id: item.model_id } });
           modelId = model?.model_name || model?.model_no || item.model_id;
-          hsCode = model?.hs_code || '';
           desc = model?.description || '';
         }
         if (item.product_id) {
           const product = await productRepo.findOne({ where: { id: item.product_id } });
           partName = product?.name || '';
+          hsCode = product?.hs_code || '';
         } else if (item.custom_product_name) {
           partName = item.custom_product_name;
         }
@@ -491,7 +491,6 @@ export class RfqService {
             .getRepository(Model)
             .findOne({ where: { id: item.model_id } });
           modelId = model?.model_name || model?.model_no || item.model_id;
-          hsCode = model?.hs_code || '';
           desc = model?.description || '';
         }
         if (item.product_id) {
@@ -499,6 +498,7 @@ export class RfqService {
             .getRepository(Product)
             .findOne({ where: { id: item.product_id } });
           partName = product?.name || '';
+          hsCode = product?.hs_code || '';
         } else if (item.custom_product_name) {
           partName = item.custom_product_name;
         }

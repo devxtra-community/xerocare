@@ -32,10 +32,10 @@ export function ProductSelect({
         let sparePartsData: SparePart[] = [];
 
         if (mode === 'PRODUCT' || mode === 'BOTH') {
-          productsData = await getAllProducts();
+          productsData = await getAllProducts({ limit: 10000 });
         }
         if (mode === 'SPAREPART' || mode === 'BOTH') {
-          sparePartsData = await getAllSpareParts();
+          sparePartsData = await getAllSpareParts({ limit: 10000 });
         }
 
         setItems([...productsData, ...sparePartsData]);
@@ -51,10 +51,6 @@ export function ProductSelect({
   const handleValueChange = (val: string) => {
     const selected = items.find((item) => item.id === val);
     if (selected) {
-      if ('product_status' in selected && selected.product_status !== ProductStatus.AVAILABLE) {
-        // Double check, though UI should prevent this
-        return;
-      }
       onSelect(selected);
     }
   };
@@ -63,7 +59,6 @@ export function ProductSelect({
     let label = '';
     let price = 0;
     let type = '';
-    let disabled = false;
 
     if ('part_name' in item) {
       // SparePart
@@ -72,20 +67,27 @@ export function ProductSelect({
       type = 'Spare Part';
     } else {
       // Product
-      label = `${item.name} - ${item.model?.model_name || ''}`;
+      label = `${item.name} ${item.model?.model_name ? `- ${item.model.model_name}` : ''}`;
+
+      // Clearly highlight product status (in stock vs out of stock/rented/leased)
+      let statusLabel = '';
+      if (!item.product_status || item.product_status === ProductStatus.AVAILABLE) {
+        statusLabel = '[IN STOCK]';
+      } else {
+        statusLabel = `[${item.product_status.toUpperCase()}]`;
+      }
+
+      label = `${statusLabel} ${label}`;
+
       price = item.sale_price || 0;
       type = 'Product';
-      if (item.product_status !== ProductStatus.AVAILABLE) {
-        label += ` (${item.product_status})`;
-        disabled = true;
-      }
     }
 
     return {
       value: item.id,
       label: label,
       description: `${type} • QAR ${price.toLocaleString()}`,
-      disabled,
+      disabled: false, // Always allow selection so user can quote out-of-stock items
     };
   });
 
@@ -94,7 +96,7 @@ export function ProductSelect({
       onValueChange={handleValueChange}
       options={options}
       loading={loading}
-      placeholder={placeholder || 'Select Product or Spare Part'}
+      placeholder={placeholder || 'Select Product'}
       emptyText="No items found."
     />
   );

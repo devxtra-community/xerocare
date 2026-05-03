@@ -86,11 +86,30 @@ export const startWorker = async () => {
       }
 
       channel.ack(msg);
-    } catch (err) {
+    } catch (err: unknown) {
       logger.error('Email worker failed to process message', err);
-      // Determine if we should ack or nack based on error.
-      // For now, ack to prevent loop, but logging is critical.
-      channel.ack(msg);
+
+      const error = err as { code?: string; responseCode?: number };
+      // Handle transient errors (DNS, network) with requeue
+      const isTransient =
+        error.code === 'EAI_AGAIN' ||
+        error.code === 'ECONNRESET' ||
+        error.code === 'ETIMEDOUT' ||
+        error.code === 'ESOCKET' ||
+        error.responseCode === 421; // SMTP 421: Service busy
+
+      if (isTransient) {
+        logger.info('Transient error detected, requeueing message...', {
+          email: job.email,
+          type: job.type,
+          errorCode: error.code,
+        });
+        // nack(message, allUpTo, requeue)
+        channel.nack(msg, false, true);
+      } else {
+        // Fatal error or unknown, ack to prevent infinite loop but it's logged
+        channel.ack(msg);
+      }
     }
   });
 

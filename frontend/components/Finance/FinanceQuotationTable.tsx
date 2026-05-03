@@ -23,13 +23,8 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { Loader2, CheckCircle, XCircle, Eye, Search, FilePlus2 } from 'lucide-react';
 import { toast } from 'sonner';
-import {
-  getBranchInvoices,
-  getInvoiceById,
-  financeRejectInvoice,
-  financeApproveQuotation,
-  Invoice,
-} from '@/lib/invoice';
+import { getBranchInvoices, getInvoiceById, financeRejectInvoice, Invoice } from '@/lib/invoice';
+import { ApproveQuotationDialog } from '../invoice/ApproveQuotationDialog';
 
 import { formatCurrency } from '@/lib/format';
 import { usePagination } from '@/hooks/usePagination';
@@ -47,6 +42,7 @@ function StatusBadge({ status }: { status: string }) {
     FINANCE_REJECTED: 'bg-red-100 text-red-700',
     APPROVED: 'bg-green-100 text-green-700',
     REJECTED: 'bg-red-100 text-red-700',
+    VALIDITY_EXTENSION_REQUESTED: 'bg-amber-100 text-amber-700',
     PENDING: 'bg-yellow-100 text-yellow-700',
   };
   const label: Record<string, string> = {
@@ -65,6 +61,7 @@ function StatusBadge({ status }: { status: string }) {
     PAID: 'PROCESSED/PAID',
     ACTIVE_LEASE: 'ACTIVE CONTRACT',
     TRANSACTION_COMPLETED: 'PENDING FINANCE REVIEW',
+    VALIDITY_EXTENSION_REQUESTED: 'VALIDITY EXTENSION REQUESTED',
   };
   return (
     <Badge
@@ -108,6 +105,8 @@ export default function FinanceQuotationTable({
   const [rejectTarget, setRejectTarget] = useState<Invoice | null>(null);
   const [rejectReason, setRejectReason] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
+  const [approveOpen, setApproveOpen] = useState(false);
+  const [approveTarget, setApproveTarget] = useState<Invoice | null>(null);
 
   const { page, limit, total, setPage, setTotal, totalPages } = usePagination(10);
 
@@ -148,7 +147,10 @@ export default function FinanceQuotationTable({
 
   // Stats
   const pending = quotations.filter(
-    (q) => q.status === 'EMPLOYEE_APPROVED' || q.status === 'PENDING',
+    (q) =>
+      q.status === 'EMPLOYEE_APPROVED' ||
+      q.status === 'PENDING' ||
+      q.status === 'VALIDITY_EXTENSION_REQUESTED',
   ).length;
   const approved = quotations.filter((q) =>
     [
@@ -196,19 +198,15 @@ export default function FinanceQuotationTable({
     }
   };
 
-  const handleApprove = async (inv: Invoice) => {
-    setActionLoading(true);
-    try {
-      await financeApproveQuotation(inv.id);
-      toast.success('Quotation pricing approved successfully!');
-      setViewQuotation(null);
-      fetchQuotations();
-    } catch (error: unknown) {
-      const err = error as { response?: { data?: { message?: string } } };
-      toast.error(err.response?.data?.message || 'Failed to approve quotation.');
-    } finally {
-      setActionLoading(false);
-    }
+  const handleApprove = (inv: Invoice) => {
+    setApproveTarget(inv);
+    setApproveOpen(true);
+  };
+
+  const handleApproveSuccess = () => {
+    setApproveOpen(false);
+    setApproveTarget(null);
+    fetchQuotations();
   };
 
   const handleRejectConfirm = async () => {
@@ -319,7 +317,9 @@ export default function FinanceQuotationTable({
               ) : (
                 paginated.map((q, index) => {
                   const isPending =
-                    q.status === 'EMPLOYEE_APPROVED' || q.status === 'TRANSACTION_COMPLETED';
+                    q.status === 'EMPLOYEE_APPROVED' ||
+                    q.status === 'TRANSACTION_COMPLETED' ||
+                    q.status === 'VALIDITY_EXTENSION_REQUESTED';
                   return (
                     <TableRow
                       key={q.id}
@@ -417,12 +417,10 @@ export default function FinanceQuotationTable({
       {/* Reject dialog */}
       {rejectOpen && (
         <Dialog open onOpenChange={(v) => !v && setRejectOpen(false)}>
-          <DialogContent className="rounded-2xl border-none shadow-2xl">
+          <DialogContent showCloseButton={false}>
             <DialogHeader>
-              <DialogTitle className="text-lg font-bold text-slate-800">
-                Reject Quotation
-              </DialogTitle>
-              <DialogDescription className="text-sm text-slate-400">
+              <DialogTitle>Reject Quotation</DialogTitle>
+              <DialogDescription>
                 Please provide a reason for rejecting this quotation. It will be sent back to the
                 employee.
               </DialogDescription>
@@ -437,19 +435,15 @@ export default function FinanceQuotationTable({
                 className="min-h-[100px] resize-none rounded-xl"
               />
             </div>
-            <DialogFooter className="gap-2">
-              <Button
-                variant="outline"
-                onClick={() => setRejectOpen(false)}
-                className="rounded-xl font-bold"
-              >
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setRejectOpen(false)}>
                 Cancel
               </Button>
               <Button
                 variant="destructive"
                 onClick={handleRejectConfirm}
                 disabled={actionLoading}
-                className="rounded-xl font-bold gap-2"
+                className="gap-2"
               >
                 {actionLoading ? (
                   <Loader2 size={14} className="animate-spin" />
@@ -461,6 +455,16 @@ export default function FinanceQuotationTable({
             </DialogFooter>
           </DialogContent>
         </Dialog>
+      )}
+
+      {/* Approve dialog */}
+      {approveOpen && approveTarget && (
+        <ApproveQuotationDialog
+          invoiceId={approveTarget.id}
+          quotation={approveTarget}
+          onClose={() => setApproveOpen(false)}
+          onSuccess={handleApproveSuccess}
+        />
       )}
     </div>
   );

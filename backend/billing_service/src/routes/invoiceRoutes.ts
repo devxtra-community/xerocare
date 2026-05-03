@@ -42,6 +42,7 @@ import {
   processReturn,
   updateStatus,
   customerRespond,
+  requestValidityExtension,
 } from '../controllers/invoiceController';
 import { uploadMeterImage } from '../middlewares/uploadMiddleware';
 import { authMiddleware } from '../middlewares/authMiddleware';
@@ -89,6 +90,16 @@ router.post(
   authMiddleware,
   requireRole(EmployeeRole.EMPLOYEE),
   employeeApprove,
+);
+
+/**
+ * Request extension of validity for an expired quotation.
+ */
+router.post(
+  '/:id/request-validity-extension',
+  authMiddleware,
+  requireRole(EmployeeRole.EMPLOYEE),
+  requestValidityExtension,
 );
 
 // --- 2. Making it Official (Contracts and Machines) ---

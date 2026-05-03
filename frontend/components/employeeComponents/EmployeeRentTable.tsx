@@ -438,6 +438,7 @@ export default function EmployeeRentTable({
         {approveOpen && selectedInvoice && (
           <ApproveQuotationDialog
             invoiceId={selectedInvoice.id}
+            quotation={selectedInvoice}
             onClose={() => setApproveOpen(false)}
             onSuccess={() => {
               setApproveOpen(false);

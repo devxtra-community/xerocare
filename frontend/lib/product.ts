@@ -27,6 +27,7 @@ export interface Product {
   print_colour?: 'BLACK_WHITE' | 'COLOUR' | 'BOTH';
   max_discount_amount?: number;
   imageUrl?: string;
+  hs_code?: string;
   created_at: string;
   inventory?: {
     id: string;
@@ -55,6 +56,7 @@ export interface CreateProductData {
   sale_price: number;
   tax_rate: number;
   product_status?: ProductStatus;
+  hs_code?: string;
 }
 
 export interface UpdateProductData {
@@ -71,6 +73,7 @@ export interface UpdateProductData {
   sale_price?: number;
   tax_rate?: number;
   product_status?: ProductStatus;
+  hs_code?: string;
 }
 
 interface ApiResponse<T> {
@@ -162,6 +165,7 @@ export interface BulkProductRow {
   lease_price_yearly: number;
   sale_price: number;
   tax_rate: number;
+  hs_code?: string;
 }
 
 /**

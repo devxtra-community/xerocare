@@ -10,12 +10,13 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { approveQuotation } from '@/lib/invoice';
+import { financeApproveQuotation, Invoice } from '@/lib/invoice';
 import { toast } from 'sonner';
 import { Loader2, ShieldCheck } from 'lucide-react';
 
 interface ApproveQuotationDialogProps {
   invoiceId: string;
+  quotation: Invoice; // Add the whole quotation object
   onClose: () => void;
   onSuccess: () => void;
 }
@@ -26,6 +27,7 @@ interface ApproveQuotationDialogProps {
  */
 export function ApproveQuotationDialog({
   invoiceId,
+  quotation,
   onClose,
   onSuccess,
 }: ApproveQuotationDialogProps) {
@@ -35,22 +37,31 @@ export function ApproveQuotationDialog({
   const [reference, setReference] = useState('');
   const [receivedDate, setReceivedDate] = useState(new Date().toISOString().split('T')[0]);
 
+  // Extension state
+  const isExtension = quotation.status === 'VALIDITY_EXTENSION_REQUESTED';
+  const defaultExtensionDate = new Date();
+  defaultExtensionDate.setDate(defaultExtensionDate.getDate() + 30); // Default +30 days
+  const [extensionDate, setExtensionDate] = useState(
+    defaultExtensionDate.toISOString().split('T')[0],
+  );
+
   const handleApprove = async () => {
     try {
       setLoading(true);
-      const depositAmount = parseFloat(amount);
-
-      const payload =
-        !isNaN(depositAmount) && depositAmount > 0
+      const depositAmount = parseFloat(amount) || 0;
+      const payload = {
+        ...(depositAmount > 0
           ? {
               amount: depositAmount,
               mode,
               reference: mode === 'CHEQUE' ? reference : undefined,
               receivedDate,
             }
-          : undefined;
+          : {}),
+        effectiveTo: isExtension ? extensionDate : undefined,
+      };
 
-      await approveQuotation(invoiceId, payload);
+      await financeApproveQuotation(invoiceId, payload);
       toast.success('Quotation approved successfully.');
       onSuccess();
       onClose();
@@ -65,18 +76,28 @@ export function ApproveQuotationDialog({
 
   return (
     <Dialog open={true} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent showCloseButton={false} className="sm:max-w-[425px]">
         <DialogHeader>
           <div className="flex items-center gap-2">
-            <div className="p-2 bg-green-50 rounded-full text-green-600">
+            <div
+              className={`p-2 rounded-full ${isExtension ? 'bg-amber-50 text-amber-600' : 'bg-green-50 text-green-600'}`}
+            >
               <ShieldCheck size={20} />
             </div>
-            <DialogTitle>Approve Quotation</DialogTitle>
+            <DialogTitle>
+              {isExtension ? 'Approve Validity Extension' : 'Approve Quotation'}
+            </DialogTitle>
           </div>
           <DialogDescription>
-            Confirm approval to convert this quotation into a Proforma Contract.
-            <br />
-            You can optionally record a security deposit below.
+            {isExtension
+              ? 'Extend the validity of this expired quotation to allow conversion.'
+              : 'Confirm approval to convert this quotation into a Proforma Contract.'}
+            {!isExtension && (
+              <>
+                <br />
+                You can optionally record a security deposit below.
+              </>
+            )}
           </DialogDescription>
         </DialogHeader>
 
@@ -163,6 +184,27 @@ export function ApproveQuotationDialog({
               </>
             )}
           </div>
+
+          {isExtension && (
+            <div className="grid gap-2 border rounded-lg p-4 bg-amber-50/30">
+              <Label
+                htmlFor="extensionDate"
+                className="text-xs font-bold text-amber-700 uppercase tracking-wider"
+              >
+                New Validity Date (Extension)
+              </Label>
+              <Input
+                id="extensionDate"
+                type="date"
+                value={extensionDate}
+                onChange={(e) => setExtensionDate(e.target.value)}
+                className="border-amber-200 focus:border-amber-400"
+              />
+              <p className="text-[10px] text-amber-600 font-medium">
+                The employee will be able to convert this quotation until this date.
+              </p>
+            </div>
+          )}
         </div>
 
         <DialogFooter>
@@ -172,10 +214,14 @@ export function ApproveQuotationDialog({
           <Button
             onClick={handleApprove}
             disabled={loading}
-            className="bg-green-600 hover:bg-green-700 text-white"
+            className={
+              isExtension
+                ? 'bg-amber-600 hover:bg-amber-700 text-white'
+                : 'bg-green-600 hover:bg-green-700 text-white'
+            }
           >
             {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-            Approve & Convert
+            {isExtension ? 'Approve Extension' : 'Approve & Convert'}
           </Button>
         </DialogFooter>
       </DialogContent>

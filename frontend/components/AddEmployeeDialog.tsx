@@ -99,9 +99,9 @@ export default function AddEmployeeDialog() {
 
       <DialogOverlay className="fixed inset-0 z-50 bg-background/70 backdrop-blur-md" />
 
-      <DialogContent className="sm:max-w-xl">
+      <DialogContent showCloseButton={false} className="sm:max-w-xl">
         <DialogHeader>
-          <DialogTitle className="text-2xl font-bold text-primary">Add New Employee</DialogTitle>
+          <DialogTitle>Add New Employee</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-6 pt-6">
@@ -232,11 +232,7 @@ export default function AddEmployeeDialog() {
             >
               Cancel
             </button>
-            <Button
-              onClick={handleSubmit}
-              disabled={loading}
-              className="h-12 px-10 rounded-xl bg-[#004a8d] text-white hover:bg-[#003f7d] font-bold shadow-lg"
-            >
+            <Button onClick={handleSubmit} disabled={loading} className="h-12 px-10">
               {loading ? 'Creating...' : 'Create'}
             </Button>
           </div>

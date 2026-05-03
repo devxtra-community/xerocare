@@ -628,7 +628,7 @@ function VendorFormModal({
               Cancel
             </button>
             <Button
-              className="h-12 px-10 rounded-xl bg-[#004a8d] text-white hover:bg-[#003f7d] font-bold shadow-lg"
+              className="h-12 px-10"
               disabled={isSubmitting}
               onClick={async () => {
                 setIsSubmitting(true);

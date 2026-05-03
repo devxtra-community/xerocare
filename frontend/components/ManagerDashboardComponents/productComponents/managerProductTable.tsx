@@ -229,6 +229,7 @@ export default function ManagerProduct() {
             ),
           },
           { id: 'price', header: 'PRICE', cell: (p: Product) => formatCurrency(p.sale_price) },
+          { id: 'hs_code', header: 'HS CODE', accessorKey: 'hs_code' as keyof Product },
           { id: 'color', header: 'PRINT COLOUR', accessorKey: 'print_colour' as keyof Product },
           {
             id: 'status',
@@ -362,6 +363,7 @@ function ProductFormModal({
     wholesale_price: string | number;
     lot_id: string;
     description: string;
+    hs_code: string;
   }>({
     name: initialData?.name || '',
     brand: initialData?.brand || '',
@@ -380,6 +382,7 @@ function ProductFormModal({
     wholesale_price: initialData?.wholesale_price ?? '',
     lot_id: initialData?.lot_id || '', // Check if initialData has lot_id support if needed
     description: initialData?.description || '',
+    hs_code: initialData?.hs_code || '',
   });
 
   // Derived state for filtering models
@@ -813,6 +816,13 @@ function ProductFormModal({
                   <SelectItem value="BOTH">Both</SelectItem>
                 </SelectContent>
               </Select>
+            </Field>
+            <Field label="HS Code">
+              <Input
+                value={form.hs_code || ''}
+                onChange={(e) => setForm({ ...form, hs_code: e.target.value })}
+                placeholder="HS Code"
+              />
             </Field>
           </div>
         </div>

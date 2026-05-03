@@ -202,6 +202,7 @@ export default function RfqCreateForm({ basePath }: RfqCreateFormProps) {
     modelExamples.forEach((m) => {
       rows.push([
         m.id,
+        // @ts-expect-error: hs_code was migrated from Model to Product
         m.hs_code || '',
         m.model_name || m.description || '',
         1,
@@ -543,41 +544,83 @@ export default function RfqCreateForm({ basePath }: RfqCreateFormProps) {
                   {/* Selector Row */}
                   <div className="grid grid-cols-[1fr_120px_40px] gap-4 items-end">
                     {item.itemType === ItemType.PRODUCT ? (
-                      <div className="space-y-1">
-                        <div className="flex justify-between items-center h-4 mb-1">
-                          <Label className="text-xs text-slate-500 font-medium">Product</Label>
-                          {item.modelId && (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                updateItem(index, 'isRequestingNewProduct', true);
-                                updateItem(index, 'productId', undefined);
-                              }}
-                              className="text-[10px] text-blue-600 hover:text-blue-800 font-medium transition-colors"
-                            >
-                              + Request New Product?
-                            </button>
-                          )}
+                      item.isRequestingNewProduct ? (
+                        <div className="flex gap-4">
+                          <div className="flex-1 space-y-1">
+                            <div className="flex justify-between items-center h-4 mb-1">
+                              <Label className="text-xs text-slate-500 font-medium">
+                                New Product Name
+                              </Label>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  updateItem(index, 'isRequestingNewProduct', false);
+                                  updateItem(index, 'customProductName', undefined);
+                                  updateItem(index, 'hsCode', undefined);
+                                }}
+                                className="text-[10px] text-red-500 hover:text-red-700 font-medium transition-colors"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                            <Input
+                              placeholder="Custom product name"
+                              value={item.customProductName || ''}
+                              onChange={(e) =>
+                                updateItem(index, 'customProductName', e.target.value)
+                              }
+                              required
+                            />
+                          </div>
+                          <div className="w-[120px] space-y-1">
+                            <Label className="text-xs text-slate-500 font-medium h-4 mb-1 block">
+                              HS Code *
+                            </Label>
+                            <Input
+                              placeholder="00.00"
+                              value={item.hsCode || ''}
+                              onChange={(e) => updateItem(index, 'hsCode', e.target.value)}
+                              required={!!item.customProductName}
+                            />
+                          </div>
                         </div>
-                        <SearchableSelect
-                          options={products
-                            .filter(
-                              (p) =>
-                                !item.modelId ||
-                                p.model?.id === item.modelId ||
-                                (p as { model_id?: string }).model_id === item.modelId,
-                            )
-                            .map((p) => ({
-                              value: p.id,
-                              label: p.name,
-                            }))}
-                          value={item.productId || ''}
-                          onValueChange={(val) => updateItem(index, 'productId', val)}
-                          placeholder="Search Product..."
-                          emptyText="No products found"
-                          disabled={!item.modelId}
-                        />
-                      </div>
+                      ) : (
+                        <div className="space-y-1">
+                          <div className="flex justify-between items-center h-4 mb-1">
+                            <Label className="text-xs text-slate-500 font-medium">Product</Label>
+                            {item.modelId && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  updateItem(index, 'isRequestingNewProduct', true);
+                                  updateItem(index, 'productId', undefined);
+                                }}
+                                className="text-[10px] text-blue-600 hover:text-blue-800 font-medium transition-colors"
+                              >
+                                + Request New Product?
+                              </button>
+                            )}
+                          </div>
+                          <SearchableSelect
+                            options={products
+                              .filter(
+                                (p) =>
+                                  !item.modelId ||
+                                  p.model?.id === item.modelId ||
+                                  (p as { model_id?: string }).model_id === item.modelId,
+                              )
+                              .map((p) => ({
+                                value: p.id,
+                                label: p.name,
+                              }))}
+                            value={item.productId || ''}
+                            onValueChange={(val) => updateItem(index, 'productId', val)}
+                            placeholder="Search Product..."
+                            emptyText="No products found"
+                            disabled={!item.modelId}
+                          />
+                        </div>
+                      )
                     ) : item.isRequestingNewPart ? (
                       <div className="flex gap-4">
                         <div className="flex-1 space-y-1">

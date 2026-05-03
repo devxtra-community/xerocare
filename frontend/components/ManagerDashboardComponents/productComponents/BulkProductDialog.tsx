@@ -156,6 +156,7 @@ export function BulkProductDialog({
     max_discount_amount: 0,
     wholesale_price: 0,
     lot_id: '',
+    hs_code: '',
   });
 
   /**
@@ -250,6 +251,7 @@ export function BulkProductDialog({
           ) || 0,
         wholesale_price: Number(getVal(['wholesale_price', 'Wholesale Price'])) || 0,
         lot_id: getVal(['lot_id', 'Lot ID', 'Lot']),
+        hs_code: getVal(['hs_code', 'HS Code', 'HSCODE']),
       };
     });
 
@@ -436,6 +438,7 @@ export function BulkProductDialog({
                     <TableHead className="min-w-[130px]">Wholesale Price</TableHead>
                     <TableHead className="min-w-[100px]">Tax %</TableHead>
                     <TableHead className="min-w-[140px]">Print Colour</TableHead>
+                    <TableHead className="min-w-[130px]">HS Code</TableHead>
                     <TableHead className="min-w-[130px]">Max Discount</TableHead>
                     <TableHead className="min-w-[60px]"></TableHead>
                   </TableRow>
@@ -650,6 +653,14 @@ export function BulkProductDialog({
                               <SelectItem value="BOTH">Both</SelectItem>
                             </SelectContent>
                           </Select>
+                        </TableCell>
+                        <TableCell className="min-w-[130px]">
+                          <Input
+                            value={row.hs_code || ''}
+                            onChange={(e) => updateRow(i, 'hs_code', e.target.value)}
+                            placeholder="HS Code"
+                            className="min-w-full"
+                          />
                         </TableCell>
                         <TableCell className="min-w-[130px]">
                           <Input

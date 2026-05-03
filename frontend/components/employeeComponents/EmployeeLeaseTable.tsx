@@ -451,6 +451,7 @@ export default function EmployeeLeaseTable({
       {approveOpen && selectedInvoice && (
         <ApproveQuotationDialog
           invoiceId={selectedInvoice.id}
+          quotation={selectedInvoice}
           onClose={() => setApproveOpen(false)}
           onSuccess={() => {
             setApproveOpen(false);

@@ -24,6 +24,11 @@ export class BranchService {
       if (!manager) {
         throw new AppError('Manager does not exist or inactive', 400);
       }
+
+      const existingBranch = await this.repo.findByManagerId(payload.manager_id);
+      if (existingBranch) {
+        throw new AppError(`Manager is already assigned to branch: ${existingBranch.name}`, 400);
+      }
     }
 
     const branch = await this.repo.create(payload);
@@ -93,6 +98,11 @@ export class BranchService {
 
       if (!manager) {
         throw new AppError('Manager does not exist or inactive', 400);
+      }
+
+      const existingBranch = await this.repo.findByManagerId(payload.manager_id);
+      if (existingBranch && existingBranch.id !== id) {
+        throw new AppError(`Manager is already assigned to branch: ${existingBranch.name}`, 400);
       }
     }
 

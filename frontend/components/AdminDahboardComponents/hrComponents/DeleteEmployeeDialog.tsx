@@ -43,9 +43,7 @@ export default function DeleteEmployeeDialog({
             >
               <AlertCircle className="h-6 w-6" />
             </div>
-            <DialogTitle className="text-xl font-bold text-primary">
-              {isEnabling ? 'Enable Employee Access' : 'Confirm Action'}
-            </DialogTitle>
+            <DialogTitle>{isEnabling ? 'Enable Employee Access' : 'Confirm Action'}</DialogTitle>
           </div>
           <DialogDescription className="text-base text-gray-600 leading-relaxed">
             {isEnabling ? (
@@ -74,7 +72,8 @@ export default function DeleteEmployeeDialog({
               onConfirm();
               onOpenChange(false);
             }}
-            className={`h-12 px-8 rounded-xl text-white font-bold shadow-lg ${isEnabling ? 'bg-blue-600 hover:bg-blue-700' : 'bg-red-600 hover:bg-red-700'}`}
+            variant={isEnabling ? 'default' : 'destructive'}
+            className="h-12 px-8"
           >
             {isEnabling ? 'Confirm Enable' : 'Confirm'}
           </Button>

@@ -17,6 +17,7 @@ export class BranchRepository {
   findAll() {
     return this.db.getRepository(Branch).find({
       where: [{ status: BranchStatus.ACTIVE }, { status: BranchStatus.INACTIVE }],
+      relations: ['manager'],
     });
   }
 
@@ -26,6 +27,16 @@ export class BranchRepository {
   findById(id: string) {
     return this.db.getRepository(Branch).findOne({
       where: { id },
+      relations: ['manager'],
+    });
+  }
+
+  /**
+   * Finds a branch by manager ID.
+   */
+  findByManagerId(managerId: string) {
+    return this.db.getRepository(Branch).findOne({
+      where: { manager_id: managerId },
     });
   }
 

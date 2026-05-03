@@ -839,10 +839,27 @@ export const updateInvoiceStatus = async (id: string, status: string): Promise<I
 };
 
 /**
- * Finance approves a quotation pricing.
+ * Request validity extension for an expired quotation.
  */
-export const financeApproveQuotation = async (id: string): Promise<Invoice> => {
-  const response = await api.post(`/b/invoices/${id}/finance-approve-quotation`);
+export const requestValidityExtension = async (id: string): Promise<Invoice> => {
+  const response = await api.post(`/b/invoices/${id}/request-validity-extension`);
+  return response.data.data;
+};
+
+/**
+ * Finance approves a quotation pricing or validity extension.
+ */
+export const financeApproveQuotation = async (
+  id: string,
+  payload?: {
+    amount?: number;
+    mode?: 'CASH' | 'CHEQUE';
+    reference?: string;
+    receivedDate?: string;
+    effectiveTo?: string; // Add this for validity extension
+  },
+): Promise<Invoice> => {
+  const response = await api.post(`/b/invoices/${id}/finance-approve-quotation`, payload);
   return response.data.data;
 };
 
