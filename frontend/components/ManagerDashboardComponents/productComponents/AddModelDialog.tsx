@@ -15,7 +15,6 @@ const formSchema = z.object({
   model_no: z.string().min(1, 'Model No is required'),
   model_name: z.string().min(1, 'Model Name is required'),
   brand_id: z.string().min(1, 'Brand is required'),
-  hs_code: z.string().optional(),
   description: z.string().optional(),
 });
 
@@ -114,10 +113,6 @@ export function AddModelDialog({ open, onOpenChange, onSuccess }: AddModelDialog
               {errors.model_no && (
                 <p className="text-destructive text-xs mt-1">{errors.model_no.message}</p>
               )}
-            </div>
-            <div className="col-span-2">
-              <label className="block text-sm font-medium mb-1">HS Code</label>
-              <Input {...register('hs_code')} placeholder="e.g. 84433100" />
             </div>
             <div className="col-span-2">
               <label className="block text-sm font-medium mb-1">Description</label>

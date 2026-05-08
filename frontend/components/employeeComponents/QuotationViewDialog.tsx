@@ -1,35 +1,19 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import {
-  Loader2,
-  Send,
-  Mail,
-  Phone,
-  ArrowRightLeft,
-  CheckCircle2,
-  PackageCheck,
-} from 'lucide-react';
+import { Loader2, ArrowRightLeft, Send, Mail, Phone } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
-import {
-  getProductById,
-  getAllProducts,
-  getAvailableProductsByModel,
-  Product,
-} from '@/lib/product';
+import { getProductById, getAllProducts } from '@/lib/product';
 import { getAllSpareParts } from '@/lib/spare-part';
 import { getAllModels } from '@/lib/model';
 import {
   Invoice,
   sendEmailNotification,
   sendWhatsappNotification,
-  convertToTransaction,
-  allocateMachinesInvoice,
   requestValidityExtension,
 } from '@/lib/invoice';
-import { recordPayment } from '@/lib/payment';
 import { toast } from 'sonner';
 
 interface ProductMeta {
@@ -72,7 +56,7 @@ export function QuotationViewDialog({
   const [isSendingCustomer, setIsSendingCustomer] = useState(false);
   const [isRequestingExtension, setIsRequestingExtension] = useState(false);
   const [productDetails, setProductDetails] = useState<Record<string, ProductMeta>>({});
-  const [showConversionModal, setShowConversionModal] = useState(false);
+  const router = useRouter();
 
   const isRent = quotation.saleType === 'RENT';
   const isLease = quotation.saleType === 'LEASE';
@@ -1183,14 +1167,24 @@ export function QuotationViewDialog({
                   </Button>
                 )}
 
-              {/* Convert Button — Direct access if valid */}
+              {/* Convert Button — Only after quotation has been sent to the customer */}
               {!onApprove &&
                 onConvertSuccess &&
                 quotation.type === 'QUOTATION' &&
+                quotation.status === 'SENT_TO_CUSTOMER' &&
                 !isExpired &&
                 !isExtensionRequested && (
                   <Button
-                    onClick={() => setShowConversionModal(true)}
+                    onClick={() => {
+                      const target =
+                        quotation.saleType === 'RENT'
+                          ? 'rent'
+                          : quotation.saleType === 'LEASE'
+                            ? 'lease'
+                            : 'sales';
+                      router.push(`/employee/${target}?convert=${quotation.invoiceNumber}`);
+                      onClose();
+                    }}
                     size="sm"
                     className="h-9 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[11px] uppercase tracking-widest px-6 gap-2 shadow-lg shadow-emerald-100 rounded-md ml-2"
                   >
@@ -1235,477 +1229,6 @@ export function QuotationViewDialog({
           </div>
         </DialogContent>
       </Dialog>
-
-      {/* Conversion Modal */}
-      {showConversionModal && onConvertSuccess && (
-        <ConversionModal
-          quotation={quotation}
-          onClose={() => setShowConversionModal(false)}
-          onSuccess={() => {
-            setShowConversionModal(false);
-            onConvertSuccess();
-          }}
-        />
-      )}
     </>
-  );
-}
-
-// ─── Conversion Modal ──────────────────────────────────────────────────────────
-// Shown when the employee clicks "Convert to Sale/Rent/Lease".
-// Steps: 1) Assign serial numbers, 2) Record advance payment, 3) Confirm.
-
-interface ConversionModalProps {
-  quotation: Invoice;
-  onClose: () => void;
-  onSuccess: () => void;
-}
-
-interface SerialUpdate {
-  itemId: string;
-  description: string;
-  productId: string;
-  modelId?: string;
-}
-
-function ConversionModal({ quotation, onClose, onSuccess }: ConversionModalProps) {
-  const [step, setStep] = useState<1 | 2 | 3>(1);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
-  // Step 1: Serial number assignment per item
-  const allocatableItems = (quotation.items || []).filter(
-    (item) => item.itemType === 'PRODUCT' || item.itemType === 'SPAREPART',
-  );
-  const [serialUpdates, setSerialUpdates] = useState<SerialUpdate[]>(
-    allocatableItems.map((item) => ({
-      itemId: item.id || '',
-      description: item.description,
-      productId: item.productId || '',
-      modelId: item.modelId,
-    })),
-  );
-
-  const [availableProducts, setAvailableProducts] = useState<Record<string, Product[]>>({});
-  const [isLoadingProducts, setIsLoadingProducts] = useState(false);
-
-  useEffect(() => {
-    const fetchAvailable = async () => {
-      setIsLoadingProducts(true);
-      const productMap: Record<string, Product[]> = {};
-      try {
-        for (const item of allocatableItems) {
-          if (item.modelId) {
-            const products = await getAvailableProductsByModel(item.modelId);
-            productMap[item.modelId] = products;
-          }
-        }
-        setAvailableProducts(productMap);
-      } catch (err) {
-        console.error('Failed to fetch available products:', err);
-      } finally {
-        setIsLoadingProducts(false);
-      }
-    };
-    fetchAvailable();
-  }, [quotation]);
-
-  // Step 2: Advance payment
-  const prefilledAdvance = Number(quotation.advanceAmount || 0);
-  const [advanceAmount, setAdvanceAmount] = useState(
-    prefilledAdvance > 0 ? String(prefilledAdvance) : '',
-  );
-  const [paymentMode, setPaymentMode] = useState<
-    'CASH' | 'BANK_TRANSFER' | 'CHEQUE' | 'CREDIT_CARD'
-  >('CASH');
-  const [referenceNumber, setReferenceNumber] = useState('');
-  const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split('T')[0]);
-  const [remarks, setRemarks] = useState('');
-  const [skipAdvance, setSkipAdvance] = useState(false);
-
-  const updateSerial = (index: number, productId: string) => {
-    setSerialUpdates((prev) => {
-      const updated = [...prev];
-      updated[index] = { ...updated[index], productId };
-      return updated;
-    });
-  };
-
-  const handleConfirm = async () => {
-    setIsSubmitting(true);
-    try {
-      // 1. Convert Quotation → Proforma
-      await convertToTransaction(quotation.id);
-
-      // 2. Allocate machines (assign serial numbers) if there are any allocatable items
-      const itemsToAllocate = serialUpdates.filter((u) => u.itemId && u.productId);
-      if (itemsToAllocate.length > 0) {
-        await allocateMachinesInvoice(quotation.id, {
-          itemUpdates: itemsToAllocate.map((u) => ({
-            id: u.itemId,
-            productId: u.productId,
-          })),
-        });
-      }
-
-      // 3. Record advance payment as a ledger entry if not skipped
-      if (!skipAdvance && advanceAmount && Number(advanceAmount) > 0) {
-        await recordPayment({
-          invoiceId: quotation.id,
-          amountPaid: Number(advanceAmount),
-          paymentMode,
-          paymentDate,
-          referenceNumber: referenceNumber || undefined,
-          remarks:
-            remarks ||
-            `Advance payment collected at conversion — Invoice ${quotation.invoiceNumber}`,
-        });
-      }
-
-      toast.success('Conversion complete!', {
-        description: `Invoice ${quotation.invoiceNumber} is now active${!skipAdvance && Number(advanceAmount) > 0 ? ` with advance QAR ${Number(advanceAmount).toFixed(2)} recorded` : ''}.`,
-      });
-      onSuccess();
-    } catch (error: unknown) {
-      const err = error as { response?: { data?: { message?: string } }; message?: string };
-      const msg = err.response?.data?.message || err.message || 'Conversion failed';
-      toast.error('Conversion failed', { description: msg });
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const saleLabel =
-    quotation.saleType === 'RENT' ? 'Rent' : quotation.saleType === 'LEASE' ? 'Lease' : 'Sale';
-
-  return (
-    <Dialog open onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="sm:max-w-lg rounded-2xl p-0 overflow-hidden bg-white shadow-2xl border-0">
-        <DialogTitle className="sr-only">Convert to {saleLabel}</DialogTitle>
-
-        {/* Header */}
-        <div className="bg-gradient-to-r from-emerald-600 to-emerald-500 p-5 text-white">
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-full bg-white/20 flex items-center justify-center">
-              <ArrowRightLeft size={20} className="text-white" />
-            </div>
-            <div>
-              <p className="text-[11px] font-black uppercase tracking-widest opacity-80">
-                Convert Quotation
-              </p>
-              <p className="text-lg font-black tracking-tight">
-                {quotation.invoiceNumber} → {saleLabel}
-              </p>
-            </div>
-          </div>
-          {/* Step indicator */}
-          <div className="flex items-center gap-2 mt-4">
-            {(['1', '2', '3'] as const).map((s, i) => (
-              <React.Fragment key={s}>
-                <div
-                  className={`h-6 w-6 rounded-full flex items-center justify-center text-[10px] font-black transition-all ${
-                    step >= i + 1 ? 'bg-white text-emerald-600' : 'bg-white/30 text-white'
-                  }`}
-                >
-                  {step > i + 1 ? <CheckCircle2 size={14} /> : i + 1}
-                </div>
-                {i < 2 && (
-                  <div
-                    className={`h-0.5 flex-1 transition-all ${step > i + 1 ? 'bg-white' : 'bg-white/30'}`}
-                  />
-                )}
-              </React.Fragment>
-            ))}
-          </div>
-          <div className="flex justify-between mt-1">
-            <span className="text-[9px] font-black uppercase tracking-widest opacity-70">
-              Serial Numbers
-            </span>
-            <span className="text-[9px] font-black uppercase tracking-widest opacity-70">
-              Advance Payment
-            </span>
-            <span className="text-[9px] font-black uppercase tracking-widest opacity-70">
-              Confirm
-            </span>
-          </div>
-        </div>
-
-        <div className="p-5 space-y-4 max-h-[50vh] overflow-y-auto">
-          {/* ── Step 1: Serial Numbers ─────────────────────────────────────── */}
-          {step === 1 && (
-            <div className="space-y-3">
-              <p className="text-xs font-black text-slate-600 uppercase tracking-wider">
-                Assign Serial / Product IDs
-              </p>
-              {allocatableItems.length === 0 ? (
-                <div className="text-center py-6 bg-slate-50 rounded-xl border border-dashed border-slate-200">
-                  <PackageCheck size={28} className="mx-auto mb-2 text-slate-300" />
-                  <p className="text-sm font-bold text-slate-500">No physical items to allocate</p>
-                  <p className="text-[11px] text-slate-400 mt-1">
-                    This quotation has no products that need serial numbers.
-                  </p>
-                </div>
-              ) : (
-                serialUpdates.map((update, idx) => (
-                  <div
-                    key={update.itemId || idx}
-                    className="bg-slate-50 rounded-xl border border-slate-100 p-3 space-y-2"
-                  >
-                    <p className="text-xs font-black text-slate-700 truncate">
-                      {update.description}
-                    </p>
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                        Assign Physical Machine (Serial Number)
-                      </label>
-                      {update.modelId && availableProducts[update.modelId] ? (
-                        <select
-                          value={update.productId}
-                          onChange={(e) => updateSerial(idx, e.target.value)}
-                          className="w-full h-9 px-3 rounded-lg border border-slate-200 bg-white text-sm font-medium focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all outline-none"
-                        >
-                          <option value="">Select a unit from inventory...</option>
-                          {availableProducts[update.modelId].map((p) => (
-                            <option key={p.id} value={p.id}>
-                              {p.serial_no} {p.name ? `— ${p.name}` : ''}
-                            </option>
-                          ))}
-                          {availableProducts[update.modelId].length === 0 && (
-                            <option disabled>No units available in stock</option>
-                          )}
-                        </select>
-                      ) : isLoadingProducts ? (
-                        <div className="flex items-center gap-2 h-9 px-3 bg-slate-100 rounded-lg animate-pulse">
-                          <Loader2 size={12} className="animate-spin text-slate-400" />
-                          <span className="text-[10px] font-bold text-slate-400 uppercase">
-                            Checking Stock...
-                          </span>
-                        </div>
-                      ) : (
-                        <Input
-                          placeholder="Enter serial number or product ID..."
-                          value={update.productId}
-                          onChange={(e) => updateSerial(idx, e.target.value)}
-                          className="h-9 text-sm font-mono border-slate-200 focus:border-emerald-400"
-                        />
-                      )}
-                      {update.modelId && availableProducts[update.modelId]?.length === 0 && (
-                        <p className="text-[9px] font-bold text-red-500 uppercase mt-1">
-                          ⚠ No units of this model are currently available in inventory.
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          )}
-
-          {/* ── Step 2: Advance Payment ──────────────────────────────────────── */}
-          {step === 2 && (
-            <div className="space-y-4">
-              <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-3">
-                <p className="text-[11px] font-black text-emerald-700 uppercase tracking-wider">
-                  Invoice Reference
-                </p>
-                <p className="text-lg font-black text-slate-800 mt-0.5">
-                  {quotation.invoiceNumber}
-                </p>
-                <p className="text-[11px] text-slate-500 font-semibold mt-0.5">
-                  Total Amount:{' '}
-                  <span className="text-slate-800 font-black">
-                    QAR {Number(quotation.totalAmount || 0).toFixed(2)}
-                  </span>
-                </p>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id="skip-advance"
-                  checked={skipAdvance}
-                  onChange={(e) => setSkipAdvance(e.target.checked)}
-                  className="h-4 w-4 rounded border-slate-300 text-emerald-600 accent-emerald-600"
-                />
-                <label
-                  htmlFor="skip-advance"
-                  className="text-xs font-bold text-slate-600 cursor-pointer"
-                >
-                  No advance collected — skip this step
-                </label>
-              </div>
-
-              {!skipAdvance && (
-                <div className="space-y-3">
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                        Advance Amount (QAR)
-                      </label>
-                      <Input
-                        type="number"
-                        placeholder="0.00"
-                        value={advanceAmount}
-                        onChange={(e) => setAdvanceAmount(e.target.value)}
-                        className="h-9 text-sm border-slate-200 focus:border-emerald-400 font-bold"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                        Payment Date
-                      </label>
-                      <Input
-                        type="date"
-                        value={paymentDate}
-                        onChange={(e) => setPaymentDate(e.target.value)}
-                        className="h-9 text-sm border-slate-200 focus:border-emerald-400"
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                      Payment Mode
-                    </label>
-                    <div className="grid grid-cols-2 gap-2">
-                      {(['CASH', 'BANK_TRANSFER', 'CHEQUE', 'CREDIT_CARD'] as const).map((mode) => (
-                        <button
-                          key={mode}
-                          onClick={() => setPaymentMode(mode)}
-                          className={`h-9 rounded-lg border text-[11px] font-black uppercase tracking-wider transition-all ${
-                            paymentMode === mode
-                              ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
-                              : 'bg-white text-slate-600 border-slate-200 hover:border-emerald-300'
-                          }`}
-                        >
-                          {mode.replace('_', ' ')}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  {(paymentMode === 'CHEQUE' || paymentMode === 'BANK_TRANSFER') && (
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                        Reference / Cheque Number
-                      </label>
-                      <Input
-                        placeholder="TXN ID, Cheque No..."
-                        value={referenceNumber}
-                        onChange={(e) => setReferenceNumber(e.target.value)}
-                        className="h-9 text-sm border-slate-200 focus:border-emerald-400 font-mono"
-                      />
-                    </div>
-                  )}
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                      Remarks (optional)
-                    </label>
-                    <Input
-                      placeholder="Any notes..."
-                      value={remarks}
-                      onChange={(e) => setRemarks(e.target.value)}
-                      className="h-9 text-sm border-slate-200 focus:border-emerald-400"
-                    />
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* ── Step 3: Confirm ────────────────────────────────────────────────── */}
-          {step === 3 && (
-            <div className="space-y-3">
-              <p className="text-xs font-black text-slate-600 uppercase tracking-wider">Summary</p>
-              <div className="bg-slate-50 rounded-xl border border-slate-100 divide-y divide-slate-100">
-                <div className="flex justify-between items-center px-4 py-2.5">
-                  <span className="text-[11px] font-bold text-slate-500 uppercase">Quotation</span>
-                  <span className="text-[11px] font-black text-slate-800">
-                    {quotation.invoiceNumber}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center px-4 py-2.5">
-                  <span className="text-[11px] font-bold text-slate-500 uppercase">Customer</span>
-                  <span className="text-[11px] font-black text-slate-800">
-                    {quotation.customerName}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center px-4 py-2.5">
-                  <span className="text-[11px] font-bold text-slate-500 uppercase">
-                    Converting To
-                  </span>
-                  <span className="text-[11px] font-black text-emerald-700 uppercase">
-                    {saleLabel}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center px-4 py-2.5">
-                  <span className="text-[11px] font-bold text-slate-500 uppercase">
-                    Items Allocated
-                  </span>
-                  <span className="text-[11px] font-black text-slate-800">
-                    {serialUpdates.filter((u) => u.productId).length} / {serialUpdates.length}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center px-4 py-2.5">
-                  <span className="text-[11px] font-bold text-slate-500 uppercase">
-                    Advance Payment
-                  </span>
-                  <span className="text-[11px] font-black text-slate-800">
-                    {skipAdvance || !advanceAmount || Number(advanceAmount) === 0
-                      ? '—'
-                      : `QAR ${Number(advanceAmount).toFixed(2)} via ${paymentMode.replace('_', ' ')}`}
-                  </span>
-                </div>
-              </div>
-
-              <div className="bg-amber-50 border border-amber-100 rounded-xl p-3">
-                <p className="text-[11px] font-black text-amber-700 uppercase tracking-wider mb-1">
-                  ⚠ This action is irreversible
-                </p>
-                <p className="text-[11px] text-amber-600 font-semibold">
-                  Once confirmed, the quotation will be converted and cannot be reverted. The
-                  advance payment will be recorded against invoice{' '}
-                  <strong>{quotation.invoiceNumber}</strong>.
-                </p>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Footer */}
-        <div className="p-4 border-t border-slate-100 bg-slate-50/50 flex items-center justify-between">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={step === 1 ? onClose : () => setStep((s) => (s - 1) as 1 | 2 | 3)}
-            className="font-black text-[11px] uppercase tracking-widest text-slate-500"
-          >
-            {step === 1 ? 'Cancel' : '← Back'}
-          </Button>
-          <div className="flex gap-2">
-            {step < 3 ? (
-              <Button
-                size="sm"
-                onClick={() => setStep((s) => (s + 1) as 1 | 2 | 3)}
-                className="h-9 px-6 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[11px] uppercase tracking-widest rounded-lg"
-              >
-                Next →
-              </Button>
-            ) : (
-              <Button
-                size="sm"
-                onClick={handleConfirm}
-                disabled={isSubmitting}
-                className="h-9 px-8 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[11px] uppercase tracking-widest rounded-lg gap-2"
-              >
-                {isSubmitting ? (
-                  <Loader2 size={14} className="animate-spin" />
-                ) : (
-                  <CheckCircle2 size={14} />
-                )}
-                Confirm &amp; Convert
-              </Button>
-            )}
-          </div>
-        </div>
-      </DialogContent>
-    </Dialog>
   );
 }

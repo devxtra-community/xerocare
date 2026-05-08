@@ -17,7 +17,6 @@ import {
   ShoppingCart,
   Key,
   FileSignature,
-  Wallet,
 } from 'lucide-react';
 import { formatCurrency } from '@/lib/format';
 import { toast } from 'sonner';
@@ -188,7 +187,7 @@ export default function EmployeeQuotationTable() {
           getBrands(),
           getAllModels({ limit: 1000 }),
         ]);
-        setAllBrands(brandsData);
+        setAllBrands(Array.isArray(brandsData.data) ? brandsData.data : []);
         setAllModels(modelsData.data);
       } catch (error) {
         console.error('Error fetching suggestions:', error);
@@ -283,11 +282,6 @@ export default function EmployeeQuotationTable() {
     } catch {
       toast.error('Failed to load quotation details.');
     }
-  };
-
-  const handleAccountView = (q: Invoice) => {
-    setSelectedQ(q);
-    setAccountViewOpen(true);
   };
 
   const handleCreate = async (payload: CreateInvoicePayload) => {
@@ -444,17 +438,6 @@ export default function EmployeeQuotationTable() {
                       >
                         <Eye className="h-4 w-4" />
                       </Button>
-                      {['PROFORMA', 'FINAL'].includes(q.type || '') && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-8 w-8 p-0 text-green-500 hover:text-green-600 hover:bg-green-50 ml-1"
-                          onClick={() => handleAccountView(q)}
-                          title="Sales Finance Account"
-                        >
-                          <Wallet className="h-4 w-4" />
-                        </Button>
-                      )}
                     </TableCell>
                   </TableRow>
                 ))

@@ -20,6 +20,9 @@ import { ProductAllocation } from './productAllocationEntity';
 export enum SecurityDepositMode {
   CASH = 'CASH',
   CHEQUE = 'CHEQUE',
+  BANK_TRANSFER = 'BANK_TRANSFER',
+  CREDIT_CARD = 'CREDIT_CARD',
+  UPI = 'UPI',
 }
 
 @Entity('invoices')

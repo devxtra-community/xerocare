@@ -52,6 +52,7 @@ export const addproduct = async (req: Request, res: Response, next: NextFunction
       wholesale_price,
       lot_id,
       description,
+      hs_code,
     } = req.body;
 
     if (!model_id || !warehouse_id || !vendor_id || !serial_no || !name || !brand || !MFD) {
@@ -89,6 +90,7 @@ export const addproduct = async (req: Request, res: Response, next: NextFunction
       imageUrl,
       lot_id: lot_id || undefined,
       description,
+      hs_code,
     });
     res
       .status(200)

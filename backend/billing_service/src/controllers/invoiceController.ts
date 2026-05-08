@@ -317,7 +317,17 @@ export const activateContract = async (req: Request, res: Response, next: NextFu
 
     const { contractConfirmationUrl, deposit, itemUpdates } = req.body;
 
-    if (!contractConfirmationUrl) {
+    const invoiceCheck = await billingService.getInvoiceById(id);
+    if (!invoiceCheck) {
+      throw new AppError('Invoice not found', 404);
+    }
+
+    if (
+      !contractConfirmationUrl &&
+      invoiceCheck.saleType !== 'SALE' &&
+      invoiceCheck.saleType !== 'PRODUCT_SALE' &&
+      invoiceCheck.saleType !== 'SPAREPART_SALE'
+    ) {
       throw new AppError(
         'Contract confirmation document URL is required to activate the contract',
         400,

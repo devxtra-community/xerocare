@@ -146,6 +146,46 @@ export const approveQuotation = async (req: Request, res: Response, next: NextFu
 };
 
 /**
+ * Finance reviews and approves the pricing/terms of a quotation.
+ */
+export const financeApproveQuotation = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = req.params.id as string;
+    const token = req.headers.authorization?.split(' ')[1] || '';
+
+    const invoice = await invoiceAggregationService.financeApproveQuotation(id, req.body, token);
+
+    return res.status(200).json({
+      success: true,
+      data: invoice,
+      message: 'Quotation pricing approved by Finance',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Employee converts an approved quotation into an active Sale/Rent/Lease transaction.
+ */
+export const convertToTransaction = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = req.params.id as string;
+    const token = req.headers.authorization?.split(' ')[1] || '';
+
+    const invoice = await invoiceAggregationService.convertToTransaction(id, token);
+
+    return res.status(200).json({
+      success: true,
+      data: invoice,
+      message: 'Quotation successfully converted to transaction',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
  * After a branch employee is happy with a deal, they send it to the main Finance team for a final check.
  */
 export const employeeApprove = async (req: Request, res: Response, next: NextFunction) => {
