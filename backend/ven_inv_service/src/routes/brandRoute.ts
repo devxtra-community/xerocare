@@ -16,7 +16,7 @@ router.post('/', authMiddleware, roleMiddleware(['ADMIN', 'MANAGER']), brandCont
 router.get(
   '/',
   authMiddleware,
-  roleMiddleware(['ADMIN', 'MANAGER', 'HR']),
+  roleMiddleware(['ADMIN', 'MANAGER', 'HR', 'EMPLOYEE']),
   brandController.getAllBrands,
 );
 

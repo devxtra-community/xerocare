@@ -107,8 +107,9 @@ export function MultiSelect({
         </Button>
       </PopoverTrigger>
       <PopoverContent
-        className="w-[--radix-popover-trigger-width] p-0 bg-card z-[9999] pointer-events-auto"
+        className="w-[var(--radix-popover-trigger-width)] min-w-[200px] max-w-[450px] p-0 bg-card z-[9999] pointer-events-auto shadow-2xl border-slate-200"
         align="start"
+        sideOffset={4}
       >
         <div className="flex flex-col bg-card rounded-md">
           <div className="flex items-center border-b px-3 py-2">

@@ -81,7 +81,7 @@ app.get('/', (_req, res) => {
  * These routes handle financial documents (invoices).
  * We process these directly here at the gateway for convenience.
  */
-app.use('/b/invoices', express_1.default.json(), invoiceRoutes_1.default);
+app.use('/b/invoices', express_1.default.json({ limit: '50mb' }), express_1.default.urlencoded({ limit: '50mb', extended: true }), invoiceRoutes_1.default);
 /**
  * Safety: Prevention of Automated Attacks (Rate Limiting)
  * We limit how many times someone can try to login or request a password reset

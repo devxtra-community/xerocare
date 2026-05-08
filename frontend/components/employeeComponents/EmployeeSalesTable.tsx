@@ -3,7 +3,9 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Plus, Search, Loader2, Eye, FileText, Send } from 'lucide-react';
+import { Plus, Search, Loader2, Eye, FileText, Wallet } from 'lucide-react';
+import { useSearchParams } from 'next/navigation';
+import { QuotationConversionFlow } from './QuotationConversionFlow';
 import { formatCurrency } from '@/lib/format';
 import { toast } from 'sonner';
 import {
@@ -21,14 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {
-  getBranchInvoices,
-  getMyInvoices,
-  convertToTransaction,
-  getInvoiceById,
-  employeeApproveInvoice,
-  Invoice,
-} from '@/lib/invoice';
+import { getBranchInvoices, getMyInvoices, getInvoiceById, Invoice } from '@/lib/invoice';
 
 import {
   Dialog,
@@ -41,6 +36,7 @@ import { Badge } from '@/components/ui/badge';
 import { usePagination } from '@/hooks/usePagination';
 import Pagination from '@/components/Pagination';
 import { InvoiceDetailsDialog } from '../invoice/InvoiceDetailsDialog';
+import { InvoiceAccountView } from '../invoice/InvoiceAccountView';
 
 interface EmployeeSalesTableProps {
   mode?: 'EMPLOYEE' | 'FINANCE';
@@ -54,20 +50,25 @@ export default function EmployeeSalesTable({ mode = 'EMPLOYEE' }: EmployeeSalesT
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [accountViewOpen, setAccountViewOpen] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [search, setSearch] = useState('');
   const [filterType, setFilterType] = useState<string>('All');
   const [isConverterOpen, setIsConverterOpen] = useState(false);
   const [pendingQuotations, setPendingQuotations] = useState<Invoice[]>([]);
   const [loadingQuotations, setLoadingQuotations] = useState(false);
+  const [selectedForConversion, setSelectedForConversion] = useState<Invoice | null>(null);
+
+  const searchParams = useSearchParams();
+  const convertId = searchParams.get('convert');
 
   const { page, limit, total, setPage, setTotal, totalPages } = usePagination(10);
 
   useEffect(() => {
-    setPage(1);
-  }, [search, filterType, setPage]);
-
-  // New state for Finance Approval Dialog
+    if (convertId) {
+      fetchPendingQuotations();
+    }
+  }, [convertId]);
 
   const fetchInvoices = useCallback(async () => {
     try {
@@ -156,7 +157,9 @@ export default function EmployeeSalesTable({ mode = 'EMPLOYEE' }: EmployeeSalesT
       const pending = data.filter(
         (inv) =>
           inv.type === 'QUOTATION' &&
-          (inv.status === 'FINANCE_APPROVED' || inv.status === 'CUSTOMER_ACCEPTED') &&
+          (inv.status === 'FINANCE_APPROVED' ||
+            inv.status === 'CUSTOMER_ACCEPTED' ||
+            inv.status === 'SENT_TO_CUSTOMER') &&
           (inv.saleType === 'SALE' ||
             inv.saleType === 'PRODUCT_SALE' ||
             inv.saleType === 'SPAREPART_SALE'),
@@ -174,30 +177,16 @@ export default function EmployeeSalesTable({ mode = 'EMPLOYEE' }: EmployeeSalesT
   };
 
   const handleConvertQuotation = async (qId: string) => {
-    try {
-      await convertToTransaction(qId);
-      toast.success('Quotation converted to transaction successfully!');
+    const q = pendingQuotations.find((inv) => inv.id === qId);
+    if (q) {
+      setSelectedForConversion(q);
       setIsConverterOpen(false);
-      fetchInvoices();
-    } catch (error) {
-      console.error(error);
-      toast.error('Failed to convert quotation');
     }
   };
 
-  const handleSendForApproval = async () => {
-    if (!selectedInvoice) return;
-    try {
-      await employeeApproveInvoice(selectedInvoice.id);
-      toast.success('Sent for Finance Approval');
-      setDetailsOpen(false);
-      fetchInvoices();
-    } catch (error: unknown) {
-      console.error(error);
-      const err = error as { response?: { data?: { message?: string } } };
-      const msg = err.response?.data?.message || 'Failed to send for approval';
-      toast.error(msg);
-    }
+  const handleConversionSuccess = () => {
+    setSelectedForConversion(null);
+    fetchInvoices();
   };
 
   const getCleanProductName = (name: string) => {
@@ -398,18 +387,18 @@ export default function EmployeeSalesTable({ mode = 'EMPLOYEE' }: EmployeeSalesT
                           <Eye className="h-4 w-4" />
                         </Button>
 
-                        {inv.status === 'DRAFT' && (
+                        {['PROFORMA', 'FINAL'].includes(inv.type || '') && (
                           <Button
                             variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-emerald-600 hover:bg-emerald-50"
+                            size="sm"
+                            className="h-8 w-8 p-0 text-green-500 hover:text-green-600 hover:bg-green-50 ml-1"
                             onClick={() => {
                               setSelectedInvoice(inv);
-                              handleSendForApproval();
+                              setAccountViewOpen(true);
                             }}
-                            title="Send to Finance"
+                            title="Sales Finance Account"
                           >
-                            <Send className="h-4 w-4" />
+                            <Wallet className="h-4 w-4" />
                           </Button>
                         )}
                       </div>
@@ -437,22 +426,21 @@ export default function EmployeeSalesTable({ mode = 'EMPLOYEE' }: EmployeeSalesT
         <InvoiceDetailsDialog
           invoice={selectedInvoice}
           onClose={() => setDetailsOpen(false)}
-          onApprove={
-            mode === 'EMPLOYEE' &&
-            (selectedInvoice.status === 'DRAFT' ||
-              selectedInvoice.status === 'SENT' ||
-              selectedInvoice.status === 'FINANCE_REJECTED')
-              ? handleSendForApproval
-              : undefined
-          }
-          // FINANCE Mode Reject
+          onApprove={undefined}
           onReject={undefined}
-          approveLabel={mode === 'EMPLOYEE' ? 'Send to Finance' : 'Approve'}
           mode={mode}
           onSuccess={() => {
             setDetailsOpen(false);
             fetchInvoices();
           }}
+        />
+      )}
+
+      {accountViewOpen && selectedInvoice && (
+        <InvoiceAccountView
+          invoiceId={selectedInvoice.id}
+          open={accountViewOpen}
+          onClose={() => setAccountViewOpen(false)}
         />
       )}
 
@@ -463,8 +451,16 @@ export default function EmployeeSalesTable({ mode = 'EMPLOYEE' }: EmployeeSalesT
           quotations={pendingQuotations}
           loading={loadingQuotations}
           onSelect={handleConvertQuotation}
-          // Scratch creation logic removed
+          initialSearch={convertId || ''}
           title="Convert Quotation to Sale"
+        />
+      )}
+
+      {selectedForConversion && (
+        <QuotationConversionFlow
+          quotation={selectedForConversion}
+          onClose={() => setSelectedForConversion(null)}
+          onSuccess={handleConversionSuccess}
         />
       )}
     </div>
@@ -477,6 +473,7 @@ interface QuotationConverterDialogProps {
   quotations: Invoice[];
   loading: boolean;
   onSelect: (id: string) => void;
+  initialSearch?: string;
   title: string;
 }
 
@@ -486,9 +483,10 @@ function QuotationConverterDialog({
   quotations,
   loading,
   onSelect,
+  initialSearch = '',
   title,
 }: QuotationConverterDialogProps) {
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState(initialSearch);
 
   const filtered = quotations.filter(
     (q) =>

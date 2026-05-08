@@ -8,7 +8,6 @@ export interface Model {
   brand?: { id: string; name: string }; // Fallback
   brand_id?: string; // Direct ID
   description: string;
-  hs_code?: string;
   quantity: number;
 }
 
@@ -17,7 +16,6 @@ export interface CreateModelDTO {
   model_name: string;
   brand_id: string;
   description: string;
-  hs_code?: string;
 }
 
 export interface PaginatedResponse<T> {

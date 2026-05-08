@@ -1,5 +1,9 @@
 import { Router } from 'express';
 import multer from 'multer';
+import { authMiddleware } from '../middleware/authMiddleware';
+import { requireRole } from '../middleware/roleMiddleware';
+import { UserRole } from '../constants/userRole';
+
 import {
   createInvoice,
   getAllInvoices,
@@ -31,10 +35,9 @@ import {
   uploadContractConfirmation,
   replaceDeviceAllocation,
   processReturn,
+  financeApproveQuotation,
+  convertToTransaction,
 } from '../controllers/invoiceController';
-import { authMiddleware } from '../middleware/authMiddleware';
-import { requireRole } from '../middleware/roleMiddleware';
-import { UserRole } from '../constants/userRole';
 
 /**
  * This file defines all the paths (routes) for handling Invoices.
@@ -187,6 +190,24 @@ router.get(
 router.put('/:id/approve', requireRole(UserRole.EMPLOYEE), approveQuotation);
 
 /**
+ * Finance approves the quotation pricing.
+ */
+router.post(
+  '/:id/finance-approve-quotation',
+  requireRole(UserRole.ADMIN, UserRole.FINANCE),
+  financeApproveQuotation,
+);
+
+/**
+ * Employee converts an approved quotation into an active transaction.
+ */
+router.post(
+  '/:id/convert-to-transaction',
+  requireRole(UserRole.EMPLOYEE, UserRole.MANAGER),
+  convertToTransaction,
+);
+
+/**
  * Manager or Employee approval for a next-step action.
  */
 router.post(
@@ -200,7 +221,7 @@ router.post(
  */
 router.post(
   '/:id/allocate-machines',
-  requireRole(UserRole.ADMIN, UserRole.FINANCE),
+  requireRole(UserRole.ADMIN, UserRole.FINANCE, UserRole.MANAGER, UserRole.EMPLOYEE),
   allocateMachines,
 );
 

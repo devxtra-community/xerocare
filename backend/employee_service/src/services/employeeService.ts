@@ -335,6 +335,34 @@ export class EmployeeService {
   }
 
   /**
+   * Resends the welcome email by resetting the password.
+   */
+  async resendWelcomeEmail(id: string) {
+    const employee = await this.employeeRepo.findById(id);
+
+    if (!employee) {
+      throw new AppError('Employee not found', 404);
+    }
+
+    if (employee.status === EmployeeStatus.DELETED) {
+      throw new AppError('Cannot send email to deleted employee', 400);
+    }
+
+    const plainPassword = generateRandomPassword();
+    const passwordHash = await bcrypt.hash(plainPassword, 10);
+
+    await this.employeeRepo.updateById(id, { password_hash: passwordHash });
+
+    await publishEmailJob({
+      type: 'WELCOME',
+      email: employee.email,
+      password: plainPassword,
+    });
+
+    return true;
+  }
+
+  /**
    * Aggregates HR statistics for the dashboard.
    */
   async getHRStats(branchId?: string, year?: number) {

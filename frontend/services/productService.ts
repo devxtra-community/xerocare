@@ -30,6 +30,7 @@ export interface Product {
   lot_id?: string;
   lot?: { lotNumber: string };
   description?: string;
+  hs_code?: string;
 }
 
 /**
@@ -50,9 +51,9 @@ export interface CreateProductDTO {
   print_colour: 'BLACK_WHITE' | 'COLOUR' | 'BOTH';
   max_discount_amount: number;
   wholesale_price?: number;
-  imageUrl?: string;
   lot_id?: string;
   description?: string;
+  hs_code?: string;
 }
 
 /**
@@ -76,6 +77,7 @@ export interface BulkProductRow {
   wholesale_price?: number;
   lot_id?: string;
   description?: string;
+  hs_code?: string;
 }
 
 /**

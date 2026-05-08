@@ -25,7 +25,6 @@ import {
 } from '@/lib/model';
 import { getBrands, Brand } from '@/lib/brand';
 import { toast } from 'sonner';
-import { BulletDescriptionInput } from '@/components/ui/bullet-description-input';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -155,7 +154,6 @@ export default function ManagerModel() {
                 'BRAND',
                 'MODEL NO',
                 'MODEL NAME',
-                'HS CODE',
                 'TOTAL',
                 'AVAILABLE',
                 'RENTED',
@@ -195,7 +193,6 @@ export default function ManagerModel() {
                     </div>
                   </TableCell>
                   <TableCell className="px-4 font-medium text-center">{m.model_name}</TableCell>
-                  <TableCell className="px-4 text-center">{m.hs_code || '-'}</TableCell>
                   <TableCell className="px-4 font-semibold text-blue-600 text-center">
                     {m.quantity}
                   </TableCell>
@@ -242,7 +239,7 @@ export default function ManagerModel() {
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={9} className="text-center py-6 text-muted-foreground">
+                <TableCell colSpan={8} className="text-center py-6 text-muted-foreground">
                   No models found
                 </TableCell>
               </TableRow>
@@ -316,7 +313,6 @@ function ModelFormModal({
     model_name: initialData?.model_name || '',
     model_no: initialData?.model_no || '',
     brand_id: initialData?.brandRelation?.id || '',
-    hs_code: initialData?.hs_code || '',
     description: initialData?.description || '',
   });
   const [brands, setBrands] = useState<Brand[]>([]);
@@ -382,19 +378,12 @@ function ModelFormModal({
             />
           </div>
           <div className="col-span-2">
-            <label className="block text-sm font-medium mb-1">HS Code</label>
-            <Input
-              value={formData.hs_code || ''}
-              onChange={(e) => setFormData({ ...formData, hs_code: e.target.value })}
-              placeholder="e.g. 84433100"
-            />
-          </div>
-          <div className="col-span-2">
-            <BulletDescriptionInput
-              label="Model Specifications (Bullet Points)"
-              value={formData.description || ''}
-              onChange={(val) => setFormData({ ...formData, description: val })}
-              placeholder="Ex. 20 PPM Print Speed"
+            <label className="block text-sm font-medium mb-1">Description</label>
+            <textarea
+              className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              value={formData.description}
+              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              placeholder="A reliable laser printer suitable for small offices."
             />
           </div>
         </div>

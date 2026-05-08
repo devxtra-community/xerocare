@@ -229,6 +229,11 @@ export default function ManagerProduct() {
             ),
           },
           { id: 'price', header: 'PRICE', cell: (p: Product) => formatCurrency(p.sale_price) },
+          {
+            id: 'hs_code',
+            header: 'HS CODE',
+            cell: (p: Product) => <span className="font-mono text-[11px]">{p.hs_code || '-'}</span>,
+          },
           { id: 'color', header: 'PRINT COLOUR', accessorKey: 'print_colour' as keyof Product },
           {
             id: 'status',
@@ -362,6 +367,7 @@ function ProductFormModal({
     wholesale_price: string | number;
     lot_id: string;
     description: string;
+    hs_code: string;
   }>({
     name: initialData?.name || '',
     brand: initialData?.brand || '',
@@ -380,6 +386,7 @@ function ProductFormModal({
     wholesale_price: initialData?.wholesale_price ?? '',
     lot_id: initialData?.lot_id || '', // Check if initialData has lot_id support if needed
     description: initialData?.description || '',
+    hs_code: initialData?.hs_code || '',
   });
 
   // Derived state for filtering models
@@ -482,6 +489,12 @@ function ProductFormModal({
     reader.readAsDataURL(file);
   };
 
+  const handleRemoveImage = () => {
+    setSelectedFile(null);
+    setImagePreview('');
+    setForm({ ...form, imageUrl: '' });
+  };
+
   const handleSubmit = async () => {
     if (isSubmitting) return; // Prevent duplicate submissions
 
@@ -505,7 +518,8 @@ function ProductFormModal({
       setIsSubmitting(true);
       const formData = new FormData();
       Object.entries(form).forEach(([key, value]) => {
-        if (value !== undefined && value !== null && value !== '') {
+        // Allow empty string for imageUrl to support removal, but skip for other required fields
+        if (value !== undefined && value !== null && (value !== '' || key === 'imageUrl')) {
           formData.append(key, value.toString());
         }
       });
@@ -814,6 +828,13 @@ function ProductFormModal({
                 </SelectContent>
               </Select>
             </Field>
+            <Field label="HS Code">
+              <Input
+                value={form.hs_code || ''}
+                onChange={(e) => setForm({ ...form, hs_code: e.target.value })}
+                placeholder="HS Code"
+              />
+            </Field>
           </div>
         </div>
       </div>
@@ -822,7 +843,7 @@ function ProductFormModal({
         <Field label="Product Image">
           <div className="flex items-center gap-4">
             {imagePreview ? (
-              <div className="relative h-16 w-16 rounded overflow-hidden border">
+              <div className="relative h-16 w-16 rounded overflow-hidden border group">
                 <Image
                   src={imagePreview}
                   alt="Preview"
@@ -830,6 +851,14 @@ function ProductFormModal({
                   className="object-cover"
                   unoptimized={true}
                 />
+                <button
+                  type="button"
+                  onClick={handleRemoveImage}
+                  className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white"
+                  title="Remove Image"
+                >
+                  <X size={20} />
+                </button>
               </div>
             ) : (
               <div className="h-16 w-16 rounded border flex items-center justify-center text-xs text-gray-400">
@@ -839,6 +868,7 @@ function ProductFormModal({
             <Input
               type="file"
               accept="image/*"
+              key={imagePreview ? 'has-image' : 'no-image'}
               onChange={(e) => e.target.files && handleImageUpload(e.target.files[0])}
             />
           </div>

@@ -302,3 +302,30 @@ export const getAllBranches = async (req: Request, res: Response, next: NextFunc
     next(new AppError(error.message, error.statusCode || 500));
   }
 };
+
+/**
+ * Resends the welcome email to a specific staff member.
+ * This will reset their password to a new random one.
+ */
+export const resendWelcomeEmail = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const employeeId = req.params.id as string;
+
+    const employee = await service.getEmployeeById(employeeId);
+
+    // Security check for managers: can only resend to employees in their branch
+    if (req.user?.role === EmployeeRole.MANAGER && employee.branch_id !== req.user.branchId) {
+      throw new AppError('Access denied: employee belongs to another branch', 403);
+    }
+
+    await service.resendWelcomeEmail(employeeId);
+
+    return res.json({
+      success: true,
+      message: 'Welcome email resent successfully. Password has been reset.',
+    });
+  } catch (err: unknown) {
+    const error = err as { message: string; statusCode?: number };
+    next(new AppError(error.message, error.statusCode || 500));
+  }
+};

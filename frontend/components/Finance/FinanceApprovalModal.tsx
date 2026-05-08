@@ -167,7 +167,10 @@ export function FinanceApprovalModal({ invoice, onClose, onSuccess }: FinanceApp
 
   return (
     <Dialog open={true} onOpenChange={(val) => !val && onClose()}>
-      <DialogContent className="sm:max-w-xl p-0 overflow-hidden bg-white/95 backdrop-blur-sm shadow-2xl border-0">
+      <DialogContent
+        showCloseButton={false}
+        className="sm:max-w-xl p-0 overflow-hidden bg-white/95 backdrop-blur-sm shadow-2xl border-0"
+      >
         <DialogHeader className="px-6 py-4 border-b border-slate-100 bg-slate-50/50">
           <DialogTitle className="flex items-center gap-2 text-xl">
             <span className="bg-blue-100 text-blue-700 p-1.5 rounded-lg">

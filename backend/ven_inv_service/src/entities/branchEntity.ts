@@ -4,7 +4,10 @@ import {
   Column,
   CreateDateColumn,
   UpdateDateColumn,
+  OneToOne,
+  JoinColumn,
 } from 'typeorm';
+import { EmployeeManager } from './employeeManagerEntity';
 
 export enum BranchStatus {
   ACTIVE = 'ACTIVE',
@@ -26,8 +29,12 @@ export class Branch {
   @Column()
   location!: string;
 
-  @Column({ nullable: true })
+  @Column({ nullable: true, unique: true })
   manager_id?: string;
+
+  @OneToOne(() => EmployeeManager, { nullable: true })
+  @JoinColumn({ name: 'manager_id' })
+  manager?: EmployeeManager;
 
   @Column({ type: 'date' })
   started_date!: Date;

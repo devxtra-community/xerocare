@@ -31,8 +31,11 @@ interface ApiResponse<T> {
   data?: T;
 }
 
-export const getAllSpareParts = async (): Promise<SparePart[]> => {
-  const response = await api.get<ApiResponse<SparePart[]>>('/i/spare-parts/');
+export const getAllSpareParts = async (params?: {
+  limit?: number;
+  page?: number;
+}): Promise<SparePart[]> => {
+  const response = await api.get<ApiResponse<SparePart[]>>('/i/spare-parts/', { params });
   return response.data.data || [];
 };
 

@@ -410,10 +410,7 @@ function WarehouseFormModal({
             >
               Cancel
             </button>
-            <Button
-              className="h-12 px-10 rounded-xl bg-[#004a8d] text-white hover:bg-[#003f7d] font-bold shadow-lg"
-              onClick={() => onConfirm(form)}
-            >
+            <Button className="h-12 px-10" onClick={() => onConfirm(form)}>
               {initialData ? 'Update' : 'Confirm'}
             </Button>
           </div>
@@ -456,10 +453,7 @@ function ConfirmDeleteModal({
           >
             Cancel
           </button>
-          <Button
-            className="h-12 px-8 rounded-xl bg-red-600 text-white hover:bg-red-700 font-bold shadow-lg"
-            onClick={onConfirm}
-          >
+          <Button variant="destructive" className="h-12 px-8" onClick={onConfirm}>
             Delete
           </Button>
         </div>

@@ -898,19 +898,37 @@ export class BillingService {
   /**
    * Finance approves the quotation pricing.
    */
-  async financeApproveQuotation(id: string, userId: string) {
+  async financeApproveQuotation(id: string, userId: string, payload?: { effectiveTo?: Date }) {
     const invoice = await this.invoiceRepo.findById(id);
     if (!invoice) throw new AppError('Quotation not found', 404);
 
-    if (invoice.status !== InvoiceStatus.EMPLOYEE_APPROVED) {
-      throw new AppError('Quotation must be approved by employee before finance approval', 400);
+    if (
+      invoice.status !== InvoiceStatus.EMPLOYEE_APPROVED &&
+      invoice.status !== InvoiceStatus.VALIDITY_EXTENSION_REQUESTED
+    ) {
+      throw new AppError('Quotation must be in a pending approval state', 400);
     }
 
     invoice.status = InvoiceStatus.FINANCE_APPROVED;
     invoice.financeApprovedBy = userId;
     invoice.financeApprovedAt = new Date();
 
+    if (payload?.effectiveTo) {
+      invoice.effectiveTo = payload.effectiveTo;
+    }
+
     return this.invoiceRepo.save(invoice);
+  }
+
+  /**
+   * Request validity extension for an expired quotation.
+   */
+  async requestValidityExtension(id: string): Promise<Invoice> {
+    const invoice = await this.invoiceRepo.findById(id);
+    if (!invoice) throw new AppError('Quotation not found', 404);
+
+    invoice.status = InvoiceStatus.VALIDITY_EXTENSION_REQUESTED;
+    return await this.invoiceRepo.save(invoice);
   }
 
   /**
@@ -920,12 +938,9 @@ export class BillingService {
     const invoice = await this.invoiceRepo.findById(id);
     if (!invoice) throw new AppError('Quotation not found', 404);
 
-    if (
-      invoice.status !== InvoiceStatus.FINANCE_APPROVED &&
-      invoice.status !== InvoiceStatus.CUSTOMER_ACCEPTED
-    ) {
+    if (invoice.effectiveTo && new Date(invoice.effectiveTo) < new Date()) {
       throw new AppError(
-        'Only finance-approved or customer-accepted quotations can be converted',
+        'Quotation validity has expired. Please request a validity extension from Finance.',
         400,
       );
     }
@@ -972,11 +987,12 @@ export class BillingService {
       }
 
       if (
+        invoice.status !== InvoiceStatus.DRAFT &&
         invoice.status !== InvoiceStatus.EMPLOYEE_APPROVED &&
         invoice.status !== InvoiceStatus.TRANSACTION_COMPLETED &&
         invoice.status !== InvoiceStatus.FINANCE_APPROVED
       ) {
-        throw new AppError('Transaction must be sent for Finance Approval before allocation', 400);
+        throw new AppError('Transaction must be in a valid state for allocation', 400);
       }
 
       // Check that all machines and spare parts are allocated
@@ -1146,7 +1162,11 @@ export class BillingService {
               logger.error(`Product fetch failed for readings: ${item.productId}`, error);
             }
 
-            if (invoice.saleType !== SaleType.SALE) {
+            if (
+              invoice.saleType !== SaleType.SALE &&
+              invoice.saleType !== SaleType.PRODUCT_SALE &&
+              invoice.saleType !== SaleType.SPAREPART_SALE
+            ) {
               if (update.initialBwCount === undefined) {
                 throw new AppError(
                   `Initial B&W reading missing for item: ${item.description}`,
@@ -1162,7 +1182,12 @@ export class BillingService {
             if (product && product.print_colour === 'BLACK_WHITE') {
               item.initialColorCount = 0;
             } else {
-              if (invoice.saleType !== SaleType.SALE && update.initialColorCount === undefined) {
+              if (
+                invoice.saleType !== SaleType.SALE &&
+                invoice.saleType !== SaleType.PRODUCT_SALE &&
+                invoice.saleType !== SaleType.SPAREPART_SALE &&
+                update.initialColorCount === undefined
+              ) {
                 throw new AppError(`Initial Color reading missing for ${item.description}`, 400);
               }
               if (update.initialColorCount !== undefined)
@@ -1194,7 +1219,11 @@ export class BillingService {
       invoice.financeApprovedAt = new Date();
       invoice.financeApprovedBy = userId;
 
-      if (invoice.saleType === SaleType.SALE) {
+      if (
+        invoice.saleType === SaleType.SALE ||
+        invoice.saleType === SaleType.PRODUCT_SALE ||
+        invoice.saleType === SaleType.SPAREPART_SALE
+      ) {
         invoice.type = InvoiceType.FINAL;
         invoice.status = InvoiceStatus.PAID;
         invoice.contractStatus = ContractStatus.ACTIVE; // Set to Active for consistency

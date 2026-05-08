@@ -10,13 +10,11 @@ import { Loader2 } from 'lucide-react';
 import { modelService, CreateModelDTO } from '@/services/modelService';
 import { getBrands, Brand } from '@/lib/brand';
 import { SearchableSelect, SearchableSelectOption } from '@/components/ui/searchable-select';
-import { BulletDescriptionInput } from '@/components/ui/bullet-description-input';
 
 const formSchema = z.object({
   model_no: z.string().min(1, 'Model No is required'),
   model_name: z.string().min(1, 'Model Name is required'),
   brand_id: z.string().min(1, 'Brand is required'),
-  hs_code: z.string().optional(),
   description: z.string().optional(),
 });
 
@@ -117,15 +115,11 @@ export function AddModelDialog({ open, onOpenChange, onSuccess }: AddModelDialog
               )}
             </div>
             <div className="col-span-2">
-              <label className="block text-sm font-medium mb-1">HS Code</label>
-              <Input {...register('hs_code')} placeholder="e.g. 84433100" />
-            </div>
-            <div className="col-span-2">
-              <BulletDescriptionInput
-                label="Model Specifications (Bullet Points)"
-                value={watch('description') || ''}
-                onChange={(val) => setValue('description', val)}
-                placeholder="Ex. 20 PPM Print Speed"
+              <label className="block text-sm font-medium mb-1">Description</label>
+              <textarea
+                className="flex min-h-[80px] w-full rounded-md border border-input bg-muted/50 px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none"
+                {...register('description')}
+                placeholder="Brief description..."
               />
             </div>
           </div>

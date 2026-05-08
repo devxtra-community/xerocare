@@ -104,6 +104,7 @@ export class ProductService {
           wholesale_price: row.wholesale_price,
           lot_id: row.lot_id || undefined,
           description: row.description,
+          hs_code: row.hs_code,
         });
 
         await this.model.syncModelQuantities(modelDetails.id);
@@ -184,6 +185,7 @@ export class ProductService {
         imageUrl: data.imageUrl,
         lot_id: data.lot_id,
         description: data.description,
+        hs_code: data.hs_code,
       });
 
       await this.model.syncModelQuantities(modelDetails.id);

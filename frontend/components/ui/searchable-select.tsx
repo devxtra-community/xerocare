@@ -73,7 +73,7 @@ export function SearchableSelect({
           disabled={disabled}
           aria-expanded={open}
           className={cn(
-            'w-full justify-between h-10 px-3 bg-card hover:bg-muted/50 border-input text-foreground',
+            'w-full justify-between h-10 font-normal px-3 bg-card hover:bg-muted/50 border-input text-foreground items-center flex overflow-hidden',
             className,
           )}
         >
@@ -94,16 +94,17 @@ export function SearchableSelect({
         </Button>
       </PopoverTrigger>
       <PopoverContent
-        className="w-[--radix-popover-trigger-width] p-0 bg-card z-[9999] pointer-events-auto"
+        className="w-[var(--radix-popover-trigger-width)] min-w-[200px] max-w-[800px] p-0 bg-card z-[9999] pointer-events-auto shadow-2xl border-slate-200"
         align="start"
+        sideOffset={4}
       >
         <div className="flex flex-col bg-card rounded-md">
           {/* Native Search Input */}
-          <div className="flex items-center border-b px-3 py-2">
-            <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+          <div className="flex items-center border-b px-4 py-3 bg-slate-50/50">
+            <Search className="mr-3 h-5 w-5 shrink-0 text-slate-400" />
             <input
               className={cn(
-                'flex h-9 w-full rounded-md bg-transparent text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50',
+                'flex h-10 w-full bg-transparent text-sm font-medium outline-none placeholder:text-slate-400 disabled:cursor-not-allowed disabled:opacity-50',
               )}
               placeholder="Search..."
               value={searchQuery}

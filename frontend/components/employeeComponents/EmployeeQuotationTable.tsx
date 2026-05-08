@@ -42,6 +42,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 import { CustomerSelect } from '@/components/invoice/CustomerSelect';
 import { ProductSelect, SelectableItem } from '@/components/invoice/ProductSelect';
 import { Product } from '@/lib/product';
@@ -58,9 +59,12 @@ import {
   Invoice,
   CreateInvoicePayload,
 } from '@/lib/invoice';
+import { getBrands, Brand } from '@/lib/brand';
+import { getAllModels, Model } from '@/lib/model';
 
 import { QuotationViewDialog } from './QuotationViewDialog';
 import RentFormModal from './RentFormModal';
+import { InvoiceAccountView } from '../invoice/InvoiceAccountView';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -76,6 +80,10 @@ interface SaleItem {
   isManual: boolean;
   productId?: string;
   modelId?: string;
+  brand?: string;
+  model?: string;
+  productName?: string;
+  hsCode?: string;
   itemType: 'PRODUCT' | 'SPAREPART';
   isEditable: boolean;
   bwIncludedLimit?: number;
@@ -167,9 +175,28 @@ export default function EmployeeQuotationTable() {
     customerId: string;
   }>({ open: false, type: 'RENT', customerId: '' });
   const [viewOpen, setViewOpen] = useState(false);
+  const [accountViewOpen, setAccountViewOpen] = useState(false);
   const [selectedQ, setSelectedQ] = useState<Invoice | null>(null);
   const [search, setSearch] = useState('');
   const [employeeJob, setEmployeeJob] = useState<EmployeeJob | null | undefined>(null);
+  const [allBrands, setAllBrands] = useState<Brand[]>([]);
+  const [allModels, setAllModels] = useState<Model[]>([]);
+
+  useEffect(() => {
+    const fetchSuggestions = async () => {
+      try {
+        const [brandsData, modelsData] = await Promise.all([
+          getBrands(),
+          getAllModels({ limit: 1000 }),
+        ]);
+        setAllBrands(Array.isArray(brandsData.data) ? brandsData.data : []);
+        setAllModels(modelsData.data);
+      } catch (error) {
+        console.error('Error fetching suggestions:', error);
+      }
+    };
+    fetchSuggestions();
+  }, []);
 
   useEffect(() => {
     const user = getUserFromToken();
@@ -294,6 +321,13 @@ export default function EmployeeQuotationTable() {
       const err = error as { response?: { data?: { message?: string } } };
       toast.error(err.response?.data?.message || `Failed to update status to ${status}`);
     }
+  };
+
+  // Called after successful conversion — refreshes table and closes dialog
+  const handleConvertSuccess = () => {
+    setViewOpen(false);
+    fetchQuotations();
+    toast.success('Quotation converted successfully! Invoice is now active.');
   };
 
   if (loading) {
@@ -426,9 +460,11 @@ export default function EmployeeQuotationTable() {
 
       {formOpen && (
         <QuotationFormModal
-          allowedTypes={allowedTypes}
           onClose={() => setFormOpen(false)}
           onConfirm={handleCreate}
+          allowedTypes={allowedTypes}
+          allBrands={allBrands}
+          allModels={allModels}
         />
       )}
       {rentLeaseModal.open && (
@@ -452,7 +488,15 @@ export default function EmployeeQuotationTable() {
           onClose={() => setViewOpen(false)}
           onStatusChange={handleStatusChange}
           onSendToFinance={handleSendToFinance}
+          onConvertSuccess={handleConvertSuccess}
           showDistribution={true}
+        />
+      )}
+      {accountViewOpen && selectedQ && (
+        <InvoiceAccountView
+          invoiceId={selectedQ.id}
+          open={accountViewOpen}
+          onClose={() => setAccountViewOpen(false)}
         />
       )}
     </div>
@@ -493,10 +537,14 @@ function QuotationFormModal({
   onClose,
   onConfirm,
   allowedTypes,
+  allBrands,
+  allModels,
 }: {
   onClose: () => void;
   onConfirm: (data: CreateInvoicePayload) => Promise<void>;
   allowedTypes: QuotationType[];
+  allBrands: Brand[];
+  allModels: Model[];
 }) {
   const [step, setStep] = useState<1 | 2>(1);
   const [activeCategory, setActiveCategory] = useState<'SALE' | 'RENT' | 'LEASE' | null>(null);
@@ -676,6 +724,33 @@ function QuotationFormModal({
 
   const removeItem = (i: number) => setSaleItems((prev) => prev.filter((_, idx) => idx !== i));
 
+  const addManualItem = () => {
+    setSaleItems((prev) => [
+      ...prev,
+      {
+        description: '',
+        brand: '',
+        model: '',
+        productName: '',
+        hsCode: '',
+        quantity: 1,
+        basePrice: 0,
+        discount: 0,
+        unitPrice: 0,
+        maxDiscount: 0,
+        isManual: true,
+        productId: undefined,
+        modelId: undefined,
+        itemType: 'PRODUCT',
+        isEditable: true,
+        bwSlabRanges: [],
+        colorSlabRanges: [],
+        comboSlabRanges: [],
+      },
+    ]);
+    toast.info('Added custom item row');
+  };
+
   const addSlab = (index: number, type: 'bwSlabRanges' | 'colorSlabRanges' | 'comboSlabRanges') => {
     setSaleItems((prev) => {
       const items = [...prev];
@@ -726,6 +801,24 @@ function QuotationFormModal({
       const item = items[index];
       if (field === 'quantity') items[index] = { ...item, quantity: Number(value) };
       else if (field === 'description') items[index] = { ...item, description: String(value) };
+      else if (field === 'brand') items[index] = { ...item, brand: String(value) };
+      else if (field === 'model') {
+        const modelNo = String(value);
+        const matchingModel = allModels.find(
+          (m) => m.model_no === modelNo && (!item.brand || m.brandRelation?.name === item.brand),
+        );
+        if (matchingModel) {
+          items[index] = {
+            ...item,
+            model: modelNo,
+            productName: matchingModel.product_name || item.productName,
+            description: matchingModel.description || item.description,
+          };
+        } else {
+          items[index] = { ...item, model: modelNo };
+        }
+      } else if (field === 'productName') items[index] = { ...item, productName: String(value) };
+      else if (field === 'hsCode') items[index] = { ...item, hsCode: String(value) };
       else if (field === 'discount') {
         const d = Number(value);
         if (d > item.basePrice) {
@@ -772,14 +865,29 @@ function QuotationFormModal({
         toast.error('Please add at least one item.');
         return;
       }
+      const validityDate = new Date();
+      validityDate.setDate(validityDate.getDate() + validDays);
+
       const totalDiscount = saleItems.reduce((s, it) => s + (it.discount || 0) * it.quantity, 0);
       payload = {
         customerId,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         saleType: quotationType as any,
         discountAmount: totalDiscount,
+        effectiveFrom: new Date().toISOString().split('T')[0],
+        effectiveTo: validityDate.toISOString().split('T')[0],
         items: saleItems.map((it) => ({
-          description: it.description,
+          description: it.isManual
+            ? [
+                it.brand,
+                it.model,
+                it.productName,
+                it.hsCode ? `[HS: ${it.hsCode}]` : '',
+                it.description ? `(${it.description})` : '',
+              ]
+                .filter(Boolean)
+                .join(' ')
+            : it.description,
           quantity: it.quantity,
           unitPrice: it.basePrice,
           productId: it.productId,
@@ -810,7 +918,17 @@ function QuotationFormModal({
         securityDepositBank,
 
         items: saleItems.map((it) => ({
-          description: it.description,
+          description: it.isManual
+            ? [
+                it.brand,
+                it.model,
+                it.productName,
+                it.hsCode ? `[HS: ${it.hsCode}]` : '',
+                it.description ? `(${it.description})` : '',
+              ]
+                .filter(Boolean)
+                .join(' ')
+            : it.description,
           quantity: it.quantity,
           unitPrice: 0,
           itemType: it.itemType,
@@ -850,7 +968,17 @@ function QuotationFormModal({
               : undefined,
         })),
         pricingItems: saleItems.map((it) => ({
-          description: it.description,
+          description: it.isManual
+            ? [
+                it.brand,
+                it.model,
+                it.productName,
+                it.hsCode ? `[HS: ${it.hsCode}]` : '',
+                it.description ? `(${it.description})` : '',
+              ]
+                .filter(Boolean)
+                .join(' ')
+            : it.description,
           bwIncludedLimit: rentType === 'FIXED_LIMIT' ? it.bwIncludedLimit || 0 : 0,
           colorIncludedLimit: rentType === 'FIXED_LIMIT' ? it.colorIncludedLimit || 0 : 0,
           combinedIncludedLimit: rentType === 'FIXED_COMBO' ? it.combinedIncludedLimit || 0 : 0,
@@ -915,7 +1043,17 @@ function QuotationFormModal({
         effectiveTo: effectiveTo || undefined,
         discountPercent: discountPercent ? Number(discountPercent) : undefined,
         items: saleItems.map((it) => ({
-          description: it.description,
+          description: it.isManual
+            ? [
+                it.brand,
+                it.model,
+                it.productName,
+                it.hsCode ? `[HS: ${it.hsCode}]` : '',
+                it.description ? `(${it.description})` : '',
+              ]
+                .filter(Boolean)
+                .join(' ')
+            : it.description,
           quantity: it.quantity,
           unitPrice: 0,
           itemType: it.itemType,
@@ -965,7 +1103,17 @@ function QuotationFormModal({
         pricingItems:
           leaseType === 'FSM'
             ? saleItems.map((it) => ({
-                description: it.description,
+                description: it.isManual
+                  ? [
+                      it.brand,
+                      it.model,
+                      it.productName,
+                      it.hsCode ? `[HS: ${it.hsCode}]` : '',
+                      it.description ? `(${it.description})` : '',
+                    ]
+                      .filter(Boolean)
+                      .join(' ')
+                  : it.description,
                 bwIncludedLimit: rentType === 'FIXED_LIMIT' ? it.bwIncludedLimit || 0 : 0,
                 colorIncludedLimit: rentType === 'FIXED_LIMIT' ? it.colorIncludedLimit || 0 : 0,
                 combinedIncludedLimit:
@@ -1272,24 +1420,34 @@ function QuotationFormModal({
                           : 'Items'}
                     </h4>
                   </div>
-                  <div className="bg-card p-2 rounded-xl border border-border shadow-sm focus-within:ring-2 focus-within:ring-primary/20 transition-all">
-                    <ProductSelect
-                      onSelect={addItem}
-                      mode={
-                        quotationType === 'PRODUCT_SALE'
-                          ? 'PRODUCT'
-                          : quotationType === 'SPAREPART_SALE'
-                            ? 'SPAREPART'
-                            : 'BOTH'
-                      }
-                      placeholder={
-                        quotationType === 'PRODUCT_SALE'
-                          ? 'Select Product'
-                          : quotationType === 'SPAREPART_SALE'
-                            ? 'Select Spare Part'
-                            : 'Select Product or Spare Part'
-                      }
-                    />
+                  <div className="flex items-center gap-3">
+                    <div className="flex-1 bg-card p-2 rounded-xl border border-border shadow-sm focus-within:ring-2 focus-within:ring-primary/20 transition-all">
+                      <ProductSelect
+                        onSelect={addItem}
+                        mode={
+                          quotationType === 'PRODUCT_SALE'
+                            ? 'PRODUCT'
+                            : quotationType === 'SPAREPART_SALE'
+                              ? 'SPAREPART'
+                              : 'BOTH'
+                        }
+                        placeholder={
+                          quotationType === 'PRODUCT_SALE'
+                            ? 'Select Product'
+                            : quotationType === 'SPAREPART_SALE'
+                              ? 'Select Spare Part'
+                              : 'Select Product '
+                        }
+                      />
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={addManualItem}
+                      className="h-[52px] px-4 rounded-xl border-dashed border-2 border-slate-200 text-slate-500 hover:border-primary hover:text-primary transition-all font-bold flex items-center gap-2 shrink-0"
+                    >
+                      <Plus size={16} /> Custom Item
+                    </Button>
                   </div>
 
                   <div className="space-y-3">
@@ -1311,49 +1469,167 @@ function QuotationFormModal({
                             <Trash2 size={16} />
                           </button>
                           <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
-                            <div className="md:col-span-4 space-y-1">
-                              <label className="text-[9px] font-bold text-slate-400 uppercase">
-                                Product / Item Name
-                              </label>
-                              <Input
-                                value={item.description}
-                                onChange={(e) => updateItem(index, 'description', e.target.value)}
-                                readOnly={!item.isManual}
-                                className={`h-9 font-bold text-sm ${!item.isManual ? 'bg-muted/50 border-transparent' : ''}`}
-                              />
-                            </div>
+                            {item.isManual ? (
+                              <div className="md:col-span-12 grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
+                                <div className="md:col-span-3 space-y-1">
+                                  <label className="text-[9px] font-bold text-slate-400 uppercase">
+                                    Brand
+                                  </label>
+                                  <Input
+                                    placeholder="Brand"
+                                    list="brand-suggestions"
+                                    value={item.brand || ''}
+                                    onChange={(e) => updateItem(index, 'brand', e.target.value)}
+                                    className="h-9 font-bold text-sm"
+                                  />
+                                  <datalist id="brand-suggestions">
+                                    {allBrands.map((b) => (
+                                      <option key={b.id} value={b.name} />
+                                    ))}
+                                  </datalist>
+                                </div>
+                                <div className="md:col-span-3 space-y-1">
+                                  <label className="text-[9px] font-bold text-slate-400 uppercase">
+                                    Model
+                                  </label>
+                                  <Input
+                                    placeholder="Model"
+                                    list={`model-suggestions-${index}`}
+                                    value={item.model || ''}
+                                    onChange={(e) => updateItem(index, 'model', e.target.value)}
+                                    className="h-9 font-bold text-sm"
+                                  />
+                                  <datalist id={`model-suggestions-${index}`}>
+                                    {allModels
+                                      .filter(
+                                        (m) => !item.brand || m.brandRelation?.name === item.brand,
+                                      )
+                                      .map((m) => (
+                                        <option key={m.id} value={m.model_no} />
+                                      ))}
+                                  </datalist>
+                                </div>
+                                <div className="md:col-span-4 space-y-1">
+                                  <label className="text-[9px] font-bold text-slate-400 uppercase">
+                                    Product Name
+                                  </label>
+                                  <Input
+                                    placeholder="Product Name"
+                                    value={item.productName || ''}
+                                    onChange={(e) =>
+                                      updateItem(index, 'productName', e.target.value)
+                                    }
+                                    className="h-9 font-bold text-sm"
+                                  />
+                                </div>
+                                <div className="md:col-span-2 space-y-1">
+                                  <label className="text-[9px] font-bold text-slate-400 uppercase">
+                                    HS Code
+                                  </label>
+                                  <Input
+                                    placeholder="HS Code"
+                                    value={item.hsCode || ''}
+                                    onChange={(e) => updateItem(index, 'hsCode', e.target.value)}
+                                    className="h-9 font-bold text-sm"
+                                  />
+                                </div>
 
-                            <div className="md:col-span-2 space-y-1">
-                              <label className="text-[9px] font-bold text-slate-400 uppercase text-right block">
-                                Rate (QAR)
-                              </label>
-                              <Input
-                                type="number"
-                                value={item.basePrice}
-                                readOnly={!item.isEditable}
-                                onChange={(e) => updateItem(index, 'basePrice', e.target.value)}
-                                className={`h-9 text-right font-bold ${!item.isEditable ? 'bg-muted/50 text-muted-foreground' : ''}`}
-                              />
-                            </div>
-                            <div className="md:col-span-2 space-y-1">
-                              <label className="text-[9px] font-bold text-slate-400 uppercase text-center block">
-                                Discount
-                              </label>
-                              <Input
-                                type="number"
-                                min="0"
-                                value={item.discount === 0 ? '' : item.discount}
-                                placeholder="0"
-                                onChange={(e) => updateItem(index, 'discount', e.target.value)}
-                                className="h-9 text-center font-bold"
-                              />
-                            </div>
-                            <div className="md:col-span-2 flex flex-col items-end justify-center h-9 mt-auto">
-                              <p className="text-[9px] font-bold text-slate-400 uppercase">Net</p>
-                              <p className="font-extrabold text-foreground">
-                                {formatCurrency(item.quantity * item.unitPrice)}
-                              </p>
-                            </div>
+                                <div className="md:col-span-6 space-y-1">
+                                  <label className="text-[9px] font-bold text-slate-400 uppercase">
+                                    Specifications / Description
+                                  </label>
+                                  <Textarea
+                                    placeholder="Detailed specifications..."
+                                    value={item.description}
+                                    onChange={(e) =>
+                                      updateItem(index, 'description', e.target.value)
+                                    }
+                                    className="min-h-[60px] text-sm resize-none bg-slate-50/50"
+                                  />
+                                </div>
+                                <div className="md:col-span-2 space-y-1">
+                                  <label className="text-[9px] font-bold text-slate-400 uppercase text-right block">
+                                    Rate
+                                  </label>
+                                  <Input
+                                    type="number"
+                                    value={item.basePrice}
+                                    onChange={(e) => updateItem(index, 'basePrice', e.target.value)}
+                                    className="h-9 text-right font-bold"
+                                  />
+                                </div>
+                                <div className="md:col-span-2 space-y-1">
+                                  <label className="text-[9px] font-bold text-slate-400 uppercase text-center block">
+                                    Discount
+                                  </label>
+                                  <Input
+                                    type="number"
+                                    value={item.discount === 0 ? '' : item.discount}
+                                    placeholder="0"
+                                    onChange={(e) => updateItem(index, 'discount', e.target.value)}
+                                    className="h-9 text-center font-bold"
+                                  />
+                                </div>
+                                <div className="md:col-span-2 flex flex-col items-end justify-center h-9 mt-auto">
+                                  <p className="text-[9px] font-bold text-slate-400 uppercase">
+                                    Net
+                                  </p>
+                                  <p className="font-extrabold text-foreground">
+                                    {formatCurrency(item.quantity * item.unitPrice)}
+                                  </p>
+                                </div>
+                              </div>
+                            ) : (
+                              <>
+                                <div className="md:col-span-4 space-y-1">
+                                  <label className="text-[9px] font-bold text-slate-400 uppercase">
+                                    Description
+                                  </label>
+                                  <Input
+                                    value={item.description}
+                                    onChange={(e) =>
+                                      updateItem(index, 'description', e.target.value)
+                                    }
+                                    readOnly={!item.isManual}
+                                    className={`h-9 font-bold text-sm ${!item.isManual ? 'bg-muted/50 border-transparent' : ''}`}
+                                  />
+                                </div>
+
+                                <div className="md:col-span-2 space-y-1">
+                                  <label className="text-[9px] font-bold text-slate-400 uppercase text-right block">
+                                    Rate (QAR)
+                                  </label>
+                                  <Input
+                                    type="number"
+                                    value={item.basePrice}
+                                    readOnly={!item.isEditable}
+                                    onChange={(e) => updateItem(index, 'basePrice', e.target.value)}
+                                    className={`h-9 text-right font-bold ${!item.isEditable ? 'bg-muted/50 text-muted-foreground' : ''}`}
+                                  />
+                                </div>
+                                <div className="md:col-span-2 space-y-1">
+                                  <label className="text-[9px] font-bold text-slate-400 uppercase text-center block">
+                                    Discount
+                                  </label>
+                                  <Input
+                                    type="number"
+                                    min="0"
+                                    value={item.discount === 0 ? '' : item.discount}
+                                    placeholder="0"
+                                    onChange={(e) => updateItem(index, 'discount', e.target.value)}
+                                    className="h-9 text-center font-bold"
+                                  />
+                                </div>
+                                <div className="md:col-span-2 flex flex-col items-end justify-center h-9 mt-auto">
+                                  <p className="text-[9px] font-bold text-slate-400 uppercase">
+                                    Net
+                                  </p>
+                                  <p className="font-extrabold text-foreground">
+                                    {formatCurrency(item.quantity * item.unitPrice)}
+                                  </p>
+                                </div>
+                              </>
+                            )}
                           </div>
                         </div>
                       ))

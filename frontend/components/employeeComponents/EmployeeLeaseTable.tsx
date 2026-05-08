@@ -2,6 +2,8 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Search, Loader2, Eye, FileText, Plus, Clock, Send } from 'lucide-react';
+import { useSearchParams } from 'next/navigation';
+import { QuotationConversionFlow } from './QuotationConversionFlow';
 import { toast } from 'sonner';
 import {
   Table,
@@ -11,13 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import {
-  getMyInvoices,
-  getBranchInvoices,
-  Invoice,
-  employeeApproveInvoice,
-  convertToTransaction,
-} from '@/lib/invoice';
+import { getMyInvoices, getBranchInvoices, Invoice, employeeApproveInvoice } from '@/lib/invoice';
 import UsageRecordingModal from '../Finance/UsageRecordingModal';
 import {
   Dialog,
@@ -68,8 +64,18 @@ export default function EmployeeLeaseTable({
   const [isConverterOpen, setIsConverterOpen] = useState(false);
   const [pendingQuotations, setPendingQuotations] = useState<Invoice[]>([]);
   const [loadingQuotations, setLoadingQuotations] = useState(false);
+  const [selectedForConversion, setSelectedForConversion] = useState<Invoice | null>(null);
+
+  const searchParams = useSearchParams();
+  const convertId = searchParams.get('convert');
 
   const { page, limit, total, setPage, setTotal, totalPages } = usePagination(10);
+
+  useEffect(() => {
+    if (convertId) {
+      fetchPendingQuotations();
+    }
+  }, [convertId]);
 
   useEffect(() => {
     setPage(1);
@@ -141,7 +147,9 @@ export default function EmployeeLeaseTable({
       const pending = data.filter(
         (inv) =>
           inv.type === 'QUOTATION' &&
-          (inv.status === 'FINANCE_APPROVED' || inv.status === 'CUSTOMER_ACCEPTED') &&
+          (inv.status === 'FINANCE_APPROVED' ||
+            inv.status === 'CUSTOMER_ACCEPTED' ||
+            inv.status === 'SENT_TO_CUSTOMER') &&
           inv.saleType === 'LEASE',
       );
       setPendingQuotations(pending);
@@ -157,17 +165,16 @@ export default function EmployeeLeaseTable({
   };
 
   const handleConvertQuotation = async (qId: string) => {
-    try {
-      await convertToTransaction(qId);
-      toast.success('Quotation converted to transaction successfully!');
+    const q = pendingQuotations.find((inv) => inv.id === qId);
+    if (q) {
+      setSelectedForConversion(q);
       setIsConverterOpen(false);
-      fetchInvoices();
-    } catch (error: unknown) {
-      console.error('Conversion failed:', error);
-      const err = error as { response?: { data?: { message?: string } } };
-      const errorMsg = err.response?.data?.message || 'Failed to convert quotation';
-      toast.error(errorMsg);
     }
+  };
+
+  const handleConversionSuccess = () => {
+    setSelectedForConversion(null);
+    fetchInvoices();
   };
 
   const filteredInvoices = invoices.filter((inv) => {
@@ -451,6 +458,7 @@ export default function EmployeeLeaseTable({
       {approveOpen && selectedInvoice && (
         <ApproveQuotationDialog
           invoiceId={selectedInvoice.id}
+          quotation={selectedInvoice}
           onClose={() => setApproveOpen(false)}
           onSuccess={() => {
             setApproveOpen(false);
@@ -480,8 +488,16 @@ export default function EmployeeLeaseTable({
           quotations={pendingQuotations}
           loading={loadingQuotations}
           onSelect={handleConvertQuotation}
-          // Scratch form removed
+          initialSearch={convertId || ''}
           title="Convert Quotation to Lease"
+        />
+      )}
+
+      {selectedForConversion && (
+        <QuotationConversionFlow
+          quotation={selectedForConversion}
+          onClose={() => setSelectedForConversion(null)}
+          onSuccess={handleConversionSuccess}
         />
       )}
     </div>
@@ -494,6 +510,7 @@ interface QuotationConverterDialogProps {
   quotations: Invoice[];
   loading: boolean;
   onSelect: (id: string) => void;
+  initialSearch?: string;
   title: string;
 }
 
@@ -503,9 +520,10 @@ function QuotationConverterDialog({
   quotations,
   loading,
   onSelect,
+  initialSearch = '',
   title,
 }: QuotationConverterDialogProps) {
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState(initialSearch);
 
   const filtered = quotations.filter(
     (q) =>

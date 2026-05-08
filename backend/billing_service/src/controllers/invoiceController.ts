@@ -238,7 +238,7 @@ export const financeApproveQuotation = async (req: Request, res: Response, next:
     const id = req.params.id as string;
     if (!req.user || !req.user.userId) throw new AppError('User context missing', 401);
 
-    const invoice = await billingService.financeApproveQuotation(id, req.user.userId);
+    const invoice = await billingService.financeApproveQuotation(id, req.user.userId, req.body);
 
     return res.status(200).json({
       success: true,
@@ -317,7 +317,17 @@ export const activateContract = async (req: Request, res: Response, next: NextFu
 
     const { contractConfirmationUrl, deposit, itemUpdates } = req.body;
 
-    if (!contractConfirmationUrl) {
+    const invoiceCheck = await billingService.getInvoiceById(id);
+    if (!invoiceCheck) {
+      throw new AppError('Invoice not found', 404);
+    }
+
+    if (
+      !contractConfirmationUrl &&
+      invoiceCheck.saleType !== 'SALE' &&
+      invoiceCheck.saleType !== 'PRODUCT_SALE' &&
+      invoiceCheck.saleType !== 'SPAREPART_SALE'
+    ) {
       throw new AppError(
         'Contract confirmation document URL is required to activate the contract',
         400,
@@ -1077,6 +1087,16 @@ export const customerRespond = async (req: Request, res: Response, next: NextFun
 </html>`;
 
     return res.status(200).send(html);
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const requestValidityExtension = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = req.params.id as string;
+    const result = await billingService.requestValidityExtension(id);
+    return res.status(200).json({ success: true, data: result });
   } catch (error) {
     next(error);
   }

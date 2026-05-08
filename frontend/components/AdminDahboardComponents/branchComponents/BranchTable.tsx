@@ -409,10 +409,8 @@ function BranchFormModal({
   return (
     <Dialog open={true} onOpenChange={(val) => !val && onClose()}>
       <DialogContent className="sm:max-w-xl">
-        <DialogHeader className="flex flex-row items-center justify-between pb-2 border-b">
-          <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-primary to-blue-600 bg-clip-text text-transparent">
-            {initialData ? 'Update Branch' : 'Add Branch'}
-          </DialogTitle>
+        <DialogHeader>
+          <DialogTitle>{initialData ? 'Update Branch' : 'Add Branch'}</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4">
@@ -505,14 +503,10 @@ function BranchFormModal({
         </div>
 
         <div className="mt-6 flex justify-end gap-3">
-          <Button variant="outline" className="rounded-full px-6" onClick={onClose}>
+          <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>
-          <Button
-            className="rounded-full px-6 bg-primary hover:bg-primary/90 text-white"
-            onClick={() => onConfirm(form)}
-            disabled={isSubmitting}
-          >
+          <Button onClick={() => onConfirm(form)} disabled={isSubmitting}>
             {isSubmitting ? 'Processing...' : 'Confirm'}
           </Button>
         </div>
@@ -536,11 +530,11 @@ function ConfirmDeleteModal({
     <Dialog open={open} onOpenChange={(val) => !val && onCancel()}>
       <DialogContent className="sm:max-w-[450px]">
         <DialogHeader>
-          <div className="flex items-center gap-4 text-danger mb-4">
-            <div className="h-12 w-12 rounded-2xl bg-danger/10 flex items-center justify-center text-danger shadow-sm">
+          <div className="flex items-center gap-4 mb-4">
+            <div className="h-12 w-12 rounded-2xl bg-destructive/10 flex items-center justify-center text-destructive shadow-sm">
               <Trash2 className="h-6 w-6" />
             </div>
-            <DialogTitle className="text-xl font-bold text-primary">Delete Branch</DialogTitle>
+            <DialogTitle>Delete Branch</DialogTitle>
           </div>
           <DialogDescription className="text-base text-gray-600 leading-relaxed">
             Are you sure you want to delete <strong>{name}</strong>?
@@ -554,10 +548,7 @@ function ConfirmDeleteModal({
           >
             Cancel
           </button>
-          <Button
-            className="h-12 px-8 rounded-xl bg-danger text-white hover:bg-danger/90 font-bold shadow-lg"
-            onClick={onConfirm}
-          >
+          <Button variant="destructive" className="h-12 px-8" onClick={onConfirm}>
             Delete
           </Button>
         </div>
@@ -604,13 +595,13 @@ function BranchDetailModal({
   return (
     <Dialog open={true} onOpenChange={(val) => !val && onClose()}>
       <DialogContent className="sm:max-w-lg">
-        <DialogHeader className="pb-4 border-b">
+        <DialogHeader>
           <div className="flex items-center gap-3">
             <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
               <Building2 className="h-5 w-5 text-primary" />
             </div>
             <div>
-              <DialogTitle className="text-xl font-bold text-primary">{branch.name}</DialogTitle>
+              <DialogTitle>{branch.name}</DialogTitle>
               <p className="text-xs text-slate-400 mt-0.5">Branch Details</p>
             </div>
           </div>
@@ -666,10 +657,8 @@ function BranchDetailModal({
           </div>
         </div>
 
-        <div className="flex justify-end pt-2 border-t">
-          <Button className="rounded-full px-6" onClick={onClose}>
-            Close
-          </Button>
+        <div className="flex justify-end pt-2">
+          <Button onClick={onClose}>Close</Button>
         </div>
       </DialogContent>
     </Dialog>

@@ -9,7 +9,6 @@ import { SearchableSelect } from '@/components/ui/searchable-select';
 import { Model, CreateModelDTO, modelService } from '@/services/modelService';
 import { getBrands, Brand } from '@/lib/brand';
 import { toast } from 'sonner';
-import { BulletDescriptionInput } from '@/components/ui/bullet-description-input';
 
 interface ModelManagementDialogProps {
   open: boolean;
@@ -118,12 +117,6 @@ export function ModelManagementDialog({ open, onClose }: ModelManagementDialogPr
                   ),
                 },
                 {
-                  id: 'hs_code',
-                  header: 'HS CODE',
-                  cell: (model: Model) => model.hs_code || '-',
-                  className: 'font-semibold text-[11px] text-primary uppercase w-[100px]',
-                },
-                {
                   id: 'qty',
                   header: 'QUANTITY',
                   className: 'font-semibold text-[11px] text-primary uppercase w-[100px]',
@@ -214,7 +207,6 @@ function ModelForm({
     model_no: initialData?.model_no || '',
     model_name: initialData?.model_name || '',
     brand_id: initialData?.brandRelation?.id || '',
-    hs_code: initialData?.hs_code || '',
     description: initialData?.description || '',
   });
   const [brands, setBrands] = useState<Brand[]>([]);
@@ -291,19 +283,11 @@ function ModelForm({
               />
             </div>
             <div className="col-span-2">
-              <label className="block text-sm font-medium mb-1">HS Code</label>
-              <Input
-                value={form.hs_code || ''}
-                onChange={(e) => setForm({ ...form, hs_code: e.target.value })}
-                placeholder="e.g. 84433100"
-              />
-            </div>
-            <div className="col-span-2">
-              <BulletDescriptionInput
-                label="Model Specifications (Bullet Points)"
-                value={form.description || ''}
-                onChange={(val) => setForm({ ...form, description: val })}
-                placeholder="Ex. 20 PPM Print Speed"
+              <label className="block text-sm font-medium mb-1">Description</label>
+              <textarea
+                className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                value={form.description}
+                onChange={(e) => setForm({ ...form, description: e.target.value })}
               />
             </div>
           </div>

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Table,
   TableBody,
@@ -23,13 +23,8 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { Loader2, CheckCircle, XCircle, Eye, Search, FilePlus2 } from 'lucide-react';
 import { toast } from 'sonner';
-import {
-  getBranchInvoices,
-  getInvoiceById,
-  financeRejectInvoice,
-  financeApproveQuotation,
-  Invoice,
-} from '@/lib/invoice';
+import { getBranchInvoices, getInvoiceById, financeRejectInvoice, Invoice } from '@/lib/invoice';
+import { ApproveQuotationDialog } from '../invoice/ApproveQuotationDialog';
 
 import { formatCurrency } from '@/lib/format';
 import { usePagination } from '@/hooks/usePagination';
@@ -47,6 +42,7 @@ function StatusBadge({ status }: { status: string }) {
     FINANCE_REJECTED: 'bg-red-100 text-red-700',
     APPROVED: 'bg-green-100 text-green-700',
     REJECTED: 'bg-red-100 text-red-700',
+    VALIDITY_EXTENSION_REQUESTED: 'bg-amber-100 text-amber-700',
     PENDING: 'bg-yellow-100 text-yellow-700',
   };
   const label: Record<string, string> = {
@@ -64,7 +60,8 @@ function StatusBadge({ status }: { status: string }) {
     PENDING_CONFIRMATION: 'WAITING FOR ALLOCATION',
     PAID: 'PROCESSED/PAID',
     ACTIVE_LEASE: 'ACTIVE CONTRACT',
-    TRANSACTION_COMPLETED: 'ACCOUNTING COMPLETED',
+    TRANSACTION_COMPLETED: 'PENDING FINANCE REVIEW',
+    VALIDITY_EXTENSION_REQUESTED: 'VALIDITY EXTENSION REQUESTED',
   };
   return (
     <Badge
@@ -108,40 +105,81 @@ export default function FinanceQuotationTable({
   const [rejectTarget, setRejectTarget] = useState<Invoice | null>(null);
   const [rejectReason, setRejectReason] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
+  const [approveOpen, setApproveOpen] = useState(false);
+  const [approveTarget, setApproveTarget] = useState<Invoice | null>(null);
 
   const { page, limit, total, setPage, setTotal, totalPages } = usePagination(10);
 
-  const fetchQuotations = async () => {
-    try {
-      setLoading(true);
-      const data = await getBranchInvoices();
-      // Show employee-approved quotations (type === QUOTATION) needing finance review
-      // + already reviewed (APPROVED / REJECTED) for visibility
-      let onlyQuotations = data.filter(
-        (inv) => inv.type === 'QUOTATION' || inv.type === 'PROFORMA',
-      );
-      if (saleType) {
-        onlyQuotations = onlyQuotations.filter((inv) => {
-          const type = inv.saleType?.toString().toUpperCase();
-          const target = saleType.toUpperCase();
-          if (target === 'SALE') {
-            return ['SALE', 'PRODUCT_SALE', 'SPAREPART_SALE'].includes(type || '');
-          }
-          return type === target;
-        });
-      }
-      setQuotations(onlyQuotations);
-    } catch (error) {
-      console.error(error);
-      toast.error('Failed to load quotations.');
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Track IDs we've already notified about so we don't repeat
+  const notifiedIds = useRef<Set<string>>(new Set());
+  const isFirstLoad = useRef(true);
 
+  const fetchQuotations = useCallback(
+    async (silent = false) => {
+      try {
+        if (!silent) setLoading(true);
+        const data = await getBranchInvoices();
+        let onlyQuotations = data.filter(
+          (inv) => inv.type === 'QUOTATION' || inv.type === 'PROFORMA',
+        );
+        if (saleType) {
+          onlyQuotations = onlyQuotations.filter((inv) => {
+            const type = inv.saleType?.toString().toUpperCase();
+            const target = saleType.toUpperCase();
+            if (target === 'SALE') {
+              return ['SALE', 'PRODUCT_SALE', 'SPAREPART_SALE'].includes(type || '');
+            }
+            return type === target;
+          });
+        }
+
+        // Browser notifications for newly pending quotations
+        if (!isFirstLoad.current) {
+          const newPending = onlyQuotations.filter(
+            (q) => q.status === 'EMPLOYEE_APPROVED' && !notifiedIds.current.has(q.id),
+          );
+          newPending.forEach((q) => {
+            notifiedIds.current.add(q.id);
+            if ('Notification' in window && Notification.permission === 'granted') {
+              new Notification('📋 New Quotation for Review', {
+                body: `${q.invoiceNumber} from ${q.employeeName || 'an employee'} — QAR ${Number(q.totalAmount || 0).toLocaleString()}`,
+                icon: '/favicon.ico',
+              });
+            }
+          });
+        } else {
+          // Seed known IDs on first load so we don't re-notify stale items
+          onlyQuotations
+            .filter((q) => q.status === 'EMPLOYEE_APPROVED')
+            .forEach((q) => notifiedIds.current.add(q.id));
+          isFirstLoad.current = false;
+        }
+
+        setQuotations(onlyQuotations);
+      } catch (error) {
+        console.error(error);
+        if (!silent) toast.error('Failed to load quotations.');
+      } finally {
+        if (!silent) setLoading(false);
+      }
+    },
+    [saleType],
+  );
+
+  // Request notification permission once
+  useEffect(() => {
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+  }, []);
+
+  // Initial fetch + poll every 30 s
   useEffect(() => {
     fetchQuotations();
-  }, []);
+    const interval = setInterval(() => fetchQuotations(true), 30_000);
+    return () => clearInterval(interval);
+  }, [fetchQuotations]);
+
   useEffect(() => {
     setPage(1);
   }, [search, setPage]);
@@ -149,10 +187,9 @@ export default function FinanceQuotationTable({
   // Stats
   const pending = quotations.filter(
     (q) =>
-      q.type === 'QUOTATION' &&
-      (q.status === 'EMPLOYEE_APPROVED' ||
-        q.status === 'PENDING' ||
-        q.status === 'TRANSACTION_COMPLETED'),
+      q.status === 'EMPLOYEE_APPROVED' ||
+      q.status === 'PENDING' ||
+      q.status === 'VALIDITY_EXTENSION_REQUESTED',
   ).length;
   const approved = quotations.filter(
     (q) =>
@@ -202,19 +239,15 @@ export default function FinanceQuotationTable({
     }
   };
 
-  const handleApprove = async (inv: Invoice) => {
-    setActionLoading(true);
-    try {
-      await financeApproveQuotation(inv.id);
-      toast.success('Quotation pricing approved successfully!');
-      setViewQuotation(null);
-      fetchQuotations();
-    } catch (error: unknown) {
-      const err = error as { response?: { data?: { message?: string } } };
-      toast.error(err.response?.data?.message || 'Failed to approve quotation.');
-    } finally {
-      setActionLoading(false);
-    }
+  const handleApprove = (inv: Invoice) => {
+    setApproveTarget(inv);
+    setApproveOpen(true);
+  };
+
+  const handleApproveSuccess = () => {
+    setApproveOpen(false);
+    setApproveTarget(null);
+    fetchQuotations();
   };
 
   const handleRejectConfirm = async () => {
@@ -328,10 +361,9 @@ export default function FinanceQuotationTable({
               ) : (
                 paginated.map((q, index) => {
                   const isPending =
-                    q.type === 'QUOTATION' &&
-                    (q.status === 'EMPLOYEE_APPROVED' ||
-                      q.status === 'PENDING' ||
-                      q.status === 'TRANSACTION_COMPLETED');
+                    q.status === 'EMPLOYEE_APPROVED' ||
+                    q.status === 'TRANSACTION_COMPLETED' ||
+                    q.status === 'VALIDITY_EXTENSION_REQUESTED';
                   return (
                     <TableRow
                       key={q.id}
@@ -417,24 +449,52 @@ export default function FinanceQuotationTable({
         )}
       </div>
 
-      {/* View dialog */}
+      {/* View dialog — finance gets approve/reject + send-to-customer */}
       {viewQuotation && (
         <QuotationViewDialog
           quotation={viewQuotation}
           onClose={() => setViewQuotation(null)}
           showDistribution={true}
+          onApprove={
+            viewQuotation.status === 'EMPLOYEE_APPROVED' ||
+            viewQuotation.status === 'VALIDITY_EXTENSION_REQUESTED'
+              ? () => {
+                  handleApprove(viewQuotation);
+                  setViewQuotation(null);
+                }
+              : undefined
+          }
+          onReject={
+            viewQuotation.status === 'EMPLOYEE_APPROVED' ||
+            viewQuotation.status === 'VALIDITY_EXTENSION_REQUESTED'
+              ? () => {
+                  openReject(viewQuotation);
+                }
+              : undefined
+          }
+          onStatusChange={async () => {
+            try {
+              const refreshed = await getInvoiceById(viewQuotation.id);
+              setViewQuotation(refreshed);
+            } catch {
+              // silent
+            }
+            fetchQuotations(true);
+          }}
+          onConvertSuccess={() => {
+            setViewQuotation(null);
+            fetchQuotations();
+          }}
         />
       )}
 
       {/* Reject dialog */}
       {rejectOpen && (
         <Dialog open onOpenChange={(v) => !v && setRejectOpen(false)}>
-          <DialogContent className="rounded-2xl border-none shadow-2xl">
+          <DialogContent showCloseButton={false}>
             <DialogHeader>
-              <DialogTitle className="text-lg font-bold text-slate-800">
-                Reject Quotation
-              </DialogTitle>
-              <DialogDescription className="text-sm text-slate-400">
+              <DialogTitle>Reject Quotation</DialogTitle>
+              <DialogDescription>
                 Please provide a reason for rejecting this quotation. It will be sent back to the
                 employee.
               </DialogDescription>
@@ -449,19 +509,15 @@ export default function FinanceQuotationTable({
                 className="min-h-[100px] resize-none rounded-xl"
               />
             </div>
-            <DialogFooter className="gap-2">
-              <Button
-                variant="outline"
-                onClick={() => setRejectOpen(false)}
-                className="rounded-xl font-bold"
-              >
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setRejectOpen(false)}>
                 Cancel
               </Button>
               <Button
                 variant="destructive"
                 onClick={handleRejectConfirm}
                 disabled={actionLoading}
-                className="rounded-xl font-bold gap-2"
+                className="gap-2"
               >
                 {actionLoading ? (
                   <Loader2 size={14} className="animate-spin" />
@@ -473,6 +529,16 @@ export default function FinanceQuotationTable({
             </DialogFooter>
           </DialogContent>
         </Dialog>
+      )}
+
+      {/* Approve dialog */}
+      {approveOpen && approveTarget && (
+        <ApproveQuotationDialog
+          invoiceId={approveTarget.id}
+          quotation={approveTarget}
+          onClose={() => setApproveOpen(false)}
+          onSuccess={handleApproveSuccess}
+        />
       )}
     </div>
   );

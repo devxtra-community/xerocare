@@ -9,6 +9,7 @@ import {
   getHRStats,
   getPublicEmployeeProfile,
   getAllBranches,
+  resendWelcomeEmail,
 } from '../controllers/employeeController';
 import { authMiddleware } from '../middleware/authMiddleware';
 import { requireRole } from '../middleware/roleMiddleware';
@@ -49,6 +50,11 @@ employeeRouter.get('/:id/id-proof', authMiddleware, requireRole('ADMIN', 'HR'), 
  * Remove a staff member from our active records.
  */
 employeeRouter.delete('/:id', requireRole('ADMIN', 'HR'), deleteEmployee);
+
+/**
+ * Resend the welcome email and reset password.
+ */
+employeeRouter.post('/:id/resend-welcome-email', requireRole('ADMIN', 'HR'), resendWelcomeEmail);
 
 // --- 2. Looking up Staff and Offices ---
 

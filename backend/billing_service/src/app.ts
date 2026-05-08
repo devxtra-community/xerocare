@@ -9,6 +9,7 @@ import { connectWithRetry } from './config/dataSource';
 import { getRabbitChannel } from './config/rabbitmq';
 import invoiceRouter from './routes/invoiceRoutes';
 import usageRouter from './routes/usageRoutes';
+import paymentRouter from './routes/paymentRoutes';
 
 /**
  * This is the main engine for the Billing Service.
@@ -35,6 +36,7 @@ app.use(httpLogger);
 app.use('/health', healthRouter);
 app.use('/invoices', invoiceRouter);
 app.use('/usage', usageRouter);
+app.use('/payments', paymentRouter);
 
 /**
  * Safety Net: Handling mistakes.

@@ -715,6 +715,68 @@ export class InvoiceAggregationService {
   }
 
   /**
+   * Finance approves quotation pricing.
+   */
+  async financeApproveQuotation(
+    id: string,
+    payload: { effectiveTo?: string } | undefined,
+    token: string,
+  ) {
+    try {
+      const response = await axios.post<{ data: Invoice }>(
+        `${BILLING_SERVICE_URL}/invoices/${id}/finance-approve-quotation`,
+        payload,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
+      return response.data.data;
+    } catch (error: unknown) {
+      if (axios.isAxiosError(error)) {
+        logger.error('Axios error in finance approve quotation', {
+          message: error.message,
+          responseStatus: error.response?.status,
+          responseData: error.response?.data,
+        });
+        throw new AppError(
+          error.response?.data?.message || 'Failed to approve quotation pricing',
+          error.response?.status || 500,
+        );
+      }
+      throw new AppError('Internal Gateway Error during finance quotation approval', 500);
+    }
+  }
+
+  /**
+   * Employee converts an approved quotation into a transaction.
+   */
+  async convertToTransaction(id: string, token: string) {
+    try {
+      const response = await axios.post<{ data: Invoice }>(
+        `${BILLING_SERVICE_URL}/invoices/${id}/convert-to-transaction`,
+        {},
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
+      return response.data.data;
+    } catch (error: unknown) {
+      if (axios.isAxiosError(error)) {
+        logger.error('Axios error in convert to transaction', {
+          message: error.message,
+          responseStatus: error.response?.status,
+          responseData: error.response?.data,
+        });
+        throw new AppError(
+          error.response?.data?.message || 'Failed to convert quotation to transaction',
+          error.response?.status || 500,
+        );
+      }
+      throw new AppError('Internal Gateway Error during quotation conversion', 500);
+    }
+  }
+
+  /**
    * Submits a quotation for Finance approval.
    */
   async employeeApprove(id: string, token: string) {
