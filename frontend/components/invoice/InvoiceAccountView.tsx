@@ -60,7 +60,7 @@ export function InvoiceAccountView({ invoiceId, onClose, open }: InvoiceAccountV
       fetchSummary();
       setShowForm(false);
     }
-  }, [open, invoiceId]);
+  }, [open, invoiceId, fetchSummary]); // Fixed missing dependency warning
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

@@ -26,7 +26,7 @@ export function BulletDescriptionInput({
         setBullets(lines);
       }
     }
-  }, [value === '']); // Only re-sync if the value was cleared externally
+  }, [value]); // Only re-sync if the value was cleared externally
 
   const handleUpdate = (updated: string[]) => {
     setBullets(updated);

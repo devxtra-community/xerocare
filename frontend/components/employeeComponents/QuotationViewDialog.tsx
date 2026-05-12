@@ -8,6 +8,9 @@ import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { getProductById, getAllProducts } from '@/lib/product';
 import { getAllSpareParts, getSparePartById } from '@/lib/spare-part';
 import { getAllModels } from '@/lib/model';
+import ProductStandardQuotation from '../../public/quatationLayouts/productsalequatation/statnderd/productstatnderdquatation';
+import ProductPremiumQuotation from '../../public/quatationLayouts/productsalequatation/premium/productpremiumquatation';
+import ProductNormalQuotation from '../../public/quatationLayouts/productsalequatation/normal/productnormalqatation';
 import {
   Invoice,
   sendEmailNotification,
@@ -373,9 +376,226 @@ export function QuotationViewDialog({
     })
     .filter((item) => item.quantity && item.quantity > 0);
 
+  // ── Layout detection ─────────────────────────────────────────────────────
+  const rawId =
+    quotation.layoutId ||
+    ((quotation as unknown as Record<string, unknown>).layout_id as string) ||
+    '';
+  const notesTags = (quotation.notes || '').toLowerCase();
+
+  // SCAN DESCRIPTIONS for hidden tags as a absolute fallback
+  const firstItemDesc = quotation.items?.[0]?.description || '';
+  const descTag = firstItemDesc.includes('[STD]')
+    ? 'standard'
+    : firstItemDesc.includes('[PRM]')
+      ? 'premium'
+      : '';
+
+  const searchStr = (rawId + notesTags + descTag).toLowerCase();
+
+  const isProductPremium = isSale && searchStr.includes('premium');
+  const isProductStandard =
+    isSale && (searchStr.includes('standard') || searchStr.includes('statntard'));
+  const isProductNormal =
+    isSale && (searchStr.includes('normal') || (!isProductStandard && !isProductPremium && isSale));
+
+  const useTemplate = isProductNormal || isProductStandard || isProductPremium;
+
+  // ── Data mapping for Standard / Premium templates ─────────────────────────
+  const templateLineItems = enrichedItems.map((item, idx) => {
+    const unitP = item.unitPrice || 0;
+
+    // EXTRACT DATA from description tags if primary field is missing (for manual items)
+    const dStr = item.description || '';
+    const extractTag = (tag: string) => {
+      const m = dStr.match(new RegExp(`\\[${tag}:(.*?)\\]`));
+      return m ? m[1] : '';
+    };
+
+    const exBN = extractTag('BN');
+    const exMN = extractTag('MN');
+    const exPN = extractTag('PN');
+    const exHS = extractTag('HS');
+    const exDiscMatch = dStr.match(/\[DISC:([\d.]+)\]/);
+    const extractedDisc = exDiscMatch ? parseFloat(exDiscMatch[1]) : 0;
+
+    // Check if the quotation itself has a global discount we can distribute
+    const globalDiscountPerItem =
+      idx === 0 && enrichedItems.length === 1 && quotation.discountAmount
+        ? quotation.discountAmount
+        : 0;
+
+    const disc =
+      item.discount !== undefined && item.discount > 0
+        ? item.discount
+        : ((item as unknown as Record<string, unknown>).discountAmount as number) ||
+          extractedDisc ||
+          globalDiscountPerItem ||
+          0;
+
+    const qty = item.quantity || 1;
+    const discountedPrice = unitP - disc;
+    const subAmt = qty * discountedPrice;
+    const rawDesc =
+      item.metadata?.description ||
+      item.metadata?.inventory?.[0]?.description ||
+      item.description ||
+      '';
+
+    // Clean all tags for display
+    const cleanDesc = rawDesc
+      .replace(/\[STD\]/g, '')
+      .replace(/\[PRM\]/g, '')
+      .replace(/\[DISC:.*?\]/g, '')
+      .replace(/\[BN:.*?\]/g, '')
+      .replace(/\[MN:.*?\]/g, '')
+      .replace(/\[PN:.*?\]/g, '')
+      .replace(/\[HS:.*?\]/g, '')
+      .trim();
+
+    const hsCodePart = exHS ? `[HS: ${exHS}] ` : '';
+
+    return {
+      productName: exPN || item.metadata?.name || item.metadata?.part_name || 'PRODUCT',
+      brand: exBN || item.metadata?.brandRelation?.name || item.metadata?.brand || 'Xerocare',
+      modelNo: exMN || item.metadata?.model?.model_name || item.metadata?.model_name || 'Generic',
+      slNo: item.allocation?.serialNumber || item.metadata?.serial_no || 'TBD',
+      description: (hsCodePart + cleanDesc).trim(),
+      qty: qty,
+      unitPrice: unitP,
+      specialPrice: discountedPrice,
+      vat: 0,
+      amount: subAmt,
+      productImage: item.metadata?.imageUrl || item.metadata?.image_url,
+      discount: disc,
+    };
+  });
+
+  const totalBeforeDiscount = templateLineItems.reduce((acc, it) => acc + it.unitPrice * it.qty, 0);
+  const totalDiscountFromItems = templateLineItems.reduce(
+    (acc, it) => acc + it.discount * it.qty,
+    0,
+  );
+  // Use quotation.discountAmount if it's greater than our detected sum
+  const finalDiscountTotal = Math.max(totalDiscountFromItems, quotation.discountAmount || 0);
+
+  const finalVatTotal = 0;
+  const finalTotalAmount =
+    quotation.totalAmount || templateLineItems.reduce((acc, it) => acc + it.amount, 0);
+
+  const templateTotals = {
+    subTotal: totalBeforeDiscount,
+    discountTotal: finalDiscountTotal,
+    vatTotal: finalVatTotal,
+    total: finalTotalAmount,
+    payment: finalTotalAmount,
+    balanceDue: finalTotalAmount,
+    paid: ['PAID', 'TRANSACTION_COMPLETED'].includes(quotation.status),
+  };
+
+  const productNames = enrichedItems
+    .map((it) => it.metadata?.name || it.description?.split(' ')[0])
+    .filter(Boolean);
+  const templateProductName =
+    productNames.length > 0 ? productNames.slice(0, 2).join(' & ') : 'PRODUCT';
+  const templateModelName = enrichedItems[0]?.metadata?.model?.model_name || '';
+
+  const templateBillTo = {
+    name: quotation.customerName || '',
+  };
+
+  const templateShipTo = {
+    name: quotation.customerName || '',
+    address: quotation.customerAddress || '',
+    email: quotation.customerEmail || '',
+    phone: quotation.customerPhone || '',
+  };
+
+  const templateQuotation = {
+    number: quotation.invoiceNumber || '',
+    date: new Date(quotation.createdAt).toLocaleDateString('en-GB').replace(/\//g, '/'),
+    terms: 'Due on receipt',
+    dueDate: quotation.effectiveTo
+      ? new Date(quotation.effectiveTo).toLocaleDateString('en-GB').replace(/\//g, '/')
+      : '',
+  };
+
   return (
-    <>
-      <Dialog open onOpenChange={(v) => !v && onClose()}>
+    <Dialog open onOpenChange={(v) => !v && onClose()}>
+      {useTemplate ? (
+        <DialogContent className="sm:max-w-5xl rounded-none border-none shadow-2xl p-0 overflow-hidden bg-white flex flex-col max-h-[95vh]">
+          <DialogTitle className="sr-only">Quotation Document</DialogTitle>
+          <div id="quotation-print-content" className="flex-1 overflow-y-auto scrollbar-hide">
+            {isProductNormal && (
+              <ProductNormalQuotation
+                productName={templateProductName}
+                modelName={templateModelName}
+                billTo={templateBillTo}
+                shipTo={templateShipTo}
+                quotation={templateQuotation}
+                lineItems={templateLineItems}
+                totals={templateTotals}
+              />
+            )}
+            {isProductStandard && (
+              <ProductStandardQuotation
+                productName={templateProductName}
+                modelName={templateModelName}
+                billTo={templateBillTo}
+                shipTo={templateShipTo}
+                quotation={templateQuotation}
+                lineItems={templateLineItems}
+                totals={templateTotals}
+              />
+            )}
+            {isProductPremium && (
+              <ProductPremiumQuotation
+                productName={templateProductName}
+                modelName={templateModelName}
+                billTo={templateBillTo}
+                shipTo={templateShipTo}
+                quotation={templateQuotation}
+                lineItems={templateLineItems}
+                totals={templateTotals}
+              />
+            )}
+          </div>
+          {/* Footer Actions */}
+          <div className="px-6 pb-4 pt-4 bg-slate-50 shrink-0 border-t border-slate-200 flex justify-between items-center">
+            <div className="flex items-center gap-2 px-3 py-1 bg-white border border-slate-200 rounded-full shadow-sm">
+              <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">
+                Status:
+              </span>
+              <span className="text-[9px] font-black uppercase tracking-widest text-blue-600">
+                {quotation.status?.replace(/_/g, ' ')}
+              </span>
+            </div>
+            <div className="flex gap-3 items-center">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={onClose}
+                className="h-9 text-[11px] font-black uppercase tracking-widest text-slate-500 hover:text-red-600"
+              >
+                Close
+              </Button>
+              {!onApprove &&
+                onSendToFinance &&
+                (quotation.status === 'DRAFT' || quotation.status === 'FINANCE_REJECTED') && (
+                  <Button
+                    onClick={handleSend}
+                    disabled={sending}
+                    size="sm"
+                    className="h-9 bg-red-700 hover:bg-red-800 text-white font-black text-[11px] uppercase tracking-widest px-10 gap-2 shadow-lg shadow-red-100 rounded-md ml-2"
+                  >
+                    {sending ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+                    Send to Finance
+                  </Button>
+                )}
+            </div>
+          </div>
+        </DialogContent>
+      ) : (
         <DialogContent className="sm:max-w-4xl rounded-none border-none shadow-2xl p-0 overflow-hidden bg-white flex flex-col max-h-[90vh]">
           <DialogTitle className="sr-only">Quotation Document</DialogTitle>
           <div
@@ -621,7 +841,10 @@ export function QuotationViewDialog({
 
                         return (
                           <React.Fragment key={idx}>
-                            <tr className="group hover:bg-red-50/40 transition-all duration-300">
+                            <tr
+                              className="group hover:bg-red-50/40 transition-all duration-300 border-b border-red-50/50"
+                              style={{ minHeight: '200px' }}
+                            >
                               <td className="py-3 px-4 border-r-2 border-red-50 align-top relative">
                                 <span className="text-[12px] font-black text-slate-800">{mpn}</span>
                               </td>
@@ -639,7 +862,7 @@ export function QuotationViewDialog({
                                       src={image}
                                       alt="Product"
                                       crossOrigin="anonymous"
-                                      className="w-[100px] h-[100px] object-contain mix-blend-multiply shrink-0 opacity-100"
+                                      className="w-[180px] h-[180px] object-contain mix-blend-multiply shrink-0 opacity-100"
                                     />
                                   )}
                                   <p className="text-[11px] text-slate-500 leading-relaxed font-bold opacity-90 uppercase mt-1">
@@ -1262,7 +1485,7 @@ export function QuotationViewDialog({
             </div>
           </div>
         </DialogContent>
-      </Dialog>
-    </>
+      )}
+    </Dialog>
   );
 }

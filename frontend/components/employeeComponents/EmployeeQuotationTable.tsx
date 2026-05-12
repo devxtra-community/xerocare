@@ -65,6 +65,7 @@ import { getAllModels, Model } from '@/lib/model';
 import { QuotationViewDialog } from './QuotationViewDialog';
 import RentFormModal from './RentFormModal';
 import { InvoiceAccountView } from '../invoice/InvoiceAccountView';
+import { LayoutSelectionDialog } from './LayoutSelectionDialog';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -552,6 +553,9 @@ function QuotationFormModal({
     allowedTypes[0] ?? 'PRODUCT_SALE',
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [selectedLayoutCategory, setSelectedLayoutCategory] = useState<string | null>('product');
+  const [selectedLayoutStyle, setSelectedLayoutStyle] = useState<string | null>('normal');
+  const [isLayoutSelectorOpen, setIsLayoutSelectorOpen] = useState(false);
 
   // ── SALE state ──────────────────────────────────────────────────────────
   const [customerId, setCustomerId] = useState('');
@@ -859,6 +863,10 @@ function QuotationFormModal({
     }
 
     let payload: CreateInvoicePayload;
+    const lid =
+      selectedLayoutCategory && selectedLayoutStyle
+        ? `${selectedLayoutCategory}:${selectedLayoutStyle}`
+        : undefined;
 
     if (['PRODUCT_SALE', 'SPAREPART_SALE'].includes(quotationType)) {
       if (saleItems.length === 0) {
@@ -873,27 +881,39 @@ function QuotationFormModal({
         customerId,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         saleType: quotationType as any,
+        layoutId: lid,
+        layout_id: lid,
+        notes:
+          `[STYLE:${selectedLayoutStyle || 'normal'}]` +
+          (quotationType === 'PRODUCT_SALE' ? '' : ''),
         discountAmount: totalDiscount,
         effectiveFrom: new Date().toISOString().split('T')[0],
         effectiveTo: validityDate.toISOString().split('T')[0],
-        items: saleItems.map((it) => ({
-          description: it.isManual
-            ? [
-                it.brand,
-                it.model,
-                it.productName,
-                it.hsCode ? `[HS: ${it.hsCode}]` : '',
-                it.description ? `(${it.description})` : '',
-              ]
-                .filter(Boolean)
-                .join(' ')
-            : it.description,
-          quantity: it.quantity,
-          unitPrice: it.basePrice,
-          productId: it.productId,
-          modelId: it.modelId,
-          itemType: it.itemType,
-        })),
+        items: saleItems.map((it, idx) => {
+          let desc = it.isManual
+            ? `[BN:${it.brand || ''}][MN:${it.model || ''}][PN:${it.productName || ''}][HS:${it.hsCode || ''}] ${it.description || ''}`
+            : it.description || 'Product Product';
+
+          if (idx === 0) {
+            if (selectedLayoutStyle === 'standard') desc = `[STD] ${desc}`;
+            else if (selectedLayoutStyle === 'premium') desc = `[PRM] ${desc}`;
+          }
+
+          // Embed discount as a secret tag to prevent backend loss
+          if (it.discount && it.discount > 0) {
+            desc = `[DISC:${it.discount}] ${desc}`;
+          }
+
+          return {
+            description: desc,
+            quantity: it.quantity,
+            unitPrice: it.basePrice,
+            discount: it.discount,
+            productId: it.productId,
+            modelId: it.modelId,
+            itemType: it.itemType,
+          };
+        }),
       };
     } else if (quotationType === 'RENT') {
       if (saleItems.length === 0) {
@@ -903,6 +923,9 @@ function QuotationFormModal({
       payload = {
         customerId,
         saleType: 'RENT',
+        layoutId: lid,
+        layout_id: lid,
+        notes: `[STYLE:${selectedLayoutStyle || 'normal'}]`,
         rentType: rentType as CreateInvoicePayload['rentType'],
         rentPeriod: rentPeriod as CreateInvoicePayload['rentPeriod'],
         monthlyRent: monthlyRent ? Number(monthlyRent) : undefined,
@@ -1019,9 +1042,17 @@ function QuotationFormModal({
         toast.error('Please add at least one specific machine (Product).');
         return;
       }
+      const lid =
+        selectedLayoutCategory && selectedLayoutStyle
+          ? `${selectedLayoutCategory}:${selectedLayoutStyle}`
+          : undefined;
+
       payload = {
         customerId,
         saleType: 'LEASE',
+        layoutId: lid,
+        layout_id: lid,
+        notes: `[STYLE:${selectedLayoutStyle || 'normal'}]`,
         leaseType,
         leaseTenureMonths: leaseTenureMonths ? Number(leaseTenureMonths) : undefined,
         totalLeaseAmount: totalLeaseAmount ? Number(totalLeaseAmount) : 0,
@@ -2875,6 +2906,34 @@ function QuotationFormModal({
               </Button>
             )}
 
+            {step === 2 && (
+              <Button
+                variant="outline"
+                className="h-10 px-6 font-bold text-[11px] uppercase tracking-wider border-dashed border-slate-400 text-slate-600 hover:bg-slate-50 hover:border-slate-600 transition-all gap-2"
+                onClick={() => setIsLayoutSelectorOpen(true)}
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <rect x="3" y="3" width="7" height="9" rx="1" />
+                  <rect x="14" y="3" width="7" height="5" rx="1" />
+                  <rect x="14" y="12" width="7" height="9" rx="1" />
+                  <rect x="3" y="16" width="7" height="5" rx="1" />
+                </svg>
+                {selectedLayoutStyle
+                  ? `Layout: ${selectedLayoutStyle} (${selectedLayoutCategory})`
+                  : 'Select Layout'}
+              </Button>
+            )}
+
             {step === 1 ? (
               <Button
                 className="h-10 px-8 bg-blue-600 hover:bg-blue-700 text-white font-bold text-[11px] uppercase tracking-widest shadow-md shadow-blue-200"
@@ -2905,6 +2964,17 @@ function QuotationFormModal({
           </div>
         </div>
       </DialogContent>
+
+      <LayoutSelectionDialog
+        open={isLayoutSelectorOpen}
+        onOpenChange={setIsLayoutSelectorOpen}
+        selectedType={selectedLayoutCategory}
+        selectedStyle={selectedLayoutStyle}
+        onSelectLayout={(category, style) => {
+          setSelectedLayoutCategory(category);
+          setSelectedLayoutStyle(style);
+        }}
+      />
     </Dialog>
   );
 }

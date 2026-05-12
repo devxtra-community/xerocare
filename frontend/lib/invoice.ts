@@ -41,6 +41,7 @@ export interface Invoice {
   emailSentAt?: string;
   type?: 'QUOTATION' | 'PROFORMA' | 'FINAL';
   saleType: string;
+  layoutId?: string;
   rentType?: 'FIXED_LIMIT' | 'FIXED_COMBO' | 'FIXED_FLAT' | 'CPC' | 'CPC_COMBO';
   rentPeriod?: 'MONTHLY' | 'QUARTERLY' | 'HALF_YEARLY' | 'YEARLY' | 'CUSTOM';
 
@@ -56,6 +57,7 @@ export interface Invoice {
   discountAmount?: number;
   effectiveFrom?: string;
   effectiveTo?: string;
+  notes?: string;
   createdAt: string;
   employeeName: string;
   branchName: string;
@@ -184,6 +186,9 @@ export const sendMonthlyUsageInvoice = async (usageId: string): Promise<unknown>
 export interface CreateInvoicePayload {
   customerId: string;
   saleType: 'SALE' | 'RENT' | 'LEASE' | 'PRODUCT_SALE' | 'SPAREPART_SALE';
+  layoutId?: string;
+  layout_id?: string;
+  notes?: string;
 
   // Rent Fields
   rentType?: 'FIXED_LIMIT' | 'FIXED_COMBO' | 'FIXED_FLAT' | 'CPC' | 'CPC_COMBO';
@@ -220,7 +225,10 @@ export interface CreateInvoicePayload {
     description: string;
     quantity: number;
     unitPrice: number;
+    discount?: number;
     itemType?: 'PRODUCT' | 'PRICING_RULE' | 'SPAREPART';
+    productId?: string;
+    modelId?: string;
   }[];
   startDate?: string;
   endDate?: string;
