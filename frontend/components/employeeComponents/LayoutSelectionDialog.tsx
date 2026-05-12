@@ -228,7 +228,10 @@ export function LayoutSelectionDialog({
                         className="absolute inset-0 bg-slate-900/40 rounded flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-[1px]"
                         onClick={(e) => {
                           e.stopPropagation();
-                          window.open(`/preview/${style.id}-quotation`, '_blank');
+                          window.open(
+                            `/preview/${style.id}-quotation?category=${activeType}`,
+                            '_blank',
+                          );
                         }}
                       >
                         <Eye className="h-6 w-6 text-white drop-shadow-md" />

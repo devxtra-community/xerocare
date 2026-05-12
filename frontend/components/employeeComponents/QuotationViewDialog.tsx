@@ -11,6 +11,9 @@ import { getAllModels } from '@/lib/model';
 import ProductStandardQuotation from '../../public/quatationLayouts/productsalequatation/statnderd/productstatnderdquatation';
 import ProductPremiumQuotation from '../../public/quatationLayouts/productsalequatation/premium/productpremiumquatation';
 import ProductNormalQuotation from '../../public/quatationLayouts/productsalequatation/normal/productnormalqatation';
+import SparePartsNormalQuotation from '../../public/quatationLayouts/sparepartsalequatation/normal/sparepartsnormalquatation';
+import SparePartsStandardQuotation from '../../public/quatationLayouts/sparepartsalequatation/standerd/sparepartsstanderdquatation';
+import SparePartsPremiumQuotation from '../../public/quatationLayouts/sparepartsalequatation/premium/sparepartspremiumquatation';
 import {
   Invoice,
   sendEmailNotification,
@@ -393,13 +396,48 @@ export function QuotationViewDialog({
 
   const searchStr = (rawId + notesTags + descTag).toLowerCase();
 
-  const isProductPremium = isSale && searchStr.includes('premium');
-  const isProductStandard =
-    isSale && (searchStr.includes('standard') || searchStr.includes('statntard'));
-  const isProductNormal =
-    isSale && (searchStr.includes('normal') || (!isProductStandard && !isProductPremium && isSale));
+  const isSparePart =
+    searchStr.includes('sparepart') ||
+    searchStr.includes('spare-part') ||
+    searchStr.includes('spare part') ||
+    quotation.saleType === 'SPAREPART_SALE' ||
+    quotation.saleType === 'SPARE_PART_SALE';
 
-  const useTemplate = isProductNormal || isProductStandard || isProductPremium;
+  const isProductPremium = !isSparePart && isSale && searchStr.includes('premium');
+  const isProductStandard =
+    !isSparePart &&
+    isSale &&
+    (searchStr.includes('standard') ||
+      searchStr.includes('statntard') ||
+      searchStr.includes('statnderd'));
+  const isProductNormal =
+    !isSparePart &&
+    isSale &&
+    (searchStr.includes('normal') || (!isProductStandard && !isProductPremium && isSale));
+
+  const isSpareNormal =
+    isSparePart &&
+    (searchStr.includes('normal') ||
+      (!searchStr.includes('premium') &&
+        !searchStr.includes('standard') &&
+        !searchStr.includes('statnderd')));
+
+  const isSpareStandard =
+    isSparePart &&
+    (searchStr.includes('standard') ||
+      searchStr.includes('standerd') ||
+      searchStr.includes('statnderd')) &&
+    !searchStr.includes('premium');
+
+  const isSparePremium = isSparePart && searchStr.includes('premium');
+
+  const useTemplate =
+    isProductNormal ||
+    isProductStandard ||
+    isProductPremium ||
+    isSpareNormal ||
+    isSpareStandard ||
+    isSparePremium;
 
   // ── Data mapping for Standard / Premium templates ─────────────────────────
   const templateLineItems = enrichedItems.map((item, idx) => {
@@ -468,6 +506,7 @@ export function QuotationViewDialog({
       amount: subAmt,
       productImage: item.metadata?.imageUrl || item.metadata?.image_url,
       discount: disc,
+      mpn: item.metadata?.mpn || extractTag('MPN'),
     };
   });
 
@@ -502,6 +541,10 @@ export function QuotationViewDialog({
 
   const templateBillTo = {
     name: quotation.customerName || '',
+    address: quotation.customerAddress || '',
+    trn: ((quotation as unknown as Record<string, unknown>).customerTrn as string) || '',
+    email: quotation.customerEmail || '',
+    phone: quotation.customerPhone || '',
   };
 
   const templateShipTo = {
@@ -528,6 +571,39 @@ export function QuotationViewDialog({
           <div id="quotation-print-content" className="flex-1 overflow-y-auto scrollbar-hide">
             {isProductNormal && (
               <ProductNormalQuotation
+                productName={templateProductName}
+                modelName={templateModelName}
+                billTo={templateBillTo}
+                shipTo={templateShipTo}
+                quotation={templateQuotation}
+                lineItems={templateLineItems}
+                totals={templateTotals}
+              />
+            )}
+            {isSpareNormal && (
+              <SparePartsNormalQuotation
+                productName={templateProductName}
+                modelName={templateModelName}
+                billTo={templateBillTo}
+                shipTo={templateShipTo}
+                quotation={templateQuotation}
+                lineItems={templateLineItems}
+                totals={templateTotals}
+              />
+            )}
+            {isSpareStandard && (
+              <SparePartsStandardQuotation
+                productName={templateProductName}
+                modelName={templateModelName}
+                billTo={templateBillTo}
+                shipTo={templateShipTo}
+                quotation={templateQuotation}
+                lineItems={templateLineItems}
+                totals={templateTotals}
+              />
+            )}
+            {isSparePremium && (
+              <SparePartsPremiumQuotation
                 productName={templateProductName}
                 modelName={templateModelName}
                 billTo={templateBillTo}
@@ -592,6 +668,26 @@ export function QuotationViewDialog({
                     Send to Finance
                   </Button>
                 )}
+
+              {onApprove && onReject && quotation.status === 'PENDING' && (
+                <div className="flex gap-2 ml-2">
+                  <Button
+                    variant="outline"
+                    onClick={onReject}
+                    size="sm"
+                    className="h-9 border-red-200 text-red-600 hover:bg-red-50 font-black text-[11px] uppercase tracking-widest px-6"
+                  >
+                    Reject Order
+                  </Button>
+                  <Button
+                    onClick={onApprove}
+                    size="sm"
+                    className="h-9 bg-green-600 hover:bg-green-700 text-white font-black text-[11px] uppercase tracking-widest px-8 shadow-lg shadow-green-100"
+                  >
+                    Approve Order
+                  </Button>
+                </div>
+              )}
             </div>
           </div>
         </DialogContent>
@@ -756,7 +852,7 @@ export function QuotationViewDialog({
               </div>
 
               {/* Main Items Table */}
-              <div className="space-y-0">
+              <div className="space-y-0 text-slate-800 font-bold">
                 <div className="border-[3px] border-red-700 rounded-t-2xl overflow-hidden shadow-2xl bg-white">
                   <table className="w-full">
                     <thead>
@@ -1011,32 +1107,31 @@ export function QuotationViewDialog({
                           </React.Fragment>
                         );
                       })}
-                      {/* Padding rows exactly like reference to fill the box */}
-                      {Array.from({ length: Math.max(0, 5 - enrichedItems.length) }).map((_, i) => (
-                        <tr key={`empty-${i}`} className="h-8">
-                          <td className="border-r-2 border-red-50 bg-slate-50/[0.02]" />
-                          <td className="border-r-2 border-red-50" />
-                          <td className="border-r-2 border-red-50 bg-slate-50/[0.02]" />
-                          <td className="border-r-2 border-red-50" />
-                          {isSale && (
-                            <>
-                              <td className="border-r-2 border-red-50 bg-slate-50/[0.02]" />
-                              <td className="border-r-2 border-red-50" />
-                              <td className="bg-slate-50/[0.02]" />
-                            </>
-                          )}
-                          {isRent && (
-                            <>
-                              <td className="border-r-2 border-red-50 bg-slate-50/[0.02]" />
-                              <td className="border-r-2 border-red-50" />
-                              <td className="bg-slate-50/[0.02]" />
-                            </>
-                          )}
-                        </tr>
-                      ))}
                     </tbody>
                   </table>
                 </div>
+
+                {onApprove && onReject && quotation.status === 'PENDING' && (
+                  <div className="px-10 pb-4 pt-4 shrink-0 flex justify-end items-center gap-6 bg-white">
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        onClick={onReject}
+                        size="sm"
+                        className="h-10 border-red-200 text-red-600 hover:bg-red-50 font-black text-[11px] uppercase tracking-widest px-8"
+                      >
+                        Reject Order
+                      </Button>
+                      <Button
+                        onClick={onApprove}
+                        size="sm"
+                        className="h-10 bg-green-600 hover:bg-green-700 text-white font-black text-[11px] uppercase tracking-widest px-10 shadow-lg shadow-green-100"
+                      >
+                        Approve Order
+                      </Button>
+                    </div>
+                  </div>
+                )}
 
                 {/* Fixed Total Box precisely connected and styled */}
                 {isSale && (
@@ -1343,7 +1438,7 @@ export function QuotationViewDialog({
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => onStatusChange('ACCEPTED')}
+                    onClick={() => onStatusChange?.('ACCEPTED')}
                     className="h-9 text-[11px] font-black uppercase tracking-widest border-green-200 text-green-700 hover:bg-green-50"
                   >
                     Mark as Accepted
@@ -1351,7 +1446,7 @@ export function QuotationViewDialog({
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => onStatusChange('REJECTED')}
+                    onClick={() => onStatusChange?.('REJECTED')}
                     className="h-9 text-[11px] font-black uppercase tracking-widest border-red-200 text-red-700 hover:bg-red-50"
                   >
                     Mark as Rejected
@@ -1396,14 +1491,14 @@ export function QuotationViewDialog({
                     variant="outline"
                     size="sm"
                     className="h-9 px-8 rounded-md font-black uppercase text-[11px] tracking-widest border-red-200 text-red-600 hover:bg-red-50 gap-2"
-                    onClick={onReject}
+                    onClick={() => onReject?.()}
                   >
                     Reject
                   </Button>
                   <Button
                     size="sm"
                     className="h-9 px-10 rounded-md font-black uppercase text-[11px] tracking-widest bg-emerald-600 hover:bg-emerald-700 text-white gap-2 shadow-lg shadow-emerald-100"
-                    onClick={onApprove}
+                    onClick={() => onApprove?.()}
                   >
                     Accept
                   </Button>

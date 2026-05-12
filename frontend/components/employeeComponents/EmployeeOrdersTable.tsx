@@ -14,7 +14,7 @@ import {
 
 import { getMyInvoices, Invoice, InvoiceItem, getInvoiceById } from '@/lib/invoice';
 import { toast } from 'sonner';
-import { InvoiceDetailsDialog } from '../invoice/InvoiceDetailsDialog';
+import { QuotationViewDialog } from './QuotationViewDialog';
 import { Button } from '@/components/ui/button';
 import Pagination from '@/components/Pagination';
 
@@ -93,17 +93,24 @@ export default function EmployeeOrdersTable({
   };
 
   const getCleanProductName = (name: string) => {
-    // Remove "Black & White - " or "Color - " prefixes
+    // 1. Try to extract our hidden Product Name tag [PN:...]
+    const pnMatch = name.match(/\[PN:([^\]]+)\]/);
+    if (pnMatch) {
+      return pnMatch[1].trim();
+    }
+
+    // 2. Fallback: Clean standard prefixes and other tags
     let clean = name.replace(/^(Black & White - |Color - |Combined - )/i, '');
-    // Remove serial number patterns like (SN-...) or - SN-... or (Serial...)
+
+    // Remove any remaining metadata tags [XX:...]
+    clean = clean.replace(/\[[A-Z]+:[^\]]*\]/g, '').replace(/\[(STD|PRM)\]/g, '');
+
+    // Remove anything in parenthesis (the 'description' part of manual items)
+    clean = clean.replace(/\s*\([^)]*\)/g, '');
+
+    // Remove serial number patterns
     clean = clean.replace(/(\s*-\s*SN-[^,]+|\s*\(SN-[^)]+\)|\s*\(Serial[^)]+\))/gi, '');
 
-    // Also remove everything after the last dash if it looks like a serial number (legacy format)
-    const lastDashIndex = clean.lastIndexOf(' - ');
-    if (lastDashIndex !== -1 && clean.length - lastDashIndex < 25) {
-      // Heuristic: if there's a dash and the suffix is short, it's likely a serial number
-      clean = clean.substring(0, lastDashIndex).trim();
-    }
     return clean.trim();
   };
 
@@ -357,40 +364,48 @@ export default function EmployeeOrdersTable({
       </div>
 
       {detailsOpen && selectedInvoice && (
-        <InvoiceDetailsDialog
-          invoice={selectedInvoice}
+        <QuotationViewDialog
+          quotation={selectedInvoice}
           onClose={() => setDetailsOpen(false)}
-          mode={mode}
-          approveLabel={mode === 'EMPLOYEE' ? 'Send for Finance Approval' : 'Approve'}
-          onApprove={async () => {
-            if (mode === 'EMPLOYEE') {
-              try {
-                const { employeeApproveInvoice } = await import('@/lib/invoice');
-                await employeeApproveInvoice(selectedInvoice.id);
-                toast.success('Sent for Finance Approval');
-                setDetailsOpen(false);
-                // Simple refresh for now
-                window.location.reload();
-              } catch (error) {
-                console.error(error);
-                toast.error('Failed to send for approval');
-              }
-            } else {
-              // FINANCE Appprove
-              try {
-                const { allocateMachinesInvoice } = await import('@/lib/invoice');
-                await allocateMachinesInvoice(selectedInvoice.id, {});
-                toast.success('Invoice Approved');
-                setDetailsOpen(false);
-                window.location.reload(); // Simple fallback for now
-              } catch {
-                toast.error('Failed to approve');
-              }
-            }
-          }}
+          onSendToFinance={
+            mode === 'EMPLOYEE' &&
+            (selectedInvoice.status === 'DRAFT' || selectedInvoice.status === 'FINANCE_REJECTED')
+              ? async (id: string) => {
+                  try {
+                    const { employeeApproveInvoice } = await import('@/lib/invoice');
+                    await employeeApproveInvoice(id);
+                    toast.success('Sent for Finance Approval');
+                    setDetailsOpen(false);
+                    window.location.reload();
+                  } catch (error) {
+                    console.error(error);
+                    toast.error('Failed to send for approval');
+                  }
+                }
+              : undefined
+          }
+          onApprove={
+            mode === 'FINANCE' && selectedInvoice.status === 'PENDING'
+              ? async () => {
+                  try {
+                    const { allocateMachinesInvoice } = await import('@/lib/invoice');
+                    await allocateMachinesInvoice(selectedInvoice.id, {});
+                    toast.success('Invoice Approved');
+                    setDetailsOpen(false);
+                    window.location.reload();
+                  } catch {
+                    toast.error('Failed to approve');
+                  }
+                }
+              : undefined
+          }
           onReject={
-            mode === 'FINANCE'
-              ? async (reason) => {
+            mode === 'FINANCE' && selectedInvoice.status === 'PENDING'
+              ? async () => {
+                  // In QuotationViewDialog, we might need a reason, but let's match simple reject for now
+                  // or I'll add a simple reason prompt
+                  const reason = prompt('Enter rejection reason:');
+                  if (!reason) return;
                   try {
                     const { financeRejectInvoice } = await import('@/lib/invoice');
                     await financeRejectInvoice(selectedInvoice.id, reason);

@@ -298,11 +298,11 @@ const ProductStandardQuotation: React.FC<ProductStandardQuotationProps> = ({
           <thead>
             <tr style={{ backgroundColor: TEAL }}>
               {[
-                { label: 'PRODUCT NAME', width: '12%' },
+                { label: 'PRODUCT NAME', width: '20%' },
                 { label: 'BRAND', width: '7%' },
                 { label: 'MODEL NO:', width: '7%' },
                 { label: 'SL NO:', width: '7%' },
-                { label: 'DESCRIPTION', width: '30%' },
+                { label: 'DESCRIPTION', width: '22%' },
                 { label: 'QTY', width: '4%' },
                 { label: 'UNIT PRICE', width: '8%' },
                 { label: 'DISCOUNT', width: '7%' },
@@ -549,8 +549,21 @@ const ProductStandardQuotation: React.FC<ProductStandardQuotationProps> = ({
             style={{
               marginTop: '40px',
               textAlign: 'right',
+              position: 'relative',
             }}
           >
+            <img
+              src="/seel/seel1.png"
+              alt="Seal"
+              style={{
+                position: 'absolute',
+                right: '120px',
+                top: '-45px',
+                width: '100px',
+                height: 'auto',
+                transform: 'rotate(-15deg)',
+              }}
+            />
             <div
               style={{
                 borderTop: '1px solid #333',

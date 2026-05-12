@@ -344,11 +344,11 @@ const ProductPremiumQuotation: React.FC<ProductPremiumQuotationProps> = ({
             <thead>
               <tr style={{ backgroundColor: ACCENT, color: '#111' }}>
                 {[
-                  { label: 'PRODUCT NAME', width: '12%' },
+                  { label: 'PRODUCT NAME', width: '20%' },
                   { label: 'BRAND', width: '7%' },
                   { label: 'MODEL NO', width: '7%' },
                   { label: 'SL NO', width: '7%' },
-                  { label: 'DESCRIPTION', width: '30%' },
+                  { label: 'DESCRIPTION', width: '22%' },
                   { label: 'QTY', width: '4%' },
                   { label: 'UNIT', width: '8%' },
                   { label: 'DISCOUNT', width: '7%' },
@@ -470,15 +470,7 @@ const ProductPremiumQuotation: React.FC<ProductPremiumQuotationProps> = ({
               </div>
             </div>
 
-            <div
-              style={{
-                width: '150px',
-                borderBottom: '1px solid #555',
-                marginTop: '40px',
-                marginBottom: '8px',
-              }}
-            />
-            <div style={{ fontSize: '10px', color: '#aaa' }}>Authorised Signature</div>
+            <div style={{ height: '40px' }} />
           </div>
 
           {/* Right: Totals Grid */}
@@ -557,6 +549,31 @@ const ProductPremiumQuotation: React.FC<ProductPremiumQuotationProps> = ({
                 PAID
               </div>
             )}
+          </div>
+        </div>
+
+        {/* ─── SIGNATURE & SEAL ─── */}
+        <div style={{ padding: '20px 50px', display: 'flex', justifyContent: 'flex-end' }}>
+          <div style={{ textAlign: 'center', position: 'relative', width: '180px' }}>
+            <img
+              src="/seel/seel1.png"
+              alt="Seal"
+              style={{
+                position: 'absolute',
+                left: '-20px',
+                top: '-50px',
+                width: '100px',
+                height: 'auto',
+                opacity: 0.8,
+                transform: 'rotate(-15deg)',
+              }}
+            />
+            <div
+              style={{ borderTop: '1px solid #ffffff', width: '100%', marginBottom: '6px' }}
+            ></div>
+            <div style={{ fontSize: '10px', fontWeight: '800', color: '#ffffff' }}>
+              AUTHORIZED SIGNATURE
+            </div>
           </div>
         </div>
 

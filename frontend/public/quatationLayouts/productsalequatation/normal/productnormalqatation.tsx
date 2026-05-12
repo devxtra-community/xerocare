@@ -465,6 +465,28 @@ const ProductNormalQuotation: React.FC<ProductNormalQuotationProps> = ({
       {/* ─── SPACER ─── */}
       <div style={{ flex: 1 }} />
 
+      {/* ─── SIGNATURE & SEAL ─── */}
+      <div style={{ padding: '0 48px 40px', display: 'flex', justifyContent: 'flex-end' }}>
+        <div style={{ textAlign: 'center', position: 'relative', width: '200px' }}>
+          <img
+            src="/seel/seel1.png"
+            alt="Seal"
+            style={{
+              position: 'absolute',
+              left: '-30px',
+              top: '-70px',
+              width: '100px',
+              height: 'auto',
+              transform: 'rotate(-15deg)',
+            }}
+          />
+          <div style={{ borderTop: '1px solid #111', width: '100%', marginBottom: '6px' }}></div>
+          <div style={{ fontSize: '11px', fontWeight: '800', color: '#111' }}>
+            AUTHORIZED SIGNATURE
+          </div>
+        </div>
+      </div>
+
       {/* ─── BOTTOM PADDING ─── */}
       <div style={{ height: '52px' }} />
 

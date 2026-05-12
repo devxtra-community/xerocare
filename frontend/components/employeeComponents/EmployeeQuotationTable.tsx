@@ -1323,7 +1323,10 @@ function QuotationFormModal({
                       </div>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <button
-                          onClick={() => setQuotationType('PRODUCT_SALE')}
+                          onClick={() => {
+                            setQuotationType('PRODUCT_SALE');
+                            setSelectedLayoutCategory('product');
+                          }}
                           className={`border-2 rounded-xl p-4 flex flex-col items-start gap-2 transition-all ${
                             quotationType === 'PRODUCT_SALE'
                               ? 'border-blue-500 bg-blue-50 text-blue-700'
@@ -1343,7 +1346,10 @@ function QuotationFormModal({
                           </div>
                         </button>
                         <button
-                          onClick={() => setQuotationType('SPAREPART_SALE')}
+                          onClick={() => {
+                            setQuotationType('SPAREPART_SALE');
+                            setSelectedLayoutCategory('sparepart');
+                          }}
                           className={`border-2 rounded-xl p-4 flex flex-col items-start gap-2 transition-all ${
                             quotationType === 'SPAREPART_SALE'
                               ? 'border-cyan-500 bg-cyan-50 text-cyan-700'
