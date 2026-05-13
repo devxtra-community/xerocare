@@ -105,7 +105,7 @@ const ProductStandardQuotation: React.FC<ProductStandardQuotationProps> = ({
   return (
     <div
       style={{
-        width: '842px',
+        width: '900px',
         minHeight: '1191px',
         margin: '0 auto',
         backgroundColor: '#ffffff',
@@ -298,16 +298,16 @@ const ProductStandardQuotation: React.FC<ProductStandardQuotationProps> = ({
           <thead>
             <tr style={{ backgroundColor: TEAL }}>
               {[
-                { label: 'PRODUCT NAME', width: '20%' },
+                { label: 'PRODUCT', width: '12%' },
                 { label: 'BRAND', width: '7%' },
-                { label: 'MODEL NO:', width: '7%' },
-                { label: 'SL NO:', width: '7%' },
-                { label: 'DESCRIPTION', width: '22%' },
+                { label: 'MODEL', width: '7%' },
+                { label: 'S/N', width: '7%' },
+                { label: 'DESCRIPTION', width: '43%' },
                 { label: 'QTY', width: '4%' },
-                { label: 'UNIT PRICE', width: '8%' },
-                { label: 'DISCOUNT', width: '7%' },
-                { label: 'DISCOUNTED PRICE', width: '8%' },
-                { label: 'AMOUNT', width: '10%' },
+                { label: 'UNIT', width: '6%' },
+                { label: 'DISC', width: '4%' },
+                { label: 'PRICE', width: '6%' },
+                { label: 'TOTAL', width: '7%' },
               ].map(({ label, width }) => (
                 <th
                   key={label}
@@ -337,7 +337,7 @@ const ProductStandardQuotation: React.FC<ProductStandardQuotationProps> = ({
                 style={{
                   borderBottom: '1px solid #e0e0e0',
                   backgroundColor: '#ffffff',
-                  height: '200px',
+                  height: '320px',
                 }}
               >
                 <td style={bodyTd('left')}>
@@ -353,6 +353,7 @@ const ProductStandardQuotation: React.FC<ProductStandardQuotationProps> = ({
                     whiteSpace: 'pre-line',
                     position: 'relative',
                     overflow: 'hidden',
+                    padding: 0,
                   }}
                 >
                   {/* Background Watermark Image */}
@@ -365,16 +366,36 @@ const ProductStandardQuotation: React.FC<ProductStandardQuotationProps> = ({
                         top: '50%',
                         left: '50%',
                         transform: 'translate(-50%, -50%)',
-                        width: '120%',
+                        width: '100%',
                         height: '120%',
                         objectFit: 'contain',
-                        opacity: 0.08,
+                        opacity: 0.25,
                         zIndex: 0,
                         pointerEvents: 'none',
+                        filter: 'grayscale(100%)',
                       }}
                     />
                   )}
-                  <div style={{ position: 'relative', zIndex: 1 }}>{item.description}</div>
+                  <div
+                    style={{
+                      position: 'relative',
+                      zIndex: 1,
+                      padding: '24px',
+                      textAlign: 'left',
+                      height: '100%',
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontSize: '11px',
+                        color: '#333',
+                        fontWeight: '600',
+                        maxWidth: '85%',
+                      }}
+                    >
+                      {item.description}
+                    </div>
+                  </div>
                 </td>
                 <td style={bodyTd('center')}>{item.qty}</td>
                 <td style={bodyTd('center')}>{fmt(item.unitPrice)}</td>

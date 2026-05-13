@@ -112,7 +112,7 @@ const ProductPremiumQuotation: React.FC<ProductPremiumQuotationProps> = ({
     <div
       className="premium-quotation-root"
       style={{
-        width: '842px',
+        width: '900px',
         height: '100%',
         minHeight: '1191px',
         margin: '0 auto',
@@ -344,16 +344,16 @@ const ProductPremiumQuotation: React.FC<ProductPremiumQuotationProps> = ({
             <thead>
               <tr style={{ backgroundColor: ACCENT, color: '#111' }}>
                 {[
-                  { label: 'PRODUCT NAME', width: '20%' },
+                  { label: 'PRODUCT', width: '12%' },
                   { label: 'BRAND', width: '7%' },
-                  { label: 'MODEL NO', width: '7%' },
-                  { label: 'SL NO', width: '7%' },
-                  { label: 'DESCRIPTION', width: '22%' },
+                  { label: 'MODEL', width: '7%' },
+                  { label: 'S/N', width: '7%' },
+                  { label: 'DESCRIPTION', width: '43%' },
                   { label: 'QTY', width: '4%' },
-                  { label: 'UNIT', width: '8%' },
-                  { label: 'DISCOUNT', width: '7%' },
-                  { label: 'DISCOUNTED PRICE', width: '8%' },
-                  { label: 'AMOUNT', width: '10%' },
+                  { label: 'UNIT', width: '6%' },
+                  { label: 'DISC', width: '4%' },
+                  { label: 'PRICE', width: '6%' },
+                  { label: 'TOTAL', width: '7%' },
                 ].map(({ label, width }, i) => (
                   <th
                     key={label}
@@ -379,7 +379,7 @@ const ProductPremiumQuotation: React.FC<ProductPremiumQuotationProps> = ({
                   style={{
                     backgroundColor: idx % 2 === 0 ? '#303240' : '#282a36',
                     borderBottom: '1px solid #3c3e4e',
-                    height: '80px',
+                    height: '320px',
                   }}
                 >
                   <td style={tdStyle('left')}>
@@ -397,6 +397,7 @@ const ProductPremiumQuotation: React.FC<ProductPremiumQuotationProps> = ({
                       whiteSpace: 'pre-line',
                       position: 'relative',
                       overflow: 'hidden',
+                      padding: 0,
                     }}
                   >
                     {/* Watermark Image */}
@@ -409,16 +410,36 @@ const ProductPremiumQuotation: React.FC<ProductPremiumQuotationProps> = ({
                           top: '50%',
                           left: '50%',
                           transform: 'translate(-50%, -50%)',
-                          width: '120%',
+                          width: '100%',
                           height: '120%',
                           objectFit: 'contain',
-                          opacity: 0.12,
+                          opacity: 0.25,
                           zIndex: 0,
                           pointerEvents: 'none',
+                          filter: 'grayscale(100%)',
                         }}
                       />
                     )}
-                    <div style={{ position: 'relative', zIndex: 1 }}>{item.description}</div>
+                    <div
+                      style={{
+                        position: 'relative',
+                        zIndex: 1,
+                        padding: '24px',
+                        textAlign: 'left',
+                        height: '100%',
+                      }}
+                    >
+                      <div
+                        style={{
+                          fontSize: '11px',
+                          color: '#ccc',
+                          fontWeight: '500',
+                          maxWidth: '85%',
+                        }}
+                      >
+                        {item.description}
+                      </div>
+                    </div>
                   </td>
                   <td style={tdStyle('center')}>{item.qty}</td>
                   <td style={tdStyle('center')}>{fmt(item.unitPrice)}</td>

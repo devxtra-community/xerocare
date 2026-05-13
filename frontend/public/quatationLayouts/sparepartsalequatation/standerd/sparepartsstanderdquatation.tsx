@@ -100,7 +100,7 @@ const SparePartsStandardQuotation: React.FC<SparePartsStandardQuotationProps> = 
       style={{
         fontFamily: "'Inter', sans-serif",
         backgroundColor: '#ffffff',
-        width: '794px',
+        width: '900px',
         minHeight: '1123px',
         margin: '0 auto',
         display: 'flex',
@@ -361,15 +361,63 @@ const SparePartsStandardQuotation: React.FC<SparePartsStandardQuotationProps> = 
         </thead>
         <tbody>
           {lineItems.map((item, idx) => (
-            <tr key={idx} style={{ backgroundColor: idx % 2 === 1 ? tableAltRow : 'transparent' }}>
-              <td style={{ padding: '12px 10px', fontSize: '11px', fontWeight: '600' }}>
+            <tr
+              key={idx}
+              style={{
+                backgroundColor: idx % 2 === 1 ? tableAltRow : 'transparent',
+                height: '320px',
+              }}
+            >
+              <td
+                style={{
+                  padding: '12px 10px',
+                  fontSize: '11px',
+                  fontWeight: '600',
+                  textAlign: 'center',
+                }}
+              >
                 {item.mpn || '---'}
               </td>
-              <td style={{ padding: '12px 10px' }}>
-                <div style={{ fontWeight: '600', marginBottom: '2px', fontSize: '12px' }}>
-                  {item.productName}
+              <td style={{ padding: 0, position: 'relative', overflow: 'hidden' }}>
+                {item.productImage && (
+                  <img
+                    src={item.productImage}
+                    alt="bg"
+                    style={{
+                      position: 'absolute',
+                      top: '50%',
+                      left: '50%',
+                      transform: 'translate(-50%, -50%)',
+                      width: '100%',
+                      height: '110%',
+                      objectFit: 'contain',
+                      opacity: 0.25,
+                      zIndex: 0,
+                      pointerEvents: 'none',
+                      filter: 'grayscale(100%)',
+                    }}
+                  />
+                )}
+                <div
+                  style={{
+                    position: 'relative',
+                    zIndex: 1,
+                    padding: '24px',
+                    textAlign: 'left',
+                    height: '100%',
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: '11px',
+                      color: mutedText,
+                      fontWeight: '500',
+                      maxWidth: '85%',
+                    }}
+                  >
+                    {item.description}
+                  </div>
                 </div>
-                <div style={{ fontSize: '11px', color: mutedText }}>{item.description}</div>
               </td>
               <td style={{ padding: '12px 10px', textAlign: 'center' }}>{item.qty}</td>
               <td style={{ padding: '12px 10px', textAlign: 'right' }}>{fmt(item.unitPrice)}</td>

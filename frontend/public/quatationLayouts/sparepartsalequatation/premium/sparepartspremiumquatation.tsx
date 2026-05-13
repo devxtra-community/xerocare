@@ -100,7 +100,7 @@ const SparePartsPremiumQuotation: React.FC<SparePartsPremiumQuotationProps> = ({
       style={{
         fontFamily: "'Inter', sans-serif",
         backgroundColor: bgColor,
-        width: '794px',
+        width: '900px',
         minHeight: '1123px',
         margin: '0 auto',
         display: 'flex',
@@ -450,6 +450,7 @@ const SparePartsPremiumQuotation: React.FC<SparePartsPremiumQuotationProps> = ({
                 style={{
                   borderBottom: '1px solid rgba(255,255,255,0.05)',
                   backgroundColor: idx % 2 === 1 ? 'rgba(255,255,255,0.01)' : 'transparent',
+                  height: '320px',
                 }}
               >
                 <td style={{ padding: '12px', fontSize: '11px', fontWeight: '600' }}>
@@ -457,7 +458,7 @@ const SparePartsPremiumQuotation: React.FC<SparePartsPremiumQuotationProps> = ({
                 </td>
                 <td
                   style={{
-                    padding: '12px',
+                    padding: 0,
                     position: 'relative',
                     overflow: 'hidden',
                     zIndex: 1,
@@ -472,27 +473,36 @@ const SparePartsPremiumQuotation: React.FC<SparePartsPremiumQuotationProps> = ({
                         top: '50%',
                         left: '50%',
                         transform: 'translate(-50%, -50%)',
-                        height: '150%',
-                        width: 'auto',
-                        opacity: 0.08,
+                        height: '110%',
+                        width: '100%',
+                        opacity: 0.25,
                         zIndex: -1,
                         pointerEvents: 'none',
                         objectFit: 'contain',
+                        filter: 'grayscale(100%)',
                       }}
                     />
                   )}
                   <div
                     style={{
-                      fontWeight: '700',
-                      color: primaryRed,
-                      marginBottom: '2px',
-                      fontSize: '12px',
+                      position: 'relative',
+                      zIndex: 1,
+                      padding: '24px',
+                      textAlign: 'left',
+                      height: '100%',
                     }}
                   >
-                    {item.productName}
-                  </div>
-                  <div style={{ fontSize: '11px', color: mutedText, lineHeight: '1.4' }}>
-                    {item.description}
+                    <div
+                      style={{
+                        fontSize: '11px',
+                        color: mutedText,
+                        fontWeight: '500',
+                        maxWidth: '85%',
+                        lineHeight: '1.4',
+                      }}
+                    >
+                      {item.description}
+                    </div>
                   </div>
                 </td>
                 <td style={{ padding: '12px', textAlign: 'center' }}>{item.qty}</td>

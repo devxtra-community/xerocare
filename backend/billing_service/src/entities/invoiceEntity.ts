@@ -249,4 +249,10 @@ export class Invoice {
 
   @Column({ type: 'text', nullable: true })
   additionalChargesRemarks?: string;
+
+  @Column({ type: 'varchar', nullable: true })
+  layoutId?: string;
+
+  @Column({ type: 'text', nullable: true })
+  notes?: string;
 }

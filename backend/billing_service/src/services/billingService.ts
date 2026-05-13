@@ -371,6 +371,8 @@ export class BillingService {
     securityDepositReference?: string;
     securityDepositDate?: string;
     securityDepositBank?: string;
+    layoutId?: string;
+    notes?: string;
   }) {
     // 1. Validation Logic
     if (payload.rentType === RentType.FIXED_LIMIT || payload.rentType === RentType.FIXED_COMBO) {
@@ -520,6 +522,9 @@ export class BillingService {
         ? new Date(payload.securityDepositDate)
         : undefined,
       securityDepositBank: payload.securityDepositBank,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      layoutId: payload.layoutId || (payload as any).layout_id,
+      notes: payload.notes,
 
       totalAmount: 0, // Placeholder
       items: invoiceItems,

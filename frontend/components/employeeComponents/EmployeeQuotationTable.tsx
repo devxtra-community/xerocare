@@ -940,8 +940,8 @@ function QuotationFormModal({
         securityDepositReference,
         securityDepositBank,
 
-        items: saleItems.map((it) => ({
-          description: it.isManual
+        items: saleItems.map((it, idx) => {
+          let desc = it.isManual
             ? [
                 it.brand,
                 it.model,
@@ -951,90 +951,20 @@ function QuotationFormModal({
               ]
                 .filter(Boolean)
                 .join(' ')
-            : it.description,
-          quantity: it.quantity,
-          unitPrice: 0,
-          itemType: it.itemType,
-          productId: it.productId,
-          modelId: it.modelId,
-          bwIncludedLimit: rentType === 'FIXED_LIMIT' ? it.bwIncludedLimit || 0 : 0,
-          colorIncludedLimit: rentType === 'FIXED_LIMIT' ? it.colorIncludedLimit || 0 : 0,
-          combinedIncludedLimit: rentType === 'FIXED_COMBO' ? it.combinedIncludedLimit || 0 : 0,
-          bwExcessRate: rentType === 'FIXED_LIMIT' || rentType === 'CPC' ? it.bwExcessRate || 0 : 0,
-          colorExcessRate:
-            rentType === 'FIXED_LIMIT' || rentType === 'CPC' ? it.colorExcessRate || 0 : 0,
-          combinedExcessRate:
-            rentType === 'FIXED_COMBO' || rentType === 'CPC_COMBO' ? it.combinedExcessRate || 0 : 0,
-          bwSlabRanges:
-            (rentType === 'CPC' || rentType === 'CPC_COMBO') && it.bwSlabRanges?.length
-              ? it.bwSlabRanges.map((r) => ({
-                  from: Number(r.from) || 0,
-                  to: Number(r.to) || 0,
-                  rate: Number(r.rate) || 0,
-                }))
-              : undefined,
-          colorSlabRanges:
-            (rentType === 'CPC' || rentType === 'CPC_COMBO') && it.colorSlabRanges?.length
-              ? it.colorSlabRanges.map((r) => ({
-                  from: Number(r.from) || 0,
-                  to: Number(r.to) || 0,
-                  rate: Number(r.rate) || 0,
-                }))
-              : undefined,
-          comboSlabRanges:
-            (rentType === 'CPC' || rentType === 'CPC_COMBO') && it.comboSlabRanges?.length
-              ? it.comboSlabRanges.map((r) => ({
-                  from: Number(r.from) || 0,
-                  to: Number(r.to) || 0,
-                  rate: Number(r.rate) || 0,
-                }))
-              : undefined,
-        })),
-        pricingItems: saleItems.map((it) => ({
-          description: it.isManual
-            ? [
-                it.brand,
-                it.model,
-                it.productName,
-                it.hsCode ? `[HS: ${it.hsCode}]` : '',
-                it.description ? `(${it.description})` : '',
-              ]
-                .filter(Boolean)
-                .join(' ')
-            : it.description,
-          bwIncludedLimit: rentType === 'FIXED_LIMIT' ? it.bwIncludedLimit || 0 : 0,
-          colorIncludedLimit: rentType === 'FIXED_LIMIT' ? it.colorIncludedLimit || 0 : 0,
-          combinedIncludedLimit: rentType === 'FIXED_COMBO' ? it.combinedIncludedLimit || 0 : 0,
-          bwExcessRate: rentType === 'FIXED_LIMIT' || rentType === 'CPC' ? it.bwExcessRate || 0 : 0,
-          colorExcessRate:
-            rentType === 'FIXED_LIMIT' || rentType === 'CPC' ? it.colorExcessRate || 0 : 0,
-          combinedExcessRate:
-            rentType === 'FIXED_COMBO' || rentType === 'CPC_COMBO' ? it.combinedExcessRate || 0 : 0,
-          bwSlabRanges:
-            (rentType === 'CPC' || rentType === 'CPC_COMBO') && it.bwSlabRanges?.length
-              ? it.bwSlabRanges.map((r) => ({
-                  from: Number(r.from) || 0,
-                  to: Number(r.to) || 0,
-                  rate: Number(r.rate) || 0,
-                }))
-              : undefined,
-          colorSlabRanges:
-            (rentType === 'CPC' || rentType === 'CPC_COMBO') && it.colorSlabRanges?.length
-              ? it.colorSlabRanges.map((r) => ({
-                  from: Number(r.from) || 0,
-                  to: Number(r.to) || 0,
-                  rate: Number(r.rate) || 0,
-                }))
-              : undefined,
-          comboSlabRanges:
-            (rentType === 'CPC' || rentType === 'CPC_COMBO') && it.comboSlabRanges?.length
-              ? it.comboSlabRanges.map((r) => ({
-                  from: Number(r.from) || 0,
-                  to: Number(r.to) || 0,
-                  rate: Number(r.rate) || 0,
-                }))
-              : undefined,
-        })),
+            : it.description;
+
+          if (idx === 0) {
+            if (selectedLayoutStyle === 'standard') desc = `[STD] ${desc}`;
+            else if (selectedLayoutStyle === 'premium') desc = `[PRM] ${desc}`;
+          }
+
+          return {
+            ...it,
+            description: desc,
+            unitPrice: 0,
+          };
+        }),
+        pricingItems: [],
       };
     } else {
       // LEASE
@@ -1296,6 +1226,7 @@ function QuotationFormModal({
                         onClick={() => {
                           setActiveCategory('RENT');
                           setQuotationType('RENT');
+                          setSelectedLayoutCategory('rental');
                         }}
                       />
                       <CategoryCard
@@ -1306,6 +1237,7 @@ function QuotationFormModal({
                         onClick={() => {
                           setActiveCategory('LEASE');
                           setQuotationType('LEASE');
+                          setSelectedLayoutCategory('lease');
                         }}
                       />
                     </div>
@@ -2935,7 +2867,9 @@ function QuotationFormModal({
                   <rect x="3" y="16" width="7" height="5" rx="1" />
                 </svg>
                 {selectedLayoutStyle
-                  ? `Layout: ${selectedLayoutStyle} (${selectedLayoutCategory})`
+                  ? `Layout: ${selectedLayoutStyle} (${
+                      selectedLayoutCategory === 'rental' ? 'rent' : selectedLayoutCategory
+                    })`
                   : 'Select Layout'}
               </Button>
             )}
