@@ -8,6 +8,9 @@ export interface SlabRange {
 
 export interface RentLineItem {
   model: string;
+  brand: string;
+  productName: string;
+  slNo: string;
   description: string;
   qty: number;
   limit: string;
@@ -267,7 +270,7 @@ const RentPremiumQuotation: React.FC<RentPremiumQuotationProps> = ({
             backdropFilter: 'blur(10px)',
           }}
         >
-          <div style={{ textAlign: 'center' }}>
+          <div style={{ textAlign: 'center', flex: 1 }}>
             <div
               style={{
                 fontSize: '10px',
@@ -279,10 +282,12 @@ const RentPremiumQuotation: React.FC<RentPremiumQuotationProps> = ({
             >
               Brand
             </div>
-            <div style={{ fontWeight: '700', fontSize: '15px' }}>Xerox</div>
+            <div style={{ fontWeight: '700', fontSize: '15px' }}>
+              {lineItems[0]?.brand || 'N/A'}
+            </div>
           </div>
           <div style={{ width: '1px', background: 'rgba(255,255,255,0.05)' }} />
-          <div style={{ textAlign: 'center' }}>
+          <div style={{ textAlign: 'center', flex: 1 }}>
             <div
               style={{
                 fontSize: '10px',
@@ -299,7 +304,24 @@ const RentPremiumQuotation: React.FC<RentPremiumQuotationProps> = ({
             </div>
           </div>
           <div style={{ width: '1px', background: 'rgba(255,255,255,0.05)' }} />
-          <div style={{ textAlign: 'center' }}>
+          <div style={{ textAlign: 'center', flex: 1 }}>
+            <div
+              style={{
+                fontSize: '10px',
+                color: TEXT_MUTED,
+                fontWeight: '700',
+                textTransform: 'uppercase',
+                marginBottom: '4px',
+              }}
+            >
+              Product Name
+            </div>
+            <div style={{ fontWeight: '700', fontSize: '15px' }}>
+              {lineItems[0]?.productName || 'N/A'}
+            </div>
+          </div>
+          <div style={{ width: '1px', background: 'rgba(255,255,255,0.05)' }} />
+          <div style={{ textAlign: 'center', flex: 1 }}>
             <div
               style={{
                 fontSize: '10px',
@@ -319,7 +341,7 @@ const RentPremiumQuotation: React.FC<RentPremiumQuotationProps> = ({
                 letterSpacing: '1px',
               }}
             >
-              TBD
+              {lineItems[0]?.slNo || 'TBD'}
             </div>
           </div>
         </div>
@@ -476,6 +498,26 @@ const RentPremiumQuotation: React.FC<RentPremiumQuotationProps> = ({
                         alignItems: 'flex-start',
                       }}
                     >
+                      <div
+                        style={{
+                          fontSize: '16px',
+                          fontWeight: '800',
+                          color: ACCENT_COLOR,
+                          marginBottom: '4px',
+                        }}
+                      >
+                        {item.productName}
+                      </div>
+                      <div
+                        style={{
+                          fontSize: '12px',
+                          fontWeight: '600',
+                          color: TEXT_MUTED,
+                          marginBottom: '12px',
+                        }}
+                      >
+                        {item.brand} {item.model} • S/N: {item.slNo || 'TBD'}
+                      </div>
                       <div
                         style={{
                           fontSize: '13px',

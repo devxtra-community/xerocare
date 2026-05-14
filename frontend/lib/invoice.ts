@@ -20,6 +20,9 @@ export interface InvoiceItem {
   quantity?: number;
   unitPrice?: number;
   discount?: number;
+  discountAmount?: number;
+  serialNumber?: string;
+  sn?: string;
   productId?: string;
   modelId?: string; // Added for finance flow
   initialBwCount?: number;
@@ -42,6 +45,8 @@ export interface Invoice {
   type?: 'QUOTATION' | 'PROFORMA' | 'FINAL';
   saleType: string;
   layoutId?: string;
+  layout_id?: string;
+  customerTrn?: string;
   rentType?: 'FIXED_LIMIT' | 'FIXED_COMBO' | 'FIXED_FLAT' | 'CPC' | 'CPC_COMBO';
   rentPeriod?: 'MONTHLY' | 'QUARTERLY' | 'HALF_YEARLY' | 'YEARLY' | 'CUSTOM';
 

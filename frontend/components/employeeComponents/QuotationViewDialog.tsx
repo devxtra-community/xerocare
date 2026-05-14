@@ -17,6 +17,9 @@ import SparePartsPremiumQuotation from '../../public/quatationLayouts/spareparts
 import RentNormalQuotation from '../../public/quatationLayouts/rentquatation/normal/rentnormalquatatio';
 import RentStandardQuotation from '../../public/quatationLayouts/rentquatation/stanterd/rentstanderdquatation';
 import RentPremiumQuotation from '../../public/quatationLayouts/rentquatation/premium/rentpremiumquatation';
+import LeaseNormalQuotation from '../../public/quatationLayouts/leasequatation/normal/leasenormalquatation';
+import LeaseStandardQuotation from '../../public/quatationLayouts/leasequatation/standerd/leasestanterdquatation';
+import LeasePremiumQuotation from '../../public/quatationLayouts/leasequatation/premium/leasepremiumqutation';
 import {
   Invoice,
   sendEmailNotification,
@@ -379,30 +382,42 @@ export function QuotationViewDialog({
     .filter((item) => item.quantity && item.quantity > 0);
 
   // ── Layout detection ─────────────────────────────────────────────────────
-  const rawId =
-    quotation.layoutId ||
-    ((quotation as unknown as Record<string, unknown>).layout_id as string) ||
-    '';
-  const notesTags = (quotation.notes || '').toLowerCase();
+  const rawId = quotation.layoutId || quotation.layout_id || '';
+  // const notesTags = (quotation.notes || '').toLowerCase(); // removed unused variable to fix lint error
 
   // SCAN DESCRIPTIONS for hidden tags as a absolute fallback
-  const firstItemDesc = quotation.items?.[0]?.description || '';
-  const descTag = firstItemDesc.includes('[STD]')
+  const allDescs = (quotation.items || []).map((it) => it.description || '').join(' ');
+  const descTag = allDescs.includes('[STD]')
     ? 'standard'
-    : firstItemDesc.includes('[PRM]')
+    : allDescs.includes('[PRM]')
       ? 'premium'
       : '';
 
-  const searchStr = (rawId + notesTags + descTag).toLowerCase();
+  const notesRaw = (quotation.notes || '').toLowerCase();
+  const notesTag =
+    notesRaw.includes('style:standard') || notesRaw.includes('style:standerd')
+      ? 'standard'
+      : notesRaw.includes('style:premium')
+        ? 'premium'
+        : '';
+
+  const searchStr = (rawId + notesRaw + descTag + notesTag).toLowerCase();
 
   const st = (quotation.saleType || '').toUpperCase().trim();
-  const isRent =
-    st === 'RENT' ||
-    searchStr.includes('rental') ||
-    !!quotation.rentType ||
-    !!quotation.monthlyRent;
+  // isLease is evaluated FIRST — saleType='LEASE' is always authoritative.
+  // FSM leases also populate rentType on the backend, so we must not let
+  // rentType/monthlyRent override a lease record.
   const isLease =
-    st === 'LEASE' || searchStr.includes('lease') || (!!quotation.leaseType && !isRent);
+    st === 'LEASE' ||
+    searchStr.includes('lease') ||
+    quotation.leaseType ||
+    (quotation.layoutId?.startsWith('lease:') ?? false);
+  const isRent =
+    !isLease &&
+    (st === 'RENT' ||
+      searchStr.includes('rental') ||
+      !!quotation.rentType ||
+      !!quotation.monthlyRent);
   const isSale = !isRent && !isLease;
 
   const isSparePart =
@@ -412,44 +427,34 @@ export function QuotationViewDialog({
     st === 'SPAREPART_SALE' ||
     st === 'SPARE_PART_SALE';
 
-  const isProductPremium = !isRent && !isSparePart && isSale && searchStr.includes('premium');
+  const isProductPremium =
+    !isRent &&
+    !isSparePart &&
+    isSale &&
+    (quotation.layoutId?.includes('premium') ||
+      quotation.layout_id?.includes('premium') ||
+      searchStr.includes('premium'));
+
   const isProductStandard =
     !isRent &&
     !isSparePart &&
     isSale &&
-    (searchStr.includes('standard') ||
+    (quotation.layoutId?.includes('standard') ||
+      quotation.layout_id?.includes('standard') ||
+      searchStr.includes('standard') ||
       searchStr.includes('standerd') ||
       searchStr.includes('statntard') ||
       searchStr.includes('stantdard') ||
       searchStr.includes('stanterd') ||
       searchStr.includes('statnderd'));
-  const isProductNormal =
-    !isRent &&
-    isSale &&
-    !isSparePart &&
-    (searchStr.includes('normal') ||
-      (!searchStr.includes('standard') &&
-        !searchStr.includes('standerd') &&
-        !searchStr.includes('statntard') &&
-        !searchStr.includes('stantdard') &&
-        !searchStr.includes('stanterd') &&
-        !searchStr.includes('statnderd') &&
-        !searchStr.includes('premium')));
 
-  const isSpareNormal =
-    isSparePart &&
-    (searchStr.includes('normal') ||
-      (!searchStr.includes('premium') &&
-        !searchStr.includes('standard') &&
-        !searchStr.includes('standerd') &&
-        !searchStr.includes('statntard') &&
-        !searchStr.includes('stantdard') &&
-        !searchStr.includes('stanterd') &&
-        !searchStr.includes('statnderd')));
+  const isProductNormal = isSale && !isProductStandard && !isProductPremium && !isSparePart;
 
   const isSpareStandard =
     isSparePart &&
-    (searchStr.includes('standard') ||
+    (quotation.layoutId?.includes('standard') ||
+      quotation.layout_id?.includes('standard') ||
+      searchStr.includes('standard') ||
       searchStr.includes('standerd') ||
       searchStr.includes('statntard') ||
       searchStr.includes('stantdard') ||
@@ -457,22 +462,19 @@ export function QuotationViewDialog({
       searchStr.includes('statnderd')) &&
     !searchStr.includes('premium');
 
-  const isSparePremium = isSparePart && searchStr.includes('premium');
+  const isSparePremium =
+    isSparePart &&
+    (quotation.layoutId?.includes('premium') ||
+      quotation.layout_id?.includes('premium') ||
+      searchStr.includes('premium'));
 
-  const isRentNormal =
-    isRent &&
-    (searchStr.includes('normal') ||
-      (!searchStr.includes('standard') &&
-        !searchStr.includes('standerd') &&
-        !searchStr.includes('statntard') &&
-        !searchStr.includes('stantdard') &&
-        !searchStr.includes('stanterd') &&
-        !searchStr.includes('statnderd') &&
-        !searchStr.includes('premium')));
+  const isSpareNormal = isSparePart && !isSpareStandard && !isSparePremium;
 
   const isRentStandard =
     isRent &&
-    (searchStr.includes('standard') ||
+    (quotation.layoutId?.includes('standard') ||
+      quotation.layout_id?.includes('standard') ||
+      searchStr.includes('standard') ||
       searchStr.includes('standerd') ||
       searchStr.includes('statntard') ||
       searchStr.includes('stantdard') ||
@@ -480,7 +482,33 @@ export function QuotationViewDialog({
       searchStr.includes('statnderd')) &&
     !searchStr.includes('premium');
 
-  const isRentPremium = isRent && searchStr.includes('premium');
+  const isRentPremium =
+    isRent &&
+    (quotation.layoutId?.includes('premium') ||
+      quotation.layout_id?.includes('premium') ||
+      searchStr.includes('premium'));
+
+  const isRentNormal = isRent && !isRentStandard && !isRentPremium;
+
+  const isLeaseStandard =
+    isLease &&
+    (quotation.layoutId?.includes('standard') ||
+      quotation.layout_id?.includes('standard') ||
+      searchStr.includes('standard') ||
+      searchStr.includes('standerd') ||
+      searchStr.includes('statntard') ||
+      searchStr.includes('stantdard') ||
+      searchStr.includes('stanterd') ||
+      searchStr.includes('statnderd')) &&
+    !searchStr.includes('premium');
+
+  const isLeasePremium =
+    isLease &&
+    (quotation.layoutId?.includes('premium') ||
+      quotation.layout_id?.includes('premium') ||
+      searchStr.includes('premium'));
+
+  const isLeaseNormal = isLease && !isLeaseStandard && !isLeasePremium;
 
   const useTemplate =
     isProductNormal ||
@@ -491,7 +519,10 @@ export function QuotationViewDialog({
     isSparePremium ||
     isRentNormal ||
     isRentStandard ||
-    isRentPremium;
+    isRentPremium ||
+    isLeaseNormal ||
+    isLeaseStandard ||
+    isLeasePremium;
 
   // ── Data mapping for Standard / Premium templates ─────────────────────────
   const templateLineItems = enrichedItems.map((item, idx) => {
@@ -520,10 +551,7 @@ export function QuotationViewDialog({
     const disc =
       item.discount !== undefined && item.discount > 0
         ? item.discount
-        : ((item as unknown as Record<string, unknown>).discountAmount as number) ||
-          extractedDisc ||
-          globalDiscountPerItem ||
-          0;
+        : item.discountAmount || extractedDisc || globalDiscountPerItem || 0;
 
     const qty = item.quantity || 1;
     const discountedPrice = unitP - disc;
@@ -596,7 +624,7 @@ export function QuotationViewDialog({
   const templateBillTo = {
     name: quotation.customerName || '',
     address: quotation.customerAddress || '',
-    trn: ((quotation as unknown as Record<string, unknown>).customerTrn as string) || '',
+    trn: quotation.customerTrn || '',
     email: quotation.customerEmail || '',
     phone: quotation.customerPhone || '',
   };
@@ -666,8 +694,7 @@ export function QuotationViewDialog({
         productName: pMeta?.name || fallbackName,
         brand: pMeta?.brandRelation?.name || pMeta?.brand || fallbackBrand,
         model: pMeta?.model_name || pMeta?.model_no || fallbackModel,
-        slNo:
-          pMeta?.serial_no || ((item as unknown as Record<string, unknown>).sn as string) || 'TBD',
+        slNo: pMeta?.serial_no || item.sn || 'TBD',
         description: pMeta?.description || item.description || '',
         qty: item.quantity || 1,
         limit: limitStr,
@@ -696,6 +723,91 @@ export function QuotationViewDialog({
     discountPercent: quotation.discountPercent || 0,
     discountedMonthlyRent:
       (quotation.monthlyRent || 0) * (1 - (quotation.discountPercent || 0) / 100),
+  };
+
+  const isFsmLease = quotation.leaseType === 'FSM';
+
+  const leaseTemplateLineItems = (quotation.items || [])
+    .filter((it) => it.itemType === 'PRODUCT' || !it.itemType)
+    .map((item) => {
+      const pMeta = productDetails[item.productId || ''] || productDetails[item.modelId || ''];
+      const cleanDesc = (item.description || '')
+        .replace(/\[STD\]/g, '')
+        .replace(/\[PRM\]/g, '')
+        .replace(/\[DISC:[^\]]*\]/g, '')
+        .trim();
+
+      const descParts = cleanDesc.split(' ');
+      const fallbackBrand = descParts[0] || 'N/A';
+      const fallbackModel = descParts[1] || 'N/A';
+      const fallbackName = descParts.slice(2).join(' ') || 'PRODUCT';
+
+      // For FSM leases, compute limit/excess exactly like rent
+      let limitStr = 'N/A';
+      let excessStr = 'N/A';
+      if (isFsmLease) {
+        const lRentType = quotation.rentType || 'FIXED_LIMIT';
+        const isCpc = lRentType === 'CPC' || lRentType === 'CPC_COMBO';
+        if (lRentType === 'FIXED_COMBO' || lRentType === 'CPC_COMBO') {
+          const lim = item.combinedIncludedLimit || 0;
+          limitStr = lim > 0 ? `Combined: ${lim}` : 'DIRECT BILLING (COMBO)';
+          excessStr = `Rate: ${Number(item.combinedExcessRate || 0).toFixed(3)}`;
+        } else if (lRentType === 'FIXED_FLAT') {
+          limitStr = 'FLAT RATE';
+          excessStr = 'N/A';
+        } else {
+          const bwLim = item.bwIncludedLimit || 0;
+          const clLim = item.colorIncludedLimit || 0;
+          limitStr =
+            bwLim > 0 || clLim > 0
+              ? `BW: ${bwLim}, Color: ${clLim}`
+              : isCpc
+                ? 'DIRECT BILLING'
+                : 'N/A';
+          excessStr = `BW: ${Number(item.bwExcessRate || 0).toFixed(3)}, Color: ${Number(item.colorExcessRate || 0).toFixed(3)}`;
+        }
+      }
+
+      return {
+        productName: pMeta?.name || fallbackName,
+        brand: pMeta?.brandRelation?.name || pMeta?.brand || fallbackBrand,
+        model: pMeta?.model_name || pMeta?.model_no || fallbackModel,
+        slNo: pMeta?.serial_no || item.sn || 'TBD',
+        description: pMeta?.description || item.description || '',
+        qty: item.quantity || 1,
+        limit: limitStr,
+        excessRate: excessStr,
+        rate: String(item.unitPrice || 0),
+        bwSlabs: item.bwSlabRanges || [],
+        colorSlabs: item.colorSlabRanges || [],
+        comboSlabs: item.comboSlabRanges || [],
+        productImage: pMeta?.imageUrl,
+        discount: item.discount || 0,
+      };
+    });
+
+  const leaseAgreementDetails = {
+    leaseType: quotation.leaseType || 'EMI',
+    // For FSM leases, also expose the rent-type pricing model
+    rentType: isFsmLease ? (quotation.rentType || 'FIXED_LIMIT').replace(/_/g, ' ') : undefined,
+    rentPeriod: isFsmLease ? (quotation.rentPeriod || 'MONTHLY').replace(/_/g, ' ') : undefined,
+    duration: `${quotation.leaseTenureMonths || 0} Months`,
+    advance: quotation.advanceAmount || 0,
+    deposit: quotation.securityDepositAmount || 0,
+    discountPercent: quotation.discountPercent || 0,
+    startDate: quotation.effectiveFrom
+      ? new Date(quotation.effectiveFrom).toLocaleDateString('en-GB')
+      : 'TBD',
+    endDate: quotation.effectiveTo
+      ? new Date(quotation.effectiveTo).toLocaleDateString('en-GB')
+      : 'TBD',
+    // FSM: periodic payment is stored in monthlyRent; total lease value in monthlyLeaseAmount
+    // EMI: periodic payment is stored in monthlyEmiAmount
+    monthlyEmi: isFsmLease ? quotation.monthlyRent || 0 : quotation.monthlyEmiAmount || 0,
+    // Total lease amount (for summary/totals row)
+    totalLeaseValue: isFsmLease
+      ? quotation.monthlyLeaseAmount || quotation.totalAmount || 0
+      : quotation.totalAmount || 0,
   };
 
   return (
@@ -806,6 +918,93 @@ export function QuotationViewDialog({
                   subTotal: quotation.monthlyRent || 0,
                   tax: 0,
                   total: quotation.monthlyRent || 0,
+                }}
+              />
+            )}
+            {isLeaseNormal && (
+              <LeaseNormalQuotation
+                billTo={templateBillTo}
+                quotation={templateQuotation}
+                lineItems={leaseTemplateLineItems}
+                leaseDetails={leaseAgreementDetails}
+                totals={{
+                  subTotal:
+                    quotation.totalLeaseAmount ||
+                    (isFsmLease
+                      ? quotation.monthlyLeaseAmount || quotation.totalAmount || 0
+                      : quotation.totalAmount ||
+                        (quotation.items || []).reduce(
+                          (acc, it) => acc + (it.quantity || 0) * (it.unitPrice || 0),
+                          0,
+                        )),
+                  tax: 0,
+                  total:
+                    quotation.totalLeaseAmount ||
+                    (isFsmLease
+                      ? quotation.monthlyLeaseAmount || quotation.totalAmount || 0
+                      : quotation.totalAmount ||
+                        (quotation.items || []).reduce(
+                          (acc, it) => acc + (it.quantity || 0) * (it.unitPrice || 0),
+                          0,
+                        )),
+                }}
+              />
+            )}
+            {isLeaseStandard && (
+              <LeaseStandardQuotation
+                billTo={templateBillTo}
+                quotation={templateQuotation}
+                lineItems={leaseTemplateLineItems}
+                leaseDetails={leaseAgreementDetails}
+                totals={{
+                  subTotal:
+                    quotation.totalLeaseAmount ||
+                    (isFsmLease
+                      ? quotation.monthlyLeaseAmount || quotation.totalAmount || 0
+                      : quotation.totalAmount ||
+                        (quotation.items || []).reduce(
+                          (acc, it) => acc + (it.quantity || 0) * (it.unitPrice || 0),
+                          0,
+                        )),
+                  tax: 0,
+                  total:
+                    quotation.totalLeaseAmount ||
+                    (isFsmLease
+                      ? quotation.monthlyLeaseAmount || quotation.totalAmount || 0
+                      : quotation.totalAmount ||
+                        (quotation.items || []).reduce(
+                          (acc, it) => acc + (it.quantity || 0) * (it.unitPrice || 0),
+                          0,
+                        )),
+                }}
+              />
+            )}
+            {isLeasePremium && (
+              <LeasePremiumQuotation
+                billTo={templateBillTo}
+                quotation={templateQuotation}
+                lineItems={leaseTemplateLineItems}
+                leaseDetails={leaseAgreementDetails}
+                totals={{
+                  subTotal:
+                    quotation.totalLeaseAmount ||
+                    (isFsmLease
+                      ? quotation.monthlyLeaseAmount || quotation.totalAmount || 0
+                      : quotation.totalAmount ||
+                        (quotation.items || []).reduce(
+                          (acc, it) => acc + (it.quantity || 0) * (it.unitPrice || 0),
+                          0,
+                        )),
+                  tax: 0,
+                  total:
+                    quotation.totalLeaseAmount ||
+                    (isFsmLease
+                      ? quotation.monthlyLeaseAmount || quotation.totalAmount || 0
+                      : quotation.totalAmount ||
+                        (quotation.items || []).reduce(
+                          (acc, it) => acc + (it.quantity || 0) * (it.unitPrice || 0),
+                          0,
+                        )),
                 }}
               />
             )}

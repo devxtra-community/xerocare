@@ -320,7 +320,9 @@ const RentStandardQuotation: React.FC<RentStandardQuotationProps> = ({
               >
                 Machine Info {lineItems.length > 1 ? `#${idx + 1}` : ''}
               </span>
-              <span style={{ color: BLUE, fontSize: '10px', fontWeight: 'bold' }}>S/N: TBD</span>
+              <span style={{ color: BLUE, fontSize: '10px', fontWeight: 'bold' }}>
+                S/N: {item.slNo || 'TBD'}
+              </span>
             </div>
             <div>
               <span style={{ color: '#888', marginRight: '5px' }}>Brand:</span>

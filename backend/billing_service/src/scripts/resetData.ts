@@ -19,6 +19,7 @@ async function resetData() {
       await queryRunner.query('DELETE FROM usage_record_items');
       await queryRunner.query('DELETE FROM usage_records');
       await queryRunner.query('DELETE FROM device_meter_readings');
+      await queryRunner.query('DELETE FROM payment_ledgers');
       await queryRunner.query('DELETE FROM return_credits');
       await queryRunner.query('DELETE FROM product_allocations');
       await queryRunner.query('DELETE FROM invoice_items');

@@ -310,7 +310,7 @@ const RentNormalQuotation: React.FC<RentNormalQuotationProps> = ({
               </div>
               <div style={{ gridColumn: 'span 2' }}>
                 <span style={{ color: '#888', marginRight: '5px' }}>Sl No:</span>
-                <span style={{ fontWeight: '600' }}>TBD</span>
+                <span style={{ fontWeight: '600' }}>{item.slNo || 'TBD'}</span>
               </div>
               <div style={{ marginBottom: '6px' }}>
                 <span style={{ fontSize: '10px', color: '#555', fontWeight: '600' }}>
