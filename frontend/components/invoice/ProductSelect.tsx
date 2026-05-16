@@ -87,7 +87,10 @@ export function ProductSelect({
       value: item.id,
       label: label,
       description: `${type} • QAR ${price.toLocaleString()}`,
-      disabled: false, // Always allow selection so user can quote out-of-stock items
+      disabled:
+        'product_status' in item &&
+        item.product_status !== ProductStatus.AVAILABLE &&
+        item.product_status !== undefined,
     };
   });
 

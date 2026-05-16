@@ -29,6 +29,7 @@ export interface Product {
   imageUrl?: string;
   description?: string;
   hs_code?: string;
+  features?: { subHeading: string; description: string }[];
   created_at: string;
   inventory?: {
     id: string;
@@ -58,6 +59,7 @@ export interface CreateProductData {
   tax_rate: number;
   product_status?: ProductStatus;
   hs_code?: string;
+  features?: { subHeading: string; description: string }[];
 }
 
 export interface UpdateProductData {
@@ -75,6 +77,7 @@ export interface UpdateProductData {
   tax_rate?: number;
   product_status?: ProductStatus;
   hs_code?: string;
+  features?: { subHeading: string; description: string }[];
 }
 
 interface ApiResponse<T> {

@@ -41,6 +41,7 @@ interface ProductMeta {
   name?: string;
   part_name?: string;
   description?: string;
+  features?: { subHeading: string; description: string }[];
   yield?: string;
   inventory?: { description?: string }[];
   image?: string;
@@ -562,6 +563,18 @@ export function QuotationViewDialog({
       item.description ||
       '';
 
+    // Parse consumables if present
+    const consTags = dStr.match(/\[CONS:[^\]]+\]/g) || [];
+    const consumables = consTags.map((tag: string) => {
+      const parts = tag.replace('[CONS:', '').replace(']', '').split('|');
+      return {
+        partName: parts[0] || '',
+        description: parts[1] || '',
+        yield: parts[2] || '',
+        price: parts[3] || '',
+      };
+    });
+
     // Clean all tags for display
     const cleanDesc = rawDesc
       .replace(/\[STD\]/g, '')
@@ -571,6 +584,7 @@ export function QuotationViewDialog({
       .replace(/\[MN:.*?\]/g, '')
       .replace(/\[PN:.*?\]/g, '')
       .replace(/\[HS:.*?\]/g, '')
+      .replace(/\[CONS:.*?\]/g, '')
       .trim();
 
     const hsCodePart = exHS ? `[HS: ${exHS}] ` : '';
@@ -581,6 +595,7 @@ export function QuotationViewDialog({
       modelNo: exMN || item.metadata?.model?.model_name || item.metadata?.model_name || 'Generic',
       slNo: item.allocation?.serialNumber || item.metadata?.serial_no || 'TBD',
       description: (hsCodePart + cleanDesc).trim(),
+      features: (item.metadata?.features as { subHeading: string; description: string }[]) || [],
       qty: qty,
       unitPrice: unitP,
       specialPrice: discountedPrice,
@@ -589,6 +604,7 @@ export function QuotationViewDialog({
       productImage: item.metadata?.imageUrl || item.metadata?.image_url || item.metadata?.image,
       discount: disc,
       mpn: item.metadata?.mpn || extractTag('MPN'),
+      consumables: consumables,
     };
   });
 
@@ -696,6 +712,7 @@ export function QuotationViewDialog({
         model: pMeta?.model_name || pMeta?.model_no || fallbackModel,
         slNo: pMeta?.serial_no || item.sn || 'TBD',
         description: pMeta?.description || item.description || '',
+        features: pMeta?.features || [],
         qty: item.quantity || 1,
         limit: limitStr,
         excessRate: excessStr,
@@ -774,6 +791,7 @@ export function QuotationViewDialog({
         model: pMeta?.model_name || pMeta?.model_no || fallbackModel,
         slNo: pMeta?.serial_no || item.sn || 'TBD',
         description: pMeta?.description || item.description || '',
+        features: pMeta?.features || [],
         qty: item.quantity || 1,
         limit: limitStr,
         excessRate: excessStr,
@@ -1181,34 +1199,44 @@ export function QuotationViewDialog({
                 </div>
               </div>
 
-              {/* Brand / Model / Sl No - Large Row exactly like image */}
-              <div className="flex justify-center gap-16 py-4 border-b border-slate-100 uppercase">
-                <div className="flex gap-4 items-center">
-                  <span className="text-base font-black text-slate-900 tracking-widest">BRAND</span>
-                  <span className="text-base font-bold text-slate-600 italic leading-none">
+              {/* Brand / Model / Sl No / MPN - Large Row */}
+              <div className="flex justify-center gap-12 py-4 border-b border-slate-100 uppercase overflow-x-auto scrollbar-hide">
+                <div className="flex gap-3 items-center shrink-0">
+                  <span className="text-[11px] font-black text-slate-400 tracking-widest">
+                    BRAND
+                  </span>
+                  <span className="text-base font-black text-slate-900 leading-none">
                     {enrichedItems[0]?.metadata?.brandRelation?.name ||
                       enrichedItems[0]?.metadata?.brand ||
                       'N/A'}
                   </span>
                 </div>
-                <div className="flex gap-4 items-center">
-                  <span className="text-base font-black text-slate-900 tracking-widest">
-                    MODEL NO
+                <div className="flex gap-3 items-center shrink-0 border-l border-slate-100 pl-8">
+                  <span className="text-[11px] font-black text-slate-400 tracking-widest">
+                    MODEL
                   </span>
-                  <span className="text-base font-bold text-slate-600 italic leading-none">
+                  <span className="text-base font-black text-slate-900 leading-none">
                     {enrichedItems[0]?.metadata?.model?.model_name ||
                       enrichedItems[0]?.metadata?.model_name ||
                       'N/A'}
                   </span>
                 </div>
-                <div className="flex gap-4 items-center">
-                  <span className="text-base font-black text-slate-900 tracking-widest">SL NO</span>
-                  <span className="text-base font-bold text-slate-600 italic leading-none">
+                <div className="flex gap-3 items-center shrink-0 border-l border-slate-100 pl-8">
+                  <span className="text-[11px] font-black text-slate-400 tracking-widest">
+                    SL NO
+                  </span>
+                  <span className="text-base font-black text-slate-900 leading-none">
                     {quotation.type === 'QUOTATION'
                       ? 'TBD UPON DISPATCH'
                       : enrichedItems[0]?.allocation?.serialNumber ||
                         enrichedItems[0]?.metadata?.serial_no ||
                         (!isRent && !isLease ? 'N/A' : 'TBD UPON DISPATCH')}
+                  </span>
+                </div>
+                <div className="flex gap-3 items-center shrink-0 border-l border-slate-100 pl-8">
+                  <span className="text-[11px] font-black text-slate-400 tracking-widest">MPN</span>
+                  <span className="text-base font-black text-red-600 leading-none">
+                    {enrichedItems[0]?.metadata?.mpn || 'N/A'}
                   </span>
                 </div>
               </div>
@@ -1231,13 +1259,7 @@ export function QuotationViewDialog({
                     <thead>
                       {isSale && (
                         <tr className="bg-red-700 text-white">
-                          <th className="text-left py-4 px-8 text-[12px] font-black uppercase tracking-widest border-r border-red-600/40">
-                            MPN
-                          </th>
-                          <th className="text-left py-4 px-8 text-[12px] font-black uppercase tracking-widest border-r border-red-600/40">
-                            Product Name
-                          </th>
-                          <th className="text-left py-4 px-8 text-[12px] font-black uppercase tracking-widest border-r border-red-600/40">
+                          <th className="text-left py-4 px-8 text-[12px] font-black uppercase tracking-widest border-r border-red-600/40 w-full">
                             Description
                           </th>
                           <th className="text-center py-4 px-6 text-[12px] font-black uppercase tracking-widest border-r border-red-600/40">
@@ -1302,11 +1324,16 @@ export function QuotationViewDialog({
                       {enrichedItems.map((item, idx) => {
                         const detail = item.metadata;
                         const image = detail?.imageUrl || detail?.image_url;
-                        const mpn = detail?.mpn || ' ';
-                        const productName =
-                          detail?.name || detail?.part_name || item.description || 'N/A';
-                        const productDesc =
-                          detail?.description || 'Standard specification as per brand guidelines.';
+                        const stripTags = (str: string) =>
+                          str.replace(/\[[A-Z0-9]+:[^\]]*\]/g, '').trim();
+                        const isManual =
+                          (item.description || '').includes('[BN:') ||
+                          (item.description || '').includes('[PN:');
+                        const productDesc = stripTags(
+                          detail?.description ||
+                            (isManual ? item.description : '') ||
+                            'Standard specification as per brand guidelines.',
+                        );
 
                         return (
                           <React.Fragment key={idx}>
@@ -1314,17 +1341,7 @@ export function QuotationViewDialog({
                               className="group hover:bg-red-50/40 transition-all duration-300 border-b border-red-50/50"
                               style={{ minHeight: '200px' }}
                             >
-                              <td className="py-3 px-4 border-r-2 border-red-50 align-top relative">
-                                <span className="text-[12px] font-black text-slate-800">{mpn}</span>
-                              </td>
-                              <td className="py-3 px-4 border-r-2 border-red-50 relative w-1/4">
-                                <div className="relative z-10 space-y-1">
-                                  <p className="text-[13px] font-black text-slate-900 uppercase tracking-tight leading-snug">
-                                    {productName}
-                                  </p>
-                                </div>
-                              </td>
-                              <td className="py-3 px-4 border-r-2 border-red-50 align-top relative w-1/4">
+                              <td className="py-3 px-4 border-r-2 border-red-50 align-top relative w-[60%]">
                                 <div className="flex gap-4">
                                   {image && (
                                     <img
@@ -1334,9 +1351,46 @@ export function QuotationViewDialog({
                                       className="w-[180px] h-[180px] object-contain mix-blend-multiply shrink-0 opacity-100"
                                     />
                                   )}
-                                  <p className="text-[11px] text-slate-500 leading-relaxed font-bold opacity-90 uppercase mt-1">
-                                    {productDesc}
-                                  </p>
+                                  <div className="flex flex-col gap-3">
+                                    <div className="space-y-1">
+                                      <p className="text-[12px] font-black text-red-600 uppercase tracking-widest flex items-center gap-2">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-red-600" />
+                                        Product Description
+                                      </p>
+                                      <p className="text-[13px] text-slate-900 leading-relaxed font-black uppercase">
+                                        {productDesc}
+                                      </p>
+                                    </div>
+
+                                    {/* Features Display if present in description or metadata */}
+                                    {detail?.features && (
+                                      <div className="space-y-2 pt-3 border-t border-red-100">
+                                        <p className="text-[12px] font-black text-red-600 uppercase tracking-widest flex items-center gap-2">
+                                          <span className="w-1.5 h-1.5 rounded-full bg-red-600" />
+                                          Features
+                                        </p>
+                                        <div className="grid grid-cols-1 gap-3">
+                                          {(
+                                            detail.features as {
+                                              subHeading: string;
+                                              description: string;
+                                            }[]
+                                          ).map((f, fi) => (
+                                            <div key={fi} className="space-y-1">
+                                              {f.subHeading && (
+                                                <p className="text-[14px] font-black text-red-500 uppercase">
+                                                  {f.subHeading}
+                                                </p>
+                                              )}
+                                              <p className="text-[14px] text-slate-700 font-bold leading-tight">
+                                                {f.description}
+                                              </p>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
                                 </div>
                               </td>
                               <td className="py-3 px-3 text-center border-r-2 border-red-50 align-top font-black text-slate-900 text-sm">
@@ -1483,6 +1537,115 @@ export function QuotationViewDialog({
                     </tbody>
                   </table>
                 </div>
+
+                {/* Second Page Simulation: Replacement Consumables */}
+                {isSale &&
+                  (quotation.items || []).some((item: { description?: string }) =>
+                    (item.description || '').includes('[CONS:'),
+                  ) && (
+                    <div className="mt-12 px-10 pt-10 border-t-4 border-double border-slate-100 bg-slate-50/30 rounded-t-[3rem]">
+                      <div className="flex items-center justify-between mb-8">
+                        <div>
+                          <h3 className="text-2xl font-black text-slate-800 uppercase tracking-tighter">
+                            Replacement Consumables
+                          </h3>
+                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">
+                            Supplementary Price List for Associated Products
+                          </p>
+                        </div>
+                        <div className="bg-blue-600 px-4 py-1.5 rounded-full">
+                          <p className="text-[10px] font-black text-white uppercase tracking-widest">
+                            Page 02
+                          </p>
+                        </div>
+                      </div>
+
+                      {(quotation.items || [])
+                        .filter((item: { description?: string }) =>
+                          (item.description || '').includes('[CONS:'),
+                        )
+                        .map((item: { description?: string }, idx: number) => {
+                          const consTags = item.description?.match(/\[CONS:[^\]]+\]/g) || [];
+                          return (
+                            <div
+                              key={idx}
+                              className="mb-10 animate-in fade-in slide-in-from-bottom-4 duration-500"
+                            >
+                              <div className="flex items-center gap-4 mb-4 bg-white p-4 rounded-2xl border border-slate-100 shadow-sm leading-tight">
+                                <div className="bg-red-50 text-red-600 p-2.5 rounded-xl font-black text-xs">
+                                  #{idx + 1}
+                                </div>
+                                <div>
+                                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                                    Pricing for:
+                                  </p>
+                                  <p className="text-sm font-black text-slate-800 uppercase">
+                                    Product Order associated items
+                                  </p>
+                                </div>
+                              </div>
+
+                              <div className="bg-white rounded-3xl border border-slate-100 shadow-xl overflow-hidden">
+                                <div className="grid grid-cols-12 gap-4 px-6 py-4 bg-slate-800 text-white">
+                                  <div className="col-span-3 text-[9px] font-black uppercase tracking-widest opacity-80">
+                                    Part Name
+                                  </div>
+                                  <div className="col-span-4 text-[9px] font-black uppercase tracking-widest opacity-80">
+                                    Description
+                                  </div>
+                                  <div className="col-span-3 text-[9px] font-black uppercase tracking-widest opacity-80">
+                                    Yield
+                                  </div>
+                                  <div className="col-span-2 text-[9px] font-black uppercase tracking-widest opacity-80 text-right">
+                                    Price (QAR)
+                                  </div>
+                                </div>
+                                <div className="divide-y divide-slate-50">
+                                  {consTags.map((tag: string, cIdx: number) => {
+                                    const parts = tag
+                                      .replace('[CONS:', '')
+                                      .replace(']', '')
+                                      .split('|');
+                                    return (
+                                      <div
+                                        key={cIdx}
+                                        className="grid grid-cols-12 gap-4 px-6 py-4 items-center hover:bg-slate-50/50 transition-colors"
+                                      >
+                                        <div className="col-span-3 text-[11px] font-black text-slate-900">
+                                          {parts[0]}
+                                        </div>
+                                        <div className="col-span-4 text-[11px] font-bold text-slate-500 leading-relaxed">
+                                          {parts[1]}
+                                        </div>
+                                        <div className="col-span-3 text-[11px] font-bold text-slate-500">
+                                          {parts[2]}
+                                        </div>
+                                        <div className="col-span-2 text-[13px] font-black text-blue-700 text-right">
+                                          {Number(parts[3] || 0).toLocaleString(undefined, {
+                                            minimumFractionDigits: 2,
+                                          })}
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+
+                      <div className="mt-8 p-6 bg-blue-50/50 rounded-2xl border border-blue-100/50 border-dashed mb-10">
+                        <p className="text-[11px] text-blue-800 leading-relaxed">
+                          <span className="font-black mr-2 uppercase tracking-tight italic">
+                            Note:
+                          </span>
+                          The consumables listed above are supplementary options for the main
+                          products quoted on Page 1. Prices are subject to standard verification at
+                          the time of separate purchase.
+                        </p>
+                      </div>
+                    </div>
+                  )}
 
                 {onApprove && onReject && quotation.status === 'PENDING' && (
                   <div className="px-10 pb-4 pt-4 shrink-0 flex justify-end items-center gap-6 bg-white">

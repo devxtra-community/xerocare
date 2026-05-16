@@ -19,6 +19,7 @@ export interface RentLineItem {
   colorSlabs?: SlabRange[];
   comboSlabs?: SlabRange[];
   image?: string;
+  features?: { subHeading: string; description: string }[];
 }
 
 export interface RentAgreementDetails {
@@ -348,10 +349,10 @@ const RentStandardQuotation: React.FC<RentStandardQuotationProps> = ({
           <thead>
             <tr style={{ backgroundColor: BLUE, color: '#fff' }}>
               <th style={th('center')}>NO.</th>
-              <th style={{ ...th('left'), width: '480px' }}>DESCRIPTION</th>
-              <th style={th('center')}>QTY.</th>
-              <th style={th('center')}>FREE LIMIT</th>
-              <th style={th('right')}>EXCESS RATE</th>
+              <th style={{ ...th('left'), width: '50%', textAlign: 'left' }}>Description</th>
+              <th style={th('center')}>Qty</th>
+              <th style={th('center')}>Limit</th>
+              <th style={th('right')}>Excess Rate</th>
             </tr>
           </thead>
           <tbody>
@@ -367,9 +368,8 @@ const RentStandardQuotation: React.FC<RentStandardQuotationProps> = ({
                 <td
                   style={{
                     ...td('left'),
-                    height: '320px',
+                    minHeight: '320px',
                     position: 'relative',
-                    overflow: 'hidden',
                     padding: 0,
                   }}
                 >
@@ -402,15 +402,62 @@ const RentStandardQuotation: React.FC<RentStandardQuotationProps> = ({
                   >
                     <div
                       style={{
-                        fontSize: '12px',
+                        fontSize: '16px',
                         color: '#333',
                         marginTop: '10px',
                         fontWeight: '600',
-                        maxWidth: '75%',
-                        lineHeight: '1.5',
+                        maxWidth: '95%',
+                        lineHeight: '1.6',
                       }}
                     >
-                      {item.description}
+                      <div
+                        style={{
+                          fontSize: '13px',
+                          fontWeight: '800',
+                          color: '#dc2626',
+                          textTransform: 'uppercase',
+                          marginBottom: '6px',
+                        }}
+                      >
+                        Product Description
+                      </div>
+                      <div style={{ marginBottom: item.features?.length ? '12px' : '0' }}>
+                        {item.description}
+                      </div>
+                      {(item.features || []).length > 0 && (
+                        <>
+                          <div
+                            style={{
+                              fontSize: '13px',
+                              fontWeight: '800',
+                              color: '#dc2626',
+                              textTransform: 'uppercase',
+                              marginBottom: '6px',
+                              marginTop: '16px',
+                            }}
+                          >
+                            Features
+                          </div>
+                          {(item.features || []).map((f, i) => (
+                            <div key={i} style={{ marginTop: '8px', fontSize: '15px' }}>
+                              {f.subHeading && (
+                                <strong
+                                  style={{
+                                    color: '#dc2626',
+                                    display: 'block',
+                                    marginBottom: '4px',
+                                  }}
+                                >
+                                  {f.subHeading}
+                                </strong>
+                              )}
+                              {f.description && (
+                                <div style={{ color: '#555' }}>{f.description}</div>
+                              )}
+                            </div>
+                          ))}
+                        </>
+                      )}
                     </div>
                   </div>
                 </td>

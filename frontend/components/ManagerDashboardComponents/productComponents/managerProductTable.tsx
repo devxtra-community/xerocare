@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Search, Plus, X, Eye, Copy } from 'lucide-react';
+import { Search, Plus, X, Eye, Copy, List } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import {
@@ -367,6 +367,7 @@ function ProductFormModal({
     wholesale_price: string | number;
     lot_id: string;
     description: string;
+    features: { subHeading: string; description: string }[];
     hs_code: string;
   }>({
     name: initialData?.name || '',
@@ -386,8 +387,29 @@ function ProductFormModal({
     wholesale_price: initialData?.wholesale_price ?? '',
     lot_id: initialData?.lot_id || '', // Check if initialData has lot_id support if needed
     description: initialData?.description || '',
+    features: initialData?.features || [],
     hs_code: initialData?.hs_code || '',
   });
+
+  const insertBullet = (field: 'description' | 'feature', featureIndex?: number) => {
+    if (field === 'description') {
+      setForm((prev) => ({
+        ...prev,
+        description:
+          prev.description +
+          (prev.description && !prev.description.endsWith('\n') ? '\n' : '') +
+          '• ',
+      }));
+    } else if (field === 'feature' && typeof featureIndex === 'number') {
+      const newFeatures = [...form.features];
+      newFeatures[featureIndex].description +=
+        (newFeatures[featureIndex].description &&
+        !newFeatures[featureIndex].description.endsWith('\n')
+          ? '\n'
+          : '') + '• ';
+      setForm({ ...form, features: newFeatures });
+    }
+  };
 
   // Derived state for filtering models
   // We need to find the brand ID corresponding to the current form.brand name if we are editing
@@ -518,8 +540,11 @@ function ProductFormModal({
       setIsSubmitting(true);
       const formData = new FormData();
       Object.entries(form).forEach(([key, value]) => {
-        // Allow empty string for imageUrl to support removal, but skip for other required fields
-        if (value !== undefined && value !== null && (value !== '' || key === 'imageUrl')) {
+        if (key === 'features') {
+          if (Array.isArray(value) && value.length > 0) {
+            formData.append('features', JSON.stringify(value));
+          }
+        } else if (value !== undefined && value !== null && (value !== '' || key === 'imageUrl')) {
           formData.append(key, value.toString());
         }
       });
@@ -611,14 +636,106 @@ function ProductFormModal({
           </Field>
 
           <Field label="Description">
-            <Textarea
-              value={form.description}
-              onChange={(e) => setForm({ ...form, description: e.target.value })}
-              placeholder="Enter product description"
-              className="resize-none"
-              rows={3}
-            />
+            <div className="flex flex-col gap-2">
+              <div className="flex justify-start">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => insertBullet('description')}
+                  className="h-7 text-xs px-2"
+                >
+                  <List size={12} className="mr-1" /> Add Bullet Point
+                </Button>
+              </div>
+              <Textarea
+                value={form.description}
+                onChange={(e) => setForm({ ...form, description: e.target.value })}
+                placeholder="Enter product description"
+                className="resize-none"
+                rows={3}
+              />
+            </div>
           </Field>
+
+          <div className="pt-2 border-t mt-4">
+            <div className="flex justify-between items-center mb-2">
+              <label className="text-sm font-semibold text-slate-700">Features</label>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() =>
+                  setForm((prev) => ({
+                    ...prev,
+                    features: [...prev.features, { subHeading: '', description: '' }],
+                  }))
+                }
+                className="h-7 text-xs px-2"
+              >
+                <Plus size={12} className="mr-1" /> Add Feature
+              </Button>
+            </div>
+
+            {form.features.map((feature, idx) => (
+              <div key={idx} className="bg-slate-50 p-3 rounded-md mb-3 border relative">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const newF = [...form.features];
+                    newF.splice(idx, 1);
+                    setForm({ ...form, features: newF });
+                  }}
+                  className="absolute top-2 right-2 text-red-500 hover:text-red-700"
+                >
+                  <X size={14} />
+                </button>
+                <div className="space-y-2">
+                  <div>
+                    <label className="text-xs text-slate-500 mb-1 block">Sub Heading</label>
+                    <Input
+                      value={feature.subHeading}
+                      onChange={(e) => {
+                        const newF = [...form.features];
+                        newF[idx].subHeading = e.target.value;
+                        setForm({ ...form, features: newF });
+                      }}
+                      placeholder="e.g. Speed Configuration"
+                      className="h-8"
+                    />
+                  </div>
+                  <div>
+                    <div className="flex justify-between items-center mb-1">
+                      <label className="text-xs text-slate-500">Feature Description</label>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => insertBullet('feature', idx)}
+                        className="h-6 text-[10px] px-2 text-primary"
+                      >
+                        <List size={10} className="mr-1" /> Add Bullet Point
+                      </Button>
+                    </div>
+                    <Textarea
+                      value={feature.description}
+                      onChange={(e) => {
+                        const newF = [...form.features];
+                        newF[idx].description = e.target.value;
+                        setForm({ ...form, features: newF });
+                      }}
+                      placeholder="Enter description details"
+                      className="resize-none text-sm min-h-[60px]"
+                      rows={2}
+                    />
+                  </div>
+                </div>
+              </div>
+            ))}
+            {form.features.length === 0 && (
+              <p className="text-xs text-slate-400 text-center py-2">No features added yet.</p>
+            )}
+          </div>
         </div>
 
         {/* Right Column */}

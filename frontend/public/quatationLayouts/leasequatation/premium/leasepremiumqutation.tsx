@@ -23,6 +23,7 @@ export interface LeaseLineItem {
   comboSlabs?: SlabRange[];
   productImage?: string;
   discount?: number;
+  features?: { subHeading: string; description: string }[];
 }
 
 export interface LeaseAgreementDetails {
@@ -116,7 +117,6 @@ const LeasePremiumQuotation: React.FC<LeasePremiumQuotationProps> = ({
         display: 'flex',
         flexDirection: 'column',
         boxShadow: '0 0 100px rgba(0,0,0,0.8)',
-        overflow: 'hidden',
       }}
     >
       {/* ─── MODERN DECORATIVE ELEMENTS ─── */}
@@ -286,6 +286,7 @@ const LeasePremiumQuotation: React.FC<LeasePremiumQuotationProps> = ({
                     textAlign: 'left',
                     fontSize: '10px',
                     color: ACCENT_COLOR,
+                    width: '50%',
                   }}
                 >
                   ITEM DESCRIPTION
@@ -380,7 +381,7 @@ const LeasePremiumQuotation: React.FC<LeasePremiumQuotationProps> = ({
               {lineItems.map((it, idx) => (
                 <tr
                   key={idx}
-                  style={{ borderBottom: '1px solid rgba(255,255,255,0.03)', height: '450px' }}
+                  style={{ borderBottom: '1px solid rgba(255,255,255,0.03)', minHeight: '320px' }}
                 >
                   <td
                     style={{
@@ -388,7 +389,7 @@ const LeasePremiumQuotation: React.FC<LeasePremiumQuotationProps> = ({
                       textAlign: 'center',
                       fontSize: '13px',
                       color: TEXT_MUTED,
-                      height: '450px',
+                      minHeight: '320px',
                     }}
                   >
                     {idx + 1}
@@ -399,7 +400,7 @@ const LeasePremiumQuotation: React.FC<LeasePremiumQuotationProps> = ({
                       position: 'relative',
                       overflow: 'hidden',
                       minWidth: '400px',
-                      height: '450px',
+                      minHeight: '320px',
                     }}
                   >
                     {/* Product Watermark */}
@@ -434,7 +435,7 @@ const LeasePremiumQuotation: React.FC<LeasePremiumQuotationProps> = ({
                     >
                       <div
                         style={{
-                          fontSize: '18px',
+                          fontSize: '20px',
                           fontWeight: '800',
                           color: '#fff',
                           marginBottom: '8px',
@@ -444,13 +445,61 @@ const LeasePremiumQuotation: React.FC<LeasePremiumQuotationProps> = ({
                       </div>
                       <div
                         style={{
-                          fontSize: '12.5px',
-                          color: TEXT_MUTED,
+                          fontSize: '16px',
+                          color: TEXT_WHITE,
+                          fontWeight: '600',
+                          maxWidth: '95%',
                           lineHeight: '1.6',
-                          fontWeight: '500',
                         }}
                       >
-                        {it.description}
+                        <div
+                          style={{
+                            fontSize: '13px',
+                            fontWeight: '800',
+                            color: '#ff4d4d',
+                            textTransform: 'uppercase',
+                            marginBottom: '6px',
+                          }}
+                        >
+                          Product Description
+                        </div>
+                        <div style={{ marginBottom: it.features?.length ? '12px' : '0' }}>
+                          {it.description}
+                        </div>
+                        {(it.features || []).length > 0 && (
+                          <>
+                            <div
+                              style={{
+                                fontSize: '13px',
+                                fontWeight: '800',
+                                color: '#ff4d4d',
+                                textTransform: 'uppercase',
+                                marginBottom: '6px',
+                                marginTop: '16px',
+                              }}
+                            >
+                              Features
+                            </div>
+                            {(it.features || []).map((f, i) => (
+                              <div key={i} style={{ marginTop: '8px', fontSize: '15px' }}>
+                                {f.subHeading && (
+                                  <strong
+                                    style={{
+                                      color: '#ff4d4d',
+                                      display: 'block',
+                                      marginBottom: '4px',
+                                    }}
+                                  >
+                                    {f.subHeading}
+                                  </strong>
+                                )}
+                                {f.description && (
+                                  <div style={{ color: '#ccc' }}>{f.description}</div>
+                                )}
+                              </div>
+                            ))}
+                          </>
+                        )}
                       </div>
                     </div>
                   </td>
@@ -460,7 +509,7 @@ const LeasePremiumQuotation: React.FC<LeasePremiumQuotationProps> = ({
                       textAlign: 'center',
                       fontSize: '16px',
                       fontWeight: '700',
-                      height: '450px',
+                      minHeight: '320px',
                     }}
                   >
                     {it.qty}
@@ -471,7 +520,7 @@ const LeasePremiumQuotation: React.FC<LeasePremiumQuotationProps> = ({
                       textAlign: 'center',
                       fontSize: '12px',
                       color: TEXT_MUTED,
-                      height: '450px',
+                      minHeight: '320px',
                     }}
                   >
                     {it.limit}

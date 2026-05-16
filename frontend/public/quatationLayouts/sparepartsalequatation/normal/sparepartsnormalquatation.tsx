@@ -266,12 +266,12 @@ const SparePartsNormalQuotation: React.FC<SparePartsNormalQuotationProps> = ({
               }}
             >
               {[
-                { label: 'MPN', width: '15%' },
-                { label: 'DESCRIPTION', width: '40%' },
-                { label: 'QUANTITY', width: '10%' },
-                { label: 'RATE', width: '12%' },
-                { label: 'DISCOUNT', width: '10%' },
-                { label: 'TOTAL', width: '13%' },
+                { label: 'MPN', width: '12%' },
+                { label: 'DESCRIPTION', width: '50%' },
+                { label: 'QUANTITY', width: '8%' },
+                { label: 'RATE', width: '10%' },
+                { label: 'DISCOUNT', width: '8%' },
+                { label: 'TOTAL', width: '12%' },
               ].map(({ label, width }) => (
                 <th
                   key={label}
@@ -293,9 +293,24 @@ const SparePartsNormalQuotation: React.FC<SparePartsNormalQuotationProps> = ({
             {lineItems.map((item, idx) => (
               <tr key={idx} style={{ borderBottom: '1px solid #f0f0f0' }}>
                 <td style={tdStyle('center')}>{item.mpn || '---'}</td>
-                <td style={{ ...tdStyle('left'), lineHeight: '1.5' }}>
-                  <div style={{ fontWeight: '700', marginBottom: '2px' }}>{item.productName}</div>
-                  <div style={{ fontSize: '10px', color: '#666' }}>{item.description}</div>
+                <td style={{ ...tdStyle('left'), lineHeight: '1.6', padding: '15px 12px' }}>
+                  <div style={{ fontWeight: '700', marginBottom: '8px', fontSize: '16px' }}>
+                    {item.productName}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: '13px',
+                      fontWeight: '800',
+                      color: '#dc2626',
+                      textTransform: 'uppercase',
+                      marginBottom: '4px',
+                    }}
+                  >
+                    Product Description
+                  </div>
+                  <div style={{ fontSize: '16px', color: '#444', fontWeight: '500' }}>
+                    {item.description}
+                  </div>
                 </td>
                 <td style={tdStyle('center')}>{item.qty}</td>
                 <td style={tdStyle('center')}>{fmt(item.unitPrice)}</td>

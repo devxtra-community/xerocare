@@ -18,6 +18,7 @@ export interface AddProductDTO {
   imageUrl?: string | null;
   lot_id?: string;
   description?: string;
+  features?: { subHeading: string; description: string }[];
   hs_code?: string;
 }
 
@@ -40,5 +41,6 @@ export interface BulkProductRow {
   lot_id?: string;
   model_id?: string;
   description?: string;
+  features?: { subHeading: string; description: string }[];
   hs_code?: string;
 }

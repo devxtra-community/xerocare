@@ -302,6 +302,7 @@ const SparePartsStandardQuotation: React.FC<SparePartsStandardQuotationProps> = 
                 fontWeight: '600',
                 borderRadius: '4px 0 0 0',
                 fontSize: '11px',
+                width: '12%',
               }}
             >
               MPN
@@ -312,6 +313,7 @@ const SparePartsStandardQuotation: React.FC<SparePartsStandardQuotationProps> = 
                 textAlign: 'left',
                 fontWeight: '600',
                 fontSize: '11px',
+                width: '50%',
               }}
             >
               Description
@@ -322,6 +324,7 @@ const SparePartsStandardQuotation: React.FC<SparePartsStandardQuotationProps> = 
                 textAlign: 'center',
                 fontWeight: '600',
                 fontSize: '11px',
+                width: '8%',
               }}
             >
               Qty
@@ -332,6 +335,7 @@ const SparePartsStandardQuotation: React.FC<SparePartsStandardQuotationProps> = 
                 textAlign: 'right',
                 fontWeight: '600',
                 fontSize: '11px',
+                width: '10%',
               }}
             >
               Rate
@@ -342,6 +346,7 @@ const SparePartsStandardQuotation: React.FC<SparePartsStandardQuotationProps> = 
                 textAlign: 'right',
                 fontWeight: '600',
                 fontSize: '11px',
+                width: '8%',
               }}
             >
               Discount
@@ -353,6 +358,7 @@ const SparePartsStandardQuotation: React.FC<SparePartsStandardQuotationProps> = 
                 fontWeight: '600',
                 borderRadius: '0 4px 0 0',
                 fontSize: '11px',
+                width: '12%',
               }}
             >
               Total
@@ -409,12 +415,24 @@ const SparePartsStandardQuotation: React.FC<SparePartsStandardQuotationProps> = 
                 >
                   <div
                     style={{
-                      fontSize: '11px',
-                      color: mutedText,
-                      fontWeight: '500',
-                      maxWidth: '85%',
+                      fontSize: '16px',
+                      color: textColor,
+                      fontWeight: '600',
+                      maxWidth: '95%',
+                      lineHeight: '1.6',
                     }}
                   >
+                    <div
+                      style={{
+                        fontSize: '13px',
+                        fontWeight: '800',
+                        color: '#dc2626',
+                        textTransform: 'uppercase',
+                        marginBottom: '6px',
+                      }}
+                    >
+                      Product Description
+                    </div>
                     {item.description}
                   </div>
                 </div>

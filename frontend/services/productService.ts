@@ -31,6 +31,7 @@ export interface Product {
   lot?: { lotNumber: string };
   description?: string;
   hs_code?: string;
+  features?: { subHeading: string; description: string }[];
 }
 
 /**
@@ -54,6 +55,7 @@ export interface CreateProductDTO {
   lot_id?: string;
   description?: string;
   hs_code?: string;
+  features?: { subHeading: string; description: string }[];
 }
 
 /**

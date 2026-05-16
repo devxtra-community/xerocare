@@ -133,6 +133,9 @@ export class Product {
   @Column({ type: 'text', nullable: true })
   description?: string;
 
+  @Column({ type: 'jsonb', nullable: true })
+  features?: { subHeading: string; description: string }[];
+
   @Column({ type: 'varchar', length: 100, nullable: true })
   hs_code?: string;
 

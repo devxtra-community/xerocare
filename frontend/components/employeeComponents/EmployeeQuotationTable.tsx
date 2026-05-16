@@ -71,6 +71,13 @@ import { LayoutSelectionDialog } from './LayoutSelectionDialog';
 
 type QuotationType = 'RENT' | 'LEASE' | 'PRODUCT_SALE' | 'SPAREPART_SALE';
 
+interface Consumable {
+  partName: string;
+  description: string;
+  yield: string;
+  price: string;
+}
+
 interface SaleItem {
   description: string;
   quantity: number;
@@ -96,6 +103,7 @@ interface SaleItem {
   bwSlabRanges?: Array<{ from: string; to: string; rate: string }>;
   colorSlabRanges?: Array<{ from: string; to: string; rate: string }>;
   comboSlabRanges?: Array<{ from: string; to: string; rate: string }>;
+  consumables?: Consumable[];
 }
 
 // ─── Status Badge ─────────────────────────────────────────────────────────────
@@ -575,7 +583,7 @@ function QuotationFormModal({
 
   // ── LEASE state ─────────────────────────────────────────────────────────
   const [leaseType, setLeaseType] = useState<'EMI' | 'FSM'>('EMI');
-  const [leaseTenureMonths, setLeaseTenureMonths] = useState('');
+  const [leaseTenureMonths, setLeaseTenureMonths] = useState('12');
   const [totalLeaseAmount, setTotalLeaseAmount] = useState('');
   const [monthlyEmiAmount, setMonthlyEmiAmount] = useState('');
   const [lastEditedLease, setLastEditedLease] = useState<'TOTAL' | 'PERIODIC'>('TOTAL');
@@ -799,6 +807,46 @@ function QuotationFormModal({
     });
   };
 
+  const addConsumable = (itemIndex: number) => {
+    setSaleItems((prev) => {
+      const items = [...prev];
+      const item = { ...items[itemIndex] };
+      item.consumables = [
+        ...(item.consumables || []),
+        { partName: '', description: '', yield: '', price: '' },
+      ];
+      items[itemIndex] = item;
+      return items;
+    });
+  };
+
+  const removeConsumable = (itemIndex: number, consumableIndex: number) => {
+    setSaleItems((prev) => {
+      const items = [...prev];
+      const item = { ...items[itemIndex] };
+      item.consumables = (item.consumables || []).filter((_, i) => i !== consumableIndex);
+      items[itemIndex] = item;
+      return items;
+    });
+  };
+
+  const updateConsumable = (
+    itemIndex: number,
+    consumableIndex: number,
+    field: keyof Consumable,
+    value: string,
+  ) => {
+    setSaleItems((prev) => {
+      const items = [...prev];
+      const item = { ...items[itemIndex] };
+      const current = [...(item.consumables || [])];
+      current[consumableIndex] = { ...current[consumableIndex], [field]: value };
+      item.consumables = current;
+      items[itemIndex] = item;
+      return items;
+    });
+  };
+
   const updateItem = (index: number, field: keyof SaleItem, value: string | number) => {
     setSaleItems((prev) => {
       const items = [...prev];
@@ -902,6 +950,17 @@ function QuotationFormModal({
           // Embed discount as a secret tag to prevent backend loss
           if (it.discount && it.discount > 0) {
             desc = `[DISC:${it.discount}] ${desc}`;
+          }
+
+          // Embed consumables for Product Sale
+          if (quotationType === 'PRODUCT_SALE' && it.consumables && it.consumables.length > 0) {
+            it.consumables.forEach((c) => {
+              const part = (c.partName || '').replace(/\|/g, ' ');
+              const d = (c.description || '').replace(/\|/g, ' ');
+              const y = (c.yield || '').replace(/\|/g, ' ');
+              const p = (c.price || '').replace(/\|/g, ' ');
+              desc = `[CONS:${part}|${d}|${y}|${p}] ${desc}`;
+            });
           }
 
           return {
@@ -1607,6 +1666,139 @@ function QuotationFormModal({
                                   </p>
                                 </div>
                               </>
+                            )}
+                            {/* Replacement Consumables Section */}
+                            {quotationType === 'PRODUCT_SALE' && (
+                              <div className="md:col-span-12 mt-6 pt-4 border-t border-slate-100">
+                                <div className="bg-slate-50/50 rounded-xl p-5 border border-slate-200/60 transition-all hover:bg-slate-50">
+                                  <div className="flex items-center justify-between mb-4">
+                                    <div className="flex items-center gap-3">
+                                      <div className="bg-blue-100 p-1.5 rounded-lg">
+                                        <ShoppingCart size={14} className="text-blue-600" />
+                                      </div>
+                                      <div>
+                                        <h5 className="text-[11px] font-black text-slate-800 uppercase tracking-wider">
+                                          Replacement Consumables
+                                        </h5>
+                                        <p className="text-[9px] text-slate-400 font-bold uppercase mt-0.5">
+                                          (Optional add-ons for this product)
+                                        </p>
+                                      </div>
+                                    </div>
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => addConsumable(index)}
+                                      className="h-8 text-[11px] font-black uppercase text-blue-600 border-blue-200 hover:bg-blue-50 hover:border-blue-300 gap-2 shadow-sm"
+                                    >
+                                      <span className="text-lg">+</span> Add Part
+                                    </Button>
+                                  </div>
+
+                                  {item.consumables && item.consumables.length > 0 ? (
+                                    <div className="space-y-3">
+                                      <div className="grid grid-cols-1 md:grid-cols-12 gap-4 px-3 mb-1">
+                                        <div className="md:col-span-3 text-[9px] font-black text-slate-400 uppercase">
+                                          Part Name
+                                        </div>
+                                        <div className="md:col-span-4 text-[9px] font-black text-slate-400 uppercase">
+                                          Specifications
+                                        </div>
+                                        <div className="md:col-span-3 text-[9px] font-black text-slate-400 uppercase text-center">
+                                          Yield
+                                        </div>
+                                        <div className="md:col-span-2 text-[9px] font-black text-slate-400 uppercase text-right">
+                                          Price (QAR)
+                                        </div>
+                                      </div>
+
+                                      {item.consumables.map((cons, cIdx) => (
+                                        <div
+                                          key={cIdx}
+                                          className="grid grid-cols-1 md:grid-cols-12 gap-3 bg-white p-3 rounded-lg border border-slate-200 shadow-sm relative group animate-in fade-in slide-in-from-top-1 duration-200"
+                                        >
+                                          <button
+                                            type="button"
+                                            onClick={() => removeConsumable(index, cIdx)}
+                                            className="absolute -top-1.5 -right-1.5 h-6 w-6 rounded-full bg-white border border-red-200 text-red-500 flex items-center justify-center hover:bg-red-500 hover:text-white shadow-md opacity-0 group-hover:opacity-100 transition-all z-20"
+                                          >
+                                            <Trash2 size={12} />
+                                          </button>
+
+                                          <div className="md:col-span-3">
+                                            <Input
+                                              placeholder="e.g. Toner Cartridge"
+                                              value={cons.partName}
+                                              onChange={(e) =>
+                                                updateConsumable(
+                                                  index,
+                                                  cIdx,
+                                                  'partName',
+                                                  e.target.value,
+                                                )
+                                              }
+                                              className="h-9 text-xs font-bold bg-slate-50/30 border-slate-200 focus:bg-white"
+                                            />
+                                          </div>
+                                          <div className="md:col-span-4">
+                                            <Input
+                                              placeholder="Specs..."
+                                              value={cons.description}
+                                              onChange={(e) =>
+                                                updateConsumable(
+                                                  index,
+                                                  cIdx,
+                                                  'description',
+                                                  e.target.value,
+                                                )
+                                              }
+                                              className="h-9 text-xs font-bold bg-slate-50/30 border-slate-200 focus:bg-white"
+                                            />
+                                          </div>
+                                          <div className="md:col-span-3">
+                                            <Input
+                                              placeholder="e.g. 20K Pages"
+                                              value={cons.yield}
+                                              onChange={(e) =>
+                                                updateConsumable(
+                                                  index,
+                                                  cIdx,
+                                                  'yield',
+                                                  e.target.value,
+                                                )
+                                              }
+                                              className="h-9 text-xs font-bold text-center bg-slate-50/30 border-slate-200 focus:bg-white"
+                                            />
+                                          </div>
+                                          <div className="md:col-span-2">
+                                            <Input
+                                              type="number"
+                                              placeholder="0.00"
+                                              value={cons.price}
+                                              onChange={(e) =>
+                                                updateConsumable(
+                                                  index,
+                                                  cIdx,
+                                                  'price',
+                                                  e.target.value,
+                                                )
+                                              }
+                                              className="h-9 text-xs font-black text-right text-blue-700 bg-blue-50/30 border-blue-100 focus:bg-white"
+                                            />
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    <div className="text-center py-6 border-2 border-dashed border-slate-200 rounded-xl bg-slate-50/30">
+                                      <p className="text-[11px] text-slate-400 font-bold uppercase tracking-tight">
+                                        No Consumables Added
+                                      </p>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
                             )}
                           </div>
                         </div>
@@ -2640,7 +2832,10 @@ function QuotationFormModal({
                         type="number"
                         placeholder="e.g. 24"
                         value={leaseTenureMonths}
-                        onChange={(e) => setLeaseTenureMonths(e.target.value)}
+                        onChange={(e) => {
+                          setLeaseTenureMonths(e.target.value);
+                          setDurationMonths(e.target.value);
+                        }}
                         className="h-9 text-sm"
                       />
                     </div>
@@ -2750,7 +2945,10 @@ function QuotationFormModal({
                           type="number"
                           placeholder="12"
                           value={durationMonths}
-                          onChange={(e) => setDurationMonths(e.target.value)}
+                          onChange={(e) => {
+                            setDurationMonths(e.target.value);
+                            setLeaseTenureMonths(e.target.value);
+                          }}
                           className="h-9 text-sm text-center border-slate-200"
                         />
                       </div>

@@ -23,6 +23,7 @@ export interface LeaseLineItem {
   comboSlabs?: SlabRange[];
   productImage?: string;
   discount?: number;
+  features?: { subHeading: string; description: string }[];
 }
 
 export interface LeaseAgreementDetails {
@@ -172,7 +173,6 @@ const LeaseStandardQuotation: React.FC<LeaseStandardQuotationProps> = ({
         display: 'flex',
         flexDirection: 'column',
         boxSizing: 'border-box',
-        overflow: 'hidden',
       }}
     >
       {/* ═══════════════════════════════════════════════════════════════
@@ -468,7 +468,7 @@ const LeaseStandardQuotation: React.FC<LeaseStandardQuotationProps> = ({
             <thead>
               <tr>
                 <th style={{ ...th('center'), width: '36px' }}>Sl.</th>
-                <th style={th('left')}>Item Description</th>
+                <th style={{ ...th('left'), width: '50%' }}>Item Description</th>
                 <th style={th('center')}>Qty</th>
                 <th style={th('center')}>Limit</th>
                 {isFSM ? (
@@ -491,7 +491,7 @@ const LeaseStandardQuotation: React.FC<LeaseStandardQuotationProps> = ({
                   key={idx}
                   style={{
                     backgroundColor: idx % 2 === 0 ? WHITE : LIGHT_BG,
-                    height: '450px',
+                    minHeight: '320px',
                   }}
                 >
                   <td
@@ -500,7 +500,7 @@ const LeaseStandardQuotation: React.FC<LeaseStandardQuotationProps> = ({
                       fontWeight: '700',
                       color: NAVY,
                       verticalAlign: 'middle',
-                      height: '450px',
+                      minHeight: '320px',
                     }}
                   >
                     {idx + 1}
@@ -512,7 +512,7 @@ const LeaseStandardQuotation: React.FC<LeaseStandardQuotationProps> = ({
                       overflow: 'hidden',
                       padding: 0,
                       minWidth: '400px',
-                      height: '450px',
+                      minHeight: '320px',
                     }}
                   >
                     {/* Background Watermark Image */}
@@ -549,9 +549,6 @@ const LeaseStandardQuotation: React.FC<LeaseStandardQuotationProps> = ({
                     >
                       <div
                         style={{
-                          fontWeight: '900',
-                          color: NAVY,
-                          fontSize: '14px',
                           marginBottom: '6px',
                         }}
                       >
@@ -559,13 +556,63 @@ const LeaseStandardQuotation: React.FC<LeaseStandardQuotationProps> = ({
                       </div>
                       <div
                         style={{
-                          fontSize: '11.5px',
-                          color: '#444',
+                          fontSize: '16px',
+                          color: '#1a1a1a',
                           lineHeight: '1.6',
                           fontWeight: '600',
+                          maxWidth: '95%',
                         }}
                       >
-                        {item.description}
+                        <div
+                          style={{
+                            fontSize: '13px',
+                            fontWeight: '800',
+                            color: '#dc2626',
+                            textTransform: 'uppercase',
+                            marginBottom: '6px',
+                          }}
+                        >
+                          Product Description
+                        </div>
+                        <div
+                          style={{ marginBottom: (item.features?.length ?? 0) > 0 ? '12px' : '0' }}
+                        >
+                          {item.description}
+                        </div>
+                        {(item.features || []).length > 0 && (
+                          <>
+                            <div
+                              style={{
+                                fontSize: '13px',
+                                fontWeight: '800',
+                                color: '#dc2626',
+                                textTransform: 'uppercase',
+                                marginBottom: '6px',
+                                marginTop: '16px',
+                              }}
+                            >
+                              Features
+                            </div>
+                            {(item.features || []).map((f, i) => (
+                              <div key={i} style={{ marginTop: '8px', fontSize: '15px' }}>
+                                {f.subHeading && (
+                                  <strong
+                                    style={{
+                                      color: '#dc2626',
+                                      display: 'block',
+                                      marginBottom: '4px',
+                                    }}
+                                  >
+                                    {f.subHeading}
+                                  </strong>
+                                )}
+                                {f.description && (
+                                  <div style={{ color: '#555' }}>{f.description}</div>
+                                )}
+                              </div>
+                            ))}
+                          </>
+                        )}
                       </div>
                     </div>
                   </td>
@@ -574,7 +621,7 @@ const LeaseStandardQuotation: React.FC<LeaseStandardQuotationProps> = ({
                       ...td('center'),
                       fontWeight: '600',
                       verticalAlign: 'middle',
-                      height: '450px',
+                      minHeight: '320px',
                     }}
                   >
                     {item.qty}
@@ -584,7 +631,7 @@ const LeaseStandardQuotation: React.FC<LeaseStandardQuotationProps> = ({
                       ...td('center'),
                       color: '#555',
                       verticalAlign: 'middle',
-                      height: '450px',
+                      minHeight: '320px',
                     }}
                   >
                     {item.limit}
@@ -596,7 +643,7 @@ const LeaseStandardQuotation: React.FC<LeaseStandardQuotationProps> = ({
                           ...td('right'),
                           color: '#555',
                           verticalAlign: 'middle',
-                          height: '450px',
+                          minHeight: '320px',
                         }}
                       >
                         {item.excessRate || 'N/A'}
@@ -606,7 +653,7 @@ const LeaseStandardQuotation: React.FC<LeaseStandardQuotationProps> = ({
                           ...td('right'),
                           color: '#555',
                           verticalAlign: 'middle',
-                          height: '450px',
+                          minHeight: '320px',
                         }}
                       >
                         {item.discount ? `${item.discount}%` : '0%'}
@@ -619,7 +666,7 @@ const LeaseStandardQuotation: React.FC<LeaseStandardQuotationProps> = ({
                           ...td('right'),
                           fontWeight: '600',
                           verticalAlign: 'middle',
-                          height: '450px',
+                          minHeight: '320px',
                         }}
                       >
                         {fmt(Number(item.rate))}
@@ -629,7 +676,7 @@ const LeaseStandardQuotation: React.FC<LeaseStandardQuotationProps> = ({
                           ...td('right'),
                           color: '#555',
                           verticalAlign: 'middle',
-                          height: '450px',
+                          minHeight: '320px',
                         }}
                       >
                         {item.discount ? `${item.discount}%` : '0%'}
@@ -640,7 +687,7 @@ const LeaseStandardQuotation: React.FC<LeaseStandardQuotationProps> = ({
                           fontWeight: '700',
                           color: NAVY,
                           verticalAlign: 'middle',
-                          height: '450px',
+                          minHeight: '320px',
                         }}
                       >
                         {fmt(item.qty * Number(item.rate))}

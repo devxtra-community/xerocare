@@ -171,9 +171,7 @@ export class InvoiceRepository {
       new Brackets((innerQb) => {
         innerQb
           .where('invoice.type != :finalType', { finalType: 'FINAL' })
-          .orWhere('invoice.saleType IN (:...saleTypes)', {
-            saleTypes: [SaleType.SALE, SaleType.PRODUCT_SALE, SaleType.SPAREPART_SALE],
-          });
+          .orWhere('invoice.referenceContractId IS NULL');
       }),
     );
 
@@ -204,9 +202,7 @@ export class InvoiceRepository {
       new Brackets((innerQb) => {
         innerQb
           .where('invoice.type != :finalType', { finalType: 'FINAL' })
-          .orWhere('invoice.saleType IN (:...saleTypes)', {
-            saleTypes: [SaleType.SALE, SaleType.PRODUCT_SALE, SaleType.SPAREPART_SALE],
-          });
+          .orWhere('invoice.referenceContractId IS NULL');
       }),
     );
 
@@ -242,9 +238,7 @@ export class InvoiceRepository {
       new Brackets((innerQb) => {
         innerQb
           .where('invoice.type != :finalType', { finalType: 'FINAL' })
-          .orWhere('invoice.saleType IN (:...saleTypes)', {
-            saleTypes: [SaleType.SALE, SaleType.PRODUCT_SALE, SaleType.SPAREPART_SALE],
-          });
+          .orWhere('invoice.referenceContractId IS NULL');
       }),
     );
 

@@ -52,8 +52,20 @@ export const addproduct = async (req: Request, res: Response, next: NextFunction
       wholesale_price,
       lot_id,
       description,
+      features,
       hs_code,
     } = req.body;
+
+    let parsedFeatures;
+    if (typeof features === 'string') {
+      try {
+        parsedFeatures = JSON.parse(features);
+      } catch {
+        parsedFeatures = [];
+      }
+    } else {
+      parsedFeatures = features;
+    }
 
     if (!model_id || !warehouse_id || !vendor_id || !serial_no || !name || !brand || !MFD) {
       throw new AppError(
@@ -90,6 +102,7 @@ export const addproduct = async (req: Request, res: Response, next: NextFunction
       imageUrl,
       lot_id: lot_id || undefined,
       description,
+      features: parsedFeatures,
       hs_code,
     });
     res
@@ -171,6 +184,14 @@ export const updateproduct = async (req: Request, res: Response, next: NextFunct
       payload.max_discount_amount = Number(payload.max_discount_amount);
     if (payload.wholesale_price !== undefined && payload.wholesale_price !== '')
       payload.wholesale_price = Number(payload.wholesale_price);
+
+    if (typeof payload.features === 'string') {
+      try {
+        payload.features = JSON.parse(payload.features);
+      } catch {
+        payload.features = [];
+      }
+    }
 
     const file = req.file as MulterS3File;
     if (file && file.key) {

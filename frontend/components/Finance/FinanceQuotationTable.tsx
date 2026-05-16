@@ -120,7 +120,7 @@ export default function FinanceQuotationTable({
         if (!silent) setLoading(true);
         const data = await getBranchInvoices();
         let onlyQuotations = data.filter(
-          (inv) => inv.type === 'QUOTATION' || inv.type === 'PROFORMA',
+          (inv) => inv.type === 'QUOTATION' || inv.type === 'PROFORMA' || inv.type === 'FINAL',
         );
         if (saleType) {
           onlyQuotations = onlyQuotations.filter((inv) => {
@@ -194,6 +194,7 @@ export default function FinanceQuotationTable({
   const approved = quotations.filter(
     (q) =>
       q.type === 'PROFORMA' ||
+      q.type === 'FINAL' ||
       [
         'APPROVED',
         'FINANCE_APPROVED',

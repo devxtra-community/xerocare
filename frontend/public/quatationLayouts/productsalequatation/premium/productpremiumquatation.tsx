@@ -1,5 +1,12 @@
 import React from 'react';
 
+export interface Consumable {
+  partName: string;
+  description: string;
+  yield: string;
+  price: string;
+}
+
 export interface PremiumQuotationLineItem {
   brand: string;
   modelNo: string;
@@ -14,6 +21,8 @@ export interface PremiumQuotationLineItem {
   productImage?: string;
   productName?: string;
   discount?: number;
+  features?: { subHeading: string; description: string }[];
+  consumables?: Consumable[];
 }
 
 export interface ProductPremiumQuotationProps {
@@ -121,7 +130,6 @@ const ProductPremiumQuotation: React.FC<ProductPremiumQuotationProps> = ({
         fontFamily: "'Inter', sans-serif",
         position: 'relative',
         boxShadow: '0 0 50px rgba(0,0,0,0.3)',
-        overflow: 'hidden',
       }}
     >
       {/* ─── BACKGROUND SHAPES ─── */}
@@ -332,6 +340,98 @@ const ProductPremiumQuotation: React.FC<ProductPremiumQuotationProps> = ({
           Subject: {productName} &amp; {modelName}
         </div>
 
+        {/* ─── PRODUCT INFO SUMMARY ─── */}
+        <div style={{ padding: '0 50px', marginBottom: '25px' }}>
+          <div
+            style={{
+              display: 'flex',
+              borderRadius: '12px',
+              overflow: 'hidden',
+              border: `1px solid ${ACCENT}20`,
+              background: '#252733',
+            }}
+          >
+            {lineItems.length > 0 && (
+              <>
+                <div
+                  style={{ flex: 2, padding: '16px 24px', borderRight: `1px solid ${ACCENT}15` }}
+                >
+                  <div
+                    style={{
+                      fontSize: '9px',
+                      fontWeight: '800',
+                      color: ACCENT,
+                      textTransform: 'uppercase',
+                      marginBottom: '4px',
+                      letterSpacing: '0.05em',
+                    }}
+                  >
+                    PRODUCT
+                  </div>
+                  <div style={{ fontSize: '15px', fontWeight: '800', color: '#ffffff' }}>
+                    {lineItems[0].productName}
+                  </div>
+                </div>
+                <div
+                  style={{ flex: 1, padding: '16px 24px', borderRight: `1px solid ${ACCENT}15` }}
+                >
+                  <div
+                    style={{
+                      fontSize: '9px',
+                      fontWeight: '800',
+                      color: ACCENT,
+                      textTransform: 'uppercase',
+                      marginBottom: '4px',
+                      letterSpacing: '0.05em',
+                    }}
+                  >
+                    BRAND
+                  </div>
+                  <div style={{ fontSize: '14px', fontWeight: '700', color: '#eeeeee' }}>
+                    {lineItems[0].brand}
+                  </div>
+                </div>
+                <div
+                  style={{ flex: 1.2, padding: '16px 24px', borderRight: `1px solid ${ACCENT}15` }}
+                >
+                  <div
+                    style={{
+                      fontSize: '9px',
+                      fontWeight: '800',
+                      color: ACCENT,
+                      textTransform: 'uppercase',
+                      marginBottom: '4px',
+                      letterSpacing: '0.05em',
+                    }}
+                  >
+                    MODEL
+                  </div>
+                  <div style={{ fontSize: '14px', fontWeight: '700', color: '#eeeeee' }}>
+                    {lineItems[0].modelNo}
+                  </div>
+                </div>
+                <div style={{ flex: 1.5, padding: '16px 24px' }}>
+                  <div
+                    style={{
+                      fontSize: '9px',
+                      fontWeight: '800',
+                      color: ACCENT,
+                      textTransform: 'uppercase',
+                      marginBottom: '4px',
+                      letterSpacing: '0.05em',
+                    }}
+                  >
+                    SERIAL NUMBER
+                  </div>
+                  <div style={{ fontSize: '14px', fontWeight: '700', color: '#eeeeee' }}>
+                    {lineItems[0].slNo}
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+
         {/* ─── TABLE ─── */}
         <div style={{ padding: '0 50px', marginTop: '10px' }}>
           <table
@@ -344,16 +444,12 @@ const ProductPremiumQuotation: React.FC<ProductPremiumQuotationProps> = ({
             <thead>
               <tr style={{ backgroundColor: ACCENT, color: '#111' }}>
                 {[
-                  { label: 'PRODUCT', width: '12%' },
-                  { label: 'BRAND', width: '7%' },
-                  { label: 'MODEL', width: '7%' },
-                  { label: 'S/N', width: '7%' },
-                  { label: 'DESCRIPTION', width: '43%' },
+                  { label: 'DESCRIPTION', width: '71%' },
                   { label: 'QTY', width: '4%' },
                   { label: 'UNIT', width: '6%' },
                   { label: 'DISC', width: '4%' },
-                  { label: 'PRICE', width: '6%' },
-                  { label: 'TOTAL', width: '7%' },
+                  { label: 'PRICE', width: '7%' },
+                  { label: 'TOTAL', width: '8%' },
                 ].map(({ label, width }, i) => (
                   <th
                     key={label}
@@ -361,10 +457,10 @@ const ProductPremiumQuotation: React.FC<ProductPremiumQuotationProps> = ({
                       padding: '12px 6px',
                       textAlign: label === 'DESCRIPTION' ? 'left' : 'center',
                       fontWeight: '800',
-                      fontSize: '9px',
+                      fontSize: '10px',
                       letterSpacing: '0.05em',
                       width,
-                      borderRight: i < 9 ? '1px solid rgba(0,0,0,0.1)' : 'none',
+                      borderRight: i < 5 ? '1px solid rgba(0,0,0,0.1)' : 'none',
                     }}
                   >
                     {label}
@@ -379,28 +475,20 @@ const ProductPremiumQuotation: React.FC<ProductPremiumQuotationProps> = ({
                   style={{
                     backgroundColor: idx % 2 === 0 ? '#303240' : '#282a36',
                     borderBottom: '1px solid #3c3e4e',
-                    height: '320px',
+                    minHeight: '320px',
                   }}
                 >
-                  <td style={tdStyle('left')}>
-                    <div style={{ fontWeight: '700', color: '#fff', textTransform: 'uppercase' }}>
-                      {item.productName}
-                    </div>
-                  </td>
-                  <td style={tdStyle('center')}>{item.brand}</td>
-                  <td style={tdStyle('center')}>{item.modelNo}</td>
-                  <td style={tdStyle('center')}>{item.slNo}</td>
                   <td
                     style={{
                       ...tdStyle('left'),
                       lineHeight: '1.6',
-                      whiteSpace: 'pre-line',
+                      whiteSpace: 'pre-wrap',
                       position: 'relative',
                       overflow: 'hidden',
                       padding: 0,
                     }}
                   >
-                    {/* Watermark Image */}
+                    {/* Watermark Image - Scaled Contained */}
                     {item.productImage && (
                       <img
                         src={item.productImage}
@@ -410,13 +498,13 @@ const ProductPremiumQuotation: React.FC<ProductPremiumQuotationProps> = ({
                           top: '50%',
                           left: '50%',
                           transform: 'translate(-50%, -50%)',
-                          width: '100%',
-                          height: '120%',
+                          width: '90%',
+                          height: '90%',
                           objectFit: 'contain',
-                          opacity: 0.25,
+                          opacity: 0.15,
                           zIndex: 0,
                           pointerEvents: 'none',
-                          filter: 'grayscale(100%)',
+                          filter: 'grayscale(100%) brightness(1.5)',
                         }}
                       />
                     )}
@@ -431,13 +519,66 @@ const ProductPremiumQuotation: React.FC<ProductPremiumQuotationProps> = ({
                     >
                       <div
                         style={{
-                          fontSize: '11px',
-                          color: '#ccc',
+                          fontSize: '16px',
+                          color: '#fff',
                           fontWeight: '500',
-                          maxWidth: '85%',
+                          maxWidth: '95%',
+                          lineHeight: '1.6',
                         }}
                       >
-                        {item.description}
+                        <div
+                          style={{
+                            fontSize: '13px',
+                            fontWeight: '800',
+                            color: ACCENT,
+                            textTransform: 'uppercase',
+                            marginBottom: '6px',
+                          }}
+                        >
+                          Product Description
+                        </div>
+                        <div
+                          style={{
+                            marginBottom: (item.features?.length ?? 0) > 0 ? '12px' : '0',
+                            fontSize: '11px',
+                            color: '#eeeeee',
+                            fontWeight: '500',
+                            maxWidth: '95%',
+                            lineHeight: '1.6',
+                          }}
+                        >
+                          {item.description}
+                        </div>
+                        {(item.features || []).length > 0 && (
+                          <>
+                            <div
+                              style={{
+                                fontSize: '13px',
+                                fontWeight: '800',
+                                color: ACCENT,
+                                textTransform: 'uppercase',
+                                marginBottom: '6px',
+                                marginTop: '16px',
+                              }}
+                            >
+                              Features
+                            </div>
+                            {(item.features || []).map((f, i: number) => (
+                              <div key={i} style={{ marginTop: '8px', fontSize: '11px' }}>
+                                {f.subHeading && (
+                                  <strong
+                                    style={{ color: ACCENT, display: 'block', marginBottom: '4px' }}
+                                  >
+                                    {f.subHeading}
+                                  </strong>
+                                )}
+                                {f.description && (
+                                  <div style={{ color: '#ccc' }}>{f.description}</div>
+                                )}
+                              </div>
+                            ))}
+                          </>
+                        )}
                       </div>
                     </div>
                   </td>
@@ -481,13 +622,22 @@ const ProductPremiumQuotation: React.FC<ProductPremiumQuotationProps> = ({
                   fontSize: '10px',
                   color: TEXT_MUTED,
                   lineHeight: '1.7',
-                  maxWidth: '300px',
+                  maxWidth: '350px',
                 }}
               >
-                Quotation valid for{' '}
-                {quotation.terms === 'Due on receipt' ? '30 Days' : quotation.terms}. All supplied
-                goods remain property of Xerocare until paid in full. Delivery &amp; Installation as
-                per standard agreement.
+                <div style={{ marginBottom: '4px' }}>
+                  <strong>1) PAYMENT:</strong> : CONFIRMED LPO
+                </div>
+                <div style={{ marginBottom: '4px' }}>
+                  <strong>2) PRICES:</strong> : 350.00 INCLUSIVE OF DELIVERY & INSTALLATION AT YOUR
+                  SITE
+                </div>
+                <div style={{ marginBottom: '4px' }}>
+                  <strong>3) DELIVERY:</strong> : EX STOCK, SUBJECT TO AVAILABILITY
+                </div>
+                <div>
+                  <strong>5) VALIDITY:</strong> : 30 DAYS FROM ORDER DATE
+                </div>
               </div>
             </div>
 
@@ -680,6 +830,305 @@ const ProductPremiumQuotation: React.FC<ProductPremiumQuotationProps> = ({
           </div>
         </div>
       </div>
+
+      {/* ─── DEDICATED CONSUMABLES PAGE ─── */}
+      {(lineItems || []).some((item) => (item.consumables || []).length > 0) && (
+        <div
+          style={{
+            pageBreakBefore: 'always',
+            paddingTop: '60px',
+            paddingLeft: '48px',
+            paddingRight: '48px',
+            backgroundColor: BG_DARK,
+            color: TEXT_LIGHT,
+            minHeight: '1191px',
+            position: 'relative',
+          }}
+        >
+          {/* Background Shape for Second Page */}
+          <svg
+            width="100%"
+            height="100%"
+            viewBox="0 0 842 1191"
+            preserveAspectRatio="none"
+            style={{ position: 'absolute', top: 0, left: 0, zIndex: 0 }}
+          >
+            <polygon points="0,0 200,0 0,200" fill={BG_DARKER} />
+          </svg>
+
+          <div style={{ position: 'relative', zIndex: 10 }}>
+            {/* Header for Second Page - Replicated Premium Style with Logo */}
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'flex-start',
+                marginBottom: '40px',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <img
+                  src="/quatationLayouts/productsalequatation/normal/normallogo/xerocarelogo-removebg-preview.png"
+                  alt="Xerocare Logo"
+                  style={{
+                    width: '80px',
+                    height: '80px',
+                    objectFit: 'contain',
+                  }}
+                />
+                <div>
+                  <div
+                    style={{
+                      fontSize: '18px',
+                      fontWeight: '800',
+                      color: '#fff',
+                      letterSpacing: '0.05em',
+                    }}
+                  >
+                    XEROCARE
+                  </div>
+                  <div
+                    style={{
+                      fontSize: '9px',
+                      color: TEXT_MUTED,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.1em',
+                    }}
+                  >
+                    Trading &amp; Services W.L.L
+                  </div>
+                </div>
+              </div>
+              <div style={{ textAlign: 'right', marginTop: '10px' }}>
+                <div style={{ fontSize: '11px', fontWeight: '700', color: ACCENT }}>
+                  QUOTATION: {quotation.number}
+                </div>
+                <div style={{ fontSize: '10px', color: TEXT_MUTED }}>Date: {quotation.date}</div>
+              </div>
+            </div>
+
+            <div style={{ borderTop: `1px solid ${ACCENT}20`, marginBottom: '30px' }} />
+
+            <div style={{ marginBottom: '35px' }}>
+              <div
+                style={{
+                  fontSize: '24px',
+                  fontWeight: '800',
+                  color: ACCENT,
+                  textTransform: 'uppercase',
+                }}
+              >
+                Replacement Consumables for {lineItems?.[0]?.productName || 'Equipment'}
+              </div>
+              <div style={{ fontSize: '12px', color: TEXT_MUTED, marginTop: '4px' }}>
+                Premium supplementary price list for your equipment
+              </div>
+            </div>
+
+            {(lineItems || [])
+              .filter((item) => (item.consumables || []).length > 0)
+              .map((item, idx) => (
+                <div key={idx} style={{ marginBottom: '40px' }}>
+                  <div
+                    style={{
+                      backgroundColor: BG_DARKER,
+                      padding: '12px 16px',
+                      borderRadius: '4px',
+                      marginBottom: '16px',
+                      borderLeft: `4px solid ${ACCENT}`,
+                    }}
+                  >
+                    <div style={{ fontSize: '14px', fontWeight: '800', color: ACCENT }}>
+                      {item.brand} {item.modelNo}
+                    </div>
+                    <div style={{ fontSize: '12px', color: TEXT_LIGHT }}>{item.description}</div>
+                  </div>
+
+                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr style={{ backgroundColor: BG_DARKER, color: ACCENT }}>
+                        <th
+                          style={{
+                            textAlign: 'left',
+                            fontSize: '10px',
+                            padding: '10px 12px',
+                            textTransform: 'uppercase',
+                            borderBottom: `1px solid ${ACCENT}`,
+                          }}
+                        >
+                          Part Name
+                        </th>
+                        <th
+                          style={{
+                            textAlign: 'left',
+                            fontSize: '10px',
+                            padding: '10px 12px',
+                            textTransform: 'uppercase',
+                            borderBottom: `1px solid ${ACCENT}`,
+                          }}
+                        >
+                          Description / Specifications
+                        </th>
+                        <th
+                          style={{
+                            textAlign: 'left',
+                            fontSize: '10px',
+                            padding: '10px 12px',
+                            textTransform: 'uppercase',
+                            borderBottom: `1px solid ${ACCENT}`,
+                          }}
+                        >
+                          Yield
+                        </th>
+                        <th
+                          style={{
+                            textAlign: 'right',
+                            fontSize: '10px',
+                            padding: '10px 12px',
+                            textTransform: 'uppercase',
+                            borderBottom: `1px solid ${ACCENT}`,
+                          }}
+                        >
+                          Unit Price (QAR)
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(item.consumables || []).map((cons, cIdx) => (
+                        <tr key={cIdx} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                          <td
+                            style={{
+                              fontSize: '12px',
+                              fontWeight: '700',
+                              padding: '12px',
+                              color: TEXT_LIGHT,
+                            }}
+                          >
+                            {cons.partName}
+                          </td>
+                          <td style={{ fontSize: '11px', padding: '12px', color: TEXT_MUTED }}>
+                            {cons.description}
+                          </td>
+                          <td style={{ fontSize: '12px', padding: '12px', color: TEXT_MUTED }}>
+                            {cons.yield}
+                          </td>
+                          <td
+                            style={{
+                              fontSize: '12px',
+                              fontWeight: '800',
+                              textAlign: 'right',
+                              padding: '12px',
+                              color: ACCENT,
+                            }}
+                          >
+                            {cons.price}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ))}
+
+            {/* Page Note / Terms */}
+            <div style={{ marginTop: '40px' }}>
+              <div
+                style={{
+                  fontSize: '13px',
+                  fontWeight: '800',
+                  color: ACCENT,
+                  textTransform: 'uppercase',
+                  marginBottom: '12px',
+                  borderBottom: `1px solid ${ACCENT}20`,
+                  paddingBottom: '6px',
+                }}
+              >
+                Terms and Conditions
+              </div>
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: '120px 1fr',
+                  gap: '8px 20px',
+                  fontSize: '11px',
+                  color: TEXT_MUTED,
+                  lineHeight: '1.6',
+                }}
+              >
+                <div style={{ fontWeight: '800', color: '#fff' }}>1) PAYMENT</div>
+                <div>: CONFIRMED LPO</div>
+
+                <div style={{ fontWeight: '800', color: '#fff' }}>2) PRICES</div>
+                <div>: 350.00 INCLUSIVE OF DELIVERY & INSTALLATION AT YOUR SITE</div>
+
+                <div style={{ fontWeight: '800', color: '#fff' }}>3) DELIVERY</div>
+                <div>: EX STOCK, SUBJECT TO AVAILABILITY</div>
+
+                <div style={{ fontWeight: '800', color: '#fff' }}>5) VALIDITY</div>
+                <div>: 30 DAYS FROM ORDER DATE</div>
+              </div>
+            </div>
+
+            {/* Professional Footer for Second Page */}
+            <div
+              style={{ marginTop: '60px', borderTop: `1px solid ${ACCENT}20`, paddingTop: '20px' }}
+            >
+              <p
+                style={{
+                  fontSize: '11px',
+                  color: TEXT_MUTED,
+                  marginBottom: '20px',
+                  lineHeight: '1.6',
+                }}
+              >
+                For any further clarifications please feel free to contact the undersigned on{' '}
+                <strong>Mob: 70717282</strong> or <strong>Email: mail@xerocare.com</strong>
+              </p>
+
+              <div
+                style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}
+              >
+                <div style={{ fontSize: '11px', color: '#eee' }}>
+                  With warm regards,
+                  <br />
+                  <br />
+                  <strong style={{ color: ACCENT }}>For XEROCARE TRADING & SERVICES WLL</strong>
+                  <br />
+                  DOHA QATAR
+                </div>
+
+                <div style={{ position: 'relative', width: '150px', textAlign: 'center' }}>
+                  <img
+                    src="/seel/seel1.png"
+                    alt="Seal"
+                    style={{
+                      position: 'absolute',
+                      bottom: '10px',
+                      right: '15px',
+                      width: '90px',
+                      opacity: 0.8,
+                      transform: 'rotate(-15deg)',
+                      zIndex: 1,
+                      filter: 'brightness(1.2)',
+                    }}
+                  />
+                  <div
+                    style={{
+                      borderTop: `1px solid ${ACCENT}80`,
+                      paddingTop: '5px',
+                      fontSize: '10px',
+                      fontWeight: '800',
+                      color: ACCENT,
+                    }}
+                  >
+                    AUTHORIZED SIGNATURE
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -687,11 +1136,11 @@ const ProductPremiumQuotation: React.FC<ProductPremiumQuotationProps> = ({
 function tdStyle(align: 'left' | 'center' | 'right'): React.CSSProperties {
   return {
     padding: '10px 6px',
-    height: '260px',
     textAlign: align,
     border: 'none',
     color: '#ccc',
     verticalAlign: 'middle',
+    fontSize: '12px',
   };
 }
 

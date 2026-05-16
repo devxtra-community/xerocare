@@ -18,6 +18,7 @@ export interface RentLineItem {
   bwSlabs?: SlabRange[];
   colorSlabs?: SlabRange[];
   comboSlabs?: SlabRange[];
+  features?: { subHeading: string; description: string }[];
 }
 
 export interface RentAgreementDetails {
@@ -351,7 +352,7 @@ const RentNormalQuotation: React.FC<RentNormalQuotationProps> = ({
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
           <thead>
             <tr style={{ backgroundColor: '#d18a66', color: '#fff' }}>
-              <th style={{ ...thStyle(), width: '45%' }}>Description</th>
+              <th style={{ ...thStyle(), width: '50%' }}>Description</th>
               <th style={thStyle('center')}>Qty</th>
               <th style={thStyle('center')}>Limit</th>
               <th style={thStyle('right')}>Excess Rate</th>
@@ -360,7 +361,61 @@ const RentNormalQuotation: React.FC<RentNormalQuotationProps> = ({
           <tbody>
             {lineItems.map((item, idx) => (
               <tr key={idx} style={{ borderBottom: '1px solid #eee' }}>
-                <td style={tdStyle()}>{item.description}</td>
+                <td style={{ ...tdStyle(), whiteSpace: 'pre-wrap' }}>
+                  <div
+                    style={{
+                      fontSize: '16px',
+                      color: '#1a1a1a',
+                      fontWeight: '600',
+                      maxWidth: '95%',
+                      lineHeight: '1.6',
+                      padding: '10px 0',
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontSize: '13px',
+                        fontWeight: '800',
+                        color: '#dc2626',
+                        textTransform: 'uppercase',
+                        marginBottom: '6px',
+                      }}
+                    >
+                      Product Description
+                    </div>
+                    <div style={{ marginBottom: item.features?.length ? '12px' : '0' }}>
+                      {item.description}
+                    </div>
+                    {(item.features || []).length > 0 && (
+                      <>
+                        <div
+                          style={{
+                            fontSize: '13px',
+                            fontWeight: '800',
+                            color: '#dc2626',
+                            textTransform: 'uppercase',
+                            marginBottom: '6px',
+                            marginTop: '16px',
+                          }}
+                        >
+                          Features
+                        </div>
+                        {(item.features || []).map((f, i) => (
+                          <div key={i} style={{ marginTop: '8px', fontSize: '15px' }}>
+                            {f.subHeading && (
+                              <strong
+                                style={{ color: '#dc2626', display: 'block', marginBottom: '4px' }}
+                              >
+                                {f.subHeading}
+                              </strong>
+                            )}
+                            {f.description && <div style={{ color: '#444' }}>{f.description}</div>}
+                          </div>
+                        ))}
+                      </>
+                    )}
+                  </div>
+                </td>
                 <td style={tdStyle('center')}>{item.qty}</td>
                 <td style={tdStyle('center')}>{item.limit}</td>
                 <td style={tdStyle('right')}>{item.excessRate}</td>
