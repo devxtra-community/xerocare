@@ -87,10 +87,7 @@ export function ProductSelect({
       value: item.id,
       label: label,
       description: `${type} • QAR ${price.toLocaleString()}`,
-      disabled:
-        'product_status' in item &&
-        item.product_status !== ProductStatus.AVAILABLE &&
-        item.product_status !== undefined,
+      disabled: false,
     };
   });
 

@@ -73,6 +73,18 @@ export function QuotationConversionFlow({
           }
         }
         setAvailableProducts(productMap);
+
+        // Auto-clear productId if it is not in the list of currently available products
+        setSerialUpdates((prev) =>
+          prev.map((update) => {
+            const modelProds = update.modelId ? productMap[update.modelId] || [] : [];
+            const isAvailable = modelProds.some((p) => p.id === update.productId);
+            return {
+              ...update,
+              productId: isAvailable ? update.productId : '',
+            };
+          }),
+        );
       } catch (err) {
         console.error('Failed to fetch available products:', err);
       } finally {
@@ -93,7 +105,24 @@ export function QuotationConversionFlow({
   const [referenceNumber, setReferenceNumber] = useState('');
   const paymentDate = new Date().toISOString().split('T')[0];
   const [remarks, setRemarks] = useState('');
-  const [skipAdvance, setSkipAdvance] = useState(false);
+
+  // Step 2: Caution Deposit (Security Deposit)
+  const prefilledCaution = Number(quotation.securityDepositAmount || 0);
+  const [cautionAmount, setCautionAmount] = useState(
+    prefilledCaution > 0 ? String(prefilledCaution) : '',
+  );
+  const [cautionMode, setCautionMode] = useState<
+    'CASH' | 'BANK_TRANSFER' | 'CHEQUE' | 'CREDIT_CARD'
+  >(
+    (quotation.securityDepositMode as unknown as
+      | 'CASH'
+      | 'BANK_TRANSFER'
+      | 'CHEQUE'
+      | 'CREDIT_CARD') || 'CASH',
+  );
+  const [cautionReference, setCautionReference] = useState(
+    quotation.securityDepositReference || '',
+  );
 
   const updateSerial = (index: number, productId: string) => {
     setSerialUpdates((prev) => {
@@ -126,17 +155,18 @@ export function QuotationConversionFlow({
       await activateContractInvoice(quotation.id, {
         contractConfirmationUrl: '',
         deposit:
-          !skipAdvance && advanceAmount && Number(advanceAmount) > 0
+          cautionAmount && Number(cautionAmount) > 0
             ? {
-                amount: Number(advanceAmount),
-                mode: paymentMode as 'CASH' | 'CHEQUE' | 'UPI' | 'BANK_TRANSFER',
+                amount: Number(cautionAmount),
+                mode: cautionMode as 'CASH' | 'CHEQUE' | 'UPI' | 'BANK_TRANSFER',
+                reference: cautionReference || undefined,
                 receivedDate: paymentDate || new Date().toISOString().split('T')[0],
               }
             : undefined,
       });
 
       // 4. Record advance payment in the ledger
-      if (!skipAdvance && advanceAmount && Number(advanceAmount) > 0) {
+      if (advanceAmount && Number(advanceAmount) > 0) {
         await recordPayment({
           invoiceId: quotation.id,
           amountPaid: Number(advanceAmount),
@@ -149,8 +179,19 @@ export function QuotationConversionFlow({
         });
       }
 
+      let successMsg = `Invoice ${quotation.invoiceNumber} is now active.`;
+      const hasAdvance = advanceAmount && Number(advanceAmount) > 0;
+      const hasCaution = cautionAmount && Number(cautionAmount) > 0;
+      if (hasAdvance && hasCaution) {
+        successMsg += ` Advance QAR ${Number(advanceAmount).toFixed(2)} and Caution QAR ${Number(cautionAmount).toFixed(2)} recorded.`;
+      } else if (hasAdvance) {
+        successMsg += ` Advance QAR ${Number(advanceAmount).toFixed(2)} recorded.`;
+      } else if (hasCaution) {
+        successMsg += ` Caution QAR ${Number(cautionAmount).toFixed(2)} recorded.`;
+      }
+
       toast.success('Conversion complete!', {
-        description: `Invoice ${quotation.invoiceNumber} is now active${!skipAdvance && Number(advanceAmount) > 0 ? ` with advance QAR ${Number(advanceAmount).toFixed(2)} recorded` : ''}.`,
+        description: successMsg,
       });
       onSuccess();
     } catch (error: unknown) {
@@ -269,100 +310,163 @@ export function QuotationConversionFlow({
             </div>
           )}
 
-          {/* ── Step 2: Advance Payment ───────────────────────────────────── */}
+          {/* ── Step 2: Payment Entry ───────────────────────────────────── */}
           {step === 2 && (
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <p className="text-xs font-black text-slate-600 uppercase tracking-wider">
-                  Advance Ledger Entry
-                </p>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    id="skip"
-                    checked={skipAdvance}
-                    onChange={(e) => setSkipAdvance(e.target.checked)}
-                    className="h-3 w-3 rounded accent-emerald-600"
-                  />
-                  <Label
-                    htmlFor="skip"
-                    className="text-[10px] font-black uppercase text-slate-400 cursor-pointer"
-                  >
-                    No Advance Taken
-                  </Label>
+              {/* Advance Payment Card */}
+              <div className="p-4 bg-slate-50/50 rounded-2xl border border-slate-100/80 space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-black text-emerald-700 uppercase tracking-wider flex items-center gap-1.5">
+                    <span className="h-2 w-2 rounded-full bg-emerald-500"></span>
+                    Advance Payment (Optional)
+                  </h4>
                 </div>
-              </div>
-
-              {!skipAdvance && (
-                <div className="grid grid-cols-2 gap-4">
+                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wide leading-relaxed">
+                  Record advance payment to initialize the financial ledger with this credit.
+                </p>
+                <div className="grid grid-cols-2 gap-3">
                   <div className="col-span-2">
-                    <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5 block">
-                      Amount (QAR)
+                    <Label className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1 block">
+                      Advance Amount (QAR)
                     </Label>
                     <Input
                       type="number"
                       value={advanceAmount}
                       onChange={(e) => setAdvanceAmount(e.target.value)}
                       placeholder="0.00"
-                      className="h-10 font-black text-emerald-600 text-lg border-emerald-100 focus:border-emerald-300"
+                      className="h-10 font-black text-emerald-600 text-sm border-slate-200 focus:border-emerald-300"
                     />
                   </div>
-
-                  <div>
-                    <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5 block">
-                      Payment Mode
-                    </Label>
-                    <Select
-                      value={paymentMode}
-                      onValueChange={(val: 'CASH' | 'BANK_TRANSFER' | 'CHEQUE' | 'CREDIT_CARD') =>
-                        setPaymentMode(val)
-                      }
-                    >
-                      <SelectTrigger className="h-10 border-slate-200 font-bold text-xs">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="CASH" className="text-xs font-bold">
-                          Cash
-                        </SelectItem>
-                        <SelectItem value="BANK_TRANSFER" className="text-xs font-bold">
-                          Bank Transfer
-                        </SelectItem>
-                        <SelectItem value="CHEQUE" className="text-xs font-bold">
-                          Cheque
-                        </SelectItem>
-                        <SelectItem value="CREDIT_CARD" className="text-xs font-bold">
-                          Credit Card
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div>
-                    <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5 block">
-                      Reference #
-                    </Label>
-                    <Input
-                      value={referenceNumber}
-                      onChange={(e) => setReferenceNumber(e.target.value)}
-                      placeholder="Ref/Cheque No"
-                      className="h-10 border-slate-200 font-bold text-xs"
-                    />
-                  </div>
-
-                  <div className="col-span-2">
-                    <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5 block">
-                      Remarks
-                    </Label>
-                    <Input
-                      value={remarks}
-                      onChange={(e) => setRemarks(e.target.value)}
-                      placeholder="Additional notes..."
-                      className="h-10 border-slate-200 font-bold text-xs"
-                    />
-                  </div>
+                  {advanceAmount && Number(advanceAmount) > 0 && (
+                    <>
+                      <div>
+                        <Label className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1 block">
+                          Payment Mode
+                        </Label>
+                        <Select
+                          value={paymentMode}
+                          onValueChange={(
+                            val: 'CASH' | 'BANK_TRANSFER' | 'CHEQUE' | 'CREDIT_CARD',
+                          ) => setPaymentMode(val)}
+                        >
+                          <SelectTrigger className="h-10 border-slate-200 font-bold text-xs">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="CASH" className="text-xs font-bold">
+                              Cash
+                            </SelectItem>
+                            <SelectItem value="BANK_TRANSFER" className="text-xs font-bold">
+                              Bank Transfer
+                            </SelectItem>
+                            <SelectItem value="CHEQUE" className="text-xs font-bold">
+                              Cheque
+                            </SelectItem>
+                            <SelectItem value="CREDIT_CARD" className="text-xs font-bold">
+                              Credit Card
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1 block">
+                          Reference #
+                        </Label>
+                        <Input
+                          value={referenceNumber}
+                          onChange={(e) => setReferenceNumber(e.target.value)}
+                          placeholder="Ref/Cheque No"
+                          className="h-10 border-slate-200 font-bold text-xs"
+                        />
+                      </div>
+                    </>
+                  )}
                 </div>
-              )}
+              </div>
+
+              {/* Caution Deposit Card */}
+              <div className="p-4 bg-slate-50/50 rounded-2xl border border-slate-100/80 space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-black text-indigo-700 uppercase tracking-wider flex items-center gap-1.5">
+                    <span className="h-2 w-2 rounded-full bg-indigo-500"></span>
+                    Caution Deposit (Optional)
+                  </h4>
+                </div>
+                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wide leading-relaxed">
+                  Record caution / security deposit for contract activation.
+                </p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="col-span-2">
+                    <Label className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1 block">
+                      Caution Deposit Amount (QAR)
+                    </Label>
+                    <Input
+                      type="number"
+                      value={cautionAmount}
+                      onChange={(e) => setCautionAmount(e.target.value)}
+                      placeholder="0.00"
+                      className="h-10 font-black text-indigo-600 text-sm border-slate-200 focus:border-indigo-300"
+                    />
+                  </div>
+                  {cautionAmount && Number(cautionAmount) > 0 && (
+                    <>
+                      <div>
+                        <Label className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1 block">
+                          Payment Mode
+                        </Label>
+                        <Select
+                          value={cautionMode}
+                          onValueChange={(
+                            val: 'CASH' | 'BANK_TRANSFER' | 'CHEQUE' | 'CREDIT_CARD',
+                          ) => setCautionMode(val)}
+                        >
+                          <SelectTrigger className="h-10 border-slate-200 font-bold text-xs">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="CASH" className="text-xs font-bold">
+                              Cash
+                            </SelectItem>
+                            <SelectItem value="BANK_TRANSFER" className="text-xs font-bold">
+                              Bank Transfer
+                            </SelectItem>
+                            <SelectItem value="CHEQUE" className="text-xs font-bold">
+                              Cheque
+                            </SelectItem>
+                            <SelectItem value="CREDIT_CARD" className="text-xs font-bold">
+                              Credit Card
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1 block">
+                          Reference #
+                        </Label>
+                        <Input
+                          value={cautionReference}
+                          onChange={(e) => setCautionReference(e.target.value)}
+                          placeholder="Ref/Cheque No"
+                          className="h-10 border-slate-200 font-bold text-xs"
+                        />
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {/* Remarks Section */}
+              <div className="p-3 bg-slate-50/20 rounded-xl border border-slate-100">
+                <Label className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1 block">
+                  Remarks / Notes
+                </Label>
+                <Input
+                  value={remarks}
+                  onChange={(e) => setRemarks(e.target.value)}
+                  placeholder="Additional conversion remarks..."
+                  className="h-10 border-slate-200 font-bold text-xs"
+                />
+              </div>
             </div>
           )}
 
@@ -386,11 +490,15 @@ export function QuotationConversionFlow({
                   <span className="text-slate-700">{saleLabel}</span>
                 </div>
                 <div className="flex justify-between text-[11px] font-bold">
-                  <span className="text-slate-400 uppercase tracking-widest">
-                    Advance Collected
+                  <span className="text-slate-400 uppercase tracking-widest">Advance Amount</span>
+                  <span className="text-emerald-600 font-black">
+                    QAR {Number(advanceAmount || 0).toFixed(2)}
                   </span>
-                  <span className="text-emerald-600">
-                    QAR {skipAdvance ? '0.00' : Number(advanceAmount || 0).toFixed(2)}
+                </div>
+                <div className="flex justify-between text-[11px] font-bold">
+                  <span className="text-slate-400 uppercase tracking-widest">Caution Deposit</span>
+                  <span className="text-indigo-600 font-black">
+                    QAR {Number(cautionAmount || 0).toFixed(2)}
                   </span>
                 </div>
                 <div className="flex justify-between text-[11px] font-bold">

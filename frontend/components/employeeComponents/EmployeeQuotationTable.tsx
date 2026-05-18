@@ -968,7 +968,7 @@ function QuotationFormModal({
             quantity: it.quantity,
             unitPrice: it.basePrice,
             discount: it.discount,
-            productId: it.productId,
+            productId: undefined,
             modelId: it.modelId,
             itemType: it.itemType,
           };
@@ -1021,6 +1021,7 @@ function QuotationFormModal({
             ...it,
             description: desc,
             unitPrice: 0,
+            productId: undefined,
           };
         }),
         pricingItems: [],
@@ -1085,7 +1086,7 @@ function QuotationFormModal({
             quantity: it.quantity,
             unitPrice: 0,
             itemType: it.itemType,
-            productId: it.productId,
+            productId: undefined,
             modelId: it.modelId,
             ...(leaseType === 'FSM'
               ? {

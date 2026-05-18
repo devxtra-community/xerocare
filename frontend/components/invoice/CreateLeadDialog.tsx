@@ -32,17 +32,19 @@ export function CreateLeadDialog({ open, onOpenChange, onCreated }: CreateLeadDi
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [location, setLocation] = useState('');
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setErrorMessage(null);
 
     if (!name.trim()) {
-      toast.error('Lead Name is required');
+      setErrorMessage('Lead Name is required');
       return;
     }
 
     if (!location.trim()) {
-      toast.error('Location is required to enable quotation/invoice conversion');
+      setErrorMessage('Location is required to enable quotation/invoice conversion');
       return;
     }
 
@@ -63,14 +65,17 @@ export function CreateLeadDialog({ open, onOpenChange, onCreated }: CreateLeadDi
       setEmail('');
       setPhone('');
       setLocation('');
+      setErrorMessage(null);
 
       // Callback with the newly created lead
       onCreated(newLead);
       onOpenChange(false);
     } catch (error: unknown) {
-      console.error('Failed to create lead:', error);
+      console.warn('Failed to create lead:', error);
       const err = error as { response?: { data?: { message?: string } } };
-      toast.error(err.response?.data?.message || 'Failed to create lead. Please check inputs.');
+      const msg = err.response?.data?.message || 'Failed to create lead. Please check inputs.';
+      setErrorMessage(msg);
+      toast.error(msg);
     } finally {
       setLoading(false);
     }
@@ -89,6 +94,12 @@ export function CreateLeadDialog({ open, onOpenChange, onCreated }: CreateLeadDi
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4 py-3">
+          {errorMessage && (
+            <div className="bg-red-50 border border-red-200 text-red-700 text-xs font-semibold px-4 py-3 rounded-xl flex items-start gap-2.5 animate-in fade-in slide-in-from-top-1 duration-200">
+              <span className="w-1.5 h-1.5 rounded-full bg-red-500 mt-1.5 shrink-0" />
+              <div className="flex-1 leading-normal">{errorMessage}</div>
+            </div>
+          )}
           <div className="space-y-1.5">
             <Label htmlFor="lead-name" className="text-xs font-bold text-slate-500 uppercase">
               Lead Name <span className="text-red-500">*</span>

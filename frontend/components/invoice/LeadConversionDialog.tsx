@@ -37,16 +37,7 @@ export function LeadConversionDialog({
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
-
-  // Pre-fill when lead changes
-  // useEffect not strictly needed if we just use defaultValues, but for controlled:
-  // We'll initialize state when the dialog opens or lead is set.
-  // For simplicity, let's use key={} on the component or useEffect.
-  // Let's use a neat trick: derived state or effect? Effect is safer for reset.
-  // Actually, we can just use defaultValue if we don't need two-way binding with parent.
-  // But we might want to edit lead's existing data if it's wrong?
-  // Requirement: "frontend sends only missing fields".
-  // So we should only ask for what's missing.
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const isNameMissing = !lead?.name;
   const isContactMissing = !lead?.email && !lead?.phone;
@@ -55,9 +46,9 @@ export function LeadConversionDialog({
     e.preventDefault();
     if (!lead) return;
 
+    setErrorMessage(null);
     setLoading(true);
     try {
-      // Construct payload of MISSING or EDITABLE fields
       // Construct payload of MISSING or EDITABLE fields
       interface ConversionPayload {
         name?: string;
@@ -71,12 +62,12 @@ export function LeadConversionDialog({
 
       // Simple validation
       if (!payload.name && !lead.name) {
-        toast.error('Name is required');
+        setErrorMessage('Name is required');
         setLoading(false);
         return;
       }
       if (!payload.email && !payload.phone && !lead.email && !lead.phone) {
-        toast.error('Email or Phone is required');
+        setErrorMessage('Email or Phone is required');
         setLoading(false);
         return;
       }
@@ -86,8 +77,11 @@ export function LeadConversionDialog({
       onConverted(customerId);
       onOpenChange(false);
     } catch (error) {
-      console.error('Conversion failed', error);
-      toast.error('Failed to convert lead');
+      console.warn('Conversion failed', error);
+      const err = error as { response?: { data?: { message?: string } } };
+      const msg = err.response?.data?.message || 'Failed to convert lead. Please try again.';
+      setErrorMessage(msg);
+      toast.error(msg);
     } finally {
       setLoading(false);
     }
@@ -129,6 +123,12 @@ export function LeadConversionDialog({
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="grid gap-4 py-4">
+          {errorMessage && (
+            <div className="bg-red-50 border border-red-200 text-red-700 text-xs font-semibold px-4 py-3 rounded-xl flex items-start gap-2.5 animate-in fade-in slide-in-from-top-1 duration-200">
+              <span className="w-1.5 h-1.5 rounded-full bg-red-500 mt-1.5 shrink-0" />
+              <div className="flex-1 leading-normal">{errorMessage}</div>
+            </div>
+          )}
           <div className="grid gap-2">
             <Label htmlFor="name">
               Name {isNameMissing && <span className="text-red-500">*</span>}
