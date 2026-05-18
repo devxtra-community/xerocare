@@ -5,6 +5,9 @@ import { getCustomers } from '@/lib/customer';
 import { getLeads, Lead } from '@/lib/lead';
 import { SearchableSelect, SearchableSelectOption } from '@/components/ui/searchable-select';
 import { LeadConversionDialog } from './LeadConversionDialog';
+import { Button } from '@/components/ui/button';
+import { Plus } from 'lucide-react';
+import { CreateLeadDialog } from './CreateLeadDialog';
 
 // Unified Selectable Entity
 export type SelectableCustomer = {
@@ -35,6 +38,7 @@ export function CustomerSelect({ value, onChange }: CustomerSelectProps) {
   // Dialog state
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
+  const [createLeadOpen, setCreateLeadOpen] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -106,13 +110,46 @@ export function CustomerSelect({ value, onChange }: CustomerSelectProps) {
 
   return (
     <>
-      <SearchableSelect
-        value={value}
-        onValueChange={handleValueChange}
-        options={options}
-        loading={loading}
-        placeholder="Select Customer or Lead"
-        emptyText="No customers found."
+      <div className="flex items-center gap-3 w-full">
+        <div className="flex-1">
+          <SearchableSelect
+            value={value}
+            onValueChange={handleValueChange}
+            options={options}
+            loading={loading}
+            placeholder="Select Customer or Lead"
+            emptyText="No customers found."
+          />
+        </div>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => setCreateLeadOpen(true)}
+          className="h-10 px-3 rounded-xl border-dashed border-2 border-slate-200 text-slate-500 hover:border-primary hover:text-primary transition-all font-bold flex items-center gap-1.5 shrink-0"
+        >
+          <Plus size={16} /> Create Lead
+        </Button>
+      </div>
+
+      <CreateLeadDialog
+        open={createLeadOpen}
+        onOpenChange={setCreateLeadOpen}
+        onCreated={(newLead) => {
+          const selectableLead: SelectableCustomer = {
+            ...newLead,
+            id: newLead._id,
+            name: newLead.name || 'Unnamed Lead',
+            phone: newLead.phone,
+            email: newLead.email,
+            type: 'LEAD',
+            isCustomer: false,
+          };
+
+          setItems((prev) => [...prev, selectableLead]);
+
+          // Small delay or directly select the newly created lead
+          handleValueChange(selectableLead.id);
+        }}
       />
 
       <LeadConversionDialog
