@@ -57,6 +57,28 @@ export interface SparePartsNormalQuotationProps {
 const fmt = (n: number) =>
   n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
+const ACCENT = '#00A389';
+
+const thStyle = (
+  align: 'left' | 'center' | 'right' = 'left',
+  color = '#fff',
+): React.CSSProperties => ({
+  padding: '10px 10px',
+  textAlign: align,
+  fontWeight: '800',
+  fontSize: '11px',
+  letterSpacing: '0.5px',
+  textTransform: 'uppercase',
+  color,
+});
+
+const tdStyleHelper = (align: 'left' | 'center' | 'right' = 'center'): React.CSSProperties => ({
+  padding: '12px 10px',
+  textAlign: align,
+  verticalAlign: 'top',
+  fontSize: '12px',
+});
+
 const SparePartsNormalQuotation: React.FC<SparePartsNormalQuotationProps> = ({
   modelName = '',
   billTo = {
@@ -64,10 +86,7 @@ const SparePartsNormalQuotation: React.FC<SparePartsNormalQuotationProps> = ({
     address: 'DOHA, QATAR',
     trn: '',
   },
-  shipTo = {
-    name: 'XEROCARE W. L. L',
-    address: 'DOHA, QATAR',
-  },
+
   quotation = {
     number: 'EST-001',
     date: '12/05/2026',
@@ -84,286 +103,333 @@ const SparePartsNormalQuotation: React.FC<SparePartsNormalQuotationProps> = ({
     paid: false,
   },
 }) => {
+  const companyInfo = {
+    name: 'Xerocare Trading & Services W.L.L',
+    address: 'P.O.BOX 37494, DOHA-QATAR',
+    email: 'mail@xerocare.com',
+    phone: '+974 7071 7282',
+    website: 'www.xerocare.com',
+    logo: '/quatationLayouts/productsalequatation/normal/normallogo/xerocarelogo-removebg-preview.png',
+  };
+
   return (
     <div
       style={{
         fontFamily: "'Inter', 'Segoe UI', Arial, sans-serif",
         backgroundColor: '#ffffff',
         width: '794px',
-        minHeight: '1123px',
+        minHeight: '1122px',
         margin: '0 auto',
+        padding: '50px 40px',
+        color: '#1a1a1a',
         display: 'flex',
         flexDirection: 'column',
-        color: '#1a1a1a',
-        fontSize: '13px',
         boxSizing: 'border-box',
       }}
     >
-      {/* ─── HEADER SECTION ─── */}
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'flex-start',
-          padding: '48px 48px 20px',
-        }}
-      >
-        <div>
-          <div
-            style={{
-              fontWeight: '700',
-              fontSize: '16px',
-              color: '#111111',
-              marginBottom: '6px',
-            }}
-          >
-            Xerocare trading &amp; services W.L.L
-          </div>
-          <div style={{ color: '#666666', fontSize: '12px', lineHeight: '1.8' }}>
-            <div>Agrico Quarter, Doha, Qatar</div>
-            <div>mail@xerocare.com</div>
-            <div>+974 7071 7282</div>
-            <div>www.xerocare.com</div>
-          </div>
+      {/* ─── TITLE ─── */}
+      <div style={{ textAlign: 'center', marginBottom: '28px' }}>
+        <div
+          style={{
+            fontSize: '26px',
+            fontWeight: '800',
+            color: ACCENT,
+            textTransform: 'uppercase',
+            letterSpacing: '2px',
+          }}
+        >
+          SPARE PART QUOTATION
         </div>
-
-        <img
-          src="/quatationLayouts/productsalequatation/normal/normallogo/xerocarelogo-removebg-preview.png"
-          alt="Xerocare Logo"
-          style={{ width: '110px', height: '110px', objectFit: 'contain' }}
-        />
       </div>
 
-      <div style={{ borderTop: '1px solid #cccccc', margin: '0 48px' }} />
+      {/* ─── HEADER ─── */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '32px' }}>
+        <div>
+          <div style={{ fontSize: '17px', fontWeight: '800', color: ACCENT, marginBottom: '6px' }}>
+            {companyInfo.name}
+          </div>
+          <div style={{ fontSize: '12px', color: '#333', lineHeight: '1.5' }}>
+            <div>{companyInfo.address}</div>
+            <div>Mobile: {companyInfo.phone}</div>
+            <div>Email: {companyInfo.email}</div>
+          </div>
+        </div>
+        <div
+          style={{
+            width: '160px',
+            height: '75px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'flex-end',
+          }}
+        >
+          {companyInfo.logo ? (
+            <img
+              src={companyInfo.logo}
+              alt="Logo"
+              style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
+            />
+          ) : (
+            <div
+              style={{
+                fontSize: '20px',
+                fontWeight: 'bold',
+                color: '#ccc',
+                border: '2px solid #ccc',
+                padding: '8px 16px',
+              }}
+            >
+              LOGO
+            </div>
+          )}
+        </div>
+      </div>
 
-      {/* ─── CUSTOMER & META INFO ─── */}
+      {/* ─── BILL TO & QUOTATION INFO ─── */}
       <div
         style={{
           display: 'flex',
           justifyContent: 'space-between',
-          padding: '20px 48px',
-          gap: '16px',
+          marginBottom: '24px',
+          borderTop: `1px solid ${ACCENT}`,
+          paddingTop: '18px',
         }}
       >
-        <div style={{ flex: '1' }}>
+        <div style={{ flex: 1 }}>
           <div
             style={{
-              fontSize: '9px',
-              color: '#888',
-              fontWeight: '600',
+              fontSize: '13px',
+              fontWeight: '800',
+              color: ACCENT,
+              marginBottom: '6px',
               textTransform: 'uppercase',
-              marginBottom: '5px',
             }}
           >
             Bill To
           </div>
-          <div style={{ fontWeight: '600', color: '#111', lineHeight: '1.7' }}>{billTo.name}</div>
-        </div>
-
-        <div style={{ flex: '1' }}>
-          <div
-            style={{
-              fontSize: '9px',
-              color: '#888',
-              fontWeight: '600',
-              textTransform: 'uppercase',
-              marginBottom: '5px',
-            }}
-          >
-            Ship To
+          <div style={{ fontSize: '14px', fontWeight: '700', marginBottom: '4px' }}>
+            {billTo.name}
           </div>
-          <div style={{ fontWeight: '600', color: '#111', lineHeight: '1.7' }}>{shipTo.name}</div>
-          <div style={{ color: '#444', fontSize: '12px' }}>{shipTo.phone}</div>
-        </div>
-
-        <div style={{ flex: '1.2', textAlign: 'right' }}>
-          {[
-            { label: 'QUOTATION', value: quotation.number },
-            { label: 'DATE', value: quotation.date },
-            { label: 'TERMS', value: quotation.terms },
-          ].map(({ label, value }) => (
-            <div
-              key={label}
-              style={{
-                display: 'flex',
-                justifyContent: 'flex-end',
-                gap: '12px',
-                lineHeight: '1.8',
-              }}
-            >
-              <span
-                style={{
-                  fontSize: '9px',
-                  color: '#888',
-                  fontWeight: '600',
-                  textTransform: 'uppercase',
-                  minWidth: '70px',
-                }}
-              >
-                {label}
-              </span>
-              <span style={{ color: '#111', fontWeight: '500', minWidth: '110px' }}>{value}</span>
+          <div
+            style={{ fontSize: '12px', color: '#555', lineHeight: '1.4', whiteSpace: 'pre-line' }}
+          >
+            {billTo.address}
+          </div>
+          {billTo.trn && (
+            <div style={{ fontSize: '12px', color: '#555', marginTop: '4px' }}>
+              TRN: {billTo.trn}
             </div>
-          ))}
+          )}
+        </div>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+          <div style={{ width: '230px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+              <span style={{ fontSize: '13px', fontWeight: '800', color: '#111' }}>
+                Quotation No :
+              </span>
+              <span style={{ fontSize: '13px', fontWeight: '800' }}>{quotation.number}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+              <span style={{ fontSize: '12px', color: '#555' }}>Date :</span>
+              <span style={{ fontSize: '12px', fontWeight: '600' }}>{quotation.date}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span style={{ fontSize: '12px', color: '#555' }}>Due Date :</span>
+              <span style={{ fontSize: '12px', fontWeight: '600' }}>{quotation.dueDate}</span>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* ─── BRAND / MODEL / SL ROW ─── */}
+      {/* ─── MACHINE DETAILS ─── */}
       <div
         style={{
-          display: 'flex',
-          justifyContent: 'center',
-          gap: '60px',
-          padding: '15px 48px',
-          borderTop: '1px solid #f0f0f0',
-          borderBottom: '1px solid #f0f0f0',
-          margin: '0 48px',
-          marginTop: '10px',
-          backgroundColor: '#fcfcfc',
+          backgroundColor: '#f9f9f9',
+          padding: '14px 18px',
+          borderRadius: '8px',
+          marginBottom: '22px',
+          border: '1px solid #eee',
         }}
       >
-        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-          <span style={{ fontWeight: '800', fontSize: '11px', color: '#999' }}>BRAND</span>
-          <span style={{ fontWeight: '700', fontSize: '12px', color: '#111' }}>
-            {lineItems[0]?.brand || 'N/A'}
-          </span>
+        <div
+          style={{
+            fontSize: '11px',
+            fontWeight: '800',
+            color: ACCENT,
+            textTransform: 'uppercase',
+            marginBottom: '10px',
+            borderBottom: '1px solid #e0e0e0',
+            paddingBottom: '5px',
+          }}
+        >
+          Spare Part Details
         </div>
-        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-          <span style={{ fontWeight: '800', fontSize: '11px', color: '#999' }}>MODEL NO</span>
-          <span style={{ fontWeight: '700', fontSize: '12px', color: '#111' }}>
-            {lineItems[0]?.modelNo || modelName || 'N/A'}
-          </span>
-        </div>
-        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-          <span style={{ fontWeight: '800', fontSize: '11px', color: '#999' }}>SL NO</span>
-          <span style={{ fontWeight: '700', fontSize: '12px', color: '#111' }}>
-            {lineItems[0]?.slNo || 'TBD'}
-          </span>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
+          <div>
+            <div style={{ fontSize: '10px', color: '#888', textTransform: 'uppercase' }}>Brand</div>
+            <div style={{ fontSize: '13px', fontWeight: '700' }}>
+              {lineItems[0]?.brand || 'N/A'}
+            </div>
+          </div>
+          <div>
+            <div style={{ fontSize: '10px', color: '#888', textTransform: 'uppercase' }}>Model</div>
+            <div style={{ fontSize: '13px', fontWeight: '700' }}>
+              {lineItems[0]?.modelNo || modelName || 'N/A'}
+            </div>
+          </div>
+          <div>
+            <div style={{ fontSize: '10px', color: '#888', textTransform: 'uppercase' }}>
+              Serial Number
+            </div>
+            <div style={{ fontSize: '13px', fontWeight: '700' }}>{lineItems[0]?.slNo || 'TBD'}</div>
+          </div>
         </div>
       </div>
 
-      {/* ─── GREETING TEXT ─── */}
-      <div
-        style={{ padding: '25px 48px 15px', fontSize: '12px', color: '#222', lineHeight: '1.6' }}
-      >
-        <p style={{ fontWeight: '700', marginBottom: '8px' }}>Dear Sir/ Madam</p>
-        <p>
-          Thanks for your valuble inquiry . As we discussed please find the maintenance for
-          printers/copiers with special price , All deatils are mentioned in the quotation , If any
-          clarification please do call and let me know the status .
-        </p>
-      </div>
-
-      {/* ─── TABLE SECTION ─── */}
-      <div style={{ padding: '0 48px' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px' }}>
+      {/* ─── ITEMS TABLE ─── */}
+      <div style={{ flex: 1, marginBottom: '24px' }}>
+        <div
+          style={{
+            fontSize: '13px',
+            fontWeight: '800',
+            color: ACCENT,
+            textTransform: 'uppercase',
+            borderBottom: `2px solid ${ACCENT}`,
+            paddingBottom: '5px',
+            marginBottom: '10px',
+          }}
+        >
+          Line Items
+        </div>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
           <thead>
-            <tr
-              style={{
-                backgroundColor: '#f5f5f5',
-                borderTop: '2px solid #111',
-                borderBottom: '1px solid #ddd',
-              }}
-            >
-              {[
-                { label: 'MPN', width: '12%' },
-                { label: 'DESCRIPTION', width: '50%' },
-                { label: 'QUANTITY', width: '8%' },
-                { label: 'RATE', width: '10%' },
-                { label: 'DISCOUNT', width: '8%' },
-                { label: 'TOTAL', width: '12%' },
-              ].map(({ label, width }) => (
-                <th
-                  key={label}
-                  style={{
-                    padding: '12px 6px',
-                    textAlign: label === 'DESCRIPTION' ? 'left' : 'center',
-                    fontWeight: '800',
-                    fontSize: '10px',
-                    color: '#111',
-                    width,
-                  }}
-                >
-                  {label}
-                </th>
-              ))}
+            <tr style={{ backgroundColor: ACCENT, color: '#fff' }}>
+              <th style={{ ...thStyle(), width: '36px' }}>Sl.</th>
+              <th style={{ ...thStyle(), width: '45%' }}>Description</th>
+              <th style={thStyle('center')}>Qty</th>
+              <th style={thStyle('center')}>Unit Price</th>
+              <th style={thStyle('center')}>Discount</th>
+              <th style={thStyle('center')}>VAT</th>
+              <th style={{ ...thStyle('right') }}>Amount</th>
             </tr>
           </thead>
           <tbody>
             {lineItems.map((item, idx) => (
-              <tr key={idx} style={{ borderBottom: '1px solid #f0f0f0' }}>
-                <td style={tdStyle('center')}>{item.mpn || '---'}</td>
-                <td style={{ ...tdStyle('left'), lineHeight: '1.6', padding: '15px 12px' }}>
-                  <div style={{ fontWeight: '700', marginBottom: '8px', fontSize: '16px' }}>
-                    {item.productName}
-                  </div>
+              <tr
+                key={idx}
+                style={{
+                  backgroundColor: idx % 2 === 0 ? '#fff' : '#f4fbf9',
+                  borderBottom: '1px solid #eee',
+                }}
+              >
+                <td style={tdStyleHelper()}>{idx + 1}</td>
+                <td style={{ ...tdStyleHelper('left'), whiteSpace: 'pre-wrap' }}>
                   <div
                     style={{
-                      fontSize: '13px',
-                      fontWeight: '800',
-                      color: '#dc2626',
-                      textTransform: 'uppercase',
-                      marginBottom: '4px',
+                      fontSize: '11px',
+                      color: '#1a1a1a',
+                      fontWeight: '600',
+                      maxWidth: '95%',
+                      lineHeight: '1.6',
                     }}
                   >
-                    Product Description
-                  </div>
-                  <div style={{ fontSize: '16px', color: '#444', fontWeight: '500' }}>
-                    {item.description}
+                    {item.productName && (
+                      <div style={{ fontWeight: '700', marginBottom: '4px', fontSize: '14px' }}>
+                        {item.productName}
+                      </div>
+                    )}
+                    <div
+                      style={{
+                        fontSize: '13px',
+                        fontWeight: '800',
+                        color: '#dc2626',
+                        textTransform: 'uppercase',
+                        marginBottom: '6px',
+                      }}
+                    >
+                      Product Description
+                    </div>
+                    <div>{item.description}</div>
                   </div>
                 </td>
-                <td style={tdStyle('center')}>{item.qty}</td>
-                <td style={tdStyle('center')}>{fmt(item.unitPrice)}</td>
-                <td style={tdStyle('center')}>{item.discount ? `${item.discount}%` : '0%'}</td>
-                <td style={{ ...tdStyle('center'), fontWeight: '700' }}>{fmt(item.amount)}</td>
+                <td style={tdStyleHelper()}>{item.qty}</td>
+                <td style={tdStyleHelper()}>{fmt(item.unitPrice)}</td>
+                <td style={tdStyleHelper()}>{item.discount ? `${item.discount}%` : '0%'}</td>
+                <td style={tdStyleHelper()}>{fmt(item.vat)}</td>
+                <td style={{ ...tdStyleHelper('right'), fontWeight: '700' }}>{fmt(item.amount)}</td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
 
-      {/* ─── TOTALS SECTION ─── */}
-      <div style={{ padding: '20px 48px', display: 'flex', justifyContent: 'flex-end' }}>
-        <div style={{ width: '220px' }}>
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              padding: '5px 0',
-              borderBottom: '1px solid #eee',
-            }}
-          >
-            <span style={{ fontSize: '10px', fontWeight: '700' }}>SUBTOTAL</span>
-            <span style={{ fontWeight: '600' }}>{fmt(totals.subTotal)}</span>
-          </div>
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              padding: '10px 0',
-              marginTop: '5px',
-            }}
-          >
-            <span style={{ fontSize: '12px', fontWeight: '800' }}>TOTAL AMOUNT</span>
-            <span style={{ fontSize: '14px', fontWeight: '800', color: '#111' }}>
-              QAR {fmt(totals.total)}
-            </span>
-          </div>
+      {/* ─── TOTALS ─── */}
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'flex-end',
+          marginBottom: '32px',
+        }}
+      >
+        <div style={{ width: '250px' }}>
+          {[
+            { label: 'Subtotal', value: fmt(totals.subTotal) },
+            { label: 'VAT Total', value: fmt(totals.vatTotal) },
+            { label: 'Total', value: `QAR ${fmt(totals.total)}`, isBold: true },
+          ].map((row, i) => (
+            <div
+              key={i}
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                padding: '8px 0',
+                borderBottom: i === 2 ? `2px solid ${ACCENT}` : '1px solid #f0f0f0',
+                fontWeight: row.isBold ? '800' : '500',
+                color: row.isBold ? ACCENT : '#333',
+              }}
+            >
+              <span style={{ fontSize: '12px', textTransform: 'uppercase' }}>{row.label}</span>
+              <span style={{ fontSize: '14px' }}>{row.value}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ─── TERMS AND CONDITIONS ─── */}
+      <div style={{ marginBottom: '32px' }}>
+        <div
+          style={{
+            fontSize: '13px',
+            fontWeight: '800',
+            color: ACCENT,
+            textTransform: 'uppercase',
+            borderBottom: `2px solid ${ACCENT}`,
+            paddingBottom: '5px',
+            marginBottom: '12px',
+          }}
+        >
+          Terms and Conditions
+        </div>
+        <div style={{ fontSize: '11px', color: '#555', lineHeight: '1.6' }}>
+          <div>1. Payment: {quotation.terms}</div>
+          <div>2. Prices are inclusive of delivery.</div>
+          <div>3. Delivery: Ex-stock, subject to availability.</div>
+          <div>4. Validity: 30 days from the quotation date.</div>
         </div>
       </div>
 
       <div style={{ flex: 1 }} />
 
       {/* ─── SIGNATURE & SEAL ─── */}
-      <div style={{ padding: '0 48px 40px', display: 'flex', justifyContent: 'flex-end' }}>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '20px' }}>
         <div style={{ textAlign: 'center', position: 'relative', width: '200px' }}>
           <img
             src="/seel/seel1.png"
             alt="Seal"
             style={{
               position: 'absolute',
-              left: '-50px',
-              top: '-75px',
+              left: '-30px',
+              top: '-70px',
               width: '100px',
               height: 'auto',
               transform: 'rotate(-15deg)',
@@ -376,35 +442,24 @@ const SparePartsNormalQuotation: React.FC<SparePartsNormalQuotationProps> = ({
         </div>
       </div>
 
-      {/* ─── FOOTER SECTION ─── */}
+      {/* ─── FOOTER ─── */}
       <div
         style={{
-          backgroundColor: '#f8f8f8',
-          borderTop: '1px solid #eee',
-          padding: '25px 48px',
+          borderTop: `2px solid ${ACCENT}`,
+          paddingTop: '15px',
           display: 'flex',
           justifyContent: 'space-between',
+          fontSize: '11px',
+          color: '#666',
         }}
       >
-        <div style={{ fontSize: '11px', color: '#444', lineHeight: '1.8' }}>
-          <div style={{ fontWeight: '700', color: '#111' }}>
-            Xerocare trading &amp; services W.L.L
-          </div>
-          <div>Agrico Quarter, Doha, Qatar</div>
-          <div>+974 7071 7282</div>
-        </div>
-        <div style={{ fontSize: '11px', color: '#444', textAlign: 'right', lineHeight: '1.8' }}>
-          <div>Email: mail@xerocare.com</div>
-          <div>Web: www.xerocare.com</div>
-          <div style={{ fontWeight: '700', color: '#111', marginTop: '5px' }}>BEST REGARDS</div>
+        <div>{companyInfo.website}</div>
+        <div>
+          {companyInfo.email} | {companyInfo.phone}
         </div>
       </div>
     </div>
   );
 };
-
-function tdStyle(align: 'left' | 'center' | 'right'): React.CSSProperties {
-  return { padding: '12px 6px', textAlign: align, verticalAlign: 'top' };
-}
 
 export default SparePartsNormalQuotation;

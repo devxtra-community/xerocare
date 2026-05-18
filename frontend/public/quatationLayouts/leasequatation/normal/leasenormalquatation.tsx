@@ -370,7 +370,7 @@ const LeaseNormalQuotation: React.FC<LeaseNormalQuotationProps> = ({
                 <td style={{ ...tdStyle('left'), whiteSpace: 'pre-wrap' }}>
                   <div
                     style={{
-                      fontSize: '16px',
+                      fontSize: '11px',
                       color: '#1a1a1a',
                       fontWeight: '600',
                       maxWidth: '95%',
@@ -406,7 +406,7 @@ const LeaseNormalQuotation: React.FC<LeaseNormalQuotationProps> = ({
                           Features
                         </div>
                         {(item.features || []).map((f, i) => (
-                          <div key={i} style={{ marginTop: '8px', fontSize: '15px' }}>
+                          <div key={i} style={{ marginTop: '8px', fontSize: '11px' }}>
                             {f.subHeading && (
                               <strong
                                 style={{ color: '#dc2626', display: 'block', marginBottom: '4px' }}
