@@ -11,7 +11,7 @@ import {
   CartesianGrid,
   Legend,
 } from 'recharts';
-import { getGlobalSalesOverview } from '@/lib/invoice';
+import { getInvoices } from '@/lib/invoice';
 import { Loader2 } from 'lucide-react';
 import { ChartTooltipContent } from '@/components/ui/ChartTooltip';
 import { formatCompactNumber } from '@/lib/format';
@@ -38,12 +38,14 @@ export default function RevenueBreakdownChart({ selectedYear }: RevenueBreakdown
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // Fetch 12 months of data
-        // Fetch 12 months of data for the selected year
-        const salesData = await getGlobalSalesOverview(
-          '1Y',
-          selectedYear === 'all' ? undefined : selectedYear,
-        );
+        const invoices = await getInvoices();
+        const paidOnly = (invoices || []).filter((inv) => inv.status === 'PAID');
+
+        // Filter by year if necessary
+        const filteredInvoices =
+          selectedYear === 'all'
+            ? paidOnly
+            : paidOnly.filter((inv) => new Date(inv.createdAt).getFullYear() === selectedYear);
 
         // Initialize all months with zero values
         const monthlyData: Record<string, MonthlyData> = {};
@@ -52,17 +54,18 @@ export default function RevenueBreakdownChart({ selectedYear }: RevenueBreakdown
         });
 
         // Populate with actual data
-        salesData.forEach((item) => {
-          const date = new Date(item.date);
+        filteredInvoices.forEach((inv) => {
+          const date = new Date(inv.createdAt);
           const monthName = MONTHS[date.getMonth()];
-          const rawType = item.saleType.toUpperCase();
-          let saleType: 'rent' | 'sale' | 'lease' | null = null;
-          if (rawType === 'RENT') saleType = 'rent';
-          else if (rawType === 'LEASE') saleType = 'lease';
-          else if (['SALE', 'PRODUCT_SALE', 'SPAREPART_SALE'].includes(rawType)) saleType = 'sale';
+          const rawType = (inv.saleType || '').toUpperCase();
 
-          if (monthlyData[monthName] && saleType) {
-            monthlyData[monthName][saleType] += item.totalSales;
+          let typeKey: 'rent' | 'sale' | 'lease' | null = null;
+          if (rawType === 'RENT') typeKey = 'rent';
+          else if (rawType === 'LEASE') typeKey = 'lease';
+          else if (['SALE', 'PRODUCT_SALE', 'SPAREPART_SALE'].includes(rawType)) typeKey = 'sale';
+
+          if (monthlyData[monthName] && typeKey) {
+            monthlyData[monthName][typeKey] += Number(inv.totalAmount) || 0;
           }
         });
 

@@ -1,7 +1,9 @@
 'use client';
 
 import React from 'react';
-import { Wallet, ArrowUpRight } from 'lucide-react';
+import { Wallet, ArrowUpRight, Loader2 } from 'lucide-react';
+import { getInvoices, Invoice } from '@/lib/invoice';
+import { formatCurrency } from '@/lib/format';
 
 // Finance components (self-contained visuals)
 import RevenueBreakdownChart from '@/components/Finance/RevenueBreakdownChart';
@@ -68,10 +70,6 @@ export default function FinanceDashboard() {
   );
 }
 
-import { getGlobalSalesTotals } from '@/lib/invoice';
-import { Loader2 } from 'lucide-react';
-import { formatCurrency } from '@/lib/format';
-
 function KPIStats({ selectedYear }: { selectedYear: number | 'all' }) {
   const [loading, setLoading] = React.useState(true);
   const [data, setData] = React.useState({
@@ -82,10 +80,34 @@ function KPIStats({ selectedYear }: { selectedYear: number | 'all' }) {
   React.useEffect(() => {
     const fetchData = async () => {
       try {
-        const result = await getGlobalSalesTotals(
-          selectedYear === 'all' ? undefined : selectedYear,
+        const invoices: Invoice[] = await getInvoices();
+        const paidInvoices = (invoices || []).filter((inv: Invoice) => inv.status === 'PAID');
+
+        // Filter by year if necessary
+        const filteredInvoices =
+          selectedYear === 'all'
+            ? paidInvoices
+            : paidInvoices.filter(
+                (inv: Invoice) => new Date(inv.createdAt).getFullYear() === selectedYear,
+              );
+
+        const totalSales = filteredInvoices.reduce(
+          (sum: number, inv: Invoice) => sum + (Number(inv.totalAmount) || 0),
+          0,
         );
-        setData(result);
+
+        const salesByTypeMap: Record<string, number> = {};
+        filteredInvoices.forEach((inv: Invoice) => {
+          const type = inv.saleType || 'UNKNOWN';
+          salesByTypeMap[type] = (salesByTypeMap[type] || 0) + (Number(inv.totalAmount) || 0);
+        });
+
+        const salesByType = Object.entries(salesByTypeMap).map(([saleType, total]) => ({
+          saleType,
+          total,
+        }));
+
+        setData({ totalSales, salesByType });
       } catch (error) {
         console.error('Failed to fetch finance stats:', error);
       } finally {

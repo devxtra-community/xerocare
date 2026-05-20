@@ -41,11 +41,9 @@ export default function RevenueTable() {
     setLoading(true);
     try {
       const data = await getInvoices();
-      // Only show finance-approved or finalized invoices if necessary,
-      // but usually dashboard shows all relevant revenue entries.
-      // Filtering for 'FINAL' or approved ones might be better if the user only wants realized revenue.
-      // Based on the request, showing all invoices seems appropriate.
-      setInvoices(data || []);
+      // Only show paid invoices as per request to see only realized income
+      const paidOnly = (data || []).filter((inv: Invoice) => inv.status === 'PAID');
+      setInvoices(paidOnly);
     } catch (error) {
       console.error('Failed to fetch invoices:', error);
       toast.error('Failed to load revenue data');

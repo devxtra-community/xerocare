@@ -150,6 +150,20 @@ export function QuotationViewDialog({
                         productWithImage as { description?: string }
                       ).description;
                     }
+                    if (
+                      (!typedM.features || typedM.features.length === 0) &&
+                      (
+                        productWithImage as {
+                          features?: { subHeading: string; description: string }[];
+                        }
+                      ).features
+                    ) {
+                      typedM.features = (
+                        productWithImage as {
+                          features?: { subHeading: string; description: string }[];
+                        }
+                      ).features;
+                    }
                   }
                 } catch (e) {
                   console.error('Failed to fetch product for model image', e);
@@ -1038,6 +1052,39 @@ export function QuotationViewDialog({
               </span>
             </div>
             <div className="flex gap-3 items-center">
+              {showDistribution &&
+                ((_isFinanceView &&
+                  ['EMPLOYEE_APPROVED', 'VALIDITY_EXTENSION_REQUESTED'].includes(
+                    quotation.status,
+                  )) ||
+                  [
+                    'FINANCE_APPROVED',
+                    'APPROVED',
+                    'SENT_TO_CUSTOMER',
+                    'ACCEPTED',
+                    'VALIDITY_EXTENSION_REQUESTED',
+                  ].includes(quotation.status)) && (
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleSendCustomer('EMAIL')}
+                      disabled={isSendingCustomer}
+                      className="h-9 px-4 rounded-md font-black uppercase text-[11px] tracking-widest border-red-200 text-red-700 hover:bg-red-50 gap-2"
+                    >
+                      <Mail size={14} /> Gmail
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleSendCustomer('WHATSAPP')}
+                      disabled={isSendingCustomer}
+                      className="h-9 px-4 rounded-md font-black uppercase text-[11px] tracking-widest border-green-200 text-emerald-700 hover:bg-green-50 gap-2"
+                    >
+                      <Phone size={14} /> WhatsApp
+                    </Button>
+                  </div>
+                )}
               <Button
                 variant="ghost"
                 size="sm"
@@ -1059,26 +1106,6 @@ export function QuotationViewDialog({
                     Send to Finance
                   </Button>
                 )}
-
-              {onApprove && onReject && quotation.status === 'PENDING' && (
-                <div className="flex gap-2 ml-2">
-                  <Button
-                    variant="outline"
-                    onClick={onReject}
-                    size="sm"
-                    className="h-9 border-red-200 text-red-600 hover:bg-red-50 font-black text-[11px] uppercase tracking-widest px-6"
-                  >
-                    Reject Order
-                  </Button>
-                  <Button
-                    onClick={onApprove}
-                    size="sm"
-                    className="h-9 bg-green-600 hover:bg-green-700 text-white font-black text-[11px] uppercase tracking-widest px-8 shadow-lg shadow-green-100"
-                  >
-                    Approve Order
-                  </Button>
-                </div>
-              )}
             </div>
           </div>
         </DialogContent>
@@ -1960,6 +1987,40 @@ export function QuotationViewDialog({
             </div>
 
             <div className="flex gap-3 items-center">
+              {showDistribution &&
+                ((_isFinanceView &&
+                  ['EMPLOYEE_APPROVED', 'VALIDITY_EXTENSION_REQUESTED'].includes(
+                    quotation.status,
+                  )) ||
+                  [
+                    'FINANCE_APPROVED',
+                    'APPROVED',
+                    'SENT_TO_CUSTOMER',
+                    'ACCEPTED',
+                    'VALIDITY_EXTENSION_REQUESTED',
+                  ].includes(quotation.status)) && (
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleSendCustomer('EMAIL')}
+                      disabled={isSendingCustomer}
+                      className="h-9 px-4 rounded-md font-black uppercase text-[11px] tracking-widest border-red-200 text-red-700 hover:bg-red-50 gap-2"
+                    >
+                      <Mail size={14} /> Gmail
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleSendCustomer('WHATSAPP')}
+                      disabled={isSendingCustomer}
+                      className="h-9 px-4 rounded-md font-black uppercase text-[11px] tracking-widest border-green-200 text-emerald-700 hover:bg-green-50 gap-2"
+                    >
+                      <Phone size={14} /> WhatsApp
+                    </Button>
+                  </div>
+                )}
+
               <Button
                 variant="ghost"
                 size="sm"
@@ -1988,57 +2049,6 @@ export function QuotationViewDialog({
                     Mark as Rejected
                   </Button>
                 </>
-              )}
-
-              {/* Distribution buttons - Visible only after Finance Approval */}
-              {showDistribution &&
-                [
-                  'FINANCE_APPROVED',
-                  'SENT_TO_CUSTOMER',
-                  'CUSTOMER_ACCEPTED',
-                  'CUSTOMER_REJECTED',
-                ].includes(quotation.status) &&
-                quotation.type === 'QUOTATION' && (
-                  <div className="flex gap-2 border-l border-slate-300 pl-4 ml-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleSendCustomer('EMAIL')}
-                      disabled={isSendingCustomer}
-                      className="h-9 px-4 rounded-md font-black uppercase text-[11px] tracking-widest border-red-200 text-red-700 hover:bg-red-50 gap-2"
-                    >
-                      <Mail size={14} /> Gmail
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleSendCustomer('WHATSAPP')}
-                      disabled={isSendingCustomer}
-                      className="h-9 px-4 rounded-md font-black uppercase text-[11px] tracking-widest border-green-200 text-emerald-700 hover:bg-green-50 gap-2"
-                    >
-                      <Phone size={14} /> WhatsApp
-                    </Button>
-                  </div>
-                )}
-
-              {onApprove && onReject && (
-                <div className="flex gap-3 border-l border-slate-300 pl-4 ml-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-9 px-8 rounded-md font-black uppercase text-[11px] tracking-widest border-red-200 text-red-600 hover:bg-red-50 gap-2"
-                    onClick={() => onReject?.()}
-                  >
-                    Reject
-                  </Button>
-                  <Button
-                    size="sm"
-                    className="h-9 px-10 rounded-md font-black uppercase text-[11px] tracking-widest bg-emerald-600 hover:bg-emerald-700 text-white gap-2 shadow-lg shadow-emerald-100"
-                    onClick={() => onApprove?.()}
-                  >
-                    Accept
-                  </Button>
-                </div>
               )}
 
               {!onApprove &&

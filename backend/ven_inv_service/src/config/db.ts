@@ -33,7 +33,7 @@ export const Source = new DataSource({
   ssl: process.env.VENDOR_DATABASE_URL?.includes('neon.tech')
     ? { rejectUnauthorized: false }
     : false,
-  synchronize: true,
+  synchronize: false,
   entities: [
     Vendor,
     Model,

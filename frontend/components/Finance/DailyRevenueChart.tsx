@@ -21,7 +21,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { CalendarDays, Loader2 } from 'lucide-react';
-import { getGlobalSalesOverview } from '@/lib/invoice';
+import { getInvoices } from '@/lib/invoice';
 import { formatCompactNumber } from '@/lib/format';
 
 interface DailyData {
@@ -68,15 +68,19 @@ export default function DailyRevenueChart({
     const fetchData = async () => {
       setLoading(true);
       try {
-        const salesData = await getGlobalSalesOverview(
-          '1Y',
-          selectedYear === 'all' ? undefined : selectedYear,
-        );
+        const invoices = await getInvoices();
+        const paidOnly = (invoices || []).filter((inv) => inv.status === 'PAID');
 
-        // Get selected month details
+        // Filter by year and month
         const now = new Date();
         const yearToUse = selectedYear === 'all' ? now.getFullYear() : selectedYear;
         const monthToUse = selectedMonth;
+
+        const filteredInvoices = paidOnly.filter((inv) => {
+          const date = new Date(inv.createdAt);
+          return date.getFullYear() === yearToUse && date.getMonth() === monthToUse;
+        });
+
         const daysInMonth = new Date(yearToUse, monthToUse + 1, 0).getDate();
 
         // Initialize data for all days of the current month
@@ -88,21 +92,18 @@ export default function DailyRevenueChart({
         }));
 
         // Map fetched data to the correct day
-        salesData.forEach((item: { date: string; saleType: string; totalSales: number }) => {
-          const date = new Date(item.date);
-          // Only include data for the selected month and year
-          if (date.getMonth() === monthToUse && date.getFullYear() === yearToUse) {
-            const dayIndex = date.getDate() - 1; // 0-based index
-            const rawType = item.saleType.toUpperCase();
-            let saleType: 'rent' | 'sale' | 'lease' | null = null;
-            if (rawType === 'RENT') saleType = 'rent';
-            else if (rawType === 'LEASE') saleType = 'lease';
-            else if (['SALE', 'PRODUCT_SALE', 'SPAREPART_SALE'].includes(rawType))
-              saleType = 'sale';
+        filteredInvoices.forEach((inv) => {
+          const date = new Date(inv.createdAt);
+          const dayIndex = date.getDate() - 1; // 0-based index
+          const rawType = (inv.saleType || '').toUpperCase();
 
-            if (fullMonthData[dayIndex] && saleType) {
-              fullMonthData[dayIndex][saleType] += item.totalSales;
-            }
+          let typeKey: 'rent' | 'sale' | 'lease' | null = null;
+          if (rawType === 'RENT') typeKey = 'rent';
+          else if (rawType === 'LEASE') typeKey = 'lease';
+          else if (['SALE', 'PRODUCT_SALE', 'SPAREPART_SALE'].includes(rawType)) typeKey = 'sale';
+
+          if (fullMonthData[dayIndex] && typeKey) {
+            fullMonthData[dayIndex][typeKey] += Number(inv.totalAmount) || 0;
           }
         });
 

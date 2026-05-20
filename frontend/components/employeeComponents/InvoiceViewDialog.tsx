@@ -37,6 +37,7 @@ interface ProductMeta {
   name?: string;
   part_name?: string;
   description?: string;
+  features?: { subHeading: string; description: string }[];
   yield?: string;
   inventory?: { description?: string }[];
   image?: string;
@@ -50,6 +51,7 @@ interface InvoiceViewDialogProps {
   onEmail?: () => Promise<void> | void;
   onWhatsApp?: () => Promise<void> | void;
   approveLabel?: string;
+  showDistribution?: boolean;
 }
 
 export function InvoiceViewDialog({
@@ -58,6 +60,7 @@ export function InvoiceViewDialog({
   onApprove,
   onReject,
   approveLabel = 'Approve',
+  showDistribution = false,
 }: InvoiceViewDialogProps) {
   const [isSendingCustomer, setIsSendingCustomer] = useState(false);
   const [productDetails, setProductDetails] = useState<Record<string, ProductMeta>>({});
@@ -110,6 +113,20 @@ export function InvoiceViewDialog({
                       typedM.description = (
                         productWithImage as { description?: string }
                       ).description;
+                    }
+                    if (
+                      (!typedM.features || typedM.features.length === 0) &&
+                      (
+                        productWithImage as {
+                          features?: { subHeading: string; description: string }[];
+                        }
+                      ).features
+                    ) {
+                      typedM.features = (
+                        productWithImage as {
+                          features?: { subHeading: string; description: string }[];
+                        }
+                      ).features;
                     }
                   }
                 } catch (e) {
@@ -412,6 +429,7 @@ export function InvoiceViewDialog({
       productImage: item.metadata?.imageUrl || item.metadata?.image_url || item.metadata?.image,
       discount: disc,
       mpn: item.metadata?.mpn || extractTag('MPN'),
+      features: (item.metadata?.features as { subHeading: string; description: string }[]) || [],
     };
   });
 
@@ -485,6 +503,7 @@ export function InvoiceViewDialog({
         model: pMeta.model_name || pMeta.model_no || 'Generic',
         slNo: pMeta.serial_no || item.serialNumber || 'TBD',
         description: pMeta.description || item.description || '',
+        features: pMeta.features || [],
         qty: item.quantity || 1,
         limit: limitStr,
         excessRate: excessStr,
@@ -529,6 +548,7 @@ export function InvoiceViewDialog({
         model: pMeta.model_name || 'Generic',
         slNo: pMeta.serial_no || item.serialNumber || 'TBD',
         description: pMeta.description || item.description || '',
+        features: pMeta.features || [],
         qty: item.quantity || 1,
         limit: limitStr,
         excessRate: excessStr,
@@ -1229,14 +1249,27 @@ export function InvoiceViewDialog({
                 {approveLabel}
               </Button>
             )}
-            <Button
-              variant="outline"
-              onClick={() => handleSendCustomer('BOTH')}
-              disabled={isSendingCustomer}
-              className="border-red-200 text-red-700 font-bold"
-            >
-              Email/WA
-            </Button>
+            {/* Distribution Buttons */}
+            {showDistribution && (
+              <div className="flex gap-2 border-l border-slate-200 pl-4 ml-2">
+                <Button
+                  variant="outline"
+                  onClick={() => handleSendCustomer('EMAIL')}
+                  disabled={isSendingCustomer}
+                  className="h-9 px-4 rounded-md font-black uppercase text-[10px] tracking-widest border-red-200 text-red-700 hover:bg-red-50 gap-2"
+                >
+                  <Mail size={14} /> Gmail
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => handleSendCustomer('WHATSAPP')}
+                  disabled={isSendingCustomer}
+                  className="h-9 px-4 rounded-md font-black uppercase text-[10px] tracking-widest border-green-200 text-emerald-700 hover:bg-green-50 gap-2"
+                >
+                  <Phone size={14} /> WhatsApp
+                </Button>
+              </div>
+            )}
           </div>
         </div>
       </DialogContent>
