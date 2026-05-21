@@ -46,7 +46,6 @@ import { Textarea } from '@/components/ui/textarea';
 import { CustomerSelect } from '@/components/invoice/CustomerSelect';
 import { ProductSelect, SelectableItem } from '@/components/invoice/ProductSelect';
 import { Product } from '@/lib/product';
-import { SparePart } from '@/lib/spare-part';
 
 import { usePagination } from '@/hooks/usePagination';
 import Pagination from '@/components/Pagination';
@@ -66,10 +65,11 @@ import { QuotationViewDialog } from './QuotationViewDialog';
 import RentFormModal from './RentFormModal';
 import { InvoiceAccountView } from '../invoice/InvoiceAccountView';
 import { LayoutSelectionDialog } from './LayoutSelectionDialog';
+import { getAccountSummary } from '@/lib/payment';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type QuotationType = 'RENT' | 'LEASE' | 'PRODUCT_SALE' | 'SPAREPART_SALE';
+type QuotationType = 'RENT' | 'LEASE' | 'PRODUCT_SALE';
 
 interface Consumable {
   partName: string;
@@ -148,7 +148,7 @@ function StatusBadge({ status }: { status: string }) {
 
   return (
     <Badge
-      className={`rounded-full px-3 py-0.5 text-[10px] font-bold tracking-wider shadow-none ${map[status] ?? 'bg-slate-100 text-slate-600'}`}
+      className={`rounded-full px-2 py-0.5 text-[8.5px] font-bold tracking-wider shadow-none ${map[status] ?? 'bg-slate-100 text-slate-600'}`}
     >
       {label[status] ?? status}
     </Badge>
@@ -157,15 +157,14 @@ function StatusBadge({ status }: { status: string }) {
 
 function TypeBadge({ type }: { type: string }) {
   const map: Record<string, string> = {
-    PRODUCT_SALE: 'bg-cyan-50 text-cyan-600 border-cyan-200',
-    SPAREPART_SALE: 'bg-teal-50 text-teal-600 border-teal-200',
-    RENT: 'bg-orange-50 text-orange-600 border-orange-200',
+    PRODUCT_SALE: 'bg-blue-50 text-blue-600 border-blue-200',
+    RENT: 'bg-green-50 text-green-600 border-green-200',
     LEASE: 'bg-purple-50 text-purple-600 border-purple-200',
   };
   return (
     <Badge
       variant="outline"
-      className={`rounded-full px-3 py-0.5 text-[10px] font-bold tracking-wider ${map[type] ?? ''}`}
+      className={`rounded-full px-2 py-0.5 text-[8.5px] font-bold tracking-wider ${map[type] ?? ''}`}
     >
       {type}
     </Badge>
@@ -176,6 +175,7 @@ function TypeBadge({ type }: { type: string }) {
 
 export default function EmployeeQuotationTable() {
   const [quotations, setQuotations] = useState<Invoice[]>([]);
+  const [balances, setBalances] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [formOpen, setFormOpen] = useState(false);
   const [rentLeaseModal, setRentLeaseModal] = useState<{
@@ -214,11 +214,10 @@ export default function EmployeeQuotationTable() {
 
   // Compute which quotation types this employee can create
   const allowedTypes = useMemo((): QuotationType[] => {
-    if (employeeJob === EmployeeJob.MANAGER)
-      return ['PRODUCT_SALE', 'SPAREPART_SALE', 'RENT', 'LEASE'];
-    if (employeeJob === EmployeeJob.SALES) return ['PRODUCT_SALE', 'SPAREPART_SALE'];
+    if (employeeJob === EmployeeJob.MANAGER) return ['PRODUCT_SALE', 'RENT', 'LEASE'];
+    if (employeeJob === EmployeeJob.SALES) return ['PRODUCT_SALE'];
     if (employeeJob === EmployeeJob.RENT_AND_LEASE) return ['RENT', 'LEASE'];
-    return ['PRODUCT_SALE', 'SPAREPART_SALE', 'RENT', 'LEASE']; // fallback
+    return ['PRODUCT_SALE', 'RENT', 'LEASE']; // fallback
   }, [employeeJob]);
 
   const { page, limit, total, setPage, setTotal, totalPages } = usePagination(10);
@@ -284,6 +283,58 @@ export default function EmployeeQuotationTable() {
     setTotal(filtered.length);
   }, [filtered.length, setTotal]);
   const paginated = filtered.slice((page - 1) * limit, page * limit);
+
+  const paginatedIds = paginated.map((q) => q.id).join(',');
+
+  useEffect(() => {
+    if (!paginatedIds) return;
+    const fetchVisibleBalances = async () => {
+      try {
+        const promises = paginated.map(async (q) => {
+          try {
+            const summary = await getAccountSummary(q.id);
+            return { id: q.id, pendingBalance: summary.pendingBalance };
+          } catch {
+            return { id: q.id, pendingBalance: q.totalAmount }; // fallback
+          }
+        });
+        const results = await Promise.all(promises);
+        setBalances((prev) => {
+          const newBalances = { ...prev };
+          results.forEach((res) => {
+            newBalances[res.id] = res.pendingBalance;
+          });
+          return newBalances;
+        });
+      } catch (err) {
+        console.error('Error fetching visible balances:', err);
+      }
+    };
+    fetchVisibleBalances();
+  }, [paginatedIds]);
+
+  const getCleanProductName = (name: string) => {
+    let clean = name.replace(/^(Black & White - |Color - |Combined - )/i, '');
+    clean = clean.replace(/(\s*-\s*SN-[^,]+|\s*\(SN-[^)]+\)|\s*\(Serial[^)]+\))/gi, '');
+    const lastDashIndex = clean.lastIndexOf(' - ');
+    if (lastDashIndex !== -1 && clean.length - lastDashIndex < 25) {
+      clean = clean.substring(0, lastDashIndex).trim();
+    }
+    return clean.trim();
+  };
+
+  const getProductNames = (invoice: Invoice) => {
+    if (!invoice.items || invoice.items.length === 0) return 'No items';
+    const productItems = invoice.items.filter(
+      (item) => item.itemType !== 'PRICING_RULE' && item.description,
+    );
+    if (productItems.length === 0) {
+      const allWithDesc = invoice.items.filter((item) => item.description);
+      if (allWithDesc.length === 0) return 'N/A';
+      return allWithDesc.map((item) => getCleanProductName(item.description)).join(', ');
+    }
+    return productItems.map((item) => getCleanProductName(item.description)).join(', ');
+  };
 
   const handleView = async (id: string) => {
     try {
@@ -367,12 +418,14 @@ export default function EmployeeQuotationTable() {
           <h2 className="text-xl font-bold text-primary">Quotations</h2>
           <p className="text-sm text-muted-foreground">Create and manage customer quotations</p>
         </div>
-        <Button
-          className="bg-primary text-white gap-2 shadow-md hover:shadow-lg transition-all self-start sm:self-auto"
-          onClick={() => setFormOpen(true)}
-        >
-          <Plus size={16} /> Add Quotation
-        </Button>
+        <div className="flex gap-2 self-start sm:self-auto">
+          <Button
+            className="bg-primary text-white gap-2 shadow-md hover:shadow-lg transition-all"
+            onClick={() => setFormOpen(true)}
+          >
+            <Plus size={16} /> Add Quotation
+          </Button>
+        </div>
       </div>
 
       {/* Search */}
@@ -395,18 +448,20 @@ export default function EmployeeQuotationTable() {
             <TableHeader className="bg-muted/50">
               <TableRow>
                 <TableHead className="text-primary font-bold">QT NUMBER</TableHead>
+                <TableHead className="text-primary font-bold">PRODUCT</TableHead>
                 <TableHead className="text-primary font-bold">CUSTOMER</TableHead>
+                <TableHead className="text-primary font-bold">PRICE</TableHead>
                 <TableHead className="text-primary font-bold">TYPE</TableHead>
-                <TableHead className="text-primary font-bold">AMOUNT</TableHead>
-                <TableHead className="text-primary font-bold">STATUS</TableHead>
+                <TableHead className="text-primary font-bold">BALANCE</TableHead>
                 <TableHead className="text-primary font-bold">DATE</TableHead>
                 <TableHead className="text-primary font-bold text-center">ACTION</TableHead>
+                <TableHead className="text-primary font-bold">STATUS</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {paginated.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-14 text-muted-foreground">
+                  <TableCell colSpan={9} className="text-center py-14 text-muted-foreground">
                     <FilePlus2 className="h-10 w-10 mx-auto mb-2 opacity-20" />
                     No quotations yet. Create your first one!
                   </TableCell>
@@ -420,17 +475,27 @@ export default function EmployeeQuotationTable() {
                     <TableCell className="text-blue-500 font-bold tracking-tight">
                       {q.invoiceNumber}
                     </TableCell>
+                    <TableCell
+                      className="font-semibold text-slate-700 max-w-[200px] truncate"
+                      title={getProductNames(q)}
+                    >
+                      {getProductNames(q)}
+                    </TableCell>
                     <TableCell className="font-bold text-slate-700">
                       {q.customerName || 'Walk-in'}
-                    </TableCell>
-                    <TableCell>
-                      <TypeBadge type={q.saleType} />
                     </TableCell>
                     <TableCell className="font-semibold text-foreground">
                       {formatCurrency(q.totalAmount)}
                     </TableCell>
                     <TableCell>
-                      <StatusBadge status={q.status} />
+                      <TypeBadge type={q.saleType} />
+                    </TableCell>
+                    <TableCell className="font-bold text-red-600">
+                      {balances[q.id] !== undefined ? (
+                        formatCurrency(balances[q.id])
+                      ) : (
+                        <Loader2 className="h-3 w-3 animate-spin text-muted-foreground inline" />
+                      )}
                     </TableCell>
                     <TableCell className="text-muted-foreground text-sm font-medium">
                       {new Date(q.createdAt).toLocaleDateString(undefined, {
@@ -449,6 +514,9 @@ export default function EmployeeQuotationTable() {
                       >
                         <Eye className="h-4 w-4" />
                       </Button>
+                    </TableCell>
+                    <TableCell>
+                      <StatusBadge status={q.status} />
                     </TableCell>
                   </TableRow>
                 ))
@@ -669,49 +737,27 @@ function QuotationFormModal({
     let description = '',
       basePrice = 0,
       maxDiscount = 0,
-      productId: string | undefined,
-      modelId: string | undefined,
       itemType: 'PRODUCT' | 'SPAREPART' = 'PRODUCT';
 
-    if ('part_name' in item) {
-      // Spare Part logic: Construct from Brand, Model, and Part Name
-      const sp = item as SparePart;
-      const brand = sp.brand || sp.model?.brandRelation?.name || '';
-      // Use raw compatible_model string if available (from backend raw query)
-      const modelName = sp.compatible_model || sp.model?.model_name || '';
-      const partName = sp.part_name || '';
+    // Product logic: Construct from Brand, Model, and Product Name
+    const pr = item as Product;
+    const brand = pr.brand || pr.model?.brandRelation?.name || '';
+    const modelName = pr.model?.model_name || pr.model?.model_no || '';
+    const productName = pr.name || '';
 
-      description = `${brand} ${modelName} ${partName}`.trim().replace(/\s+/g, ' ');
+    description = `${brand} ${modelName} ${productName}`.trim().replace(/\s+/g, ' ');
 
-      // Fallback if built name is empty
-      if (!description) {
-        description = sp.description || 'Spare Part';
-      }
-
-      basePrice = Number(sp.base_price) || 0;
-      modelId = sp.model_id || sp.model?.id;
-      productId = sp.id;
-      itemType = 'SPAREPART';
-    } else {
-      // Product logic: Construct from Brand, Model, and Product Name
-      const pr = item as Product;
-      const brand = pr.brand || pr.model?.brandRelation?.name || '';
-      const modelName = pr.model?.model_name || pr.model?.model_no || '';
-      const productName = pr.name || '';
-
-      description = `${brand} ${modelName} ${productName}`.trim().replace(/\s+/g, ' ');
-
-      // Fallback if built name is empty
-      if (!description) {
-        description = pr.description || pr.model?.description || 'Product';
-      }
-
-      basePrice = pr.sale_price || 0;
-      maxDiscount = pr.max_discount_amount || 0;
-      productId = pr.id;
-      modelId = pr.model?.id;
-      itemType = 'PRODUCT';
+    // Fallback if built name is empty
+    if (!description) {
+      description = pr.description || pr.model?.description || 'Product';
     }
+
+    basePrice = pr.sale_price || 0;
+    maxDiscount = pr.max_discount_amount || 0;
+    const productId = pr.id;
+    const modelId = pr.model?.id;
+    itemType = 'PRODUCT';
+
     setSaleItems((prev) => [
       ...prev,
       {
@@ -916,7 +962,7 @@ function QuotationFormModal({
         ? `${selectedLayoutCategory}:${selectedLayoutStyle}`
         : undefined;
 
-    if (['PRODUCT_SALE', 'SPAREPART_SALE'].includes(quotationType)) {
+    if (['PRODUCT_SALE'].includes(quotationType)) {
       if (saleItems.length === 0) {
         toast.error('Please add at least one item.');
         return;
@@ -1200,12 +1246,6 @@ function QuotationFormModal({
       color: 'bg-blue-600',
       desc: 'Direct sale of full machines & products',
     },
-    SPAREPART_SALE: {
-      icon: ShoppingCart,
-      label: 'Spare Part Sale',
-      color: 'bg-cyan-600',
-      desc: 'Sale of spare parts and components',
-    },
     RENT: {
       icon: Key,
       label: 'Rent Quotation',
@@ -1276,14 +1316,12 @@ function QuotationFormModal({
                       <CategoryCard
                         icon={ShoppingCart}
                         label="Sales Quotation"
-                        desc="Products and Spare Parts"
+                        desc="Full Machines"
                         color="border-blue-200 hover:border-blue-400"
                         onClick={() => {
                           setActiveCategory('SALE');
                           if (allowedTypes.includes('PRODUCT_SALE')) {
                             setQuotationType('PRODUCT_SALE');
-                          } else if (allowedTypes.includes('SPAREPART_SALE')) {
-                            setQuotationType('SPAREPART_SALE');
                           }
                         }}
                       />
@@ -1322,7 +1360,7 @@ function QuotationFormModal({
                           ← Back to Categories
                         </Button>
                       </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="grid grid-cols-1 gap-3">
                         <button
                           onClick={() => {
                             setQuotationType('PRODUCT_SALE');
@@ -1343,29 +1381,6 @@ function QuotationFormModal({
                             <p className="text-sm font-bold">Product Sale</p>
                             <p className="text-[10px] opacity-70 mt-0.5">
                               Full machines and equipments
-                            </p>
-                          </div>
-                        </button>
-                        <button
-                          onClick={() => {
-                            setQuotationType('SPAREPART_SALE');
-                            setSelectedLayoutCategory('sparepart');
-                          }}
-                          className={`border-2 rounded-xl p-4 flex flex-col items-start gap-2 transition-all ${
-                            quotationType === 'SPAREPART_SALE'
-                              ? 'border-cyan-500 bg-cyan-50 text-cyan-700'
-                              : 'border-slate-200 hover:border-cyan-300'
-                          }`}
-                        >
-                          <div
-                            className={`p-2 rounded-lg ${quotationType === 'SPAREPART_SALE' ? 'bg-white/60' : 'bg-slate-50'}`}
-                          >
-                            <ShoppingCart size={18} />
-                          </div>
-                          <div className="text-left">
-                            <p className="text-sm font-bold">Spare Part Sale</p>
-                            <p className="text-[10px] opacity-70 mt-0.5">
-                              Individual components and parts
                             </p>
                           </div>
                         </button>
@@ -1411,7 +1426,7 @@ function QuotationFormModal({
               </div>
 
               {/* Validity & Notes (Sale only) */}
-              {['PRODUCT_SALE', 'SPAREPART_SALE'].includes(quotationType) && (
+              {['PRODUCT_SALE'].includes(quotationType) && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="bg-card p-4 rounded-xl border border-slate-100 shadow-sm space-y-2">
                     <label className="text-[11px] font-bold text-muted-foreground uppercase">
@@ -1446,36 +1461,20 @@ function QuotationFormModal({
               {/* ── STEP 2: Type-specific fields ─────────────────────────── */}
 
               {/* ── SALE FIELDS ──────────────────────────────────────────── */}
-              {['SALE', 'PRODUCT_SALE', 'SPAREPART_SALE'].includes(quotationType) && (
+              {['SALE', 'PRODUCT_SALE'].includes(quotationType) && (
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
                       <span className="w-2 h-2 rounded-full bg-blue-400" />{' '}
-                      {quotationType === 'PRODUCT_SALE'
-                        ? 'Products'
-                        : quotationType === 'SPAREPART_SALE'
-                          ? 'Spare Parts'
-                          : 'Items'}
+                      {quotationType === 'PRODUCT_SALE' ? 'Products' : 'Items'}
                     </h4>
                   </div>
                   <div className="flex items-center gap-3">
                     <div className="flex-1 bg-card p-2 rounded-xl border border-border shadow-sm focus-within:ring-2 focus-within:ring-primary/20 transition-all">
                       <ProductSelect
                         onSelect={addItem}
-                        mode={
-                          quotationType === 'PRODUCT_SALE'
-                            ? 'PRODUCT'
-                            : quotationType === 'SPAREPART_SALE'
-                              ? 'SPAREPART'
-                              : 'BOTH'
-                        }
-                        placeholder={
-                          quotationType === 'PRODUCT_SALE'
-                            ? 'Select Product'
-                            : quotationType === 'SPAREPART_SALE'
-                              ? 'Select Spare Part'
-                              : 'Select Product '
-                        }
+                        mode="PRODUCT"
+                        placeholder="Select Product"
                       />
                     </div>
                     <Button

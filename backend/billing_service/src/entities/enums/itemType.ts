@@ -1,5 +1,5 @@
 export enum ItemType {
   PRICING_RULE = 'PRICING_RULE',
   PRODUCT = 'PRODUCT',
-  SPAREPART = 'SPAREPART',
+  SPARE_PART = 'SPARE_PART',
 }

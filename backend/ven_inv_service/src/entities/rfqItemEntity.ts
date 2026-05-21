@@ -15,7 +15,7 @@ export enum ItemType {
 }
 
 @Entity({ name: 'rfq_items' })
-@Index(['rfq_id', 'model_id'], { unique: true, where: 'model_id IS NOT NULL' })
+@Index(['rfq_id', 'model_id'], { unique: false, where: 'model_id IS NOT NULL' })
 export class RfqItem {
   @PrimaryGeneratedColumn('uuid')
   id!: string;

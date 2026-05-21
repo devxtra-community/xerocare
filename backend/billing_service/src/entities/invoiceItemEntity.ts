@@ -70,6 +70,12 @@ export class InvoiceItem {
   productId?: string;
 
   @Column({ type: 'uuid', nullable: true })
+  sparePartId?: string;
+
+  @Column({ type: 'varchar', nullable: true })
+  serialNumber?: string;
+
+  @Column({ type: 'uuid', nullable: true })
   modelId?: string;
 
   @ManyToOne(() => Invoice, (invoice) => invoice.items, {

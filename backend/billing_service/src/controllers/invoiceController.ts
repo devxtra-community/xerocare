@@ -1101,3 +1101,30 @@ export const requestValidityExtension = async (req: Request, res: Response, next
     next(error);
   }
 };
+
+export const createDirectSale = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { branchId, employeeId, createdBy, ...payload } = req.body;
+
+    if (branchId || employeeId || createdBy) {
+      throw new AppError(
+        'Security Violation: branchId, employeeId, and createdBy must not be provided in request body',
+        400,
+      );
+    }
+
+    if (!req.user || !req.user.userId || !req.user.branchId) {
+      throw new AppError('User context missing or incomplete', 401);
+    }
+
+    const result = await billingService.createDirectSale({
+      ...payload,
+      branchId: req.user.branchId,
+      createdBy: req.user.userId,
+    });
+
+    return res.status(201).json({ success: true, data: result });
+  } catch (error) {
+    next(error);
+  }
+};

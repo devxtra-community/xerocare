@@ -125,6 +125,9 @@ export class Invoice {
   })
   saleType!: SaleType;
 
+  @Column({ type: 'boolean', default: false })
+  isDirectSale!: boolean;
+
   // --- Quotation / Quotation Fields ---
 
   @Column({

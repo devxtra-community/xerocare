@@ -394,20 +394,20 @@ export class RfqService {
         compatible_models: compatibleModels,
         description: desc,
         quantity: item.quantity,
-        unit_price: '',
-        total_price: '',
-        stock_status: '',
-        available_quantity: '',
-        estimated_shipment_date: '',
-        vendor_note: '',
+        unit_price: undefined,
+        total_price: undefined,
+        stock_status: undefined,
+        available_quantity: undefined,
+        estimated_shipment_date: undefined,
+        vendor_note: undefined,
         rfq_item_id: item.id,
       });
     }
 
     const rowCount = worksheet.rowCount;
-    // Add validations for stock_status (Column I) and estimated_shipment_date (Column K)
+    // Add validations for stock_status (Column K) and estimated_shipment_date (Column M)
     for (let i = 2; i <= Math.max(rowCount, 100); i++) {
-      worksheet.getCell(`I${i}`).dataValidation = {
+      worksheet.getCell(`K${i}`).dataValidation = {
         type: 'list',
         allowBlank: true,
         formulae: ['"IN_STOCK,OUT_OF_STOCK,ON_PRODUCTION"'],
@@ -416,7 +416,7 @@ export class RfqService {
         error: 'Please select a valid stock status from the dropdown list.',
       };
 
-      worksheet.getCell(`K${i}`).dataValidation = {
+      worksheet.getCell(`M${i}`).dataValidation = {
         type: 'date',
         operator: 'greaterThanOrEqual',
         showErrorMessage: true,
@@ -426,8 +426,8 @@ export class RfqService {
         errorTitle: 'Invalid Date',
         error: 'Please enter a valid present or future date (YYYY-MM-DD).',
       };
-      worksheet.getCell(`K${i}`).numFmt = 'yyyy-mm-dd';
-      worksheet.getCell(`K${i}`).font = { color: { argb: 'FF0000FF' }, underline: true }; // Visual hint for interactable cell
+      worksheet.getCell(`M${i}`).numFmt = 'yyyy-mm-dd';
+      worksheet.getCell(`M${i}`).font = { color: { argb: 'FF0000FF' }, underline: true }; // Visual hint for interactable cell
     }
 
     const buffer = await workbook.xlsx.writeBuffer();
@@ -553,22 +553,22 @@ export class RfqService {
         compatible_models: compatibleModels,
         description: desc,
         quantity: item.quantity,
-        unit_price: vendorItem?.unit_price || '',
-        total_price: vendorItem?.total_price || '',
-        stock_status: vendorItem?.stock_status || '',
-        available_quantity: vendorItem?.available_quantity || '',
+        unit_price: vendorItem?.unit_price ?? undefined,
+        total_price: vendorItem?.total_price ?? undefined,
+        stock_status: vendorItem?.stock_status ?? undefined,
+        available_quantity: vendorItem?.available_quantity ?? undefined,
         estimated_shipment_date: vendorItem?.estimated_shipment_date
           ? new Date(vendorItem.estimated_shipment_date)
-          : '',
-        vendor_note: vendorItem?.vendor_note || '',
+          : undefined,
+        vendor_note: vendorItem?.vendor_note ?? undefined,
         rfq_item_id: item.id,
       });
     }
 
     const rowCount = worksheet.rowCount;
-    // Add validations for stock_status (Column I) and estimated_shipment_date (Column K)
+    // Add validations for stock_status (Column K) and estimated_shipment_date (Column M)
     for (let i = 2; i <= Math.max(rowCount, 100); i++) {
-      worksheet.getCell(`I${i}`).dataValidation = {
+      worksheet.getCell(`K${i}`).dataValidation = {
         type: 'list',
         allowBlank: true,
         formulae: ['"IN_STOCK,OUT_OF_STOCK,ON_PRODUCTION"'],
@@ -577,7 +577,7 @@ export class RfqService {
         error: 'Please select a valid stock status from the dropdown list.',
       };
 
-      worksheet.getCell(`K${i}`).dataValidation = {
+      worksheet.getCell(`M${i}`).dataValidation = {
         type: 'date',
         operator: 'greaterThanOrEqual',
         showErrorMessage: true,
@@ -587,8 +587,8 @@ export class RfqService {
         errorTitle: 'Invalid Date',
         error: 'Please enter a valid present or future date (YYYY-MM-DD).',
       };
-      worksheet.getCell(`K${i}`).numFmt = 'yyyy-mm-dd';
-      worksheet.getCell(`K${i}`).font = { color: { argb: 'FF0000FF' }, underline: true }; // Visual hint for interactable cell
+      worksheet.getCell(`M${i}`).numFmt = 'yyyy-mm-dd';
+      worksheet.getCell(`M${i}`).font = { color: { argb: 'FF0000FF' }, underline: true }; // Visual hint for interactable cell
     }
 
     const buffer = await workbook.xlsx.writeBuffer();

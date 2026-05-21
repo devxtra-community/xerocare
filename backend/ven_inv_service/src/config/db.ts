@@ -26,6 +26,7 @@ import { Purchase } from '../entities/purchaseEntity';
 import { PurchaseCost } from '../entities/purchaseCostEntity';
 import { PurchasePayment } from '../entities/purchasePaymentEntity';
 import { SparePartInventory } from '../entities/sparePartInventoryEntity';
+import { ProcessedInvoiceItem } from '../entities/processedInvoiceItemEntity';
 
 export const Source = new DataSource({
   type: 'postgres',
@@ -54,6 +55,7 @@ export const Source = new DataSource({
     PurchaseCost,
     PurchasePayment,
     SparePartInventory,
+    ProcessedInvoiceItem,
   ],
   poolSize: 1,
   extra: {
@@ -76,6 +78,21 @@ export const connectWithRetry = async (initialDelayMs = 2000): Promise<DataSourc
         logger.info(`Attempting database connection (Attempt ${attempt})...`);
         await Source.initialize();
         logger.info('Database connected successfully.');
+        // Ensure processed_invoice_items table exists
+        await Source.query(`
+          CREATE TABLE IF NOT EXISTS processed_invoice_items (
+            invoice_item_id UUID PRIMARY KEY,
+            processed_at TIMESTAMP DEFAULT NOW()
+          )
+        `);
+        logger.info('Guaranteed processed_invoice_items table exists.');
+        // Ensure tax_rate and max_discount_amount exist on spare_parts table
+        await Source.query(`
+          ALTER TABLE spare_parts 
+          ADD COLUMN IF NOT EXISTS tax_rate NUMERIC(5,2) DEFAULT 0,
+          ADD COLUMN IF NOT EXISTS max_discount_amount NUMERIC(12,2) DEFAULT 0
+        `);
+        logger.info('Guaranteed tax_rate and max_discount_amount exist on spare_parts table.');
       }
       return Source;
     } catch (error: unknown) {

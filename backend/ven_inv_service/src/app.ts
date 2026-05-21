@@ -11,6 +11,8 @@ import branchRouter from './routes/branchRoutes';
 import warehouseRouter from './routes/warehouseRoutes';
 import { startEmployeeConsumer } from './events/consumers/employeeConsumer';
 import { startProductStatusConsumer } from './worker/productStatusUpdateWorker';
+import { startProductAllocationConsumer } from './worker/productAllocationWorker';
+import { startSparePartReductionConsumer } from './worker/sparePartReductionWorker';
 import { getRabbitChannel } from './config/rabbitmq';
 import modelRoute from './routes/modelRoute';
 import inventoryRouter from './routes/inventoryRoutes';
@@ -99,6 +101,8 @@ const startServer = async () => {
     // Start listening for updates about employees and product statuses
     await startEmployeeConsumer();
     await startProductStatusConsumer();
+    await startProductAllocationConsumer();
+    await startSparePartReductionConsumer();
 
     const PORT = process.env.PORT;
 

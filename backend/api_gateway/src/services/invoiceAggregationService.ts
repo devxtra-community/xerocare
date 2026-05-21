@@ -570,6 +570,70 @@ export class InvoiceAggregationService {
   }
 
   /**
+   * Creates a direct sale (final invoice) bypassing quotation.
+   */
+  async createDirectSale(
+    payload: Record<string, unknown>,
+    token: string,
+  ): Promise<AggregatedInvoice> {
+    try {
+      const billingResponse = await axios.post<{ data: Invoice }>(
+        `${BILLING_SERVICE_URL}/invoices/direct-sale`,
+        payload,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
+      const invoice = billingResponse.data.data;
+
+      const [employeeName, branchName, customerDetails] = await Promise.all([
+        fetchEntityName(
+          invoice.createdBy,
+          employeeCache,
+          `${EMPLOYEE_SERVICE_URL}/employee/public/${invoice.createdBy}`,
+          token,
+        ),
+        fetchEntityName(
+          invoice.branchId,
+          branchCache,
+          `${VENDOR_INVENTORY_SERVICE_URL}/branch/${invoice.branchId}`,
+          token,
+        ),
+        fetchCustomerDetails(
+          invoice.customerId,
+          `${CRM_SERVICE_URL}/customers/${invoice.customerId}`,
+          token,
+        ),
+      ]);
+
+      return {
+        ...invoice,
+        employeeName,
+        branchName,
+        customerName: customerDetails.name,
+        customerPhone: customerDetails.phone,
+        customerEmail: customerDetails.email,
+        customerAddress: customerDetails.address,
+        startDate: invoice.effectiveFrom,
+        endDate: invoice.effectiveTo,
+      };
+    } catch (error: unknown) {
+      if (axios.isAxiosError(error)) {
+        logger.error('Axios error in create direct sale', {
+          message: error.message,
+          responseStatus: error.response?.status,
+          responseData: error.response?.data,
+        });
+        throw new AppError(
+          error.response?.data?.message || 'Failed to create direct sale',
+          error.response?.status || 500,
+        );
+      }
+      throw new AppError('Internal Gateway Error during direct sale creation', 500);
+    }
+  }
+
+  /**
    * Updates an existing quotation and aggregates the result.
    */
   async updateQuotation(

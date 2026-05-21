@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import {
   createQuotation,
+  createDirectSale,
   updateQuotation,
   approveQuotation,
   employeeApprove,
@@ -68,6 +69,18 @@ router.post(
   requireRole(EmployeeRole.EMPLOYEE),
   requireJob(EmployeeJob.SALES, EmployeeJob.RENT_LEASE),
   createQuotation,
+);
+
+/**
+ * Create a new direct sale (Final Invoice) bypassing the quotation flow.
+ * Only Sales team members can do this.
+ */
+router.post(
+  '/direct-sale',
+  authMiddleware,
+  requireRole(EmployeeRole.EMPLOYEE),
+  requireJob(EmployeeJob.SALES, EmployeeJob.RENT_LEASE),
+  createDirectSale,
 );
 
 /**

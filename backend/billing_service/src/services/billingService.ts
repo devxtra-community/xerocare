@@ -21,7 +21,11 @@ import { ProductAllocation, AllocationStatus } from '../entities/productAllocati
 import { DeviceMeterReading, ReadingSource } from '../entities/deviceMeterReadingEntity';
 import { UsageRecord } from '../entities/usageRecordEntity';
 import { UsageService } from './usageService';
-
+import { PaymentMode } from '../entities/paymentLedgerEntity';
+import {
+  emitProductAllocate,
+  emitSparePartReduce,
+} from '../events/publisher/inventoryEventPublisher';
 const appendOpenEndedSlab = <T extends { from: number; to: number; rate: number }>(
   ranges: T[] | undefined,
   excessRate: number | undefined,
@@ -375,6 +379,14 @@ export class BillingService {
     notes?: string;
   }) {
     // 1. Validation Logic
+    if (
+      payload.items?.some(
+        (item) => item.itemType === 'SPARE_PART' || (item.itemType as unknown) === 'SPAREPART',
+      )
+    ) {
+      throw new AppError('Spare parts are not allowed in quotations', 400);
+    }
+
     if (payload.rentType === RentType.FIXED_LIMIT || payload.rentType === RentType.FIXED_COMBO) {
       if (payload.pricingItems) {
         // Rule: No Slabs for Fixed
@@ -630,6 +642,15 @@ export class BillingService {
         'Cannot edit a Quotation after it has been finalized/approved by Finance',
         400,
       );
+    }
+
+    if (
+      invoice.type === InvoiceType.QUOTATION &&
+      payload.items?.some(
+        (item) => item.itemType === 'SPARE_PART' || (item.itemType as unknown) === 'SPAREPART',
+      )
+    ) {
+      throw new AppError('Spare parts are not allowed in quotations', 400);
     }
 
     // Update basic fields
@@ -1003,7 +1024,9 @@ export class BillingService {
       // Check that all machines and spare parts are allocated
       const allocatableItems = invoice.items.filter(
         (item) =>
-          (item.itemType === 'PRODUCT' || item.itemType === 'SPAREPART') &&
+          (item.itemType === 'PRODUCT' ||
+            (item.itemType as unknown) === 'SPARE_PART' ||
+            (item.itemType as unknown) === 'SPAREPART') &&
           (item.modelId || item.productId),
       );
       const updatesMap = new Map<string, { id: string; productId: string }>();
@@ -1027,7 +1050,11 @@ export class BillingService {
           if (item && update.productId) {
             let product;
             try {
-              const endpoint = item.itemType === 'SPAREPART' ? 'spare-parts' : 'products';
+              const endpoint =
+                (item.itemType as unknown) === 'SPARE_PART' ||
+                (item.itemType as unknown) === 'SPAREPART'
+                  ? 'spare-parts'
+                  : 'products';
               const response = await fetch(
                 `${inventoryServiceUrl}/${endpoint}/${update.productId}`,
                 {
@@ -1048,7 +1075,8 @@ export class BillingService {
 
             // Use serial number for products, lot ID/SKU for spare parts
             const serialNo =
-              item.itemType === 'SPAREPART'
+              (item.itemType as unknown) === 'SPARE_PART' ||
+              (item.itemType as unknown) === 'SPAREPART'
                 ? product.sku || product.lot_id || 'Part'
                 : product.serial_no || 'Unknown';
 
@@ -2109,5 +2137,274 @@ export class BillingService {
     }
 
     return returnCredit;
+  }
+
+  /**
+   * Direct Sale: Creates a FINAL invoice bypassing the quotation flow.
+   */
+  async createDirectSale(payload: {
+    branchId: string;
+    createdBy: string;
+    customerId: string;
+    saleType: SaleType;
+    items: {
+      itemType: 'PRODUCT' | 'SPARE_PART';
+      productId?: string;
+      sparePartId?: string;
+      serialNumber?: string;
+      quantity?: number;
+      unitPrice: number;
+      description: string;
+      discount?: number;
+      modelId?: string;
+      taxRate?: number;
+    }[];
+    paymentAmount?: number;
+    paymentMode?: PaymentMode;
+    paymentReference?: string;
+    notes?: string;
+  }) {
+    if (!payload.items || payload.items.length === 0) {
+      throw new AppError('Direct sale must have at least one item', 400);
+    }
+
+    // Determine SaleType based on item composition:
+    // Only products -> PRODUCT_SALE
+    // Only spare parts -> SPAREPART_SALE
+    // Mixed -> SALE
+    const hasProducts = payload.items.some((item) => item.itemType === 'PRODUCT');
+    const hasSpareParts = payload.items.some((item) => item.itemType === 'SPARE_PART');
+
+    let determinedSaleType: SaleType;
+    if (hasProducts && !hasSpareParts) {
+      determinedSaleType = SaleType.PRODUCT_SALE;
+    } else if (hasSpareParts && !hasProducts) {
+      determinedSaleType = SaleType.SPAREPART_SALE;
+    } else {
+      determinedSaleType = SaleType.SALE;
+    }
+
+    // Pre-validation HTTP check before starting transaction
+    const { sign } = await import('jsonwebtoken');
+    const token = sign(
+      { userId: 'billing_service', role: 'ADMIN' },
+      process.env.ACCESS_SECRET as string,
+      { expiresIn: '5m' },
+    );
+    const inventoryServiceUrl = process.env.INVENTORY_SERVICE_URL || 'http://localhost:3003';
+
+    for (const item of payload.items) {
+      if (!item.itemType) throw new AppError('itemType required', 400);
+
+      if (item.itemType === 'PRODUCT') {
+        if (!item.productId) throw new AppError('productId required for PRODUCT', 400);
+        if (!item.serialNumber) throw new AppError('serialNumber required for PRODUCT', 400);
+
+        // Fetch products to search by serial_no and check status
+        const response = await fetch(
+          `${inventoryServiceUrl}/products?search=${encodeURIComponent(item.serialNumber)}&status=AVAILABLE`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          },
+        );
+        if (!response.ok) {
+          throw new AppError(
+            'Failed to communicate with Inventory Service to verify product availability',
+            500,
+          );
+        }
+        const resData = await response.json();
+        const productsList = resData.data?.data || resData.data || [];
+        const matched = productsList.find(
+          (p: { serial_no: string; product_status: string }) =>
+            p.serial_no === item.serialNumber && p.product_status === 'AVAILABLE',
+        );
+        if (!matched) {
+          throw new AppError(
+            `Product with serial number ${item.serialNumber} is not available`,
+            400,
+          );
+        }
+      }
+
+      if (item.itemType === 'SPARE_PART') {
+        if (!item.sparePartId) throw new AppError('sparePartId required for SPARE_PART', 400);
+        if (!item.quantity || item.quantity <= 0) {
+          throw new AppError('quantity required and must be > 0 for SPARE_PART', 400);
+        }
+
+        // Fetch spare part stock
+        const response = await fetch(`${inventoryServiceUrl}/spare-parts/${item.sparePartId}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!response.ok) {
+          throw new AppError(
+            'Failed to communicate with Inventory Service to verify spare part stock',
+            500,
+          );
+        }
+        const resData = await response.json();
+        const sparePart = resData.data;
+        if (!sparePart || sparePart.quantity < item.quantity) {
+          throw new AppError(
+            `Insufficient stock for spare part: ${sparePart?.part_name || item.sparePartId}. Available: ${sparePart?.quantity || 0}, Required: ${item.quantity}`,
+            400,
+          );
+        }
+      }
+    }
+
+    const invoiceNumber = await this.invoiceRepo.generateInvoiceNumber();
+    let calculatedTotal = 0;
+
+    const queryRunner = this.invoiceRepo.manager.connection.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      const invoice = this.invoiceRepo.manager.create(Invoice, {
+        invoiceNumber,
+        branchId: payload.branchId,
+        createdBy: payload.createdBy,
+        customerId: payload.customerId,
+        saleType: determinedSaleType,
+        type: InvoiceType.FINAL,
+        status: InvoiceStatus.DRAFT, // Will update based on payment later
+        isDirectSale: true,
+        notes: payload.notes,
+        grossAmount: 0,
+        discountAmount: 0,
+        totalAmount: 0,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+
+      const savedInvoice = await queryRunner.manager.save(invoice);
+      const allocationsToEmit: {
+        serialNumber: string;
+        invoiceId: string;
+        invoiceItemId: string;
+        action: 'SALE';
+      }[] = [];
+      const reductionsToEmit: {
+        sparePartId: string;
+        quantity: number;
+        invoiceId: string;
+        invoiceItemId: string;
+      }[] = [];
+
+      let grossAmount = 0;
+      let totalDiscount = 0;
+
+      for (const item of payload.items) {
+        const quantity = item.itemType === 'SPARE_PART' ? item.quantity! : 1;
+        const discount = item.discount || 0;
+        const taxRate = item.taxRate || 0;
+
+        const taxAmount = item.unitPrice * (taxRate / 100) * quantity;
+        const subtotalAfterDiscount = (item.unitPrice - discount) * quantity;
+        const itemTotal = subtotalAfterDiscount + taxAmount;
+
+        grossAmount += item.unitPrice * quantity;
+        totalDiscount += discount * quantity;
+        calculatedTotal += itemTotal;
+
+        const invItem = new InvoiceItem();
+        invItem.itemType = item.itemType as ItemType;
+        invItem.description = item.description;
+        invItem.quantity = quantity;
+        invItem.unitPrice = item.unitPrice;
+        if (item.itemType === 'PRODUCT') {
+          invItem.productId = item.productId;
+          invItem.serialNumber = item.serialNumber;
+          invItem.modelId = item.modelId;
+        } else {
+          invItem.sparePartId = item.sparePartId;
+        }
+        invItem.invoice = savedInvoice;
+
+        const savedItem = await queryRunner.manager.save(invItem);
+
+        if (item.itemType === 'PRODUCT') {
+          allocationsToEmit.push({
+            serialNumber: item.serialNumber!,
+            invoiceId: savedInvoice.id,
+            invoiceItemId: savedItem.id,
+            action: 'SALE',
+          });
+
+          // Create ProductAllocation for safety/billing tracking
+          await queryRunner.manager.insert(ProductAllocation, {
+            contractId: savedInvoice.id,
+            productId: item.productId,
+            serialNumber: item.serialNumber,
+            status: AllocationStatus.ALLOCATED,
+            initialBwA4: 0,
+            initialBwA3: 0,
+            initialColorA4: 0,
+            initialColorA3: 0,
+            currentBwA4: 0,
+            currentBwA3: 0,
+            currentColorA4: 0,
+            currentColorA3: 0,
+          });
+        } else if (item.itemType === 'SPARE_PART') {
+          reductionsToEmit.push({
+            sparePartId: item.sparePartId!,
+            quantity: quantity,
+            invoiceId: savedInvoice.id,
+            invoiceItemId: savedItem.id,
+          });
+        }
+      }
+
+      savedInvoice.grossAmount = grossAmount;
+      savedInvoice.discountAmount = totalDiscount;
+      savedInvoice.totalAmount = calculatedTotal;
+
+      let paymentStatus = InvoiceStatus.PENDING;
+      if (payload.paymentAmount && payload.paymentAmount > 0) {
+        if (payload.paymentAmount >= calculatedTotal - 0.01) {
+          paymentStatus = InvoiceStatus.PAID;
+        } else {
+          paymentStatus = InvoiceStatus.PENDING;
+        }
+      }
+
+      savedInvoice.status = paymentStatus;
+      await queryRunner.manager.save(savedInvoice);
+
+      // Handle payment if provided
+      if (payload.paymentAmount && payload.paymentAmount > 0) {
+        if (!payload.paymentMode)
+          throw new AppError('paymentMode required if paymentAmount provided', 400);
+        await queryRunner.manager.insert('payment_ledgers', {
+          invoiceId: savedInvoice.id,
+          amountPaid: payload.paymentAmount,
+          paymentMode: payload.paymentMode,
+          paymentDate: new Date(),
+          referenceNumber: payload.paymentReference,
+          remarks: 'Direct Sale Payment',
+          recordedBy: payload.createdBy,
+        });
+      }
+
+      await queryRunner.commitTransaction();
+
+      // Emit Events POST-COMMIT
+      for (const allocation of allocationsToEmit) {
+        emitProductAllocate(allocation);
+      }
+      for (const reduction of reductionsToEmit) {
+        emitSparePartReduce(reduction);
+      }
+
+      return savedInvoice;
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      throw error;
+    } finally {
+      await queryRunner.release();
+    }
   }
 }

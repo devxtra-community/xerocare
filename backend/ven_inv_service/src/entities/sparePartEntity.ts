@@ -98,6 +98,19 @@ export class SparePart {
   @Column({ name: 'wholesale_price', type: 'decimal', precision: 12, scale: 2, default: 0 })
   wholesale_price!: number;
 
+  @Column({ name: 'tax_rate', type: 'decimal', precision: 5, scale: 2, default: 0 })
+  tax_rate!: number;
+
+  @Column({
+    name: 'max_discount_amount',
+    type: 'decimal',
+    precision: 12,
+    scale: 2,
+    default: 0,
+    nullable: true,
+  })
+  max_discount_amount!: number | null;
+
   @Column({ type: 'int', default: 0 })
   quantity!: number;
 

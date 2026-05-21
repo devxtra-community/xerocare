@@ -107,6 +107,23 @@ export const createInvoice = async (req: Request, res: Response, next: NextFunct
 };
 
 /**
+ * Create a direct sale bypassing quotation.
+ */
+export const createDirectSale = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const token = req.headers.authorization?.split(' ')[1] || '';
+    const invoice = await invoiceAggregationService.createDirectSale(req.body, token);
+    return res.status(201).json({
+      success: true,
+      data: invoice,
+      message: 'Direct sale completed successfully',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
  * Change the details of a price estimate (a formal "quotation") if a customer requests changes.
  */
 export const updateQuotation = async (req: Request, res: Response, next: NextFunction) => {

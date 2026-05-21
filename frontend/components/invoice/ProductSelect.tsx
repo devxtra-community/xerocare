@@ -10,6 +10,8 @@ export type SelectableItem = Product | SparePart;
 interface ProductSelectProps {
   onSelect: (item: SelectableItem) => void;
   mode?: 'PRODUCT' | 'SPAREPART' | 'BOTH';
+  className?: string;
+  onlyAvailable?: boolean;
 }
 
 /**
@@ -20,6 +22,8 @@ export function ProductSelect({
   onSelect,
   mode = 'BOTH',
   placeholder,
+  className,
+  onlyAvailable = true,
 }: ProductSelectProps & { placeholder?: string }) {
   const [items, setItems] = useState<SelectableItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -32,10 +36,21 @@ export function ProductSelect({
         let sparePartsData: SparePart[] = [];
 
         if (mode === 'PRODUCT' || mode === 'BOTH') {
-          productsData = await getAllProducts({ limit: 10000 });
+          const fetchParams: { limit?: number; status?: string } = { limit: 10000 };
+          if (onlyAvailable) {
+            fetchParams.status = 'AVAILABLE';
+          }
+          productsData = await getAllProducts(fetchParams);
         }
         if (mode === 'SPAREPART' || mode === 'BOTH') {
-          sparePartsData = await getAllSpareParts({ limit: 10000 });
+          const allSpares = await getAllSpareParts({ limit: 10000 });
+          if (onlyAvailable) {
+            sparePartsData = allSpares.filter(
+              (sp) => (sp as SparePart & { quantity?: number }).quantity! > 0,
+            );
+          } else {
+            sparePartsData = allSpares;
+          }
         }
 
         setItems([...productsData, ...sparePartsData]);
@@ -46,7 +61,7 @@ export function ProductSelect({
       }
     };
     fetchData();
-  }, [mode]);
+  }, [mode, onlyAvailable]);
 
   const handleValueChange = (val: string) => {
     const selected = items.find((item) => item.id === val);
@@ -98,6 +113,7 @@ export function ProductSelect({
       loading={loading}
       placeholder={placeholder || 'Select Product'}
       emptyText="No items found."
+      className={className}
     />
   );
 }

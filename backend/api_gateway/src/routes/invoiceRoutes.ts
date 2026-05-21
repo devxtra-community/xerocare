@@ -37,6 +37,7 @@ import {
   processReturn,
   financeApproveQuotation,
   convertToTransaction,
+  createDirectSale,
 } from '../controllers/invoiceController';
 
 /**
@@ -285,6 +286,11 @@ router.post(
  * Create a brand new invoice.
  */
 router.post('/', requireRole(UserRole.EMPLOYEE), createInvoice);
+
+/**
+ * Create a new direct sale (Final Invoice) bypassing the quotation flow.
+ */
+router.post('/direct-sale', requireRole(UserRole.EMPLOYEE), createDirectSale);
 
 /**
  * Update the details of a price estimate (Quotation).

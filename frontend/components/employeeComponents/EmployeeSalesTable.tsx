@@ -8,6 +8,7 @@ import { useSearchParams } from 'next/navigation';
 import { QuotationConversionFlow } from './QuotationConversionFlow';
 import { formatCurrency } from '@/lib/format';
 import { toast } from 'sonner';
+import DirectSaleFormModal from './DirectSaleFormModal';
 import {
   Table,
   TableBody,
@@ -48,6 +49,30 @@ interface EmployeeSalesTableProps {
  */
 export default function EmployeeSalesTable({ mode = 'EMPLOYEE' }: EmployeeSalesTableProps) {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [selectModeOpen, setSelectModeOpen] = useState(false);
+  const [directSaleFormOpen, setDirectSaleFormOpen] = useState(false);
+  const [allBrands, setAllBrands] = useState<unknown[]>([]);
+  const [allModels, setAllModels] = useState<unknown[]>([]);
+
+  useEffect(() => {
+    const fetchSuggestions = async () => {
+      try {
+        const { getBrands } = await import('@/lib/brand');
+        const { getAllModels } = await import('@/lib/model');
+        const [brandsData, modelsData] = await Promise.all([
+          getBrands(),
+          getAllModels({ limit: 1000 }),
+        ]);
+        setAllBrands(Array.isArray(brandsData.data) ? brandsData.data : []);
+        setAllModels(modelsData.data);
+      } catch (error) {
+        console.error('Error fetching suggestions:', error);
+      }
+    };
+    if (mode === 'EMPLOYEE') {
+      fetchSuggestions();
+    }
+  }, [mode]);
   const [loading, setLoading] = useState(true);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [accountViewOpen, setAccountViewOpen] = useState(false);
@@ -220,7 +245,7 @@ export default function EmployeeSalesTable({ mode = 'EMPLOYEE' }: EmployeeSalesT
         {mode === 'EMPLOYEE' && (
           <Button
             className="bg-primary text-white gap-2 shadow-md hover:shadow-lg transition-all"
-            onClick={fetchPendingQuotations}
+            onClick={() => setSelectModeOpen(true)}
           >
             <Plus size={16} /> New Sale
           </Button>
@@ -461,6 +486,71 @@ export default function EmployeeSalesTable({ mode = 'EMPLOYEE' }: EmployeeSalesT
           quotation={selectedForConversion}
           onClose={() => setSelectedForConversion(null)}
           onSuccess={handleConversionSuccess}
+        />
+      )}
+
+      {selectModeOpen && (
+        <Dialog open={selectModeOpen} onOpenChange={setSelectModeOpen}>
+          <DialogContent className="max-w-md p-6 rounded-2xl">
+            <DialogHeader className="pb-4">
+              <DialogTitle className="text-xl font-bold text-primary tracking-tight">
+                New Sale Options
+              </DialogTitle>
+              <DialogDescription className="text-xs text-slate-500">
+                Choose how you want to initiate this sale transaction.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid grid-cols-1 gap-4 py-4">
+              <Button
+                variant="outline"
+                className="flex flex-col items-start p-6 h-auto hover:bg-slate-50 border-2 hover:border-primary transition-all text-left gap-1 rounded-xl"
+                onClick={() => {
+                  setSelectModeOpen(false);
+                  fetchPendingQuotations();
+                }}
+              >
+                <span className="font-bold text-slate-900 text-sm">Convert from Quotation</span>
+                <span className="text-[11px] text-slate-500 font-normal">
+                  Select an approved quotation to finalize as a sale.
+                </span>
+              </Button>
+              <Button
+                variant="outline"
+                className="flex flex-col items-start p-6 h-auto hover:bg-slate-50 border-2 hover:border-primary transition-all text-left gap-1 rounded-xl"
+                onClick={() => {
+                  setSelectModeOpen(false);
+                  setDirectSaleFormOpen(true);
+                }}
+              >
+                <span className="font-bold text-slate-900 text-sm">Direct Sale</span>
+                <span className="text-[11px] text-slate-500 font-normal">
+                  Create a new sale directly without an existing quotation.
+                </span>
+              </Button>
+            </div>
+            <div className="flex justify-end pt-2 border-t">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setSelectModeOpen(false)}
+                className="font-black text-[10px] uppercase tracking-widest text-slate-500"
+              >
+                Cancel
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {directSaleFormOpen && (
+        <DirectSaleFormModal
+          onClose={() => setDirectSaleFormOpen(false)}
+          onSuccess={() => {
+            setDirectSaleFormOpen(false);
+            fetchInvoices();
+          }}
+          allBrands={allBrands}
+          allModels={allModels}
         />
       )}
     </div>

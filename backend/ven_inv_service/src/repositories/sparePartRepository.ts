@@ -125,6 +125,8 @@ export class SparePartRepository {
         'sp.base_price AS base_price', // Frontend consistency
         'sp.purchase_price AS purchase_price',
         'sp.wholesale_price AS wholesale_price',
+        'sp.tax_rate AS tax_rate',
+        'sp.max_discount_amount AS max_discount_amount',
         'sp.image_url AS image_url',
         'sp.description AS description',
         'sp.yield AS yield',
