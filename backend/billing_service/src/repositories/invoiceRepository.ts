@@ -77,7 +77,7 @@ export class InvoiceRepository {
   }
 
   /**
-   * Generates a unique invoice number (INV-YYYY-XXXX).
+   * Generates a unique invoice number (QTN-YYYY-XXXX).
    * Parses the highest existing number for the current year to safely handle deletions.
    */
   async generateInvoiceNumber(): Promise<string> {
@@ -85,7 +85,7 @@ export class InvoiceRepository {
 
     const latestInvoice = await this.repo
       .createQueryBuilder('invoice')
-      .where('invoice.invoiceNumber LIKE :pattern', { pattern: `INV-${year}-%` })
+      .where('invoice.invoiceNumber LIKE :pattern', { pattern: `QTN-${year}-%` })
       .orderBy('invoice.invoiceNumber', 'DESC')
       .getOne();
 
@@ -101,7 +101,7 @@ export class InvoiceRepository {
     }
 
     const paddedCount = String(nextNumber).padStart(4, '0');
-    return `INV-${year}-${paddedCount}`;
+    return `QTN-${year}-${paddedCount}`;
   }
 
   /**

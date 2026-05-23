@@ -78,16 +78,6 @@ const STYLES = [
     label: 'Normal',
     description: 'Clean, no-border table style',
   },
-  {
-    id: 'standard',
-    label: 'Standard',
-    description: 'Teal/Gold wave header and footer',
-  },
-  {
-    id: 'premium',
-    label: 'Premium',
-    description: 'High-end elegant presentation',
-  },
 ];
 
 export function LayoutSelectionDialog({

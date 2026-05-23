@@ -31,7 +31,9 @@ export interface Product {
   lot?: { lotNumber: string };
   description?: string;
   hs_code?: string;
+  warranty?: string;
   features?: { subHeading: string; description: string }[];
+  consumables?: { partName: string; description: string; yield: string; price: string }[];
 }
 
 /**
@@ -55,7 +57,9 @@ export interface CreateProductDTO {
   lot_id?: string;
   description?: string;
   hs_code?: string;
+  warranty?: string;
   features?: { subHeading: string; description: string }[];
+  consumables?: { partName: string; description: string; yield: string; price: string }[];
 }
 
 /**
@@ -80,6 +84,8 @@ export interface BulkProductRow {
   lot_id?: string;
   description?: string;
   hs_code?: string;
+  warranty?: string;
+  consumables?: { partName: string; description: string; yield: string; price: string }[];
 }
 
 /**

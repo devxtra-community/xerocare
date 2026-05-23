@@ -8,6 +8,8 @@ export interface SlabRange {
 
 export interface RentLineItem {
   model: string;
+  modelName?: string;
+  modelNo?: string;
   brand: string;
   productName: string;
   slNo: string;
@@ -20,6 +22,7 @@ export interface RentLineItem {
   colorSlabs?: SlabRange[];
   comboSlabs?: SlabRange[];
   features?: { subHeading: string; description: string }[];
+  warranty?: string;
 }
 
 export interface RentPremiumQuotationProps {

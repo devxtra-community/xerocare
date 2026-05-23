@@ -29,7 +29,14 @@ export interface Product {
   imageUrl?: string;
   description?: string;
   hs_code?: string;
+  warranty?: string;
   features?: { subHeading: string; description: string }[];
+  consumables?: Array<{
+    partName?: string;
+    description?: string;
+    yield?: string;
+    price?: string | number;
+  }>;
   created_at: string;
   inventory?: {
     id: string;
@@ -59,6 +66,7 @@ export interface CreateProductData {
   tax_rate: number;
   product_status?: ProductStatus;
   hs_code?: string;
+  warranty?: string;
   features?: { subHeading: string; description: string }[];
 }
 
@@ -77,6 +85,7 @@ export interface UpdateProductData {
   tax_rate?: number;
   product_status?: ProductStatus;
   hs_code?: string;
+  warranty?: string;
   features?: { subHeading: string; description: string }[];
 }
 

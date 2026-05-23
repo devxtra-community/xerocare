@@ -105,6 +105,8 @@ export class ProductService {
           lot_id: row.lot_id || undefined,
           description: row.description,
           hs_code: row.hs_code,
+          warranty: row.warranty,
+          consumables: row.consumables,
         });
 
         await this.model.syncModelQuantities(modelDetails.id);
@@ -186,6 +188,8 @@ export class ProductService {
         lot_id: data.lot_id,
         description: data.description,
         hs_code: data.hs_code,
+        warranty: data.warranty,
+        consumables: data.consumables,
       });
 
       await this.model.syncModelQuantities(modelDetails.id);

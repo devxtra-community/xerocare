@@ -93,6 +93,13 @@ export const connectWithRetry = async (initialDelayMs = 2000): Promise<DataSourc
           ADD COLUMN IF NOT EXISTS max_discount_amount NUMERIC(12,2) DEFAULT 0
         `);
         logger.info('Guaranteed tax_rate and max_discount_amount exist on spare_parts table.');
+        // Ensure warranty column exists on products table
+        await Source.query(`
+          ALTER TABLE products 
+          ADD COLUMN IF NOT EXISTS warranty VARCHAR(255),
+          ADD COLUMN IF NOT EXISTS consumables JSONB
+        `);
+        logger.info('Guaranteed warranty and consumables columns exist on products table.');
       }
       return Source;
     } catch (error: unknown) {

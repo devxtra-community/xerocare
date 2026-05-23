@@ -10,6 +10,8 @@ export interface RentLineItem {
   productName: string;
   brand: string;
   model: string;
+  modelName?: string;
+  modelNo?: string;
   slNo?: string;
   description: string;
   qty: number;
@@ -20,6 +22,7 @@ export interface RentLineItem {
   comboSlabs?: SlabRange[];
   image?: string;
   features?: { subHeading: string; description: string }[];
+  warranty?: string;
 }
 
 export interface RentAgreementDetails {

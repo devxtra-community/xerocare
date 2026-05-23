@@ -64,7 +64,6 @@ import { getAllModels, Model } from '@/lib/model';
 import { QuotationViewDialog } from './QuotationViewDialog';
 import RentFormModal from './RentFormModal';
 import { InvoiceAccountView } from '../invoice/InvoiceAccountView';
-import { LayoutSelectionDialog } from './LayoutSelectionDialog';
 import { getAccountSummary } from '@/lib/payment';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -104,6 +103,7 @@ interface SaleItem {
   colorSlabRanges?: Array<{ from: string; to: string; rate: string }>;
   comboSlabRanges?: Array<{ from: string; to: string; rate: string }>;
   consumables?: Consumable[];
+  warranty?: string;
 }
 
 // ─── Status Badge ─────────────────────────────────────────────────────────────
@@ -273,6 +273,7 @@ export default function EmployeeQuotationTable() {
     const s = search.toLowerCase();
     return (
       q.invoiceNumber?.toLowerCase().includes(s) ||
+      q.invoiceNumber?.toLowerCase().replace('inv-', 'qty-').includes(s) ||
       q.customerName?.toLowerCase().includes(s) ||
       q.saleType?.toLowerCase().includes(s) ||
       q.status?.toLowerCase().includes(s)
@@ -447,7 +448,7 @@ export default function EmployeeQuotationTable() {
           <Table className="min-w-[750px] sm:min-w-full">
             <TableHeader className="bg-muted/50">
               <TableRow>
-                <TableHead className="text-primary font-bold">QT NUMBER</TableHead>
+                <TableHead className="text-primary font-bold">QTY NUMBER</TableHead>
                 <TableHead className="text-primary font-bold">PRODUCT</TableHead>
                 <TableHead className="text-primary font-bold">CUSTOMER</TableHead>
                 <TableHead className="text-primary font-bold">PRICE</TableHead>
@@ -473,7 +474,7 @@ export default function EmployeeQuotationTable() {
                     className={`${index % 2 ? 'bg-blue-50/10' : 'bg-card'} hover:bg-muted/50 transition-colors`}
                   >
                     <TableCell className="text-blue-500 font-bold tracking-tight">
-                      {q.invoiceNumber}
+                      {q.invoiceNumber?.replace('INV-', 'QTY-')}
                     </TableCell>
                     <TableCell
                       className="font-semibold text-slate-700 max-w-[200px] truncate"
@@ -630,8 +631,7 @@ function QuotationFormModal({
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedLayoutCategory, setSelectedLayoutCategory] = useState<string | null>('product');
-  const [selectedLayoutStyle, setSelectedLayoutStyle] = useState<string | null>('normal');
-  const [isLayoutSelectorOpen, setIsLayoutSelectorOpen] = useState(false);
+  const [selectedLayoutStyle] = useState<string | null>('normal');
 
   // ── SALE state ──────────────────────────────────────────────────────────
   const [customerId, setCustomerId] = useState('');
@@ -741,11 +741,10 @@ function QuotationFormModal({
 
     // Product logic: Construct from Brand, Model, and Product Name
     const pr = item as Product;
-    const brand = pr.brand || pr.model?.brandRelation?.name || '';
     const modelName = pr.model?.model_name || pr.model?.model_no || '';
     const productName = pr.name || '';
 
-    description = `${brand} ${modelName} ${productName}`.trim().replace(/\s+/g, ' ');
+    description = `${modelName} ${productName}`.trim().replace(/\s+/g, ' ');
 
     // Fallback if built name is empty
     if (!description) {
@@ -775,6 +774,22 @@ function QuotationFormModal({
         bwSlabRanges: [],
         colorSlabRanges: [],
         comboSlabRanges: [],
+        warranty: pr.warranty || '',
+        consumables: pr.consumables
+          ? pr.consumables.map(
+              (c: {
+                partName?: string;
+                description?: string;
+                yield?: string;
+                price?: string | number;
+              }) => ({
+                partName: c.partName || '',
+                description: c.description || '',
+                yield: c.yield || '',
+                price: String(c.price || ''),
+              }),
+            )
+          : [],
       },
     ]);
     toast.success(`Added ${description}`);
@@ -1669,7 +1684,7 @@ function QuotationFormModal({
                             )}
                             {/* Replacement Consumables Section */}
                             {quotationType === 'PRODUCT_SALE' && (
-                              <div className="md:col-span-12 mt-6 pt-4 border-t border-slate-100">
+                              <div className="md:col-span-12 mt-2 pt-2 border-t border-slate-100">
                                 <div className="bg-slate-50/50 rounded-xl p-5 border border-slate-200/60 transition-all hover:bg-slate-50">
                                   <div className="flex items-center justify-between mb-4">
                                     <div className="flex items-center gap-3">
@@ -3051,36 +3066,6 @@ function QuotationFormModal({
               </Button>
             )}
 
-            {step === 2 && (
-              <Button
-                variant="outline"
-                className="h-10 px-6 font-bold text-[11px] uppercase tracking-wider border-dashed border-slate-400 text-slate-600 hover:bg-slate-50 hover:border-slate-600 transition-all gap-2"
-                onClick={() => setIsLayoutSelectorOpen(true)}
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="14"
-                  height="14"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <rect x="3" y="3" width="7" height="9" rx="1" />
-                  <rect x="14" y="3" width="7" height="5" rx="1" />
-                  <rect x="14" y="12" width="7" height="9" rx="1" />
-                  <rect x="3" y="16" width="7" height="5" rx="1" />
-                </svg>
-                {selectedLayoutStyle
-                  ? `Layout: ${selectedLayoutStyle} (${
-                      selectedLayoutCategory === 'rental' ? 'rent' : selectedLayoutCategory
-                    })`
-                  : 'Select Layout'}
-              </Button>
-            )}
-
             {step === 1 ? (
               <Button
                 className="h-10 px-8 bg-blue-600 hover:bg-blue-700 text-white font-bold text-[11px] uppercase tracking-widest shadow-md shadow-blue-200"
@@ -3111,17 +3096,6 @@ function QuotationFormModal({
           </div>
         </div>
       </DialogContent>
-
-      <LayoutSelectionDialog
-        open={isLayoutSelectorOpen}
-        onOpenChange={setIsLayoutSelectorOpen}
-        selectedType={selectedLayoutCategory}
-        selectedStyle={selectedLayoutStyle}
-        onSelectLayout={(category, style) => {
-          setSelectedLayoutCategory(category);
-          setSelectedLayoutStyle(style);
-        }}
-      />
     </Dialog>
   );
 }

@@ -139,6 +139,12 @@ export class Product {
   @Column({ type: 'varchar', length: 100, nullable: true })
   hs_code?: string;
 
+  @Column({ type: 'jsonb', nullable: true })
+  consumables?: { partName: string; description: string; yield: string; price: string }[];
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  warranty?: string;
+
   @CreateDateColumn()
   created_at!: Date;
 }

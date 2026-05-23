@@ -1,4 +1,5 @@
 import React from 'react';
+import { numberToWords } from '@/lib/numberToWords';
 
 export interface Consumable {
   partName: string;
@@ -10,6 +11,7 @@ export interface Consumable {
 export interface PremiumQuotationLineItem {
   brand: string;
   modelNo: string;
+  modelName: string;
   slNo: string;
   description: string;
   qty: number;
@@ -23,6 +25,7 @@ export interface PremiumQuotationLineItem {
   discount?: number;
   features?: { subHeading: string; description: string }[];
   consumables?: Consumable[];
+  warranty?: string;
 }
 
 export interface ProductPremiumQuotationProps {
@@ -68,7 +71,6 @@ const fmt = (n: number) =>
 
 const ProductPremiumQuotation: React.FC<ProductPremiumQuotationProps> = ({
   productName = 'TONER CHIP SET',
-  modelName = 'ALTALink C8130',
   billTo = {
     name: 'XEROCARE W. L. L',
     address: 'SHARJAH UAE',
@@ -88,6 +90,7 @@ const ProductPremiumQuotation: React.FC<ProductPremiumQuotationProps> = ({
     {
       brand: 'Xerox',
       modelNo: 'C8130',
+      modelName: 'ALTALink C8130',
       slNo: 'SN123456',
       description: 'TONER CHIP SET (C/M/Y/K) | ALTALink C8130/35 | 006R01754/5/6/7',
       qty: 1,
@@ -99,6 +102,7 @@ const ProductPremiumQuotation: React.FC<ProductPremiumQuotationProps> = ({
     {
       brand: 'Xerox',
       modelNo: 'C8130',
+      modelName: 'ALTALink C8130',
       slNo: 'SN123457',
       description: 'DRUM CARTRIDGE | ALTALink C8130',
       qty: 2,
@@ -221,7 +225,7 @@ const ProductPremiumQuotation: React.FC<ProductPremiumQuotationProps> = ({
               }}
             >
               <div
-                style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontWeight: '700' }}
+                style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontWeight: '400' }}
               >
                 <span>Quotation Number:</span>
                 <span>Creation Date:</span>
@@ -330,16 +334,34 @@ const ProductPremiumQuotation: React.FC<ProductPremiumQuotationProps> = ({
         {/* Subject Line */}
         <div
           style={{
-            padding: '0 50px 20px',
-            color: ACCENT,
-            fontWeight: '700',
-            fontSize: '12px',
-            letterSpacing: '0.02em',
+            margin: '10px 50px 15px',
+            backgroundColor: ACCENT,
+            color: '#ffffff', // White text for better contrast on green background
+            padding: '6px 20px',
+            borderRadius: '6px',
+            textAlign: 'center',
+            fontSize: '13px',
+            fontWeight: '500',
+            textTransform: 'uppercase',
+            letterSpacing: '1px',
           }}
         >
-          Subject: {productName} &amp; {modelName}
+          Sub: Quatation for {lineItems[0]?.productName || productName || 'N/A'}
         </div>
-
+        <div
+          style={{
+            margin: '0 50px 15px',
+            color: '#eeeeee',
+            fontSize: '13px',
+            lineHeight: '1.4',
+            opacity: 0.9,
+          }}
+        >
+          <div style={{ color: '#ffffff', marginBottom: '4px' }}>Dear Sir,</div>
+          <div>
+            Thank you for your valuable enquiry, please find our best competitive offers below:
+          </div>
+        </div>
         {/* ─── PRODUCT INFO SUMMARY ─── */}
         <div style={{ padding: '0 50px', marginBottom: '25px' }}>
           <div
@@ -354,7 +376,7 @@ const ProductPremiumQuotation: React.FC<ProductPremiumQuotationProps> = ({
             {lineItems.length > 0 && (
               <>
                 <div
-                  style={{ flex: 2, padding: '16px 24px', borderRight: `1px solid ${ACCENT}15` }}
+                  style={{ flex: 2, padding: '10px 24px', borderRight: `1px solid ${ACCENT}15` }}
                 >
                   <div
                     style={{
@@ -373,7 +395,7 @@ const ProductPremiumQuotation: React.FC<ProductPremiumQuotationProps> = ({
                   </div>
                 </div>
                 <div
-                  style={{ flex: 1, padding: '16px 24px', borderRight: `1px solid ${ACCENT}15` }}
+                  style={{ flex: 1, padding: '10px 24px', borderRight: `1px solid ${ACCENT}15` }}
                 >
                   <div
                     style={{
@@ -387,12 +409,12 @@ const ProductPremiumQuotation: React.FC<ProductPremiumQuotationProps> = ({
                   >
                     BRAND
                   </div>
-                  <div style={{ fontSize: '14px', fontWeight: '700', color: '#eeeeee' }}>
+                  <div style={{ fontSize: '14px', fontWeight: '500', color: '#eeeeee' }}>
                     {lineItems[0].brand}
                   </div>
                 </div>
                 <div
-                  style={{ flex: 1.2, padding: '16px 24px', borderRight: `1px solid ${ACCENT}15` }}
+                  style={{ flex: 1.2, padding: '10px 24px', borderRight: `1px solid ${ACCENT}15` }}
                 >
                   <div
                     style={{
@@ -406,11 +428,11 @@ const ProductPremiumQuotation: React.FC<ProductPremiumQuotationProps> = ({
                   >
                     MODEL
                   </div>
-                  <div style={{ fontSize: '14px', fontWeight: '700', color: '#eeeeee' }}>
+                  <div style={{ fontSize: '14px', fontWeight: '500', color: '#eeeeee' }}>
                     {lineItems[0].modelNo}
                   </div>
                 </div>
-                <div style={{ flex: 1.5, padding: '16px 24px' }}>
+                <div style={{ flex: 1.5, padding: '10px 24px' }}>
                   <div
                     style={{
                       fontSize: '9px',
@@ -423,7 +445,7 @@ const ProductPremiumQuotation: React.FC<ProductPremiumQuotationProps> = ({
                   >
                     SERIAL NUMBER
                   </div>
-                  <div style={{ fontSize: '14px', fontWeight: '700', color: '#eeeeee' }}>
+                  <div style={{ fontSize: '14px', fontWeight: '500', color: '#eeeeee' }}>
                     {lineItems[0].slNo}
                   </div>
                 </div>
@@ -508,6 +530,7 @@ const ProductPremiumQuotation: React.FC<ProductPremiumQuotationProps> = ({
                         }}
                       />
                     )}
+
                     <div
                       style={{
                         position: 'relative',
@@ -526,17 +549,6 @@ const ProductPremiumQuotation: React.FC<ProductPremiumQuotationProps> = ({
                           lineHeight: '1.6',
                         }}
                       >
-                        <div
-                          style={{
-                            fontSize: '13px',
-                            fontWeight: '800',
-                            color: ACCENT,
-                            textTransform: 'uppercase',
-                            marginBottom: '6px',
-                          }}
-                        >
-                          Product Description
-                        </div>
                         <div
                           style={{
                             marginBottom: (item.features?.length ?? 0) > 0 ? '12px' : '0',
@@ -604,6 +616,22 @@ const ProductPremiumQuotation: React.FC<ProductPremiumQuotationProps> = ({
             >
               Thank You For Your Business!
             </div>
+
+            {lineItems?.[0]?.productImage && (
+              <div style={{ marginBottom: '20px' }}>
+                <img
+                  src={lineItems[0].productImage}
+                  alt="Product"
+                  style={{
+                    maxWidth: '600px',
+                    maxHeight: '400px',
+                    objectFit: 'contain',
+                    filter: 'grayscale(100%) brightness(1.2)',
+                    opacity: 0.6,
+                  }}
+                />
+              </div>
+            )}
 
             <div style={{ marginBottom: '20px' }}>
               <div
@@ -692,18 +720,32 @@ const ProductPremiumQuotation: React.FC<ProductPremiumQuotationProps> = ({
                 color: '#111',
                 padding: '16px 20px',
                 display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
+                flexDirection: 'column',
                 marginTop: '16px',
                 borderRadius: '2px',
               }}
             >
-              <span style={{ fontWeight: '800', fontSize: '16px', textTransform: 'uppercase' }}>
-                Total:
-              </span>
-              <span style={{ fontWeight: '900', fontSize: '18px' }}>
-                QAR {fmt(totals.balanceDue)}
-              </span>
+              <div
+                style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+              >
+                <span style={{ fontWeight: '500', fontSize: '16px', textTransform: 'uppercase' }}>
+                  Total:
+                </span>
+                <span style={{ fontWeight: '500', fontSize: '18px' }}>
+                  QAR {fmt(totals.balanceDue)}
+                </span>
+              </div>
+              <div
+                style={{
+                  fontSize: '10px',
+                  color: '#eeeeee',
+                  fontStyle: 'italic',
+                  textAlign: 'right',
+                  marginTop: '1px',
+                }}
+              >
+                {numberToWords(totals.balanceDue)}
+              </div>
             </div>
 
             {totals.paid && (
@@ -775,7 +817,7 @@ const ProductPremiumQuotation: React.FC<ProductPremiumQuotationProps> = ({
                 gap: '10px',
               }}
             >
-              <span>+974 7071 7282</span>
+              <span>+974 7071 7282 / +٩٧٤ ٧٠٧١ ٧٢٨٢</span>
               <span
                 style={{
                   display: 'inline-block',
@@ -805,6 +847,26 @@ const ProductPremiumQuotation: React.FC<ProductPremiumQuotationProps> = ({
                 }}
               >
                 ✉
+              </span>
+            </div>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'flex-end',
+                gap: '10px',
+              }}
+            >
+              <span>37494,Doha-qatar</span>
+              <span
+                style={{
+                  display: 'inline-block',
+                  width: '16px',
+                  textAlign: 'center',
+                  color: ACCENT,
+                }}
+              >
+                📍
               </span>
             </div>
             <div
@@ -907,15 +969,16 @@ const ProductPremiumQuotation: React.FC<ProductPremiumQuotationProps> = ({
               </div>
             </div>
 
-            <div style={{ borderTop: `1px solid ${ACCENT}20`, marginBottom: '30px' }} />
+            <div style={{ borderTop: `1px solid ${ACCENT}20`, marginBottom: '10px' }} />
 
-            <div style={{ marginBottom: '35px' }}>
+            <div style={{ marginBottom: '20px' }}>
               <div
                 style={{
-                  fontSize: '24px',
+                  fontSize: '14px',
                   fontWeight: '800',
                   color: ACCENT,
                   textTransform: 'uppercase',
+                  textAlign: 'center',
                 }}
               >
                 Replacement Consumables for {lineItems?.[0]?.productName || 'Equipment'}
@@ -938,7 +1001,7 @@ const ProductPremiumQuotation: React.FC<ProductPremiumQuotationProps> = ({
                       borderLeft: `4px solid ${ACCENT}`,
                     }}
                   >
-                    <div style={{ fontSize: '14px', fontWeight: '800', color: ACCENT }}>
+                    <div style={{ fontSize: '14px', fontWeight: '400', color: ACCENT }}>
                       {item.brand} {item.modelNo}
                     </div>
                     <div style={{ fontSize: '12px', color: TEXT_LIGHT }}>{item.description}</div>
@@ -954,6 +1017,7 @@ const ProductPremiumQuotation: React.FC<ProductPremiumQuotationProps> = ({
                             padding: '10px 12px',
                             textTransform: 'uppercase',
                             borderBottom: `1px solid ${ACCENT}`,
+                            fontWeight: '400',
                           }}
                         >
                           Part Name
@@ -965,6 +1029,7 @@ const ProductPremiumQuotation: React.FC<ProductPremiumQuotationProps> = ({
                             padding: '10px 12px',
                             textTransform: 'uppercase',
                             borderBottom: `1px solid ${ACCENT}`,
+                            fontWeight: '400',
                           }}
                         >
                           Description / Specifications
@@ -976,6 +1041,7 @@ const ProductPremiumQuotation: React.FC<ProductPremiumQuotationProps> = ({
                             padding: '10px 12px',
                             textTransform: 'uppercase',
                             borderBottom: `1px solid ${ACCENT}`,
+                            fontWeight: '400',
                           }}
                         >
                           Yield
@@ -987,6 +1053,7 @@ const ProductPremiumQuotation: React.FC<ProductPremiumQuotationProps> = ({
                             padding: '10px 12px',
                             textTransform: 'uppercase',
                             borderBottom: `1px solid ${ACCENT}`,
+                            fontWeight: '400',
                           }}
                         >
                           Unit Price (QAR)
@@ -1015,7 +1082,6 @@ const ProductPremiumQuotation: React.FC<ProductPremiumQuotationProps> = ({
                           <td
                             style={{
                               fontSize: '12px',
-                              fontWeight: '800',
                               textAlign: 'right',
                               padding: '12px',
                               color: ACCENT,
@@ -1081,20 +1147,21 @@ const ProductPremiumQuotation: React.FC<ProductPremiumQuotationProps> = ({
                   lineHeight: '1.6',
                 }}
               >
-                For any further clarifications please feel free to contact the undersigned on{' '}
-                <strong>Mob: 70717282</strong> or <strong>Email: mail@xerocare.com</strong>
+                for any further clarifications please feel free to contact the undersigned on{' '}
+                <span style={{ color: ACCENT }}>mob: 70717282</span> or{' '}
+                <span style={{ color: ACCENT }}>email:mail@xerocare.com</span>
               </p>
 
               <div
                 style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}
               >
                 <div style={{ fontSize: '11px', color: '#eee' }}>
-                  With warm regards,
+                  with warm regards,
                   <br />
                   <br />
-                  <strong style={{ color: ACCENT }}>For XEROCARE TRADING & SERVICES WLL</strong>
+                  <strong style={{ color: ACCENT }}>For Xerocare Trading&services WLL</strong>
                   <br />
-                  DOHA QATAR
+                  DOHA QTAR
                 </div>
 
                 <div style={{ position: 'relative', width: '150px', textAlign: 'center' }}>

@@ -12,6 +12,8 @@ export interface LeaseLineItem {
   productName: string;
   brand: string;
   model: string;
+  modelName?: string;
+  modelNo?: string;
   slNo?: string;
   description: string;
   qty: number;
@@ -24,6 +26,7 @@ export interface LeaseLineItem {
   productImage?: string;
   discount?: number;
   features?: { subHeading: string; description: string }[];
+  warranty?: string;
 }
 
 export interface LeaseAgreementDetails {

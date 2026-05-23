@@ -1,4 +1,5 @@
 import React from 'react';
+import { numberToWords } from '@/lib/numberToWords';
 
 export interface SlabRange {
   from: number;
@@ -10,6 +11,8 @@ export interface RentLineItem {
   productName: string;
   brand: string;
   model: string;
+  modelName?: string;
+  modelNo?: string;
   slNo?: string;
   description: string;
   qty: number;
@@ -19,6 +22,8 @@ export interface RentLineItem {
   colorSlabs?: SlabRange[];
   comboSlabs?: SlabRange[];
   features?: { subHeading: string; description: string }[];
+  productImage?: string;
+  warranty?: string;
 }
 
 export interface RentAgreementDetails {
@@ -114,6 +119,8 @@ const RentNormalQuotation: React.FC<RentNormalQuotationProps> = ({
       productName: 'Xerox Altalink',
       brand: 'Xerox',
       model: 'C8130',
+      modelName: 'ALTALink C8130',
+      modelNo: 'C8130',
       slNo: 'SN123456789',
       description: 'Multifunction Color Printer',
       qty: 1,
@@ -260,7 +267,7 @@ const RentNormalQuotation: React.FC<RentNormalQuotationProps> = ({
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
           <div style={{ width: '230px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-              <span style={{ fontSize: '13px', fontWeight: '800', color: '#111' }}>
+              <span style={{ fontSize: '13px', fontWeight: '400', color: '#111' }}>
                 Quotation No :
               </span>
               <span style={{ fontSize: '13px', fontWeight: '800' }}>{quotation.number}</span>
@@ -300,7 +307,7 @@ const RentNormalQuotation: React.FC<RentNormalQuotationProps> = ({
         >
           Machine Details
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px 24px' }}>
           <div>
             <div style={{ fontSize: '10px', color: '#888', textTransform: 'uppercase' }}>Brand</div>
             <div style={{ fontSize: '13px', fontWeight: '700' }}>
@@ -308,9 +315,27 @@ const RentNormalQuotation: React.FC<RentNormalQuotationProps> = ({
             </div>
           </div>
           <div>
-            <div style={{ fontSize: '10px', color: '#888', textTransform: 'uppercase' }}>Model</div>
+            <div style={{ fontSize: '10px', color: '#888', textTransform: 'uppercase' }}>
+              Product Name
+            </div>
             <div style={{ fontSize: '13px', fontWeight: '700' }}>
-              {lineItems[0]?.model || 'N/A'}
+              {lineItems[0]?.productName || 'N/A'}
+            </div>
+          </div>
+          <div>
+            <div style={{ fontSize: '10px', color: '#888', textTransform: 'uppercase' }}>
+              Model Name
+            </div>
+            <div style={{ fontSize: '13px', fontWeight: '700' }}>
+              {lineItems[0]?.modelName || 'N/A'}
+            </div>
+          </div>
+          <div>
+            <div style={{ fontSize: '10px', color: '#888', textTransform: 'uppercase' }}>
+              Model Number
+            </div>
+            <div style={{ fontSize: '13px', fontWeight: '700' }}>
+              {lineItems[0]?.modelNo || lineItems[0]?.model || 'N/A'}
             </div>
           </div>
           <div>
@@ -387,7 +412,7 @@ const RentNormalQuotation: React.FC<RentNormalQuotationProps> = ({
                           style={{
                             fontSize: '13px',
                             fontWeight: '800',
-                            color: '#dc2626',
+                            color: '#10b981',
                             textTransform: 'uppercase',
                             marginBottom: '6px',
                             marginTop: '16px',
@@ -682,29 +707,82 @@ const RentNormalQuotation: React.FC<RentNormalQuotationProps> = ({
       <div
         style={{
           display: 'flex',
-          justifyContent: 'flex-end',
+          justifyContent: lineItems?.[0]?.productImage ? 'space-between' : 'flex-end',
+          alignItems: 'flex-start',
           marginBottom: '32px',
         }}
       >
+        {lineItems?.[0]?.productImage && (
+          <div style={{ flex: 1, paddingRight: '20px' }}>
+            <img
+              src={lineItems[0].productImage}
+              alt="Product"
+              style={{
+                maxWidth: '600px',
+                maxHeight: '400px',
+                objectFit: 'contain',
+                filter: 'grayscale(100%)',
+                opacity: 0.8,
+              }}
+            />
+          </div>
+        )}
         <div style={{ width: '250px' }}>
           {[
-            { label: 'Subtotal', value: fmt(totals.subTotal) },
-            { label: 'Tax (0%)', value: fmt(totals.tax) },
-            { label: 'Total', value: `QAR ${fmt(totals.total)}`, isBold: true },
+            { label: 'Subtotal', value: totals.subTotal, num: totals.subTotal },
+            { label: 'Tax (0%)', value: totals.tax, num: totals.tax },
+            {
+              label: 'Total',
+              value: totals.total,
+              num: totals.total,
+              prefix: 'QAR ',
+              isBold: true,
+            },
           ].map((row, i) => (
             <div
               key={i}
               style={{
                 display: 'flex',
-                justifyContent: 'space-between',
+                flexDirection: 'column',
                 padding: '8px 0',
                 borderBottom: i === 2 ? `2px solid ${ACCENT}` : '1px solid #f0f0f0',
-                fontWeight: row.isBold ? '800' : '500',
-                color: row.isBold ? ACCENT : '#333',
               }}
             >
-              <span style={{ fontSize: '12px', textTransform: 'uppercase' }}>{row.label}</span>
-              <span style={{ fontSize: '14px' }}>{row.value}</span>
+              <div
+                style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+              >
+                <span
+                  style={{
+                    fontSize: '12px',
+                    textTransform: 'uppercase',
+                    color: row.isBold ? ACCENT : '#000',
+                    fontWeight: row.isBold ? '800' : '700',
+                  }}
+                >
+                  {row.label}
+                </span>
+                <span
+                  style={{
+                    fontSize: '14px',
+                    color: row.isBold ? ACCENT : '#000',
+                    fontWeight: row.isBold ? '800' : '700',
+                  }}
+                >
+                  {row.prefix || ''}
+                  {fmt(row.value)}
+                </span>
+              </div>
+              <div
+                style={{
+                  fontSize: '9px',
+                  color: '#111827',
+                  fontStyle: 'italic',
+                  textAlign: 'right',
+                  marginTop: '1px',
+                }}
+              >
+                {numberToWords(row.num)}
+              </div>
             </div>
           ))}
         </div>

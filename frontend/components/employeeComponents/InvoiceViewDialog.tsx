@@ -10,6 +10,16 @@ import { getAllModels } from '@/lib/model';
 import { Invoice, sendEmailNotification, sendWhatsappNotification } from '@/lib/invoice';
 import { toast } from 'sonner';
 
+interface InternalConsumable {
+  name?: string;
+  model?: string;
+  yield?: string;
+  image?: string;
+  partName?: string;
+  description?: string;
+  price?: string;
+}
+
 import ProductStandardQuotation from '../../public/quatationLayouts/productsalequatation/statnderd/productstatnderdquatation';
 import ProductPremiumQuotation from '../../public/quatationLayouts/productsalequatation/premium/productpremiumquatation';
 import ProductNormalQuotation from '../../public/quatationLayouts/productsalequatation/normal/productnormalqatation';
@@ -26,10 +36,11 @@ import LeasePremiumQuotation from '../../public/quatationLayouts/leasequatation/
 interface ProductMeta {
   brandRelation?: { name?: string };
   brand?: string;
-  model?: { model_name?: string; id?: string; description?: string };
+  model?: { model_name?: string; model_no?: string; id?: string; description?: string };
   model_name?: string;
   model_no?: string;
   serial_no?: string;
+  serialNo?: string;
   imageUrl?: string;
   image_url?: string;
   mpn?: string;
@@ -37,10 +48,12 @@ interface ProductMeta {
   name?: string;
   part_name?: string;
   description?: string;
+  warranty?: string;
   features?: { subHeading: string; description: string }[];
   yield?: string;
   inventory?: { description?: string }[];
   image?: string;
+  consumables?: InternalConsumable[];
 }
 
 interface InvoiceViewDialogProps {
@@ -418,7 +431,8 @@ export function InvoiceViewDialog({
     return {
       productName: exPN || item.metadata?.name || item.metadata?.part_name || 'PRODUCT',
       brand: exBN || item.metadata?.brandRelation?.name || item.metadata?.brand || 'Xerocare',
-      modelNo: exMN || item.metadata?.model?.model_name || item.metadata?.model_name || 'Generic',
+      modelNo: exMN || item.metadata?.model?.model_no || item.metadata?.model_no || 'Generic',
+      modelName: item.metadata?.model?.model_name || item.metadata?.model_name || 'N/A',
       slNo: item.allocation?.serialNumber || item.metadata?.serial_no || 'TBD',
       description: cleanDesc,
       qty: qty,
@@ -430,6 +444,13 @@ export function InvoiceViewDialog({
       discount: disc,
       mpn: item.metadata?.mpn || extractTag('MPN'),
       features: (item.metadata?.features as { subHeading: string; description: string }[]) || [],
+      consumables: (item.metadata?.consumables || []).map((c: InternalConsumable) => ({
+        partName: c.partName || c.name || '',
+        description: c.description || c.model || '',
+        yield: c.yield || '',
+        price: c.price || '0.00',
+      })),
+      warranty: item.metadata?.warranty || '',
     };
   });
 
@@ -501,6 +522,8 @@ export function InvoiceViewDialog({
         productName: pMeta.name || 'PRODUCT',
         brand: pMeta.brandRelation?.name || pMeta.brand || 'Xerocare',
         model: pMeta.model_name || pMeta.model_no || 'Generic',
+        modelName: pMeta.model_name || 'N/A',
+        modelNo: pMeta.model_no || 'Generic',
         slNo: pMeta.serial_no || item.serialNumber || 'TBD',
         description: pMeta.description || item.description || '',
         features: pMeta.features || [],
@@ -546,6 +569,8 @@ export function InvoiceViewDialog({
         productName: pMeta.name || 'PRODUCT',
         brand: pMeta.brandRelation?.name || pMeta.brand || 'Xerocare',
         model: pMeta.model_name || 'Generic',
+        modelName: pMeta.model_name || 'N/A',
+        modelNo: pMeta.model_no || 'Generic',
         slNo: pMeta.serial_no || item.serialNumber || 'TBD',
         description: pMeta.description || item.description || '',
         features: pMeta.features || [],

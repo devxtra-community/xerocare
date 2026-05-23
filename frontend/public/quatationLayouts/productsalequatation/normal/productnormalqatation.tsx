@@ -1,4 +1,5 @@
 import React from 'react';
+import { numberToWords } from '@/lib/numberToWords';
 
 export interface Consumable {
   partName: string;
@@ -10,6 +11,7 @@ export interface Consumable {
 export interface QuotationLineItem {
   brand: string;
   modelNo: string;
+  modelName: string;
   slNo: string;
   description: string;
   qty: number;
@@ -22,6 +24,7 @@ export interface QuotationLineItem {
   discount?: number;
   features?: { subHeading: string; description: string }[];
   consumables?: Consumable[];
+  warranty?: string;
 }
 
 export interface ProductNormalQuotationProps {
@@ -34,6 +37,8 @@ export interface ProductNormalQuotationProps {
     name: string;
     address?: string;
     trn?: string;
+    email?: string;
+    phone?: string;
   };
   /** Ship-to customer info */
   shipTo?: {
@@ -88,7 +93,6 @@ const tdStyle = (align: 'left' | 'center' | 'right' = 'center'): React.CSSProper
 });
 
 const ProductNormalQuotation: React.FC<ProductNormalQuotationProps> = ({
-  modelName = 'ALTALink C8130',
   billTo = {
     name: 'XEROCARE W. L. L',
     address: 'SHARJAH UAE',
@@ -105,6 +109,7 @@ const ProductNormalQuotation: React.FC<ProductNormalQuotationProps> = ({
     {
       brand: 'Xerox',
       modelNo: 'C8130',
+      modelName: 'ALTALink C8130',
       slNo: 'SN123456',
       description: 'TONER CHIP SET (C/M/Y/K) | ALTALink C8130/35 | 006R01754/5/6/7',
       qty: 1,
@@ -227,13 +232,15 @@ const ProductNormalQuotation: React.FC<ProductNormalQuotationProps> = ({
           >
             Bill To
           </div>
-          <div style={{ fontSize: '14px', fontWeight: '700', marginBottom: '4px' }}>
+          <div style={{ fontSize: '14px', fontWeight: '500', marginBottom: '4px' }}>
             {billTo.name}
           </div>
-          <div
-            style={{ fontSize: '12px', color: '#555', lineHeight: '1.4', whiteSpace: 'pre-line' }}
-          >
-            {billTo.address}
+          <div style={{ fontSize: '12px', color: '#555', lineHeight: '1.4' }}>
+            {billTo.email && <div>{billTo.email}</div>}
+            {billTo.phone && <div>{billTo.phone}</div>}
+            {billTo.address && (
+              <div style={{ whiteSpace: 'pre-line', marginTop: '2px' }}>{billTo.address}</div>
+            )}
           </div>
           {billTo.trn && (
             <div style={{ fontSize: '12px', color: '#555', marginTop: '4px' }}>
@@ -244,30 +251,62 @@ const ProductNormalQuotation: React.FC<ProductNormalQuotationProps> = ({
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
           <div style={{ width: '230px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-              <span style={{ fontSize: '13px', fontWeight: '800', color: '#111' }}>
+              <span style={{ fontSize: '13px', fontWeight: '400', color: '#111' }}>
                 Quotation No :
               </span>
-              <span style={{ fontSize: '13px', fontWeight: '800' }}>{quotation.number}</span>
+              <span style={{ fontSize: '13px', fontWeight: '500' }}>{quotation.number}</span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
               <span style={{ fontSize: '12px', color: '#555' }}>Date :</span>
-              <span style={{ fontSize: '12px', fontWeight: '600' }}>{quotation.date}</span>
+              <span style={{ fontSize: '12px', fontWeight: '400' }}>{quotation.date}</span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
               <span style={{ fontSize: '12px', color: '#555' }}>Due Date :</span>
-              <span style={{ fontSize: '12px', fontWeight: '600' }}>{quotation.dueDate}</span>
+              <span style={{ fontSize: '12px', fontWeight: '400' }}>{quotation.dueDate}</span>
             </div>
           </div>
         </div>
       </div>
 
+      {/* ─── SUBJECT LINE ─── */}
+      <div style={{ marginBottom: '22px' }}>
+        <div
+          style={{
+            backgroundColor: ACCENT,
+            color: '#ffffff',
+            padding: '6px 20px',
+            borderRadius: '6px',
+            textAlign: 'center',
+            fontSize: '13px',
+            fontWeight: '500',
+            textTransform: 'uppercase',
+            letterSpacing: '1px',
+          }}
+        >
+          Sub: Quatation for {lineItems[0]?.productName || 'N/A'}
+        </div>
+      </div>
+      <div
+        style={{
+          marginBottom: '15px',
+          padding: '0 5px',
+          color: '#333',
+          fontSize: '12.5px',
+          lineHeight: '1.4',
+        }}
+      >
+        <div style={{ marginBottom: '2px' }}>Dear Sir,</div>
+        <div>
+          Thank you for your valuable enquiry, please find our best competitive offers below:
+        </div>
+      </div>
       {/* ─── MACHINE DETAILS ─── */}
       <div
         style={{
           backgroundColor: '#f9f9f9',
-          padding: '14px 18px',
+          padding: '6px 18px',
           borderRadius: '8px',
-          marginBottom: '22px',
+          marginBottom: '12px',
           border: '1px solid #eee',
         }}
       >
@@ -284,24 +323,42 @@ const ProductNormalQuotation: React.FC<ProductNormalQuotationProps> = ({
         >
           Product Details
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px 24px' }}>
           <div>
             <div style={{ fontSize: '10px', color: '#888', textTransform: 'uppercase' }}>Brand</div>
-            <div style={{ fontSize: '13px', fontWeight: '700' }}>
+            <div style={{ fontSize: '13px', fontWeight: '500' }}>
               {lineItems[0]?.brand || 'N/A'}
             </div>
           </div>
           <div>
-            <div style={{ fontSize: '10px', color: '#888', textTransform: 'uppercase' }}>Model</div>
-            <div style={{ fontSize: '13px', fontWeight: '700' }}>
-              {lineItems[0]?.modelNo || modelName || 'N/A'}
+            <div style={{ fontSize: '10px', color: '#888', textTransform: 'uppercase' }}>
+              Product Name
+            </div>
+            <div style={{ fontSize: '13px', fontWeight: '500' }}>
+              {lineItems[0]?.productName || 'N/A'}
+            </div>
+          </div>
+          <div>
+            <div style={{ fontSize: '10px', color: '#888', textTransform: 'uppercase' }}>
+              Model Name
+            </div>
+            <div style={{ fontSize: '13px', fontWeight: '500' }}>
+              {lineItems[0]?.modelName || 'N/A'}
+            </div>
+          </div>
+          <div>
+            <div style={{ fontSize: '10px', color: '#888', textTransform: 'uppercase' }}>
+              Model Number
+            </div>
+            <div style={{ fontSize: '13px', fontWeight: '500' }}>
+              {lineItems[0]?.modelNo || 'N/A'}
             </div>
           </div>
           <div>
             <div style={{ fontSize: '10px', color: '#888', textTransform: 'uppercase' }}>
               Serial Number
             </div>
-            <div style={{ fontSize: '13px', fontWeight: '700' }}>{lineItems[0]?.slNo || 'TBD'}</div>
+            <div style={{ fontSize: '13px', fontWeight: '500' }}>{lineItems[0]?.slNo || 'TBD'}</div>
           </div>
         </div>
       </div>
@@ -348,23 +405,17 @@ const ProductNormalQuotation: React.FC<ProductNormalQuotationProps> = ({
                     style={{
                       fontSize: '11px',
                       color: '#1a1a1a',
-                      fontWeight: '600',
+                      fontWeight: '400',
                       maxWidth: '95%',
                       lineHeight: '1.6',
                     }}
                   >
                     <div
                       style={{
-                        fontSize: '13px',
-                        fontWeight: '800',
-                        color: '#dc2626',
-                        textTransform: 'uppercase',
-                        marginBottom: '6px',
+                        whiteSpace: 'pre-wrap',
+                        marginBottom: (item.features?.length ?? 0) > 0 ? '12px' : '0',
                       }}
                     >
-                      Product Description
-                    </div>
-                    <div style={{ marginBottom: (item.features?.length ?? 0) > 0 ? '12px' : '0' }}>
                       {item.description}
                     </div>
                     {(item.features || []).length > 0 && (
@@ -373,7 +424,7 @@ const ProductNormalQuotation: React.FC<ProductNormalQuotationProps> = ({
                           style={{
                             fontSize: '13px',
                             fontWeight: '800',
-                            color: '#dc2626',
+                            color: '#10b981',
                             textTransform: 'uppercase',
                             marginBottom: '6px',
                             marginTop: '16px',
@@ -397,11 +448,95 @@ const ProductNormalQuotation: React.FC<ProductNormalQuotationProps> = ({
                     )}
                   </div>
                 </td>
-                <td style={tdStyle()}>{item.qty}</td>
-                <td style={tdStyle()}>{fmt(item.unitPrice)}</td>
-                <td style={tdStyle()}>{fmt(item.discount || 0)}</td>
-                <td style={tdStyle()}>{fmt(item.vat)}</td>
-                <td style={{ ...tdStyle('right'), fontWeight: '700' }}>{fmt(item.amount)}</td>
+                <td
+                  colSpan={5}
+                  style={{
+                    padding: 0,
+                    verticalAlign: 'top',
+                  }}
+                >
+                  {/* Numeric values row at the top */}
+                  <div
+                    style={{
+                      display: 'flex',
+                      color: '#111',
+                    }}
+                  >
+                    <div
+                      style={{
+                        flex: 1,
+                        padding: '12px 6px',
+                        textAlign: 'center',
+                        fontSize: '12px',
+                      }}
+                    >
+                      {item.qty}
+                    </div>
+                    <div
+                      style={{
+                        flex: 1.5,
+                        padding: '12px 6px',
+                        textAlign: 'center',
+                        fontSize: '12px',
+                      }}
+                    >
+                      {fmt(item.unitPrice)}
+                    </div>
+                    <div
+                      style={{
+                        flex: 1.3,
+                        padding: '12px 6px',
+                        textAlign: 'center',
+                        fontSize: '12px',
+                      }}
+                    >
+                      {fmt(item.discount || 0)}
+                    </div>
+                    <div
+                      style={{
+                        flex: 1,
+                        padding: '12px 6px',
+                        textAlign: 'center',
+                        fontSize: '12px',
+                      }}
+                    >
+                      {fmt(item.vat)}
+                    </div>
+                    <div
+                      style={{
+                        flex: 1.5,
+                        padding: '12px 8px',
+                        textAlign: 'right',
+                        fontSize: '12px',
+                        fontWeight: '500',
+                      }}
+                    >
+                      {fmt(item.amount)}
+                    </div>
+                  </div>
+                  {/* Product image filling the remaining vertical space */}
+                  {item.productImage && (
+                    <div
+                      style={{
+                        width: '100%',
+                        padding: '4px',
+                      }}
+                    >
+                      <img
+                        src={item.productImage}
+                        alt="Product"
+                        style={{
+                          width: '100%',
+                          height: '100%',
+                          minHeight: '600px',
+                          objectFit: 'contain',
+                          opacity: 0.9,
+                          display: 'block',
+                        }}
+                      />
+                    </div>
+                  )}
+                </td>
               </tr>
             ))}
           </tbody>
@@ -413,41 +548,88 @@ const ProductNormalQuotation: React.FC<ProductNormalQuotationProps> = ({
         style={{
           display: 'flex',
           justifyContent: 'flex-end',
+          alignItems: 'flex-start',
           marginBottom: '32px',
         }}
       >
         <div style={{ width: '250px' }}>
           {[
-            { label: 'Subtotal', value: fmt(totals.subTotal) },
-            { label: 'VAT Total', value: fmt(totals.vatTotal) },
-            { label: 'Total', value: `QAR ${fmt(totals.total)}`, isBold: true },
-            { label: 'Payment', value: fmt(totals.payment) },
+            { label: 'Subtotal', value: totals.subTotal },
+            { label: 'VAT Total', value: totals.vatTotal },
+            { label: 'Total', value: totals.total, prefix: 'QAR ', isBold: true },
+            { label: 'Payment', value: totals.payment },
           ].map((row, i) => (
             <div
               key={i}
               style={{
                 display: 'flex',
-                justifyContent: 'space-between',
+                flexDirection: 'column',
                 padding: '8px 0',
                 borderBottom: i === 2 ? `2px solid ${ACCENT}` : '1px solid #f0f0f0',
-                fontWeight: row.isBold ? '800' : '500',
-                color: row.isBold ? ACCENT : '#333',
               }}
             >
-              <span style={{ fontSize: '12px', textTransform: 'uppercase' }}>{row.label}</span>
-              <span style={{ fontSize: '14px' }}>{row.value}</span>
+              <div
+                style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+              >
+                <span
+                  style={{
+                    fontSize: '12px',
+                    textTransform: 'uppercase',
+                    color: row.isBold ? ACCENT : '#000',
+                    fontWeight: row.isBold ? '800' : '700',
+                  }}
+                >
+                  {row.label}
+                </span>
+                <span
+                  style={{
+                    fontSize: '14px',
+                    color: row.isBold ? ACCENT : '#000',
+                    fontWeight: row.isBold ? '800' : '700',
+                  }}
+                >
+                  {row.prefix || ''}
+                  {fmt(row.value)}
+                </span>
+              </div>
+              <div
+                style={{
+                  fontSize: '10px',
+                  color: '#111827',
+                  fontStyle: 'italic',
+                  textAlign: 'right',
+                  marginTop: '2px',
+                }}
+              >
+                {numberToWords(row.value)}
+              </div>
             </div>
           ))}
           <div
             style={{
               display: 'flex',
-              justifyContent: 'space-between',
+              flexDirection: 'column',
               padding: '12px 0',
-              fontWeight: '800',
+              fontWeight: '500',
             }}
           >
-            <span style={{ fontSize: '13px', textTransform: 'uppercase' }}>Balance Due</span>
-            <span style={{ fontSize: '16px', color: '#dc2626' }}>QAR {fmt(totals.balanceDue)}</span>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: '13px', textTransform: 'uppercase' }}>Balance Due</span>
+              <span style={{ fontSize: '15px', color: '#dc2626', fontWeight: '800' }}>
+                QAR {fmt(totals.balanceDue)}
+              </span>
+            </div>
+            <div
+              style={{
+                fontSize: '10px',
+                color: '#111827',
+                fontStyle: 'italic',
+                textAlign: 'right',
+                marginTop: '4px',
+              }}
+            >
+              {numberToWords(totals.balanceDue)}
+            </div>
           </div>
           {totals.paid && (
             <div
@@ -466,8 +648,76 @@ const ProductNormalQuotation: React.FC<ProductNormalQuotationProps> = ({
         </div>
       </div>
 
+      {/* ─── DEDICATED CONSUMABLES PAGE ─── */}
+      {(lineItems || []).some((item) => (item.consumables || []).length > 0) && (
+        <div
+          style={{
+            pageBreakBefore: 'always',
+            marginTop: '20px',
+            paddingTop: '20px',
+            borderTop: 'none',
+          }}
+        >
+          <div
+            style={{
+              fontSize: '14px',
+              fontWeight: '800',
+              color: ACCENT,
+              marginBottom: '24px',
+              textTransform: 'uppercase',
+              textAlign: 'center',
+            }}
+          >
+            Replacement Consumables for {lineItems?.[0]?.productName || 'Equipment'}
+          </div>
+          {lineItems.map(
+            (item, idx) =>
+              (item.consumables || []).length > 0 && (
+                <div key={idx} style={{ marginBottom: '40px' }}>
+                  <div
+                    style={{
+                      fontSize: '14px',
+                      fontWeight: '400',
+                      marginBottom: '12px',
+                      color: '#444',
+                    }}
+                  >
+                    Model: {item.modelNo} ({item.brand})
+                  </div>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+                    <thead>
+                      <tr
+                        style={{ backgroundColor: '#f9f9f9', borderBottom: `2px solid ${ACCENT}` }}
+                      >
+                        <th style={{ ...thStyle('left', '#333'), fontWeight: '400' }}>Part Name</th>
+                        <th style={{ ...thStyle('left', '#333'), fontWeight: '400' }}>
+                          Description
+                        </th>
+                        <th style={{ ...thStyle('center', '#333'), fontWeight: '400' }}>Yield</th>
+                        <th style={{ ...thStyle('right', '#333'), fontWeight: '400' }}>
+                          Price (QAR)
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {item.consumables!.map((c, cidx) => (
+                        <tr key={cidx} style={{ borderBottom: '1px solid #eee' }}>
+                          <td style={tdStyle('left')}>{c.partName}</td>
+                          <td style={tdStyle('left')}>{c.description}</td>
+                          <td style={tdStyle('center')}>{c.yield}</td>
+                          <td style={{ ...tdStyle('right') }}>{fmt(Number(c.price))}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ),
+          )}
+        </div>
+      )}
+
       {/* ─── TERMS AND CONDITIONS ─── */}
-      <div style={{ marginBottom: '32px' }}>
+      <div style={{ marginTop: '40px', marginBottom: '32px' }}>
         <div
           style={{
             fontSize: '13px',
@@ -489,6 +739,32 @@ const ProductNormalQuotation: React.FC<ProductNormalQuotationProps> = ({
         </div>
       </div>
 
+      <div
+        style={{
+          fontSize: '12px',
+          marginTop: '20px',
+          marginBottom: '30px',
+          lineHeight: '1.6',
+          color: '#333',
+        }}
+      >
+        <div style={{ marginBottom: '15px' }}>
+          for any further clarifications please feel free to contact the undersigned on{' '}
+          <span style={{ color: ACCENT }}>mob: 70717282</span> or{' '}
+          <span style={{ color: ACCENT }}>email:mail@xerocare.com</span>
+        </div>
+        <div style={{ marginTop: '10px' }}>
+          with warm regards,
+          <br />
+          <strong style={{ display: 'block', marginTop: '4px', color: ACCENT }}>
+            For
+            <br />
+            Xerocare Trading&services WLL
+          </strong>
+          DOHA QTAR
+        </div>
+      </div>
+
       <div style={{ flex: 1 }} />
 
       {/* ─── SIGNATURE & SEAL ─── */}
@@ -506,7 +782,7 @@ const ProductNormalQuotation: React.FC<ProductNormalQuotationProps> = ({
               transform: 'rotate(-15deg)',
             }}
           />
-          <div style={{ borderTop: '1px solid #111', width: '100%', marginBottom: '6px' }}></div>
+          <div style={{ borderTop: 'none', width: '100%', marginBottom: '6px' }}></div>
           <div style={{ fontSize: '11px', fontWeight: '800', color: '#111' }}>
             AUTHORIZED SIGNATURE
           </div>
@@ -525,75 +801,11 @@ const ProductNormalQuotation: React.FC<ProductNormalQuotationProps> = ({
         }}
       >
         <div>{companyInfo.website}</div>
+        <div>37494,Doha-qatar (٣٧٤٩٤ ، الدوحة-قطر)</div>
         <div>
-          {companyInfo.email} | {companyInfo.phone}
+          {companyInfo.email} | {companyInfo.phone} (+٩٧٤ ٧٠٧١ ٧٢٨٢)
         </div>
       </div>
-
-      {/* ─── DEDICATED CONSUMABLES PAGE ─── */}
-      {(lineItems || []).some((item) => (item.consumables || []).length > 0) && (
-        <div
-          style={{
-            pageBreakBefore: 'always',
-            marginTop: '50px',
-            paddingTop: '50px',
-            borderTop: '1px dashed #ccc',
-          }}
-        >
-          <div
-            style={{
-              fontSize: '20px',
-              fontWeight: '800',
-              color: ACCENT,
-              marginBottom: '24px',
-              textTransform: 'uppercase',
-            }}
-          >
-            Replacement Consumables for {lineItems?.[0]?.productName || 'Equipment'}
-          </div>
-          {lineItems.map(
-            (item, idx) =>
-              (item.consumables || []).length > 0 && (
-                <div key={idx} style={{ marginBottom: '40px' }}>
-                  <div
-                    style={{
-                      fontSize: '14px',
-                      fontWeight: '700',
-                      marginBottom: '12px',
-                      color: '#444',
-                    }}
-                  >
-                    Model: {item.modelNo} ({item.brand})
-                  </div>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
-                    <thead>
-                      <tr
-                        style={{ backgroundColor: '#f9f9f9', borderBottom: `2px solid ${ACCENT}` }}
-                      >
-                        <th style={thStyle('left', '#333')}>Part Name</th>
-                        <th style={thStyle('left', '#333')}>Description</th>
-                        <th style={thStyle('center', '#333')}>Yield</th>
-                        <th style={thStyle('right', '#333')}>Price (QAR)</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {item.consumables!.map((c, cidx) => (
-                        <tr key={cidx} style={{ borderBottom: '1px solid #eee' }}>
-                          <td style={tdStyle('left')}>{c.partName}</td>
-                          <td style={tdStyle('left')}>{c.description}</td>
-                          <td style={tdStyle('center')}>{c.yield}</td>
-                          <td style={{ ...tdStyle('right'), fontWeight: '700' }}>
-                            {fmt(Number(c.price))}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              ),
-          )}
-        </div>
-      )}
     </div>
   );
 };

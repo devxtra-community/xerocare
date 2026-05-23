@@ -1,8 +1,10 @@
 import React from 'react';
+import { numberToWords } from '@/lib/numberToWords';
 
 export interface QuotationLineItem {
   brand: string;
-  modelNo: string;
+  modelNo?: string;
+  modelName?: string;
   slNo: string;
   description: string;
   qty: number;
@@ -14,6 +16,8 @@ export interface QuotationLineItem {
   productName?: string;
   discount?: number;
   mpn?: string;
+  warranty?: string;
+  features?: { subHeading: string; description: string }[];
 }
 
 export interface SparePartsNormalQuotationProps {
@@ -224,7 +228,7 @@ const SparePartsNormalQuotation: React.FC<SparePartsNormalQuotationProps> = ({
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
           <div style={{ width: '230px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-              <span style={{ fontSize: '13px', fontWeight: '800', color: '#111' }}>
+              <span style={{ fontSize: '13px', fontWeight: '400', color: '#111' }}>
                 Quotation No :
               </span>
               <span style={{ fontSize: '13px', fontWeight: '800' }}>{quotation.number}</span>
@@ -324,15 +328,7 @@ const SparePartsNormalQuotation: React.FC<SparePartsNormalQuotationProps> = ({
               >
                 <td style={tdStyleHelper()}>{idx + 1}</td>
                 <td style={{ ...tdStyleHelper('left'), whiteSpace: 'pre-wrap' }}>
-                  <div
-                    style={{
-                      fontSize: '11px',
-                      color: '#1a1a1a',
-                      fontWeight: '600',
-                      maxWidth: '95%',
-                      lineHeight: '1.6',
-                    }}
-                  >
+                  <div style={{ fontSize: '11px', color: '#1a1a1a', lineHeight: '1.6' }}>
                     {item.productName && (
                       <div style={{ fontWeight: '700', marginBottom: '4px', fontSize: '14px' }}>
                         {item.productName}
@@ -350,6 +346,34 @@ const SparePartsNormalQuotation: React.FC<SparePartsNormalQuotationProps> = ({
                       Product Description
                     </div>
                     <div>{item.description}</div>
+                    {(item.features || []).length > 0 && (
+                      <>
+                        <div
+                          style={{
+                            fontSize: '13px',
+                            fontWeight: '800',
+                            color: '#10b981',
+                            textTransform: 'uppercase',
+                            marginBottom: '6px',
+                            marginTop: '16px',
+                          }}
+                        >
+                          Features
+                        </div>
+                        {(item.features || []).map((f, i) => (
+                          <div key={i} style={{ marginTop: '8px', fontSize: '11px' }}>
+                            {f.subHeading && (
+                              <strong
+                                style={{ color: '#10b981', display: 'block', marginBottom: '4px' }}
+                              >
+                                {f.subHeading}
+                              </strong>
+                            )}
+                            {f.description && <div style={{ color: '#444' }}>{f.description}</div>}
+                          </div>
+                        ))}
+                      </>
+                    )}
                   </div>
                 </td>
                 <td style={tdStyleHelper()}>{item.qty}</td>
@@ -367,31 +391,112 @@ const SparePartsNormalQuotation: React.FC<SparePartsNormalQuotationProps> = ({
       <div
         style={{
           display: 'flex',
-          justifyContent: 'flex-end',
+          justifyContent: lineItems?.[0]?.productImage ? 'space-between' : 'flex-end',
+          alignItems: 'flex-start',
           marginBottom: '32px',
         }}
       >
+        {lineItems?.[0]?.productImage && (
+          <div style={{ paddingRight: '20px' }}>
+            <img
+              src={lineItems[0].productImage}
+              alt="Product"
+              style={{
+                maxWidth: '600px',
+                maxHeight: '400px',
+                objectFit: 'contain',
+                filter: 'grayscale(100%)',
+                opacity: 0.8,
+              }}
+            />
+          </div>
+        )}
         <div style={{ width: '250px' }}>
           {[
-            { label: 'Subtotal', value: fmt(totals.subTotal) },
-            { label: 'VAT Total', value: fmt(totals.vatTotal) },
-            { label: 'Total', value: `QAR ${fmt(totals.total)}`, isBold: true },
+            { label: 'Subtotal', value: totals.subTotal, num: totals.subTotal },
+            { label: 'VAT Total', value: totals.vatTotal, num: totals.vatTotal },
+            {
+              label: 'Total',
+              value: totals.total,
+              num: totals.total,
+              prefix: 'QAR ',
+              isBold: true,
+            },
+            { label: 'Payment', value: totals.payment, num: totals.payment },
           ].map((row, i) => (
             <div
               key={i}
               style={{
                 display: 'flex',
-                justifyContent: 'space-between',
+                flexDirection: 'column',
                 padding: '8px 0',
                 borderBottom: i === 2 ? `2px solid ${ACCENT}` : '1px solid #f0f0f0',
-                fontWeight: row.isBold ? '800' : '500',
-                color: row.isBold ? ACCENT : '#333',
               }}
             >
-              <span style={{ fontSize: '12px', textTransform: 'uppercase' }}>{row.label}</span>
-              <span style={{ fontSize: '14px' }}>{row.value}</span>
+              <div
+                style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+              >
+                <span
+                  style={{
+                    fontSize: '12px',
+                    textTransform: 'uppercase',
+                    color: row.isBold ? ACCENT : '#000',
+                    fontWeight: row.isBold ? '800' : '700',
+                  }}
+                >
+                  {row.label}
+                </span>
+                <span
+                  style={{
+                    fontSize: '14px',
+                    color: row.isBold ? ACCENT : '#000',
+                    fontWeight: row.isBold ? '800' : '700',
+                  }}
+                >
+                  {row.prefix || ''}
+                  {fmt(row.value)}
+                </span>
+              </div>
+              <div
+                style={{
+                  fontSize: '9px',
+                  color: '#111827',
+                  fontStyle: 'italic',
+                  textAlign: 'right',
+                  marginTop: '1px',
+                }}
+              >
+                {numberToWords(row.num)}
+              </div>
             </div>
           ))}
+
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              padding: '12px 0',
+              fontWeight: '500',
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: '13px', textTransform: 'uppercase' }}>Balance Due</span>
+              <span style={{ fontSize: '15px', color: '#dc2626', fontWeight: '800' }}>
+                QAR {fmt(totals.balanceDue)}
+              </span>
+            </div>
+            <div
+              style={{
+                fontSize: '9px',
+                color: '#111827',
+                fontStyle: 'italic',
+                textAlign: 'right',
+                marginTop: '4px',
+              }}
+            >
+              {numberToWords(totals.balanceDue)}
+            </div>
+          </div>
         </div>
       </div>
 

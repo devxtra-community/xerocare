@@ -1,4 +1,5 @@
 import React from 'react';
+import { numberToWords } from '@/lib/numberToWords';
 
 export interface SlabRange {
   from: number;
@@ -10,6 +11,8 @@ export interface LeaseLineItem {
   productName: string;
   brand: string;
   model: string;
+  modelName?: string;
+  modelNo?: string;
   slNo?: string;
   description: string;
   qty: number;
@@ -20,6 +23,8 @@ export interface LeaseLineItem {
   colorSlabs?: SlabRange[];
   comboSlabs?: SlabRange[];
   features?: { subHeading: string; description: string }[];
+  productImage?: string;
+  warranty?: string;
 }
 
 export interface LeaseAgreementDetails {
@@ -116,6 +121,8 @@ const LeaseNormalQuotation: React.FC<LeaseNormalQuotationProps> = ({
       productName: 'Xerox Altalink',
       brand: 'Xerox',
       model: 'C8130',
+      modelName: 'ALTALink C8130',
+      modelNo: 'C8130',
       slNo: 'SN123456789',
       description: 'Multifunction Color Printer',
       qty: 1,
@@ -243,7 +250,7 @@ const LeaseNormalQuotation: React.FC<LeaseNormalQuotationProps> = ({
           >
             Bill To
           </div>
-          <div style={{ fontSize: '14px', fontWeight: '700', marginBottom: '4px' }}>
+          <div style={{ fontSize: '14px', fontWeight: '500', marginBottom: '4px' }}>
             {billTo.name}
           </div>
           <div
@@ -261,30 +268,62 @@ const LeaseNormalQuotation: React.FC<LeaseNormalQuotationProps> = ({
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
           <div style={{ width: '230px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-              <span style={{ fontSize: '13px', fontWeight: '800', color: '#111' }}>
+              <span style={{ fontSize: '13px', fontWeight: '400', color: '#111' }}>
                 Quotation No :
               </span>
-              <span style={{ fontSize: '13px', fontWeight: '800' }}>{quotation.number}</span>
+              <span style={{ fontSize: '13px', fontWeight: '500' }}>{quotation.number}</span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
               <span style={{ fontSize: '12px', color: '#555' }}>Date :</span>
-              <span style={{ fontSize: '12px', fontWeight: '600' }}>{quotation.date}</span>
+              <span style={{ fontSize: '12px', fontWeight: '400' }}>{quotation.date}</span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
               <span style={{ fontSize: '12px', color: '#555' }}>Due Date :</span>
-              <span style={{ fontSize: '12px', fontWeight: '600' }}>{quotation.dueDate}</span>
+              <span style={{ fontSize: '12px', fontWeight: '400' }}>{quotation.dueDate}</span>
             </div>
           </div>
         </div>
       </div>
 
+      {/* ─── SUBJECT LINE ─── */}
+      <div style={{ marginBottom: '22px' }}>
+        <div
+          style={{
+            backgroundColor: ACCENT,
+            color: '#ffffff',
+            padding: '6px 20px',
+            borderRadius: '6px',
+            textAlign: 'center',
+            fontSize: '13px',
+            fontWeight: '500',
+            textTransform: 'uppercase',
+            letterSpacing: '1px',
+          }}
+        >
+          Sub: Quatation for {lineItems[0]?.productName || 'N/A'}
+        </div>
+      </div>
+      <div
+        style={{
+          marginBottom: '15px',
+          padding: '0 5px',
+          color: '#333',
+          fontSize: '12.5px',
+          lineHeight: '1.4',
+        }}
+      >
+        <div style={{ marginBottom: '2px' }}>Dear Sir,</div>
+        <div>
+          Thank you for your valuable enquiry, please find our best competitive offers below:
+        </div>
+      </div>
       {/* ─── MACHINE DETAILS ─── */}
       <div
         style={{
           backgroundColor: '#f9f9f9',
-          padding: '14px 18px',
+          padding: '6px 18px',
           borderRadius: '8px',
-          marginBottom: '22px',
+          marginBottom: '12px',
           border: '1px solid #eee',
         }}
       >
@@ -299,26 +338,44 @@ const LeaseNormalQuotation: React.FC<LeaseNormalQuotationProps> = ({
             paddingBottom: '5px',
           }}
         >
-          Machine Details
+          Product Details
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px 24px' }}>
           <div>
             <div style={{ fontSize: '10px', color: '#888', textTransform: 'uppercase' }}>Brand</div>
-            <div style={{ fontSize: '13px', fontWeight: '700' }}>
+            <div style={{ fontSize: '13px', fontWeight: '500' }}>
               {lineItems[0]?.brand || 'N/A'}
             </div>
           </div>
           <div>
-            <div style={{ fontSize: '10px', color: '#888', textTransform: 'uppercase' }}>Model</div>
-            <div style={{ fontSize: '13px', fontWeight: '700' }}>
-              {lineItems[0]?.model || 'N/A'}
+            <div style={{ fontSize: '10px', color: '#888', textTransform: 'uppercase' }}>
+              Product Name
+            </div>
+            <div style={{ fontSize: '13px', fontWeight: '500' }}>
+              {lineItems[0]?.productName || 'N/A'}
+            </div>
+          </div>
+          <div>
+            <div style={{ fontSize: '10px', color: '#888', textTransform: 'uppercase' }}>
+              Model Name
+            </div>
+            <div style={{ fontSize: '13px', fontWeight: '500' }}>
+              {lineItems[0]?.modelName || 'N/A'}
+            </div>
+          </div>
+          <div>
+            <div style={{ fontSize: '10px', color: '#888', textTransform: 'uppercase' }}>
+              Model Number
+            </div>
+            <div style={{ fontSize: '13px', fontWeight: '500' }}>
+              {lineItems[0]?.modelNo || lineItems[0]?.model || 'N/A'}
             </div>
           </div>
           <div>
             <div style={{ fontSize: '10px', color: '#888', textTransform: 'uppercase' }}>
               Serial Number
             </div>
-            <div style={{ fontSize: '13px', fontWeight: '700' }}>{lineItems[0]?.slNo || 'TBD'}</div>
+            <div style={{ fontSize: '13px', fontWeight: '500' }}>{lineItems[0]?.slNo || 'TBD'}</div>
           </div>
         </div>
       </div>
@@ -379,16 +436,10 @@ const LeaseNormalQuotation: React.FC<LeaseNormalQuotationProps> = ({
                   >
                     <div
                       style={{
-                        fontSize: '13px',
-                        fontWeight: '800',
-                        color: '#dc2626',
-                        textTransform: 'uppercase',
-                        marginBottom: '6px',
+                        whiteSpace: 'pre-wrap',
+                        marginBottom: item.features?.length ? '12px' : '0',
                       }}
                     >
-                      Product Description
-                    </div>
-                    <div style={{ marginBottom: item.features?.length ? '12px' : '0' }}>
                       {item.description}
                     </div>
                     {(item.features || []).length > 0 && (
@@ -397,7 +448,7 @@ const LeaseNormalQuotation: React.FC<LeaseNormalQuotationProps> = ({
                           style={{
                             fontSize: '13px',
                             fontWeight: '800',
-                            color: '#dc2626',
+                            color: '#10b981',
                             textTransform: 'uppercase',
                             marginBottom: '6px',
                             marginTop: '16px',
@@ -851,44 +902,102 @@ const LeaseNormalQuotation: React.FC<LeaseNormalQuotationProps> = ({
               Xerocare Trading &amp; Services W.L.L
             </span>
           </div>
+
+          {lineItems?.[0]?.productImage && (
+            <div style={{ marginTop: '20px' }}>
+              <img
+                src={lineItems[0].productImage}
+                alt="Product"
+                style={{
+                  maxWidth: '600px',
+                  maxHeight: '400px',
+                  objectFit: 'contain',
+                  filter: 'grayscale(100%)',
+                  opacity: 0.8,
+                }}
+              />
+            </div>
+          )}
         </div>
         <div style={{ width: '280px' }}>
           <div style={{ padding: '0 15px' }}>
             <div
               style={{
                 display: 'flex',
-                justifyContent: 'space-between',
+                flexDirection: 'column',
                 marginBottom: '8px',
-                fontSize: '13px',
               }}
             >
-              <span style={{ color: '#666' }}>Total Lease Value</span>
-              <span style={{ fontWeight: '600' }}>{fmt(totals.subTotal)}</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
+                <span style={{ color: '#666' }}>Total Lease Value</span>
+                <span style={{ color: '#000', fontWeight: '700' }}>{fmt(totals.subTotal)}</span>
+              </div>
+              <div
+                style={{
+                  fontSize: '9px',
+                  color: '#111827',
+                  fontStyle: 'italic',
+                  textAlign: 'right',
+                }}
+              >
+                {numberToWords(totals.subTotal)}
+              </div>
             </div>
+
             <div
               style={{
                 display: 'flex',
-                justifyContent: 'space-between',
+                flexDirection: 'column',
                 marginBottom: '10px',
                 borderBottom: '1px solid #ddd',
                 paddingBottom: '8px',
-                fontSize: '13px',
               }}
             >
-              <span style={{ color: '#666' }}>Total Tax (0%)</span>
-              <span style={{ fontWeight: '600' }}>{fmt(totals.tax)}</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
+                <span style={{ color: '#666' }}>Total Tax (0%)</span>
+                <span style={{ color: '#000', fontWeight: '700' }}>{fmt(totals.tax)}</span>
+              </div>
+              <div
+                style={{
+                  fontSize: '9px',
+                  color: '#111827',
+                  fontStyle: 'italic',
+                  textAlign: 'right',
+                }}
+              >
+                {numberToWords(totals.tax)}
+              </div>
             </div>
+
             <div
               style={{
                 display: 'flex',
-                justifyContent: 'space-between',
-                fontSize: '18px',
-                fontWeight: '900',
+                flexDirection: 'column',
                 color: ACCENT,
               }}
             >
-              <span>TOTAL</span>
-              <span>QAR {fmt(totals.total)}</span>
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  fontSize: '18px',
+                  fontWeight: '900',
+                }}
+              >
+                <span>TOTAL</span>
+                <span>QAR {fmt(totals.total)}</span>
+              </div>
+              <div
+                style={{
+                  fontSize: '10px',
+                  color: '#111827',
+                  fontStyle: 'italic',
+                  textAlign: 'right',
+                  marginTop: '2px',
+                }}
+              >
+                {numberToWords(totals.total)}
+              </div>
             </div>
           </div>
 
@@ -899,10 +1008,45 @@ const LeaseNormalQuotation: React.FC<LeaseNormalQuotationProps> = ({
             <div style={{ fontSize: '22px', fontWeight: '900', color: '#111' }}>
               QAR {fmt(leaseDetails.monthlyEmi)}
             </div>
+            <div
+              style={{
+                fontSize: '10px',
+                color: '#888',
+                fontStyle: 'italic',
+                textAlign: 'right',
+                marginTop: '4px',
+              }}
+            >
+              {numberToWords(leaseDetails.monthlyEmi)}
+            </div>
           </div>
         </div>
       </div>
-
+      <div
+        style={{
+          fontSize: '12px',
+          marginTop: '30px',
+          marginBottom: '40px',
+          lineHeight: '1.6',
+          color: '#333',
+        }}
+      >
+        <div style={{ marginBottom: '15px' }}>
+          for any further clarifications please feel free to contact the undersigned on{' '}
+          <span style={{ color: ACCENT }}>mob: 70717282</span> or{' '}
+          <span style={{ color: ACCENT }}>email:mail@xerocare.com</span>
+        </div>
+        <div style={{ marginTop: '10px' }}>
+          with warm regards,
+          <br />
+          <strong style={{ display: 'block', marginTop: '4px', color: ACCENT }}>
+            For
+            <br />
+            Xerocare Trading&services WLL
+          </strong>
+          DOHA QTAR
+        </div>
+      </div>
       {/* ─── SIGNATURE ─── */}
       <div
         style={{
@@ -934,6 +1078,23 @@ const LeaseNormalQuotation: React.FC<LeaseNormalQuotationProps> = ({
             </div>
           </div>
         </div>
+      </div>
+
+      {/* ─── FOOTER ─── */}
+      <div
+        style={{
+          marginTop: 'auto',
+          borderTop: `2px solid ${ACCENT}`,
+          paddingTop: '15px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          fontSize: '11px',
+          color: '#666',
+        }}
+      >
+        <div>www.xerocare.com</div>
+        <div>37494,Doha-qatar</div>
+        <div>mail@xerocare.com | +974 7071 7282 (+٩٧٤ ٧٠٧١ ٧٢٨٢)</div>
       </div>
     </div>
   );

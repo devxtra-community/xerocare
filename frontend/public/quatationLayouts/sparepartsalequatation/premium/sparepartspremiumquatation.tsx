@@ -2,7 +2,8 @@ import React from 'react';
 
 export interface QuotationLineItem {
   brand: string;
-  modelNo: string;
+  modelNo?: string;
+  modelName?: string;
   slNo: string;
   description: string;
   qty: number;
@@ -14,6 +15,8 @@ export interface QuotationLineItem {
   productName?: string;
   discount?: number;
   mpn?: string;
+  warranty?: string;
+  features?: { subHeading: string; description: string }[];
 }
 
 export interface SparePartsPremiumQuotationProps {

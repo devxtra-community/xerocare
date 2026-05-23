@@ -54,6 +54,8 @@ export const addproduct = async (req: Request, res: Response, next: NextFunction
       description,
       features,
       hs_code,
+      warranty,
+      consumables,
     } = req.body;
 
     let parsedFeatures;
@@ -65,6 +67,17 @@ export const addproduct = async (req: Request, res: Response, next: NextFunction
       }
     } else {
       parsedFeatures = features;
+    }
+
+    let parsedConsumables;
+    if (typeof consumables === 'string') {
+      try {
+        parsedConsumables = JSON.parse(consumables);
+      } catch {
+        parsedConsumables = [];
+      }
+    } else {
+      parsedConsumables = consumables;
     }
 
     if (!model_id || !warehouse_id || !vendor_id || !serial_no || !name || !brand || !MFD) {
@@ -104,6 +117,8 @@ export const addproduct = async (req: Request, res: Response, next: NextFunction
       description,
       features: parsedFeatures,
       hs_code,
+      warranty,
+      consumables: parsedConsumables,
     });
     res
       .status(200)
@@ -190,6 +205,14 @@ export const updateproduct = async (req: Request, res: Response, next: NextFunct
         payload.features = JSON.parse(payload.features);
       } catch {
         payload.features = [];
+      }
+    }
+
+    if (typeof payload.consumables === 'string') {
+      try {
+        payload.consumables = JSON.parse(payload.consumables);
+      } catch {
+        payload.consumables = [];
       }
     }
 
