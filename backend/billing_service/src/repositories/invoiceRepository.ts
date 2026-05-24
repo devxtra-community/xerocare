@@ -167,6 +167,11 @@ export class InvoiceRepository {
       qb.andWhere('invoice.branchId = :branchId', { branchId });
     }
 
+    qb.andWhere('invoice.isTemplate = :isTemplate', { isTemplate: false });
+    qb.andWhere('invoice.status NOT IN (:...excludedStatuses)', {
+      excludedStatuses: ['TEMPLATE', 'RETAKEN', 'SUPERSEDED'],
+    });
+
     qb.andWhere(
       new Brackets((innerQb) => {
         innerQb
@@ -197,6 +202,10 @@ export class InvoiceRepository {
           .where('usage."contractId" = invoice.id');
       }, 'calculatedTotal');
     qb.where('invoice.createdBy = :createdBy', { createdBy });
+    qb.andWhere('invoice.isTemplate = :isTemplate', { isTemplate: false });
+    qb.andWhere('invoice.status NOT IN (:...excludedStatuses)', {
+      excludedStatuses: ['TEMPLATE', 'RETAKEN', 'SUPERSEDED'],
+    });
 
     qb.andWhere(
       new Brackets((innerQb) => {
@@ -232,6 +241,10 @@ export class InvoiceRepository {
           .where('usage."contractId" = invoice.id');
       }, 'calculatedTotal')
       .where('invoice.branchId = :branchId', { branchId })
+      .andWhere('invoice.isTemplate = :isTemplate', { isTemplate: false })
+      .andWhere('invoice.status NOT IN (:...excludedStatuses)', {
+        excludedStatuses: ['TEMPLATE', 'RETAKEN', 'SUPERSEDED'],
+      })
       .orderBy('invoice.createdAt', 'DESC');
 
     qb.andWhere(

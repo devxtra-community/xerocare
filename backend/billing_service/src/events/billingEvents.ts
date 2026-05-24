@@ -3,6 +3,7 @@ export enum BillingEventType {
   INVOICE_PAID = 'billing.invoice.paid',
   NOTIFICATION_EMAIL = 'notification.email.request',
   NOTIFICATION_WHATSAPP = 'notification.whatsapp.request',
+  NOTIFICATION_IN_APP = 'notification.in_app.request',
 }
 
 export interface InvoiceCreatedEvent {
@@ -26,4 +27,13 @@ export interface NotificationRequestEvent {
   invoiceId?: string; // Useful for linking
   attachmentUrl?: string; // Link to Invoice PDF
   attachments?: { filename: string; content: string; encoding: string }[]; // Base64 Buffer attachments
+}
+
+export interface InAppNotificationRequestEvent {
+  recipients?: string[];
+  notifyAdmins?: boolean;
+  title: string;
+  message: string;
+  type?: string;
+  data?: unknown;
 }

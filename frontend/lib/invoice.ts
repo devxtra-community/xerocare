@@ -890,3 +890,94 @@ export const convertToTransaction = async (id: string): Promise<Invoice> => {
   const response = await api.post(`/b/invoices/${id}/convert-to-transaction`);
   return response.data.data;
 };
+
+/**
+ * Create a new quotation template (Manager/Admin).
+ */
+export const createQuotationTemplate = async (payload: CreateInvoicePayload): Promise<Invoice> => {
+  const response = await api.post('/b/invoices/quotation/template', payload);
+  return response.data.data;
+};
+
+/**
+ * Get all quotation templates (Manager/Admin).
+ */
+export const getQuotationTemplates = async (): Promise<Invoice[]> => {
+  const response = await api.get('/b/invoices/quotation/template');
+  return response.data.data;
+};
+
+/**
+ * Assign a quotation template to employees (Manager/Admin).
+ */
+export const assignQuotationTemplate = async (
+  id: string,
+  employeeIds: string[],
+): Promise<unknown> => {
+  const response = await api.post(`/b/invoices/quotation/template/${id}/assign`, { employeeIds });
+  return response.data.data;
+};
+
+/**
+ * Get all assignments for a template (Manager/Admin).
+ */
+export const getTemplateAssignments = async (
+  id: string,
+): Promise<
+  Array<{
+    id: string;
+    templateId: string;
+    assignedEmployeeId: string;
+    assignedEmployeeName: string;
+    assignedAt: string;
+    status: string;
+    customerName?: string;
+    invoiceNumber: string;
+  }>
+> => {
+  const response = await api.get(`/b/invoices/quotation/template/${id}/assignments`);
+  return response.data.data;
+};
+
+/**
+ * Retake a quotation assignment (Manager/Admin).
+ */
+export const retakeQuotationAssignment = async (id: string): Promise<unknown> => {
+  const response = await api.post(`/b/invoices/quotation/${id}/retake`);
+  return response.data.data;
+};
+
+/**
+ * Retake all assignments for a template (Manager/Admin).
+ */
+export const bulkRetakeQuotationAssignments = async (id: string): Promise<unknown> => {
+  const response = await api.post(`/b/invoices/quotation/template/${id}/retake-all`);
+  return response.data.data;
+};
+
+/**
+ * Assign a customer to an assigned quotation (Employee).
+ */
+export const assignCustomerToQuotation = async (
+  id: string,
+  payload: { customerId: string; notes?: string },
+): Promise<Invoice> => {
+  const response = await api.post(`/b/invoices/quotation/${id}/assign-customer`, payload);
+  return response.data.data;
+};
+
+/**
+ * Get all employee assigned quotations.
+ */
+export const getEmployeeAssignedQuotations = async (): Promise<Invoice[]> => {
+  const response = await api.get('/b/invoices/quotation/assigned');
+  return response.data.data;
+};
+
+/**
+ * Soft deletes a quotation template.
+ */
+export const deleteInvoice = async (id: string): Promise<unknown> => {
+  const response = await api.delete(`/b/invoices/${id}`);
+  return response.data.data;
+};

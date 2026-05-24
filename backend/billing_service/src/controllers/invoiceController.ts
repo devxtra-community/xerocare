@@ -1128,3 +1128,181 @@ export const createDirectSale = async (req: Request, res: Response, next: NextFu
     next(error);
   }
 };
+
+export const createQuotationTemplate = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { branchId, employeeId, createdBy, ...payload } = req.body;
+
+    if (branchId || employeeId || createdBy) {
+      throw new AppError(
+        'Security Violation: branchId, employeeId, and createdBy must not be provided in request body',
+        400,
+      );
+    }
+
+    if (!req.user || !req.user.userId || !req.user.branchId) {
+      throw new AppError('User context missing or incomplete', 401);
+    }
+
+    const { pricingItems, rentType, saleType, items } = payload;
+
+    if (!saleType) {
+      throw new AppError('Invalid request payload: saleType is required', 400);
+    }
+
+    if (['SALE', 'PRODUCT_SALE', 'SPAREPART_SALE'].includes(saleType)) {
+      if (!items || !Array.isArray(items) || items.length === 0) {
+        throw new AppError(`Invalid request payload: items array is required for ${saleType}`, 400);
+      }
+    } else if (saleType === 'LEASE') {
+      if (!payload.leaseType || (!payload.leaseTenureMonths && payload.leaseTenureMonths !== 0)) {
+        throw new AppError(
+          'Invalid request payload: leaseType and leaseTenureMonths are required for LEASE',
+          400,
+        );
+      }
+    } else if (saleType === 'RENT') {
+      if (!pricingItems || !rentType) {
+        throw new AppError(
+          'Invalid request payload: pricingItems and rentType are required for RENT',
+          400,
+        );
+      }
+    } else {
+      throw new AppError(`Invalid request payload: unsupported saleType ${saleType}`, 400);
+    }
+
+    const template = await billingService.createQuotationTemplate({
+      ...payload,
+      branchId: req.user.branchId,
+      createdBy: req.user.userId,
+    });
+
+    return res.status(201).json({ success: true, data: template });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getQuotationTemplates = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const templates = await billingService.getQuotationTemplates();
+    return res.status(200).json({ success: true, data: templates });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const assignQuotationTemplate = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = req.params.id as string;
+    const { employeeIds } = req.body;
+
+    if (!employeeIds || !Array.isArray(employeeIds) || employeeIds.length === 0) {
+      throw new AppError('employeeIds must be a non-empty array', 400);
+    }
+
+    if (!req.user || !req.user.userId) {
+      throw new AppError('User context missing or incomplete', 401);
+    }
+
+    await billingService.assignQuotationTemplate(id, employeeIds, req.user.userId);
+    return res.status(200).json({ success: true });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getTemplateAssignments = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = req.params.id as string;
+    const assignments = await billingService.getTemplateAssignments(id);
+    return res.status(200).json({ success: true, data: assignments });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const assignCustomerToQuotation = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const id = req.params.id as string;
+    const { customerId, discountAmount, notes } = req.body;
+
+    if (!customerId) {
+      throw new AppError('customerId is required', 400);
+    }
+
+    if (!req.user || !req.user.userId) {
+      throw new AppError('User context missing or incomplete', 401);
+    }
+
+    const result = await billingService.assignCustomerToQuotation(
+      id,
+      customerId,
+      discountAmount !== undefined ? Number(discountAmount) : undefined,
+      notes,
+      req.user,
+    );
+
+    return res.status(200).json({ success: true, data: result });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const retakeQuotationAssignment = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const id = req.params.id as string;
+    if (!req.user || !req.user.userId) {
+      throw new AppError('User context missing or incomplete', 401);
+    }
+
+    const result = await billingService.retakeQuotationAssignment(id, req.user.userId);
+    return res.status(200).json({ success: true, data: result });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const bulkRetakeQuotationAssignments = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const id = req.params.id as string; // templateId
+    if (!req.user || !req.user.userId) {
+      throw new AppError('User context missing or incomplete', 401);
+    }
+
+    await billingService.bulkRetakeQuotationAssignments(id, req.user.userId);
+    return res.status(200).json({ success: true });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getEmployeeAssignedQuotations = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    if (!req.user || !req.user.userId) {
+      throw new AppError('User context missing or incomplete', 401);
+    }
+
+    const result = await billingService.getEmployeeAssignedQuotations(req.user.userId);
+    return res.status(200).json({ success: true, data: result });
+  } catch (error) {
+    next(error);
+  }
+};

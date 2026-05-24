@@ -1,4 +1,7 @@
 import { InvoiceRepository } from '../repositories/invoiceRepository';
+import { In, Raw } from 'typeorm';
+import { Source } from '../config/dataSource';
+import { QuotationTemplateAssignment } from '../entities/quotationTemplateAssignmentEntity';
 // import { getRabbitChannel } from '../config/rabbitmq';
 import { InvoiceStatus } from '../entities/enums/invoiceStatus';
 import { InvoiceItem } from '../entities/invoiceItemEntity';
@@ -2405,6 +2408,477 @@ export class BillingService {
       throw error;
     } finally {
       await queryRunner.release();
+    }
+  }
+
+  // --- Manager Quotation Template & Assignment System ---
+
+  async createQuotationTemplate(
+    payload: Record<string, unknown> & { maxDiscountAllowed?: number | string },
+  ): Promise<Invoice> {
+    const template = await this.createQuotation({
+      ...payload,
+      customerId: undefined,
+    } as unknown as Parameters<BillingService['createQuotation']>[0]);
+    template.isTemplate = true;
+    template.status = InvoiceStatus.TEMPLATE;
+    template.maxDiscountAllowed = payload.maxDiscountAllowed
+      ? Number(payload.maxDiscountAllowed)
+      : 0;
+    await this.invoiceRepo.save(template);
+    return template;
+  }
+
+  async getQuotationTemplates(): Promise<Invoice[]> {
+    const qb = Source.getRepository(Invoice)
+      .createQueryBuilder('invoice')
+      .leftJoinAndSelect('invoice.items', 'items')
+      .where('invoice.isTemplate = :isTemplate', { isTemplate: true })
+      .orderBy('invoice.createdAt', 'DESC');
+    return qb.getMany();
+  }
+
+  async assignQuotationTemplate(
+    templateId: string,
+    employeeIds: string[],
+    userId: string,
+  ): Promise<void> {
+    const template = await this.invoiceRepo.findById(templateId);
+    if (!template) {
+      throw new AppError('Template not found', 404);
+    }
+
+    const assignmentRepo = Source.getRepository(QuotationTemplateAssignment);
+
+    for (const employeeId of employeeIds) {
+      // Check if this assignment already exists
+      const existingAssignment = await assignmentRepo.findOne({
+        where: { templateId, employeeId },
+      });
+
+      if (existingAssignment) {
+        continue;
+      }
+
+      // Create new join record
+      const assignment = assignmentRepo.create({
+        templateId,
+        employeeId,
+        assignedBy: userId,
+      });
+      await assignmentRepo.save(assignment);
+
+      // Clone template to create ASSIGNED invoice for the employee
+      const invoiceNumber = await this.invoiceRepo.generateInvoiceNumber();
+
+      // Clone items
+      const clonedItems = (template.items || []).map((item) => {
+        const newItem = new InvoiceItem();
+        newItem.description = item.description;
+        newItem.itemType = item.itemType;
+        newItem.bwIncludedLimit = item.bwIncludedLimit;
+        newItem.colorIncludedLimit = item.colorIncludedLimit;
+        newItem.combinedIncludedLimit = item.combinedIncludedLimit;
+        newItem.bwExcessRate = item.bwExcessRate;
+        newItem.colorExcessRate = item.colorExcessRate;
+        newItem.combinedExcessRate = item.combinedExcessRate;
+        newItem.bwSlabRanges = item.bwSlabRanges;
+        newItem.colorSlabRanges = item.colorSlabRanges;
+        newItem.comboSlabRanges = item.comboSlabRanges;
+        newItem.quantity = item.quantity;
+        newItem.unitPrice = item.unitPrice;
+        newItem.productId = item.productId;
+        newItem.sparePartId = item.sparePartId;
+        newItem.serialNumber = item.serialNumber;
+        newItem.modelId = item.modelId;
+        return newItem;
+      });
+
+      const clone = await this.invoiceRepo.createInvoice({
+        invoiceNumber,
+        branchId: template.branchId,
+        createdBy: employeeId,
+        saleType: template.saleType,
+        type: InvoiceType.QUOTATION,
+        status: InvoiceStatus.ASSIGNED,
+        rentType: template.rentType,
+        rentPeriod: template.rentPeriod,
+        monthlyRent: template.monthlyRent,
+        advanceAmount: template.advanceAmount,
+        discountPercent: template.discountPercent,
+        effectiveFrom: template.effectiveFrom,
+        effectiveTo: template.effectiveTo,
+        billingCycleInDays: template.billingCycleInDays,
+        leaseType: template.leaseType,
+        leaseTenureMonths: template.leaseTenureMonths,
+        totalLeaseAmount: template.totalLeaseAmount,
+        monthlyEmiAmount: template.monthlyEmiAmount,
+        monthlyLeaseAmount: template.monthlyLeaseAmount,
+        securityDepositAmount: template.securityDepositAmount,
+        securityDepositMode: template.securityDepositMode,
+        securityDepositReference: template.securityDepositReference,
+        securityDepositDate: template.securityDepositDate,
+        securityDepositBank: template.securityDepositBank,
+        layoutId: template.layoutId,
+        notes: template.notes,
+        totalAmount: template.totalAmount,
+        isTemplate: false,
+        templateId,
+        assignedEmployeeId: employeeId,
+        maxDiscountAllowed: template.maxDiscountAllowed,
+        assignedAt: new Date(),
+        assignedBy: userId,
+        items: clonedItems,
+      });
+
+      // Publish in-app assignment notification to the employee
+      try {
+        const { NotificationPublisher } = await import('../events/publisher/notificationPublisher');
+        await NotificationPublisher.publishInAppRequest({
+          recipients: [employeeId],
+          title: '📋 New Quotation Assigned',
+          message: `Manager assigned you a new quotation template (Reference: ${template.invoiceNumber}).`,
+          type: 'INFO',
+          data: { quotationId: clone.id },
+        });
+      } catch (err) {
+        logger.error('Failed to publish assignment notification', err);
+      }
+    }
+  }
+
+  async getTemplateAssignments(templateId: string): Promise<unknown[]> {
+    const assignments = await Source.getRepository(QuotationTemplateAssignment).find({
+      where: { templateId },
+      order: { assignedAt: 'DESC' },
+    });
+
+    const result = [];
+    const invoiceRepo = Source.getRepository(Invoice);
+
+    for (const assignment of assignments) {
+      const clones = await invoiceRepo.find({
+        where: { templateId, assignedEmployeeId: assignment.employeeId },
+        order: { createdAt: 'DESC' },
+        withDeleted: true,
+      });
+
+      let displayStatus = 'Pending Customer';
+      let cloneId = null;
+      let customerId = null;
+
+      if (clones.length > 0) {
+        const latestClone = clones[0];
+        cloneId = latestClone.id;
+        customerId = latestClone.customerId;
+
+        if (latestClone.deletedAt) {
+          displayStatus = 'Deleted';
+        } else if (latestClone.status === InvoiceStatus.ASSIGNED && !latestClone.customerId) {
+          displayStatus = 'Pending Customer';
+        } else if (latestClone.status === InvoiceStatus.DRAFT) {
+          displayStatus = 'Draft';
+        } else if (latestClone.status === InvoiceStatus.SUPERSEDED) {
+          displayStatus = 'Superseded';
+        } else if (latestClone.status === InvoiceStatus.RETAKEN) {
+          displayStatus = 'Retaken';
+        } else {
+          displayStatus = latestClone.status;
+        }
+      }
+
+      result.push({
+        id: assignment.id,
+        employeeId: assignment.employeeId,
+        assignedAt: assignment.assignedAt,
+        assignedBy: assignment.assignedBy,
+        cloneId,
+        customerId,
+        status: displayStatus,
+      });
+    }
+
+    return result;
+  }
+
+  async assignCustomerToQuotation(
+    id: string,
+    customerId: string,
+    discountAmount: number | undefined,
+    notes: string | undefined,
+    user: { role: string; userId: string },
+  ): Promise<Invoice> {
+    const quotation = await this.invoiceRepo.findById(id);
+    if (!quotation) {
+      throw new AppError('Quotation not found', 404);
+    }
+
+    if (user.role === 'EMPLOYEE' && quotation.assignedEmployeeId !== user.userId) {
+      throw new AppError('Forbidden: You can only edit your own assigned quotations', 403);
+    }
+
+    if (quotation.templateId && quotation.assignedEmployeeId) {
+      const existingActive = await Source.getRepository(Invoice).findOne({
+        where: {
+          templateId: quotation.templateId,
+          assignedEmployeeId: quotation.assignedEmployeeId,
+          customerId,
+          status: Raw((alias) => `${alias} NOT IN ('SUPERSEDED', 'RETAKEN')`),
+        },
+      });
+
+      if (existingActive && existingActive.id !== quotation.id) {
+        throw new AppError('This customer is already assigned to this template for you.', 400);
+      }
+    }
+
+    if (discountAmount !== undefined && quotation.maxDiscountAllowed !== undefined) {
+      if (Number(discountAmount) > Number(quotation.maxDiscountAllowed)) {
+        throw new AppError(
+          `Discount exceeds maximum allowed limit of QAR ${quotation.maxDiscountAllowed}.`,
+          400,
+        );
+      }
+    }
+
+    const finalDiscount =
+      discountAmount !== undefined ? Number(discountAmount) : Number(quotation.discountAmount || 0);
+
+    if (!quotation.customerId) {
+      quotation.customerId = customerId;
+      quotation.discountAmount = finalDiscount;
+      if (notes !== undefined) quotation.notes = notes;
+      quotation.status = InvoiceStatus.DRAFT;
+
+      if (
+        [SaleType.SALE, SaleType.PRODUCT_SALE, SaleType.SPAREPART_SALE].includes(quotation.saleType)
+      ) {
+        const grossAmount = Number(quotation.grossAmount || quotation.totalAmount || 0);
+        quotation.totalAmount = grossAmount - finalDiscount;
+      }
+
+      await this.invoiceRepo.save(quotation);
+      return quotation;
+    }
+
+    if (quotation.customerId !== customerId) {
+      const invoiceNumber = await this.invoiceRepo.generateInvoiceNumber();
+
+      const clonedItems = (quotation.items || []).map((item) => {
+        const newItem = new InvoiceItem();
+        newItem.description = item.description;
+        newItem.itemType = item.itemType;
+        newItem.bwIncludedLimit = item.bwIncludedLimit;
+        newItem.colorIncludedLimit = item.colorIncludedLimit;
+        newItem.combinedIncludedLimit = item.combinedIncludedLimit;
+        newItem.bwExcessRate = item.bwExcessRate;
+        newItem.colorExcessRate = item.colorExcessRate;
+        newItem.combinedExcessRate = item.combinedExcessRate;
+        newItem.bwSlabRanges = item.bwSlabRanges;
+        newItem.colorSlabRanges = item.colorSlabRanges;
+        newItem.comboSlabRanges = item.comboSlabRanges;
+        newItem.quantity = item.quantity;
+        newItem.unitPrice = item.unitPrice;
+        newItem.productId = item.productId;
+        newItem.sparePartId = item.sparePartId;
+        newItem.serialNumber = item.serialNumber;
+        newItem.modelId = item.modelId;
+        return newItem;
+      });
+
+      const clone = await this.invoiceRepo.createInvoice({
+        invoiceNumber,
+        branchId: quotation.branchId,
+        createdBy: quotation.createdBy,
+        customerId,
+        saleType: quotation.saleType,
+        type: InvoiceType.QUOTATION,
+        status: InvoiceStatus.DRAFT,
+        rentType: quotation.rentType,
+        rentPeriod: quotation.rentPeriod,
+        monthlyRent: quotation.monthlyRent,
+        advanceAmount: quotation.advanceAmount,
+        discountPercent: quotation.discountPercent,
+        effectiveFrom: quotation.effectiveFrom,
+        effectiveTo: quotation.effectiveTo,
+        billingCycleInDays: quotation.billingCycleInDays,
+        leaseType: quotation.leaseType,
+        leaseTenureMonths: quotation.leaseTenureMonths,
+        totalLeaseAmount: quotation.totalLeaseAmount,
+        monthlyEmiAmount: quotation.monthlyEmiAmount,
+        monthlyLeaseAmount: quotation.monthlyLeaseAmount,
+        securityDepositAmount: quotation.securityDepositAmount,
+        securityDepositMode: quotation.securityDepositMode,
+        securityDepositReference: quotation.securityDepositReference,
+        securityDepositDate: quotation.securityDepositDate,
+        securityDepositBank: quotation.securityDepositBank,
+        layoutId: quotation.layoutId,
+        notes: notes !== undefined ? notes : quotation.notes,
+        isTemplate: false,
+        templateId: quotation.templateId,
+        assignedEmployeeId: quotation.assignedEmployeeId,
+        maxDiscountAllowed: quotation.maxDiscountAllowed,
+        assignedAt: quotation.assignedAt,
+        assignedBy: quotation.assignedBy,
+        discountAmount: finalDiscount,
+        totalAmount: [SaleType.SALE, SaleType.PRODUCT_SALE, SaleType.SPAREPART_SALE].includes(
+          quotation.saleType,
+        )
+          ? Number(quotation.grossAmount || 0) - finalDiscount
+          : quotation.totalAmount,
+        grossAmount: quotation.grossAmount,
+        items: clonedItems,
+      });
+
+      quotation.status = InvoiceStatus.SUPERSEDED;
+      await this.invoiceRepo.save(quotation);
+
+      try {
+        const { NotificationPublisher } = await import('../events/publisher/notificationPublisher');
+        await NotificationPublisher.publishInAppRequest({
+          recipients: [quotation.createdBy],
+          title: '🔄 Customer Swapped on Quotation',
+          message: `Quotation ${quotation.invoiceNumber} has been updated with a new customer. A new draft has been created: ${clone.invoiceNumber}.`,
+          type: 'INFO',
+          data: { oldQuotationId: quotation.id, newQuotationId: clone.id },
+        });
+      } catch (err) {
+        logger.error('Failed to publish customer swap notification', err);
+      }
+
+      return clone;
+    }
+
+    quotation.discountAmount = finalDiscount;
+    if (notes !== undefined) quotation.notes = notes;
+
+    if (
+      [SaleType.SALE, SaleType.PRODUCT_SALE, SaleType.SPAREPART_SALE].includes(quotation.saleType)
+    ) {
+      const grossAmount = Number(quotation.grossAmount || quotation.totalAmount || 0);
+      quotation.totalAmount = grossAmount - finalDiscount;
+    }
+
+    await this.invoiceRepo.save(quotation);
+    return quotation;
+  }
+
+  async retakeQuotationAssignment(id: string, userId: string): Promise<Invoice> {
+    const quotation = await this.invoiceRepo.findById(id);
+    if (!quotation) {
+      throw new AppError('Quotation not found', 404);
+    }
+
+    quotation.status = InvoiceStatus.RETAKEN;
+    quotation.retakenAt = new Date();
+    quotation.retakenBy = userId;
+    await this.invoiceRepo.save(quotation);
+
+    try {
+      const { NotificationPublisher } = await import('../events/publisher/notificationPublisher');
+      await NotificationPublisher.publishInAppRequest({
+        recipients: [quotation.createdBy],
+        title: '⚠️ Quotation Assignment Retaken',
+        message: `Quotation assignment (${quotation.invoiceNumber}) has been retaken by your manager.`,
+        type: 'WARNING',
+        data: { quotationId: quotation.id },
+      });
+    } catch (err) {
+      logger.error('Failed to publish retake notification', err);
+    }
+
+    return quotation;
+  }
+
+  async bulkRetakeQuotationAssignments(templateId: string, userId: string): Promise<void> {
+    const invoices = await Source.getRepository(Invoice).find({
+      where: {
+        templateId,
+        status: In([InvoiceStatus.ASSIGNED, InvoiceStatus.DRAFT]),
+      },
+    });
+
+    for (const quotation of invoices) {
+      quotation.status = InvoiceStatus.RETAKEN;
+      quotation.retakenAt = new Date();
+      quotation.retakenBy = userId;
+      await this.invoiceRepo.save(quotation);
+
+      try {
+        const { NotificationPublisher } = await import('../events/publisher/notificationPublisher');
+        await NotificationPublisher.publishInAppRequest({
+          recipients: [quotation.createdBy],
+          title: '⚠️ Quotation Assignment Retaken',
+          message: `Quotation assignment (${quotation.invoiceNumber}) has been retaken by your manager.`,
+          type: 'WARNING',
+          data: { quotationId: quotation.id },
+        });
+      } catch (err) {
+        logger.error('Failed to publish retake notification', err);
+      }
+    }
+  }
+
+  async getEmployeeAssignedQuotations(employeeId: string): Promise<Invoice[]> {
+    const qb = Source.getRepository(Invoice)
+      .createQueryBuilder('invoice')
+      .leftJoinAndSelect('invoice.items', 'items')
+      .where('invoice.assignedEmployeeId = :employeeId', { employeeId })
+      .andWhere('invoice.isTemplate = :isTemplate', { isTemplate: false })
+      .orderBy('invoice.createdAt', 'DESC');
+    return qb.getMany();
+  }
+
+  async deleteInvoice(id: string): Promise<void> {
+    const invoice = await this.invoiceRepo.findById(id);
+    if (!invoice) {
+      throw new AppError('Invoice not found', 404);
+    }
+
+    if (invoice.isTemplate) {
+      const activeClones = await Source.getRepository(Invoice).find({
+        where: {
+          templateId: id,
+          isTemplate: false,
+        },
+      });
+
+      const progressed = activeClones.filter(
+        (clone) =>
+          ![
+            InvoiceStatus.ASSIGNED,
+            InvoiceStatus.DRAFT,
+            InvoiceStatus.RETAKEN,
+            InvoiceStatus.SUPERSEDED,
+          ].includes(clone.status),
+      );
+
+      if (progressed.length > 0) {
+        throw new AppError(
+          'Cannot delete template: assignments have progressed beyond DRAFT stage.',
+          400,
+        );
+      }
+
+      await Source.getRepository(Invoice).softRemove(invoice);
+
+      await Source.getRepository(QuotationTemplateAssignment).delete({ templateId: id });
+
+      if (activeClones.length > 0) {
+        await Source.getRepository(Invoice).softRemove(activeClones);
+      }
+    } else {
+      if (
+        ![
+          InvoiceStatus.ASSIGNED,
+          InvoiceStatus.DRAFT,
+          InvoiceStatus.RETAKEN,
+          InvoiceStatus.SUPERSEDED,
+        ].includes(invoice.status)
+      ) {
+        throw new AppError('Cannot delete progressed invoices.', 400);
+      }
+      await Source.getRepository(Invoice).softRemove(invoice);
     }
   }
 }

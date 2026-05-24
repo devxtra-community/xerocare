@@ -38,6 +38,14 @@ import {
   financeApproveQuotation,
   convertToTransaction,
   createDirectSale,
+  createQuotationTemplate,
+  getQuotationTemplates,
+  assignQuotationTemplate,
+  getTemplateAssignments,
+  assignCustomerToQuotation,
+  retakeQuotationAssignment,
+  bulkRetakeQuotationAssignments,
+  getEmployeeAssignedQuotations,
 } from '../controllers/invoiceController';
 
 /**
@@ -296,6 +304,51 @@ router.post('/direct-sale', requireRole(UserRole.EMPLOYEE), createDirectSale);
  * Update the details of a price estimate (Quotation).
  */
 router.put('/:id', requireRole(UserRole.EMPLOYEE), updateQuotation);
+
+// --- Manager Quotation Template & Assignment System ---
+router.post(
+  '/quotation/template',
+  requireRole(UserRole.MANAGER, UserRole.ADMIN),
+  createQuotationTemplate,
+);
+
+router.get(
+  '/quotation/template',
+  requireRole(UserRole.MANAGER, UserRole.ADMIN),
+  getQuotationTemplates,
+);
+
+router.get(
+  '/quotation/template/:id/assignments',
+  requireRole(UserRole.MANAGER, UserRole.ADMIN),
+  getTemplateAssignments,
+);
+
+router.post(
+  '/quotation/template/:id/assign',
+  requireRole(UserRole.MANAGER, UserRole.ADMIN),
+  assignQuotationTemplate,
+);
+
+router.post(
+  '/quotation/template/:id/retake-all',
+  requireRole(UserRole.MANAGER, UserRole.ADMIN),
+  bulkRetakeQuotationAssignments,
+);
+
+router.post(
+  '/quotation/:id/retake',
+  requireRole(UserRole.MANAGER, UserRole.ADMIN),
+  retakeQuotationAssignment,
+);
+
+router.post(
+  '/quotation/:id/assign-customer',
+  requireRole(UserRole.EMPLOYEE),
+  assignCustomerToQuotation,
+);
+
+router.get('/quotation/assigned', requireRole(UserRole.EMPLOYEE), getEmployeeAssignedQuotations);
 
 // --- 4. Notifications ---
 

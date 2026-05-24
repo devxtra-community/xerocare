@@ -44,6 +44,14 @@ import {
   updateStatus,
   customerRespond,
   requestValidityExtension,
+  createQuotationTemplate,
+  getQuotationTemplates,
+  assignQuotationTemplate,
+  getTemplateAssignments,
+  assignCustomerToQuotation,
+  retakeQuotationAssignment,
+  bulkRetakeQuotationAssignments,
+  getEmployeeAssignedQuotations,
 } from '../controllers/invoiceController';
 import { uploadMeterImage } from '../middlewares/uploadMiddleware';
 import { authMiddleware } from '../middlewares/authMiddleware';
@@ -87,6 +95,64 @@ router.post(
  * Update a price estimate if the customer wants to change something.
  */
 router.put('/quotation/:id', authMiddleware, requireRole(EmployeeRole.EMPLOYEE), updateQuotation);
+
+// --- Manager Quotation Template & Assignment System ---
+router.post(
+  '/quotation/template',
+  authMiddleware,
+  requireRole(EmployeeRole.MANAGER, EmployeeRole.ADMIN),
+  createQuotationTemplate,
+);
+
+router.get(
+  '/quotation/template',
+  authMiddleware,
+  requireRole(EmployeeRole.MANAGER, EmployeeRole.ADMIN),
+  getQuotationTemplates,
+);
+
+router.get(
+  '/quotation/template/:id/assignments',
+  authMiddleware,
+  requireRole(EmployeeRole.MANAGER, EmployeeRole.ADMIN),
+  getTemplateAssignments,
+);
+
+router.post(
+  '/quotation/template/:id/assign',
+  authMiddleware,
+  requireRole(EmployeeRole.MANAGER, EmployeeRole.ADMIN),
+  assignQuotationTemplate,
+);
+
+router.post(
+  '/quotation/template/:id/retake-all',
+  authMiddleware,
+  requireRole(EmployeeRole.MANAGER, EmployeeRole.ADMIN),
+  bulkRetakeQuotationAssignments,
+);
+
+router.post(
+  '/quotation/:id/retake',
+  authMiddleware,
+  requireRole(EmployeeRole.MANAGER, EmployeeRole.ADMIN),
+  retakeQuotationAssignment,
+);
+
+router.post(
+  '/quotation/:id/assign-customer',
+  authMiddleware,
+  requireRole(EmployeeRole.EMPLOYEE),
+  requireJob(EmployeeJob.SALES, EmployeeJob.RENT_LEASE),
+  assignCustomerToQuotation,
+);
+
+router.get(
+  '/quotation/assigned',
+  authMiddleware,
+  requireRole(EmployeeRole.EMPLOYEE),
+  getEmployeeAssignedQuotations,
+);
 
 /**
  * Download a professional premium PDF for a quotation.
