@@ -6,6 +6,7 @@ import {
   UpdateDateColumn,
   OneToMany,
   Index,
+  DeleteDateColumn,
 } from 'typeorm';
 import { InvoiceItem } from './invoiceItemEntity';
 import { InvoiceStatus } from './enums/invoiceStatus';
@@ -27,6 +28,11 @@ export enum SecurityDepositMode {
 
 @Entity('invoices')
 @Index(['contractStatus', 'type'], { where: "type = 'PROFORMA'" })
+@Index(['templateId', 'assignedEmployeeId', 'customerId'], {
+  unique: true,
+  where:
+    'status NOT IN (\'SUPERSEDED\', \'RETAKEN\') AND type = \'QUOTATION\' AND "templateId" IS NOT NULL AND "assignedEmployeeId" IS NOT NULL AND "customerId" IS NOT NULL',
+})
 export class Invoice {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
@@ -63,8 +69,8 @@ export class Invoice {
   @Column()
   createdBy!: string; // employeeId
 
-  @Column()
-  customerId!: string;
+  @Column({ nullable: true })
+  customerId?: string;
 
   @Column({ type: 'decimal', precision: 12, scale: 2, nullable: true })
   totalAmount!: number;
@@ -258,4 +264,35 @@ export class Invoice {
 
   @Column({ type: 'text', nullable: true })
   notes?: string;
+
+  // --- Manager Template & Assignment System ---
+  @Index()
+  @Column({ type: 'boolean', default: false })
+  isTemplate!: boolean;
+
+  @Index()
+  @Column({ type: 'uuid', nullable: true })
+  templateId?: string | null;
+
+  @Index()
+  @Column({ type: 'varchar', nullable: true })
+  assignedEmployeeId?: string | null;
+
+  @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
+  maxDiscountAllowed?: number;
+
+  @Column({ type: 'timestamp', nullable: true })
+  assignedAt?: Date;
+
+  @Column({ type: 'varchar', nullable: true })
+  assignedBy?: string;
+
+  @Column({ type: 'timestamp', nullable: true })
+  retakenAt?: Date | null;
+
+  @Column({ type: 'varchar', nullable: true })
+  retakenBy?: string | null;
+
+  @DeleteDateColumn()
+  deletedAt?: Date;
 }

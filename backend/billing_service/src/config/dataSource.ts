@@ -9,6 +9,7 @@ import { UsageRecord } from '../entities/usageRecordEntity';
 import { ProductAllocation } from '../entities/productAllocationEntity';
 import { ReturnCredit } from '../entities/returnCreditEntity';
 import { PaymentLedger } from '../entities/paymentLedgerEntity';
+import { QuotationTemplateAssignment } from '../entities/quotationTemplateAssignmentEntity';
 
 import { logger } from './logger';
 import { UsageRecordItem } from '../entities/usageRecordItemEntity';
@@ -31,6 +32,7 @@ export const Source = new DataSource({
     DeviceMeterReading,
     ReturnCredit,
     PaymentLedger,
+    QuotationTemplateAssignment,
   ],
   poolSize: 1,
   extra: {

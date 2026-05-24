@@ -17,6 +17,7 @@ import {
   ShoppingCart,
   Key,
   FileSignature,
+  UserCheck,
 } from 'lucide-react';
 import { formatCurrency } from '@/lib/format';
 import { toast } from 'sonner';
@@ -55,6 +56,7 @@ import {
   getInvoiceById,
   employeeApproveInvoice,
   updateInvoiceStatus,
+  assignCustomerToQuotation,
   Invoice,
   CreateInvoicePayload,
 } from '@/lib/invoice';
@@ -126,9 +128,13 @@ function StatusBadge({ status }: { status: string }) {
     PAID: 'bg-green-100 text-green-700',
     ACTIVE_LEASE: 'bg-green-100 text-green-700',
     TRANSACTION_COMPLETED: 'bg-green-100 text-green-700 font-bold border-green-200',
+    ASSIGNED: 'bg-indigo-100 text-indigo-700',
+    RETAKEN: 'bg-red-100 text-red-700',
   };
 
   const label: Record<string, string> = {
+    ASSIGNED: 'PENDING CUSTOMER ASSIGNMENT',
+    RETAKEN: 'RETAKEN BY MANAGER',
     DRAFT: 'DRAFT (IN PREPARATION)',
     SENT: 'SENT TO CUSTOMER',
     SENT_TO_CUSTOMER: 'SENT TO CUSTOMER',
@@ -190,6 +196,34 @@ export default function EmployeeQuotationTable() {
   const [employeeJob, setEmployeeJob] = useState<EmployeeJob | null | undefined>(null);
   const [allBrands, setAllBrands] = useState<Brand[]>([]);
   const [allModels, setAllModels] = useState<Model[]>([]);
+
+  const [assignCustomerOpen, setAssignCustomerOpen] = useState(false);
+  const [assignCustomerQId, setAssignCustomerQId] = useState<string | null>(null);
+  const [assignCustomerId, setAssignCustomerId] = useState('');
+  const [assignCustomerNotes, setAssignCustomerNotes] = useState('');
+  const [submittingAssignCustomer, setSubmittingAssignCustomer] = useState(false);
+
+  const handleAssignCustomerSubmit = async () => {
+    if (!assignCustomerQId || !assignCustomerId) {
+      toast.error('Please select a customer.');
+      return;
+    }
+    setSubmittingAssignCustomer(true);
+    try {
+      await assignCustomerToQuotation(assignCustomerQId, {
+        customerId: assignCustomerId,
+        notes: assignCustomerNotes,
+      });
+      toast.success('Customer assigned successfully. Quotation is now in DRAFT.');
+      setAssignCustomerOpen(false);
+      fetchQuotations();
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { message?: string } } };
+      toast.error(err.response?.data?.message || 'Failed to assign customer.');
+    } finally {
+      setSubmittingAssignCustomer(false);
+    }
+  };
 
   useEffect(() => {
     const fetchSuggestions = async () => {
@@ -506,15 +540,38 @@ export default function EmployeeQuotationTable() {
                       })}
                     </TableCell>
                     <TableCell className="text-center">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-8 w-8 p-0 text-blue-500 hover:text-blue-600 hover:bg-blue-50"
-                        onClick={() => handleView(q.id)}
-                        title="View Quotation"
-                      >
-                        <Eye className="h-4 w-4" />
-                      </Button>
+                      <div className="flex items-center justify-center gap-1.5">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 w-8 p-0 text-blue-500 hover:text-blue-600 hover:bg-blue-50"
+                          onClick={() => handleView(q.id)}
+                          title="View Quotation"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                        {q.status === 'ASSIGNED' && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 w-8 p-0 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
+                            onClick={() => {
+                              setAssignCustomerQId(q.id);
+                              setAssignCustomerId('');
+                              setAssignCustomerNotes('');
+                              setAssignCustomerOpen(true);
+                            }}
+                            title="Assign Customer"
+                          >
+                            <UserCheck className="h-4 w-4" />
+                          </Button>
+                        )}
+                        {q.status === 'RETAKEN' && (
+                          <span className="text-[10px] font-bold text-red-500 bg-red-50 px-2 py-0.5 rounded border border-red-100 uppercase select-none">
+                            Locked
+                          </span>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell>
                       <StatusBadge status={q.status} />
@@ -576,6 +633,59 @@ export default function EmployeeQuotationTable() {
           open={accountViewOpen}
           onClose={() => setAccountViewOpen(false)}
         />
+      )}
+      {assignCustomerOpen && assignCustomerQId && (
+        <Dialog open={assignCustomerOpen} onOpenChange={setAssignCustomerOpen}>
+          <DialogContent className="sm:max-w-md bg-white border border-slate-100 rounded-xl shadow-lg p-6">
+            <DialogHeader>
+              <DialogTitle className="text-lg font-bold text-slate-800">
+                Assign Customer
+              </DialogTitle>
+              <DialogDescription className="text-xs text-slate-500">
+                To activate this assigned quotation template, select the customer and provide
+                optional notes.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4 my-4">
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                  Select Customer
+                </label>
+                <CustomerSelect value={assignCustomerId} onChange={setAssignCustomerId} />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                  Internal Notes / Remarks
+                </label>
+                <Textarea
+                  value={assignCustomerNotes}
+                  onChange={(e) => setAssignCustomerNotes(e.target.value)}
+                  placeholder="Enter notes about this assignment..."
+                  className="text-xs h-20"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 border-t pt-4">
+              <Button
+                variant="ghost"
+                onClick={() => setAssignCustomerOpen(false)}
+                className="text-xs font-bold uppercase tracking-wider text-slate-500"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleAssignCustomerSubmit}
+                disabled={submittingAssignCustomer}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs uppercase tracking-wider px-5"
+              >
+                {submittingAssignCustomer ? 'Assigning...' : 'Confirm Assignment'}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       )}
     </div>
   );

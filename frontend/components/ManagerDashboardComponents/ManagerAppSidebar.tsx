@@ -74,6 +74,11 @@ const menuItems = [
         href: '/manager/sales',
       },
       {
+        title: 'Templates',
+        icon: FileText,
+        href: '/manager/sales/templates',
+      },
+      {
         title: 'Returns',
         icon: RotateCcw,
         href: '/manager/sales/returns',

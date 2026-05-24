@@ -352,7 +352,8 @@ export class NotificationService {
     });
   }
 
-  private async getCustomerDetails(customerId: string) {
+  private async getCustomerDetails(customerId: string | null | undefined) {
+    if (!customerId) return null;
     try {
       const crmServiceUrl = process.env.CRM_SERVICE_URL || 'http://localhost:3005';
       const { sign } = await import('jsonwebtoken');

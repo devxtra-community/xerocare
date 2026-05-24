@@ -244,7 +244,7 @@ export class BillingReportService {
       if (contract.leaseTenureMonths && history.length >= contract.leaseTenureMonths) {
         alerts.push({
           contractId: contract.id,
-          customerId: contract.customerId,
+          customerId: contract.customerId || '',
           invoiceNumber: contract.invoiceNumber,
           type: 'SUMMARY_PENDING',
           saleType: contract.saleType,
@@ -285,7 +285,7 @@ export class BillingReportService {
 
       alerts.push({
         contractId: contract.id,
-        customerId: contract.customerId,
+        customerId: contract.customerId || '',
         invoiceNumber: contract.invoiceNumber,
         type: 'USAGE_PENDING',
         saleType: contract.saleType,
@@ -312,7 +312,7 @@ export class BillingReportService {
     for (const inv of finalInvoices) {
       alerts.push({
         contractId: inv.id,
-        customerId: inv.customerId,
+        customerId: inv.customerId || '',
         invoiceNumber: inv.invoiceNumber,
         type: 'INVOICE_PENDING',
         saleType: inv.saleType,
@@ -456,7 +456,8 @@ export class BillingReportService {
     return collections;
   }
 
-  private async getCustomerDetails(customerId: string) {
+  private async getCustomerDetails(customerId: string | null | undefined) {
+    if (!customerId) return null;
     try {
       const crmServiceUrl = process.env.CRM_SERVICE_URL || 'http://localhost:3005';
       const { sign } = await import('jsonwebtoken');

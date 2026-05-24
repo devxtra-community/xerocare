@@ -1,5 +1,9 @@
 import { getRabbitChannel } from '../../config/rabbitmq';
-import { BillingEventType, NotificationRequestEvent } from '../billingEvents';
+import {
+  BillingEventType,
+  NotificationRequestEvent,
+  InAppNotificationRequestEvent,
+} from '../billingEvents';
 
 const EXCHANGE = 'domain_events'; // Or 'notification_events' if separated
 
@@ -23,6 +27,18 @@ export class NotificationPublisher {
     channel.publish(
       EXCHANGE,
       BillingEventType.NOTIFICATION_WHATSAPP,
+      Buffer.from(JSON.stringify(payload)),
+      { persistent: true },
+    );
+  }
+
+  static async publishInAppRequest(payload: InAppNotificationRequestEvent) {
+    const channel = await getRabbitChannel();
+    await channel.assertExchange(EXCHANGE, 'topic', { durable: true });
+
+    channel.publish(
+      EXCHANGE,
+      BillingEventType.NOTIFICATION_IN_APP,
       Buffer.from(JSON.stringify(payload)),
       { persistent: true },
     );

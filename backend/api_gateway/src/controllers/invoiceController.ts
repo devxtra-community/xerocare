@@ -662,3 +662,108 @@ export const processReturn = async (req: Request, res: Response, next: NextFunct
     next(error);
   }
 };
+
+export const createQuotationTemplate = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const token = req.headers.authorization?.split(' ')[1] || '';
+    const result = await invoiceAggregationService.createQuotationTemplate(req.body, token);
+    return res.status(201).json(result);
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getQuotationTemplates = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const token = req.headers.authorization?.split(' ')[1] || '';
+    const result = await invoiceAggregationService.getQuotationTemplates(token);
+    return res.status(200).json(result);
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const assignQuotationTemplate = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = req.params.id as string;
+    const token = req.headers.authorization?.split(' ')[1] || '';
+    const result = await invoiceAggregationService.assignQuotationTemplate(
+      id,
+      req.body.employeeIds,
+      token,
+    );
+    return res.status(200).json(result);
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getTemplateAssignments = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = req.params.id as string;
+    const token = req.headers.authorization?.split(' ')[1] || '';
+    const result = await invoiceAggregationService.getTemplateAssignments(id, token);
+    return res.status(200).json(result);
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const assignCustomerToQuotation = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const id = req.params.id as string;
+    const token = req.headers.authorization?.split(' ')[1] || '';
+    const result = await invoiceAggregationService.assignCustomerToQuotation(id, req.body, token);
+    return res.status(200).json(result);
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const retakeQuotationAssignment = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const id = req.params.id as string;
+    const token = req.headers.authorization?.split(' ')[1] || '';
+    const result = await invoiceAggregationService.retakeQuotationAssignment(id, token);
+    return res.status(200).json(result);
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const bulkRetakeQuotationAssignments = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const id = req.params.id as string; // templateId
+    const token = req.headers.authorization?.split(' ')[1] || '';
+    const result = await invoiceAggregationService.bulkRetakeQuotationAssignments(id, token);
+    return res.status(200).json(result);
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getEmployeeAssignedQuotations = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const token = req.headers.authorization?.split(' ')[1] || '';
+    const result = await invoiceAggregationService.getEmployeeAssignedQuotations(token);
+    return res.status(200).json(result);
+  } catch (error) {
+    next(error);
+  }
+};

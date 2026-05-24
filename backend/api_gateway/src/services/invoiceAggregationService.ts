@@ -1576,4 +1576,163 @@ export class InvoiceAggregationService {
       throw new AppError('Internal Gateway Error while processing return', 500);
     }
   }
+
+  async createQuotationTemplate(payload: unknown, token: string) {
+    try {
+      const response = await axios.post(
+        `${BILLING_SERVICE_URL}/invoices/quotation/template`,
+        payload,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
+      return response.data;
+    } catch (error: unknown) {
+      if (axios.isAxiosError(error)) {
+        throw new AppError(
+          error.response?.data?.message || 'Failed to create quotation template',
+          error.response?.status || 500,
+        );
+      }
+      throw new AppError('Internal Gateway Error while creating quotation template', 500);
+    }
+  }
+
+  async getQuotationTemplates(token: string) {
+    try {
+      const response = await axios.get(`${BILLING_SERVICE_URL}/invoices/quotation/template`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      return response.data;
+    } catch (error: unknown) {
+      if (axios.isAxiosError(error)) {
+        throw new AppError(
+          error.response?.data?.message || 'Failed to fetch quotation templates',
+          error.response?.status || 500,
+        );
+      }
+      throw new AppError('Internal Gateway Error while fetching quotation templates', 500);
+    }
+  }
+
+  async assignQuotationTemplate(templateId: string, employeeIds: string[], token: string) {
+    try {
+      const response = await axios.post(
+        `${BILLING_SERVICE_URL}/invoices/quotation/template/${templateId}/assign`,
+        { employeeIds },
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
+      return response.data;
+    } catch (error: unknown) {
+      if (axios.isAxiosError(error)) {
+        throw new AppError(
+          error.response?.data?.message || 'Failed to assign quotation template',
+          error.response?.status || 500,
+        );
+      }
+      throw new AppError('Internal Gateway Error while assigning quotation template', 500);
+    }
+  }
+
+  async getTemplateAssignments(templateId: string, token: string) {
+    try {
+      const response = await axios.get(
+        `${BILLING_SERVICE_URL}/invoices/quotation/template/${templateId}/assignments`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
+      return response.data;
+    } catch (error: unknown) {
+      if (axios.isAxiosError(error)) {
+        throw new AppError(
+          error.response?.data?.message || 'Failed to fetch template assignments',
+          error.response?.status || 500,
+        );
+      }
+      throw new AppError('Internal Gateway Error while fetching template assignments', 500);
+    }
+  }
+
+  async assignCustomerToQuotation(id: string, payload: unknown, token: string) {
+    try {
+      const response = await axios.post(
+        `${BILLING_SERVICE_URL}/invoices/quotation/${id}/assign-customer`,
+        payload,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
+      return response.data;
+    } catch (error: unknown) {
+      if (axios.isAxiosError(error)) {
+        throw new AppError(
+          error.response?.data?.message || 'Failed to assign customer to quotation',
+          error.response?.status || 500,
+        );
+      }
+      throw new AppError('Internal Gateway Error while assigning customer to quotation', 500);
+    }
+  }
+
+  async retakeQuotationAssignment(id: string, token: string) {
+    try {
+      const response = await axios.post(
+        `${BILLING_SERVICE_URL}/invoices/quotation/${id}/retake`,
+        {},
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
+      return response.data;
+    } catch (error: unknown) {
+      if (axios.isAxiosError(error)) {
+        throw new AppError(
+          error.response?.data?.message || 'Failed to retake quotation assignment',
+          error.response?.status || 500,
+        );
+      }
+      throw new AppError('Internal Gateway Error while retaking quotation assignment', 500);
+    }
+  }
+
+  async bulkRetakeQuotationAssignments(templateId: string, token: string) {
+    try {
+      const response = await axios.post(
+        `${BILLING_SERVICE_URL}/invoices/quotation/template/${templateId}/retake-all`,
+        {},
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
+      return response.data;
+    } catch (error: unknown) {
+      if (axios.isAxiosError(error)) {
+        throw new AppError(
+          error.response?.data?.message || 'Failed to bulk retake quotation assignments',
+          error.response?.status || 500,
+        );
+      }
+      throw new AppError('Internal Gateway Error while bulk retaking quotation assignments', 500);
+    }
+  }
+
+  async getEmployeeAssignedQuotations(token: string) {
+    try {
+      const response = await axios.get(`${BILLING_SERVICE_URL}/invoices/quotation/assigned`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      return response.data;
+    } catch (error: unknown) {
+      if (axios.isAxiosError(error)) {
+        throw new AppError(
+          error.response?.data?.message || 'Failed to fetch assigned quotations',
+          error.response?.status || 500,
+        );
+      }
+      throw new AppError('Internal Gateway Error while fetching assigned quotations', 500);
+    }
+  }
 }

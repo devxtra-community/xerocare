@@ -886,6 +886,14 @@ export function QuotationViewDialog({
       {useTemplate ? (
         <DialogContent className="sm:max-w-5xl rounded-none border-none shadow-2xl p-0 overflow-hidden bg-white flex flex-col max-h-[95vh]">
           <DialogTitle className="sr-only">Quotation Document</DialogTitle>
+          {quotation.status === 'RETAKEN' && (
+            <div className="bg-red-500 text-white font-bold text-xs px-6 py-2.5 flex items-center justify-between shrink-0 border-b border-red-600">
+              <span className="uppercase tracking-wider">
+                ⚠️ Retaken by Manager — Editing is Locked
+              </span>
+              <span className="text-[10px] bg-red-700 px-2 py-0.5 rounded">READ ONLY</span>
+            </div>
+          )}
           <div id="quotation-print-content" className="flex-1 overflow-y-auto scrollbar-hide">
             {isProductNormal && (
               <ProductNormalQuotation
@@ -1151,6 +1159,14 @@ export function QuotationViewDialog({
       ) : (
         <DialogContent className="sm:max-w-4xl rounded-none border-none shadow-2xl p-0 overflow-hidden bg-white flex flex-col max-h-[90vh]">
           <DialogTitle className="sr-only">Quotation Document</DialogTitle>
+          {quotation.status === 'RETAKEN' && (
+            <div className="bg-red-500 text-white font-bold text-xs px-6 py-2.5 flex items-center justify-between shrink-0 border-b border-red-600">
+              <span className="uppercase tracking-wider">
+                ⚠️ Retaken by Manager — Editing is Locked
+              </span>
+              <span className="text-[10px] bg-red-700 px-2 py-0.5 rounded">READ ONLY</span>
+            </div>
+          )}
           <div
             id="quotation-print-content"
             className="flex-1 overflow-y-auto scrollbar-hide flex flex-col bg-white"
