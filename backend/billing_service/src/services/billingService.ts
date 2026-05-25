@@ -432,6 +432,7 @@ export class BillingService {
         invItem.unitPrice = item.unitPrice;
         invItem.modelId = item.modelId;
         invItem.productId = item.productId; // Specific Serial (if Sale)
+        invItem.sparePartId = item.sparePartId; // Spare Part reference (if SPAREPART_SALE)
 
         // Map Pricing/Limit Fields for Product Items (Rent/Lease)
         invItem.bwIncludedLimit = item.bwIncludedLimit;
