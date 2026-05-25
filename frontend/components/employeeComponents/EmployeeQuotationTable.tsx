@@ -18,6 +18,7 @@ import {
   Key,
   FileSignature,
   UserCheck,
+  Wrench,
 } from 'lucide-react';
 import { formatCurrency } from '@/lib/format';
 import { toast } from 'sonner';
@@ -70,7 +71,7 @@ import { getAccountSummary } from '@/lib/payment';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type QuotationType = 'RENT' | 'LEASE' | 'PRODUCT_SALE';
+type QuotationType = 'RENT' | 'LEASE' | 'PRODUCT_SALE' | 'SPAREPART_SALE';
 
 interface Consumable {
   partName: string;
@@ -88,6 +89,7 @@ interface SaleItem {
   maxDiscount: number;
   isManual: boolean;
   productId?: string;
+  sparePartId?: string;
   modelId?: string;
   brand?: string;
   model?: string;
@@ -164,15 +166,22 @@ function StatusBadge({ status }: { status: string }) {
 function TypeBadge({ type }: { type: string }) {
   const map: Record<string, string> = {
     PRODUCT_SALE: 'bg-blue-50 text-blue-600 border-blue-200',
+    SPAREPART_SALE: 'bg-teal-50 text-teal-600 border-teal-200 whitespace-nowrap',
     RENT: 'bg-green-50 text-green-600 border-green-200',
     LEASE: 'bg-purple-50 text-purple-600 border-purple-200',
+  };
+  const labels: Record<string, string> = {
+    PRODUCT_SALE: 'PRODUCT SALE',
+    SPAREPART_SALE: 'SPARE PARTS SALE',
+    RENT: 'RENT',
+    LEASE: 'LEASE',
   };
   return (
     <Badge
       variant="outline"
       className={`rounded-full px-2 py-0.5 text-[8.5px] font-bold tracking-wider ${map[type] ?? ''}`}
     >
-      {type}
+      {labels[type] ?? type}
     </Badge>
   );
 }
@@ -248,10 +257,11 @@ export default function EmployeeQuotationTable() {
 
   // Compute which quotation types this employee can create
   const allowedTypes = useMemo((): QuotationType[] => {
-    if (employeeJob === EmployeeJob.MANAGER) return ['PRODUCT_SALE', 'RENT', 'LEASE'];
-    if (employeeJob === EmployeeJob.SALES) return ['PRODUCT_SALE'];
+    if (employeeJob === EmployeeJob.MANAGER)
+      return ['PRODUCT_SALE', 'SPAREPART_SALE', 'RENT', 'LEASE'];
+    if (employeeJob === EmployeeJob.SALES) return ['PRODUCT_SALE', 'SPAREPART_SALE'];
     if (employeeJob === EmployeeJob.RENT_AND_LEASE) return ['RENT', 'LEASE'];
-    return ['PRODUCT_SALE', 'RENT', 'LEASE']; // fallback
+    return ['PRODUCT_SALE', 'SPAREPART_SALE', 'RENT', 'LEASE']; // fallback
   }, [employeeJob]);
 
   const { page, limit, total, setPage, setTotal, totalPages } = usePagination(10);
@@ -847,25 +857,58 @@ function QuotationFormModal({
     let description = '',
       basePrice = 0,
       maxDiscount = 0,
-      itemType: 'PRODUCT' | 'SPAREPART' = 'PRODUCT';
+      itemType: 'PRODUCT' | 'SPAREPART' = 'PRODUCT',
+      productId: string | undefined = undefined,
+      sparePartId: string | undefined = undefined,
+      modelId: string | undefined = undefined,
+      warranty = '',
+      consumables: Consumable[] = [];
 
-    // Product logic: Construct from Brand, Model, and Product Name
-    const pr = item as Product;
-    const modelName = pr.model?.model_name || pr.model?.model_no || '';
-    const productName = pr.name || '';
+    const isSparePart = 'part_name' in item;
 
-    description = `${modelName} ${productName}`.trim().replace(/\s+/g, ' ');
+    if (isSparePart) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const sp = item as any;
+      description = sp.part_name || 'Spare Part';
+      basePrice = Number(sp.base_price) || 0;
+      maxDiscount = Number(sp.max_discount_amount) || 0;
+      sparePartId = sp.id;
+      itemType = 'SPAREPART';
+    } else {
+      const pr = item as Product;
+      const brand = pr.brand || pr.model?.brandRelation?.name || '';
+      const modelName = pr.model?.model_name || pr.model?.model_no || '';
+      const productName = pr.name || '';
 
-    // Fallback if built name is empty
-    if (!description) {
-      description = pr.description || pr.model?.description || 'Product';
+      description = `${brand} ${modelName} ${productName}`.trim().replace(/\s+/g, ' ');
+
+      // Fallback if built name is empty
+      if (!description) {
+        description = pr.description || pr.model?.description || 'Product';
+      }
+
+      basePrice = pr.sale_price || 0;
+      maxDiscount = pr.max_discount_amount || 0;
+      productId = pr.id;
+      modelId = pr.model?.id;
+      itemType = 'PRODUCT';
+      warranty = pr.warranty || '';
+      consumables = pr.consumables
+        ? pr.consumables.map(
+            (c: {
+              partName?: string;
+              description?: string;
+              yield?: string;
+              price?: string | number;
+            }) => ({
+              partName: c.partName || '',
+              description: c.description || '',
+              yield: c.yield || '',
+              price: String(c.price || ''),
+            }),
+          )
+        : [];
     }
-
-    basePrice = pr.sale_price || 0;
-    maxDiscount = pr.max_discount_amount || 0;
-    const productId = pr.id;
-    const modelId = pr.model?.id;
-    itemType = 'PRODUCT';
 
     setSaleItems((prev) => [
       ...prev,
@@ -878,28 +921,15 @@ function QuotationFormModal({
         maxDiscount,
         isManual: false,
         productId,
+        sparePartId,
         modelId,
         itemType,
-        isEditable: !productId || basePrice === 0,
+        isEditable: isSparePart ? false : !productId || basePrice === 0,
         bwSlabRanges: [],
         colorSlabRanges: [],
         comboSlabRanges: [],
-        warranty: pr.warranty || '',
-        consumables: pr.consumables
-          ? pr.consumables.map(
-              (c: {
-                partName?: string;
-                description?: string;
-                yield?: string;
-                price?: string | number;
-              }) => ({
-                partName: c.partName || '',
-                description: c.description || '',
-                yield: c.yield || '',
-                price: String(c.price || ''),
-              }),
-            )
-          : [],
+        warranty,
+        consumables,
       },
     ]);
     toast.success(`Added ${description}`);
@@ -1087,7 +1117,7 @@ function QuotationFormModal({
         ? `${selectedLayoutCategory}:${selectedLayoutStyle}`
         : undefined;
 
-    if (['PRODUCT_SALE'].includes(quotationType)) {
+    if (['PRODUCT_SALE', 'SPAREPART_SALE'].includes(quotationType)) {
       if (saleItems.length === 0) {
         toast.error('Please add at least one item.');
         return;
@@ -1139,7 +1169,8 @@ function QuotationFormModal({
             quantity: it.quantity,
             unitPrice: it.basePrice,
             discount: it.discount,
-            productId: undefined,
+            productId: it.productId,
+            sparePartId: it.sparePartId,
             modelId: it.modelId,
             itemType: it.itemType,
           };
@@ -1371,6 +1402,12 @@ function QuotationFormModal({
       color: 'bg-blue-600',
       desc: 'Direct sale of full machines & products',
     },
+    SPAREPART_SALE: {
+      icon: Wrench,
+      label: 'Spare Parts Sale',
+      color: 'bg-teal-600',
+      desc: 'Quotation for spare parts and accessories',
+    },
     RENT: {
       icon: Key,
       label: 'Rent Quotation',
@@ -1447,6 +1484,8 @@ function QuotationFormModal({
                           setActiveCategory('SALE');
                           if (allowedTypes.includes('PRODUCT_SALE')) {
                             setQuotationType('PRODUCT_SALE');
+                          } else if (allowedTypes.includes('SPAREPART_SALE')) {
+                            setQuotationType('SPAREPART_SALE');
                           }
                         }}
                       />
@@ -1485,30 +1524,58 @@ function QuotationFormModal({
                           ← Back to Categories
                         </Button>
                       </div>
-                      <div className="grid grid-cols-1 gap-3">
-                        <button
-                          onClick={() => {
-                            setQuotationType('PRODUCT_SALE');
-                            setSelectedLayoutCategory('product');
-                          }}
-                          className={`border-2 rounded-xl p-4 flex flex-col items-start gap-2 transition-all ${
-                            quotationType === 'PRODUCT_SALE'
-                              ? 'border-blue-500 bg-blue-50 text-blue-700'
-                              : 'border-slate-200 hover:border-blue-300'
-                          }`}
-                        >
-                          <div
-                            className={`p-2 rounded-lg ${quotationType === 'PRODUCT_SALE' ? 'bg-white/60' : 'bg-slate-50'}`}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {allowedTypes.includes('PRODUCT_SALE') && (
+                          <button
+                            onClick={() => {
+                              setQuotationType('PRODUCT_SALE');
+                              setSelectedLayoutCategory('product');
+                            }}
+                            className={`border-2 rounded-xl p-4 flex flex-col items-start gap-2 transition-all ${
+                              quotationType === 'PRODUCT_SALE'
+                                ? 'border-blue-500 bg-blue-50 text-blue-700'
+                                : 'border-slate-200 hover:border-blue-300'
+                            }`}
                           >
-                            <ShoppingCart size={18} />
-                          </div>
-                          <div className="text-left">
-                            <p className="text-sm font-bold">Product Sale</p>
-                            <p className="text-[10px] opacity-70 mt-0.5">
-                              Full machines and equipments
-                            </p>
-                          </div>
-                        </button>
+                            <div
+                              className={`p-2 rounded-lg ${quotationType === 'PRODUCT_SALE' ? 'bg-white/60' : 'bg-slate-50'}`}
+                            >
+                              <ShoppingCart size={18} />
+                            </div>
+                            <div className="text-left">
+                              <p className="text-sm font-bold">Product Sale</p>
+                              <p className="text-[10px] opacity-70 mt-0.5">
+                                Full machines and equipments
+                              </p>
+                            </div>
+                          </button>
+                        )}
+
+                        {allowedTypes.includes('SPAREPART_SALE') && (
+                          <button
+                            onClick={() => {
+                              setQuotationType('SPAREPART_SALE');
+                              setSelectedLayoutCategory('product');
+                            }}
+                            className={`border-2 rounded-xl p-4 flex flex-col items-start gap-2 transition-all ${
+                              quotationType === 'SPAREPART_SALE'
+                                ? 'border-teal-500 bg-teal-50 text-teal-700'
+                                : 'border-slate-200 hover:border-teal-300'
+                            }`}
+                          >
+                            <div
+                              className={`p-2 rounded-lg ${quotationType === 'SPAREPART_SALE' ? 'bg-white/60' : 'bg-slate-50'}`}
+                            >
+                              <Wrench size={18} />
+                            </div>
+                            <div className="text-left">
+                              <p className="text-sm font-bold">Spare Parts Sale</p>
+                              <p className="text-[10px] opacity-70 mt-0.5">
+                                Spare parts and accessories
+                              </p>
+                            </div>
+                          </button>
+                        )}
                       </div>
                     </div>
                   ) : (
@@ -1551,7 +1618,7 @@ function QuotationFormModal({
               </div>
 
               {/* Validity & Notes (Sale only) */}
-              {['PRODUCT_SALE'].includes(quotationType) && (
+              {['PRODUCT_SALE', 'SPAREPART_SALE'].includes(quotationType) && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="bg-card p-4 rounded-xl border border-slate-100 shadow-sm space-y-2">
                     <label className="text-[11px] font-bold text-muted-foreground uppercase">
@@ -1586,20 +1653,28 @@ function QuotationFormModal({
               {/* ── STEP 2: Type-specific fields ─────────────────────────── */}
 
               {/* ── SALE FIELDS ──────────────────────────────────────────── */}
-              {['SALE', 'PRODUCT_SALE'].includes(quotationType) && (
+              {['SALE', 'PRODUCT_SALE', 'SPAREPART_SALE'].includes(quotationType) && (
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
                       <span className="w-2 h-2 rounded-full bg-blue-400" />{' '}
-                      {quotationType === 'PRODUCT_SALE' ? 'Products' : 'Items'}
+                      {quotationType === 'PRODUCT_SALE'
+                        ? 'Products'
+                        : quotationType === 'SPAREPART_SALE'
+                          ? 'Spare Parts'
+                          : 'Items'}
                     </h4>
                   </div>
                   <div className="flex items-center gap-3">
                     <div className="flex-1 bg-card p-2 rounded-xl border border-border shadow-sm focus-within:ring-2 focus-within:ring-primary/20 transition-all">
                       <ProductSelect
                         onSelect={addItem}
-                        mode="PRODUCT"
-                        placeholder="Select Product"
+                        mode={quotationType === 'SPAREPART_SALE' ? 'SPAREPART' : 'PRODUCT'}
+                        placeholder={
+                          quotationType === 'SPAREPART_SALE'
+                            ? 'Select Spare Part'
+                            : 'Select Product'
+                        }
                       />
                     </div>
                     <Button

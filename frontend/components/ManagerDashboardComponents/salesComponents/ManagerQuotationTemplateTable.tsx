@@ -191,9 +191,9 @@ export default function ManagerQuotationTemplateTable() {
     try {
       setLoadingEmployees(true);
       const res = await getAllEmployees(1, 1000);
-      // Filter only employee roles
+      // Filter only sales and rent/lease staff
       const filtered = (res.data.employees || []).filter(
-        (emp) => emp.role === 'EMPLOYEE' || emp.role === 'MANAGER',
+        (emp) => emp.employee_job === 'SALES' || emp.employee_job === 'RENT_AND_LEASE',
       );
       setEmployees(filtered);
     } catch (error) {
