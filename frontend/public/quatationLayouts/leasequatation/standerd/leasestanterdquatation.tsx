@@ -1043,8 +1043,7 @@ const LeaseStandardQuotation: React.FC<LeaseStandardQuotationProps> = ({
                     <th style={th('left')}>Lease Type</th>
                     <th style={th('center')}>Pricing Model</th>
                     <th style={th('center')}>Period</th>
-                    <th style={th('center')}>Advance</th>
-                    <th style={th('center')}>Deposit</th>
+                    <th style={th('center')}>Advance / Deposit</th>
                     <th style={th('center')}>Duration</th>
                     <th style={th('center')}>Discount</th>
                     <th style={th('right')}>Monthly Amount</th>
@@ -1057,8 +1056,9 @@ const LeaseStandardQuotation: React.FC<LeaseStandardQuotationProps> = ({
                       {leaseDetails.rentType || 'FIXED LIMIT'}
                     </td>
                     <td style={{ ...td('center') }}>{leaseDetails.rentPeriod || 'MONTHLY'}</td>
-                    <td style={{ ...td('center') }}>QAR {fmt(leaseDetails.advance)}</td>
-                    <td style={{ ...td('center') }}>QAR {fmt(leaseDetails.deposit)}</td>
+                    <td style={{ ...td('center') }}>
+                      QAR {fmt(leaseDetails.advance || leaseDetails.deposit || 0)}
+                    </td>
                     <td style={{ ...td('center'), fontWeight: '600' }}>{leaseDetails.duration}</td>
                     <td style={{ ...td('center') }}>
                       {leaseDetails.discountPercent && leaseDetails.discountPercent > 0 ? (
@@ -1120,8 +1120,10 @@ const LeaseStandardQuotation: React.FC<LeaseStandardQuotationProps> = ({
               {[
                 { label: 'Lease Type', value: leaseDetails.leaseType },
                 { label: 'Tenure / Duration', value: leaseDetails.duration },
-                { label: 'Advance Payment', value: `QAR ${fmt(leaseDetails.advance)}` },
-                { label: 'Security Deposit', value: `QAR ${fmt(leaseDetails.deposit)}` },
+                {
+                  label: 'Advance / Deposit',
+                  value: `QAR ${fmt(leaseDetails.advance || leaseDetails.deposit || 0)}`,
+                },
                 { label: 'Contract Start Date', value: leaseDetails.startDate },
                 { label: 'Contract End Date', value: leaseDetails.endDate },
                 { label: 'Monthly EMI Amount', value: `QAR ${fmt(leaseDetails.monthlyEmi)}` },

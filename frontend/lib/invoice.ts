@@ -78,6 +78,7 @@ export interface Invoice {
   securityDepositMode?: 'CASH' | 'CHEQUE' | 'UPI' | 'BANK_TRANSFER';
   securityDepositReference?: string;
   securityDepositReceivedDate?: string;
+  securityDepositBank?: string;
 
   // Audit Fields
   employeeApprovedBy?: string;

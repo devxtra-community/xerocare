@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Loader2, ArrowRightLeft, Send, Mail, Phone } from 'lucide-react';
+import { Loader2, ArrowRightLeft, Send, Mail, Phone, Copy } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
@@ -59,6 +59,7 @@ interface QuotationViewDialogProps {
   onReject?: () => void;
   onStatusChange?: (status: string) => Promise<void>;
   onConvertSuccess?: () => void;
+  onCreateNewFromExisting?: (id: string) => void;
   showDistribution?: boolean;
 }
 
@@ -70,6 +71,7 @@ export function QuotationViewDialog({
   onReject,
   onStatusChange,
   onConvertSuccess,
+  onCreateNewFromExisting,
   showDistribution = false,
 }: QuotationViewDialogProps) {
   const [sending, setSending] = useState(false);
@@ -635,11 +637,7 @@ export function QuotationViewDialog({
       brand: exBN || item.metadata?.brandRelation?.name || item.metadata?.brand || 'Xerocare',
       modelNo: exMN || item.metadata?.model?.model_no || item.metadata?.model_no || 'Generic',
       modelName: item.metadata?.model?.model_name || item.metadata?.model_name || 'N/A',
-      slNo:
-        item.allocation?.serialNumber ||
-        item.metadata?.serial_no ||
-        item.metadata?.serialNo ||
-        'TBD',
+      slNo: item.allocation?.serialNumber || item.sn || item.serialNumber || 'TBD',
       description: (hsCodePart + cleanDesc).trim(),
       features: (item.metadata?.features as { subHeading: string; description: string }[]) || [],
       qty: qty,
@@ -759,7 +757,7 @@ export function QuotationViewDialog({
         model: pMeta?.model_no || pMeta?.model_name || fallbackModel,
         modelName: pMeta?.model_name || 'N/A',
         modelNo: pMeta?.model_no || fallbackModel,
-        slNo: pMeta?.serial_no || pMeta?.serialNo || item.sn || 'TBD',
+        slNo: item.sn || 'TBD',
         description: pMeta?.description || item.description || '',
         features: pMeta?.features || [],
         qty: item.quantity || 1,
@@ -841,7 +839,7 @@ export function QuotationViewDialog({
         model: pMeta?.model_no || pMeta?.model_name || fallbackModel,
         modelName: pMeta?.model_name || 'N/A',
         modelNo: pMeta?.model_no || fallbackModel,
-        slNo: pMeta?.serial_no || pMeta?.serialNo || item.sn || 'TBD',
+        slNo: item.sn || 'TBD',
         description: pMeta?.description || item.description || '',
         features: pMeta?.features || [],
         qty: item.quantity || 1,
@@ -1329,11 +1327,10 @@ export function QuotationViewDialog({
                     SL NO
                   </span>
                   <span className="text-sm font-semibold text-slate-900">
-                    {quotation.type === 'QUOTATION'
-                      ? 'TBD'
-                      : enrichedItems[0]?.allocation?.serialNumber ||
-                        enrichedItems[0]?.metadata?.serial_no ||
-                        'TBD'}
+                    {enrichedItems[0]?.allocation?.serialNumber ||
+                      enrichedItems[0]?.sn ||
+                      enrichedItems[0]?.serialNumber ||
+                      'TBD'}
                   </span>
                 </div>
               </div>
@@ -1801,18 +1798,15 @@ export function QuotationViewDialog({
                         </div>
                         <div>
                           <p className="text-[9px] font-semibold text-slate-400 uppercase tracking-widest">
-                            Advance
+                            Advance / Deposit
                           </p>
                           <p className="text-[12px] font-semibold text-slate-800 leading-none mt-1">
-                            QAR {(quotation.advanceAmount || 0).toLocaleString()}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-[9px] font-semibold text-slate-400 uppercase tracking-widest">
-                            Deposit
-                          </p>
-                          <p className="text-[12px] font-semibold text-slate-800 leading-none mt-1">
-                            QAR {(quotation.securityDepositAmount || 0).toLocaleString()}
+                            QAR{' '}
+                            {(
+                              quotation.advanceAmount ||
+                              quotation.securityDepositAmount ||
+                              0
+                            ).toLocaleString()}
                           </p>
                         </div>
                         <div>
@@ -1881,18 +1875,15 @@ export function QuotationViewDialog({
                         </div>
                         <div>
                           <p className="text-[9px] font-semibold text-slate-400 uppercase tracking-widest">
-                            Advance
+                            Advance / Deposit
                           </p>
                           <p className="text-[12px] font-semibold text-slate-800 leading-none mt-1">
-                            QAR {(quotation.advanceAmount || 0).toLocaleString()}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-[9px] font-semibold text-slate-400 uppercase tracking-widest">
-                            Deposit
-                          </p>
-                          <p className="text-[12px] font-semibold text-slate-800 leading-none mt-1">
-                            QAR {(quotation.securityDepositAmount || 0).toLocaleString()}
+                            QAR{' '}
+                            {(
+                              quotation.advanceAmount ||
+                              quotation.securityDepositAmount ||
+                              0
+                            ).toLocaleString()}
                           </p>
                         </div>
                         <div>
@@ -2112,6 +2103,21 @@ export function QuotationViewDialog({
                     Mark as Rejected
                   </Button>
                 </>
+              )}
+
+              {!onApprove && onCreateNewFromExisting && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    onCreateNewFromExisting(quotation.id);
+                    onClose();
+                  }}
+                  className="h-9 text-[11px] font-semibold uppercase tracking-widest border-amber-200 text-amber-700 hover:bg-amber-50 gap-2 ml-2"
+                >
+                  <Copy size={13} />
+                  Create New from this
+                </Button>
               )}
 
               {!onApprove &&

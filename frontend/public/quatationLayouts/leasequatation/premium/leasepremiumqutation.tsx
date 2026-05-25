@@ -812,8 +812,10 @@ const LeasePremiumQuotation: React.FC<LeasePremiumQuotationProps> = ({
               {[
                 { l: 'Lease Type', v: leaseDetails.leaseType },
                 { l: 'Tenure / Duration', v: leaseDetails.duration },
-                { l: 'Advance Payment', v: `QAR ${fmt(leaseDetails.advance)}` },
-                { l: 'Security Deposit', v: `QAR ${fmt(leaseDetails.deposit)}` },
+                {
+                  l: 'Advance / Deposit',
+                  v: `QAR ${fmt(leaseDetails.advance || leaseDetails.deposit || 0)}`,
+                },
                 { l: 'Start Date', v: leaseDetails.startDate || 'TBD' },
                 { l: 'End Date', v: leaseDetails.endDate || 'TBD' },
               ].map((it, i) => (

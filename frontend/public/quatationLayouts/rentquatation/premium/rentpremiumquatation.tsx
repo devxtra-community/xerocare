@@ -657,8 +657,10 @@ const RentPremiumQuotation: React.FC<RentPremiumQuotationProps> = ({
                 { label: 'RENT TYPE', value: agreementDetails.rentType },
                 { label: 'PERIOD', value: agreementDetails.period },
                 { label: 'MONTHS COUNT', value: agreementDetails.duration },
-                { label: 'ADVANCE', value: `QAR ${fmt(agreementDetails.advance)}` },
-                { label: 'DEPOSIT', value: `QAR ${fmt(agreementDetails.deposit)}` },
+                {
+                  label: 'ADVANCE / DEPOSIT',
+                  value: `QAR ${fmt(agreementDetails.advance || agreementDetails.deposit || 0)}`,
+                },
                 { label: 'DISCOUNT', value: `${agreementDetails.discountPercent}%` },
                 { label: 'START DATE', value: quotation.contractStartDate || 'TBD' },
                 { label: 'END DATE', value: quotation.contractEndDate || 'TBD' },

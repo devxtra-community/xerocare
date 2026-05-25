@@ -758,7 +758,7 @@ function QuotationTemplateFormModal({
   const [rentType, setRentType] = useState('FIXED_LIMIT');
   const [rentPeriod, setRentPeriod] = useState('MONTHLY');
   const [monthlyRent, setMonthlyRent] = useState('');
-  const [advanceAmount] = useState('');
+  const [advanceAmount, setAdvanceAmount] = useState('');
   const [discountPercent, setDiscountPercent] = useState('');
   const [durationMonths, setDurationMonths] = useState('12');
 
@@ -836,15 +836,7 @@ function QuotationTemplateFormModal({
       itemType: 'PRODUCT' | 'SPAREPART' = 'PRODUCT';
 
     const pr = item as Product;
-    const brand = pr.brand || pr.model?.brandRelation?.name || '';
-    const modelName = pr.model?.model_name || pr.model?.model_no || '';
-    const productName = pr.name || '';
-
-    description = `${brand} ${modelName} ${productName}`.trim().replace(/\s+/g, ' ');
-
-    if (!description) {
-      description = pr.description || pr.model?.description || 'Product';
-    }
+    description = pr.name || pr.description || pr.model?.description || 'Product';
 
     basePrice = pr.sale_price || 0;
     maxDiscount = pr.max_discount_amount || 0;
@@ -1104,6 +1096,7 @@ function QuotationTemplateFormModal({
 
         if (securityDepositAmount) {
           payload.securityDepositAmount = Number(securityDepositAmount);
+          payload.advanceAmount = Number(securityDepositAmount);
           payload.securityDepositMode =
             securityDepositMode as NonNullable<CreateInvoicePayload>['securityDepositMode'];
         }
@@ -1520,7 +1513,7 @@ function QuotationTemplateFormModal({
             {(activeCategory === 'RENT' || activeCategory === 'LEASE') && (
               <div className="space-y-3 bg-slate-50 p-4 rounded-xl border border-slate-100">
                 <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-500">
-                  Required Security Deposit
+                  Advance / Caution Deposit
                 </h4>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">
@@ -1528,7 +1521,11 @@ function QuotationTemplateFormModal({
                     <Input
                       type="number"
                       value={securityDepositAmount}
-                      onChange={(e) => setSecurityDepositAmount(e.target.value)}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setSecurityDepositAmount(val);
+                        setAdvanceAmount(val);
+                      }}
                       placeholder="e.g. 1000"
                       className="text-xs h-9 bg-white"
                     />

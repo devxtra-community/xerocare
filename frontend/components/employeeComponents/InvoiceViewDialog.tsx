@@ -1140,17 +1140,18 @@ export function InvoiceViewDialog({
                     <h4 className="text-[14px] font-black text-black underline uppercase mb-3 text-center">
                       Contract Terms Summary
                     </h4>
-                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 text-center">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-center">
                       <div>
-                        <p className="text-[10px] font-black text-gray-500 uppercase">Advance</p>
-                        <p className="text-sm font-black text-black">
-                          QAR {(invoice.advanceAmount || 0).toLocaleString()}
+                        <p className="text-[10px] font-black text-gray-500 uppercase">
+                          Advance / Deposit
                         </p>
-                      </div>
-                      <div>
-                        <p className="text-[10px] font-black text-gray-500 uppercase">Deposit</p>
                         <p className="text-sm font-black text-black">
-                          QAR {(invoice.securityDepositAmount || 0).toLocaleString()}
+                          QAR{' '}
+                          {(
+                            invoice.advanceAmount ||
+                            invoice.securityDepositAmount ||
+                            0
+                          ).toLocaleString()}
                         </p>
                       </div>
                       <div>

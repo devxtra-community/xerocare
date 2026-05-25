@@ -46,6 +46,7 @@ import {
   retakeQuotationAssignment,
   bulkRetakeQuotationAssignments,
   getEmployeeAssignedQuotations,
+  updateStatus,
 } from '../controllers/invoiceController';
 
 /**
@@ -300,10 +301,16 @@ router.post('/', requireRole(UserRole.EMPLOYEE), createInvoice);
  */
 router.post('/direct-sale', requireRole(UserRole.EMPLOYEE), createDirectSale);
 
-/**
- * Update the details of a price estimate (Quotation).
- */
 router.put('/:id', requireRole(UserRole.EMPLOYEE), updateQuotation);
+
+/**
+ * Update the status of an invoice or quotation.
+ */
+router.put(
+  '/:id/status',
+  requireRole(UserRole.ADMIN, UserRole.FINANCE, UserRole.MANAGER, UserRole.EMPLOYEE),
+  updateStatus,
+);
 
 // --- Manager Quotation Template & Assignment System ---
 router.post(

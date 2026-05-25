@@ -671,8 +671,7 @@ const RentNormalQuotation: React.FC<RentNormalQuotationProps> = ({
             <tr style={{ backgroundColor: '#f9f9f9', color: ACCENT }}>
               <th style={thStyle('left', ACCENT)}>Rent Type</th>
               <th style={thStyle('center', ACCENT)}>Period</th>
-              <th style={thStyle('center', ACCENT)}>Advance</th>
-              <th style={thStyle('center', ACCENT)}>Deposit</th>
+              <th style={thStyle('center', ACCENT)}>Advance / Deposit</th>
               <th style={thStyle('center', ACCENT)}>Months Count</th>
               <th style={thStyle('center', ACCENT)}>Discount</th>
               <th style={thStyle('right', ACCENT)}>Monthly Rent</th>
@@ -682,8 +681,9 @@ const RentNormalQuotation: React.FC<RentNormalQuotationProps> = ({
             <tr style={{ borderBottom: '1px solid #eee' }}>
               <td style={tdStyle('left')}>{agreementDetails.rentType}</td>
               <td style={tdStyle('center')}>{agreementDetails.period}</td>
-              <td style={tdStyle('center')}>QAR {fmt(agreementDetails.advance)}</td>
-              <td style={tdStyle('center')}>QAR {fmt(agreementDetails.deposit)}</td>
+              <td style={tdStyle('center')}>
+                QAR {fmt(agreementDetails.advance || agreementDetails.deposit || 0)}
+              </td>
               <td style={tdStyle('center')}>{agreementDetails.duration}</td>
               <td style={tdStyle('center')}>
                 {agreementDetails.discountPercent && agreementDetails.discountPercent > 0 ? (

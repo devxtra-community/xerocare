@@ -19,6 +19,7 @@ import {
   FileSignature,
   UserCheck,
   Wrench,
+  Copy,
 } from 'lucide-react';
 import { formatCurrency } from '@/lib/format';
 import { toast } from 'sonner';
@@ -201,6 +202,7 @@ export default function EmployeeQuotationTable() {
   const [viewOpen, setViewOpen] = useState(false);
   const [accountViewOpen, setAccountViewOpen] = useState(false);
   const [selectedQ, setSelectedQ] = useState<Invoice | null>(null);
+  const [sourceQuotationData, setSourceQuotationData] = useState<Invoice | null>(null);
   const [search, setSearch] = useState('');
   const [employeeJob, setEmployeeJob] = useState<EmployeeJob | null | undefined>(null);
   const [allBrands, setAllBrands] = useState<Brand[]>([]);
@@ -211,6 +213,11 @@ export default function EmployeeQuotationTable() {
   const [assignCustomerId, setAssignCustomerId] = useState('');
   const [assignCustomerNotes, setAssignCustomerNotes] = useState('');
   const [submittingAssignCustomer, setSubmittingAssignCustomer] = useState(false);
+
+  const [newFromExistingOpen, setNewFromExistingOpen] = useState(false);
+  const [newFromExistingCustomerId, setNewFromExistingCustomerId] = useState('');
+  const [newFromExistingNotes, setNewFromExistingNotes] = useState('');
+  const [submittingNewFromExisting, setSubmittingNewFromExisting] = useState(false);
 
   const handleAssignCustomerSubmit = async () => {
     if (!assignCustomerQId || !assignCustomerId) {
@@ -319,6 +326,7 @@ export default function EmployeeQuotationTable() {
       q.invoiceNumber?.toLowerCase().includes(s) ||
       q.invoiceNumber?.toLowerCase().replace('inv-', 'qty-').includes(s) ||
       q.customerName?.toLowerCase().includes(s) ||
+      getProductNames(q).toLowerCase().includes(s) ||
       q.saleType?.toLowerCase().includes(s) ||
       q.status?.toLowerCase().includes(s)
     );
@@ -388,6 +396,215 @@ export default function EmployeeQuotationTable() {
       setViewOpen(true);
     } catch {
       toast.error('Failed to load quotation details.');
+    }
+  };
+
+  const handleCreateNewFromExisting = async (id: string) => {
+    try {
+      const data = await getInvoiceById(id);
+      setSourceQuotationData(data);
+      setNewFromExistingCustomerId('');
+      setNewFromExistingNotes('');
+      setNewFromExistingOpen(true);
+    } catch {
+      toast.error('Failed to load quotation details.');
+    }
+  };
+
+  const handleNewFromExistingSubmit = async () => {
+    if (!sourceQuotationData || !newFromExistingCustomerId) {
+      toast.error('Please select a customer.');
+      return;
+    }
+    setSubmittingNewFromExisting(true);
+    try {
+      // Helper to parse description tags
+      const parseDescriptionTags = (desc: string) => {
+        let clean = desc || '';
+
+        let style: string | null = null;
+        if (clean.includes('[STD]')) {
+          style = 'standard';
+          clean = clean.replace('[STD]', '');
+        } else if (clean.includes('[PRM]')) {
+          style = 'premium';
+          clean = clean.replace('[PRM]', '');
+        }
+
+        let brand = '';
+        let model = '';
+        let productName = '';
+        let hsCode = '';
+        let isManual = false;
+
+        const bnMatch = clean.match(/\[BN:([^\]]*)\]/);
+        if (bnMatch) {
+          brand = bnMatch[1];
+          isManual = true;
+          clean = clean.replace(/\[BN:[^\]]*\]/, '');
+        }
+        const mnMatch = clean.match(/\[MN:([^\]]*)\]/);
+        if (mnMatch) {
+          model = mnMatch[1];
+          isManual = true;
+          clean = clean.replace(/\[MN:[^\]]*\]/, '');
+        }
+        const pnMatch = clean.match(/\[PN:([^\]]*)\]/);
+        if (pnMatch) {
+          productName = pnMatch[1];
+          isManual = true;
+          clean = clean.replace(/\[PN:[^\]]*\]/, '');
+        }
+        const hsMatch = clean.match(/\[HS:([^\]]*)\]/);
+        if (hsMatch) {
+          hsCode = hsMatch[1];
+          isManual = true;
+          clean = clean.replace(/\[HS:[^\]]*\]/, '');
+        }
+
+        let discountTag: number | undefined = undefined;
+        const discMatch = clean.match(/\[DISC:([^\]]*)\]/);
+        if (discMatch) {
+          discountTag = Number(discMatch[1]) || 0;
+          clean = clean.replace(/\[DISC:[^\]]*\]/, '');
+        }
+
+        const consumables: Consumable[] = [];
+        const consMatches = clean.match(/\[CONS:([^\]]*)\]/g);
+        if (consMatches) {
+          consMatches.forEach((m) => {
+            const inner = m.substring(6, m.length - 1);
+            const parts = inner.split('|');
+            consumables.push({
+              partName: parts[0] || '',
+              description: parts[1] || '',
+              yield: parts[2] || '',
+              price: parts[3] || '',
+            });
+          });
+          clean = clean.replace(/\[CONS:[^\]]*\]/g, '');
+        }
+
+        return {
+          cleanDescription: clean.trim(),
+          style,
+          brand,
+          model,
+          productName,
+          hsCode,
+          isManual,
+          discountTag,
+          consumables,
+        };
+      };
+
+      const sType = sourceQuotationData.saleType as QuotationType;
+
+      let baseNotes = sourceQuotationData.notes || '';
+      let styleTag = '';
+      const styleMatch = baseNotes.match(/\[STYLE:([^\]]*)\]/);
+      if (styleMatch) {
+        styleTag = `[STYLE:${styleMatch[1]}]`;
+        baseNotes = baseNotes.replace(/\[STYLE:[^\]]*\]/g, '').trim();
+      }
+
+      let finalNotes = newFromExistingNotes ? newFromExistingNotes.trim() : baseNotes;
+      if (styleTag) {
+        finalNotes = `${styleTag} ${finalNotes}`.trim();
+      }
+
+      // Map items
+      const mappedItems = (sourceQuotationData.items || []).map((item) => {
+        const parsed = parseDescriptionTags(item.description);
+
+        let desc = parsed.cleanDescription;
+        if (parsed.brand) desc = `[BN:${parsed.brand}] ${desc}`;
+        if (parsed.model) desc = `[MN:${parsed.model}] ${desc}`;
+        if (parsed.productName) desc = `[PN:${parsed.productName}] ${desc}`;
+        if (parsed.hsCode) desc = `[HS:${parsed.hsCode}] ${desc}`;
+        if (parsed.discountTag) desc = `[DISC:${parsed.discountTag}] ${desc}`;
+
+        if (parsed.consumables && parsed.consumables.length > 0) {
+          parsed.consumables.forEach((c) => {
+            const part = (c.partName || '').replace(/\|/g, ' ');
+            const d = (c.description || '').replace(/\|/g, ' ');
+            const y = (c.yield || '').replace(/\|/g, ' ');
+            const p = (c.price || '').replace(/\|/g, ' ');
+            desc = `[CONS:${part}|${d}|${y}|${p}] ${desc}`;
+          });
+        }
+
+        const mappedSlabs = (ranges?: Array<{ from: number; to: number; rate: number }>) => {
+          if (!ranges) return [];
+          return ranges.map((r) => ({
+            from: r.from,
+            to: r.to,
+            rate: r.rate,
+          }));
+        };
+
+        return {
+          description: desc,
+          quantity: item.quantity || 1,
+          unitPrice: item.unitPrice || 0,
+          discount: item.discount || 0,
+          productId: item.productId,
+          modelId: item.modelId,
+          itemType: item.itemType || 'PRODUCT',
+
+          bwIncludedLimit: item.bwIncludedLimit,
+          colorIncludedLimit: item.colorIncludedLimit,
+          combinedIncludedLimit: item.combinedIncludedLimit,
+          bwExcessRate: item.bwExcessRate,
+          colorExcessRate: item.colorExcessRate,
+          combinedExcessRate: item.combinedExcessRate,
+
+          bwSlabRanges: mappedSlabs(item.bwSlabRanges),
+          colorSlabRanges: mappedSlabs(item.colorSlabRanges),
+          comboSlabRanges: mappedSlabs(item.comboSlabRanges),
+        };
+      });
+
+      const payload: CreateInvoicePayload = {
+        customerId: newFromExistingCustomerId,
+        saleType: sType,
+        notes: finalNotes,
+        items: mappedItems,
+      };
+
+      if (sType === 'RENT') {
+        payload.rentType = sourceQuotationData.rentType as CreateInvoicePayload['rentType'];
+        payload.rentPeriod = sourceQuotationData.rentPeriod as CreateInvoicePayload['rentPeriod'];
+        payload.monthlyRent = sourceQuotationData.monthlyRent;
+        payload.advanceAmount = sourceQuotationData.advanceAmount;
+        payload.discountPercent = sourceQuotationData.discountPercent;
+        payload.effectiveFrom = sourceQuotationData.effectiveFrom;
+        payload.effectiveTo = sourceQuotationData.effectiveTo;
+      } else if (sType === 'LEASE') {
+        payload.leaseType = sourceQuotationData.leaseType as CreateInvoicePayload['leaseType'];
+        payload.leaseTenureMonths = sourceQuotationData.leaseTenureMonths;
+        payload.totalLeaseAmount = sourceQuotationData.totalLeaseAmount;
+        payload.monthlyEmiAmount = sourceQuotationData.monthlyEmiAmount;
+      }
+
+      if (sourceQuotationData.securityDepositAmount) {
+        payload.securityDepositAmount = sourceQuotationData.securityDepositAmount;
+        payload.securityDepositMode =
+          sourceQuotationData.securityDepositMode as CreateInvoicePayload['securityDepositMode'];
+        payload.securityDepositReference = sourceQuotationData.securityDepositReference;
+        payload.securityDepositBank = sourceQuotationData.securityDepositBank;
+      }
+
+      const newQ = await createInvoice(payload);
+      setQuotations((prev) => [newQ, ...prev]);
+      setNewFromExistingOpen(false);
+      setSourceQuotationData(null);
+      toast.success('New quotation created successfully from existing quotation.');
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { message?: string } } };
+      toast.error(err.response?.data?.message || 'Failed to create new quotation.');
+    } finally {
+      setSubmittingNewFromExisting(false);
     }
   };
 
@@ -560,6 +777,15 @@ export default function EmployeeQuotationTable() {
                         >
                           <Eye className="h-4 w-4" />
                         </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 w-8 p-0 text-amber-600 hover:text-amber-700 hover:bg-amber-50"
+                          onClick={() => handleCreateNewFromExisting(q.id)}
+                          title="Create New from this"
+                        >
+                          <Copy className="h-4 w-4" />
+                        </Button>
                         {q.status === 'ASSIGNED' && (
                           <Button
                             variant="ghost"
@@ -605,7 +831,11 @@ export default function EmployeeQuotationTable() {
 
       {formOpen && (
         <QuotationFormModal
-          onClose={() => setFormOpen(false)}
+          initialData={sourceQuotationData}
+          onClose={() => {
+            setFormOpen(false);
+            setSourceQuotationData(null);
+          }}
           onConfirm={handleCreate}
           allowedTypes={allowedTypes}
           allBrands={allBrands}
@@ -634,6 +864,7 @@ export default function EmployeeQuotationTable() {
           onStatusChange={handleStatusChange}
           onSendToFinance={handleSendToFinance}
           onConvertSuccess={handleConvertSuccess}
+          onCreateNewFromExisting={handleCreateNewFromExisting}
           showDistribution={true}
         />
       )}
@@ -697,6 +928,63 @@ export default function EmployeeQuotationTable() {
           </DialogContent>
         </Dialog>
       )}
+
+      {newFromExistingOpen && sourceQuotationData && (
+        <Dialog open={newFromExistingOpen} onOpenChange={setNewFromExistingOpen}>
+          <DialogContent className="sm:max-w-md bg-white border border-slate-100 rounded-xl shadow-lg p-6">
+            <DialogHeader>
+              <DialogTitle className="text-lg font-bold text-slate-800">
+                Assign Customer
+              </DialogTitle>
+              <DialogDescription className="text-xs text-slate-500">
+                To activate this assigned quotation template, select the customer and provide
+                optional notes.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4 my-4">
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                  Select Customer
+                </label>
+                <CustomerSelect
+                  value={newFromExistingCustomerId}
+                  onChange={setNewFromExistingCustomerId}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                  Internal Notes / Remarks
+                </label>
+                <Textarea
+                  value={newFromExistingNotes}
+                  onChange={(e) => setNewFromExistingNotes(e.target.value)}
+                  placeholder="Enter notes about this assignment..."
+                  className="text-xs h-20"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 border-t pt-4">
+              <Button
+                variant="ghost"
+                onClick={() => setNewFromExistingOpen(false)}
+                className="text-xs font-bold uppercase tracking-wider text-slate-500"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleNewFromExistingSubmit}
+                disabled={submittingNewFromExisting}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs uppercase tracking-wider px-5"
+              >
+                {submittingNewFromExisting ? 'Creating...' : 'Confirm Assignment'}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }
@@ -737,12 +1025,14 @@ function QuotationFormModal({
   allowedTypes,
   allBrands,
   allModels,
+  initialData,
 }: {
   onClose: () => void;
   onConfirm: (data: CreateInvoicePayload) => Promise<void>;
   allowedTypes: QuotationType[];
   allBrands: Brand[];
   allModels: Model[];
+  initialData?: Invoice | null;
 }) {
   const [step, setStep] = useState<1 | 2>(1);
   const [activeCategory, setActiveCategory] = useState<'SALE' | 'RENT' | 'LEASE' | null>(null);
@@ -781,6 +1071,198 @@ function QuotationFormModal({
   const [securityDepositMode, setSecurityDepositMode] = useState<'CASH' | 'CHEQUE'>('CASH');
   const [securityDepositReference, setSecurityDepositReference] = useState('');
   const [securityDepositBank, setSecurityDepositBank] = useState('');
+
+  useEffect(() => {
+    if (!initialData) return;
+
+    // Helper to parse description tags
+    const parseDescriptionTags = (desc: string) => {
+      let clean = desc || '';
+
+      let style: string | null = null;
+      if (clean.includes('[STD]')) {
+        style = 'standard';
+        clean = clean.replace('[STD]', '');
+      } else if (clean.includes('[PRM]')) {
+        style = 'premium';
+        clean = clean.replace('[PRM]', '');
+      }
+
+      let brand = '';
+      let model = '';
+      let productName = '';
+      let hsCode = '';
+      let isManual = false;
+
+      const bnMatch = clean.match(/\[BN:([^\]]*)\]/);
+      if (bnMatch) {
+        brand = bnMatch[1];
+        isManual = true;
+        clean = clean.replace(/\[BN:[^\]]*\]/, '');
+      }
+      const mnMatch = clean.match(/\[MN:([^\]]*)\]/);
+      if (mnMatch) {
+        model = mnMatch[1];
+        isManual = true;
+        clean = clean.replace(/\[MN:[^\]]*\]/, '');
+      }
+      const pnMatch = clean.match(/\[PN:([^\]]*)\]/);
+      if (pnMatch) {
+        productName = pnMatch[1];
+        isManual = true;
+        clean = clean.replace(/\[PN:[^\]]*\]/, '');
+      }
+      const hsMatch = clean.match(/\[HS:([^\]]*)\]/);
+      if (hsMatch) {
+        hsCode = hsMatch[1];
+        isManual = true;
+        clean = clean.replace(/\[HS:[^\]]*\]/, '');
+      }
+
+      let discountTag: number | undefined = undefined;
+      const discMatch = clean.match(/\[DISC:([^\]]*)\]/);
+      if (discMatch) {
+        discountTag = Number(discMatch[1]) || 0;
+        clean = clean.replace(/\[DISC:[^\]]*\]/, '');
+      }
+
+      const consumables: Consumable[] = [];
+      const consMatches = clean.match(/\[CONS:([^\]]*)\]/g);
+      if (consMatches) {
+        consMatches.forEach((m) => {
+          const inner = m.substring(6, m.length - 1);
+          const parts = inner.split('|');
+          consumables.push({
+            partName: parts[0] || '',
+            description: parts[1] || '',
+            yield: parts[2] || '',
+            price: parts[3] || '',
+          });
+        });
+        clean = clean.replace(/\[CONS:[^\]]*\]/g, '');
+      }
+
+      return {
+        cleanDescription: clean.trim(),
+        style,
+        brand,
+        model,
+        productName,
+        hsCode,
+        isManual,
+        discountTag,
+        consumables,
+      };
+    };
+
+    const sType = initialData.saleType as QuotationType;
+    setQuotationType(sType);
+
+    if (['PRODUCT_SALE', 'SPAREPART_SALE'].includes(sType)) {
+      setActiveCategory('SALE');
+      setSelectedLayoutCategory('product');
+    } else if (sType === 'RENT') {
+      setActiveCategory('RENT');
+      setSelectedLayoutCategory('rental');
+    } else if (sType === 'LEASE') {
+      setActiveCategory('LEASE');
+      setSelectedLayoutCategory('lease');
+    }
+
+    setCustomerId(initialData.customerId || '');
+
+    let rawNotes = initialData.notes || '';
+    if (rawNotes.includes('[STYLE:')) {
+      rawNotes = rawNotes.replace(/\[STYLE:[^\]]*\]/g, '').trim();
+    }
+    setNotes(rawNotes);
+
+    if (initialData.rentType) setRentType(initialData.rentType);
+    if (initialData.rentPeriod) setRentPeriod(initialData.rentPeriod);
+    if (initialData.monthlyRent) setMonthlyRent(String(initialData.monthlyRent));
+    if (initialData.advanceAmount) setAdvanceAmount(String(initialData.advanceAmount));
+    if (initialData.discountPercent) setDiscountPercent(String(initialData.discountPercent));
+    if (initialData.effectiveFrom) {
+      setEffectiveFrom(initialData.effectiveFrom.split('T')[0]);
+    }
+    if (initialData.effectiveTo) {
+      setEffectiveTo(initialData.effectiveTo.split('T')[0]);
+      if (initialData.effectiveFrom) {
+        const fromD = new Date(initialData.effectiveFrom);
+        const toD = new Date(initialData.effectiveTo);
+        const months =
+          (toD.getFullYear() - fromD.getFullYear()) * 12 + toD.getMonth() - fromD.getMonth();
+        if (months > 0) setDurationMonths(String(months));
+      }
+    }
+
+    if (initialData.leaseType) setLeaseType(initialData.leaseType);
+    if (initialData.leaseTenureMonths) setLeaseTenureMonths(String(initialData.leaseTenureMonths));
+    if (initialData.totalLeaseAmount) setTotalLeaseAmount(String(initialData.totalLeaseAmount));
+    if (initialData.monthlyEmiAmount) setMonthlyEmiAmount(String(initialData.monthlyEmiAmount));
+
+    if (initialData.securityDepositAmount)
+      setSecurityDepositAmount(String(initialData.securityDepositAmount));
+    if (initialData.securityDepositMode) {
+      setSecurityDepositMode(initialData.securityDepositMode === 'CHEQUE' ? 'CHEQUE' : 'CASH');
+    }
+    if (initialData.securityDepositReference)
+      setSecurityDepositReference(initialData.securityDepositReference);
+    if (initialData.securityDepositBank) setSecurityDepositBank(initialData.securityDepositBank);
+
+    if (initialData.items) {
+      const mappedItems: SaleItem[] = initialData.items.map((item) => {
+        const parsed = parseDescriptionTags(item.description);
+        const discountVal = item.discount || parsed.discountTag || 0;
+        const basePriceVal = item.unitPrice || 0;
+        const finalUnitPrice = basePriceVal - discountVal;
+
+        const mappedSlabs = (ranges?: Array<{ from: number; to: number; rate: number }>) => {
+          if (!ranges) return [];
+          return ranges.map((r) => ({
+            from: String(r.from),
+            to: String(r.to),
+            rate: String(r.rate),
+          }));
+        };
+
+        return {
+          description: parsed.cleanDescription,
+          quantity: item.quantity || 1,
+          basePrice: basePriceVal,
+          discount: discountVal,
+          unitPrice: finalUnitPrice,
+          maxDiscount: 0,
+          isManual: parsed.isManual,
+          productId: item.itemType === 'PRODUCT' ? item.productId : undefined,
+          sparePartId: item.itemType === 'SPAREPART' ? item.productId : undefined,
+          modelId: item.modelId,
+          itemType: (item.itemType === 'SPAREPART' ? 'SPAREPART' : 'PRODUCT') as
+            | 'PRODUCT'
+            | 'SPAREPART',
+          isEditable: parsed.isManual || !item.productId,
+
+          bwIncludedLimit: item.bwIncludedLimit,
+          colorIncludedLimit: item.colorIncludedLimit,
+          combinedIncludedLimit: item.combinedIncludedLimit,
+          bwExcessRate: item.bwExcessRate,
+          colorExcessRate: item.colorExcessRate,
+          combinedExcessRate: item.combinedExcessRate,
+
+          bwSlabRanges: mappedSlabs(item.bwSlabRanges),
+          colorSlabRanges: mappedSlabs(item.colorSlabRanges),
+          comboSlabRanges: mappedSlabs(item.comboSlabRanges),
+
+          brand: parsed.brand,
+          model: parsed.model,
+          productName: parsed.productName,
+          hsCode: parsed.hsCode,
+          consumables: parsed.consumables,
+        };
+      });
+      setSaleItems(mappedItems);
+    }
+  }, [initialData]);
 
   // ── Auto-Calculators ───────────────────────────────────────────────────
   const getPeriodsForRent = (period: string, duration: number) => {
@@ -876,16 +1358,7 @@ function QuotationFormModal({
       itemType = 'SPAREPART';
     } else {
       const pr = item as Product;
-      const brand = pr.brand || pr.model?.brandRelation?.name || '';
-      const modelName = pr.model?.model_name || pr.model?.model_no || '';
-      const productName = pr.name || '';
-
-      description = `${brand} ${modelName} ${productName}`.trim().replace(/\s+/g, ' ');
-
-      // Fallback if built name is empty
-      if (!description) {
-        description = pr.description || pr.model?.description || 'Product';
-      }
+      description = pr.name || pr.description || pr.model?.description || 'Product';
 
       basePrice = pr.sale_price || 0;
       maxDiscount = pr.max_discount_amount || 0;
@@ -2469,13 +2942,17 @@ function QuotationFormModal({
                     </div>
                     <div className="bg-card p-4 rounded-xl border border-slate-100 shadow-sm space-y-2">
                       <label className="text-[11px] font-bold text-muted-foreground uppercase">
-                        Advance Amount (QAR)
+                        Advance / Caution Deposit (QAR)
                       </label>
                       <Input
                         type="number"
                         placeholder="0.00"
                         value={advanceAmount}
-                        onChange={(e) => setAdvanceAmount(e.target.value)}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setAdvanceAmount(val);
+                          setSecurityDepositAmount(val);
+                        }}
                         className="h-9 text-sm"
                       />
                     </div>
@@ -2535,19 +3012,7 @@ function QuotationFormModal({
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
-                      <div className="space-y-2">
-                        <label className="text-[10px] font-bold text-muted-foreground uppercase">
-                          Security Deposit Amount (QAR)
-                        </label>
-                        <Input
-                          type="number"
-                          placeholder="0.00"
-                          value={securityDepositAmount}
-                          onChange={(e) => setSecurityDepositAmount(e.target.value)}
-                          className="h-9 text-sm border-blue-100 focus:border-blue-400"
-                        />
-                      </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
                       <div className="space-y-2">
                         <label className="text-[10px] font-bold text-muted-foreground uppercase">
                           Deposit Mode
@@ -3096,13 +3561,17 @@ function QuotationFormModal({
                     )}
                     <div className="bg-card p-4 rounded-xl border border-slate-100 shadow-sm space-y-2">
                       <label className="text-[11px] font-bold text-muted-foreground uppercase">
-                        Advance Amount (QAR)
+                        Advance / Caution Deposit (QAR)
                       </label>
                       <Input
                         type="number"
                         placeholder="0.00"
                         value={advanceAmount}
-                        onChange={(e) => setAdvanceAmount(e.target.value)}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setAdvanceAmount(val);
+                          setSecurityDepositAmount(val);
+                        }}
                         className="h-9 text-sm"
                       />
                     </div>
@@ -3165,24 +3634,11 @@ function QuotationFormModal({
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
-                      <div className="space-y-2">
-                        <label className="text-[10px] font-bold text-muted-foreground uppercase">
-                          Security Deposit Amount (QAR)
-                        </label>
-                        <Input
-                          type="number"
-                          placeholder="0.00"
-                          value={securityDepositAmount}
-                          onChange={(e) => setSecurityDepositAmount(e.target.value)}
-                          className="h-9 text-sm border-blue-100 focus:border-blue-400"
-                        />
-                      </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
                       <div className="space-y-2">
                         <label className="text-[10px] font-bold text-muted-foreground uppercase">
                           Deposit Mode
                         </label>
-                        <span className="flex-1" />
                         <Select
                           value={securityDepositMode}
                           onValueChange={(v) => setSecurityDepositMode(v as 'CASH' | 'CHEQUE')}

@@ -1735,4 +1735,30 @@ export class InvoiceAggregationService {
       throw new AppError('Internal Gateway Error while fetching assigned quotations', 500);
     }
   }
+
+  async updateStatus(id: string, status: string, token: string) {
+    try {
+      const response = await axios.put<{ data: Invoice }>(
+        `${BILLING_SERVICE_URL}/invoices/${id}/status`,
+        { status },
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
+      return response.data.data;
+    } catch (error: unknown) {
+      if (axios.isAxiosError(error)) {
+        logger.error('Axios error in update status', {
+          message: error.message,
+          responseStatus: error.response?.status,
+          responseData: error.response?.data,
+        });
+        throw new AppError(
+          error.response?.data?.message || 'Failed to update status',
+          error.response?.status || 500,
+        );
+      }
+      throw new AppError('Internal Gateway Error during status update', 500);
+    }
+  }
 }

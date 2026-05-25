@@ -501,10 +501,7 @@ const RentStandardQuotation: React.FC<RentStandardQuotationProps> = ({
                 PERIOD
               </th>
               <th style={{ padding: '8px 12px', textAlign: 'center', fontWeight: '800' }}>
-                ADVANCE
-              </th>
-              <th style={{ padding: '8px 12px', textAlign: 'center', fontWeight: '800' }}>
-                DEPOSIT
+                ADVANCE / DEPOSIT
               </th>
               <th style={{ padding: '8px 12px', textAlign: 'center', fontWeight: '800' }}>
                 MONTHS COUNT
@@ -526,10 +523,7 @@ const RentStandardQuotation: React.FC<RentStandardQuotationProps> = ({
                 {agreementDetails.period}
               </td>
               <td style={{ padding: '12px', textAlign: 'center', color: '#444' }}>
-                {fmt(agreementDetails.advance)}
-              </td>
-              <td style={{ padding: '12px', textAlign: 'center', color: '#444' }}>
-                {fmt(agreementDetails.deposit)}
+                {fmt(agreementDetails.advance || agreementDetails.deposit || 0)}
               </td>
               <td style={{ padding: '12px', textAlign: 'center', color: '#444' }}>
                 {agreementDetails.duration}
