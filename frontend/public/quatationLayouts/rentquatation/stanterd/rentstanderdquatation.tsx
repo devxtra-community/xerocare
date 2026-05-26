@@ -461,6 +461,33 @@ const RentStandardQuotation: React.FC<RentStandardQuotationProps> = ({
                           ))}
                         </>
                       )}
+                      {item.warranty && (
+                        <div
+                          style={{
+                            marginTop: '10px',
+                            fontSize: '12px',
+                            color: '#000',
+                            fontWeight: '400',
+                            textTransform: 'uppercase',
+                          }}
+                        >
+                          <span style={{ color: '#dc2626', fontWeight: '700' }}>Warranty: </span>
+                          {(() => {
+                            const parts = item.warranty.split(' ');
+                            if (parts.length >= 2) {
+                              return (
+                                <>
+                                  <span style={{ color: '#dc2626' }}>
+                                    {parts[0]} {parts[1]}
+                                  </span>
+                                  <span> {parts.slice(2).join(' ')}</span>
+                                </>
+                              );
+                            }
+                            return <span style={{ color: '#dc2626' }}>{item.warranty}</span>;
+                          })()}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </td>
@@ -833,8 +860,8 @@ const RentStandardQuotation: React.FC<RentStandardQuotationProps> = ({
               fontSize: '12px',
             }}
           >
-            <span style={{ fontWeight: '700', color: '#333' }}>Sub Total</span>
-            <span style={{ fontWeight: '700' }}>QAR {fmt(totals.subTotal)}</span>
+            <span style={{ fontWeight: '400', color: '#333' }}>Sub Total</span>
+            <span style={{ fontWeight: '400' }}>QAR {fmt(totals.subTotal)}</span>
           </div>
           <div
             style={{
@@ -845,8 +872,8 @@ const RentStandardQuotation: React.FC<RentStandardQuotationProps> = ({
               fontSize: '12px',
             }}
           >
-            <span style={{ fontWeight: '700', color: '#333' }}>Tax (0%)</span>
-            <span style={{ fontWeight: '700' }}>QAR {fmt(totals.tax)}</span>
+            <span style={{ fontWeight: '400', color: '#333' }}>Tax (0%)</span>
+            <span style={{ fontWeight: '400' }}>QAR {fmt(totals.tax)}</span>
           </div>
           <div
             style={{

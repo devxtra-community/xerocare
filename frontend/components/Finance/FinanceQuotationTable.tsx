@@ -215,13 +215,39 @@ export default function FinanceQuotationTable({
       q.status === 'CUSTOMER_REJECTED',
   ).length;
 
+  // ── Product name helpers ───────────────────────────────────────────────
+  const getCleanProductName = (name: string) => {
+    let clean = name.replace(/^(Black & White - |Color - |Combined - )/i, '');
+    clean = clean.replace(/(\s*-\s*SN-[^,]+|\s*\(SN-[^)]+\)|\s*\(Serial[^)]+\))/gi, '');
+    const lastDashIndex = clean.lastIndexOf(' - ');
+    if (lastDashIndex !== -1 && clean.length - lastDashIndex < 25) {
+      clean = clean.substring(0, lastDashIndex).trim();
+    }
+    return clean.trim();
+  };
+
+  const getProductNames = (invoice: Invoice) => {
+    if (!invoice.items || invoice.items.length === 0) return '';
+    const productItems = invoice.items.filter(
+      (item) => item.itemType !== 'PRICING_RULE' && item.description,
+    );
+    if (productItems.length === 0) {
+      const allWithDesc = invoice.items.filter((item) => item.description);
+      if (allWithDesc.length === 0) return '';
+      return allWithDesc.map((item) => getCleanProductName(item.description)).join(', ');
+    }
+    return productItems.map((item) => getCleanProductName(item.description)).join(', ');
+  };
+
   const filtered = quotations.filter((q) => {
     const s = search.toLowerCase();
     return (
       q.invoiceNumber?.toLowerCase().includes(s) ||
+      q.invoiceNumber?.toLowerCase().replace(/^inv-/i, 'qtn-').includes(s) ||
       q.customerName?.toLowerCase().includes(s) ||
       q.employeeName?.toLowerCase().includes(s) ||
-      q.saleType?.toLowerCase().includes(s)
+      q.saleType?.toLowerCase().includes(s) ||
+      getProductNames(q).toLowerCase().includes(s)
     );
   });
 
@@ -327,7 +353,7 @@ export default function FinanceQuotationTable({
         <div className="relative max-w-sm">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-400" />
           <Input
-            placeholder="Search by number, customer, employee..."
+            placeholder="Search by number, customer, product, employee..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="pl-9 h-9 text-xs"
@@ -342,6 +368,7 @@ export default function FinanceQuotationTable({
             <TableHeader className="bg-muted/50">
               <TableRow>
                 <TableHead className="text-primary font-bold">QT NUMBER</TableHead>
+                <TableHead className="text-primary font-bold">PRODUCT</TableHead>
                 <TableHead className="text-primary font-bold">CUSTOMER</TableHead>
                 <TableHead className="text-primary font-bold">TYPE</TableHead>
                 <TableHead className="text-primary font-bold">AMOUNT</TableHead>
@@ -354,7 +381,7 @@ export default function FinanceQuotationTable({
             <TableBody>
               {paginated.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center py-14 text-muted-foreground">
+                  <TableCell colSpan={9} className="text-center py-14 text-muted-foreground">
                     <FilePlus2 className="h-10 w-10 mx-auto mb-2 opacity-20" />
                     No quotations found.
                   </TableCell>
@@ -371,7 +398,13 @@ export default function FinanceQuotationTable({
                       className={`${isPending ? 'bg-blue-50/30 hover:bg-blue-50/50' : index % 2 ? 'bg-slate-50/30' : 'bg-card'} hover:bg-muted/40 transition-colors`}
                     >
                       <TableCell className="text-blue-500 font-bold tracking-tight">
-                        {q.invoiceNumber}
+                        {q.invoiceNumber?.replace(/^INV-/i, 'QTN-')}
+                      </TableCell>
+                      <TableCell
+                        className="font-semibold text-slate-700 max-w-[200px] truncate"
+                        title={getProductNames(q)}
+                      >
+                        {getProductNames(q) || '—'}
                       </TableCell>
                       <TableCell className="font-bold text-slate-700">
                         {q.customerName || 'Walk-in'}

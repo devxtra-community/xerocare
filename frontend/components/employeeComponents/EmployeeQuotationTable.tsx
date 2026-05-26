@@ -319,6 +319,30 @@ export default function EmployeeQuotationTable() {
       q.status === 'FINANCE_REJECTED',
   ).length;
 
+  // ── Product name helpers (must be defined before `filtered`) ────────────
+  const getCleanProductName = (name: string) => {
+    let clean = name.replace(/^(Black & White - |Color - |Combined - )/i, '');
+    clean = clean.replace(/(\s*-\s*SN-[^,]+|\s*\(SN-[^)]+\)|\s*\(Serial[^)]+\))/gi, '');
+    const lastDashIndex = clean.lastIndexOf(' - ');
+    if (lastDashIndex !== -1 && clean.length - lastDashIndex < 25) {
+      clean = clean.substring(0, lastDashIndex).trim();
+    }
+    return clean.trim();
+  };
+
+  const getProductNames = (invoice: Invoice) => {
+    if (!invoice.items || invoice.items.length === 0) return 'No items';
+    const productItems = invoice.items.filter(
+      (item) => item.itemType !== 'PRICING_RULE' && item.description,
+    );
+    if (productItems.length === 0) {
+      const allWithDesc = invoice.items.filter((item) => item.description);
+      if (allWithDesc.length === 0) return 'N/A';
+      return allWithDesc.map((item) => getCleanProductName(item.description)).join(', ');
+    }
+    return productItems.map((item) => getCleanProductName(item.description)).join(', ');
+  };
+
   // Filter
   const filtered = quotations.filter((q) => {
     const s = search.toLowerCase();
@@ -328,7 +352,8 @@ export default function EmployeeQuotationTable() {
       q.customerName?.toLowerCase().includes(s) ||
       getProductNames(q).toLowerCase().includes(s) ||
       q.saleType?.toLowerCase().includes(s) ||
-      q.status?.toLowerCase().includes(s)
+      q.status?.toLowerCase().includes(s) ||
+      getProductNames(q)?.toLowerCase().includes(s)
     );
   });
 
@@ -365,29 +390,6 @@ export default function EmployeeQuotationTable() {
     };
     fetchVisibleBalances();
   }, [paginatedIds]);
-
-  const getCleanProductName = (name: string) => {
-    let clean = name.replace(/^(Black & White - |Color - |Combined - )/i, '');
-    clean = clean.replace(/(\s*-\s*SN-[^,]+|\s*\(SN-[^)]+\)|\s*\(Serial[^)]+\))/gi, '');
-    const lastDashIndex = clean.lastIndexOf(' - ');
-    if (lastDashIndex !== -1 && clean.length - lastDashIndex < 25) {
-      clean = clean.substring(0, lastDashIndex).trim();
-    }
-    return clean.trim();
-  };
-
-  const getProductNames = (invoice: Invoice) => {
-    if (!invoice.items || invoice.items.length === 0) return 'No items';
-    const productItems = invoice.items.filter(
-      (item) => item.itemType !== 'PRICING_RULE' && item.description,
-    );
-    if (productItems.length === 0) {
-      const allWithDesc = invoice.items.filter((item) => item.description);
-      if (allWithDesc.length === 0) return 'N/A';
-      return allWithDesc.map((item) => getCleanProductName(item.description)).join(', ');
-    }
-    return productItems.map((item) => getCleanProductName(item.description)).join(', ');
-  };
 
   const handleView = async (id: string) => {
     try {
@@ -695,7 +697,7 @@ export default function EmployeeQuotationTable() {
         <div className="relative max-w-sm">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-400" />
           <Input
-            placeholder="Search by number, customer, type..."
+            placeholder="Search by number, customer, product, type..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="pl-9 h-9 text-xs"

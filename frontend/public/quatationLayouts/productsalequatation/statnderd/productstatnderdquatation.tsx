@@ -536,41 +536,68 @@ const ProductStandardQuotation: React.FC<ProductStandardQuotationProps> = ({
                         }}
                       >
                         {item.description}
-                      </div>
-                      {(item.features || []).length > 0 && (
-                        <>
+                        {(item.features || []).length > 0 && (
+                          <>
+                            <div
+                              style={{
+                                fontSize: '13px',
+                                fontWeight: '800',
+                                color: '#10b981',
+                                textTransform: 'uppercase',
+                                marginBottom: '4px',
+                                marginTop: '12px',
+                              }}
+                            >
+                              Features
+                            </div>
+                            {(item.features || []).map((f, i) => (
+                              <div key={i} style={{ marginTop: '6px', fontSize: '12px' }}>
+                                {f.subHeading && (
+                                  <strong
+                                    style={{
+                                      color: '#dc2626',
+                                      display: 'block',
+                                      marginBottom: '2px',
+                                    }}
+                                  >
+                                    {f.subHeading}
+                                  </strong>
+                                )}
+                                {f.description && (
+                                  <div style={{ color: '#555' }}>{f.description}</div>
+                                )}
+                              </div>
+                            ))}
+                          </>
+                        )}
+                        {item.warranty && (
                           <div
                             style={{
-                              fontSize: '13px',
-                              fontWeight: '800',
-                              color: '#10b981',
-                              textTransform: 'uppercase',
-                              marginBottom: '4px',
                               marginTop: '12px',
+                              fontSize: '12px',
+                              color: '#000',
+                              fontWeight: '400',
+                              textTransform: 'uppercase',
                             }}
                           >
-                            Features
+                            <span style={{ color: '#dc2626', fontWeight: '700' }}>Warranty: </span>
+                            {(() => {
+                              const parts = item.warranty.split(' ');
+                              if (parts.length >= 2) {
+                                return (
+                                  <>
+                                    <span style={{ color: '#dc2626' }}>
+                                      {parts[0]} {parts[1]}
+                                    </span>
+                                    <span> {parts.slice(2).join(' ')}</span>
+                                  </>
+                                );
+                              }
+                              return <span style={{ color: '#dc2626' }}>{item.warranty}</span>;
+                            })()}
                           </div>
-                          {(item.features || []).map((f, i) => (
-                            <div key={i} style={{ marginTop: '6px', fontSize: '12px' }}>
-                              {f.subHeading && (
-                                <strong
-                                  style={{
-                                    color: '#dc2626',
-                                    display: 'block',
-                                    marginBottom: '2px',
-                                  }}
-                                >
-                                  {f.subHeading}
-                                </strong>
-                              )}
-                              {f.description && (
-                                <div style={{ color: '#555' }}>{f.description}</div>
-                              )}
-                            </div>
-                          ))}
-                        </>
-                      )}
+                        )}
+                      </div>
                     </div>
                   </div>
                 </td>
@@ -643,7 +670,7 @@ const ProductStandardQuotation: React.FC<ProductStandardQuotationProps> = ({
                 alt="Product"
                 style={{
                   maxWidth: '500px',
-                  maxHeight: '350px',
+                  maxHeight: '450px',
                   objectFit: 'contain',
                   filter: 'grayscale(100%)',
                   opacity: 0.7,
@@ -682,7 +709,7 @@ const ProductStandardQuotation: React.FC<ProductStandardQuotationProps> = ({
                   display: 'flex',
                   justifyContent: 'space-between',
                   alignItems: 'center',
-                  fontWeight: bold ? '800' : '700',
+                  fontWeight: bold ? '800' : '400',
                   fontSize: '11.5px',
                 }}
               >
@@ -691,7 +718,7 @@ const ProductStandardQuotation: React.FC<ProductStandardQuotationProps> = ({
                     textTransform: 'uppercase',
                     letterSpacing: '0.05em',
                     fontSize: '10px',
-                    fontWeight: bold ? '700' : '600',
+                    fontWeight: bold ? '700' : '400',
                   }}
                 >
                   {label}

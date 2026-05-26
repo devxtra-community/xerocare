@@ -382,7 +382,7 @@ const ProductNormalQuotation: React.FC<ProductNormalQuotationProps> = ({
           <thead>
             <tr style={{ backgroundColor: ACCENT, color: '#fff' }}>
               <th style={{ ...thStyle(), width: '36px' }}>Sl.</th>
-              <th style={{ ...thStyle(), width: '45%' }}>Description</th>
+              <th style={{ ...thStyle(), width: '40%' }}>Description</th>
               <th style={thStyle('center')}>Qty</th>
               <th style={thStyle('center')}>Unit Price</th>
               <th style={thStyle('center')}>Discount</th>
@@ -446,6 +446,33 @@ const ProductNormalQuotation: React.FC<ProductNormalQuotationProps> = ({
                         ))}
                       </>
                     )}
+                    {item.warranty && (
+                      <div
+                        style={{
+                          marginTop: '12px',
+                          fontSize: '11px',
+                          color: '#1a1a1a',
+                          fontWeight: '400',
+                          lineHeight: '1.6',
+                        }}
+                      >
+                        <span style={{ color: '#dc2626', fontWeight: '700' }}>Warranty: </span>
+                        {(() => {
+                          const parts = item.warranty.split(' ');
+                          if (parts.length >= 2) {
+                            return (
+                              <>
+                                <span style={{ color: '#dc2626' }}>
+                                  {parts[0]} {parts[1]}
+                                </span>
+                                <span> {parts.slice(2).join(' ')}</span>
+                              </>
+                            );
+                          }
+                          return <span style={{ color: '#dc2626' }}>{item.warranty}</span>;
+                        })()}
+                      </div>
+                    )}
                   </div>
                 </td>
                 <td
@@ -453,89 +480,94 @@ const ProductNormalQuotation: React.FC<ProductNormalQuotationProps> = ({
                   style={{
                     padding: 0,
                     verticalAlign: 'top',
+                    height: '1px',
                   }}
                 >
-                  {/* Numeric values row at the top */}
-                  <div
-                    style={{
-                      display: 'flex',
-                      color: '#111',
-                    }}
-                  >
+                  <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
                     <div
                       style={{
-                        flex: 1,
-                        padding: '12px 6px',
-                        textAlign: 'center',
-                        fontSize: '12px',
+                        display: 'flex',
+                        color: '#111',
                       }}
                     >
-                      {item.qty}
+                      <div
+                        style={{
+                          flex: 1,
+                          padding: '12px 6px',
+                          textAlign: 'center',
+                          fontSize: '12px',
+                        }}
+                      >
+                        {item.qty}
+                      </div>
+                      <div
+                        style={{
+                          flex: 1.5,
+                          padding: '12px 6px',
+                          textAlign: 'center',
+                          fontSize: '12px',
+                        }}
+                      >
+                        {fmt(item.unitPrice)}
+                      </div>
+                      <div
+                        style={{
+                          flex: 1.3,
+                          padding: '12px 6px',
+                          textAlign: 'center',
+                          fontSize: '12px',
+                        }}
+                      >
+                        {fmt(item.discount || 0)}
+                      </div>
+                      <div
+                        style={{
+                          flex: 1,
+                          padding: '12px 6px',
+                          textAlign: 'center',
+                          fontSize: '12px',
+                        }}
+                      >
+                        {fmt(item.vat)}
+                      </div>
+                      <div
+                        style={{
+                          flex: 1.5,
+                          padding: '12px 8px',
+                          textAlign: 'right',
+                          fontSize: '12px',
+                          fontWeight: '500',
+                        }}
+                      >
+                        {fmt(item.amount)}
+                      </div>
                     </div>
-                    <div
-                      style={{
-                        flex: 1.5,
-                        padding: '12px 6px',
-                        textAlign: 'center',
-                        fontSize: '12px',
-                      }}
-                    >
-                      {fmt(item.unitPrice)}
-                    </div>
-                    <div
-                      style={{
-                        flex: 1.3,
-                        padding: '12px 6px',
-                        textAlign: 'center',
-                        fontSize: '12px',
-                      }}
-                    >
-                      {fmt(item.discount || 0)}
-                    </div>
-                    <div
-                      style={{
-                        flex: 1,
-                        padding: '12px 6px',
-                        textAlign: 'center',
-                        fontSize: '12px',
-                      }}
-                    >
-                      {fmt(item.vat)}
-                    </div>
-                    <div
-                      style={{
-                        flex: 1.5,
-                        padding: '12px 8px',
-                        textAlign: 'right',
-                        fontSize: '12px',
-                        fontWeight: '500',
-                      }}
-                    >
-                      {fmt(item.amount)}
-                    </div>
-                  </div>
-                  {/* Product image filling the remaining vertical space */}
-                  {item.productImage && (
-                    <div
-                      style={{
-                        width: '100%',
-                        padding: '4px',
-                      }}
-                    >
-                      <img
-                        src={item.productImage}
-                        alt="Product"
+                    {/* Product image filling the remaining vertical space */}
+                    {item.productImage && (
+                      <div
                         style={{
                           width: '100%',
-                          height: '100%',
-                          minHeight: '600px',
-                          objectFit: 'contain',
-                          opacity: 0.9,
-                          display: 'block',
+                          padding: '4px 4px 0 4px',
+                          flexGrow: 1,
+                          display: 'flex',
+                          alignItems: 'flex-end',
+                          justifyContent: 'center',
                         }}
-                      />
-                    </div>
-                  )}
+                      >
+                        <img
+                          src={item.productImage}
+                          alt="Product"
+                          style={{
+                            width: '100%',
+                            height: '100%',
+                            objectFit: 'contain',
+                            opacity: 0.9,
+                            display: 'block',
+                          }}
+                        />
+                      </div>
+                    )}
+                  </div>
                 </td>
               </tr>
             ))}
@@ -576,7 +608,7 @@ const ProductNormalQuotation: React.FC<ProductNormalQuotationProps> = ({
                     fontSize: '12px',
                     textTransform: 'uppercase',
                     color: row.isBold ? ACCENT : '#000',
-                    fontWeight: row.isBold ? '800' : '700',
+                    fontWeight: row.isBold ? '800' : '400',
                   }}
                 >
                   {row.label}
@@ -585,7 +617,7 @@ const ProductNormalQuotation: React.FC<ProductNormalQuotationProps> = ({
                   style={{
                     fontSize: '14px',
                     color: row.isBold ? ACCENT : '#000',
-                    fontWeight: row.isBold ? '800' : '700',
+                    fontWeight: row.isBold ? '800' : '400',
                   }}
                 >
                   {row.prefix || ''}

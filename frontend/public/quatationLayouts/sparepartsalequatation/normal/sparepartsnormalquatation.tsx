@@ -374,6 +374,33 @@ const SparePartsNormalQuotation: React.FC<SparePartsNormalQuotationProps> = ({
                         ))}
                       </>
                     )}
+                    {item.warranty && (
+                      <div
+                        style={{
+                          marginTop: '12px',
+                          fontSize: '11px',
+                          color: '#1a1a1a',
+                          fontWeight: '400',
+                          lineHeight: '1.6',
+                        }}
+                      >
+                        <span style={{ color: '#dc2626', fontWeight: '700' }}>Warranty: </span>
+                        {(() => {
+                          const parts = item.warranty.split(' ');
+                          if (parts.length >= 2) {
+                            return (
+                              <>
+                                <span style={{ color: '#dc2626' }}>
+                                  {parts[0]} {parts[1]}
+                                </span>
+                                <span> {parts.slice(2).join(' ')}</span>
+                              </>
+                            );
+                          }
+                          return <span style={{ color: '#dc2626' }}>{item.warranty}</span>;
+                        })()}
+                      </div>
+                    )}
                   </div>
                 </td>
                 <td style={tdStyleHelper()}>{item.qty}</td>
@@ -392,18 +419,20 @@ const SparePartsNormalQuotation: React.FC<SparePartsNormalQuotationProps> = ({
         style={{
           display: 'flex',
           justifyContent: lineItems?.[0]?.productImage ? 'space-between' : 'flex-end',
-          alignItems: 'flex-start',
+          alignItems: 'stretch',
           marginBottom: '32px',
+          minHeight: '1px',
         }}
       >
         {lineItems?.[0]?.productImage && (
-          <div style={{ paddingRight: '20px' }}>
+          <div style={{ paddingRight: '20px', display: 'flex', alignItems: 'flex-end' }}>
             <img
               src={lineItems[0].productImage}
               alt="Product"
               style={{
                 maxWidth: '600px',
-                maxHeight: '400px',
+                height: '100%',
+                maxHeight: '600px',
                 objectFit: 'contain',
                 filter: 'grayscale(100%)',
                 opacity: 0.8,
@@ -441,7 +470,7 @@ const SparePartsNormalQuotation: React.FC<SparePartsNormalQuotationProps> = ({
                     fontSize: '12px',
                     textTransform: 'uppercase',
                     color: row.isBold ? ACCENT : '#000',
-                    fontWeight: row.isBold ? '800' : '700',
+                    fontWeight: row.isBold ? '800' : '400',
                   }}
                 >
                   {row.label}
@@ -450,7 +479,7 @@ const SparePartsNormalQuotation: React.FC<SparePartsNormalQuotationProps> = ({
                   style={{
                     fontSize: '14px',
                     color: row.isBold ? ACCENT : '#000',
-                    fontWeight: row.isBold ? '800' : '700',
+                    fontWeight: row.isBold ? '800' : '400',
                   }}
                 >
                   {row.prefix || ''}

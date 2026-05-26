@@ -46,8 +46,12 @@ export function QuotationConversionFlow({
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Step 1: Serial number assignment per item
-  const allocatableItems = (quotation.items || []).filter(
-    (item) => item.itemType === 'PRODUCT' || item.itemType === 'SPAREPART',
+  const allocatableItems = React.useMemo(
+    () =>
+      (quotation.items || []).filter(
+        (item) => item.itemType === 'PRODUCT' || item.itemType === 'SPAREPART',
+      ),
+    [quotation.items],
   );
   const [serialUpdates, setSerialUpdates] = useState<SerialUpdate[]>(
     allocatableItems.map((item) => ({
@@ -92,7 +96,7 @@ export function QuotationConversionFlow({
       }
     };
     fetchAvailable();
-  }, [quotation]);
+  }, [quotation, allocatableItems]);
 
   // Step 2: Advance payment
   const prefilledAdvance = Number(quotation.advanceAmount || 0);

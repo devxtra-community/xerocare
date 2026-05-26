@@ -503,6 +503,33 @@ const LeasePremiumQuotation: React.FC<LeasePremiumQuotationProps> = ({
                             ))}
                           </>
                         )}
+                        {it.warranty && (
+                          <div
+                            style={{
+                              marginTop: '12px',
+                              fontSize: '12px',
+                              color: '#fff',
+                              fontWeight: '400',
+                              textTransform: 'uppercase',
+                            }}
+                          >
+                            <span style={{ color: '#ff4d4d', fontWeight: '700' }}>Warranty: </span>
+                            {(() => {
+                              const parts = it.warranty.split(' ');
+                              if (parts.length >= 2) {
+                                return (
+                                  <>
+                                    <span style={{ color: '#ff4d4d' }}>
+                                      {parts[0]} {parts[1]}
+                                    </span>
+                                    <span> {parts.slice(2).join(' ')}</span>
+                                  </>
+                                );
+                              }
+                              return <span style={{ color: '#ff4d4d' }}>{it.warranty}</span>;
+                            })()}
+                          </div>
+                        )}
                       </div>
                     </div>
                   </td>
@@ -857,7 +884,7 @@ const LeasePremiumQuotation: React.FC<LeasePremiumQuotationProps> = ({
               }}
             >
               <span>Total Lease Value</span>
-              <span style={{ fontWeight: '700', color: TEXT_WHITE }}>
+              <span style={{ fontWeight: '400', color: TEXT_WHITE }}>
                 QAR {fmt(totals.subTotal)}
               </span>
             </div>
@@ -870,7 +897,7 @@ const LeasePremiumQuotation: React.FC<LeasePremiumQuotationProps> = ({
               }}
             >
               <span>Tax (0%)</span>
-              <span style={{ fontWeight: '700', color: TEXT_WHITE }}>QAR {fmt(totals.tax)}</span>
+              <span style={{ fontWeight: '400', color: TEXT_WHITE }}>QAR {fmt(totals.tax)}</span>
             </div>
             <div
               style={{

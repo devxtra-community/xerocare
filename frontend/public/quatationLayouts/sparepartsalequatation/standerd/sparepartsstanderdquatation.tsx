@@ -437,6 +437,33 @@ const SparePartsStandardQuotation: React.FC<SparePartsStandardQuotationProps> = 
                       Product Description
                     </div>
                     {item.description}
+                    {item.warranty && (
+                      <div
+                        style={{
+                          marginTop: '8px',
+                          fontSize: '12px',
+                          color: '#000',
+                          fontWeight: '400',
+                          textTransform: 'uppercase',
+                        }}
+                      >
+                        <span style={{ color: '#dc2626', fontWeight: '700' }}>Warranty: </span>
+                        {(() => {
+                          const parts = item.warranty.split(' ');
+                          if (parts.length >= 2) {
+                            return (
+                              <>
+                                <span style={{ color: '#dc2626' }}>
+                                  {parts[0]} {parts[1]}
+                                </span>
+                                <span> {parts.slice(2).join(' ')}</span>
+                              </>
+                            );
+                          }
+                          return <span style={{ color: '#dc2626' }}>{item.warranty}</span>;
+                        })()}
+                      </div>
+                    )}
                   </div>
                 </div>
               </td>
@@ -487,8 +514,8 @@ const SparePartsStandardQuotation: React.FC<SparePartsStandardQuotationProps> = 
               borderBottom: '1px solid #f1f5f9',
             }}
           >
-            <span style={{ color: mutedText, fontWeight: '600' }}>Sub Total</span>
-            <span style={{ fontWeight: '700' }}>QAR {fmt(totals.subTotal)}</span>
+            <span style={{ color: mutedText, fontWeight: '400' }}>Sub Total</span>
+            <span style={{ fontWeight: '400' }}>QAR {fmt(totals.subTotal)}</span>
           </div>
           <div
             style={{
@@ -499,8 +526,8 @@ const SparePartsStandardQuotation: React.FC<SparePartsStandardQuotationProps> = 
               color: '#16a34a',
             }}
           >
-            <span style={{ fontWeight: '600' }}>Discount</span>
-            <span style={{ fontWeight: '700' }}>- QAR {fmt(totals.discountTotal || 0)}</span>
+            <span style={{ fontWeight: '400' }}>Discount</span>
+            <span style={{ fontWeight: '400' }}>- QAR {fmt(totals.discountTotal || 0)}</span>
           </div>
           <div
             style={{

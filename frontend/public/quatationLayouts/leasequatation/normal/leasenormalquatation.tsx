@@ -470,6 +470,33 @@ const LeaseNormalQuotation: React.FC<LeaseNormalQuotationProps> = ({
                         ))}
                       </>
                     )}
+                    {item.warranty && (
+                      <div
+                        style={{
+                          marginTop: '12px',
+                          fontSize: '11px',
+                          color: '#1a1a1a',
+                          fontWeight: '400',
+                          lineHeight: '1.6',
+                        }}
+                      >
+                        <span style={{ color: '#dc2626', fontWeight: '700' }}>Warranty: </span>
+                        {(() => {
+                          const parts = item.warranty.split(' ');
+                          if (parts.length >= 2) {
+                            return (
+                              <>
+                                <span style={{ color: '#dc2626' }}>
+                                  {parts[0]} {parts[1]}
+                                </span>
+                                <span> {parts.slice(2).join(' ')}</span>
+                              </>
+                            );
+                          }
+                          return <span style={{ color: '#dc2626' }}>{item.warranty}</span>;
+                        })()}
+                      </div>
+                    )}
                   </div>
                 </td>
                 <td style={tdStyle()}>{item.qty}</td>
@@ -890,7 +917,14 @@ const LeaseNormalQuotation: React.FC<LeaseNormalQuotationProps> = ({
       </div>
 
       {/* ─── TOTALS & MONTHLY AMOUNT ─── */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'stretch',
+          minHeight: '1px',
+        }}
+      >
         <div>
           <div style={{ fontSize: '12px', fontWeight: '800', color: '#333', marginBottom: '8px' }}>
             Payment Instructions :
@@ -906,13 +940,16 @@ const LeaseNormalQuotation: React.FC<LeaseNormalQuotationProps> = ({
           </div>
 
           {lineItems?.[0]?.productImage && (
-            <div style={{ marginTop: '20px' }}>
+            <div
+              style={{ marginTop: '20px', display: 'flex', alignItems: 'flex-end', flexGrow: 1 }}
+            >
               <img
                 src={lineItems[0].productImage}
                 alt="Product"
                 style={{
                   maxWidth: '600px',
-                  maxHeight: '400px',
+                  height: '100%',
+                  maxHeight: '600px',
                   objectFit: 'contain',
                   filter: 'grayscale(100%)',
                   opacity: 0.8,
@@ -932,7 +969,7 @@ const LeaseNormalQuotation: React.FC<LeaseNormalQuotationProps> = ({
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
                 <span style={{ color: '#666' }}>Total Lease Value</span>
-                <span style={{ color: '#000', fontWeight: '700' }}>{fmt(totals.subTotal)}</span>
+                <span style={{ color: '#000', fontWeight: '400' }}>{fmt(totals.subTotal)}</span>
               </div>
               <div
                 style={{
@@ -957,7 +994,7 @@ const LeaseNormalQuotation: React.FC<LeaseNormalQuotationProps> = ({
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
                 <span style={{ color: '#666' }}>Total Tax (0%)</span>
-                <span style={{ color: '#000', fontWeight: '700' }}>{fmt(totals.tax)}</span>
+                <span style={{ color: '#000', fontWeight: '400' }}>{fmt(totals.tax)}</span>
               </div>
               <div
                 style={{
