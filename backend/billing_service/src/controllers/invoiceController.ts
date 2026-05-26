@@ -1306,3 +1306,15 @@ export const getEmployeeAssignedQuotations = async (
     next(error);
   }
 };
+
+export const deleteInvoice = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = req.params.id as string;
+    await billingService.deleteInvoice(id);
+    return res
+      .status(200)
+      .json({ success: true, message: 'Invoice/Template deleted successfully' });
+  } catch (error) {
+    next(error);
+  }
+};

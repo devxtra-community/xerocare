@@ -47,6 +47,7 @@ import {
   bulkRetakeQuotationAssignments,
   getEmployeeAssignedQuotations,
   updateStatus,
+  deleteInvoice,
 } from '../controllers/invoiceController';
 
 /**
@@ -387,5 +388,10 @@ router.get(
   requireRole(UserRole.ADMIN, UserRole.FINANCE, UserRole.MANAGER, UserRole.EMPLOYEE),
   getInvoiceById,
 );
+
+/**
+ * Delete a specific invoice or template.
+ */
+router.delete('/:id', requireRole(UserRole.MANAGER, UserRole.ADMIN), deleteInvoice);
 
 export default router;

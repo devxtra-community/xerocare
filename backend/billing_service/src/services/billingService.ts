@@ -604,6 +604,13 @@ export class BillingService {
       monthlyEmiAmount?: number;
       monthlyLeaseAmount?: number;
 
+      // Additional Fields for Templates / Edit Mode
+      layoutId?: string;
+      notes?: string;
+      maxDiscountAllowed?: number;
+      branchId?: string;
+      saleType?: SaleType;
+
       pricingItems?: {
         description: string;
         bwIncludedLimit?: number;
@@ -669,6 +676,13 @@ export class BillingService {
     if (payload.billingCycleInDays !== undefined) {
       invoice.billingCycleInDays = payload.billingCycleInDays;
     }
+    if (payload.layoutId !== undefined) invoice.layoutId = payload.layoutId;
+    if (payload.notes !== undefined) invoice.notes = payload.notes;
+    if (payload.maxDiscountAllowed !== undefined) {
+      invoice.maxDiscountAllowed = Number(payload.maxDiscountAllowed);
+    }
+    if (payload.branchId !== undefined) invoice.branchId = payload.branchId;
+    if (payload.saleType !== undefined) invoice.saleType = payload.saleType;
 
     // Security Deposit Update
     if (payload.securityDepositAmount !== undefined) {

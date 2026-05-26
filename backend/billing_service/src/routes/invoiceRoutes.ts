@@ -52,6 +52,7 @@ import {
   retakeQuotationAssignment,
   bulkRetakeQuotationAssignments,
   getEmployeeAssignedQuotations,
+  deleteInvoice,
 } from '../controllers/invoiceController';
 import { uploadMeterImage } from '../middlewares/uploadMiddleware';
 import { authMiddleware } from '../middlewares/authMiddleware';
@@ -453,5 +454,15 @@ router.get('/:id/respond', customerRespond);
  * Find one specific bill using its unique ID number.
  */
 router.get('/:id', authMiddleware, getInvoiceById);
+
+/**
+ * Delete a specific invoice or template using its unique ID.
+ */
+router.delete(
+  '/:id',
+  authMiddleware,
+  requireRole(EmployeeRole.MANAGER, EmployeeRole.ADMIN),
+  deleteInvoice,
+);
 
 export default router;

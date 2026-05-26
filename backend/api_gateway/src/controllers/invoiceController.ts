@@ -783,3 +783,14 @@ export const updateStatus = async (req: Request, res: Response, next: NextFuncti
     next(error);
   }
 };
+
+export const deleteInvoice = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = req.params.id as string;
+    const token = req.headers.authorization?.split(' ')[1] || '';
+    const result = await invoiceAggregationService.deleteInvoice(id, token);
+    return res.status(200).json(result);
+  } catch (error) {
+    next(error);
+  }
+};

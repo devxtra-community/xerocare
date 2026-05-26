@@ -638,16 +638,7 @@ export class InvoiceAggregationService {
    */
   async updateQuotation(
     id: string,
-    payload: {
-      rentType?: RentType;
-      rentPeriod?: RentPeriod;
-      monthlyRent?: number;
-      advanceAmount?: number;
-      discountPercent?: number;
-      effectiveFrom?: string;
-      effectiveTo?: string;
-      pricingItems?: unknown[];
-    },
+    payload: Record<string, unknown>,
     token: string,
   ): Promise<AggregatedInvoice> {
     try {
@@ -1759,6 +1750,23 @@ export class InvoiceAggregationService {
         );
       }
       throw new AppError('Internal Gateway Error during status update', 500);
+    }
+  }
+
+  async deleteInvoice(id: string, token: string) {
+    try {
+      const response = await axios.delete(`${BILLING_SERVICE_URL}/invoices/${id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      return response.data;
+    } catch (error: unknown) {
+      if (axios.isAxiosError(error)) {
+        throw new AppError(
+          error.response?.data?.message || 'Failed to delete template',
+          error.response?.status || 500,
+        );
+      }
+      throw new AppError('Internal Gateway Error during deletion', 500);
     }
   }
 }

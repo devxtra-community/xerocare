@@ -1,4 +1,4 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, DeleteDateColumn } from 'typeorm';
 import { Invoice } from './invoiceEntity';
 import { ItemType } from './enums/itemType';
 
@@ -82,4 +82,7 @@ export class InvoiceItem {
     onDelete: 'CASCADE',
   })
   invoice!: Invoice;
+
+  @DeleteDateColumn()
+  deletedAt?: Date;
 }
