@@ -4,6 +4,7 @@ export interface InvoiceItem {
   id?: string;
   itemType?: 'PRICING_RULE' | 'PRODUCT' | 'SPAREPART';
   description: string;
+  warranty?: string;
   // Fixed
   bwIncludedLimit?: number;
   colorIncludedLimit?: number;
@@ -235,6 +236,7 @@ export interface CreateInvoicePayload {
     itemType?: 'PRODUCT' | 'PRICING_RULE' | 'SPAREPART';
     productId?: string;
     modelId?: string;
+    warranty?: string;
   }[];
   startDate?: string;
   endDate?: string;
@@ -466,6 +468,22 @@ export const getBranchSalesTotals = async (
   const url = year
     ? `/b/invoices/sales/branch-totals?year=${year}`
     : '/b/invoices/sales/branch-totals';
+  const response = await api.get(url);
+  return response.data.data;
+};
+
+/**
+ * Retrieves daily/weekly sales trend data for the current branch.
+ * @param period Time range e.g. '1M', '1Y'
+ * @param year Optional year to filter by
+ */
+export const getBranchSalesOverview = async (
+  period: string = '1Y',
+  year?: number,
+): Promise<{ date: string; saleType: string; totalSales: number }[]> => {
+  const url = year
+    ? `/b/invoices/sales/branch-overview?period=${period}&year=${year}`
+    : `/b/invoices/sales/branch-overview?period=${period}`;
   const response = await api.get(url);
   return response.data.data;
 };

@@ -70,15 +70,15 @@ export interface ProductNormalQuotationProps {
 const fmt = (n: number) =>
   n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-const ACCENT = '#00A389';
+const ACCENT = '#000000';
 
 const thStyle = (
   align: 'left' | 'center' | 'right' = 'left',
-  color = '#fff',
+  color = '#000',
 ): React.CSSProperties => ({
   padding: '10px 10px',
   textAlign: align,
-  fontWeight: '800',
+  fontWeight: '300',
   fontSize: '11px',
   letterSpacing: '0.5px',
   textTransform: 'uppercase',
@@ -156,8 +156,8 @@ const ProductNormalQuotation: React.FC<ProductNormalQuotationProps> = ({
       <div style={{ textAlign: 'center', marginBottom: '28px' }}>
         <div
           style={{
-            fontSize: '26px',
-            fontWeight: '800',
+            fontSize: '22px',
+            fontWeight: '300',
             color: ACCENT,
             textTransform: 'uppercase',
             letterSpacing: '2px',
@@ -170,7 +170,7 @@ const ProductNormalQuotation: React.FC<ProductNormalQuotationProps> = ({
       {/* ─── HEADER ─── */}
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '32px' }}>
         <div>
-          <div style={{ fontSize: '17px', fontWeight: '800', color: ACCENT, marginBottom: '6px' }}>
+          <div style={{ fontSize: '17px', fontWeight: '300', color: ACCENT, marginBottom: '6px' }}>
             {companyInfo.name}
           </div>
           <div style={{ fontSize: '12px', color: '#333', lineHeight: '1.5' }}>
@@ -198,9 +198,9 @@ const ProductNormalQuotation: React.FC<ProductNormalQuotationProps> = ({
             <div
               style={{
                 fontSize: '20px',
-                fontWeight: 'bold',
+                fontWeight: 'normal',
                 color: '#ccc',
-                border: '2px solid #ccc',
+                border: '1px solid #ccc',
                 padding: '8px 16px',
               }}
             >
@@ -224,7 +224,7 @@ const ProductNormalQuotation: React.FC<ProductNormalQuotationProps> = ({
           <div
             style={{
               fontSize: '13px',
-              fontWeight: '800',
+              fontWeight: '300',
               color: ACCENT,
               marginBottom: '6px',
               textTransform: 'uppercase',
@@ -232,7 +232,7 @@ const ProductNormalQuotation: React.FC<ProductNormalQuotationProps> = ({
           >
             Bill To
           </div>
-          <div style={{ fontSize: '14px', fontWeight: '500', marginBottom: '4px' }}>
+          <div style={{ fontSize: '14px', fontWeight: '300', marginBottom: '4px' }}>
             {billTo.name}
           </div>
           <div style={{ fontSize: '12px', color: '#555', lineHeight: '1.4' }}>
@@ -251,18 +251,18 @@ const ProductNormalQuotation: React.FC<ProductNormalQuotationProps> = ({
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
           <div style={{ width: '230px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-              <span style={{ fontSize: '13px', fontWeight: '400', color: '#111' }}>
+              <span style={{ fontSize: '13px', fontWeight: '300', color: '#111' }}>
                 Quotation No :
               </span>
-              <span style={{ fontSize: '13px', fontWeight: '500' }}>{quotation.number}</span>
+              <span style={{ fontSize: '13px', fontWeight: '300' }}>{quotation.number}</span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
               <span style={{ fontSize: '12px', color: '#555' }}>Date :</span>
-              <span style={{ fontSize: '12px', fontWeight: '400' }}>{quotation.date}</span>
+              <span style={{ fontSize: '12px', fontWeight: '300' }}>{quotation.date}</span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
               <span style={{ fontSize: '12px', color: '#555' }}>Due Date :</span>
-              <span style={{ fontSize: '12px', fontWeight: '400' }}>{quotation.dueDate}</span>
+              <span style={{ fontSize: '12px', fontWeight: '300' }}>{quotation.dueDate}</span>
             </div>
           </div>
         </div>
@@ -272,13 +272,14 @@ const ProductNormalQuotation: React.FC<ProductNormalQuotationProps> = ({
       <div style={{ marginBottom: '22px' }}>
         <div
           style={{
-            backgroundColor: ACCENT,
-            color: '#ffffff',
+            backgroundColor: 'transparent',
+            color: '#000000',
             padding: '6px 20px',
+            border: '1px solid #000000',
             borderRadius: '6px',
             textAlign: 'center',
             fontSize: '13px',
-            fontWeight: '500',
+            fontWeight: '300',
             textTransform: 'uppercase',
             letterSpacing: '1px',
           }}
@@ -313,7 +314,7 @@ const ProductNormalQuotation: React.FC<ProductNormalQuotationProps> = ({
         <div
           style={{
             fontSize: '11px',
-            fontWeight: '800',
+            fontWeight: '300',
             color: ACCENT,
             textTransform: 'uppercase',
             marginBottom: '10px',
@@ -326,7 +327,7 @@ const ProductNormalQuotation: React.FC<ProductNormalQuotationProps> = ({
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px 24px' }}>
           <div>
             <div style={{ fontSize: '10px', color: '#888', textTransform: 'uppercase' }}>Brand</div>
-            <div style={{ fontSize: '13px', fontWeight: '500' }}>
+            <div style={{ fontSize: '13px', fontWeight: '300' }}>
               {lineItems[0]?.brand || 'N/A'}
             </div>
           </div>
@@ -334,7 +335,7 @@ const ProductNormalQuotation: React.FC<ProductNormalQuotationProps> = ({
             <div style={{ fontSize: '10px', color: '#888', textTransform: 'uppercase' }}>
               Product Name
             </div>
-            <div style={{ fontSize: '13px', fontWeight: '500' }}>
+            <div style={{ fontSize: '13px', fontWeight: '300' }}>
               {lineItems[0]?.productName || 'N/A'}
             </div>
           </div>
@@ -342,7 +343,7 @@ const ProductNormalQuotation: React.FC<ProductNormalQuotationProps> = ({
             <div style={{ fontSize: '10px', color: '#888', textTransform: 'uppercase' }}>
               Model Name
             </div>
-            <div style={{ fontSize: '13px', fontWeight: '500' }}>
+            <div style={{ fontSize: '13px', fontWeight: '300' }}>
               {lineItems[0]?.modelName || 'N/A'}
             </div>
           </div>
@@ -350,7 +351,7 @@ const ProductNormalQuotation: React.FC<ProductNormalQuotationProps> = ({
             <div style={{ fontSize: '10px', color: '#888', textTransform: 'uppercase' }}>
               Model Number
             </div>
-            <div style={{ fontSize: '13px', fontWeight: '500' }}>
+            <div style={{ fontSize: '13px', fontWeight: '300' }}>
               {lineItems[0]?.modelNo || 'N/A'}
             </div>
           </div>
@@ -358,7 +359,7 @@ const ProductNormalQuotation: React.FC<ProductNormalQuotationProps> = ({
             <div style={{ fontSize: '10px', color: '#888', textTransform: 'uppercase' }}>
               Serial Number
             </div>
-            <div style={{ fontSize: '13px', fontWeight: '500' }}>{lineItems[0]?.slNo || 'TBD'}</div>
+            <div style={{ fontSize: '13px', fontWeight: '300' }}>{lineItems[0]?.slNo || 'TBD'}</div>
           </div>
         </div>
       </div>
@@ -368,10 +369,10 @@ const ProductNormalQuotation: React.FC<ProductNormalQuotationProps> = ({
         <div
           style={{
             fontSize: '13px',
-            fontWeight: '800',
+            fontWeight: '300',
             color: ACCENT,
             textTransform: 'uppercase',
-            borderBottom: `2px solid ${ACCENT}`,
+
             paddingBottom: '5px',
             marginBottom: '10px',
           }}
@@ -380,7 +381,7 @@ const ProductNormalQuotation: React.FC<ProductNormalQuotationProps> = ({
         </div>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
           <thead>
-            <tr style={{ backgroundColor: ACCENT, color: '#fff' }}>
+            <tr style={{ backgroundColor: 'transparent', color: '#000' }}>
               <th style={{ ...thStyle(), width: '36px' }}>Sl.</th>
               <th style={{ ...thStyle(), width: '40%' }}>Description</th>
               <th style={thStyle('center')}>Qty</th>
@@ -395,7 +396,7 @@ const ProductNormalQuotation: React.FC<ProductNormalQuotationProps> = ({
               <tr
                 key={idx}
                 style={{
-                  backgroundColor: idx % 2 === 0 ? '#fff' : '#f4fbf9',
+                  backgroundColor: idx % 2 === 0 ? '#fff' : '#f7f7f7',
                   borderBottom: '1px solid #eee',
                 }}
               >
@@ -405,7 +406,7 @@ const ProductNormalQuotation: React.FC<ProductNormalQuotationProps> = ({
                     style={{
                       fontSize: '11px',
                       color: '#1a1a1a',
-                      fontWeight: '400',
+                      fontWeight: '300',
                       maxWidth: '95%',
                       lineHeight: '1.6',
                     }}
@@ -423,8 +424,8 @@ const ProductNormalQuotation: React.FC<ProductNormalQuotationProps> = ({
                         <div
                           style={{
                             fontSize: '13px',
-                            fontWeight: '800',
-                            color: '#10b981',
+                            fontWeight: '300',
+                            color: '#000000',
                             textTransform: 'uppercase',
                             marginBottom: '6px',
                             marginTop: '16px',
@@ -435,11 +436,11 @@ const ProductNormalQuotation: React.FC<ProductNormalQuotationProps> = ({
                         {(item.features || []).map((f, i) => (
                           <div key={i} style={{ marginTop: '8px', fontSize: '11px' }}>
                             {f.subHeading && (
-                              <strong
-                                style={{ color: '#dc2626', display: 'block', marginBottom: '4px' }}
+                              <div
+                                style={{ color: '#000000', display: 'block', marginBottom: '4px' }}
                               >
                                 {f.subHeading}
-                              </strong>
+                              </div>
                             )}
                             {f.description && <div style={{ color: '#444' }}>{f.description}</div>}
                           </div>
@@ -452,24 +453,24 @@ const ProductNormalQuotation: React.FC<ProductNormalQuotationProps> = ({
                           marginTop: '12px',
                           fontSize: '11px',
                           color: '#1a1a1a',
-                          fontWeight: '400',
+                          fontWeight: '300',
                           lineHeight: '1.6',
                         }}
                       >
-                        <span style={{ color: '#dc2626', fontWeight: '700' }}>Warranty: </span>
+                        <span style={{ color: '#000000', fontWeight: '300' }}>Warranty: </span>
                         {(() => {
                           const parts = item.warranty.split(' ');
                           if (parts.length >= 2) {
                             return (
                               <>
-                                <span style={{ color: '#dc2626' }}>
+                                <span style={{ color: '#000000' }}>
                                   {parts[0]} {parts[1]}
                                 </span>
                                 <span> {parts.slice(2).join(' ')}</span>
                               </>
                             );
                           }
-                          return <span style={{ color: '#dc2626' }}>{item.warranty}</span>;
+                          return <span style={{ color: '#000000' }}>{item.warranty}</span>;
                         })()}
                       </div>
                     )}
@@ -536,7 +537,7 @@ const ProductNormalQuotation: React.FC<ProductNormalQuotationProps> = ({
                           padding: '12px 8px',
                           textAlign: 'right',
                           fontSize: '12px',
-                          fontWeight: '500',
+                          fontWeight: '300',
                         }}
                       >
                         {fmt(item.amount)}
@@ -597,7 +598,7 @@ const ProductNormalQuotation: React.FC<ProductNormalQuotationProps> = ({
                 display: 'flex',
                 flexDirection: 'column',
                 padding: '8px 0',
-                borderBottom: i === 2 ? `2px solid ${ACCENT}` : '1px solid #f0f0f0',
+                borderBottom: i === 2 ? `1px solid ${ACCENT}` : '1px solid #f0f0f0',
               }}
             >
               <div
@@ -608,7 +609,7 @@ const ProductNormalQuotation: React.FC<ProductNormalQuotationProps> = ({
                     fontSize: '12px',
                     textTransform: 'uppercase',
                     color: row.isBold ? ACCENT : '#000',
-                    fontWeight: row.isBold ? '800' : '400',
+                    fontWeight: '300',
                   }}
                 >
                   {row.label}
@@ -617,7 +618,7 @@ const ProductNormalQuotation: React.FC<ProductNormalQuotationProps> = ({
                   style={{
                     fontSize: '14px',
                     color: row.isBold ? ACCENT : '#000',
-                    fontWeight: row.isBold ? '800' : '400',
+                    fontWeight: '300',
                   }}
                 >
                   {row.prefix || ''}
@@ -642,12 +643,12 @@ const ProductNormalQuotation: React.FC<ProductNormalQuotationProps> = ({
               display: 'flex',
               flexDirection: 'column',
               padding: '12px 0',
-              fontWeight: '500',
+              fontWeight: '300',
             }}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontSize: '13px', textTransform: 'uppercase' }}>Balance Due</span>
-              <span style={{ fontSize: '15px', color: '#dc2626', fontWeight: '800' }}>
+              <span style={{ fontSize: '15px', color: '#000000', fontWeight: '300' }}>
                 QAR {fmt(totals.balanceDue)}
               </span>
             </div>
@@ -667,8 +668,8 @@ const ProductNormalQuotation: React.FC<ProductNormalQuotationProps> = ({
             <div
               style={{
                 textAlign: 'right',
-                color: '#16a34a',
-                fontWeight: '900',
+                color: '#000000',
+                fontWeight: '300',
                 fontSize: '18px',
                 marginTop: '4px',
                 letterSpacing: '1px',
@@ -693,7 +694,7 @@ const ProductNormalQuotation: React.FC<ProductNormalQuotationProps> = ({
           <div
             style={{
               fontSize: '14px',
-              fontWeight: '800',
+              fontWeight: '300',
               color: ACCENT,
               marginBottom: '24px',
               textTransform: 'uppercase',
@@ -709,7 +710,7 @@ const ProductNormalQuotation: React.FC<ProductNormalQuotationProps> = ({
                   <div
                     style={{
                       fontSize: '14px',
-                      fontWeight: '400',
+                      fontWeight: '300',
                       marginBottom: '12px',
                       color: '#444',
                     }}
@@ -719,14 +720,16 @@ const ProductNormalQuotation: React.FC<ProductNormalQuotationProps> = ({
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
                     <thead>
                       <tr
-                        style={{ backgroundColor: '#f9f9f9', borderBottom: `2px solid ${ACCENT}` }}
+                        style={{ backgroundColor: '#f9f9f9', borderBottom: `1px solid ${ACCENT}` }}
                       >
-                        <th style={{ ...thStyle('left', '#333'), fontWeight: '400' }}>Part Name</th>
-                        <th style={{ ...thStyle('left', '#333'), fontWeight: '400' }}>
+                        <th style={{ ...thStyle('left', '#333'), fontWeight: '300' }}>
+                          Part Number
+                        </th>
+                        <th style={{ ...thStyle('left', '#333'), fontWeight: '300' }}>
                           Description
                         </th>
-                        <th style={{ ...thStyle('center', '#333'), fontWeight: '400' }}>Yield</th>
-                        <th style={{ ...thStyle('right', '#333'), fontWeight: '400' }}>
+                        <th style={{ ...thStyle('center', '#333'), fontWeight: '300' }}>Yield</th>
+                        <th style={{ ...thStyle('right', '#333'), fontWeight: '300' }}>
                           Price (QAR)
                         </th>
                       </tr>
@@ -753,10 +756,10 @@ const ProductNormalQuotation: React.FC<ProductNormalQuotationProps> = ({
         <div
           style={{
             fontSize: '13px',
-            fontWeight: '800',
+            fontWeight: '300',
             color: ACCENT,
             textTransform: 'uppercase',
-            borderBottom: `2px solid ${ACCENT}`,
+
             paddingBottom: '5px',
             marginBottom: '12px',
           }}
@@ -788,11 +791,11 @@ const ProductNormalQuotation: React.FC<ProductNormalQuotationProps> = ({
         <div style={{ marginTop: '10px' }}>
           with warm regards,
           <br />
-          <strong style={{ display: 'block', marginTop: '4px', color: ACCENT }}>
+          <div style={{ display: 'block', marginTop: '4px', color: ACCENT }}>
             For
             <br />
             Xerocare Trading&services WLL
-          </strong>
+          </div>
           DOHA QTAR
         </div>
       </div>
@@ -815,7 +818,7 @@ const ProductNormalQuotation: React.FC<ProductNormalQuotationProps> = ({
             }}
           />
           <div style={{ borderTop: 'none', width: '100%', marginBottom: '6px' }}></div>
-          <div style={{ fontSize: '11px', fontWeight: '800', color: '#111' }}>
+          <div style={{ fontSize: '11px', fontWeight: '300', color: '#111' }}>
             AUTHORIZED SIGNATURE
           </div>
         </div>
@@ -824,7 +827,7 @@ const ProductNormalQuotation: React.FC<ProductNormalQuotationProps> = ({
       {/* ─── FOOTER ─── */}
       <div
         style={{
-          borderTop: `2px solid ${ACCENT}`,
+          borderTop: `1px solid ${ACCENT}`,
           paddingTop: '15px',
           display: 'flex',
           justifyContent: 'space-between',

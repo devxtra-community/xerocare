@@ -58,9 +58,10 @@ export class PaymentService {
     await this.paymentRepo.save(payment);
     logger.info(`Recorded payment of ${data.amountPaid} for Invoice ${invoice.invoiceNumber}`);
 
-    // If fully paid, optionally update invoice status (e.g., PAID or TRANSACTION_COMPLETED)
+    // Update invoice payment status based on how much has been collected
     const newTotalPaid = totalPaidSoFar + data.amountPaid;
     if (newTotalPaid >= Number(invoice.totalAmount) - 0.01) {
+      // Fully paid
       if (
         invoice.status !== InvoiceStatus.PAID &&
         invoice.status !== InvoiceStatus.TRANSACTION_COMPLETED
@@ -69,6 +70,13 @@ export class PaymentService {
         await this.invoiceRepo.save(invoice);
         logger.info(`Invoice ${invoice.invoiceNumber} marked as PAID`);
       }
+    } else if (newTotalPaid > 0) {
+      // Partially paid — some amount received but balance still outstanding
+      invoice.status = InvoiceStatus.PARTIAL;
+      await this.invoiceRepo.save(invoice);
+      logger.info(
+        `Invoice ${invoice.invoiceNumber} marked as PARTIAL (paid ${newTotalPaid} of ${invoice.totalAmount})`,
+      );
     }
 
     return payment;

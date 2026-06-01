@@ -866,7 +866,7 @@ export function InvoiceViewDialog({
                         <thead>
                           <tr className="bg-[#D1E5F4] border-b-[2px] border-black">
                             <th className="text-center py-2 px-4 text-[13px] font-black border-r-[2px] border-black w-[25%]">
-                              PART NAME
+                              PART NUMBER
                             </th>
                             <th className="text-center py-2 px-4 text-[13px] font-black border-r-[2px] border-black w-[40%]">
                               DESCRIPTION

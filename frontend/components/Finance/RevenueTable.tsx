@@ -9,7 +9,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { getInvoices, Invoice } from '@/lib/invoice';
+import { getInvoiceHistory, Invoice } from '@/lib/invoice';
 import { Loader2, RefreshCw, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -26,6 +26,18 @@ import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { formatCurrency } from '@/lib/format';
 
+// Revenue-generating statuses — covers SALE (PAID), RENT/LEASE (TRANSACTION_COMPLETED, ACTIVE_LEASE, etc.)
+const REVENUE_STATUSES = new Set([
+  'PAID',
+  'TRANSACTION_COMPLETED',
+  'ACTIVE_LEASE',
+  'FINANCE_APPROVED',
+  'APPROVED',
+  'ISSUED',
+  'EMPLOYEE_APPROVED',
+  'SENT',
+]);
+
 export default function RevenueTable() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
@@ -40,10 +52,13 @@ export default function RevenueTable() {
   const fetchInvoices = async () => {
     setLoading(true);
     try {
-      const data = await getInvoices();
-      // Only show paid invoices as per request to see only realized income
-      const paidOnly = (data || []).filter((inv: Invoice) => inv.status === 'PAID');
-      setInvoices(paidOnly);
+      // getInvoiceHistory returns finalized invoices for the branch across all saleTypes
+      const data = await getInvoiceHistory();
+      // Include all revenue-generating statuses (not just PAID)
+      const revenueInvoices = (data || []).filter((inv: Invoice) =>
+        REVENUE_STATUSES.has(inv.status),
+      );
+      setInvoices(revenueInvoices);
     } catch (error) {
       console.error('Failed to fetch invoices:', error);
       toast.error('Failed to load revenue data');
@@ -56,7 +71,6 @@ export default function RevenueTable() {
     fetchInvoices();
   }, []);
 
-  // Move filteredRows and useEffect up before early return
   // Flatten invoices to rows (one row per item)
   const rows = invoices.flatMap((invoice) => {
     // Filter out PRICING_RULE items because they are metadata/config, not separate revenue products
@@ -88,7 +102,6 @@ export default function RevenueTable() {
       createdAt: invoice.createdAt,
       product: item.description,
       qty: item.quantity || 1,
-      // For line items, we ideally want line item amount, but invoice often has unitPrice/quantity
       amount:
         Number(item.unitPrice) > 0
           ? Number(item.unitPrice) * (item.quantity || 1)
@@ -199,7 +212,9 @@ export default function RevenueTable() {
                       className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
                         row.saleType === 'RENT'
                           ? 'bg-blue-100 text-blue-700'
-                          : row.saleType === 'SALE'
+                          : row.saleType === 'SALE' ||
+                              row.saleType === 'PRODUCT_SALE' ||
+                              row.saleType === 'SPAREPART_SALE'
                             ? 'bg-emerald-100 text-emerald-700'
                             : 'bg-purple-100 text-purple-700'
                       }`}
@@ -219,7 +234,9 @@ export default function RevenueTable() {
                       className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
                         row.status === 'APPROVED' ||
                         row.status === 'FINANCE_APPROVED' ||
-                        row.status === 'PAID'
+                        row.status === 'PAID' ||
+                        row.status === 'TRANSACTION_COMPLETED' ||
+                        row.status === 'ACTIVE_LEASE'
                           ? 'bg-emerald-100 text-emerald-700'
                           : row.status === 'REJECTED' || row.status === 'FINANCE_REJECTED'
                             ? 'bg-red-100 text-red-700'

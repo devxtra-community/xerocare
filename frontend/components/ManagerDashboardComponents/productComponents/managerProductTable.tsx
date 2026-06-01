@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -118,30 +118,22 @@ function ProductViewModal({ product, onClose }: { product: Product; onClose: () 
                     </span>
                   </div>
                   <div className="flex justify-between py-2 border-b border-slate-50">
-                    <span className="text-slate-500 font-normal">Serial No</span>
-                    <span className="text-slate-800 font-mono text-[11px] font-normal">
-                      {product.serial_no}
-                    </span>
-                  </div>
-                  <div className="flex justify-between py-2 border-b border-slate-50">
-                    <span className="text-slate-500 font-normal">Warranty</span>
-                    <span className="text-slate-800 font-normal">{product.warranty || '-'}</span>
-                  </div>
-                  <div className="flex justify-between py-2 border-b border-slate-50">
-                    <span className="text-slate-500 font-normal">Print Colour</span>
-                    <span className="text-slate-800 font-normal">{product.print_colour}</span>
-                  </div>
-                  <div className="flex justify-between py-2 border-b border-slate-50">
-                    <span className="text-slate-500 font-normal">HS Code</span>
-                    <span className="text-slate-800 font-mono text-[11px] font-normal">
-                      {product.hs_code || '-'}
-                    </span>
-                  </div>
-                  <div className="flex justify-between py-2 border-b border-slate-50">
-                    <span className="text-slate-500 font-normal">Lot ID</span>
-                    <span className="text-slate-800 font-mono text-[11px] font-normal">
-                      {product.lot?.lotNumber || '-'}
-                    </span>
+                    <div className="flex justify-between py-2 border-b border-slate-50">
+                      <span className="text-slate-500 font-normal">Print Colour</span>
+                      <span className="text-slate-800 font-normal">{product.print_colour}</span>
+                    </div>
+                    <div className="flex justify-between py-2 border-b border-slate-50">
+                      <span className="text-slate-500 font-normal">HS Code</span>
+                      <span className="text-slate-800 font-mono text-[11px] font-normal">
+                        {product.hs_code || '-'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between py-2 border-b border-slate-50">
+                      <span className="text-slate-500 font-normal">Lot ID</span>
+                      <span className="text-slate-800 font-mono text-[11px] font-normal">
+                        {product.lot?.lotNumber || '-'}
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -189,7 +181,9 @@ function ProductViewModal({ product, onClose }: { product: Product; onClose: () 
                     <table className="w-full text-left text-xs border-collapse">
                       <thead className="bg-slate-50 text-slate-500 border-b border-slate-200">
                         <tr>
-                          <th className="px-4 py-2 font-semibold uppercase tracking-wider">Part</th>
+                          <th className="px-4 py-2 font-semibold uppercase tracking-wider">
+                            Part Number
+                          </th>
                           <th className="px-4 py-2 font-semibold uppercase tracking-wider">Desc</th>
                           <th className="px-4 py-2 font-semibold uppercase tracking-wider">
                             Yield
@@ -433,20 +427,6 @@ export default function ManagerProduct() {
             header: 'HS CODE',
             cell: (p: Product) => <span className="font-mono text-[11px]">{p.hs_code || '-'}</span>,
           },
-          {
-            id: 'warranty',
-            header: 'WARRANTY',
-            cell: (p: Product) => {
-              if (!p.warranty) return '-';
-              const match = p.warranty.match(/^(\d+\s*(?:Year|Month|Yr|Mo)s?)/i);
-              const display = match ? match[1] : p.warranty;
-              return (
-                <span className="text-[11px]" title={p.warranty}>
-                  {display}
-                </span>
-              );
-            },
-          },
           { id: 'color', header: 'PRINT COLOUR', accessorKey: 'print_colour' as keyof Product },
           {
             id: 'status',
@@ -592,7 +572,6 @@ function ProductFormModal({
     lot_id: string;
     description: string;
     hs_code: string;
-    warranty: string;
     consumables: { partName: string; description: string; yield: string; price: string }[];
     features: { subHeading: string; description: string }[];
   }>({
@@ -614,7 +593,6 @@ function ProductFormModal({
     lot_id: initialData?.lot_id || '', // Check if initialData has lot_id support if needed
     description: initialData?.description || '',
     hs_code: initialData?.hs_code || '',
-    warranty: initialData?.warranty || '',
     consumables: initialData?.consumables || [],
     features: initialData?.features || [{ subHeading: '', description: '' }],
   });
@@ -901,7 +879,7 @@ function ProductFormModal({
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <div className="col-span-1">
                     <label className="text-[11px] font-semibold text-slate-500 uppercase mb-1 block">
-                      Part Name
+                      Part Number
                     </label>
                     <Input
                       value={consumable.partName}
@@ -1184,13 +1162,6 @@ function ProductFormModal({
                 value={form.hs_code || ''}
                 onChange={(e) => setForm({ ...form, hs_code: e.target.value })}
                 placeholder="HS Code"
-              />
-            </Field>
-            <Field label="Warranty">
-              <Input
-                value={form.warranty || ''}
-                onChange={(e) => setForm({ ...form, warranty: e.target.value })}
-                placeholder="e.g. 1 Year"
               />
             </Field>
           </div>

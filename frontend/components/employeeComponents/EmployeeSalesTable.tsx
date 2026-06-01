@@ -309,7 +309,7 @@ export default function EmployeeSalesTable({ mode = 'EMPLOYEE' }: EmployeeSalesT
                 <TableHead className="text-primary font-bold">ITEMS</TableHead>
                 <TableHead className="text-primary font-bold">AMOUNT</TableHead>
                 <TableHead className="text-primary font-bold">TYPE</TableHead>
-                <TableHead className="text-primary font-bold">STATUS</TableHead>
+                <TableHead className="text-primary font-bold">PAYMENT STATUS</TableHead>
                 <TableHead className="text-primary font-bold">DATE</TableHead>
                 <TableHead className="text-primary font-bold text-center">ACTION</TableHead>
               </TableRow>
@@ -370,29 +370,26 @@ export default function EmployeeSalesTable({ mode = 'EMPLOYEE' }: EmployeeSalesT
                     </TableCell>
 
                     <TableCell>
-                      <Badge
-                        className={`rounded-full px-3 py-0.5 text-[10px] font-bold tracking-wider shadow-none
-                        ${
-                          inv.status === 'PAID' || inv.status === 'FINANCE_APPROVED'
-                            ? 'bg-green-100 text-green-700 hover:bg-green-100'
-                            : inv.status === 'PENDING' ||
-                                inv.status === 'TRANSACTION_COMPLETED' ||
-                                inv.status === 'EMPLOYEE_APPROVED'
-                              ? 'bg-blue-100 text-blue-700 hover:bg-blue-100'
-                              : inv.status === 'FINANCE_REJECTED' || inv.status === 'REJECTED'
-                                ? 'bg-red-100 text-red-700 hover:bg-red-100'
-                                : 'bg-slate-100 text-slate-700 hover:bg-slate-100'
-                        }`}
-                      >
-                        {inv.status === 'TRANSACTION_COMPLETED' ||
-                        inv.status === 'EMPLOYEE_APPROVED'
-                          ? 'PENDING FINANCE'
-                          : inv.status === 'FINANCE_REJECTED'
-                            ? 'FINANCE REJECTED'
-                            : inv.status === 'FINANCE_APPROVED'
-                              ? 'APPROVED'
-                              : inv.status}
-                      </Badge>
+                      {(() => {
+                        // Derive a clean payment status from the invoice status
+                        const isPaid = inv.status === 'PAID';
+                        const isPartial = inv.status === 'PARTIAL';
+                        // Any other active status (TRANSACTION_COMPLETED, EMPLOYEE_APPROVED, FINANCE_APPROVED, etc.)
+                        // means no payment received yet → PENDING
+                        const label = isPaid ? 'PAID' : isPartial ? 'PARTIAL' : 'PENDING';
+                        const cls = isPaid
+                          ? 'bg-green-100 text-green-700 hover:bg-green-100'
+                          : isPartial
+                            ? 'bg-amber-100 text-amber-700 hover:bg-amber-100'
+                            : 'bg-slate-100 text-slate-600 hover:bg-slate-100';
+                        return (
+                          <Badge
+                            className={`rounded-full px-3 py-0.5 text-[10px] font-bold tracking-wider shadow-none ${cls}`}
+                          >
+                            {label}
+                          </Badge>
+                        );
+                      })()}
                     </TableCell>
                     <TableCell className="text-muted-foreground text-sm font-medium">
                       {new Date(inv.createdAt).toLocaleDateString(undefined, {

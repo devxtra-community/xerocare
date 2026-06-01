@@ -12,6 +12,7 @@ export enum InvoiceStatus {
   CUSTOMER_REJECTED = 'CUSTOMER_REJECTED', // Customer rejected the quotation via email/whatsapp link
   ISSUED = 'ISSUED',
   PAID = 'PAID',
+  PARTIAL = 'PARTIAL', // Partially paid — some amount received but balance still outstanding
   CANCELLED = 'CANCELLED',
   PENDING = 'PENDING', // @deprecated - added to fix db sync issue
   TRANSACTION_COMPLETED = 'TRANSACTION_COMPLETED',

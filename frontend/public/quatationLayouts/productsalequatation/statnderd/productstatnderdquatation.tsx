@@ -953,7 +953,7 @@ const ProductStandardQuotation: React.FC<ProductStandardQuotationProps> = ({
                           fontWeight: '400',
                         }}
                       >
-                        Part Name
+                        Part Number
                       </th>
                       <th
                         style={{

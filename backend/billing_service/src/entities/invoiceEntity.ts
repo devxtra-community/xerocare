@@ -76,8 +76,7 @@ export class Invoice {
   totalAmount!: number;
 
   @Column({
-    type: 'enum',
-    enum: InvoiceStatus,
+    type: 'varchar',
     default: InvoiceStatus.DRAFT,
   })
   status!: InvoiceStatus;

@@ -1051,7 +1051,7 @@ const ProductPremiumQuotation: React.FC<ProductPremiumQuotationProps> = ({
                             fontWeight: '400',
                           }}
                         >
-                          Part Name
+                          Part Number
                         </th>
                         <th
                           style={{

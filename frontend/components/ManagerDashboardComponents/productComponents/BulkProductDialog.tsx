@@ -157,7 +157,6 @@ export function BulkProductDialog({
     wholesale_price: 0,
     lot_id: '',
     hs_code: '',
-    warranty: '',
   });
 
   /**
@@ -253,7 +252,6 @@ export function BulkProductDialog({
         wholesale_price: Number(getVal(['wholesale_price', 'Wholesale Price'])) || 0,
         lot_id: getVal(['lot_id', 'Lot ID', 'Lot']),
         hs_code: getVal(['hs_code', 'HS Code', 'HSCODE']),
-        warranty: getVal(['warranty', 'Warranty', 'Warranty Period', 'Guarantee']),
       };
     });
 
@@ -442,7 +440,6 @@ export function BulkProductDialog({
                     <TableHead className="min-w-[140px]">Print Colour</TableHead>
                     <TableHead className="min-w-[130px]">HS Code</TableHead>
                     <TableHead className="min-w-[130px]">Max Discount</TableHead>
-                    <TableHead className="min-w-[150px]">Warranty</TableHead>
                     <TableHead className="min-w-[60px]"></TableHead>
                   </TableRow>
                 </TableHeader>
@@ -673,14 +670,6 @@ export function BulkProductDialog({
                               updateRow(i, 'max_discount_amount', Number(e.target.value))
                             }
                             placeholder="0"
-                            className="min-w-full"
-                          />
-                        </TableCell>
-                        <TableCell className="min-w-[150px]">
-                          <Input
-                            value={row.warranty || ''}
-                            onChange={(e) => updateRow(i, 'warranty', e.target.value)}
-                            placeholder="e.g. 1 Year"
                             className="min-w-full"
                           />
                         </TableCell>

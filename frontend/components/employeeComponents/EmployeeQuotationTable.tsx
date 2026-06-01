@@ -97,6 +97,7 @@ interface SaleItem {
   productName?: string;
   hsCode?: string;
   itemType: 'PRODUCT' | 'SPAREPART';
+  warranty?: string;
   isEditable: boolean;
   bwIncludedLimit?: number;
   colorIncludedLimit?: number;
@@ -108,7 +109,6 @@ interface SaleItem {
   colorSlabRanges?: Array<{ from: string; to: string; rate: string }>;
   comboSlabRanges?: Array<{ from: string; to: string; rate: string }>;
   consumables?: Consumable[];
-  warranty?: string;
 }
 
 // ─── Status Badge ─────────────────────────────────────────────────────────────
@@ -1648,6 +1648,7 @@ function QuotationFormModal({
             sparePartId: it.sparePartId,
             modelId: it.modelId,
             itemType: it.itemType,
+            warranty: it.warranty,
           };
         }),
       };
@@ -1699,6 +1700,7 @@ function QuotationFormModal({
             description: desc,
             unitPrice: 0,
             productId: undefined,
+            warranty: it.warranty,
           };
         }),
         pricingItems: [],
@@ -1765,6 +1767,7 @@ function QuotationFormModal({
             itemType: it.itemType,
             productId: undefined,
             modelId: it.modelId,
+            warranty: it.warranty,
             ...(leaseType === 'FSM'
               ? {
                   bwIncludedLimit: rentType === 'FIXED_LIMIT' ? it.bwIncludedLimit || 0 : 0,
@@ -2260,6 +2263,17 @@ function QuotationFormModal({
                                   />
                                 </div>
                                 <div className="md:col-span-2 space-y-1">
+                                  <label className="text-[9px] font-bold text-slate-400 uppercase">
+                                    Warranty
+                                  </label>
+                                  <Input
+                                    placeholder="e.g. 1 Year"
+                                    value={item.warranty}
+                                    onChange={(e) => updateItem(index, 'warranty', e.target.value)}
+                                    className="h-9 text-sm bg-slate-50/50"
+                                  />
+                                </div>
+                                <div className="md:col-span-2 space-y-1">
                                   <label className="text-[9px] font-bold text-slate-400 uppercase text-right block">
                                     Rate
                                   </label>
@@ -2304,6 +2318,18 @@ function QuotationFormModal({
                                     }
                                     readOnly={!item.isManual}
                                     className={`h-9 font-bold text-sm ${!item.isManual ? 'bg-muted/50 border-transparent' : ''}`}
+                                  />
+                                </div>
+
+                                <div className="md:col-span-2 space-y-1">
+                                  <label className="text-[9px] font-bold text-slate-400 uppercase">
+                                    Warranty
+                                  </label>
+                                  <Input
+                                    placeholder="e.g. 1 Year"
+                                    value={item.warranty}
+                                    onChange={(e) => updateItem(index, 'warranty', e.target.value)}
+                                    className="h-9 text-sm bg-slate-50/50"
                                   />
                                 </div>
 

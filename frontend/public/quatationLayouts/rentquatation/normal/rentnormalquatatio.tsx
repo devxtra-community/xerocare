@@ -72,15 +72,15 @@ export interface RentNormalQuotationProps {
 const fmt = (n: number) =>
   n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-const ACCENT = '#00A389';
+const ACCENT = '#000000';
 
 const thStyle = (
   align: 'left' | 'center' | 'right' = 'left',
-  color = '#fff',
+  color = '#000',
 ): React.CSSProperties => ({
   padding: '10px 10px',
   textAlign: align,
-  fontWeight: '800',
+  fontWeight: '300',
   fontSize: '11px',
   letterSpacing: '0.5px',
   textTransform: 'uppercase',
@@ -168,8 +168,8 @@ const RentNormalQuotation: React.FC<RentNormalQuotationProps> = ({
       <div style={{ textAlign: 'center', marginBottom: '28px' }}>
         <div
           style={{
-            fontSize: '26px',
-            fontWeight: '800',
+            fontSize: '22px',
+            fontWeight: '300',
             color: ACCENT,
             textTransform: 'uppercase',
             letterSpacing: '2px',
@@ -182,7 +182,7 @@ const RentNormalQuotation: React.FC<RentNormalQuotationProps> = ({
       {/* ─── HEADER ─── */}
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '32px' }}>
         <div>
-          <div style={{ fontSize: '17px', fontWeight: '800', color: ACCENT, marginBottom: '6px' }}>
+          <div style={{ fontSize: '17px', fontWeight: '300', color: ACCENT, marginBottom: '6px' }}>
             {companyInfo.name}
           </div>
           <div style={{ fontSize: '12px', color: '#333', lineHeight: '1.5' }}>
@@ -210,7 +210,7 @@ const RentNormalQuotation: React.FC<RentNormalQuotationProps> = ({
             <div
               style={{
                 fontSize: '20px',
-                fontWeight: 'bold',
+                fontWeight: 'normal',
                 color: '#ccc',
                 border: '2px solid #ccc',
                 padding: '8px 16px',
@@ -236,7 +236,7 @@ const RentNormalQuotation: React.FC<RentNormalQuotationProps> = ({
           <div
             style={{
               fontSize: '13px',
-              fontWeight: '800',
+              fontWeight: '300',
               color: ACCENT,
               marginBottom: '6px',
               textTransform: 'uppercase',
@@ -244,7 +244,7 @@ const RentNormalQuotation: React.FC<RentNormalQuotationProps> = ({
           >
             Bill To
           </div>
-          <div style={{ fontSize: '14px', fontWeight: '700', marginBottom: '4px' }}>
+          <div style={{ fontSize: '14px', fontWeight: '300', marginBottom: '4px' }}>
             {billTo.name}
           </div>
           <div
@@ -267,18 +267,18 @@ const RentNormalQuotation: React.FC<RentNormalQuotationProps> = ({
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
           <div style={{ width: '230px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-              <span style={{ fontSize: '13px', fontWeight: '400', color: '#111' }}>
+              <span style={{ fontSize: '13px', fontWeight: '300', color: '#111' }}>
                 Quotation No :
               </span>
-              <span style={{ fontSize: '13px', fontWeight: '800' }}>{quotation.number}</span>
+              <span style={{ fontSize: '13px', fontWeight: '300' }}>{quotation.number}</span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
               <span style={{ fontSize: '12px', color: '#555' }}>Date :</span>
-              <span style={{ fontSize: '12px', fontWeight: '600' }}>{quotation.date}</span>
+              <span style={{ fontSize: '12px', fontWeight: '300' }}>{quotation.date}</span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
               <span style={{ fontSize: '12px', color: '#555' }}>Due Date :</span>
-              <span style={{ fontSize: '12px', fontWeight: '600' }}>{quotation.dueDate}</span>
+              <span style={{ fontSize: '12px', fontWeight: '300' }}>{quotation.dueDate}</span>
             </div>
           </div>
         </div>
@@ -297,7 +297,7 @@ const RentNormalQuotation: React.FC<RentNormalQuotationProps> = ({
         <div
           style={{
             fontSize: '11px',
-            fontWeight: '800',
+            fontWeight: '300',
             color: ACCENT,
             textTransform: 'uppercase',
             marginBottom: '10px',
@@ -310,7 +310,7 @@ const RentNormalQuotation: React.FC<RentNormalQuotationProps> = ({
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px 24px' }}>
           <div>
             <div style={{ fontSize: '10px', color: '#888', textTransform: 'uppercase' }}>Brand</div>
-            <div style={{ fontSize: '13px', fontWeight: '700' }}>
+            <div style={{ fontSize: '13px', fontWeight: '300' }}>
               {lineItems[0]?.brand || 'N/A'}
             </div>
           </div>
@@ -318,7 +318,7 @@ const RentNormalQuotation: React.FC<RentNormalQuotationProps> = ({
             <div style={{ fontSize: '10px', color: '#888', textTransform: 'uppercase' }}>
               Product Name
             </div>
-            <div style={{ fontSize: '13px', fontWeight: '700' }}>
+            <div style={{ fontSize: '13px', fontWeight: '300' }}>
               {lineItems[0]?.productName || 'N/A'}
             </div>
           </div>
@@ -326,7 +326,7 @@ const RentNormalQuotation: React.FC<RentNormalQuotationProps> = ({
             <div style={{ fontSize: '10px', color: '#888', textTransform: 'uppercase' }}>
               Model Name
             </div>
-            <div style={{ fontSize: '13px', fontWeight: '700' }}>
+            <div style={{ fontSize: '13px', fontWeight: '300' }}>
               {lineItems[0]?.modelName || 'N/A'}
             </div>
           </div>
@@ -334,7 +334,7 @@ const RentNormalQuotation: React.FC<RentNormalQuotationProps> = ({
             <div style={{ fontSize: '10px', color: '#888', textTransform: 'uppercase' }}>
               Model Number
             </div>
-            <div style={{ fontSize: '13px', fontWeight: '700' }}>
+            <div style={{ fontSize: '13px', fontWeight: '300' }}>
               {lineItems[0]?.modelNo || lineItems[0]?.model || 'N/A'}
             </div>
           </div>
@@ -342,7 +342,7 @@ const RentNormalQuotation: React.FC<RentNormalQuotationProps> = ({
             <div style={{ fontSize: '10px', color: '#888', textTransform: 'uppercase' }}>
               Serial Number
             </div>
-            <div style={{ fontSize: '13px', fontWeight: '700' }}>{lineItems[0]?.slNo || 'TBD'}</div>
+            <div style={{ fontSize: '13px', fontWeight: '300' }}>{lineItems[0]?.slNo || 'TBD'}</div>
           </div>
         </div>
       </div>
@@ -352,10 +352,10 @@ const RentNormalQuotation: React.FC<RentNormalQuotationProps> = ({
         <div
           style={{
             fontSize: '13px',
-            fontWeight: '800',
+            fontWeight: '300',
             color: ACCENT,
             textTransform: 'uppercase',
-            borderBottom: `2px solid ${ACCENT}`,
+            borderBottom: `1px solid ${ACCENT}`,
             paddingBottom: '5px',
             marginBottom: '10px',
           }}
@@ -364,7 +364,14 @@ const RentNormalQuotation: React.FC<RentNormalQuotationProps> = ({
         </div>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
           <thead>
-            <tr style={{ backgroundColor: ACCENT, color: '#fff' }}>
+            <tr
+              style={{
+                backgroundColor: 'transparent',
+                color: '#000',
+                borderTop: '2.5px solid #000',
+                borderBottom: '2.5px solid #000',
+              }}
+            >
               <th style={{ ...thStyle(), width: '36px' }}>Sl.</th>
               <th style={{ ...thStyle(), width: '50%' }}>Description</th>
               <th style={thStyle('center')}>Qty</th>
@@ -377,7 +384,7 @@ const RentNormalQuotation: React.FC<RentNormalQuotationProps> = ({
               <tr
                 key={idx}
                 style={{
-                  backgroundColor: idx % 2 === 0 ? '#fff' : '#f4fbf9',
+                  backgroundColor: idx % 2 === 0 ? '#fff' : '#f7f7f7',
                   borderBottom: '1px solid #eee',
                 }}
               >
@@ -387,7 +394,7 @@ const RentNormalQuotation: React.FC<RentNormalQuotationProps> = ({
                     style={{
                       fontSize: '11px',
                       color: '#1a1a1a',
-                      fontWeight: '600',
+                      fontWeight: '300',
                       maxWidth: '95%',
                       lineHeight: '1.6',
                     }}
@@ -395,7 +402,7 @@ const RentNormalQuotation: React.FC<RentNormalQuotationProps> = ({
                     <div
                       style={{
                         fontSize: '13px',
-                        fontWeight: '800',
+                        fontWeight: '300',
                         color: '#dc2626',
                         textTransform: 'uppercase',
                         marginBottom: '6px',
@@ -411,7 +418,7 @@ const RentNormalQuotation: React.FC<RentNormalQuotationProps> = ({
                         <div
                           style={{
                             fontSize: '13px',
-                            fontWeight: '800',
+                            fontWeight: '300',
                             color: '#10b981',
                             textTransform: 'uppercase',
                             marginBottom: '6px',
@@ -423,11 +430,11 @@ const RentNormalQuotation: React.FC<RentNormalQuotationProps> = ({
                         {(item.features || []).map((f, i) => (
                           <div key={i} style={{ marginTop: '8px', fontSize: '11px' }}>
                             {f.subHeading && (
-                              <strong
+                              <div
                                 style={{ color: '#dc2626', display: 'block', marginBottom: '4px' }}
                               >
                                 {f.subHeading}
-                              </strong>
+                              </div>
                             )}
                             {f.description && <div style={{ color: '#444' }}>{f.description}</div>}
                           </div>
@@ -440,11 +447,11 @@ const RentNormalQuotation: React.FC<RentNormalQuotationProps> = ({
                           marginTop: '12px',
                           fontSize: '11px',
                           color: '#1a1a1a',
-                          fontWeight: '400',
+                          fontWeight: '300',
                           lineHeight: '1.6',
                         }}
                       >
-                        <span style={{ color: '#dc2626', fontWeight: '700' }}>Warranty: </span>
+                        <span style={{ color: '#dc2626', fontWeight: '300' }}>Warranty: </span>
                         {(() => {
                           const parts = item.warranty.split(' ');
                           if (parts.length >= 2) {
@@ -478,10 +485,10 @@ const RentNormalQuotation: React.FC<RentNormalQuotationProps> = ({
           <div
             style={{
               fontSize: '13px',
-              fontWeight: '800',
+              fontWeight: '300',
               color: ACCENT,
               textTransform: 'uppercase',
-              borderBottom: `2px solid ${ACCENT}`,
+              borderBottom: `1px solid ${ACCENT}`,
               paddingBottom: '5px',
               marginBottom: '14px',
             }}
@@ -506,7 +513,7 @@ const RentNormalQuotation: React.FC<RentNormalQuotationProps> = ({
                     <div
                       style={{
                         fontSize: '11px',
-                        fontWeight: '800',
+                        fontWeight: '300',
                         color: '#475569',
                         marginBottom: '12px',
                         display: 'flex',
@@ -546,7 +553,7 @@ const RentNormalQuotation: React.FC<RentNormalQuotationProps> = ({
                                 borderRadius: '2px',
                               }}
                             />
-                            <span style={{ fontSize: '10px', fontWeight: '900', color: '#1e293b' }}>
+                            <span style={{ fontSize: '10px', fontWeight: '300', color: '#1e293b' }}>
                               B&W RATE TABLE
                             </span>
                           </div>
@@ -561,12 +568,12 @@ const RentNormalQuotation: React.FC<RentNormalQuotationProps> = ({
                                   borderBottom: '1px solid #e2e8f0',
                                 }}
                               >
-                                <th style={{ padding: '6px 0', fontWeight: '600' }}>Page Range</th>
+                                <th style={{ padding: '6px 0', fontWeight: '300' }}>Page Range</th>
                                 <th
                                   style={{
                                     padding: '6px 0',
                                     textAlign: 'right',
-                                    fontWeight: '600',
+                                    fontWeight: '300',
                                   }}
                                 >
                                   Rate
@@ -586,7 +593,7 @@ const RentNormalQuotation: React.FC<RentNormalQuotationProps> = ({
                                     style={{
                                       padding: '6px 0',
                                       textAlign: 'right',
-                                      fontWeight: '900',
+                                      fontWeight: '300',
                                       color: '#0f172a',
                                     }}
                                   >
@@ -617,7 +624,7 @@ const RentNormalQuotation: React.FC<RentNormalQuotationProps> = ({
                                 borderRadius: '2px',
                               }}
                             />
-                            <span style={{ fontSize: '10px', fontWeight: '900', color: '#1e293b' }}>
+                            <span style={{ fontSize: '10px', fontWeight: '300', color: '#1e293b' }}>
                               COLOR RATE TABLE
                             </span>
                           </div>
@@ -632,12 +639,12 @@ const RentNormalQuotation: React.FC<RentNormalQuotationProps> = ({
                                   borderBottom: '1px solid #e2e8f0',
                                 }}
                               >
-                                <th style={{ padding: '6px 0', fontWeight: '600' }}>Page Range</th>
+                                <th style={{ padding: '6px 0', fontWeight: '300' }}>Page Range</th>
                                 <th
                                   style={{
                                     padding: '6px 0',
                                     textAlign: 'right',
-                                    fontWeight: '600',
+                                    fontWeight: '300',
                                   }}
                                 >
                                   Rate
@@ -657,7 +664,7 @@ const RentNormalQuotation: React.FC<RentNormalQuotationProps> = ({
                                     style={{
                                       padding: '6px 0',
                                       textAlign: 'right',
-                                      fontWeight: '900',
+                                      fontWeight: '300',
                                       color: '#b91c1c',
                                     }}
                                   >
@@ -682,11 +689,11 @@ const RentNormalQuotation: React.FC<RentNormalQuotationProps> = ({
         <div
           style={{
             fontSize: '13px',
-            fontWeight: '800',
+            fontWeight: '300',
             color: ACCENT,
             marginBottom: '12px',
             textTransform: 'uppercase',
-            borderBottom: `2px solid ${ACCENT}`,
+            borderBottom: `1px solid ${ACCENT}`,
             paddingBottom: '5px',
           }}
         >
@@ -714,14 +721,14 @@ const RentNormalQuotation: React.FC<RentNormalQuotationProps> = ({
               <td style={tdStyle('center')}>{agreementDetails.duration}</td>
               <td style={tdStyle('center')}>
                 {agreementDetails.discountPercent && agreementDetails.discountPercent > 0 ? (
-                  <span style={{ color: '#16a34a', fontWeight: '800' }}>
+                  <span style={{ color: '#16a34a', fontWeight: '300' }}>
                     {agreementDetails.discountPercent}%
                   </span>
                 ) : (
                   '0%'
                 )}
               </td>
-              <td style={{ ...tdStyle('right'), fontWeight: '700', color: ACCENT }}>
+              <td style={{ ...tdStyle('right'), fontWeight: '300', color: ACCENT }}>
                 QAR{' '}
                 {fmt(agreementDetails.discountedMonthlyRent || agreementDetails.monthlyRentAmount)}
               </td>
@@ -774,7 +781,7 @@ const RentNormalQuotation: React.FC<RentNormalQuotationProps> = ({
                 display: 'flex',
                 flexDirection: 'column',
                 padding: '8px 0',
-                borderBottom: i === 2 ? `2px solid ${ACCENT}` : '1px solid #f0f0f0',
+                borderBottom: i === 2 ? `1px solid ${ACCENT}` : '1px solid #f0f0f0',
               }}
             >
               <div
@@ -822,10 +829,10 @@ const RentNormalQuotation: React.FC<RentNormalQuotationProps> = ({
         <div
           style={{
             fontSize: '13px',
-            fontWeight: '800',
+            fontWeight: '300',
             color: ACCENT,
             textTransform: 'uppercase',
-            borderBottom: `2px solid ${ACCENT}`,
+            borderBottom: `1px solid ${ACCENT}`,
             paddingBottom: '5px',
             marginBottom: '12px',
           }}
@@ -858,7 +865,7 @@ const RentNormalQuotation: React.FC<RentNormalQuotationProps> = ({
             }}
           />
           <div style={{ borderTop: '1px solid #111', width: '100%', marginBottom: '6px' }}></div>
-          <div style={{ fontSize: '11px', fontWeight: '800', color: '#111' }}>
+          <div style={{ fontSize: '11px', fontWeight: '300', color: '#111' }}>
             AUTHORIZED SIGNATURE
           </div>
         </div>
@@ -867,7 +874,7 @@ const RentNormalQuotation: React.FC<RentNormalQuotationProps> = ({
       {/* ─── FOOTER ─── */}
       <div
         style={{
-          borderTop: `2px solid ${ACCENT}`,
+          borderTop: `1px solid ${ACCENT}`,
           paddingTop: '15px',
           display: 'flex',
           justifyContent: 'space-between',
