@@ -9,6 +9,9 @@ export class ProductRepository {
    * Adds a new product.
    */
   async addProduct(entity: Partial<Product>) {
+    if (entity.serial_no && !entity.barcode_id) {
+      entity.barcode_id = `XC-P-${entity.serial_no}`;
+    }
     return this.repo.save(entity);
   }
 

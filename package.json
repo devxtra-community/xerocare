@@ -42,5 +42,14 @@
     "reflect-metadata": "^0.2.2",
     "typeorm": "^0.3.28",
     "winston": "^3.19.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "canvas",
+      "bcrypt",
+      "sharp",
+      "unrs-resolver",
+      "core-js"
+    ]
   }
 }

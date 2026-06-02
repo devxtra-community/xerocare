@@ -100,6 +100,38 @@ export const connectWithRetry = async (initialDelayMs = 2000): Promise<DataSourc
           ADD COLUMN IF NOT EXISTS consumables JSONB
         `);
         logger.info('Guaranteed warranty and consumables columns exist on products table.');
+
+        // Ensure barcode_id column exists on products and spare_parts tables
+        await Source.query(`
+          ALTER TABLE products ADD COLUMN IF NOT EXISTS barcode_id VARCHAR(255);
+        `);
+        await Source.query(`
+          UPDATE products SET barcode_id = 'XC-P-' || serial_no WHERE barcode_id IS NULL;
+        `);
+        try {
+          await Source.query(`
+            ALTER TABLE products ADD CONSTRAINT products_barcode_id_unique UNIQUE (barcode_id);
+          `);
+        } catch {
+          // Unique constraint already exists
+        }
+
+        await Source.query(`
+          ALTER TABLE spare_parts ADD COLUMN IF NOT EXISTS barcode_id VARCHAR(255);
+        `);
+        await Source.query(`
+          UPDATE spare_parts SET barcode_id = 'XC-S-' || item_code WHERE barcode_id IS NULL;
+        `);
+        try {
+          await Source.query(`
+            ALTER TABLE spare_parts ADD CONSTRAINT spare_parts_barcode_id_unique UNIQUE (barcode_id);
+          `);
+        } catch {
+          // Unique constraint already exists
+        }
+        logger.info(
+          'Guaranteed barcode_id column and constraints exist on products and spare_parts tables.',
+        );
       }
       return Source;
     } catch (error: unknown) {

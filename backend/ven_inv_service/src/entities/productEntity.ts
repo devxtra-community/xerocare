@@ -7,6 +7,7 @@ import {
   JoinColumn,
   Index,
   Check,
+  BeforeInsert,
 } from 'typeorm';
 import { Model } from './modelEntity';
 import { Warehouse } from './warehouseEntity';
@@ -144,6 +145,16 @@ export class Product {
 
   @Column({ type: 'varchar', length: 255, nullable: true })
   warranty?: string;
+
+  @Column({ name: 'barcode_id', type: 'varchar', length: 255, nullable: true, unique: true })
+  barcode_id?: string;
+
+  @BeforeInsert()
+  generateBarcodeId() {
+    if (!this.barcode_id && this.serial_no) {
+      this.barcode_id = `XC-P-${this.serial_no}`;
+    }
+  }
 
   @CreateDateColumn()
   created_at!: Date;

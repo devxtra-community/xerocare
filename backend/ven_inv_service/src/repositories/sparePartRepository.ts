@@ -30,6 +30,9 @@ export class SparePartRepository {
    * Creates new spare part master data.
    */
   async createMaster(data: Partial<SparePart>) {
+    if (data.sku && !data.barcode_id) {
+      data.barcode_id = `XC-S-${data.sku}`;
+    }
     const part = this.masterRepo.create(data);
     return this.masterRepo.save(part);
   }

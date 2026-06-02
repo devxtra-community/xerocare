@@ -86,6 +86,7 @@ export class InvoiceRepository {
     const latestInvoice = await this.repo
       .createQueryBuilder('invoice')
       .where('invoice.invoiceNumber LIKE :pattern', { pattern: `QTN-${year}-%` })
+      .withDeleted()
       .orderBy('invoice.invoiceNumber', 'DESC')
       .getOne();
 

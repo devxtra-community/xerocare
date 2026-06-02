@@ -10,6 +10,9 @@ import { httpLogger } from './middleware/httplogger';
 import { logger } from './config/logger';
 import { errorHandler } from './middleware/errorHandler';
 import { otpSendLimiter, otpVerifyLimiter, loginLimiter } from './middleware/rateLimitter';
+import { authMiddleware } from './middleware/authMiddleware';
+import { requireRole } from './middleware/roleMiddleware';
+import { UserRole } from './constants/userRole';
 
 /*
  * This is the main setup for the API Gateway.
@@ -177,6 +180,27 @@ for (const [key, value] of Object.entries(requiredEnvVars)) {
  * - "/c" goes to CRM (Customer Management)
  */
 app.use('/e', createServiceProxy(EMPLOYEE_SERVICE_URL));
+
+// Barcode scan and print endpoints with explicit role checks at the Gateway
+app.get(
+  '/i/inventory/scan',
+  authMiddleware,
+  requireRole(UserRole.ADMIN, UserRole.FINANCE, UserRole.MANAGER, UserRole.EMPLOYEE),
+  createServiceProxy(VENDOR_INVENTORY_SERVICE_URL),
+);
+app.get(
+  '/i/inventory/products/barcode-pdf',
+  authMiddleware,
+  requireRole(UserRole.ADMIN, UserRole.MANAGER),
+  createServiceProxy(VENDOR_INVENTORY_SERVICE_URL),
+);
+app.get(
+  '/i/inventory/spare-parts/barcode-pdf',
+  authMiddleware,
+  requireRole(UserRole.ADMIN, UserRole.MANAGER),
+  createServiceProxy(VENDOR_INVENTORY_SERVICE_URL),
+);
+
 app.use('/i', createServiceProxy(VENDOR_INVENTORY_SERVICE_URL));
 app.use('/b', createServiceProxy(BILLING_SERVICE_URL));
 app.use('/c', createServiceProxy(CRM_SERVICE_URL));

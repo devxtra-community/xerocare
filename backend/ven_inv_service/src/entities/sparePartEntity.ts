@@ -9,6 +9,7 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   Index,
+  BeforeInsert,
 } from 'typeorm';
 import { Model } from './modelEntity';
 import { Branch } from './branchEntity';
@@ -116,6 +117,16 @@ export class SparePart {
 
   @Column({ nullable: true })
   image_url?: string;
+
+  @Column({ name: 'barcode_id', type: 'varchar', length: 255, nullable: true, unique: true })
+  barcode_id?: string;
+
+  @BeforeInsert()
+  generateBarcodeId() {
+    if (!this.barcode_id && this.sku) {
+      this.barcode_id = `XC-S-${this.sku}`;
+    }
+  }
 
   @CreateDateColumn({ name: 'created_at' })
   created_at!: Date;

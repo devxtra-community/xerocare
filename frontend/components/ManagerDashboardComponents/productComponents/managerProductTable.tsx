@@ -28,6 +28,7 @@ import { commonService, Vendor, Warehouse } from '@/services/commonService';
 import { getBrands, Brand } from '@/lib/brand';
 import { toast } from 'sonner';
 import { formatCurrency } from '@/lib/format';
+import Barcode from 'react-barcode';
 
 // Local interfaces removed in favor of imports from @/lib/lot
 
@@ -92,6 +93,22 @@ function ProductViewModal({ product, onClose }: { product: Product; onClose: () 
                     </p>
                     <p className="text-sm font-normal text-slate-700">{product.tax_rate}%</p>
                   </div>
+                </div>
+              </div>
+
+              {/* Barcode Card */}
+              <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex flex-col items-center justify-center">
+                <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 self-start">
+                  Product Barcode
+                </p>
+                <div className="bg-white p-2 rounded-lg border border-slate-200 flex items-center justify-center w-full shadow-sm">
+                  <Barcode
+                    value={product.barcode_id || `XC-P-${product.serial_no}`}
+                    width={1.5}
+                    height={50}
+                    fontSize={12}
+                    margin={5}
+                  />
                 </div>
               </div>
             </div>

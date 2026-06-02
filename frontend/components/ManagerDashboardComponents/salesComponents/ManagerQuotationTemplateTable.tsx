@@ -568,7 +568,7 @@ export default function ManagerQuotationTemplateTable() {
                               setViewingTemplate(q);
                               setViewDialogOpen(true);
                             }}
-                            className="h-8 text-xs font-bold text-slate-600 border-slate-200 hover:bg-slate-50 gap-1"
+                            className="h-8 text-xs font-bold text-slate-600 border-slate-200 hover:bg-background hover:text-slate-600 gap-1"
                           >
                             <Eye size={12} />
                             View
@@ -577,7 +577,7 @@ export default function ManagerQuotationTemplateTable() {
                             variant="outline"
                             size="sm"
                             onClick={() => handleOpenAssignModal(q)}
-                            className="h-8 text-xs font-bold text-primary border-primary/20 hover:bg-primary/5 gap-1"
+                            className="h-8 text-xs font-bold text-primary border-primary/20 hover:bg-background hover:text-primary gap-1"
                           >
                             <UserPlus size={12} />
                             Assign
@@ -589,7 +589,7 @@ export default function ManagerQuotationTemplateTable() {
                               setEditingTemplate(q);
                               setEditTemplateOpen(true);
                             }}
-                            className="h-8 text-xs font-bold text-amber-600 border-amber-200 hover:bg-amber-50 gap-1"
+                            className="h-8 text-xs font-bold text-amber-600 border-amber-200 hover:bg-background hover:text-amber-600 gap-1"
                           >
                             <Pencil size={12} />
                             Edit
@@ -598,7 +598,7 @@ export default function ManagerQuotationTemplateTable() {
                             variant="ghost"
                             size="sm"
                             onClick={() => promptDeleteTemplate(q.id)}
-                            className="h-8 w-8 p-0 text-red-500 hover:text-red-600 hover:bg-red-50"
+                            className="h-8 w-8 p-0 text-red-500 hover:bg-transparent hover:text-red-500"
                             title="Delete Template"
                           >
                             <Trash2 className="h-4 w-4" />
@@ -1188,12 +1188,21 @@ function QuotationTemplateFormModal({
       if (field === 'quantity') {
         item.quantity = Math.max(1, Number(val));
       } else if (field === 'discount') {
-        const disc = Math.max(0, Number(val));
+        let disc = Math.max(0, Number(val));
+        if (item.maxDiscount > 0 && disc > item.maxDiscount) {
+          toast.warning(`Maximum discount allowed is QAR ${item.maxDiscount}`);
+          disc = item.maxDiscount;
+        }
+        if (disc > item.basePrice) {
+          toast.error('Discount cannot exceed price');
+          disc = item.basePrice;
+        }
         item.discount = disc;
         item.unitPrice = item.basePrice - disc;
       } else if (field === 'basePrice' && item.isEditable) {
-        item.basePrice = Number(val);
-        item.unitPrice = Number(val) - item.discount;
+        const bp = Number(val);
+        item.basePrice = bp;
+        item.unitPrice = bp - item.discount;
       } else {
         (item as unknown as Record<string, string | number>)[field as string] = val;
       }
