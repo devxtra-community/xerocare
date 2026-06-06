@@ -133,6 +133,12 @@ function createServiceProxy(target: string) {
   return createProxyMiddleware({
     target,
     changeOrigin: true,
+    pathRewrite: {
+      '^/i/': '/',
+      '^/b/': '/',
+      '^/c/': '/',
+      '^/e/': '/',
+    },
     proxyTimeout: 60_000, // Wait up to 60 seconds for a response
     timeout: 60_000, // If nothing happens for 60 seconds, close the connection
     secure: false, // Trust our own internal network connections
