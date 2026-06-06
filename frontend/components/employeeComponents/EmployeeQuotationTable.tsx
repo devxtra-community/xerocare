@@ -132,6 +132,10 @@ function StatusBadge({ status }: { status: string }) {
     PENDING: 'bg-yellow-100 text-yellow-700',
     PAID: 'bg-green-100 text-green-700',
     ACTIVE_LEASE: 'bg-green-100 text-green-700',
+    ACTIVE_CONTRACT: 'bg-green-100 text-green-700',
+    INVOICED: 'bg-blue-100 text-blue-600',
+    CANCELLED: 'bg-slate-100 text-slate-600',
+    WAITING_FINANCE_APPROVAL: 'bg-amber-100 text-amber-700',
     TRANSACTION_COMPLETED: 'bg-green-100 text-green-700 font-bold border-green-200',
     ASSIGNED: 'bg-indigo-100 text-indigo-700',
     RETAKEN: 'bg-red-100 text-red-700',
@@ -155,6 +159,11 @@ function StatusBadge({ status }: { status: string }) {
     TRANSACTION_COMPLETED: 'ACCOUNTING COMPLETED',
     PAID: 'FULLY PAID',
     ACTIVE_LEASE: 'ACTIVE',
+    ACTIVE_CONTRACT: 'ACTIVE',
+    INVOICED: 'INVOICED',
+    CANCELLED: 'CANCELLED',
+    EXPIRED: 'EXPIRED',
+    WAITING_FINANCE_APPROVAL: 'WAITING FINANCE APPROVAL',
   };
 
   return (
@@ -309,6 +318,9 @@ export default function EmployeeQuotationTable() {
       'FINANCE_APPROVED',
       'PAID',
       'ACTIVE_LEASE',
+      'ACTIVE_CONTRACT',
+      'ISSUED',
+      'INVOICED',
       'TRANSACTION_COMPLETED',
       'PENDING_CONFIRMATION',
       'SENT_TO_CUSTOMER',

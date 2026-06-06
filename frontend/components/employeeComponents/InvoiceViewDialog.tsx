@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Send, Mail, Phone, Globe } from 'lucide-react';
+import { Send, Mail, Phone, Globe, AlertTriangle, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { getProductById, getAllProducts } from '@/lib/product';
@@ -9,6 +9,8 @@ import { getAllSpareParts } from '@/lib/spare-part';
 import { getAllModels } from '@/lib/model';
 import { Invoice, sendEmailNotification, sendWhatsappNotification } from '@/lib/invoice';
 import { toast } from 'sonner';
+import { getUserFromToken } from '@/lib/auth';
+import AuditTimeline from '../invoice/AuditTimeline';
 
 interface InternalConsumable {
   name?: string;
@@ -79,6 +81,9 @@ export function InvoiceViewDialog({
   const [productDetails, setProductDetails] = useState<Record<string, ProductMeta>>({});
   const [isRejecting, setIsRejecting] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
+
+  const currentUser = getUserFromToken();
+  const canViewTimeline = currentUser && ['MANAGER', 'FINANCE', 'ADMIN'].includes(currentUser.role);
 
   useEffect(() => {
     const fetchFullDetails = async () => {
@@ -475,11 +480,11 @@ export function InvoiceViewDialog({
   };
 
   const templateBillTo = {
-    name: invoice.customerName || '',
-    address: invoice.customerAddress || '',
-    trn: invoice.customerTrn || '',
-    email: invoice.customerEmail || '',
-    phone: invoice.customerPhone || '',
+    name: invoice.customerName || 'No Customer Assigned',
+    address: invoice.customerAddress || 'N/A',
+    trn: invoice.customerTrn || 'N/A',
+    email: invoice.customerEmail || 'No Customer Assigned',
+    phone: invoice.customerPhone || 'No Customer Assigned',
   };
 
   const templateQuotation = {
@@ -610,618 +615,672 @@ export function InvoiceViewDialog({
     <Dialog open onOpenChange={(v) => !v && onClose()}>
       <DialogContent className="sm:max-w-5xl rounded-none border-none shadow-2xl p-0 overflow-hidden bg-white flex flex-col h-[98vh]">
         <DialogTitle className="sr-only">Invoice Document</DialogTitle>
-        <div
-          id="invoice-print-content"
-          className="flex-1 overflow-y-auto scrollbar-hide flex flex-col bg-white"
-        >
-          {useTemplate ? (
-            <div className="flex-1">
-              {isProductNormal && (
-                <ProductNormalQuotation
-                  productName={templateProductName}
-                  modelName={templateModelName}
-                  billTo={templateBillTo}
-                  shipTo={templateShipTo}
-                  quotation={templateQuotation}
-                  lineItems={templateLineItems}
-                  totals={templateTotals}
-                />
-              )}
-              {isProductStandard && (
-                <ProductStandardQuotation
-                  productName={templateProductName}
-                  modelName={templateModelName}
-                  billTo={templateBillTo}
-                  shipTo={templateShipTo}
-                  quotation={templateQuotation}
-                  lineItems={templateLineItems}
-                  totals={templateTotals}
-                />
-              )}
-              {isProductPremium && (
-                <ProductPremiumQuotation
-                  productName={templateProductName}
-                  modelName={templateModelName}
-                  billTo={templateBillTo}
-                  shipTo={templateShipTo}
-                  quotation={templateQuotation}
-                  lineItems={templateLineItems}
-                  totals={templateTotals}
-                />
-              )}
+        {(() => {
+          if (!invoice.effectiveTo) return null;
+          const isContract = invoice.status === 'ACTIVE_CONTRACT' || invoice.status === 'EXPIRED';
+          if (!isContract) return null;
 
-              {isSpareNormal && (
-                <SparePartsNormalQuotation
-                  productName={templateProductName}
-                  modelName={templateModelName}
-                  billTo={templateBillTo}
-                  shipTo={templateShipTo}
-                  quotation={templateQuotation}
-                  lineItems={templateLineItems}
-                  totals={templateTotals}
-                />
-              )}
-              {isSpareStandard && (
-                <SparePartsStandardQuotation
-                  productName={templateProductName}
-                  modelName={templateModelName}
-                  billTo={templateBillTo}
-                  shipTo={templateShipTo}
-                  quotation={templateQuotation}
-                  lineItems={templateLineItems}
-                  totals={templateTotals}
-                />
-              )}
-              {isSparePremium && (
-                <SparePartsPremiumQuotation
-                  productName={templateProductName}
-                  modelName={templateModelName}
-                  billTo={templateBillTo}
-                  shipTo={templateShipTo}
-                  quotation={templateQuotation}
-                  lineItems={templateLineItems}
-                  totals={templateTotals}
-                />
-              )}
+          const toDate = new Date(invoice.effectiveTo);
+          const today = new Date();
+          const isExpired = toDate < today;
 
-              {isRentNormal && (
-                <RentNormalQuotation
-                  billTo={templateBillTo}
-                  quotation={templateQuotation}
-                  lineItems={rentTemplateLineItems}
-                  agreementDetails={rentAgreementDetails}
-                  totals={{
-                    subTotal:
-                      invoice.monthlyRent ||
-                      (invoice.items || []).reduce(
-                        (acc, it) => acc + (it.quantity || 0) * (it.unitPrice || 0),
-                        0,
-                      ),
-                    tax: 0,
-                    total: invoice.totalAmount || 0,
-                  }}
-                />
-              )}
-              {isRentStandard && (
-                <RentStandardQuotation
-                  billTo={templateBillTo}
-                  quotation={templateQuotation}
-                  lineItems={rentTemplateLineItems}
-                  agreementDetails={rentAgreementDetails}
-                  totals={{
-                    subTotal:
-                      invoice.monthlyRent ||
-                      (invoice.items || []).reduce(
-                        (acc, it) => acc + (it.quantity || 0) * (it.unitPrice || 0),
-                        0,
-                      ),
-                    tax: 0,
-                    total: invoice.totalAmount || 0,
-                  }}
-                />
-              )}
-              {isRentPremium && (
-                <RentPremiumQuotation
-                  billTo={templateBillTo}
-                  quotation={templateQuotation}
-                  lineItems={rentTemplateLineItems}
-                  agreementDetails={rentAgreementDetails}
-                  totals={{
-                    subTotal:
-                      invoice.monthlyRent ||
-                      (invoice.items || []).reduce(
-                        (acc, it) => acc + (it.quantity || 0) * (it.unitPrice || 0),
-                        0,
-                      ),
-                    tax: 0,
-                    total: invoice.totalAmount || 0,
-                  }}
-                />
-              )}
+          const thirtyDaysFromNow = new Date();
+          thirtyDaysFromNow.setDate(today.getDate() + 30);
+          const isExpiringSoon = toDate <= thirtyDaysFromNow && toDate >= today;
 
-              {isLeaseNormal && (
-                <LeaseNormalQuotation
-                  billTo={templateBillTo}
-                  quotation={templateQuotation}
-                  lineItems={leaseTemplateLineItems}
-                  leaseDetails={leaseAgreementDetails}
-                  totals={{
-                    subTotal: leaseAgreementDetails.totalLeaseValue,
-                    tax: 0,
-                    total: leaseAgreementDetails.totalLeaseValue,
-                  }}
-                />
+          if (!isExpired && !isExpiringSoon) return null;
+
+          const diffTime = Math.abs(toDate.getTime() - today.getTime());
+          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+          return (
+            <div
+              className={`p-4 flex items-center gap-3 border-b ${
+                isExpired
+                  ? 'bg-red-50 border-red-100 text-red-700'
+                  : 'bg-amber-50 border-amber-100 text-amber-700'
+              }`}
+            >
+              {isExpired ? (
+                <AlertCircle className="h-5 w-5 flex-shrink-0" />
+              ) : (
+                <AlertTriangle className="h-5 w-5 flex-shrink-0" />
               )}
-              {isLeaseStandard && (
-                <LeaseStandardQuotation
-                  billTo={templateBillTo}
-                  quotation={templateQuotation}
-                  lineItems={leaseTemplateLineItems}
-                  leaseDetails={leaseAgreementDetails}
-                  totals={{
-                    subTotal: leaseAgreementDetails.totalLeaseValue,
-                    tax: 0,
-                    total: leaseAgreementDetails.totalLeaseValue,
-                  }}
-                />
-              )}
-              {isLeasePremium && (
-                <LeasePremiumQuotation
-                  billTo={templateBillTo}
-                  quotation={templateQuotation}
-                  lineItems={leaseTemplateLineItems}
-                  leaseDetails={leaseAgreementDetails}
-                  totals={{
-                    subTotal: leaseAgreementDetails.totalLeaseValue,
-                    tax: 0,
-                    total: leaseAgreementDetails.totalLeaseValue,
-                  }}
-                />
-              )}
-            </div>
-          ) : (
-            <>
-              {/* Header */}
-              <div className="relative flex justify-between items-center px-12 pt-6 pb-4 shrink-0 bg-white">
-                <div className="flex flex-col">
-                  <h1 className="text-5xl font-[900] text-[#D41B22] tracking-[-0.051em] leading-[0.7] font-sans lowercase">
-                    xerocare
-                  </h1>
-                  <p className="text-[11px] font-bold text-[#AAAAAA] tracking-[0.25em] mt-2 uppercase">
-                    TRADING & SERVICES W.L.L
-                  </p>
-                </div>
-                <div className="absolute left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2 flex items-center justify-center pt-2 bg-transparent">
-                  <img
-                    src="/quatationlogo/quatationlogo.png"
-                    alt="logo"
-                    className="w-[90px] h-[90px] object-contain"
-                  />
-                </div>
-                <div className="flex flex-col items-end">
-                  <h1 className="text-5xl font-[900] text-[#D41B22] leading-[0.7] mb-1" dir="rtl">
-                    زيرو كير
-                  </h1>
-                  <p
-                    className="text-[14px] font-black text-[#AAAAAA] tracking-tight mt-2"
-                    dir="rtl"
-                  >
-                    للتجارة والخدمات ذ.م.م
-                  </p>
-                </div>
+              <div className="flex-1">
+                <p className="text-xs font-bold uppercase tracking-wider">
+                  {isExpired ? 'Contract Expired' : 'Contract Expiring Soon'}
+                </p>
+                <p className="text-xs opacity-90 mt-0.5 font-medium leading-relaxed">
+                  {isExpired
+                    ? `This contract expired ${diffDays} days ago on ${toDate.toLocaleDateString()}. Please renew or request validity extension.`
+                    : `This contract will expire in ${diffDays} days on ${toDate.toLocaleDateString()}.`}
+                </p>
               </div>
-
-              <div className="px-12 pb-6 space-y-4 bg-white flex-1 overflow-visible">
-                <div className="flex justify-between items-start pt-1">
-                  <div className="space-y-0 text-black">
-                    <h3 className="text-[17px] font-black uppercase leading-tight">
-                      {invoice.customerName || 'N/A'}
-                    </h3>
-                    {invoice.customerAddress ? (
-                      <h3 className="text-[17px] font-black leading-tight uppercase">
-                        {invoice.customerAddress}
-                      </h3>
-                    ) : null}
-                    {invoice.customerEmail && (
-                      <p className="text-[14px] font-bold text-gray-700 leading-tight">
-                        Email: {invoice.customerEmail}
-                      </p>
-                    )}
-                    {invoice.customerPhone && (
-                      <p className="text-[14px] font-bold text-gray-700 leading-tight">
-                        Phone: {invoice.customerPhone}
-                      </p>
-                    )}
-                  </div>
-                  <div className="text-right space-y-0 text-black">
-                    <p className="text-[16px] font-black">
-                      DATE:{' '}
-                      {new Date(invoice.createdAt).toLocaleDateString('en-US', {
-                        month: 'long',
-                        day: 'numeric',
-                        year: 'numeric',
-                      })}
-                    </p>
-                    <p className="text-[16px] font-black uppercase">
-                      REF NO {invoice.invoiceNumber.split('-').pop()}/
-                      {new Date().getFullYear().toString().slice(-2)}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="relative flex items-center bg-[#CCCCCC] border border-black shadow-[2px_2px_0px_rgba(0,0,0,0.1)]">
-                  <div className="absolute left-0 top-0 bottom-0 w-3 bg-gray-500 border-r border-black"></div>
-                  <p className="w-full py-1.5 px-4 text-center text-[13px] font-black text-black uppercase tracking-tight ml-3">
-                    Sub:{' '}
-                    {isSparePartSale
-                      ? `Invoice for Replacement Consumables for ${firstModelName}`
-                      : `${invoice.saleType?.replace(/_/g, ' ')} Invoice for ${enrichedItems[0]?.metadata?.name || enrichedItems[0]?.description || 'Equipment'}`}
-                  </p>
-                </div>
-
-                <div className="space-y-6">
-                  {isSparePartSale ? (
-                    <div className="border-[2px] border-black overflow-hidden bg-white">
-                      <table className="w-full border-collapse">
-                        <thead>
-                          <tr className="bg-[#D1E5F4] border-b-[2px] border-black">
-                            <th className="text-center py-2 px-4 text-[13px] font-black border-r-[2px] border-black w-[25%]">
-                              PART NAME
-                            </th>
-                            <th className="text-center py-2 px-4 text-[13px] font-black border-r-[2px] border-black w-[40%]">
-                              DESCRIPTION
-                            </th>
-                            <th className="text-center py-2 px-4 text-[13px] font-black border-r-[2px] border-black w-[20%]">
-                              YIELD*
-                            </th>
-                            <th className="text-center py-2 px-4 text-[13px] font-black w-[15%] underline">
-                              Price(Qr)
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {enrichedItems.map((item, idx) => {
-                            const detail = item.metadata;
-                            const partName =
-                              detail?.mpn || detail?.sku || item.description || 'N/A';
-                            const description =
-                              detail?.description ||
-                              detail?.model?.description ||
-                              detail?.part_name ||
-                              item.description ||
-                              'N/A';
-                            const yieldSpec = detail?.yield || '';
-                            const priceValue =
-                              Number(item.quantity || 1) * Number(item.unitPrice || 0) -
-                              Number(item.discount || 0);
-
-                            return (
-                              <tr key={idx} className="border-b border-black last:border-b-0">
-                                <td className="border-r-[2px] border-black p-3 text-[12px] font-black text-center uppercase">
-                                  {partName}
-                                </td>
-                                <td className="border-r-[2px] border-black p-3 text-[12px] align-top text-left">
-                                  <div className="space-y-1.5">
-                                    {description.split('\n').map((line: string, i: number) => {
-                                      const trimmedLine = line.trim();
-                                      if (!trimmedLine) return null;
-                                      const isRed = i % 2 === 0;
-                                      return (
-                                        <p
-                                          key={i}
-                                          className={`flex gap-2 items-start ${isRed ? 'font-black text-[#D41B22]' : 'font-bold text-black'}`}
-                                        >
-                                          <span
-                                            className={`${isRed ? 'text-[#D41B22]' : 'text-gray-900'} mt-0.5`}
-                                          >
-                                            ➤
-                                          </span>
-                                          <span className="uppercase">{trimmedLine}</span>
-                                        </p>
-                                      );
-                                    })}
-                                  </div>
-                                </td>
-                                <td className="border-r-[2px] border-black p-3 text-[12px] font-black text-center uppercase">
-                                  {yieldSpec}
-                                </td>
-                                <td className="p-3 text-[12px] font-black text-center">
-                                  {priceValue.toLocaleString(undefined, {
-                                    minimumFractionDigits: 2,
-                                    maximumFractionDigits: 2,
-                                  })}
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-                  ) : (
-                    enrichedItems.map((item, idx) => {
-                      const detail = item.metadata;
-                      const image = detail?.imageUrl || detail?.image_url;
-                      const productName =
-                        detail?.name || detail?.part_name || item.description || 'N/A';
-                      const productDesc =
-                        detail?.description || detail?.model?.description || item.description || '';
-                      return (
-                        <div key={idx} className="space-y-4 relative">
-                          <div className="pl-2">
-                            <h4 className="text-[16px] font-black text-black border-b-2 border-black inline-block pb-0.5">
-                              {idx + 1}. {productName}
-                            </h4>
-                          </div>
-                          <div className="border-[2px] border-black overflow-hidden bg-white">
-                            <table className="w-full border-collapse">
-                              <thead>
-                                <tr className="bg-[#D1E5F4] border-b-[2px] border-black">
-                                  <th className="text-center py-2 px-4 text-[13px] font-black border-r-[2px] border-black w-[65%]">
-                                    Description
-                                  </th>
-                                  <th className="text-center py-2 px-2 text-[13px] font-black border-r-[2px] border-black w-[7.5%] underline">
-                                    Qty.
-                                  </th>
-                                  <th className="text-center py-2 px-4 text-[13px] font-black border-r-[2px] border-black w-[13.75%] underline">
-                                    Unit Price <br /> (Qr.)
-                                  </th>
-                                  <th className="text-center py-2 px-4 text-[13px] font-black w-[13.75%] underline">
-                                    Total <br /> (Qr.)
-                                  </th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                <tr>
-                                  <td
-                                    rowSpan={2}
-                                    className="border-r-[2px] border-black align-top p-5"
-                                    style={{ width: '65%' }}
-                                  >
-                                    <p className="text-[15px] font-black text-black underline uppercase mb-3">
-                                      {productName}
-                                    </p>
-                                    <div className="text-[12px] text-black space-y-1.5 font-bold leading-relaxed">
-                                      {productDesc ? (
-                                        productDesc.split('\n').map((line: string, i: number) => {
-                                          const trimmedLine = line.trim();
-                                          if (!trimmedLine) return null;
-                                          const isHeader =
-                                            trimmedLine.endsWith(':') ||
-                                            trimmedLine.match(/^[A-Z\s]+$/);
-                                          const isKeywordRed =
-                                            trimmedLine.includes('+') ||
-                                            trimmedLine.includes('Machine') ||
-                                            trimmedLine.includes('trays') ||
-                                            trimmedLine.includes('Toner') ||
-                                            trimmedLine.startsWith('Warranty');
-
-                                          // Pattern: 1st Red, 2nd Black, 3rd Red...
-                                          const isPatternRed = i % 2 === 0;
-                                          const shouldBeRed =
-                                            isPatternRed || isKeywordRed || isHeader;
-
-                                          return (
-                                            <p
-                                              key={i}
-                                              className={`flex gap-2 ${shouldBeRed ? 'font-black text-[#D41B22]' : 'font-bold text-black'}`}
-                                            >
-                                              <span
-                                                className={`${shouldBeRed ? 'text-[#D41B22]' : 'text-gray-900'} mt-0.5`}
-                                              >
-                                                ➤
-                                              </span>
-                                              <span
-                                                className={
-                                                  isHeader ? 'underline decoration-black' : ''
-                                                }
-                                              >
-                                                {trimmedLine}
-                                              </span>
-                                            </p>
-                                          );
-                                        })
-                                      ) : (
-                                        <p className="flex gap-2">
-                                          <span className="text-gray-900 mt-0.5">➤</span>
-                                          <span>
-                                            Standard specification as per brand guidelines.
-                                          </span>
-                                        </p>
-                                      )}
-                                    </div>
-                                  </td>
-                                  <td
-                                    colSpan={3}
-                                    className="border-b-[2px] border-black text-center p-4"
-                                    style={{ height: '360px' }}
-                                  >
-                                    {image ? (
-                                      <img
-                                        src={image}
-                                        alt="product"
-                                        className="max-w-full max-h-[320px] object-contain mx-auto"
-                                      />
-                                    ) : (
-                                      <div className="h-full" />
-                                    )}
-                                  </td>
-                                </tr>
-                                <tr>
-                                  <td className="text-center align-middle py-5 border-r-[2px] border-black font-black text-black">
-                                    <p className="text-[15px] font-black text-black">
-                                      {String(item.quantity || 1).padStart(2, '0')}
-                                    </p>
-                                  </td>
-                                  <td className="text-center align-middle py-5 border-r-[2px] border-black font-black text-black">
-                                    <p className="text-[15px] font-black text-black">
-                                      {Number(item.unitPrice || 0).toLocaleString(undefined, {
-                                        minimumFractionDigits: 2,
-                                      })}
-                                    </p>
-                                  </td>
-                                  <td className="text-center align-middle py-5 font-black text-black">
-                                    <p className="text-[15px] font-black text-black">
-                                      {Number(
-                                        (item.quantity || 1) * (item.unitPrice || 0),
-                                      ).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                                    </p>
-                                  </td>
-                                </tr>
-                              </tbody>
-                            </table>
-                          </div>
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
-
-                <div className="space-y-8 mt-6">
-                  <div className="pl-1">
-                    <h4 className="text-[14px] font-black text-black underline mb-3 uppercase tracking-wider">
-                      TERMS AND CONDITIONS
-                    </h4>
-                    <div className="space-y-1 text-[13px] font-bold text-black">
-                      <div className="flex gap-4">
-                        <span className="w-28 uppercase">1) PAYMENT</span>
-                        <span>: CONFIRMED LPO</span>
-                      </div>
-                      <div className="flex gap-4">
-                        <span className="w-28 uppercase">2) PRICES</span>
-                        <span>: INCLUSIVE OF DELIVERY & INSTALLATION AT YOUR SITE</span>
-                      </div>
-                      <div className="flex gap-4">
-                        <span className="w-28 uppercase">3) DELIVERY</span>
-                        <span>
-                          :{' '}
-                          <span className="underline font-black italic">
-                            EX STOCK, SUBJECT TO AVAILABILITY
-                          </span>{' '}
-                          OR 30 DAYS FROM ORDER DATE
-                        </span>
-                      </div>
-                      <div className="flex gap-4">
-                        <span className="w-28 uppercase">5) VALIDITY</span>
-                        <span>: 30 Days</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="pl-1 space-y-4">
-                    <p className="text-[13px] font-bold text-black">
-                      For any further clarifications please feel free to contact the undersigned on
-                      Mob: 70717282 or Email: mail@xerocare.com
-                    </p>
-                    <div className="space-y-1">
-                      <p className="text-[13px] font-bold text-black">With warm regards,</p>
-                      <div className="pt-2">
-                        <p className="text-[13px] font-black text-black uppercase">For</p>
-                        <p className="text-[13px] font-black text-black uppercase">
-                          XEROCARE TRADING & SERVICES WLL
-                        </p>
-                        <p className="text-[13px] font-black text-black uppercase">DOHA QATAR</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="relative flex justify-end px-4 -mt-36 z-50 pointer-events-none pr-20">
-                  <img
-                    src="/seel/seel1.png"
-                    alt="Seal"
-                    className="w-56 h-56 object-contain rotate-[-12deg]"
-                    style={{ mixBlendMode: 'multiply', filter: 'contrast(1.1)' }}
+            </div>
+          );
+        })()}
+        <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
+          <div
+            id="invoice-print-content"
+            className="flex-1 overflow-y-auto scrollbar-hide flex flex-col bg-white"
+          >
+            {useTemplate ? (
+              <div className="flex-1">
+                {isProductNormal && (
+                  <ProductNormalQuotation
+                    productName={templateProductName}
+                    modelName={templateModelName}
+                    billTo={templateBillTo}
+                    shipTo={templateShipTo}
+                    quotation={templateQuotation}
+                    lineItems={templateLineItems}
+                    totals={templateTotals}
                   />
-                </div>
-
-                {/* Maintenance Summary */}
-                {(isRent || isLease) && (
-                  <div className="border-[2px] border-black p-4 bg-white mt-10">
-                    <h4 className="text-[14px] font-black text-black underline uppercase mb-3 text-center">
-                      Contract Terms Summary
-                    </h4>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-center">
-                      <div>
-                        <p className="text-[10px] font-black text-gray-500 uppercase">
-                          Advance / Deposit
-                        </p>
-                        <p className="text-sm font-black text-black">
-                          QAR{' '}
-                          {(
-                            invoice.advanceAmount ||
-                            invoice.securityDepositAmount ||
-                            0
-                          ).toLocaleString()}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-[10px] font-black text-gray-500 uppercase">Period</p>
-                        <p className="text-sm font-black text-black">
-                          {invoice.effectiveFrom
-                            ? new Date(invoice.effectiveFrom).toLocaleDateString()
-                            : 'N/A'}{' '}
-                          -{' '}
-                          {invoice.effectiveTo
-                            ? new Date(invoice.effectiveTo).toLocaleDateString()
-                            : 'N/A'}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-[10px] font-black text-gray-500 uppercase">Monthly</p>
-                        <p className="text-sm font-black text-black">
-                          QAR{' '}
-                          {(
-                            invoice.monthlyRent ||
-                            invoice.monthlyLeaseAmount ||
-                            0
-                          ).toLocaleString()}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
+                )}
+                {isProductStandard && (
+                  <ProductStandardQuotation
+                    productName={templateProductName}
+                    modelName={templateModelName}
+                    billTo={templateBillTo}
+                    shipTo={templateShipTo}
+                    quotation={templateQuotation}
+                    lineItems={templateLineItems}
+                    totals={templateTotals}
+                  />
+                )}
+                {isProductPremium && (
+                  <ProductPremiumQuotation
+                    productName={templateProductName}
+                    modelName={templateModelName}
+                    billTo={templateBillTo}
+                    shipTo={templateShipTo}
+                    quotation={templateQuotation}
+                    lineItems={templateLineItems}
+                    totals={templateTotals}
+                  />
                 )}
 
-                <div className="flex justify-end pt-2">
-                  <div className="border-[2px] border-black px-8 py-3 bg-[#D1E5F4] shadow-[4px_4px_0px_rgba(0,0,0,1)]">
-                    <p className="text-xl font-black text-black uppercase tracking-tight">
-                      Total: QAR{' '}
-                      {Number(invoice.totalAmount || 0).toLocaleString(undefined, {
-                        minimumFractionDigits: 2,
-                      })}
+                {isSpareNormal && (
+                  <SparePartsNormalQuotation
+                    productName={templateProductName}
+                    modelName={templateModelName}
+                    billTo={templateBillTo}
+                    shipTo={templateShipTo}
+                    quotation={templateQuotation}
+                    lineItems={templateLineItems}
+                    totals={templateTotals}
+                  />
+                )}
+                {isSpareStandard && (
+                  <SparePartsStandardQuotation
+                    productName={templateProductName}
+                    modelName={templateModelName}
+                    billTo={templateBillTo}
+                    shipTo={templateShipTo}
+                    quotation={templateQuotation}
+                    lineItems={templateLineItems}
+                    totals={templateTotals}
+                  />
+                )}
+                {isSparePremium && (
+                  <SparePartsPremiumQuotation
+                    productName={templateProductName}
+                    modelName={templateModelName}
+                    billTo={templateBillTo}
+                    shipTo={templateShipTo}
+                    quotation={templateQuotation}
+                    lineItems={templateLineItems}
+                    totals={templateTotals}
+                  />
+                )}
+
+                {isRentNormal && (
+                  <RentNormalQuotation
+                    billTo={templateBillTo}
+                    quotation={templateQuotation}
+                    lineItems={rentTemplateLineItems}
+                    agreementDetails={rentAgreementDetails}
+                    totals={{
+                      subTotal:
+                        invoice.monthlyRent ||
+                        (invoice.items || []).reduce(
+                          (acc, it) => acc + (it.quantity || 0) * (it.unitPrice || 0),
+                          0,
+                        ),
+                      tax: 0,
+                      total: invoice.totalAmount || 0,
+                    }}
+                  />
+                )}
+                {isRentStandard && (
+                  <RentStandardQuotation
+                    billTo={templateBillTo}
+                    quotation={templateQuotation}
+                    lineItems={rentTemplateLineItems}
+                    agreementDetails={rentAgreementDetails}
+                    totals={{
+                      subTotal:
+                        invoice.monthlyRent ||
+                        (invoice.items || []).reduce(
+                          (acc, it) => acc + (it.quantity || 0) * (it.unitPrice || 0),
+                          0,
+                        ),
+                      tax: 0,
+                      total: invoice.totalAmount || 0,
+                    }}
+                  />
+                )}
+                {isRentPremium && (
+                  <RentPremiumQuotation
+                    billTo={templateBillTo}
+                    quotation={templateQuotation}
+                    lineItems={rentTemplateLineItems}
+                    agreementDetails={rentAgreementDetails}
+                    totals={{
+                      subTotal:
+                        invoice.monthlyRent ||
+                        (invoice.items || []).reduce(
+                          (acc, it) => acc + (it.quantity || 0) * (it.unitPrice || 0),
+                          0,
+                        ),
+                      tax: 0,
+                      total: invoice.totalAmount || 0,
+                    }}
+                  />
+                )}
+
+                {isLeaseNormal && (
+                  <LeaseNormalQuotation
+                    billTo={templateBillTo}
+                    quotation={templateQuotation}
+                    lineItems={leaseTemplateLineItems}
+                    leaseDetails={leaseAgreementDetails}
+                    totals={{
+                      subTotal: leaseAgreementDetails.totalLeaseValue,
+                      tax: 0,
+                      total: leaseAgreementDetails.totalLeaseValue,
+                    }}
+                  />
+                )}
+                {isLeaseStandard && (
+                  <LeaseStandardQuotation
+                    billTo={templateBillTo}
+                    quotation={templateQuotation}
+                    lineItems={leaseTemplateLineItems}
+                    leaseDetails={leaseAgreementDetails}
+                    totals={{
+                      subTotal: leaseAgreementDetails.totalLeaseValue,
+                      tax: 0,
+                      total: leaseAgreementDetails.totalLeaseValue,
+                    }}
+                  />
+                )}
+                {isLeasePremium && (
+                  <LeasePremiumQuotation
+                    billTo={templateBillTo}
+                    quotation={templateQuotation}
+                    lineItems={leaseTemplateLineItems}
+                    leaseDetails={leaseAgreementDetails}
+                    totals={{
+                      subTotal: leaseAgreementDetails.totalLeaseValue,
+                      tax: 0,
+                      total: leaseAgreementDetails.totalLeaseValue,
+                    }}
+                  />
+                )}
+              </div>
+            ) : (
+              <>
+                {/* Header */}
+                <div className="relative flex justify-between items-center px-12 pt-6 pb-4 shrink-0 bg-white">
+                  <div className="flex flex-col">
+                    <h1 className="text-5xl font-[900] text-[#D41B22] tracking-[-0.051em] leading-[0.7] font-sans lowercase">
+                      xerocare
+                    </h1>
+                    <p className="text-[11px] font-bold text-[#AAAAAA] tracking-[0.25em] mt-2 uppercase">
+                      TRADING & SERVICES W.L.L
+                    </p>
+                  </div>
+                  <div className="absolute left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2 flex items-center justify-center pt-2 bg-transparent">
+                    <img
+                      src="/quatationlogo/quatationlogo.png"
+                      alt="logo"
+                      className="w-[90px] h-[90px] object-contain"
+                    />
+                  </div>
+                  <div className="flex flex-col items-end">
+                    <h1 className="text-5xl font-[900] text-[#D41B22] leading-[0.7] mb-1" dir="rtl">
+                      زيرو كير
+                    </h1>
+                    <p
+                      className="text-[14px] font-black text-[#AAAAAA] tracking-tight mt-2"
+                      dir="rtl"
+                    >
+                      للتجارة والخدمات ذ.م.م
                     </p>
                   </div>
                 </div>
-              </div>
 
-              <div className="px-12 pb-10 pt-4 bg-white shrink-0 border-t-[2px] border-black mt-auto">
-                <div className="flex justify-between items-center py-6">
-                  <div className="flex items-center gap-3">
-                    <div className="bg-zinc-900 p-2 rounded-md">
-                      <Mail size={16} className="text-white" />
+                <div className="px-12 pb-6 space-y-4 bg-white flex-1 overflow-visible">
+                  <div className="flex justify-between items-start pt-1">
+                    <div className="space-y-0 text-black">
+                      <h3 className="text-[17px] font-black uppercase leading-tight">
+                        {invoice.customerName || 'No Customer Assigned'}
+                      </h3>
+                      {invoice.customerAddress ? (
+                        <h3 className="text-[17px] font-black leading-tight uppercase">
+                          {invoice.customerAddress}
+                        </h3>
+                      ) : null}
+                      {invoice.customerEmail && (
+                        <p className="text-[14px] font-bold text-gray-700 leading-tight">
+                          Email: {invoice.customerEmail}
+                        </p>
+                      )}
+                      {invoice.customerPhone && (
+                        <p className="text-[14px] font-bold text-gray-700 leading-tight">
+                          Phone: {invoice.customerPhone}
+                        </p>
+                      )}
                     </div>
-                    <span className="text-[12px] font-black text-black">mail@xerocare.com</span>
+                    <div className="text-right space-y-0 text-black">
+                      <p className="text-[16px] font-black">
+                        DATE:{' '}
+                        {new Date(invoice.createdAt).toLocaleDateString('en-US', {
+                          month: 'long',
+                          day: 'numeric',
+                          year: 'numeric',
+                        })}
+                      </p>
+                      <p className="text-[16px] font-black uppercase">
+                        REF NO {invoice.invoiceNumber.split('-').pop()}/
+                        {new Date().getFullYear().toString().slice(-2)}
+                      </p>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <div className="bg-zinc-900 p-2 rounded-md">
-                      <Phone size={16} className="text-white" />
-                    </div>
-                    <span className="text-[12px] font-black text-black">+974 7071 7282</span>
+
+                  <div className="relative flex items-center bg-[#CCCCCC] border border-black shadow-[2px_2px_0px_rgba(0,0,0,0.1)]">
+                    <div className="absolute left-0 top-0 bottom-0 w-3 bg-gray-500 border-r border-black"></div>
+                    <p className="w-full py-1.5 px-4 text-center text-[13px] font-black text-black uppercase tracking-tight ml-3">
+                      Sub:{' '}
+                      {isSparePartSale
+                        ? `Invoice for Replacement Consumables for ${firstModelName}`
+                        : `${invoice.saleType?.replace(/_/g, ' ')} Invoice for ${enrichedItems[0]?.metadata?.name || enrichedItems[0]?.description || 'Equipment'}`}
+                    </p>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <div className="bg-zinc-900 p-2 rounded-md">
-                      <Send size={16} className="text-white" />
-                    </div>
-                    <span className="text-[12px] font-black text-black">Doha-Qatar</span>
+
+                  <div className="space-y-6">
+                    {isSparePartSale ? (
+                      <div className="border-[2px] border-black overflow-hidden bg-white">
+                        <table className="w-full border-collapse">
+                          <thead>
+                            <tr className="bg-[#D1E5F4] border-b-[2px] border-black">
+                              <th className="text-center py-2 px-4 text-[13px] font-black border-r-[2px] border-black w-[25%]">
+                                PART NAME
+                              </th>
+                              <th className="text-center py-2 px-4 text-[13px] font-black border-r-[2px] border-black w-[40%]">
+                                DESCRIPTION
+                              </th>
+                              <th className="text-center py-2 px-4 text-[13px] font-black border-r-[2px] border-black w-[20%]">
+                                YIELD*
+                              </th>
+                              <th className="text-center py-2 px-4 text-[13px] font-black w-[15%] underline">
+                                Price(Qr)
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {enrichedItems.map((item, idx) => {
+                              const detail = item.metadata;
+                              const partName =
+                                detail?.mpn || detail?.sku || item.description || 'N/A';
+                              const description =
+                                detail?.description ||
+                                detail?.model?.description ||
+                                detail?.part_name ||
+                                item.description ||
+                                'N/A';
+                              const yieldSpec = detail?.yield || '';
+                              const priceValue =
+                                Number(item.quantity || 1) * Number(item.unitPrice || 0) -
+                                Number(item.discount || 0);
+
+                              return (
+                                <tr key={idx} className="border-b border-black last:border-b-0">
+                                  <td className="border-r-[2px] border-black p-3 text-[12px] font-black text-center uppercase">
+                                    {partName}
+                                  </td>
+                                  <td className="border-r-[2px] border-black p-3 text-[12px] align-top text-left">
+                                    <div className="space-y-1.5">
+                                      {description.split('\n').map((line: string, i: number) => {
+                                        const trimmedLine = line.trim();
+                                        if (!trimmedLine) return null;
+                                        const isRed = i % 2 === 0;
+                                        return (
+                                          <p
+                                            key={i}
+                                            className={`flex gap-2 items-start ${isRed ? 'font-black text-[#D41B22]' : 'font-bold text-black'}`}
+                                          >
+                                            <span
+                                              className={`${isRed ? 'text-[#D41B22]' : 'text-gray-900'} mt-0.5`}
+                                            >
+                                              ➤
+                                            </span>
+                                            <span className="uppercase">{trimmedLine}</span>
+                                          </p>
+                                        );
+                                      })}
+                                    </div>
+                                  </td>
+                                  <td className="border-r-[2px] border-black p-3 text-[12px] font-black text-center uppercase">
+                                    {yieldSpec}
+                                  </td>
+                                  <td className="p-3 text-[12px] font-black text-center">
+                                    {priceValue.toLocaleString(undefined, {
+                                      minimumFractionDigits: 2,
+                                      maximumFractionDigits: 2,
+                                    })}
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : (
+                      enrichedItems.map((item, idx) => {
+                        const detail = item.metadata;
+                        const image = detail?.imageUrl || detail?.image_url;
+                        const productName =
+                          detail?.name || detail?.part_name || item.description || 'N/A';
+                        const productDesc =
+                          detail?.description ||
+                          detail?.model?.description ||
+                          item.description ||
+                          '';
+                        return (
+                          <div key={idx} className="space-y-4 relative">
+                            <div className="pl-2">
+                              <h4 className="text-[16px] font-black text-black border-b-2 border-black inline-block pb-0.5">
+                                {idx + 1}. {productName}
+                              </h4>
+                            </div>
+                            <div className="border-[2px] border-black overflow-hidden bg-white">
+                              <table className="w-full border-collapse">
+                                <thead>
+                                  <tr className="bg-[#D1E5F4] border-b-[2px] border-black">
+                                    <th className="text-center py-2 px-4 text-[13px] font-black border-r-[2px] border-black w-[65%]">
+                                      Description
+                                    </th>
+                                    <th className="text-center py-2 px-2 text-[13px] font-black border-r-[2px] border-black w-[7.5%] underline">
+                                      Qty.
+                                    </th>
+                                    <th className="text-center py-2 px-4 text-[13px] font-black border-r-[2px] border-black w-[13.75%] underline">
+                                      Unit Price <br /> (Qr.)
+                                    </th>
+                                    <th className="text-center py-2 px-4 text-[13px] font-black w-[13.75%] underline">
+                                      Total <br /> (Qr.)
+                                    </th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  <tr>
+                                    <td
+                                      rowSpan={2}
+                                      className="border-r-[2px] border-black align-top p-5"
+                                      style={{ width: '65%' }}
+                                    >
+                                      <p className="text-[15px] font-black text-black underline uppercase mb-3">
+                                        {productName}
+                                      </p>
+                                      <div className="text-[12px] text-black space-y-1.5 font-bold leading-relaxed">
+                                        {productDesc ? (
+                                          productDesc.split('\n').map((line: string, i: number) => {
+                                            const trimmedLine = line.trim();
+                                            if (!trimmedLine) return null;
+                                            const isHeader =
+                                              trimmedLine.endsWith(':') ||
+                                              trimmedLine.match(/^[A-Z\s]+$/);
+                                            const isKeywordRed =
+                                              trimmedLine.includes('+') ||
+                                              trimmedLine.includes('Machine') ||
+                                              trimmedLine.includes('trays') ||
+                                              trimmedLine.includes('Toner') ||
+                                              trimmedLine.startsWith('Warranty');
+
+                                            // Pattern: 1st Red, 2nd Black, 3rd Red...
+                                            const isPatternRed = i % 2 === 0;
+                                            const shouldBeRed =
+                                              isPatternRed || isKeywordRed || isHeader;
+
+                                            return (
+                                              <p
+                                                key={i}
+                                                className={`flex gap-2 ${shouldBeRed ? 'font-black text-[#D41B22]' : 'font-bold text-black'}`}
+                                              >
+                                                <span
+                                                  className={`${shouldBeRed ? 'text-[#D41B22]' : 'text-gray-900'} mt-0.5`}
+                                                >
+                                                  ➤
+                                                </span>
+                                                <span
+                                                  className={
+                                                    isHeader ? 'underline decoration-black' : ''
+                                                  }
+                                                >
+                                                  {trimmedLine}
+                                                </span>
+                                              </p>
+                                            );
+                                          })
+                                        ) : (
+                                          <p className="flex gap-2">
+                                            <span className="text-gray-900 mt-0.5">➤</span>
+                                            <span>
+                                              Standard specification as per brand guidelines.
+                                            </span>
+                                          </p>
+                                        )}
+                                      </div>
+                                    </td>
+                                    <td
+                                      colSpan={3}
+                                      className="border-b-[2px] border-black text-center p-4"
+                                      style={{ height: '360px' }}
+                                    >
+                                      {image ? (
+                                        <img
+                                          src={image}
+                                          alt="product"
+                                          className="max-w-full max-h-[320px] object-contain mx-auto"
+                                        />
+                                      ) : (
+                                        <div className="h-full" />
+                                      )}
+                                    </td>
+                                  </tr>
+                                  <tr>
+                                    <td className="text-center align-middle py-5 border-r-[2px] border-black font-black text-black">
+                                      <p className="text-[15px] font-black text-black">
+                                        {String(item.quantity || 1).padStart(2, '0')}
+                                      </p>
+                                    </td>
+                                    <td className="text-center align-middle py-5 border-r-[2px] border-black font-black text-black">
+                                      <p className="text-[15px] font-black text-black">
+                                        {Number(item.unitPrice || 0).toLocaleString(undefined, {
+                                          minimumFractionDigits: 2,
+                                        })}
+                                      </p>
+                                    </td>
+                                    <td className="text-center align-middle py-5 font-black text-black">
+                                      <p className="text-[15px] font-black text-black">
+                                        {Number(
+                                          (item.quantity || 1) * (item.unitPrice || 0),
+                                        ).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                      </p>
+                                    </td>
+                                  </tr>
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
                   </div>
-                  <div className="flex items-center gap-3">
-                    <div className="bg-zinc-900 p-2 rounded-md">
-                      <Globe size={16} className="text-white" />
+
+                  <div className="space-y-8 mt-6">
+                    <div className="pl-1">
+                      <h4 className="text-[14px] font-black text-black underline mb-3 uppercase tracking-wider">
+                        TERMS AND CONDITIONS
+                      </h4>
+                      <div className="space-y-1 text-[13px] font-bold text-black">
+                        <div className="flex gap-4">
+                          <span className="w-28 uppercase">1) PAYMENT</span>
+                          <span>: CONFIRMED LPO</span>
+                        </div>
+                        <div className="flex gap-4">
+                          <span className="w-28 uppercase">2) PRICES</span>
+                          <span>: INCLUSIVE OF DELIVERY & INSTALLATION AT YOUR SITE</span>
+                        </div>
+                        <div className="flex gap-4">
+                          <span className="w-28 uppercase">3) DELIVERY</span>
+                          <span>
+                            :{' '}
+                            <span className="underline font-black italic">
+                              EX STOCK, SUBJECT TO AVAILABILITY
+                            </span>{' '}
+                            OR 30 DAYS FROM ORDER DATE
+                          </span>
+                        </div>
+                        <div className="flex gap-4">
+                          <span className="w-28 uppercase">5) VALIDITY</span>
+                          <span>: 30 Days</span>
+                        </div>
+                      </div>
                     </div>
-                    <span className="text-[12px] font-black text-black">www.xerocare.com</span>
+
+                    <div className="pl-1 space-y-4">
+                      <p className="text-[13px] font-bold text-black">
+                        For any further clarifications please feel free to contact the undersigned
+                        on Mob: 70717282 or Email: mail@xerocare.com
+                      </p>
+                      <div className="space-y-1">
+                        <p className="text-[13px] font-bold text-black">With warm regards,</p>
+                        <div className="pt-2">
+                          <p className="text-[13px] font-black text-black uppercase">For</p>
+                          <p className="text-[13px] font-black text-black uppercase">
+                            XEROCARE TRADING & SERVICES WLL
+                          </p>
+                          <p className="text-[13px] font-black text-black uppercase">DOHA QATAR</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="relative flex justify-end px-4 -mt-36 z-50 pointer-events-none pr-20">
+                    <img
+                      src="/seel/seel1.png"
+                      alt="Seal"
+                      className="w-56 h-56 object-contain rotate-[-12deg]"
+                      style={{ mixBlendMode: 'multiply', filter: 'contrast(1.1)' }}
+                    />
+                  </div>
+
+                  {/* Maintenance Summary */}
+                  {(isRent || isLease) && (
+                    <div className="border-[2px] border-black p-4 bg-white mt-10">
+                      <h4 className="text-[14px] font-black text-black underline uppercase mb-3 text-center">
+                        Contract Terms Summary
+                      </h4>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-center">
+                        <div>
+                          <p className="text-[10px] font-black text-gray-500 uppercase">
+                            Advance / Deposit
+                          </p>
+                          <p className="text-sm font-black text-black">
+                            QAR{' '}
+                            {(
+                              invoice.advanceAmount ||
+                              invoice.securityDepositAmount ||
+                              0
+                            ).toLocaleString()}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-[10px] font-black text-gray-500 uppercase">Period</p>
+                          <p className="text-sm font-black text-black">
+                            {invoice.effectiveFrom
+                              ? new Date(invoice.effectiveFrom).toLocaleDateString()
+                              : 'N/A'}{' '}
+                            -{' '}
+                            {invoice.effectiveTo
+                              ? new Date(invoice.effectiveTo).toLocaleDateString()
+                              : 'N/A'}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-[10px] font-black text-gray-500 uppercase">Monthly</p>
+                          <p className="text-sm font-black text-black">
+                            QAR{' '}
+                            {(
+                              invoice.monthlyRent ||
+                              invoice.monthlyLeaseAmount ||
+                              0
+                            ).toLocaleString()}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex justify-end pt-2">
+                    <div className="border-[2px] border-black px-8 py-3 bg-[#D1E5F4] shadow-[4px_4px_0px_rgba(0,0,0,1)]">
+                      <p className="text-xl font-black text-black uppercase tracking-tight">
+                        Total: QAR{' '}
+                        {Number(invoice.totalAmount || 0).toLocaleString(undefined, {
+                          minimumFractionDigits: 2,
+                        })}
+                      </p>
+                    </div>
                   </div>
                 </div>
-              </div>
-            </>
+
+                <div className="px-12 pb-10 pt-4 bg-white shrink-0 border-t-[2px] border-black mt-auto">
+                  <div className="flex justify-between items-center py-6">
+                    <div className="flex items-center gap-3">
+                      <div className="bg-zinc-900 p-2 rounded-md">
+                        <Mail size={16} className="text-white" />
+                      </div>
+                      <span className="text-[12px] font-black text-black">mail@xerocare.com</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="bg-zinc-900 p-2 rounded-md">
+                        <Phone size={16} className="text-white" />
+                      </div>
+                      <span className="text-[12px] font-black text-black">+974 7071 7282</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="bg-zinc-900 p-2 rounded-md">
+                        <Send size={16} className="text-white" />
+                      </div>
+                      <span className="text-[12px] font-black text-black">Doha-Qatar</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="bg-zinc-900 p-2 rounded-md">
+                        <Globe size={16} className="text-white" />
+                      </div>
+                      <span className="text-[12px] font-black text-black">www.xerocare.com</span>
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+          {canViewTimeline && (
+            <div className="w-full md:w-[350px] shrink-0 border-t md:border-t-0 md:border-l border-gray-100 bg-slate-50/50 p-6 overflow-y-auto max-h-[35vh] md:max-h-full">
+              <AuditTimeline entityId={invoice.id} />
+            </div>
           )}
         </div>
 

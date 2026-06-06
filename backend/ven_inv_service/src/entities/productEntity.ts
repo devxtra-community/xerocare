@@ -17,6 +17,7 @@ export enum ProductStatus {
   LEASE = 'LEASE',
   SOLD = 'SOLD',
   DAMAGED = 'DAMAGED',
+  RETURNED = 'RETURNED',
 }
 
 export enum PrintColour {

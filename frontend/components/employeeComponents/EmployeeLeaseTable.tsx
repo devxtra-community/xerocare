@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Search, Loader2, Eye, FileText, Plus, Clock, Send } from 'lucide-react';
+import { Search, Loader2, Eye, FileText, Plus, Clock, Send, ClipboardList } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
 import { QuotationConversionFlow } from './QuotationConversionFlow';
 import { toast } from 'sonner';
@@ -55,6 +55,7 @@ export default function EmployeeLeaseTable({
 }: EmployeeLeaseTableProps) {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
+
   const [detailsOpen, setDetailsOpen] = useState(false); // Changed from useState(false) to useState(false) to allow state change
   const [approveOpen, setApproveOpen] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
@@ -407,6 +408,21 @@ export default function EmployeeLeaseTable({
                             title="Send to Finance"
                           >
                             <Send className="h-4 w-4" />
+                          </Button>
+                        )}
+
+                        {inv.status !== 'DRAFT' && inv.contractStatus !== 'COMPLETED' && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-amber-600 hover:bg-amber-50 hover:text-amber-700"
+                            onClick={() => {
+                              setSelectedInvoice(inv);
+                              setIsUsageModalOpen(true);
+                            }}
+                            title="Submit Meter Reading"
+                          >
+                            <ClipboardList className="h-4 w-4" />
                           </Button>
                         )}
 

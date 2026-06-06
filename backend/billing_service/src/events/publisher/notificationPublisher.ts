@@ -36,10 +36,22 @@ export class NotificationPublisher {
     const channel = await getRabbitChannel();
     await channel.assertExchange(EXCHANGE, 'topic', { durable: true });
 
+    const rabbitPayload = {
+      recipients: [payload.recipientId],
+      notifyAdmins: false,
+      title: payload.title,
+      message: payload.message,
+      type: payload.type,
+      data: {
+        referenceId: payload.referenceId,
+        referenceType: payload.referenceType,
+      },
+    };
+
     channel.publish(
       EXCHANGE,
       BillingEventType.NOTIFICATION_IN_APP,
-      Buffer.from(JSON.stringify(payload)),
+      Buffer.from(JSON.stringify(rabbitPayload)),
       { persistent: true },
     );
   }

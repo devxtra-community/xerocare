@@ -43,7 +43,15 @@ function StatusBadge({ status }: { status: string }) {
     APPROVED: 'bg-green-100 text-green-700',
     REJECTED: 'bg-red-100 text-red-700',
     VALIDITY_EXTENSION_REQUESTED: 'bg-amber-100 text-amber-700',
+    WAITING_FINANCE_APPROVAL: 'bg-amber-100 text-amber-700',
     PENDING: 'bg-yellow-100 text-yellow-700',
+    ACTIVE_CONTRACT: 'bg-green-100 text-green-700',
+    ACTIVE_LEASE: 'bg-green-100 text-green-700',
+    INVOICED: 'bg-blue-100 text-blue-600',
+    PAID: 'bg-green-100 text-green-700',
+    EXPIRED: 'bg-red-100 text-red-700',
+    CUSTOMER_ACCEPTED: 'bg-green-100 text-green-700',
+    CUSTOMER_REJECTED: 'bg-red-100 text-red-700',
   };
   const label: Record<string, string> = {
     DRAFT: 'DRAFT (IN PREPARATION)',
@@ -60,12 +68,17 @@ function StatusBadge({ status }: { status: string }) {
     PENDING_CONFIRMATION: 'WAITING FOR ALLOCATION',
     PAID: 'PROCESSED/PAID',
     ACTIVE_LEASE: 'ACTIVE CONTRACT',
+    ACTIVE_CONTRACT: 'ACTIVE CONTRACT',
+    INVOICED: 'INVOICED',
     TRANSACTION_COMPLETED: 'PENDING FINANCE REVIEW',
     VALIDITY_EXTENSION_REQUESTED: 'VALIDITY EXTENSION REQUESTED',
+    WAITING_FINANCE_APPROVAL: 'WAITING FINANCE APPROVAL',
+    EXPIRED: 'EXPIRED',
+    CANCELLED: 'CANCELLED',
   };
   return (
     <Badge
-      className={`rounded-full px-3 py-0.5 text-[10px] font-bold tracking-wider shadow-none ${map[status] || (['FINANCE_APPROVED', 'PAID', 'ACTIVE_LEASE'].includes(status) ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-600')}`}
+      className={`rounded-full px-3 py-0.5 text-[10px] font-bold tracking-wider shadow-none ${map[status] || (['FINANCE_APPROVED', 'PAID', 'ACTIVE_LEASE', 'ACTIVE_CONTRACT', 'INVOICED'].includes(status) ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-600')}`}
     >
       {label[status] ?? status}
     </Badge>
@@ -189,7 +202,8 @@ export default function FinanceQuotationTable({
     (q) =>
       q.status === 'EMPLOYEE_APPROVED' ||
       q.status === 'PENDING' ||
-      q.status === 'VALIDITY_EXTENSION_REQUESTED',
+      q.status === 'VALIDITY_EXTENSION_REQUESTED' ||
+      q.status === 'WAITING_FINANCE_APPROVAL',
   ).length;
   const approved = quotations.filter(
     (q) =>
@@ -203,7 +217,9 @@ export default function FinanceQuotationTable({
         'SENT_TO_CUSTOMER',
         'PAID',
         'ACTIVE_LEASE',
+        'ACTIVE_CONTRACT',
         'ISSUED',
+        'INVOICED',
         'TRANSACTION_COMPLETED',
         'PENDING_CONFIRMATION',
       ].includes(q.status),
@@ -391,7 +407,8 @@ export default function FinanceQuotationTable({
                   const isPending =
                     q.status === 'EMPLOYEE_APPROVED' ||
                     q.status === 'TRANSACTION_COMPLETED' ||
-                    q.status === 'VALIDITY_EXTENSION_REQUESTED';
+                    q.status === 'VALIDITY_EXTENSION_REQUESTED' ||
+                    q.status === 'WAITING_FINANCE_APPROVAL';
                   return (
                     <TableRow
                       key={q.id}
@@ -491,7 +508,8 @@ export default function FinanceQuotationTable({
           showDistribution={true}
           onApprove={
             viewQuotation.status === 'EMPLOYEE_APPROVED' ||
-            viewQuotation.status === 'VALIDITY_EXTENSION_REQUESTED'
+            viewQuotation.status === 'VALIDITY_EXTENSION_REQUESTED' ||
+            viewQuotation.status === 'WAITING_FINANCE_APPROVAL'
               ? () => {
                   handleApprove(viewQuotation);
                   setViewQuotation(null);
@@ -500,7 +518,8 @@ export default function FinanceQuotationTable({
           }
           onReject={
             viewQuotation.status === 'EMPLOYEE_APPROVED' ||
-            viewQuotation.status === 'VALIDITY_EXTENSION_REQUESTED'
+            viewQuotation.status === 'VALIDITY_EXTENSION_REQUESTED' ||
+            viewQuotation.status === 'WAITING_FINANCE_APPROVAL'
               ? () => {
                   openReject(viewQuotation);
                 }

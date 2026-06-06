@@ -17,6 +17,7 @@ import { RentPeriod } from './enums/rentPeriod';
 import { LeaseType } from './enums/leaseType';
 import { ContractStatus } from './enums/contractStatus';
 import { ProductAllocation } from './productAllocationEntity';
+import { BillType } from './enums/billType';
 
 export enum SecurityDepositMode {
   CASH = 'CASH',
@@ -292,6 +293,19 @@ export class Invoice {
 
   @Column({ type: 'varchar', nullable: true })
   retakenBy?: string | null;
+
+  @Column({
+    type: 'enum',
+    enum: BillType,
+    nullable: true,
+  })
+  billType?: BillType | null;
+
+  @Column({ type: 'uuid', nullable: true })
+  serviceTicketId?: string | null;
+
+  @Column({ type: 'integer', nullable: true })
+  maxCopyLimit?: number | null;
 
   @DeleteDateColumn()
   deletedAt?: Date;

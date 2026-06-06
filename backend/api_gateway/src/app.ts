@@ -6,12 +6,14 @@ import { createProxyMiddleware } from 'http-proxy-middleware';
 import healthRouter from './routes/health';
 import { startCustomerConsumer } from './events/consumers/customerUpdatedConsumer';
 import invoiceRouter from './routes/invoiceRoutes';
+import { getAuditLogs } from './controllers/invoiceController';
 import { httpLogger } from './middleware/httplogger';
 import { logger } from './config/logger';
 import { errorHandler } from './middleware/errorHandler';
 import { otpSendLimiter, otpVerifyLimiter, loginLimiter } from './middleware/rateLimitter';
 import { authMiddleware } from './middleware/authMiddleware';
 import { requireRole } from './middleware/roleMiddleware';
+import { requireServiceRole } from './middleware/serviceRoleMiddleware';
 import { UserRole } from './constants/userRole';
 
 /*
@@ -100,6 +102,13 @@ app.use(
   invoiceRouter,
 );
 
+app.get(
+  '/b/audit-logs/:entityId',
+  authMiddleware,
+  requireRole(UserRole.MANAGER, UserRole.FINANCE, UserRole.ADMIN),
+  getAuditLogs,
+);
+
 /**
  * Safety: Prevention of Automated Attacks (Rate Limiting)
  * We limit how many times someone can try to login or request a password reset
@@ -180,6 +189,98 @@ for (const [key, value] of Object.entries(requiredEnvVars)) {
  * - "/c" goes to CRM (Customer Management)
  */
 app.use('/e', createServiceProxy(EMPLOYEE_SERVICE_URL));
+
+// --- Service Management Module Gateway Routes ---
+app.post(
+  '/i/service/tickets',
+  authMiddleware,
+  requireServiceRole(['SERVICE_HELP_DESK']),
+  createServiceProxy(VENDOR_INVENTORY_SERVICE_URL),
+);
+app.get(
+  '/i/service/tickets',
+  authMiddleware,
+  requireServiceRole(['SERVICE_HELP_DESK', 'SERVICE_TECHNICIAN']),
+  createServiceProxy(VENDOR_INVENTORY_SERVICE_URL),
+);
+app.get(
+  '/i/service/tickets/:id',
+  authMiddleware,
+  requireServiceRole(['SERVICE_HELP_DESK', 'SERVICE_TECHNICIAN']),
+  createServiceProxy(VENDOR_INVENTORY_SERVICE_URL),
+);
+app.put(
+  '/i/service/tickets/:id',
+  authMiddleware,
+  requireServiceRole(['SERVICE_HELP_DESK']),
+  createServiceProxy(VENDOR_INVENTORY_SERVICE_URL),
+);
+app.post(
+  '/i/service/tickets/:id/assign',
+  authMiddleware,
+  requireServiceRole(['SERVICE_HELP_DESK']),
+  createServiceProxy(VENDOR_INVENTORY_SERVICE_URL),
+);
+app.post(
+  '/i/service/tickets/:id/diagnose',
+  authMiddleware,
+  requireServiceRole(['SERVICE_TECHNICIAN']),
+  createServiceProxy(VENDOR_INVENTORY_SERVICE_URL),
+);
+app.post(
+  '/i/service/tickets/:id/quote',
+  authMiddleware,
+  requireServiceRole(['SERVICE_TECHNICIAN']),
+  createServiceProxy(VENDOR_INVENTORY_SERVICE_URL),
+);
+app.post(
+  '/i/service/tickets/:id/customer-approve',
+  authMiddleware,
+  requireServiceRole(['SERVICE_HELP_DESK']),
+  createServiceProxy(VENDOR_INVENTORY_SERVICE_URL),
+);
+app.post(
+  '/i/service/tickets/:id/customer-reject',
+  authMiddleware,
+  requireServiceRole(['SERVICE_HELP_DESK']),
+  createServiceProxy(VENDOR_INVENTORY_SERVICE_URL),
+);
+app.post(
+  '/i/service/tickets/:id/start',
+  authMiddleware,
+  requireServiceRole(['SERVICE_TECHNICIAN']),
+  createServiceProxy(VENDOR_INVENTORY_SERVICE_URL),
+);
+app.post(
+  '/i/service/tickets/:id/complete',
+  authMiddleware,
+  requireServiceRole(['SERVICE_TECHNICIAN']),
+  createServiceProxy(VENDOR_INVENTORY_SERVICE_URL),
+);
+app.post(
+  '/i/service/tickets/:id/cancel',
+  authMiddleware,
+  requireServiceRole([], false), // Only ADMIN and MANAGER allowed
+  createServiceProxy(VENDOR_INVENTORY_SERVICE_URL),
+);
+app.get(
+  '/i/service/technicians',
+  authMiddleware,
+  requireServiceRole(['SERVICE_HELP_DESK']),
+  createServiceProxy(VENDOR_INVENTORY_SERVICE_URL),
+);
+app.get(
+  '/i/service/customers/:customerId/history',
+  authMiddleware,
+  requireServiceRole(['SERVICE_HELP_DESK', 'SERVICE_TECHNICIAN']),
+  createServiceProxy(VENDOR_INVENTORY_SERVICE_URL),
+);
+app.post(
+  '/b/service-quotation',
+  authMiddleware,
+  requireServiceRole(['SERVICE_TECHNICIAN']),
+  createServiceProxy(BILLING_SERVICE_URL),
+);
 
 // Barcode scan and print endpoints with explicit role checks at the Gateway
 app.get(

@@ -72,6 +72,10 @@ const startServer = async () => {
     // Open the communication channel (RabbitMQ)
     await getRabbitChannel();
 
+    // Start Contract Expiry Scheduler
+    const { startContractExpiryScheduler } = await import('./services/cron');
+    startContractExpiryScheduler();
+
     const PORT = process.env.PORT || 3004;
 
     // Start listening for requests

@@ -4,6 +4,7 @@ import { Invoice } from '../entities/invoiceEntity';
 import { AppError } from '../errors/appError';
 import { InvoiceStatus } from '../entities/enums/invoiceStatus';
 import { logger } from '../config/logger';
+import { logAudit } from './auditLogService';
 
 export class PaymentService {
   private paymentRepo = Source.getRepository(PaymentLedger);
@@ -58,16 +59,32 @@ export class PaymentService {
     await this.paymentRepo.save(payment);
     logger.info(`Recorded payment of ${data.amountPaid} for Invoice ${invoice.invoiceNumber}`);
 
+    await logAudit(
+      invoice.id,
+      'PAYMENT',
+      data.recordedBy,
+      `Recorded payment of QAR ${data.amountPaid} via ${data.paymentMode}. Ref: ${data.referenceNumber || 'N/A'}. Remarks: ${data.remarks || 'N/A'}`,
+    );
+
     // If fully paid, optionally update invoice status (e.g., PAID or TRANSACTION_COMPLETED)
     const newTotalPaid = totalPaidSoFar + data.amountPaid;
     if (newTotalPaid >= Number(invoice.totalAmount) - 0.01) {
       if (
         invoice.status !== InvoiceStatus.PAID &&
-        invoice.status !== InvoiceStatus.TRANSACTION_COMPLETED
+        (invoice.status as string) !== 'TRANSACTION_COMPLETED'
       ) {
+        const oldStatus = invoice.status;
         invoice.status = InvoiceStatus.PAID;
         await this.invoiceRepo.save(invoice);
         logger.info(`Invoice ${invoice.invoiceNumber} marked as PAID`);
+        await logAudit(
+          invoice.id,
+          'STATUS_CHANGE',
+          'SYSTEM',
+          `Invoice marked as PAID due to full payment reception.`,
+          oldStatus,
+          InvoiceStatus.PAID,
+        );
       }
     }
 

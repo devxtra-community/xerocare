@@ -31,14 +31,47 @@ export interface InvoiceItem {
   initialColorA3Count?: number;
 }
 
+export type InvoiceStatus =
+  | 'TEMPLATE'
+  | 'ASSIGNED'
+  | 'DRAFT'
+  | 'SENT'
+  | 'CUSTOMER_ACCEPTED'
+  | 'CUSTOMER_REJECTED'
+  | 'EMPLOYEE_APPROVED'
+  | 'WAITING_FINANCE_APPROVAL'
+  | 'FINANCE_APPROVED'
+  | 'FINANCE_REJECTED'
+  | 'ACTIVE_CONTRACT'
+  | 'INVOICED'
+  | 'PAID'
+  | 'EXPIRED'
+  | 'CANCELLED'
+  | 'RETAKEN'
+  | 'SUPERSEDED'
+  | 'REJECTED'
+  | 'SENT_TO_CUSTOMER'
+  | 'PENDING'
+  | 'TRANSACTION_COMPLETED'
+  | 'VALIDITY_EXTENSION_REQUESTED'
+  | 'FINAL'
+  | 'APPROVED'
+  | 'ACCEPTED'
+  | 'PENDING_CONFIRMATION'
+  | 'ISSUED'
+  | 'OPEN'
+  | 'FREE_SERVICE'
+  | 'DIAGNOSED'
+  | 'QUOTED';
+
 export interface Invoice {
   id: string;
   invoiceNumber: string;
   branchId: string;
-  customerId: string;
+  customerId: string | null;
   createdBy: string;
   totalAmount: number;
-  status: string;
+  status: InvoiceStatus;
   contractStatus?: 'PENDING_CONFIRMATION' | 'ACTIVE' | 'COMPLETED' | 'CANCELLED';
   contractConfirmationUrl?: string;
   emailSentAt?: string;
@@ -980,5 +1013,24 @@ export const getEmployeeAssignedQuotations = async (): Promise<Invoice[]> => {
  */
 export const deleteInvoice = async (id: string): Promise<unknown> => {
   const response = await api.delete(`/b/invoices/${id}`);
+  return response.data.data;
+};
+
+export interface AuditLog {
+  id: string;
+  entityId: string;
+  action: string;
+  performedBy: string;
+  oldValue?: string;
+  newValue?: string;
+  details?: string;
+  createdAt: string;
+}
+
+/**
+ * Fetch audit logs for a specific entity ID.
+ */
+export const getAuditLogs = async (entityId: string): Promise<AuditLog[]> => {
+  const response = await api.get(`/b/audit-logs/${entityId}`);
   return response.data.data;
 };

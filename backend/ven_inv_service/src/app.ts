@@ -22,6 +22,7 @@ import lotRouter from './routes/lotRoutes';
 import rfqRouter from './routes/rfqRoute';
 import purchaseRouter from './routes/purchaseRoutes';
 import { httpLogger } from './middlewares/httpLogger';
+import serviceRouter from './routes/serviceRoutes';
 
 /**
  * This is the main engine for the Vendor & Inventory Service.
@@ -63,6 +64,7 @@ app.use('/brands', brandRouter);
 app.use('/lots', lotRouter);
 app.use('/rfq', rfqRouter);
 app.use('/purchases', purchaseRouter);
+app.use('/service', serviceRouter);
 
 /**
  * Safety Net: Handling mistakes.
@@ -103,6 +105,10 @@ const startServer = async () => {
     await startProductStatusConsumer();
     await startProductAllocationConsumer();
     await startSparePartReductionConsumer();
+
+    // Start polling Dead Letter Queue
+    const { startDLQMonitor } = await import('./services/dlqMonitorService');
+    await startDLQMonitor();
 
     const PORT = process.env.PORT;
 

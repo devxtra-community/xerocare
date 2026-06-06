@@ -7,6 +7,7 @@ export enum ProductStatus {
   SOLD = 'SOLD',
   DAMAGED = 'DAMAGED',
   LEASE = 'LEASE',
+  RETURNED = 'RETURNED',
 }
 
 export interface Product {

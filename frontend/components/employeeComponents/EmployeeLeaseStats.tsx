@@ -38,7 +38,9 @@ export default function EmployeeLeaseStats({ invoices: propInvoices }: EmployeeL
 
   // 1. Total Lease: All lease contracts (excluding rejected/cancelled)
   const allLeases = invoices.filter(
-    (inv) => inv.saleType === 'LEASE' && !['REJECTED', 'CANCELLED'].includes(inv.status),
+    (inv) =>
+      inv.saleType === 'LEASE' &&
+      !['REJECTED', 'CANCELLED', 'CUSTOMER_REJECTED', 'FINANCE_REJECTED'].includes(inv.status),
   );
 
   const now = new Date();
@@ -60,8 +62,10 @@ export default function EmployeeLeaseStats({ invoices: propInvoices }: EmployeeL
           'PAID',
           'PARTIALLY_PAID',
           'ISSUED',
+          'INVOICED',
           'FINANCE_APPROVED',
           'ACTIVE_LEASE',
+          'ACTIVE_CONTRACT',
           'EMPLOYEE_APPROVED',
           'APPROVED',
           'COMPLETED',

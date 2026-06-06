@@ -36,6 +36,7 @@ export default function EmployeeRentStats({ invoices, rentTotalOverride }: Emplo
       'PAID',
       'PARTIALLY_PAID',
       'ISSUED',
+      'INVOICED',
       'FINANCE_APPROVED',
       'SENT',
       'APPROVED',

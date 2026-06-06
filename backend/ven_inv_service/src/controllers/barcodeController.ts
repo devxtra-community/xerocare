@@ -55,16 +55,19 @@ function drawSticker(
 export const scanLookup = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const code = req.query.code as string;
+    const warehouseId = req.query.warehouseId as string;
     if (!code) {
       throw new AppError('Barcode code parameter is required', 400);
     }
 
-    logger.info(`Barcode scan lookup initiated for code: ${code}`);
+    logger.info(
+      `Barcode scan lookup initiated for code: ${code}, warehouseId: ${warehouseId || 'any'}`,
+    );
 
     // Try lookup in Products first
     const product = await Source.getRepository(Product).findOne({
       where: { barcode_id: code },
-      relations: ['model'],
+      relations: ['model', 'warehouse'],
     });
 
     if (product) {
@@ -72,6 +75,11 @@ export const scanLookup = async (req: Request, res: Response, next: NextFunction
       if (product.product_status !== ProductStatus.AVAILABLE) {
         warning = 'This product is currently not available for sale';
       }
+
+      if (warehouseId && product.warehouse_id !== warehouseId) {
+        warning = `This product is stored in warehouse "${product.warehouse?.warehouseName || product.warehouse_id}" and not the selected warehouse`;
+      }
+
       return res.status(200).json({
         success: true,
         type: 'PRODUCT',
@@ -83,14 +91,40 @@ export const scanLookup = async (req: Request, res: Response, next: NextFunction
     // Try lookup in SpareParts next
     const sparePart = await Source.getRepository(SparePart).findOne({
       where: { barcode_id: code },
-      relations: ['model'],
+      relations: ['model', 'warehouse'],
     });
 
     if (sparePart) {
+      let finalSparePart = sparePart;
+      let warning: string | undefined = undefined;
+
+      if (warehouseId && sparePart.warehouse_id !== warehouseId) {
+        // Find spare part of same SKU in the selected warehouse
+        const warehouseSpecificPart = await Source.getRepository(SparePart).findOne({
+          where: { sku: sparePart.sku, warehouse_id: warehouseId },
+          relations: ['model', 'warehouse'],
+        });
+
+        if (warehouseSpecificPart) {
+          finalSparePart = warehouseSpecificPart;
+        } else {
+          // No stock of this SKU in the selected warehouse
+          finalSparePart = {
+            ...sparePart,
+            id: '', // Empty ID to prevent allocating from a non-existent warehouse record
+            quantity: 0,
+            warehouse_id: warehouseId,
+            warehouse: undefined,
+          } as unknown as SparePart;
+          warning = `No stock of this spare part found in the selected warehouse`;
+        }
+      }
+
       return res.status(200).json({
         success: true,
         type: 'SPARE_PART',
-        item: sparePart,
+        item: finalSparePart,
+        warning,
       });
     }
 
