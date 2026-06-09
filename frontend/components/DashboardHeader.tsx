@@ -238,10 +238,10 @@ export default function DashboardHeader({ title = 'Dashboard' }: { title?: strin
                   className="hidden sm:flex flex-col min-w-0 items-start"
                   suppressHydrationWarning
                 >
-                  <span className="text-sm font-medium truncate">{user.name}</span>
-                  <span className="text-xs text-sidebar-foreground/70 truncate">{user.email}</span>
+                  <span className="text-sm font-medium truncate text-white">{user.name}</span>
+                  <span className="text-xs text-white/70 truncate">{user.email}</span>
                 </div>
-                <ChevronDown className="hidden sm:block h-4 w-4 text-sidebar-foreground/70" />
+                <ChevronDown className="hidden sm:block h-4 w-4 text-white/70" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent

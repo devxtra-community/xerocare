@@ -9,6 +9,7 @@ import { QuotationConversionFlow } from './QuotationConversionFlow';
 import { formatCurrency } from '@/lib/format';
 import { toast } from 'sonner';
 import DirectSaleFormModal from './DirectSaleFormModal';
+import { getUserFromToken } from '@/lib/auth';
 import {
   Table,
   TableBody,
@@ -53,6 +54,10 @@ export default function EmployeeSalesTable({ mode = 'EMPLOYEE' }: EmployeeSalesT
   const [directSaleFormOpen, setDirectSaleFormOpen] = useState(false);
   const [allBrands, setAllBrands] = useState<unknown[]>([]);
   const [allModels, setAllModels] = useState<unknown[]>([]);
+
+  const currentUser = getUserFromToken();
+  const isManagerOrAdmin =
+    currentUser && (currentUser.role === 'ADMIN' || currentUser.role === 'MANAGER');
 
   useEffect(() => {
     const fetchSuggestions = async () => {
@@ -511,19 +516,21 @@ export default function EmployeeSalesTable({ mode = 'EMPLOYEE' }: EmployeeSalesT
                   Select an approved quotation to finalize as a sale.
                 </span>
               </Button>
-              <Button
-                variant="outline"
-                className="flex flex-col items-start p-6 h-auto hover:bg-slate-50 border-2 hover:border-primary transition-all text-left gap-1 rounded-xl"
-                onClick={() => {
-                  setSelectModeOpen(false);
-                  setDirectSaleFormOpen(true);
-                }}
-              >
-                <span className="font-bold text-slate-900 text-sm">Direct Sale</span>
-                <span className="text-[11px] text-slate-500 font-normal">
-                  Create a new sale directly without an existing quotation.
-                </span>
-              </Button>
+              {isManagerOrAdmin && (
+                <Button
+                  variant="outline"
+                  className="flex flex-col items-start p-6 h-auto hover:bg-slate-50 border-2 hover:border-primary transition-all text-left gap-1 rounded-xl"
+                  onClick={() => {
+                    setSelectModeOpen(false);
+                    setDirectSaleFormOpen(true);
+                  }}
+                >
+                  <span className="font-bold text-slate-900 text-sm">Direct Sale</span>
+                  <span className="text-[11px] text-slate-500 font-normal">
+                    Create a new sale directly without an existing quotation.
+                  </span>
+                </Button>
+              )}
             </div>
             <div className="flex justify-end pt-2 border-t">
               <Button

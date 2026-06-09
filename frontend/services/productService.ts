@@ -7,6 +7,7 @@ export interface Product {
   model_id: string;
   model?: Model;
   model_no?: string;
+  barcode_id?: string;
   warehouse_id: string;
   warehouse_name?: string;
   vendor_id: string;

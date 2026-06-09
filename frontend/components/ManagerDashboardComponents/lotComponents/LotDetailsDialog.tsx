@@ -41,6 +41,7 @@ import { Input } from '@/components/ui/input';
 import AddPaymentModal from '../purchaseComponents/AddPaymentModal';
 import AddPurchaseDialog from '../purchaseComponents/AddPurchaseDialog';
 import AddCostModal from '../purchaseComponents/AddCostModal';
+import api from '@/lib/api';
 
 interface LotDetailsDialogProps {
   lot: Lot;
@@ -231,6 +232,41 @@ export default function LotDetailsDialog({ lot, onClose, onSuccess }: LotDetails
     } catch (error) {
       console.error('Failed to download spare parts excel:', error);
       toast.error('Failed to download spare parts Excel');
+    }
+  };
+
+  const handlePrintProductBarcodes = async () => {
+    try {
+      const response = await api.get(`/i/inventory/products/barcode-pdf?lotId=${currentLot.id}`, {
+        responseType: 'blob',
+      });
+      const fileUrl = URL.createObjectURL(response.data);
+      window.open(fileUrl);
+    } catch (err: unknown) {
+      toast.error('Failed to generate product barcodes', {
+        description:
+          (err as { response?: { data?: { message?: string } } }).response?.data?.message ||
+          (err as Error).message,
+      });
+    }
+  };
+
+  const handlePrintSparePartBarcodes = async () => {
+    try {
+      const response = await api.get(
+        `/i/inventory/spare-parts/barcode-pdf?lotId=${currentLot.id}`,
+        {
+          responseType: 'blob',
+        },
+      );
+      const fileUrl = URL.createObjectURL(response.data);
+      window.open(fileUrl);
+    } catch (err: unknown) {
+      toast.error('Failed to generate spare part barcodes', {
+        description:
+          (err as { response?: { data?: { message?: string } } }).response?.data?.message ||
+          (err as Error).message,
+      });
     }
   };
 
@@ -675,23 +711,53 @@ export default function LotDetailsDialog({ lot, onClose, onSuccess }: LotDetails
             <div className="bg-slate-50 border-t p-4 flex justify-between items-center">
               <div className="flex gap-2">
                 {currentLot.status === LotStatus.RECEIVED && hasProducts && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-7 text-[10px] gap-1.5 border-blue-200 text-blue-700"
-                    onClick={() => handleAddToInventory(undefined, LotItemType.MODEL)}
-                  >
-                    <Plus size={12} /> Add Products to Inventory
-                  </Button>
+                  <div className="flex gap-1.5">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 text-[10px] gap-1.5 border-blue-200 text-blue-700"
+                      onClick={() => handleAddToInventory(undefined, LotItemType.MODEL)}
+                    >
+                      <Plus size={12} /> Add Products to Inventory
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 text-[10px] gap-1.5 border-indigo-200 text-indigo-700"
+                      onClick={handlePrintProductBarcodes}
+                    >
+                      <FileText size={12} /> Print Barcodes
+                    </Button>
+                  </div>
                 )}
                 {currentLot.status === LotStatus.RECEIVED && hasSpareParts && (
+                  <div className="flex gap-1.5">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 text-[10px] gap-1.5 border-orange-200 text-orange-700"
+                      onClick={() => handleAddToInventory(undefined, LotItemType.SPARE_PART)}
+                    >
+                      <Plus size={12} /> Add Spare to Inventory
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 text-[10px] gap-1.5 border-amber-200 text-amber-700"
+                      onClick={handlePrintSparePartBarcodes}
+                    >
+                      <FileText size={12} /> Print Barcodes
+                    </Button>
+                  </div>
+                )}
+                {currentLot.status !== LotStatus.RECEIVED && hasSpareParts && (
                   <Button
                     variant="outline"
                     size="sm"
-                    className="h-7 text-[10px] gap-1.5 border-orange-200 text-orange-700"
-                    onClick={() => handleAddToInventory(undefined, LotItemType.SPARE_PART)}
+                    className="h-7 text-[10px] gap-1.5 border-amber-200 text-amber-700"
+                    onClick={handlePrintSparePartBarcodes}
                   >
-                    <Plus size={12} /> Add Spare to Inventory
+                    <FileText size={12} /> Print Spare Barcodes
                   </Button>
                 )}
               </div>

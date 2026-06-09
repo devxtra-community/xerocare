@@ -21,6 +21,7 @@ import {
 import { sparePartService, SparePartInventoryItem } from '@/services/sparePartService';
 import EditSparePartDialog from '@/components/ManagerDashboardComponents/spareParts/EditSparePartDialog';
 import { toast } from 'sonner';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 
 interface SparePartTableProps {
   showActions?: boolean;
@@ -60,10 +61,19 @@ export default function SparePartTable({ showActions = true, selectedYear }: Spa
     loadParts();
   }, [selectedYear, loadParts]);
 
-  const handleDelete = async (id: string, name: string) => {
-    if (!confirm(`Are you sure you want to delete ${name}?`)) return;
+  // Delete States
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deletingPart, setDeletingPart] = useState<{ id: string; name: string } | null>(null);
+
+  const handleDeleteClick = (id: string, name: string) => {
+    setDeletingPart({ id, name });
+    setDeleteOpen(true);
+  };
+
+  const executeDelete = async () => {
+    if (!deletingPart) return;
     try {
-      await sparePartService.deleteSparePart(id);
+      await sparePartService.deleteSparePart(deletingPart.id);
       toast.success('Spare part deleted successfully');
       loadParts();
     } catch (error: unknown) {
@@ -71,6 +81,8 @@ export default function SparePartTable({ showActions = true, selectedYear }: Spa
       const err = error as { response?: { data?: { message?: string } } };
       const msg = err.response?.data?.message || 'Failed to delete spare part';
       toast.error(msg);
+    } finally {
+      setDeleteOpen(false);
     }
   };
 
@@ -246,7 +258,7 @@ export default function SparePartTable({ showActions = true, selectedYear }: Spa
                             <Pencil size={16} />
                           </button>
                           <button
-                            onClick={() => handleDelete(item.id, item.part_name)}
+                            onClick={() => handleDeleteClick(item.id, item.part_name)}
                             className="p-1 hover:bg-red-50 rounded text-red-500"
                           >
                             <Trash2 size={16} />
@@ -284,6 +296,16 @@ export default function SparePartTable({ showActions = true, selectedYear }: Spa
           onSuccess={loadParts}
         />
       )}
+
+      <ConfirmDialog
+        isOpen={deleteOpen}
+        onClose={() => setDeleteOpen(false)}
+        title="Delete Spare Part"
+        description={deletingPart ? `Are you sure you want to delete ${deletingPart.name}?` : ''}
+        type="destructive"
+        confirmText="Delete"
+        onConfirm={executeDelete}
+      />
     </div>
   );
 }

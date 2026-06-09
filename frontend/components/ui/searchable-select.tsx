@@ -131,16 +131,16 @@ export function SearchableSelect({
                     }
                   }}
                   className={cn(
-                    'relative flex select-none items-center rounded-sm px-3 py-2 text-sm outline-none transition-all duration-200 group',
+                    'relative flex select-none items-center justify-between rounded-sm px-3 py-2 text-sm outline-none transition-all duration-200 group',
                     option.disabled
                       ? 'cursor-not-allowed opacity-50 bg-muted/50'
                       : 'cursor-pointer hover:bg-blue-600 hover:shadow-sm',
                   )}
                 >
-                  <div className="flex w-full items-center justify-between">
+                  <div className="flex flex-col min-w-0 flex-1">
                     <span
                       className={cn(
-                        'font-bold text-sm transition-colors duration-200',
+                        'font-bold text-sm transition-colors duration-200 truncate',
                         option.disabled
                           ? 'text-slate-400'
                           : 'text-slate-700 group-hover:text-white',
@@ -148,20 +148,20 @@ export function SearchableSelect({
                     >
                       {option.label}
                     </span>
-                    <Check
-                      className={cn(
-                        'ml-auto h-4 w-4 transition-colors duration-200',
-                        value === option.value
-                          ? 'opacity-100 text-blue-600 group-hover:text-white'
-                          : 'opacity-0',
-                      )}
-                    />
+                    {option.description && (
+                      <p className="text-[10px] font-medium leading-tight mt-0.5 transition-colors duration-200 text-slate-400 group-hover:text-blue-100 truncate">
+                        {option.description}
+                      </p>
+                    )}
                   </div>
-                  {option.description && (
-                    <p className="text-[10px] font-medium leading-tight mt-0.5 ml-0 transition-colors duration-200 text-slate-400 group-hover:text-blue-100">
-                      {option.description}
-                    </p>
-                  )}
+                  <Check
+                    className={cn(
+                      'ml-2 h-4 w-4 shrink-0 transition-colors duration-200',
+                      value === option.value
+                        ? 'opacity-100 text-blue-600 group-hover:text-white'
+                        : 'opacity-0',
+                    )}
+                  />
                 </div>
               ))
             )}

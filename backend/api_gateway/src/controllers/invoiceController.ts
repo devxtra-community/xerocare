@@ -794,3 +794,14 @@ export const deleteInvoice = async (req: Request, res: Response, next: NextFunct
     next(error);
   }
 };
+
+export const getAuditLogs = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const entityId = req.params.entityId as string;
+    const token = req.headers.authorization?.split(' ')[1] || '';
+    const result = await invoiceAggregationService.getAuditLogs(entityId, token);
+    return res.status(200).json(result);
+  } catch (error) {
+    next(error);
+  }
+};

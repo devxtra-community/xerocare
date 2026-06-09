@@ -11,7 +11,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { Calendar, Coins, Loader2, Mail } from 'lucide-react';
+import { Calendar, Coins, Loader2, Mail, AlertTriangle, AlertCircle } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { formatCurrency } from '@/lib/format';
 import { Invoice, getInvoiceById } from '@/lib/invoice';
@@ -22,6 +22,7 @@ import UsageRecordingModal from '@/components/Finance/UsageRecordingModal';
 import ReplaceDeviceModal from '@/components/Finance/ReplaceDeviceModal';
 import { RefreshCw } from 'lucide-react';
 import { InvoiceViewDialog } from '../employeeComponents/InvoiceViewDialog';
+import AuditTimeline from './AuditTimeline';
 
 interface InvoiceDetailsDialogProps {
   invoice: Invoice;
@@ -369,6 +370,51 @@ export function InvoiceDetailsDialog({
     <Dialog open={true} onOpenChange={(val) => !val && onClose()}>
       <DialogContent className="p-0 overflow-y-auto rounded-none border-none shadow-2xl bg-white flex flex-col max-h-[95vh] sm:max-w-xl">
         <DialogTitle className="sr-only">Invoice Details</DialogTitle>
+        {(() => {
+          if (!currentInvoice.effectiveTo) return null;
+          const isContract =
+            currentInvoice.status === 'ACTIVE_CONTRACT' || currentInvoice.status === 'EXPIRED';
+          if (!isContract) return null;
+
+          const toDate = new Date(currentInvoice.effectiveTo);
+          const today = new Date();
+          const isExpired = toDate < today;
+
+          const thirtyDaysFromNow = new Date();
+          thirtyDaysFromNow.setDate(today.getDate() + 30);
+          const isExpiringSoon = toDate <= thirtyDaysFromNow && toDate >= today;
+
+          if (!isExpired && !isExpiringSoon) return null;
+
+          const diffTime = Math.abs(toDate.getTime() - today.getTime());
+          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+          return (
+            <div
+              className={`p-4 flex items-center gap-3 border-b ${
+                isExpired
+                  ? 'bg-red-50 border-red-100 text-red-700'
+                  : 'bg-amber-50 border-amber-100 text-amber-700'
+              }`}
+            >
+              {isExpired ? (
+                <AlertCircle className="h-5 w-5 flex-shrink-0" />
+              ) : (
+                <AlertTriangle className="h-5 w-5 flex-shrink-0" />
+              )}
+              <div className="flex-1">
+                <p className="text-xs font-bold uppercase tracking-wider">
+                  {isExpired ? 'Contract Expired' : 'Contract Expiring Soon'}
+                </p>
+                <p className="text-xs opacity-90 mt-0.5 font-medium leading-relaxed">
+                  {isExpired
+                    ? `This contract expired ${diffDays} days ago on ${toDate.toLocaleDateString()}. Please renew or request validity extension.`
+                    : `This contract will expire in ${diffDays} days on ${toDate.toLocaleDateString()}.`}
+                </p>
+              </div>
+            </div>
+          );
+        })()}
         <div
           className="space-y-8 overflow-y-auto scrollbar-hide flex-1 p-8 pt-6"
           ref={scrollContainerRef}
@@ -1111,6 +1157,11 @@ export function InvoiceDetailsDialog({
               </div>
             </div>
           )}
+
+          {/* Audit Timeline Section */}
+          <div className="pt-6 border-t border-gray-100">
+            <AuditTimeline entityId={currentInvoice.id} />
+          </div>
         </div>
 
         <div className="p-6 bg-muted/50/50 border-t border-gray-100 flex flex-col md:flex-row items-center justify-between gap-6">

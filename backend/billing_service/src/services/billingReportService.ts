@@ -1073,7 +1073,7 @@ export class BillingReportService {
       .text(
         customer
           ? `${customer.firstName} ${customer.lastName || ''}`.toUpperCase()
-          : 'WALKING CUSTOMER',
+          : 'NO CUSTOMER ASSIGNED',
         40,
         startY + 28,
       );
@@ -1081,8 +1081,8 @@ export class BillingReportService {
       .fillColor('#64748b')
       .font('Helvetica')
       .fontSize(8)
-      .text(customer?.email || 'mail@customer.com', 40, startY + 41);
-    doc.text(customer?.phone || '+974-0000-0000', 40, startY + 50);
+      .text(customer?.email || '—', 40, startY + 41);
+    doc.text(customer?.phone || '—', 40, startY + 50);
     doc
       .font('Helvetica-Oblique')
       .fontSize(9)
@@ -1487,7 +1487,7 @@ export class BillingReportService {
       .text(
         customer
           ? `${customer.firstName} ${customer.lastName || ''}`.toUpperCase()
-          : 'WALKING CUSTOMER',
+          : 'NO CUSTOMER ASSIGNED',
         40,
         startY + 28,
       );
@@ -1495,8 +1495,8 @@ export class BillingReportService {
       .fillColor('#64748b')
       .font('Helvetica')
       .fontSize(8)
-      .text(customer?.email || 'mail@customer.com', 40, startY + 41);
-    doc.text(customer?.phone || '+974-0000-0000', 40, startY + 50);
+      .text(customer?.email || '—', 40, startY + 41);
+    doc.text(customer?.phone || '—', 40, startY + 50);
     doc
       .font('Helvetica-Oblique')
       .fontSize(9)

@@ -20,9 +20,11 @@ import {
   UserCheck,
   Wrench,
   Copy,
+  Scan,
 } from 'lucide-react';
 import { formatCurrency } from '@/lib/format';
 import { toast } from 'sonner';
+import api from '@/lib/api';
 import {
   Table,
   TableBody,
@@ -130,6 +132,10 @@ function StatusBadge({ status }: { status: string }) {
     PENDING: 'bg-yellow-100 text-yellow-700',
     PAID: 'bg-green-100 text-green-700',
     ACTIVE_LEASE: 'bg-green-100 text-green-700',
+    ACTIVE_CONTRACT: 'bg-green-100 text-green-700',
+    INVOICED: 'bg-blue-100 text-blue-600',
+    CANCELLED: 'bg-slate-100 text-slate-600',
+    WAITING_FINANCE_APPROVAL: 'bg-amber-100 text-amber-700',
     TRANSACTION_COMPLETED: 'bg-green-100 text-green-700 font-bold border-green-200',
     ASSIGNED: 'bg-indigo-100 text-indigo-700',
     RETAKEN: 'bg-red-100 text-red-700',
@@ -153,6 +159,11 @@ function StatusBadge({ status }: { status: string }) {
     TRANSACTION_COMPLETED: 'ACCOUNTING COMPLETED',
     PAID: 'FULLY PAID',
     ACTIVE_LEASE: 'ACTIVE',
+    ACTIVE_CONTRACT: 'ACTIVE',
+    INVOICED: 'INVOICED',
+    CANCELLED: 'CANCELLED',
+    EXPIRED: 'EXPIRED',
+    WAITING_FINANCE_APPROVAL: 'WAITING FINANCE APPROVAL',
   };
 
   return (
@@ -307,6 +318,9 @@ export default function EmployeeQuotationTable() {
       'FINANCE_APPROVED',
       'PAID',
       'ACTIVE_LEASE',
+      'ACTIVE_CONTRACT',
+      'ISSUED',
+      'INVOICED',
       'TRANSACTION_COMPLETED',
       'PENDING_CONFIRMATION',
       'SENT_TO_CUSTOMER',
@@ -1050,6 +1064,7 @@ function QuotationFormModal({
   const [saleItems, setSaleItems] = useState<SaleItem[]>([]);
   const [notes, setNotes] = useState('');
   const [validDays, setValidDays] = useState(30);
+  const [scanQuery, setScanQuery] = useState('');
 
   // ── RENT state ──────────────────────────────────────────────────────────
   const [rentType, setRentType] = useState('FIXED_LIMIT');
@@ -1412,6 +1427,50 @@ function QuotationFormModal({
 
   const removeItem = (i: number) => setSaleItems((prev) => prev.filter((_, idx) => idx !== i));
 
+  const handleBarcodeScan = async (code: string) => {
+    try {
+      const response = await api.get(`/i/inventory/scan?code=${code}`);
+      const { type, item, warning } = response.data;
+
+      if (warning) {
+        toast.warning(warning);
+      }
+
+      if (type === 'PRODUCT') {
+        const pr = item as Product;
+        const exists = saleItems.some((si) => si.productId === pr.id);
+        if (exists) {
+          toast.warning(`Product "${pr.name}" (SN: ${pr.serial_no}) has already been added.`);
+          return;
+        }
+        addItem(pr);
+      } else if (type === 'SPARE_PART') {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const sp = item as any;
+        const existingIndex = saleItems.findIndex((si) => si.sparePartId === sp.id);
+        if (existingIndex > -1) {
+          setSaleItems((prev) => {
+            const updated = [...prev];
+            updated[existingIndex] = {
+              ...updated[existingIndex],
+              quantity: updated[existingIndex].quantity + 1,
+            };
+            return updated;
+          });
+          toast.success(`Incremented quantity for "${sp.part_name || 'Spare Part'}"`);
+        } else {
+          addItem(sp);
+        }
+      }
+    } catch (err: unknown) {
+      toast.error('Scan failed', {
+        description:
+          (err as { response?: { data?: { message?: string } } }).response?.data?.message ||
+          (err as Error).message,
+      });
+    }
+  };
+
   const addManualItem = () => {
     setSaleItems((prev) => [
       ...prev,
@@ -1548,14 +1607,14 @@ function QuotationFormModal({
       } else if (field === 'productName') items[index] = { ...item, productName: String(value) };
       else if (field === 'hsCode') items[index] = { ...item, hsCode: String(value) };
       else if (field === 'discount') {
-        const d = Number(value);
+        let d = Number(value);
+        if (item.maxDiscount > 0 && d > item.maxDiscount) {
+          toast.warning(`Maximum discount allowed is QAR ${item.maxDiscount}`);
+          d = item.maxDiscount;
+        }
         if (d > item.basePrice) {
           toast.error('Discount cannot exceed price');
-          return prev;
-        }
-        if (item.maxDiscount > 0 && d > item.maxDiscount) {
-          toast.error(`Maximum discount allowed is ${item.maxDiscount}`);
-          return prev;
+          d = item.basePrice;
         }
         items[index] = { ...item, discount: d, unitPrice: item.basePrice - d };
       } else if (field === 'basePrice' && item.isEditable) {
@@ -2143,6 +2202,44 @@ function QuotationFormModal({
                           : 'Items'}
                     </h4>
                   </div>
+                  {/* Barcode Scanner Input */}
+                  <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 shadow-inner space-y-2">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase flex items-center gap-1.5 pl-0.5">
+                      <Scan size={12} className="text-primary animate-pulse" /> Scan Product or
+                      Spare Part Barcode
+                    </label>
+                    <div className="flex gap-2">
+                      <Input
+                        type="text"
+                        placeholder="Scan or enter barcode ID (e.g. XC-P-12345) and press Enter..."
+                        value={scanQuery}
+                        onChange={(e) => setScanQuery(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            if (scanQuery.trim()) {
+                              handleBarcodeScan(scanQuery.trim());
+                              setScanQuery('');
+                            }
+                          }
+                        }}
+                        className="bg-white rounded-lg border-slate-200"
+                      />
+                      <Button
+                        type="button"
+                        onClick={() => {
+                          if (scanQuery.trim()) {
+                            handleBarcodeScan(scanQuery.trim());
+                            setScanQuery('');
+                          }
+                        }}
+                        className="rounded-lg px-4 shrink-0 font-bold"
+                      >
+                        Scan
+                      </Button>
+                    </div>
+                  </div>
+
                   <div className="flex items-center gap-3">
                     <div className="flex-1 bg-card p-2 rounded-xl border border-border shadow-sm focus-within:ring-2 focus-within:ring-primary/20 transition-all">
                       <ProductSelect

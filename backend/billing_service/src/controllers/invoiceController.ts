@@ -5,8 +5,10 @@ import { NotificationService } from '../services/notificationService';
 import { AppError } from '../errors/appError';
 import { MulterS3File } from '../types/multer-s3-file';
 import { Source } from '../config/dataSource';
-import { ProductAllocation } from '../entities/productAllocationEntity';
+import { ProductAllocation, AllocationStatus } from '../entities/productAllocationEntity';
+import { Invoice } from '../entities/invoiceEntity';
 import { EmployeeRole } from '../constants/employeeRole';
+import { InvoiceStatus } from '../entities/enums/invoiceStatus';
 
 const billingService = new BillingService();
 const reportService = new BillingReportService();
@@ -179,7 +181,7 @@ export const updateStatus = async (req: Request, res: Response, next: NextFuncti
   try {
     const id = req.params.id as string;
     const { status } = req.body;
-    const result = await billingService.updateStatus(id, status);
+    const result = await billingService.updateStatus(id, status, req.user?.userId);
     return res.status(200).json({ success: true, data: result });
   } catch (error) {
     next(error);
@@ -195,7 +197,7 @@ export const approveQuotation = async (req: Request, res: Response, next: NextFu
     const id = req.params.id as string;
     const { deposit } = req.body;
 
-    const invoice = await billingService.approveQuotation(id, deposit);
+    const invoice = await billingService.approveQuotation(id, deposit, req.user?.userId);
     return res.status(200).json({
       success: true,
       data: invoice,
@@ -258,7 +260,7 @@ export const convertToTransaction = async (req: Request, res: Response, next: Ne
     const id = req.params.id as string;
     if (!req.user || !req.user.userId) throw new AppError('User context missing', 401);
 
-    const invoice = await billingService.convertToTransaction(id);
+    const invoice = await billingService.convertToTransaction(id, req.user.userId);
 
     return res.status(200).json({
       success: true,
@@ -730,12 +732,16 @@ export const updateInvoiceUsage = async (req: Request, res: Response, next: Next
     const id = req.params.id as string;
     const { bwA4Count, bwA3Count, colorA4Count, colorA3Count } = req.body;
 
-    const invoice = await billingService.updateInvoiceUsage(id, {
-      bwA4Count: Number(bwA4Count || 0),
-      bwA3Count: Number(bwA3Count || 0),
-      colorA4Count: Number(colorA4Count || 0),
-      colorA3Count: Number(colorA3Count || 0),
-    });
+    const invoice = await billingService.updateInvoiceUsage(
+      id,
+      {
+        bwA4Count: Number(bwA4Count || 0),
+        bwA3Count: Number(bwA3Count || 0),
+        colorA4Count: Number(colorA4Count || 0),
+        colorA3Count: Number(colorA3Count || 0),
+      },
+      req.user?.userId,
+    );
 
     return res.status(200).json({
       success: true,
@@ -1314,6 +1320,153 @@ export const deleteInvoice = async (req: Request, res: Response, next: NextFunct
     return res
       .status(200)
       .json({ success: true, message: 'Invoice/Template deleted successfully' });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getInvoiceAuditLogs = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = req.params.id as string;
+    const invoice = await billingService.getInvoiceById(id);
+
+    const userRole = req.headers['x-user-role'] as string;
+    const userBranchId = req.headers['x-user-branch-id'] as string;
+
+    if (userRole !== 'ADMIN' && invoice.branchId !== userBranchId) {
+      throw new AppError('Access denied: Invoice belongs to another branch', 403);
+    }
+
+    const logs = [];
+
+    // 1. Creation log
+    logs.push({
+      action: 'CREATED',
+      userId: invoice.createdBy,
+      timestamp: invoice.createdAt,
+      remarks: 'Invoice/Contract created.',
+    });
+
+    // 2. Employee approval log
+    if (invoice.employeeApprovedBy || invoice.employeeApprovedAt) {
+      logs.push({
+        action: 'EMPLOYEE_APPROVED',
+        userId: invoice.employeeApprovedBy,
+        timestamp: invoice.employeeApprovedAt,
+        remarks: 'Contract approved by employee.',
+      });
+    }
+
+    // 3. Finance approval log
+    if (invoice.financeApprovedBy || invoice.financeApprovedAt) {
+      logs.push({
+        action: 'FINANCE_APPROVED',
+        userId: invoice.financeApprovedBy,
+        timestamp: invoice.financeApprovedAt,
+        remarks: invoice.financeRemarks || 'Quotation/Contract approved by finance.',
+      });
+    }
+
+    // 4. Finance rejection log (fallback if rejected status is present)
+    if (
+      (invoice.status === InvoiceStatus.FINANCE_REJECTED ||
+        (invoice.status as string) === 'REJECTED') &&
+      invoice.financeRemarks
+    ) {
+      logs.push({
+        action: 'FINANCE_REJECTED',
+        userId: 'Finance Team',
+        timestamp: invoice.updatedAt,
+        remarks: invoice.financeRemarks,
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: logs,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const createServiceQuotation = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { customerId, branchId, createdBy, serviceTicketId, items, saleType, status } = req.body;
+    const invoice = await billingService.createServiceQuotation({
+      customerId,
+      branchId,
+      createdBy,
+      serviceTicketId,
+      items,
+      saleType,
+      status,
+    });
+    return res.status(201).json({
+      success: true,
+      data: invoice,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getContractBySerial = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const serialNumber = req.params.serialNumber as string;
+    const allocation = await Source.getRepository(ProductAllocation).findOne({
+      where: { serialNumber, status: AllocationStatus.ALLOCATED },
+    });
+    if (!allocation) {
+      return res.status(200).json({
+        success: false,
+        message: 'No active allocation found for serial number',
+      });
+    }
+
+    const contract = await Source.getRepository(Invoice).findOne({
+      where: { id: allocation.contractId },
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        contract,
+        allocation,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getCustomerBillingHistory = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const customerId = req.params.customerId as string;
+    const invoices = await Source.getRepository(Invoice).find({
+      where: { customerId },
+      relations: ['items', 'productAllocations'],
+      order: { createdAt: 'DESC' },
+    });
+
+    // Group by billType
+    const grouped: Record<string, Invoice[]> = {};
+    invoices.forEach((inv) => {
+      const type = inv.billType || 'SALE';
+      if (!grouped[type]) {
+        grouped[type] = [];
+      }
+      grouped[type].push(inv);
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: grouped,
+    });
   } catch (error) {
     next(error);
   }

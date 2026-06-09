@@ -81,7 +81,9 @@ export function QuotationViewDialog({
   const router = useRouter();
 
   const isExpired = quotation.effectiveTo ? new Date() > new Date(quotation.effectiveTo) : false;
-  const isExtensionRequested = quotation.status === 'VALIDITY_EXTENSION_REQUESTED';
+  const isExtensionRequested =
+    quotation.status === 'VALIDITY_EXTENSION_REQUESTED' ||
+    quotation.status === 'WAITING_FINANCE_APPROVAL';
 
   // We determine if we are in finance view by checking if they can approve/reject, OR if the status is already finalized
 
@@ -2021,7 +2023,9 @@ export function QuotationViewDialog({
                       'TRANSACTION_COMPLETED',
                       'PAID',
                       'ACTIVE_LEASE',
+                      'ACTIVE_CONTRACT',
                       'ISSUED',
+                      'INVOICED',
                     ].includes(quotation.status)
                       ? 'text-emerald-600'
                       : quotation.status === 'FINANCE_REJECTED' ||

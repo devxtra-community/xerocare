@@ -24,7 +24,7 @@ const STATUS_MAP: Record<BillType, ProductStatus> = {
   SALE: ProductStatus.SOLD,
   RENT: ProductStatus.RENTED,
   LEASE: ProductStatus.LEASE,
-  RETURNED: ProductStatus.AVAILABLE,
+  RETURNED: ProductStatus.RETURNED,
 };
 
 /**

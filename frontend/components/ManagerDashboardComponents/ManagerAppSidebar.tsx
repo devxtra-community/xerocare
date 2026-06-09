@@ -37,6 +37,7 @@ import {
 import { logout } from '@/lib/auth';
 import { toast } from 'sonner';
 import { useRouter, usePathname } from 'next/navigation';
+import { getBranchInvoices } from '@/lib/invoice';
 
 const menuItems = [
   {
@@ -143,6 +144,27 @@ export default function ManagerSidebar() {
   const router = useRouter();
   const pathname = usePathname();
   const [openGroups, setOpenGroups] = useState<string[]>([]);
+  const [expiryCount, setExpiryCount] = useState(0);
+
+  useEffect(() => {
+    getBranchInvoices()
+      .then((data) => {
+        if (!Array.isArray(data)) return;
+        const now = new Date();
+        const thirtyDaysFromNow = new Date();
+        thirtyDaysFromNow.setDate(now.getDate() + 30);
+
+        const expiring = data.filter((inv) => {
+          if (!inv.effectiveTo) return false;
+          const isContract = inv.status === 'ACTIVE_CONTRACT' || inv.status === 'EXPIRED';
+          if (!isContract) return false;
+          const toDate = new Date(inv.effectiveTo);
+          return toDate <= thirtyDaysFromNow;
+        });
+        setExpiryCount(expiring.length);
+      })
+      .catch((err) => console.error('Failed to fetch sidebar expiry count:', err));
+  }, []);
 
   // Auto-expand groups if child is active
   useEffect(() => {
@@ -216,6 +238,11 @@ export default function ManagerSidebar() {
                           <div className="flex items-center gap-3 px-3">
                             <item.icon className="h-4 w-4" />
                             <span className="font-medium">{item.title}</span>
+                            {item.title === 'Sales' && expiryCount > 0 && (
+                              <span className="bg-red-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full animate-pulse ml-2">
+                                {expiryCount}
+                              </span>
+                            )}
                           </div>
                           {isOpen ? (
                             <ChevronDown className="h-4 w-4 opacity-50" />
@@ -238,9 +265,19 @@ export default function ManagerSidebar() {
                                         : 'hover:bg-card/10 text-sidebar-accent-foreground'
                                     }`}
                                 >
-                                  <a href={sub.href} className="flex items-center gap-3 px-3">
-                                    <sub.icon className="h-3.5 w-3.5" />
-                                    <span>{sub.title}</span>
+                                  <a
+                                    href={sub.href}
+                                    className="flex items-center justify-between gap-3 px-3 w-full"
+                                  >
+                                    <div className="flex items-center gap-3">
+                                      <sub.icon className="h-3.5 w-3.5" />
+                                      <span>{sub.title}</span>
+                                    </div>
+                                    {sub.title === 'Overview' && expiryCount > 0 && (
+                                      <span className="bg-red-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full">
+                                        {expiryCount}
+                                      </span>
+                                    )}
                                   </a>
                                 </SidebarMenuSubButton>
                               </SidebarMenuSubItem>

@@ -111,17 +111,19 @@ export const getAllEmployees = async (req: Request, res: Response, next: NextFun
     const limit = Number(req.query.limit) || 20;
     const role = req.query.role as EmployeeRole | undefined;
     const search = req.query.search as string | undefined;
+    const job = req.query.job as string | undefined;
 
     // Branch filtering: Admin see all employees, HR and MANAGERS see only their branch (if assigned)
     const branchId = req.user?.role === EmployeeRole.ADMIN ? undefined : req.user?.branchId;
 
-    const result = await service.getAllEmployees(page, limit, role, branchId, search);
+    const result = await service.getAllEmployees(page, limit, role, branchId, search, job);
     logger.debug('Fetched employees', {
       count: result.employees.length,
       page,
       limit,
       role,
       branchId,
+      job,
     });
     return res.json({
       success: true,

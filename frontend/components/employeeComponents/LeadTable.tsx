@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Edit, Trash2, User, Mail, Phone, Loader2, FileText } from 'lucide-react';
 import { Lead, deleteLead } from '@/lib/lead';
 import { toast } from 'sonner';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { usePagination } from '@/hooks/usePagination';
 import Pagination from '@/components/Pagination';
 
@@ -35,11 +36,19 @@ export function LeadTable({ leads, onRefresh, onEdit }: LeadTableProps) {
     setTotal(leads.length);
   }, [leads.length, setTotal]);
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this lead?')) return;
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deletingLeadId, setDeletingLeadId] = useState<string | null>(null);
+
+  const handleDeleteClick = (id: string) => {
+    setDeletingLeadId(id);
+    setDeleteOpen(true);
+  };
+
+  const executeDelete = async () => {
+    if (!deletingLeadId) return;
     try {
-      setIsDeleting(id);
-      await deleteLead(id);
+      setIsDeleting(deletingLeadId);
+      await deleteLead(deletingLeadId);
       toast.success('Lead deleted successfully');
       onRefresh();
     } catch (error) {
@@ -47,6 +56,7 @@ export function LeadTable({ leads, onRefresh, onEdit }: LeadTableProps) {
       console.error(error);
     } finally {
       setIsDeleting(null);
+      setDeleteOpen(false);
     }
   };
 
@@ -140,7 +150,7 @@ export function LeadTable({ leads, onRefresh, onEdit }: LeadTableProps) {
                         size="icon"
                         className="h-8 w-8 text-red-500 hover:text-red-600 hover:bg-red-50"
                         disabled={isDeleting === lead._id}
-                        onClick={() => handleDelete(lead._id)}
+                        onClick={() => handleDeleteClick(lead._id)}
                       >
                         {isDeleting === lead._id ? (
                           <Loader2 className="h-4 w-4 animate-spin" />
@@ -165,6 +175,15 @@ export function LeadTable({ leads, onRefresh, onEdit }: LeadTableProps) {
           onPageChange={setPage}
         />
       )}
+      <ConfirmDialog
+        isOpen={deleteOpen}
+        onClose={() => setDeleteOpen(false)}
+        title="Delete Lead"
+        description="Are you sure you want to delete this lead? This action cannot be undone."
+        type="destructive"
+        confirmText="Delete Lead"
+        onConfirm={executeDelete}
+      />
     </div>
   );
 }

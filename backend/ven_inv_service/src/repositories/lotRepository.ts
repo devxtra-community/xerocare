@@ -167,6 +167,7 @@ export class LotRepository {
               sparePart.lot_id = savedLot.id;
               sparePart.mpn = itemData.mpn;
               sparePart.compatible_models = itemData.compatibleModels;
+              sparePart.barcode_id = `XC-S-${sparePart.sku}`;
               sparePart = await manager.save(SparePart, sparePart);
             }
 

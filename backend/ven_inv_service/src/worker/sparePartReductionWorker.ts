@@ -12,8 +12,29 @@ const ROUTING_KEY = 'inventory.sparepart.reduce';
 export async function startSparePartReductionConsumer() {
   const channel = await getRabbitChannel();
 
+  const DLX = 'dlx.inventory';
+  const DLQ = 'dlq.inventory';
+
+  await channel.assertExchange(DLX, 'topic', { durable: true });
+  await channel.assertQueue(DLQ, { durable: true });
+  await channel.bindQueue(DLQ, DLX, '#');
+
   await channel.assertExchange(EXCHANGE, 'topic', { durable: true });
-  await channel.assertQueue(QUEUE, { durable: true });
+
+  // Delete the old queue if it exists to allow changing the arguments
+  try {
+    await channel.deleteQueue(QUEUE);
+  } catch (err) {
+    logger.warn('Failed to delete queue prior to re-asserting', { queue: QUEUE, error: err });
+  }
+
+  await channel.assertQueue(QUEUE, {
+    durable: true,
+    arguments: {
+      'x-dead-letter-exchange': DLX,
+      'x-dead-letter-routing-key': 'inventory.sparepart.reduce.dlq',
+    },
+  });
   await channel.bindQueue(QUEUE, EXCHANGE, ROUTING_KEY);
 
   channel.consume(QUEUE, async (msg) => {
@@ -106,6 +127,7 @@ export async function startSparePartReductionConsumer() {
       channel.ack(msg);
     } catch (error) {
       logger.error('Spare part reduction consumer failed', error);
+      channel.nack(msg, false, false);
     }
   });
 

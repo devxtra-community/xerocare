@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Upload, Search, Pencil, Trash2, Copy } from 'lucide-react';
@@ -16,7 +16,9 @@ import EditSparePartDialog from '@/components/ManagerDashboardComponents/sparePa
 import SparePartDetailDialog from '@/components/ManagerDashboardComponents/spareParts/SparePartDetailDialog';
 import { ErrorDialog } from '@/components/dialogs/ErrorDialog';
 
-export default function SparePartsPage() {
+export const dynamic = 'force-dynamic';
+
+function SparePartsContent() {
   const [bulkOpen, setBulkOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
@@ -105,204 +107,226 @@ export default function SparePartsPage() {
   };
 
   return (
-    <div className="bg-blue-100 min-h-screen p-3 sm:p-4 md:p-6 space-y-6">
-      <div className="flex justify-between items-center">
-        <h3 className="text-xl sm:text-2xl font-bold text-primary">Spare Parts Inventory</h3>
-        <div className="flex gap-2">
-          <Button className="bg-primary text-white gap-2" onClick={() => setAddOpen(true)}>
-            + Add Item
-          </Button>
-          <Button
-            className="bg-card text-primary border border-primary gap-2 hover:bg-muted/50"
-            onClick={() => setBulkOpen(true)}
-          >
-            <Upload size={16} /> Bulk Upload
-          </Button>
+    <Suspense
+      fallback={
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>
         </div>
-      </div>
+      }
+    >
+      <div className="bg-blue-100 min-h-screen p-3 sm:p-4 md:p-6 space-y-6">
+        <div className="flex justify-between items-center">
+          <h3 className="text-xl sm:text-2xl font-bold text-primary">Spare Parts Inventory</h3>
+          <div className="flex gap-2">
+            <Button className="bg-primary text-white gap-2" onClick={() => setAddOpen(true)}>
+              + Add Item
+            </Button>
+            <Button
+              className="bg-card text-primary border border-primary gap-2 hover:bg-muted/50"
+              onClick={() => setBulkOpen(true)}
+            >
+              <Upload size={16} /> Bulk Upload
+            </Button>
+          </div>
+        </div>
 
-      <div className="flex items-center justify-between">
-        <div className="relative w-[300px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-          <Input
-            placeholder="Search by code, name or brand..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-9"
+        <div className="flex items-center justify-between">
+          <div className="relative w-[300px]">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <Input
+              placeholder="Search by code, name or brand..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-9"
+            />
+          </div>
+        </div>
+
+        <div className="rounded-2xl bg-card shadow-sm overflow-hidden">
+          <StandardTable
+            columns={[
+              {
+                id: 'brand',
+                header: 'BRAND',
+                accessorKey: 'brand' as keyof SparePartInventoryItem,
+                className: 'font-semibold text-[11px] text-primary uppercase',
+              },
+              {
+                id: 'part_name',
+                header: 'PART NAME',
+                accessorKey: 'part_name' as keyof SparePartInventoryItem,
+                className: 'font-semibold text-[11px] text-primary uppercase',
+                cell: (item: SparePartInventoryItem) => (
+                  <button
+                    onClick={() => handleOpenDetail(item)}
+                    className="hover:text-blue-600 hover:underline transition-colors text-left font-bold"
+                  >
+                    {item.part_name}
+                  </button>
+                ),
+              },
+              {
+                id: 'sku',
+                header: 'SKU',
+                accessorKey: 'sku' as keyof SparePartInventoryItem,
+                className: 'font-semibold text-[11px] text-primary uppercase',
+                cell: (item: SparePartInventoryItem) => (
+                  <span className="font-mono text-[11px] bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+                    {item.sku || '-'}
+                  </span>
+                ),
+              },
+              {
+                id: 'lotNumber',
+                header: 'LOT ID',
+                accessorKey: 'lotNumber' as keyof SparePartInventoryItem,
+                className: 'font-semibold text-[11px] text-primary uppercase',
+                cell: (item: SparePartInventoryItem) => (
+                  <div className="flex items-center gap-2 group">
+                    <span className="font-mono text-[11px]">{item.lotNumber}</span>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigator.clipboard.writeText(item.lotNumber);
+                        toast.success('Copied to clipboard');
+                      }}
+                      className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-slate-100 rounded text-slate-400 hover:text-primary"
+                      title="Copy Lot ID"
+                    >
+                      <Copy size={12} />
+                    </button>
+                  </div>
+                ),
+              },
+              {
+                id: 'warehouse',
+                header: 'WAREHOUSE',
+                accessorKey: 'warehouse_name' as keyof SparePartInventoryItem,
+                className: 'font-semibold text-[11px] text-primary uppercase',
+              },
+              {
+                id: 'vendor',
+                header: 'VENDOR',
+                cell: (item: SparePartInventoryItem) => item.vendor_name || '-',
+                className: 'font-semibold text-[11px] text-primary uppercase',
+              },
+              {
+                id: 'price',
+                header: 'SELLING PRICE',
+                cell: (item: SparePartInventoryItem) => formatCurrency(item.price || 0),
+                className: 'font-semibold text-[11px] text-primary uppercase',
+              },
+              {
+                id: 'qty',
+                header: 'QTY',
+                cell: (item: SparePartInventoryItem) => item.quantity,
+                className: 'font-bold text-primary text-[11px] uppercase',
+              },
+              {
+                id: 'action',
+                header: 'ACTION',
+                className: 'font-semibold text-[11px] text-primary uppercase text-right w-[80px]',
+                cell: (item: SparePartInventoryItem) => (
+                  <div className="flex justify-end gap-2 text-primary">
+                    <button
+                      onClick={() => handleEdit(item)}
+                      className="hover:opacity-70 transition-opacity"
+                    >
+                      <Pencil size={18} />
+                    </button>
+                    <button
+                      onClick={() => {
+                        setPartToDelete({ id: item.id, name: item.part_name });
+                        setDeleteDialogOpen(true);
+                      }}
+                      className="hover:opacity-70 transition-opacity"
+                    >
+                      <Trash2 size={18} className="text-red-500" />
+                    </button>
+                  </div>
+                ),
+              },
+            ]}
+            data={parts}
+            loading={loading}
+            emptyMessage="No spare parts found. Try adding some."
+            keyExtractor={(item) => item.id}
+            page={page}
+            limit={limit}
+            total={total}
+            onPageChange={setPage}
+            onLimitChange={setLimit}
           />
         </div>
-      </div>
 
-      <div className="rounded-2xl bg-card shadow-sm overflow-hidden">
-        <StandardTable
-          columns={[
-            {
-              id: 'brand',
-              header: 'BRAND',
-              accessorKey: 'brand' as keyof SparePartInventoryItem,
-              className: 'font-semibold text-[11px] text-primary uppercase',
-            },
-            {
-              id: 'part_name',
-              header: 'PART NAME',
-              accessorKey: 'part_name' as keyof SparePartInventoryItem,
-              className: 'font-semibold text-[11px] text-primary uppercase',
-              cell: (item: SparePartInventoryItem) => (
-                <button
-                  onClick={() => handleOpenDetail(item)}
-                  className="hover:text-blue-600 hover:underline transition-colors text-left font-bold"
-                >
-                  {item.part_name}
-                </button>
-              ),
-            },
-            {
-              id: 'sku',
-              header: 'SKU',
-              accessorKey: 'sku' as keyof SparePartInventoryItem,
-              className: 'font-semibold text-[11px] text-primary uppercase',
-              cell: (item: SparePartInventoryItem) => (
-                <span className="font-mono text-[11px] bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
-                  {item.sku || '-'}
-                </span>
-              ),
-            },
-            {
-              id: 'lotNumber',
-              header: 'LOT ID',
-              accessorKey: 'lotNumber' as keyof SparePartInventoryItem,
-              className: 'font-semibold text-[11px] text-primary uppercase',
-              cell: (item: SparePartInventoryItem) => (
-                <div className="flex items-center gap-2 group">
-                  <span className="font-mono text-[11px]">{item.lotNumber}</span>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      navigator.clipboard.writeText(item.lotNumber);
-                      toast.success('Copied to clipboard');
-                    }}
-                    className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-slate-100 rounded text-slate-400 hover:text-primary"
-                    title="Copy Lot ID"
-                  >
-                    <Copy size={12} />
-                  </button>
-                </div>
-              ),
-            },
-            {
-              id: 'warehouse',
-              header: 'WAREHOUSE',
-              accessorKey: 'warehouse_name' as keyof SparePartInventoryItem,
-              className: 'font-semibold text-[11px] text-primary uppercase',
-            },
-            {
-              id: 'vendor',
-              header: 'VENDOR',
-              cell: (item: SparePartInventoryItem) => item.vendor_name || '-',
-              className: 'font-semibold text-[11px] text-primary uppercase',
-            },
-            {
-              id: 'price',
-              header: 'SELLING PRICE',
-              cell: (item: SparePartInventoryItem) => formatCurrency(item.price || 0),
-              className: 'font-semibold text-[11px] text-primary uppercase',
-            },
-            {
-              id: 'qty',
-              header: 'QTY',
-              cell: (item: SparePartInventoryItem) => item.quantity,
-              className: 'font-bold text-primary text-[11px] uppercase',
-            },
-            {
-              id: 'action',
-              header: 'ACTION',
-              className: 'font-semibold text-[11px] text-primary uppercase text-right w-[80px]',
-              cell: (item: SparePartInventoryItem) => (
-                <div className="flex justify-end gap-2 text-primary">
-                  <button
-                    onClick={() => handleEdit(item)}
-                    className="hover:opacity-70 transition-opacity"
-                  >
-                    <Pencil size={18} />
-                  </button>
-                  <button
-                    onClick={() => {
-                      setPartToDelete({ id: item.id, name: item.part_name });
-                      setDeleteDialogOpen(true);
-                    }}
-                    className="hover:opacity-70 transition-opacity"
-                  >
-                    <Trash2 size={18} className="text-red-500" />
-                  </button>
-                </div>
-              ),
-            },
-          ]}
-          data={parts}
-          loading={loading}
-          emptyMessage="No spare parts found. Try adding some."
-          keyExtractor={(item) => item.id}
-          page={page}
-          limit={limit}
-          total={total}
-          onPageChange={setPage}
-          onLimitChange={setLimit}
+        {bulkOpen && (
+          <BulkSparePartDialog
+            open={bulkOpen}
+            onOpenChange={(open) => {
+              setBulkOpen(open);
+              if (!open) {
+                setInitialLotId(undefined);
+                setInitialItemId(undefined);
+              }
+            }}
+            onSuccess={handleRefresh}
+            initialLotId={initialLotId}
+            initialItemId={initialItemId}
+          />
+        )}
+
+        {addOpen && (
+          <AddSparePartDialog open={addOpen} onOpenChange={setAddOpen} onSuccess={loadParts} />
+        )}
+
+        {editOpen && selectedPart && (
+          <EditSparePartDialog
+            open={editOpen}
+            onOpenChange={setEditOpen}
+            product={selectedPart}
+            onSuccess={loadParts}
+          />
+        )}
+
+        {detailOpen && selectedPartForDetail && (
+          <SparePartDetailDialog
+            part={selectedPartForDetail}
+            onClose={() => setDetailOpen(false)}
+            onEdit={() => {
+              setDetailOpen(false);
+              handleEdit(selectedPartForDetail);
+            }}
+          />
+        )}
+
+        <DeleteConfirmDialog
+          open={deleteDialogOpen}
+          onOpenChange={setDeleteDialogOpen}
+          title="Delete Spare Part?"
+          itemName={partToDelete?.name}
+          onConfirm={confirmDelete}
+        />
+
+        <ErrorDialog
+          open={errorDialogOpen}
+          onOpenChange={setErrorDialogOpen}
+          message={errorMessage}
         />
       </div>
+    </Suspense>
+  );
+}
 
-      {bulkOpen && (
-        <BulkSparePartDialog
-          open={bulkOpen}
-          onOpenChange={(open) => {
-            setBulkOpen(open);
-            if (!open) {
-              setInitialLotId(undefined);
-              setInitialItemId(undefined);
-            }
-          }}
-          onSuccess={handleRefresh}
-          initialLotId={initialLotId}
-          initialItemId={initialItemId}
-        />
-      )}
-
-      {addOpen && (
-        <AddSparePartDialog open={addOpen} onOpenChange={setAddOpen} onSuccess={loadParts} />
-      )}
-
-      {editOpen && selectedPart && (
-        <EditSparePartDialog
-          open={editOpen}
-          onOpenChange={setEditOpen}
-          product={selectedPart}
-          onSuccess={loadParts}
-        />
-      )}
-
-      {detailOpen && selectedPartForDetail && (
-        <SparePartDetailDialog
-          part={selectedPartForDetail}
-          onClose={() => setDetailOpen(false)}
-          onEdit={() => {
-            setDetailOpen(false);
-            handleEdit(selectedPartForDetail);
-          }}
-        />
-      )}
-
-      <DeleteConfirmDialog
-        open={deleteDialogOpen}
-        onOpenChange={setDeleteDialogOpen}
-        title="Delete Spare Part?"
-        itemName={partToDelete?.name}
-        onConfirm={confirmDelete}
-      />
-
-      <ErrorDialog
-        open={errorDialogOpen}
-        onOpenChange={setErrorDialogOpen}
-        message={errorMessage}
-      />
-    </div>
+export default function SparePartsPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex items-center justify-center min-h-screen bg-blue-100">
+          <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>
+        </div>
+      }
+    >
+      <SparePartsContent />
+    </Suspense>
   );
 }

@@ -86,6 +86,7 @@ export class InvoiceRepository {
     const latestInvoice = await this.repo
       .createQueryBuilder('invoice')
       .where('invoice.invoiceNumber LIKE :pattern', { pattern: `QTN-${year}-%` })
+      .withDeleted()
       .orderBy('invoice.invoiceNumber', 'DESC')
       .getOne();
 
@@ -309,7 +310,11 @@ export class InvoiceRepository {
       .select('invoice.saleType', 'saleType')
       .addSelect('COUNT(*)', 'count')
       .where('invoice.status NOT IN (:...excludedStatuses)', {
-        excludedStatuses: [InvoiceStatus.REJECTED, InvoiceStatus.CANCELLED],
+        excludedStatuses: [
+          InvoiceStatus.CUSTOMER_REJECTED,
+          InvoiceStatus.FINANCE_REJECTED,
+          InvoiceStatus.CANCELLED,
+        ],
       });
 
     if (filter.startOfDay) {
@@ -374,13 +379,13 @@ export class InvoiceRepository {
       )
       .where('invoice.status IN (:...statuses)', {
         statuses: [
-          InvoiceStatus.TRANSACTION_COMPLETED,
+          'TRANSACTION_COMPLETED',
           InvoiceStatus.PAID,
-          InvoiceStatus.ISSUED,
+          InvoiceStatus.INVOICED,
           InvoiceStatus.FINANCE_APPROVED,
-          InvoiceStatus.ACTIVE_LEASE,
+          InvoiceStatus.ACTIVE_CONTRACT,
           InvoiceStatus.EMPLOYEE_APPROVED,
-          InvoiceStatus.APPROVED,
+          'APPROVED',
           InvoiceStatus.SENT,
         ],
       })
@@ -445,13 +450,13 @@ export class InvoiceRepository {
       )
       .where('invoice.status IN (:...statuses)', {
         statuses: [
-          InvoiceStatus.TRANSACTION_COMPLETED,
+          'TRANSACTION_COMPLETED',
           InvoiceStatus.PAID,
-          InvoiceStatus.ISSUED,
+          InvoiceStatus.INVOICED,
           InvoiceStatus.FINANCE_APPROVED,
-          InvoiceStatus.ACTIVE_LEASE,
+          InvoiceStatus.ACTIVE_CONTRACT,
           InvoiceStatus.EMPLOYEE_APPROVED,
-          InvoiceStatus.APPROVED,
+          'APPROVED',
           InvoiceStatus.SENT,
         ],
       })
@@ -515,13 +520,13 @@ export class InvoiceRepository {
       .addSelect('COUNT(invoice.id)', 'totalInvoices')
       .where('invoice.status IN (:...statuses)', {
         statuses: [
-          InvoiceStatus.TRANSACTION_COMPLETED,
+          'TRANSACTION_COMPLETED',
           InvoiceStatus.PAID,
-          InvoiceStatus.ISSUED,
+          InvoiceStatus.INVOICED,
           InvoiceStatus.FINANCE_APPROVED,
-          InvoiceStatus.ACTIVE_LEASE,
+          InvoiceStatus.ACTIVE_CONTRACT,
           InvoiceStatus.EMPLOYEE_APPROVED,
-          InvoiceStatus.APPROVED,
+          'APPROVED',
           InvoiceStatus.SENT,
         ],
       })
@@ -562,13 +567,13 @@ export class InvoiceRepository {
       )
       .where('invoice.status IN (:...statuses)', {
         statuses: [
-          InvoiceStatus.TRANSACTION_COMPLETED,
+          'TRANSACTION_COMPLETED',
           InvoiceStatus.PAID,
-          InvoiceStatus.ISSUED,
+          InvoiceStatus.INVOICED,
           InvoiceStatus.FINANCE_APPROVED,
-          InvoiceStatus.ACTIVE_LEASE,
+          InvoiceStatus.ACTIVE_CONTRACT,
           InvoiceStatus.EMPLOYEE_APPROVED,
-          InvoiceStatus.APPROVED,
+          'APPROVED',
           InvoiceStatus.SENT,
         ],
       })
@@ -634,13 +639,13 @@ export class InvoiceRepository {
       .addSelect('COUNT(invoice.id)', 'totalInvoices')
       .where('invoice.status IN (:...statuses)', {
         statuses: [
-          InvoiceStatus.TRANSACTION_COMPLETED,
+          'TRANSACTION_COMPLETED',
           InvoiceStatus.PAID,
-          InvoiceStatus.ISSUED,
+          InvoiceStatus.INVOICED,
           InvoiceStatus.FINANCE_APPROVED,
-          InvoiceStatus.ACTIVE_LEASE,
+          InvoiceStatus.ACTIVE_CONTRACT,
           InvoiceStatus.EMPLOYEE_APPROVED,
-          InvoiceStatus.APPROVED,
+          'APPROVED',
           InvoiceStatus.SENT,
         ],
       })
@@ -682,13 +687,13 @@ export class InvoiceRepository {
       )
       .where('invoice.status IN (:...statuses)', {
         statuses: [
-          InvoiceStatus.TRANSACTION_COMPLETED,
+          'TRANSACTION_COMPLETED',
           InvoiceStatus.PAID,
-          InvoiceStatus.ISSUED,
+          InvoiceStatus.INVOICED,
           InvoiceStatus.FINANCE_APPROVED,
-          InvoiceStatus.ACTIVE_LEASE,
+          InvoiceStatus.ACTIVE_CONTRACT,
           InvoiceStatus.EMPLOYEE_APPROVED,
-          InvoiceStatus.APPROVED,
+          'APPROVED',
           InvoiceStatus.SENT,
         ],
       })
@@ -754,7 +759,7 @@ export class InvoiceRepository {
 
     qb.where('(invoice.type = :proforma OR invoice.status = :activeLease)', {
       proforma: InvoiceType.PROFORMA,
-      activeLease: InvoiceStatus.ACTIVE_LEASE,
+      activeLease: InvoiceStatus.ACTIVE_CONTRACT,
     }).andWhere('(invoice.contractStatus IS NULL OR invoice.contractStatus != :completed)', {
       completed: ContractStatus.COMPLETED,
     });
@@ -845,13 +850,13 @@ export class InvoiceRepository {
       .addSelect('COUNT(invoice.id)', 'count')
       .where('invoice.status IN (:...includedStatuses)', {
         includedStatuses: [
-          InvoiceStatus.TRANSACTION_COMPLETED,
+          'TRANSACTION_COMPLETED',
           InvoiceStatus.FINANCE_APPROVED,
-          InvoiceStatus.ACTIVE_LEASE,
-          InvoiceStatus.ISSUED,
+          InvoiceStatus.ACTIVE_CONTRACT,
+          InvoiceStatus.INVOICED,
           InvoiceStatus.PAID,
           InvoiceStatus.EMPLOYEE_APPROVED,
-          InvoiceStatus.APPROVED,
+          'APPROVED',
         ],
       })
       .andWhere(
@@ -859,7 +864,7 @@ export class InvoiceRepository {
         {
           quotationType: InvoiceType.QUOTATION,
           leaseType: SaleType.LEASE,
-          activeLease: InvoiceStatus.ACTIVE_LEASE,
+          activeLease: InvoiceStatus.ACTIVE_CONTRACT,
         },
       );
 
@@ -903,12 +908,12 @@ export class InvoiceRepository {
   async getAdminSalesStats() {
     const statuses = [
       InvoiceStatus.PAID,
-      InvoiceStatus.ISSUED,
+      InvoiceStatus.INVOICED,
       InvoiceStatus.FINANCE_APPROVED,
       InvoiceStatus.SENT,
       InvoiceStatus.EMPLOYEE_APPROVED,
       InvoiceStatus.DRAFT,
-      InvoiceStatus.APPROVED,
+      'APPROVED',
     ];
 
     const totals = await this.repo
@@ -919,7 +924,7 @@ export class InvoiceRepository {
         saleTypes: [SaleType.SALE, SaleType.PRODUCT_SALE, SaleType.SPAREPART_SALE],
       })
       .andWhere('invoice.status IN (:...statuses)', {
-        statuses: [...statuses, InvoiceStatus.TRANSACTION_COMPLETED],
+        statuses: [...statuses, 'TRANSACTION_COMPLETED'],
       })
       .getRawOne();
 
@@ -1013,8 +1018,8 @@ export class InvoiceRepository {
       .andWhere('invoice.status IN (:...statuses)', {
         statuses: [
           InvoiceStatus.FINANCE_APPROVED,
-          InvoiceStatus.ACTIVE_LEASE,
-          InvoiceStatus.ISSUED,
+          InvoiceStatus.ACTIVE_CONTRACT,
+          InvoiceStatus.INVOICED,
           InvoiceStatus.PAID,
         ],
       });

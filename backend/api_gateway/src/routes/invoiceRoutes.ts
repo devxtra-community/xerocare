@@ -48,6 +48,7 @@ import {
   getEmployeeAssignedQuotations,
   updateStatus,
   deleteInvoice,
+  getAuditLogs,
 } from '../controllers/invoiceController';
 
 /**
@@ -393,5 +394,14 @@ router.get(
  * Delete a specific invoice or template.
  */
 router.delete('/:id', requireRole(UserRole.MANAGER, UserRole.ADMIN), deleteInvoice);
+
+/**
+ * Get audit logs for an invoice/contract.
+ */
+router.get(
+  '/audit-logs/:entityId',
+  requireRole(UserRole.MANAGER, UserRole.FINANCE, UserRole.ADMIN),
+  getAuditLogs,
+);
 
 export default router;

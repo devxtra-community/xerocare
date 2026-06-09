@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import {
   createQuotation,
   createDirectSale,
@@ -53,18 +53,41 @@ import {
   bulkRetakeQuotationAssignments,
   getEmployeeAssignedQuotations,
   deleteInvoice,
+  getInvoiceAuditLogs,
+  createServiceQuotation,
+  getContractBySerial,
+  getCustomerBillingHistory,
 } from '../controllers/invoiceController';
 import { uploadMeterImage } from '../middlewares/uploadMiddleware';
 import { authMiddleware } from '../middlewares/authMiddleware';
 import { requireRole } from '../middlewares/roleMiddleware';
 import { EmployeeRole } from '../constants/employeeRole';
 import { requireJob, EmployeeJob } from '../middlewares/jobMiddleware';
+import { AppError } from '../errors/appError';
 
 /**
  * This file sets up all the communication paths for managing money,
  * price estimates (quotations), and official contracts.
  */
 const router = Router();
+
+const requireInvoiceUsageUpdatePermission = (req: Request, res: Response, next: NextFunction) => {
+  if (!req.user) {
+    return next(new AppError('Not authenticated', 401));
+  }
+
+  const { role, employeeJob } = req.user;
+
+  if (role === 'ADMIN' || role === 'FINANCE' || role === 'MANAGER') {
+    return next();
+  }
+
+  if (role === 'EMPLOYEE' && employeeJob === 'TECHNICIAN') {
+    return next();
+  }
+
+  return next(new AppError('Access denied: insufficient permissions', 403));
+};
 
 // --- 1. Starting a New Deal (Quotations) ---
 
@@ -76,19 +99,18 @@ router.post(
   '/quotation',
   authMiddleware,
   requireRole(EmployeeRole.EMPLOYEE),
-  requireJob(EmployeeJob.SALES, EmployeeJob.RENT_LEASE),
+  requireJob(EmployeeJob.SALES, EmployeeJob.RENT_AND_LEASE),
   createQuotation,
 );
 
 /**
  * Create a new direct sale (Final Invoice) bypassing the quotation flow.
- * Only Sales team members can do this.
+ * Only MANAGER and ADMIN can do this.
  */
 router.post(
   '/direct-sale',
   authMiddleware,
-  requireRole(EmployeeRole.EMPLOYEE),
-  requireJob(EmployeeJob.SALES, EmployeeJob.RENT_LEASE),
+  requireRole(EmployeeRole.MANAGER, EmployeeRole.ADMIN),
   createDirectSale,
 );
 
@@ -144,7 +166,7 @@ router.post(
   '/quotation/:id/assign-customer',
   authMiddleware,
   requireRole(EmployeeRole.EMPLOYEE),
-  requireJob(EmployeeJob.SALES, EmployeeJob.RENT_LEASE),
+  requireJob(EmployeeJob.SALES, EmployeeJob.RENT_AND_LEASE),
   assignCustomerToQuotation,
 );
 
@@ -420,12 +442,7 @@ router.get(
 /**
  * Update how much a customer has used our service (e.g., meter readings).
  */
-router.put(
-  '/:id/usage',
-  authMiddleware,
-  requireRole(EmployeeRole.ADMIN, EmployeeRole.FINANCE),
-  updateInvoiceUsage,
-);
+router.put('/:id/usage', authMiddleware, requireInvoiceUsageUpdatePermission, updateInvoiceUsage);
 
 // --- 7. Notifications and Lookups ---
 
@@ -464,5 +481,14 @@ router.delete(
   requireRole(EmployeeRole.MANAGER, EmployeeRole.ADMIN),
   deleteInvoice,
 );
+
+/**
+ * Get audit logs for a specific contract or invoice.
+ */
+router.get('/audit-logs/:id', authMiddleware, getInvoiceAuditLogs);
+
+router.post('/service-quotation', createServiceQuotation);
+router.get('/invoices/contract/serial/:serialNumber', getContractBySerial);
+router.get('/invoices/customer/:customerId/history', getCustomerBillingHistory);
 
 export default router;

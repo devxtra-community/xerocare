@@ -25,6 +25,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { formatCurrency } from '@/lib/format';
 import { SparePartInventoryItem } from '@/services/sparePartService';
+import Barcode from 'react-barcode';
 
 interface SparePartDetailDialogProps {
   part: SparePartInventoryItem;
@@ -204,6 +205,23 @@ export default function SparePartDetailDialog({
                 </div>
               </div>
             )}
+            {/* Barcode Display */}
+            <div className="space-y-3 col-span-2">
+              <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">
+                Spare Part Barcode
+              </h3>
+              <div className="bg-slate-50 rounded-xl p-4 border border-slate-100 flex flex-col items-center justify-center">
+                <div className="bg-white p-2 rounded-lg border border-slate-200 flex items-center justify-center w-full max-w-xs shadow-sm">
+                  <Barcode
+                    value={part.barcode_id || `XC-S-${part.sku}`}
+                    width={1.5}
+                    height={50}
+                    fontSize={12}
+                    margin={5}
+                  />
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
