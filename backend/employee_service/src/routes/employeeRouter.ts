@@ -72,7 +72,11 @@ employeeRouter.get('/branches', requireRole('ADMIN', 'HR', 'MANAGER'), getAllBra
 /**
  * List every single staff member in the company.
  */
-employeeRouter.get('/', requireRole('ADMIN', 'HR', 'MANAGER'), getAllEmployees);
+employeeRouter.get(
+  '/',
+  requireRole('ADMIN', 'HR', 'MANAGER', 'EMPLOYEE', 'FINANCE'),
+  getAllEmployees,
+);
 
 /**
  * Get the specific details of one staff member.

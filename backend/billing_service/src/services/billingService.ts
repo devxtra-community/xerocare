@@ -3606,6 +3606,12 @@ export class BillingService {
     });
 
     await invoiceItemRepo.save(invoiceItems);
+
+    // Break the circular reference to prevent JSON serialization errors
+    invoiceItems.forEach((item) => {
+      delete (item as { invoice?: unknown }).invoice;
+    });
+
     savedInvoice.items = invoiceItems;
     return savedInvoice;
   }

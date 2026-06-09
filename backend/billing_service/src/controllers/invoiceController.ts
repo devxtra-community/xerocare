@@ -1449,7 +1449,7 @@ export const getCustomerBillingHistory = async (
     const customerId = req.params.customerId as string;
     const invoices = await Source.getRepository(Invoice).find({
       where: { customerId },
-      relations: ['items'],
+      relations: ['items', 'productAllocations'],
       order: { createdAt: 'DESC' },
     });
 

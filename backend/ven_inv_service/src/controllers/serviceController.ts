@@ -11,6 +11,7 @@ import { Branch } from '../entities/branchEntity';
 import { NotificationPublisher } from '../events/publisher/notificationPublisher';
 import axios from 'axios';
 import { logger } from '../config/logger';
+import { BILLING_ENDPOINTS, CRM_ENDPOINTS } from '../constants/serviceUrls';
 
 const CRM_SERVICE_URL = process.env.CRM_SERVICE_URL || 'http://localhost:3005';
 const BILLING_SERVICE_URL = process.env.BILLING_SERVICE_URL || 'http://localhost:3004';
@@ -77,7 +78,7 @@ export class ServiceController {
       if (serviceContext === 'LEASE_UNDER_WARRANTY' || serviceContext === 'LEASE_EXPIRED') {
         try {
           const contractRes = await axios.get(
-            `${BILLING_SERVICE_URL}/invoices/contract/serial/${serialNumber}`,
+            `${BILLING_SERVICE_URL}${BILLING_ENDPOINTS.CONTRACT_BY_SERIAL.replace(':serialNumber', serialNumber)}`,
           );
           if (contractRes.data && contractRes.data.success && contractRes.data.data) {
             const { contract, allocation } = contractRes.data.data;
@@ -373,11 +374,14 @@ export class ServiceController {
         createdBy: ticket.createdBy,
         serviceTicketId: ticket.id,
         items,
-        saleType: 'PRODUCT', // Direct sale quotation
+        saleType: 'PRODUCT_SALE', // Direct sale quotation
         status: isFreeContext ? 'CUSTOMER_ACCEPTED' : 'WAITING_FINANCE_APPROVAL',
       };
 
-      const quoteRes = await axios.post(`${BILLING_SERVICE_URL}/service-quotation`, billingPayload);
+      const quoteRes = await axios.post(
+        `${BILLING_SERVICE_URL}${BILLING_ENDPOINTS.SERVICE_QUOTATION}`,
+        billingPayload,
+      );
       const quotation = quoteRes.data.data;
 
       // Update ServiceTicket depending on context
@@ -394,7 +398,7 @@ export class ServiceController {
       if (!isFreeContext) {
         // Query Finance job role users from employee service
         try {
-          const empRes = await axios.get(`${EMPLOYEE_SERVICE_URL}/employees?job=FINANCE`); // assuming endpoint exists
+          const empRes = await axios.get(`${EMPLOYEE_SERVICE_URL}/employee?job=FINANCE`); // assuming endpoint exists
           const financeUsers = empRes.data.data || [];
           for (const fUser of financeUsers) {
             await NotificationPublisher.publishInAppRequest({
@@ -468,7 +472,7 @@ export class ServiceController {
         try {
           // Trigger convert endpoint on CRM Service
           const convertRes = await axios.post(
-            `${CRM_SERVICE_URL}/leads/${ticket.leadId}/convert`,
+            `${CRM_SERVICE_URL}${CRM_ENDPOINTS.LEAD_CONVERT.replace(':id', ticket.leadId)}`,
             {
               location: 'Service Delivery Location',
             },
@@ -576,7 +580,7 @@ export class ServiceController {
         if (freeContexts.includes(ticket.serviceContext)) {
           try {
             const convertRes = await axios.post(
-              `${CRM_SERVICE_URL}/leads/${ticket.leadId}/convert`,
+              `${CRM_SERVICE_URL}${CRM_ENDPOINTS.LEAD_CONVERT.replace(':id', ticket.leadId)}`,
               {
                 location: 'Service Site',
               },
@@ -770,15 +774,20 @@ export class ServiceController {
   getTechnicians = async (req: Request, res: Response, next: NextFunction) => {
     try {
       // Fetch list of technicians from employee service
-      const empRes = await axios.get(`${EMPLOYEE_SERVICE_URL}/employees?job=SERVICE_TECHNICIAN`, {
+      const empRes = await axios.get(`${EMPLOYEE_SERVICE_URL}/employee?job=SERVICE_TECHNICIAN`, {
         headers: {
           Authorization: req.headers.authorization,
         },
       });
 
+      const responseData = empRes.data.data;
+      const techniciansList = Array.isArray(responseData)
+        ? responseData
+        : responseData?.employees || [];
+
       res.status(200).json({
         success: true,
-        data: empRes.data.data,
+        data: techniciansList,
       });
     } catch (error) {
       next(error);
@@ -805,7 +814,7 @@ export class ServiceController {
       let billingHistory = null;
       try {
         const billingRes = await axios.get(
-          `${BILLING_SERVICE_URL}/invoices/customer/${customerId}/history`,
+          `${BILLING_SERVICE_URL}${BILLING_ENDPOINTS.CUSTOMER_HISTORY.replace(':customerId', customerId)}`,
           {
             headers: {
               Authorization: req.headers.authorization,

@@ -1,8 +1,11 @@
 import { Router } from 'express';
 import { ServiceController } from '../controllers/serviceController';
+import { authMiddleware } from '../middlewares/authMiddleware';
 
 const router = Router();
 const controller = new ServiceController();
+
+router.use(authMiddleware);
 
 router.post('/tickets', controller.createTicket);
 router.get('/tickets', controller.getTickets);

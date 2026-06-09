@@ -128,15 +128,7 @@ export interface ServiceTechnicianInfo {
 
 export interface CustomerServiceHistory {
   tickets: ServiceTicket[];
-  billingHistory: Record<
-    string,
-    Array<{
-      id: string;
-      invoiceNumber: string;
-      totalAmount: number;
-      status: string;
-    }>
-  > | null;
+  billingHistory: Record<string, unknown[]> | null;
 }
 
 export const getTechnicians = async (): Promise<ServiceTechnicianInfo[]> => {

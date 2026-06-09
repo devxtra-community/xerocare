@@ -272,7 +272,7 @@ app.post(
 app.get(
   '/i/service/technicians',
   authMiddleware,
-  requireServiceRole(['SERVICE_HELP_DESK']),
+  requireServiceRole(['SERVICE_HELP_DESK', 'SERVICE_TECHNICIAN']),
   createServiceProxy(VENDOR_INVENTORY_SERVICE_URL),
 );
 app.get(

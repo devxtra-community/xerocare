@@ -25,18 +25,26 @@ export default function EmployeeLeasePage() {
 
   return (
     <ProtectedRoute requiredModules={['lease']}>
-      <div className="bg-blue-100 min-h-full p-3 sm:p-4 md:p-6 space-y-6 sm:space-y-8">
-        <div className="flex flex-col space-y-4 sm:space-y-6">
-          <h3 className="text-xl sm:text-2xl font-bold text-primary">Lease Management</h3>
-          <EmployeeLeaseStats invoices={invoices} />
-          <EmployeeLeaseGraphs invoices={invoices} />
+      <React.Suspense
+        fallback={
+          <div className="flex items-center justify-center min-h-screen">
+            <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>
+          </div>
+        }
+      >
+        <div className="bg-blue-100 min-h-full p-3 sm:p-4 md:p-6 space-y-6 sm:space-y-8">
+          <div className="flex flex-col space-y-4 sm:space-y-6">
+            <h3 className="text-xl sm:text-2xl font-bold text-primary">Lease Management</h3>
+            <EmployeeLeaseStats invoices={invoices} />
+            <EmployeeLeaseGraphs invoices={invoices} />
 
-          <div className="space-y-3">
-            <h3 className="text-lg sm:text-xl font-bold text-primary">All Leases</h3>
-            <EmployeeLeaseTable onRefresh={() => setRefreshTrigger((prev) => prev + 1)} />
+            <div className="space-y-3">
+              <h3 className="text-lg sm:text-xl font-bold text-primary">All Leases</h3>
+              <EmployeeLeaseTable onRefresh={() => setRefreshTrigger((prev) => prev + 1)} />
+            </div>
           </div>
         </div>
-      </div>
+      </React.Suspense>
     </ProtectedRoute>
   );
 }
