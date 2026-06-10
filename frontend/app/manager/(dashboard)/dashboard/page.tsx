@@ -65,7 +65,7 @@ export default function Dashboard() {
           (a, b) => new Date(a.effectiveTo!).getTime() - new Date(b.effectiveTo!).getTime(),
         );
         setExpiringContracts(expiring);
-      } catch (error) {
+      } catch (error: unknown) {
         console.error('Failed to fetch dashboard data', error);
       } finally {
         setLoading(false);

@@ -18,6 +18,7 @@ import { LeaseType } from './enums/leaseType';
 import { ContractStatus } from './enums/contractStatus';
 import { ProductAllocation } from './productAllocationEntity';
 import { BillType } from './enums/billType';
+import { CreditNote } from './creditNoteEntity';
 
 export enum SecurityDepositMode {
   CASH = 'CASH',
@@ -118,6 +119,9 @@ export class Invoice {
     cascade: false,
   })
   productAllocations?: ProductAllocation[];
+
+  @OneToMany(() => CreditNote, (cn) => cn.invoice)
+  creditNotes?: CreditNote[];
 
   @CreateDateColumn()
   createdAt!: Date;

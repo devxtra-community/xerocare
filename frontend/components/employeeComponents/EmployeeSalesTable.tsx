@@ -341,9 +341,27 @@ export default function EmployeeSalesTable({ mode = 'EMPLOYEE' }: EmployeeSalesT
                     </TableCell>
                     <TableCell className="max-w-[250px]">
                       <div className="text-sm font-medium text-slate-700 truncate">
-                        {inv.items
-                          ?.map((item) => getCleanProductName(item.description))
-                          .join(', ') || 'No items'}
+                        {(() => {
+                          const completedExchange = inv.creditNotes?.find(
+                            (cn) =>
+                              cn.status === 'PRODUCT_REPLACED' && cn.type === 'CREDIT_EXCHANGE',
+                          );
+                          if (completedExchange?.replacementProductName) {
+                            return (
+                              <span className="text-violet-700 font-bold">
+                                {completedExchange.replacementProductName}
+                                <Badge className="ml-2 bg-violet-100 text-violet-600 border-none text-[8px] h-4">
+                                  EXCHANGED
+                                </Badge>
+                              </span>
+                            );
+                          }
+                          return (
+                            inv.items
+                              ?.map((item) => getCleanProductName(item.description))
+                              .join(', ') || 'No items'
+                          );
+                        })()}
                       </div>
                       {inv.items && inv.items.length > 1 && (
                         <span className="text-[10px] text-slate-400 font-semibold uppercase">
@@ -352,7 +370,24 @@ export default function EmployeeSalesTable({ mode = 'EMPLOYEE' }: EmployeeSalesT
                       )}
                     </TableCell>
                     <TableCell className="font-semibold text-foreground">
-                      {formatCurrency(inv.totalAmount)}
+                      {(() => {
+                        const completedExchange = inv.creditNotes?.find(
+                          (cn) => cn.status === 'PRODUCT_REPLACED' && cn.type === 'CREDIT_EXCHANGE',
+                        );
+                        if (completedExchange && Number(completedExchange.replacementAmount) > 0) {
+                          return (
+                            <div>
+                              <div className="text-sm font-black text-violet-700">
+                                {formatCurrency(Number(completedExchange.replacementAmount))}
+                              </div>
+                              <div className="text-[10px] text-slate-400 font-semibold line-through">
+                                {formatCurrency(inv.totalAmount)}
+                              </div>
+                            </div>
+                          );
+                        }
+                        return formatCurrency(inv.totalAmount);
+                      })()}
                     </TableCell>
                     <TableCell>
                       <Badge
@@ -379,14 +414,37 @@ export default function EmployeeSalesTable({ mode = 'EMPLOYEE' }: EmployeeSalesT
                         // Derive a clean payment status from the invoice status
                         const isPaid = inv.status === 'PAID';
                         const isPartial = inv.status === 'PARTIAL';
-                        // Any other active status (TRANSACTION_COMPLETED, EMPLOYEE_APPROVED, FINANCE_APPROVED, etc.)
-                        // means no payment received yet → PENDING
-                        const label = isPaid ? 'PAID' : isPartial ? 'PARTIAL' : 'PENDING';
-                        const cls = isPaid
-                          ? 'bg-green-100 text-green-700 hover:bg-green-100'
-                          : isPartial
-                            ? 'bg-amber-100 text-amber-700 hover:bg-amber-100'
-                            : 'bg-slate-100 text-slate-600 hover:bg-slate-100';
+                        const isRefunded = inv.status === 'REFUNDED';
+
+                        const completedExchange = inv.creditNotes?.find(
+                          (cn) => cn.status === 'PRODUCT_REPLACED' && cn.type === 'CREDIT_EXCHANGE',
+                        );
+                        const completedReplacement = inv.creditNotes?.find(
+                          (cn) => cn.status === 'PRODUCT_REPLACED' && cn.type === 'REPLACEMENT',
+                        );
+
+                        let label = isRefunded
+                          ? 'CASH REFUND CREDIT'
+                          : isPaid
+                            ? 'PAID'
+                            : isPartial
+                              ? 'PARTIAL'
+                              : 'PENDING';
+                        let cls = isRefunded
+                          ? 'bg-red-100 text-red-700 hover:bg-red-100'
+                          : isPaid
+                            ? 'bg-green-100 text-green-700 hover:bg-green-100'
+                            : isPartial
+                              ? 'bg-amber-100 text-amber-700 hover:bg-amber-100'
+                              : 'bg-slate-100 text-slate-600 hover:bg-slate-100';
+
+                        if (completedExchange) {
+                          label = 'CREDIT EXCHANGE';
+                          cls = 'bg-violet-100 text-violet-700 hover:bg-violet-100';
+                        } else if (completedReplacement) {
+                          label = 'PRODUCT REPLACED';
+                          cls = 'bg-blue-100 text-blue-700 hover:bg-blue-100';
+                        }
                         return (
                           <Badge
                             className={`rounded-full px-3 py-0.5 text-[10px] font-bold tracking-wider shadow-none ${cls}`}

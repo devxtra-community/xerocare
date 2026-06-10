@@ -238,12 +238,14 @@ export default function RevenueTable() {
                         row.status === 'TRANSACTION_COMPLETED' ||
                         row.status === 'ACTIVE_LEASE'
                           ? 'bg-emerald-100 text-emerald-700'
-                          : row.status === 'REJECTED' || row.status === 'FINANCE_REJECTED'
+                          : row.status === 'REJECTED' ||
+                              row.status === 'FINANCE_REJECTED' ||
+                              row.status === 'REFUNDED'
                             ? 'bg-red-100 text-red-700'
                             : 'bg-amber-100 text-amber-700'
                       }`}
                     >
-                      {row.status}
+                      {row.status === 'REFUNDED' ? 'CASH REFUND CREDIT' : row.status}
                     </span>
                   </TableCell>
                   <TableCell className="text-right font-bold text-primary">

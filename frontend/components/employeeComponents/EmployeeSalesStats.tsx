@@ -50,7 +50,7 @@ export default function EmployeeSalesStats({
 
         // Only count finance-approved sales (type === PROFORMA means finance approved the quotation)
         const approvedSalesInvoices = salesInvoices.filter(
-          (inv) => inv.type === 'PROFORMA' || inv.type === 'FINAL',
+          (inv) => (inv.type === 'PROFORMA' || inv.type === 'FINAL') && inv.status !== 'REFUNDED',
         );
         const rejectedSalesInvoices = salesInvoices.filter((inv) => inv.status === 'REJECTED');
 
@@ -60,11 +60,23 @@ export default function EmployeeSalesStats({
         ).length;
         const rejectedCount = rejectedSalesInvoices.length;
 
-        // Parse float to avoid string concatenation if API returns strings
-        const totalAmount = approvedSalesInvoices.reduce(
-          (sum, inv) => sum + (parseFloat(String(inv.totalAmount)) || 0),
-          0,
-        );
+        const totalAmount = salesInvoices.reduce((sum, inv) => {
+          const amount = parseFloat(String(inv.totalAmount)) || 0;
+          if (inv.status === 'REFUNDED') {
+            return sum; // Refunded items contribute 0 to the net total
+          }
+          if (inv.type === 'PROFORMA' || inv.type === 'FINAL') {
+            // For completed credit exchanges, use the new product (replacement) amount
+            const completedExchange = inv.creditNotes?.find(
+              (cn) => cn.status === 'PRODUCT_REPLACED' && cn.type === 'CREDIT_EXCHANGE',
+            );
+            if (completedExchange && Number(completedExchange.replacementAmount) > 0) {
+              return sum + Number(completedExchange.replacementAmount);
+            }
+            return sum + amount;
+          }
+          return sum;
+        }, 0);
 
         setStats({
           totalOrders,

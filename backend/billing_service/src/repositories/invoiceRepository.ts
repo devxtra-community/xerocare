@@ -111,7 +111,7 @@ export class InvoiceRepository {
   findById(id: string) {
     return this.repo.findOne({
       where: { id },
-      relations: ['items', 'productAllocations'],
+      relations: ['items', 'productAllocations', 'creditNotes'],
     });
   }
 
@@ -153,6 +153,7 @@ export class InvoiceRepository {
       .createQueryBuilder('invoice')
       .leftJoinAndSelect('invoice.items', 'items')
       .leftJoinAndSelect('invoice.productAllocations', 'productAllocations')
+      .leftJoinAndSelect('invoice.creditNotes', 'creditNotes')
       .addSelect((subQuery) => {
         return subQuery
           .select(
@@ -193,6 +194,7 @@ export class InvoiceRepository {
       .createQueryBuilder('invoice')
       .leftJoinAndSelect('invoice.items', 'items')
       .leftJoinAndSelect('invoice.productAllocations', 'productAllocations')
+      .leftJoinAndSelect('invoice.creditNotes', 'creditNotes')
       .addSelect((subQuery) => {
         return subQuery
           .select(
@@ -232,6 +234,7 @@ export class InvoiceRepository {
       .createQueryBuilder('invoice')
       .leftJoinAndSelect('invoice.items', 'items')
       .leftJoinAndSelect('invoice.productAllocations', 'productAllocations')
+      .leftJoinAndSelect('invoice.creditNotes', 'creditNotes')
       .addSelect((subQuery) => {
         return subQuery
           .select(
@@ -387,6 +390,7 @@ export class InvoiceRepository {
           InvoiceStatus.EMPLOYEE_APPROVED,
           'APPROVED',
           InvoiceStatus.SENT,
+          InvoiceStatus.REFUNDED,
         ],
       })
       .andWhere('invoice.branchId = :branchId', { branchId })
@@ -458,6 +462,7 @@ export class InvoiceRepository {
           InvoiceStatus.EMPLOYEE_APPROVED,
           'APPROVED',
           InvoiceStatus.SENT,
+          InvoiceStatus.REFUNDED,
         ],
       })
       .andWhere('(invoice.type != :proforma OR invoice.saleType IN (:...saleTypes))', {
@@ -528,6 +533,7 @@ export class InvoiceRepository {
           InvoiceStatus.EMPLOYEE_APPROVED,
           'APPROVED',
           InvoiceStatus.SENT,
+          InvoiceStatus.REFUNDED,
         ],
       })
       .andWhere('(invoice.type != :proforma OR invoice.saleType IN (:...saleTypes))', {
@@ -575,6 +581,7 @@ export class InvoiceRepository {
           InvoiceStatus.EMPLOYEE_APPROVED,
           'APPROVED',
           InvoiceStatus.SENT,
+          InvoiceStatus.REFUNDED,
         ],
       })
       .andWhere('(invoice.type != :proforma OR invoice.saleType IN (:...saleTypes))', {
@@ -647,6 +654,7 @@ export class InvoiceRepository {
           InvoiceStatus.EMPLOYEE_APPROVED,
           'APPROVED',
           InvoiceStatus.SENT,
+          InvoiceStatus.REFUNDED,
         ],
       })
       .andWhere('invoice.branchId = :branchId', { branchId })
@@ -695,6 +703,7 @@ export class InvoiceRepository {
           InvoiceStatus.EMPLOYEE_APPROVED,
           'APPROVED',
           InvoiceStatus.SENT,
+          InvoiceStatus.REFUNDED,
         ],
       })
       .andWhere('invoice.branchId = :branchId', { branchId })

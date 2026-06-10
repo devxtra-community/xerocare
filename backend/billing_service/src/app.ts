@@ -27,6 +27,8 @@ app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 app.use(httpLogger);
 
+import creditNoteRouter from './routes/creditNoteRoutes';
+
 /**
  * Routing: Directing users to the right department.
  * - /health: A quick check to see if the service is awake.
@@ -37,6 +39,7 @@ app.use('/health', healthRouter);
 app.use('/invoices', invoiceRouter);
 app.use('/usage', usageRouter);
 app.use('/payments', paymentRouter);
+app.use('/credit-notes', creditNoteRouter);
 
 /**
  * Safety Net: Handling mistakes.

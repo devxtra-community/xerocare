@@ -292,14 +292,36 @@ export function QuotationConversionFlow({
                         placeholder="Search by Serial Number, Brand, or Product Name..."
                         className="h-12 border-slate-200"
                         options={(update.modelId ? availableProducts[update.modelId] || [] : [])
-                          .filter((p) => p.product_status === 'AVAILABLE')
-                          .map((p) => ({
-                            value: p.id,
-                            label: `${p.serial_no} — ${p.brand?.toUpperCase() || ''} ${p.name}`,
-                            description: p.model?.model_name
-                              ? `Model: ${p.model.model_name}`
-                              : undefined,
-                          }))}
+                          .filter((p) =>
+                            ['AVAILABLE', 'RETURNED', 'DAMAGED'].includes(p.product_status),
+                          )
+                          .map((p) => {
+                            const statusColor =
+                              p.product_status === 'DAMAGED'
+                                ? 'text-red-600'
+                                : p.product_status === 'RETURNED'
+                                  ? 'text-green-600'
+                                  : 'text-slate-400';
+                            const statusLabel =
+                              p.product_status && p.product_status !== 'AVAILABLE' ? (
+                                <span className={`${statusColor} font-black ml-2`}>
+                                  [{p.product_status}]
+                                </span>
+                              ) : null;
+                            return {
+                              value: p.id,
+                              label: (
+                                <span className="flex items-center">
+                                  {p.serial_no} — {p.brand?.toUpperCase() || ''} {p.name}
+                                  {statusLabel}
+                                </span>
+                              ),
+                              searchText: `${p.serial_no} ${p.brand} ${p.name} ${p.product_status}`,
+                              description: p.model?.model_name
+                                ? `Model: ${p.model.model_name} • QAR ${Number(p.sale_price || 0).toLocaleString()}`
+                                : `QAR ${Number(p.sale_price || 0).toLocaleString()}`,
+                            };
+                          })}
                       />
                     )}
                   </div>

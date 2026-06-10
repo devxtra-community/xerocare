@@ -322,12 +322,12 @@ export default function ManagerProduct() {
   };
 
   return (
-    <div className="bg-blue-100 min-h-screen p-3 sm:p-4 md:p-6 space-y-4">
-      <div className="flex justify-between items-center">
+    <div className="bg-blue-100 min-h-screen p-3 sm:p-4 md:p-6 space-y-4" suppressHydrationWarning>
+      <div className="flex justify-between items-center" suppressHydrationWarning>
         <h3 className="text-xl sm:text-2xl font-bold text-primary">Products</h3>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2" suppressHydrationWarning>
         <StatCard title="Total Inventory" value={stats.total.toString()} subtitle="All Items" />
         <StatCard title="Available" value={stats.inStock.toString()} subtitle="In Warehouse" />
         <StatCard title="Rented" value={stats.rented.toString()} subtitle="Active Rentals" />
@@ -622,6 +622,18 @@ function ProductFormModal({
   // Ideally we track selectedBrandId explicitly for the dropdown.
   const [selectedBrandId, setSelectedBrandId] = useState<string>('');
   const [selectedLotItemId, setSelectedLotItemId] = useState<string>('');
+  // Products already registered under the selected model (for auto-fill)
+  const [modelProducts, setModelProducts] = useState<
+    {
+      name: string;
+      purchase_price?: number;
+      sale_price: number;
+      tax_rate: number;
+      max_discount_amount: number;
+      wholesale_price?: number;
+    }[]
+  >([]);
+  const [loadingModelProducts, setLoadingModelProducts] = useState(false);
 
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string>(initialData?.imageUrl || '');
@@ -694,6 +706,38 @@ function ProductFormModal({
       }
     }
   }, [initialData, models, brands, lots]);
+
+  // Fetch existing products for the selected model to offer auto-fill
+  useEffect(() => {
+    if (!form.model_id || initialData) {
+      setModelProducts([]);
+      return;
+    }
+    const fetch = async () => {
+      setLoadingModelProducts(true);
+      try {
+        // Correctly filter by model_id on the backend
+        const res = await productService.getAllProducts({ modelId: form.model_id, limit: 100 });
+        const byModel = res.data.map((p) => ({
+          name: p.name,
+          purchase_price: p.purchase_price,
+          sale_price: p.sale_price,
+          tax_rate: p.tax_rate,
+          max_discount_amount: p.max_discount_amount,
+          wholesale_price: p.wholesale_price,
+        }));
+        // Deduplicate by name
+        const unique = Array.from(new Map(byModel.map((p) => [p.name, p])).values());
+        setModelProducts(unique);
+      } catch (err) {
+        console.error('Error fetching model products:', err);
+        setModelProducts([]);
+      } finally {
+        setLoadingModelProducts(false);
+      }
+    };
+    fetch();
+  }, [form.model_id, initialData]);
 
   // Filter models based on selectedBrandId
   const filteredModels = selectedBrandId
@@ -823,13 +867,51 @@ function ProductFormModal({
           </Field>
 
           <Field label="Product Name">
-            <Input
-              value={form.name}
-              disabled={!!initialData}
-              onChange={(e) => setForm({ ...form, name: e.target.value })}
-              placeholder="Enter product name"
-              required
-            />
+            <div className="relative">
+              <Input
+                list="model-product-names"
+                value={form.name}
+                disabled={!!initialData}
+                autoComplete="off"
+                onChange={(e) => {
+                  const val = e.target.value;
+                  const selected = modelProducts.find((p) => p.name === val);
+                  if (selected) {
+                    setForm({
+                      ...form,
+                      name: selected.name,
+                      purchase_price: selected.purchase_price ?? form.purchase_price,
+                      sale_price: selected.sale_price ?? form.sale_price,
+                      tax_rate: selected.tax_rate ?? form.tax_rate,
+                      max_discount_amount: selected.max_discount_amount ?? form.max_discount_amount,
+                      wholesale_price: selected.wholesale_price ?? form.wholesale_price,
+                    });
+                    toast.success('Fields auto-filled from existing product');
+                  } else {
+                    setForm({ ...form, name: val });
+                  }
+                }}
+                placeholder={
+                  loadingModelProducts ? 'Loading names...' : 'Enter or select product name'
+                }
+                required
+              />
+              <datalist id="model-product-names">
+                {modelProducts.map((p) => (
+                  <option key={p.name} value={p.name} />
+                ))}
+              </datalist>
+            </div>
+            {loadingModelProducts && (
+              <p className="text-[10px] text-muted-foreground mt-1 animate-pulse">
+                Fetching existing products for this model...
+              </p>
+            )}
+            {!initialData && modelProducts.length > 0 && !form.name && (
+              <p className="text-[10px] text-blue-600 mt-1">
+                Tip: Start typing to see existing product names for this model.
+              </p>
+            )}
           </Field>
 
           <Field label="Serial Number">

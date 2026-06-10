@@ -145,7 +145,8 @@ export default function EmployeeOrdersTable({
     return items.reduce((sum, item) => sum + (item.quantity || 0), 0);
   };
 
-  const getCleanCustomerName = (name: string) => {
+  const getCleanCustomerName = (name: string | null | undefined) => {
+    if (!name) return 'N/A';
     // Remove color/type information that might be appended to the name
     // e.g., "John Doe (Color)" -> "John Doe"
     return name.split('(')[0].trim();

@@ -1,4 +1,4 @@
-import { getRabbitChannel } from '../config/rabbitmq';
+import { getRabbitChannel, getRabbitConnection } from '../config/rabbitmq';
 import { logger } from '../config/logger';
 import { Source } from '../config/db';
 import { Product, ProductStatus } from '../entities/productEntity';
@@ -22,11 +22,14 @@ export async function startProductAllocationConsumer() {
 
   await channel.assertExchange(EXCHANGE, 'topic', { durable: true });
 
-  // Delete the old queue if it exists to allow changing the arguments
+  // Delete the old queue if it exists to allow changing the arguments safely
   try {
-    await channel.deleteQueue(QUEUE);
-  } catch (err) {
-    logger.warn('Failed to delete queue prior to re-asserting', { queue: QUEUE, error: err });
+    const conn = await getRabbitConnection();
+    const tempChannel = await conn.createChannel();
+    await tempChannel.deleteQueue(QUEUE);
+    await tempChannel.close();
+  } catch {
+    // Ignore error if queue doesn't exist
   }
 
   await channel.assertQueue(QUEUE, {

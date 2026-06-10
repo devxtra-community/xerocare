@@ -200,19 +200,19 @@ app.use('/e', createServiceProxy(EMPLOYEE_SERVICE_URL));
 app.post(
   '/i/service/tickets',
   authMiddleware,
-  requireServiceRole(['SERVICE_HELP_DESK']),
+  requireRole(UserRole.ADMIN, UserRole.MANAGER, UserRole.EMPLOYEE),
   createServiceProxy(VENDOR_INVENTORY_SERVICE_URL),
 );
 app.get(
   '/i/service/tickets',
   authMiddleware,
-  requireServiceRole(['SERVICE_HELP_DESK', 'SERVICE_TECHNICIAN']),
+  requireRole(UserRole.ADMIN, UserRole.MANAGER, UserRole.FINANCE, UserRole.EMPLOYEE),
   createServiceProxy(VENDOR_INVENTORY_SERVICE_URL),
 );
 app.get(
   '/i/service/tickets/:id',
   authMiddleware,
-  requireServiceRole(['SERVICE_HELP_DESK', 'SERVICE_TECHNICIAN']),
+  requireRole(UserRole.ADMIN, UserRole.MANAGER, UserRole.FINANCE, UserRole.EMPLOYEE),
   createServiceProxy(VENDOR_INVENTORY_SERVICE_URL),
 );
 app.put(
@@ -272,13 +272,13 @@ app.post(
 app.get(
   '/i/service/technicians',
   authMiddleware,
-  requireServiceRole(['SERVICE_HELP_DESK', 'SERVICE_TECHNICIAN']),
+  requireRole(UserRole.ADMIN, UserRole.MANAGER, UserRole.FINANCE, UserRole.EMPLOYEE),
   createServiceProxy(VENDOR_INVENTORY_SERVICE_URL),
 );
 app.get(
   '/i/service/customers/:customerId/history',
   authMiddleware,
-  requireServiceRole(['SERVICE_HELP_DESK', 'SERVICE_TECHNICIAN']),
+  requireRole(UserRole.ADMIN, UserRole.MANAGER, UserRole.FINANCE, UserRole.EMPLOYEE),
   createServiceProxy(VENDOR_INVENTORY_SERVICE_URL),
 );
 app.post(

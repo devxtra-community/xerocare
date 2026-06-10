@@ -105,12 +105,17 @@ export const connectWithRetry = async (initialDelayMs = 2000): Promise<DataSourc
         `);
         logger.info('Guaranteed warranty and consumables columns exist on products table.');
 
-        // Ensure products_product_status_enum contains RETURNED status
+        // Ensure products_product_status_enum contains RETURNED and DAMAGED statuses
         try {
           await Source.query(
             `ALTER TYPE products_product_status_enum ADD VALUE IF NOT EXISTS 'RETURNED'`,
           );
-          logger.info('Guaranteed RETURNED status exists in products_product_status_enum.');
+          await Source.query(
+            `ALTER TYPE products_product_status_enum ADD VALUE IF NOT EXISTS 'DAMAGED'`,
+          );
+          logger.info(
+            'Guaranteed RETURNED and DAMAGED statuses exist in products_product_status_enum.',
+          );
         } catch (enumErr) {
           logger.warn(
             'Could not alter products_product_status_enum: ' + (enumErr as Error).message,

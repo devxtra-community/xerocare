@@ -31,6 +31,7 @@ export default function StatCard({ title, value, subtitle }: StatCardProps) {
 
         <div
           className={`font-bold text-primary leading-snug w-full text-center flex items-center justify-center ${getFontSizeClass(value)}`}
+          suppressHydrationWarning
         >
           {value || '0'}
         </div>

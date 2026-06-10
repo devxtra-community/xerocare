@@ -49,7 +49,10 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     <ToastContext.Provider value={{ showToast, success, error }}>
       {children}
       {/* Toast container at bottom-right of screen */}
-      <div className="fixed bottom-4 right-4 z-9999 flex flex-col gap-2 max-w-md w-full pointer-events-none sm:w-[350px]">
+      <div
+        className="fixed bottom-4 right-4 z-9999 flex flex-col gap-2 max-w-md w-full pointer-events-none sm:w-[350px]"
+        suppressHydrationWarning
+      >
         {toasts.map((toast) => (
           <div key={toast.id} className="pointer-events-auto">
             <Toast

@@ -1,7 +1,16 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Send, Mail, Phone, Globe, AlertTriangle, AlertCircle } from 'lucide-react';
+import {
+  Send,
+  Mail,
+  Phone,
+  Globe,
+  AlertTriangle,
+  AlertCircle,
+  RotateCcw,
+  MoveHorizontal,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { getProductById, getAllProducts } from '@/lib/product';
@@ -11,6 +20,8 @@ import { Invoice, sendEmailNotification, sendWhatsappNotification } from '@/lib/
 import { toast } from 'sonner';
 import { getUserFromToken } from '@/lib/auth';
 import AuditTimeline from '../invoice/AuditTimeline';
+import { Badge } from '@/components/ui/badge';
+import { formatCurrency } from '@/lib/format';
 
 interface InternalConsumable {
   name?: string;
@@ -1277,11 +1288,122 @@ export function InvoiceViewDialog({
               </>
             )}
           </div>
-          {canViewTimeline && (
-            <div className="w-full md:w-[350px] shrink-0 border-t md:border-t-0 md:border-l border-gray-100 bg-slate-50/50 p-6 overflow-y-auto max-h-[35vh] md:max-h-full">
-              <AuditTimeline entityId={invoice.id} />
-            </div>
-          )}
+          {/* Credit Exchange Details Sidebar */}
+          {invoice.creditNotes &&
+            invoice.creditNotes.some((cn) => cn.status === 'PRODUCT_REPLACED') && (
+              <div className="w-full md:w-[350px] shrink-0 border-t md:border-t-0 md:border-l border-violet-100 bg-violet-50/20 p-6 overflow-y-auto max-h-[45vh] md:max-h-full space-y-6">
+                <div className="flex items-center gap-2 text-violet-700">
+                  <RotateCcw className="h-5 w-5" />
+                  <h3 className="text-sm font-black uppercase tracking-widest">
+                    Returns &amp; Exchange
+                  </h3>
+                </div>
+
+                {invoice.creditNotes
+                  .filter((cn) => cn.status === 'PRODUCT_REPLACED')
+                  .map((cn) => {
+                    const variation =
+                      (cn.replacementAmount || 0) -
+                      cn.productAmount -
+                      (cn.replacementDiscount || 0);
+                    return (
+                      <div key={cn.id} className="space-y-4">
+                        <div className="rounded-xl border border-violet-100 bg-white p-4 shadow-sm space-y-4">
+                          <div className="flex justify-between items-center">
+                            <Badge className="bg-violet-600 text-white border-none text-[9px] font-black tracking-widest px-2 py-0.5">
+                              {cn.type.replace('_', ' ')}
+                            </Badge>
+                            <span className="text-[10px] font-bold text-slate-400">
+                              {cn.creditNoteNo}
+                            </span>
+                          </div>
+
+                          <div className="space-y-3">
+                            {/* Returned */}
+                            <div className="p-3 rounded-lg bg-rose-50 border border-rose-100">
+                              <p className="text-[9px] font-black text-rose-500 uppercase tracking-widest mb-1">
+                                ↩ Returned
+                              </p>
+                              <p className="text-xs font-bold text-slate-800 line-clamp-1">
+                                {cn.productName}
+                              </p>
+                              <p className="text-[11px] font-black text-rose-600 mt-1">
+                                {formatCurrency(cn.productAmount)}
+                              </p>
+                            </div>
+
+                            <div className="flex justify-center -my-2 relative z-10">
+                              <div className="bg-white p-1 rounded-full border border-violet-100 shadow-sm">
+                                <MoveHorizontal className="h-4 w-4 text-violet-400" />
+                              </div>
+                            </div>
+
+                            {/* Replacement */}
+                            <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-100">
+                              <p className="text-[9px] font-black text-emerald-500 uppercase tracking-widest mb-1">
+                                ↗ Replacement
+                              </p>
+                              <p className="text-xs font-bold text-slate-800 line-clamp-1">
+                                {cn.replacementProductName || 'New Product'}
+                              </p>
+                              <p className="text-[11px] font-black text-emerald-600 mt-1">
+                                {formatCurrency(cn.replacementAmount || 0)}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="pt-3 border-t border-slate-100 space-y-1.5">
+                            <div className="flex justify-between text-xs">
+                              <span className="text-slate-500 font-medium">New Price</span>
+                              <span className="font-bold text-slate-700">
+                                {formatCurrency(cn.replacementAmount || 0)}
+                              </span>
+                            </div>
+                            <div className="flex justify-between text-xs">
+                              <span className="text-slate-500 font-medium">Returned Credit</span>
+                              <span className="font-bold text-rose-600">
+                                − {formatCurrency(cn.productAmount)}
+                              </span>
+                            </div>
+                            {cn.replacementDiscount > 0 && (
+                              <div className="flex justify-between text-xs">
+                                <span className="text-slate-500 font-medium">
+                                  Exchange Discount
+                                </span>
+                                <span className="font-bold text-rose-500">
+                                  − {formatCurrency(cn.replacementDiscount)}
+                                </span>
+                              </div>
+                            )}
+                            <div className="pt-2 border-t border-slate-100 flex justify-between items-center">
+                              <span className="text-[10px] font-black text-violet-600 uppercase">
+                                Net Variation
+                              </span>
+                              <span
+                                className={`text-sm font-black ${variation >= 0 ? 'text-amber-600' : 'text-emerald-600'}`}
+                              >
+                                {variation >= 0 ? '+' : ''}
+                                {formatCurrency(variation)}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                <div className="h-px bg-violet-100 my-4" />
+                <AuditTimeline entityId={invoice.id} />
+              </div>
+            )}
+
+          {canViewTimeline &&
+            (!invoice.creditNotes ||
+              !invoice.creditNotes.some((cn) => cn.status === 'PRODUCT_REPLACED')) && (
+              <div className="w-full md:w-[350px] shrink-0 border-t md:border-t-0 md:border-l border-gray-100 bg-slate-50/50 p-6 overflow-y-auto max-h-[35vh] md:max-h-full">
+                <AuditTimeline entityId={invoice.id} />
+              </div>
+            )}
         </div>
 
         {/* Footer Actions */}

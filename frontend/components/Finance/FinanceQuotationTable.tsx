@@ -75,6 +75,8 @@ function StatusBadge({ status }: { status: string }) {
     WAITING_FINANCE_APPROVAL: 'PENDING FINANCE',
     EXPIRED: 'EXPIRED',
     CANCELLED: 'CANCELLED',
+    CREDIT_EXCHANGE: 'CREDIT EXCHANGE',
+    PRODUCT_REPLACED: 'EXCHANGE REALIZED',
   };
   return (
     <Badge
@@ -246,6 +248,13 @@ export default function FinanceQuotationTable({
   };
 
   const getProductNames = (invoice: Invoice) => {
+    const completedExchange = invoice.creditNotes?.find(
+      (cn) => cn.status === 'PRODUCT_REPLACED' && cn.type === 'CREDIT_EXCHANGE',
+    );
+    if (completedExchange?.replacementProductName) {
+      return completedExchange.replacementProductName;
+    }
+
     if (!invoice.items || invoice.items.length === 0) return '';
     const productItems = invoice.items.filter(
       (item) => item.itemType !== 'PRICING_RULE' && item.description,
@@ -464,7 +473,28 @@ export default function FinanceQuotationTable({
                       </TableCell>
                       <TableCell className="py-3 px-3">
                         <div className="font-semibold text-foreground truncate text-xs">
-                          {formatCurrency(q.totalAmount)}
+                          {(() => {
+                            const completedExchange = q.creditNotes?.find(
+                              (cn) =>
+                                cn.status === 'PRODUCT_REPLACED' && cn.type === 'CREDIT_EXCHANGE',
+                            );
+                            if (
+                              completedExchange &&
+                              Number(completedExchange.replacementAmount) > 0
+                            ) {
+                              return (
+                                <div>
+                                  <div className="text-violet-700">
+                                    {formatCurrency(Number(completedExchange.replacementAmount))}
+                                  </div>
+                                  <div className="text-[9px] text-slate-400 line-through">
+                                    {formatCurrency(q.totalAmount)}
+                                  </div>
+                                </div>
+                              );
+                            }
+                            return formatCurrency(q.totalAmount);
+                          })()}
                         </div>
                       </TableCell>
                       <TableCell className="py-3 px-3">

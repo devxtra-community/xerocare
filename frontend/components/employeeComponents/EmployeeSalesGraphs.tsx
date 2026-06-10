@@ -237,6 +237,8 @@ export default function EmployeeSalesGraphs({
         }));
 
         salesInvoices.forEach((inv) => {
+          if (inv.status === 'REFUNDED') return;
+
           const d = new Date(inv.createdAt);
           const amount = parseFloat(String(inv.totalAmount)) || 0;
 

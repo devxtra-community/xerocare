@@ -118,6 +118,8 @@ export const productService = {
     page?: number;
     limit?: number;
     search?: string;
+    modelId?: string;
+    status?: string;
   }): Promise<PaginatedResponse<Product>> => {
     const response = await api.get('/i/products', { params });
     // Safety check: ensure we handle the data correctly whether it's one page or many.

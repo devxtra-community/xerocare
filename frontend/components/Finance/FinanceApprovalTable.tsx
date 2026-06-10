@@ -370,12 +370,65 @@ export default function FinanceApprovalTable({ saleType }: FinanceApprovalTableP
           <TableBody>
             {paginatedInvoices.map((inv) => (
               <TableRow key={inv.id}>
-                <TableCell className="font-bold">{inv.invoiceNumber}</TableCell>
-                <TableCell>{inv.customerName}</TableCell>
+                <TableCell className="font-bold">
+                  <div className="flex flex-col">
+                    <span>{inv.invoiceNumber}</span>
+                    {(() => {
+                      const completedExchange = inv.creditNotes?.find(
+                        (cn) => cn.status === 'PRODUCT_REPLACED' && cn.type === 'CREDIT_EXCHANGE',
+                      );
+                      if (completedExchange) {
+                        return (
+                          <Badge className="w-fit bg-violet-100 text-violet-600 border-none text-[8px] h-3 px-1 mt-0.5">
+                            EXCHANGED
+                          </Badge>
+                        );
+                      }
+                      return null;
+                    })()}
+                  </div>
+                </TableCell>
+                <TableCell>
+                  <div className="flex flex-col">
+                    <span className="font-medium text-slate-800">{inv.customerName}</span>
+                    {(() => {
+                      const completedExchange = inv.creditNotes?.find(
+                        (cn) => cn.status === 'PRODUCT_REPLACED' && cn.type === 'CREDIT_EXCHANGE',
+                      );
+                      if (completedExchange?.replacementProductName) {
+                        return (
+                          <span className="text-[10px] text-violet-600 font-bold italic line-clamp-1">
+                            {completedExchange.replacementProductName}
+                          </span>
+                        );
+                      }
+                      return null;
+                    })()}
+                  </div>
+                </TableCell>
                 <TableCell>
                   <Badge variant="outline">{inv.saleType}</Badge>
                 </TableCell>
-                <TableCell className="font-bold">{formatCurrency(inv.totalAmount)}</TableCell>
+                <TableCell className="font-bold text-slate-900">
+                  {(() => {
+                    const completedExchange = inv.creditNotes?.find(
+                      (cn) => cn.status === 'PRODUCT_REPLACED' && cn.type === 'CREDIT_EXCHANGE',
+                    );
+                    if (completedExchange && Number(completedExchange.replacementAmount) > 0) {
+                      return (
+                        <div className="flex flex-col">
+                          <span className="text-violet-700">
+                            {formatCurrency(Number(completedExchange.replacementAmount))}
+                          </span>
+                          <span className="text-[9px] text-slate-400 font-normal line-through">
+                            {formatCurrency(inv.totalAmount)}
+                          </span>
+                        </div>
+                      );
+                    }
+                    return formatCurrency(inv.totalAmount);
+                  })()}
+                </TableCell>
                 <TableCell className="text-blue-600 font-semibold">
                   {formatCurrency(inv.advanceAmount || 0)}
                 </TableCell>

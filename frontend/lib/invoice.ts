@@ -65,7 +65,39 @@ export type InvoiceStatus =
   | 'OPEN'
   | 'FREE_SERVICE'
   | 'DIAGNOSED'
-  | 'QUOTED';
+  | 'QUOTED'
+  | 'REFUNDED';
+
+export interface CreditNoteRecord {
+  id: string;
+  creditNoteNo: string;
+  invoiceId: string;
+  invoiceNumber: string;
+  customerId: string;
+  customerName: string;
+  branchId: string;
+  productId: string;
+  productName: string;
+  modelName: string;
+  brand: string;
+  serialNumber?: string;
+  productAmount: number;
+  type: 'DIRECT_REFUND' | 'REPLACEMENT' | 'CREDIT_EXCHANGE';
+  status: 'DRAFT' | 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED' | 'COMPLETED' | 'PRODUCT_REPLACED';
+  sellerEmployeeId: string;
+  notes?: string;
+  financeNote?: string;
+  damageReason?: string;
+  rejectionReason?: string;
+  replacementProductId?: string;
+  replacementProductName?: string;
+  replacementSerialNumber?: string;
+  replacementAmount?: number;
+  replacementDiscount?: number;
+  createdAt?: string;
+  updatedAt?: string;
+  invoice?: Invoice;
+}
 
 export interface Invoice {
   id: string;
@@ -140,6 +172,21 @@ export interface Invoice {
   displayAmount?: number; // Backend aggregated lifetime total
   usageRevenue?: number; // Sum of all recorded EMIs/UsageRecords
   invoiceHistory?: Invoice[];
+  creditNotes?: Array<{
+    id: string;
+    creditNoteNo: string;
+    type: string;
+    status: string;
+    productAmount: number;
+    replacementAmount?: number;
+    replacementDiscount: number;
+    productName: string;
+    modelName: string;
+    brand: string;
+    replacementProductId?: string;
+    replacementProductName?: string;
+    replacementSerialNumber?: string;
+  }>;
   productAllocations?: Array<{
     id: string;
     productId: string;
@@ -159,6 +206,16 @@ export interface Invoice {
     endTimestamp?: string;
   }>;
 }
+
+export interface CreateCreditNotePayload {
+  invoiceId: string;
+  productId: string;
+  productAmount: number;
+  type: 'DIRECT_REFUND' | 'REPLACEMENT' | 'CREDIT_EXCHANGE';
+  notes?: string;
+}
+
+export type UpdateCreditNotePayload = Partial<CreateCreditNotePayload>;
 
 export interface UsageRecord {
   id: string;

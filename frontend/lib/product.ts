@@ -117,9 +117,13 @@ export const getAllProducts = async (params?: {
  */
 export const getAvailableProductsByModel = async (modelId: string): Promise<Product[]> => {
   const allProducts = await getAllProducts({ modelId, limit: 1000 });
-  return allProducts.filter(
-    (p) => p.product_status === ProductStatus.AVAILABLE || p.product_status === ProductStatus.LEASE,
-  );
+  const allowed = [
+    ProductStatus.AVAILABLE,
+    ProductStatus.LEASE,
+    ProductStatus.RETURNED,
+    ProductStatus.DAMAGED,
+  ];
+  return allProducts.filter((p) => allowed.includes(p.product_status));
 };
 
 /**

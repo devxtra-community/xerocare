@@ -9,7 +9,8 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 
 export interface SearchableSelectOption {
   value: string;
-  label: string;
+  label: React.ReactNode;
+  searchText?: string; // Optional field for string-based search when label is a node
   description?: string;
   disabled?: boolean;
   [key: string]: unknown;
@@ -51,8 +52,11 @@ export function SearchableSelect({
 
   const filteredOptions = options.filter((option) => {
     const searchStr = searchQuery.toLowerCase();
+    const labelStr = (
+      option.searchText || (typeof option.label === 'string' ? option.label : '')
+    ).toLowerCase();
     return (
-      option.label.toLowerCase().includes(searchStr) ||
+      labelStr.includes(searchStr) ||
       option.value.toLowerCase().includes(searchStr) ||
       (option.description && option.description.toLowerCase().includes(searchStr))
     );

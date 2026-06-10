@@ -23,4 +23,5 @@ export enum InvoiceStatus {
   CANCELLED = 'CANCELLED',
   RETAKEN = 'RETAKEN',
   SUPERSEDED = 'SUPERSEDED',
+  REFUNDED = 'REFUNDED',
 }

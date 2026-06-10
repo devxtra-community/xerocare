@@ -11,7 +11,15 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { Calendar, Coins, Loader2, Mail, AlertTriangle, AlertCircle } from 'lucide-react';
+import {
+  Calendar,
+  Coins,
+  Loader2,
+  Mail,
+  AlertTriangle,
+  AlertCircle,
+  RotateCcw,
+} from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { formatCurrency } from '@/lib/format';
 import { Invoice, getInvoiceById } from '@/lib/invoice';
@@ -817,7 +825,24 @@ export function InvoiceDetailsDialog({
                         <TableCell className="py-3">
                           <div className="space-y-1">
                             <p className="font-bold text-gray-700 text-sm">
-                              {getCleanProductName(item.description)}
+                              {(() => {
+                                const completedExchange = currentInvoice.creditNotes?.find(
+                                  (cn) =>
+                                    cn.status === 'PRODUCT_REPLACED' &&
+                                    cn.type === 'CREDIT_EXCHANGE',
+                                );
+                                if (completedExchange?.replacementProductName) {
+                                  return (
+                                    <span className="text-violet-700">
+                                      {completedExchange.replacementProductName}
+                                      <Badge className="ml-2 bg-violet-100 text-violet-500 border-none text-[8px] tracking-[0.05em]">
+                                        EXCHANGED
+                                      </Badge>
+                                    </span>
+                                  );
+                                }
+                                return getCleanProductName(item.description);
+                              })()}
                             </p>
                             {(item.initialBwCount !== undefined ||
                               item.initialColorCount !== undefined) && (
@@ -1107,6 +1132,139 @@ export function InvoiceDetailsDialog({
               )}
             </div>
           </div>
+
+          {/* Returns & Credit Exchange Section */}
+          {currentInvoice.creditNotes &&
+            currentInvoice.creditNotes.some((cn) => cn.status === 'PRODUCT_REPLACED') && (
+              <div className="space-y-4 pt-4 border-t border-violet-100">
+                <h3 className="text-[10px] font-bold text-violet-600 uppercase tracking-wider flex items-center gap-2">
+                  <RotateCcw size={12} />
+                  Returns &amp; Credit Exchange History
+                </h3>
+                <div className="space-y-3">
+                  {currentInvoice.creditNotes
+                    .filter((cn) => cn.status === 'PRODUCT_REPLACED')
+                    .map((cn) => {
+                      const variation =
+                        (cn.replacementAmount || 0) -
+                        cn.productAmount -
+                        (cn.replacementDiscount || 0);
+                      return (
+                        <div
+                          key={cn.id}
+                          className="rounded-2xl border border-violet-100 bg-gradient-to-br from-violet-50/30 to-white p-4 space-y-4 shadow-sm"
+                        >
+                          <div className="flex items-start justify-between">
+                            <div className="flex items-center gap-3">
+                              <div className="bg-violet-100 p-1.5 rounded-lg">
+                                <RotateCcw className="h-4 w-4 text-violet-600" />
+                              </div>
+                              <div>
+                                <p className="text-[9px] font-black text-violet-500 uppercase tracking-widest">
+                                  {cn.type.replace('_', ' ')}
+                                </p>
+                                <h4 className="text-sm font-bold text-slate-900">
+                                  {cn.creditNoteNo}
+                                </h4>
+                              </div>
+                            </div>
+                            <Badge className="bg-violet-600 text-white border-none text-[9px] uppercase font-black tracking-widest px-2 py-0.5">
+                              Exchange Realized
+                            </Badge>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-3">
+                            {/* Returned Product */}
+                            <div className="bg-rose-50/60 border border-rose-100 rounded-xl p-3 space-y-1">
+                              <p className="text-[9px] font-black text-rose-400 uppercase tracking-widest">
+                                ↩ Returned Product
+                              </p>
+                              <p className="text-xs font-bold text-slate-800 leading-tight">
+                                {cn.productName}
+                              </p>
+                              <p className="text-[9px] text-slate-500 font-bold uppercase">
+                                {cn.brand} · {cn.modelName}
+                              </p>
+                              <p className="text-[9px] font-black text-rose-600 mt-1 bg-rose-100 px-2 py-0.5 rounded-full inline-block">
+                                Credit: {formatCurrency(cn.productAmount)}
+                              </p>
+                            </div>
+
+                            {/* New / Exchange Product */}
+                            <div className="bg-violet-50/60 border border-violet-100 rounded-xl p-3 space-y-1">
+                              <p className="text-[9px] font-black text-violet-500 uppercase tracking-widest">
+                                ↗{' '}
+                                {cn.type === 'CREDIT_EXCHANGE'
+                                  ? 'Exchange Product'
+                                  : 'Replacement Product'}
+                              </p>
+                              <p className="text-xs font-bold text-slate-800 leading-tight">
+                                {cn.replacementProductName || '—'}
+                              </p>
+                              {cn.replacementSerialNumber && (
+                                <p className="text-[9px] text-violet-600 font-black uppercase bg-violet-100 px-2 py-0.5 rounded-full inline-block">
+                                  S/N: {cn.replacementSerialNumber}
+                                </p>
+                              )}
+                              <p className="text-[9px] font-black text-emerald-600 mt-1 bg-emerald-50 px-2 py-0.5 rounded-full inline-block">
+                                Price: {formatCurrency(cn.replacementAmount || 0)}
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* Financial Breakdown */}
+                          <div className="bg-white rounded-xl border border-slate-100 p-3 space-y-2">
+                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">
+                              Financial Summary
+                            </p>
+                            <div className="flex justify-between text-xs">
+                              <span className="text-slate-500 font-semibold">
+                                New Product Price
+                              </span>
+                              <span className="font-bold text-slate-800">
+                                {formatCurrency(cn.replacementAmount || 0)}
+                              </span>
+                            </div>
+                            <div className="flex justify-between text-xs text-emerald-600">
+                              <span className="font-semibold">Returned Credit</span>
+                              <span className="font-bold">
+                                − {formatCurrency(cn.productAmount)}
+                              </span>
+                            </div>
+                            {(cn.replacementDiscount || 0) > 0 && (
+                              <div className="flex justify-between text-xs text-rose-500">
+                                <span className="font-semibold">Exchange Discount</span>
+                                <span className="font-bold">
+                                  − {formatCurrency(cn.replacementDiscount)}
+                                </span>
+                              </div>
+                            )}
+                            <div className="h-px bg-slate-100 my-1" />
+                            <div className="flex justify-between items-center">
+                              <span className="text-[9px] font-black uppercase tracking-widest text-violet-600">
+                                Net Variation
+                              </span>
+                              <div className="text-right">
+                                <p
+                                  className={`text-sm font-black ${variation >= 0 ? 'text-amber-600' : 'text-emerald-600'}`}
+                                >
+                                  {variation >= 0 ? '+' : ''}
+                                  {formatCurrency(variation)}
+                                </p>
+                                <p className="text-[8px] font-bold text-slate-400 italic">
+                                  {variation >= 0
+                                    ? 'Customer Payable Gap'
+                                    : 'Refundable to Customer'}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                </div>
+              </div>
+            )}
 
           {/* Invoice History Section */}
           {currentInvoice.invoiceHistory && currentInvoice.invoiceHistory.length > 0 && (
