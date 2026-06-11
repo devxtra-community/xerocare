@@ -29,6 +29,16 @@ import { SparePartInventory } from '../entities/sparePartInventoryEntity';
 import { ProcessedInvoiceItem } from '../entities/processedInvoiceItemEntity';
 import { ServiceTicket } from '../entities/serviceTicketEntity';
 import { ServiceTicketItem } from '../entities/serviceTicketItemEntity';
+import { ServiceDiagnosis } from '../entities/serviceDiagnosisEntity';
+import { ServiceEstimate } from '../entities/serviceEstimateEntity';
+import { ServiceEstimateRevision } from '../entities/serviceEstimateRevisionEntity';
+import { ServiceEstimateItem } from '../entities/serviceEstimateItemEntity';
+import { ServiceReport } from '../entities/serviceReportEntity';
+import { MachineServiceHistory } from '../entities/machineServiceHistoryEntity';
+import { ConsumableYieldHistory } from '../entities/consumableYieldHistoryEntity';
+import { InventoryReservation } from '../entities/inventoryReservationEntity';
+import { ServiceTicketActivity } from '../entities/serviceTicketActivityEntity';
+import { ServiceContract } from '../entities/serviceContractEntity';
 
 export const Source = new DataSource({
   type: 'postgres',
@@ -60,6 +70,16 @@ export const Source = new DataSource({
     ProcessedInvoiceItem,
     ServiceTicket,
     ServiceTicketItem,
+    ServiceDiagnosis,
+    ServiceEstimate,
+    ServiceEstimateRevision,
+    ServiceEstimateItem,
+    ServiceReport,
+    MachineServiceHistory,
+    ConsumableYieldHistory,
+    InventoryReservation,
+    ServiceTicketActivity,
+    ServiceContract,
   ],
   poolSize: 1,
   extra: {
@@ -116,6 +136,29 @@ export const connectWithRetry = async (initialDelayMs = 2000): Promise<DataSourc
             'Could not alter products_product_status_enum: ' + (enumErr as Error).message,
           );
         }
+
+        try {
+          await Source.query(`
+            DO $$
+            BEGIN
+              IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'products_ownership_enum') THEN
+                CREATE TYPE products_ownership_enum AS ENUM ('RENT', 'LEASE', 'SALE', 'EXTERNAL');
+              END IF;
+            END
+            $$;
+          `);
+        } catch (enumErr) {
+          logger.warn('Could not create products_ownership_enum type:', enumErr);
+        }
+        await Source.query(`
+          ALTER TABLE products 
+          ADD COLUMN IF NOT EXISTS ownership products_ownership_enum DEFAULT 'SALE',
+          ADD COLUMN IF NOT EXISTS warranty_start_date TIMESTAMP NULL,
+          ADD COLUMN IF NOT EXISTS warranty_end_date TIMESTAMP NULL,
+          ADD COLUMN IF NOT EXISTS warranty_max_pages INTEGER DEFAULT 200000,
+          ADD COLUMN IF NOT EXISTS meter_reading INTEGER DEFAULT 0,
+          ADD COLUMN IF NOT EXISTS customer_id UUID NULL;
+        `);
 
         // Ensure barcode_id column exists on products and spare_parts tables
         await Source.query(`
@@ -179,6 +222,18 @@ export const connectWithRetry = async (initialDelayMs = 2000): Promise<DataSourc
                   'SPARE_PART', 'CUSTOM'
                 );
               END IF;
+
+              BEGIN
+                ALTER TYPE service_tickets_servicecontext_enum ADD VALUE 'WARRANTY';
+              EXCEPTION
+                WHEN duplicate_object THEN NULL;
+              END;
+
+              BEGIN
+                ALTER TYPE service_tickets_servicecontext_enum ADD VALUE 'EXTERNAL_MACHINE';
+              EXCEPTION
+                WHEN duplicate_object THEN NULL;
+              END;
             END
             $$;
           `);
@@ -186,6 +241,27 @@ export const connectWithRetry = async (initialDelayMs = 2000): Promise<DataSourc
         } catch (err) {
           logger.warn('Could not create service enums:', err);
         }
+
+        // Alter service_tickets table to add diagnosis and repair columns
+        await Source.query(`
+          ALTER TABLE service_tickets 
+          ADD COLUMN IF NOT EXISTS "diagnosisStartedAt" TIMESTAMP NULL,
+          ADD COLUMN IF NOT EXISTS "diagnosisCompletedAt" TIMESTAMP NULL,
+          ADD COLUMN IF NOT EXISTS "repairStartedAt" TIMESTAMP NULL,
+          ADD COLUMN IF NOT EXISTS "repairCompletedAt" TIMESTAMP NULL,
+          ADD COLUMN IF NOT EXISTS "diagnosisDuration" INTEGER NULL,
+          ADD COLUMN IF NOT EXISTS "repairDuration" INTEGER NULL;
+        `);
+        logger.info('Guaranteed service_tickets time tracking columns exist.');
+
+        // Alter spare_parts table to add reservation columns
+        await Source.query(`
+          ALTER TABLE spare_parts 
+          ADD COLUMN IF NOT EXISTS "reserved_quantity" INTEGER DEFAULT 0,
+          ADD COLUMN IF NOT EXISTS "consumed_quantity" INTEGER DEFAULT 0,
+          ADD COLUMN IF NOT EXISTS "damaged_quantity" INTEGER DEFAULT 0;
+        `);
+        logger.info('Guaranteed spare_parts reservation columns exist.');
 
         await Source.query(`
           CREATE TABLE IF NOT EXISTS service_tickets (
@@ -211,6 +287,12 @@ export const connectWithRetry = async (initialDelayMs = 2000): Promise<DataSourc
             "scheduledVisitDate" TIMESTAMP NULL,
             "completedAt" TIMESTAMP NULL,
             "completionNotes" TEXT NULL,
+            "diagnosisStartedAt" TIMESTAMP NULL,
+            "diagnosisCompletedAt" TIMESTAMP NULL,
+            "repairStartedAt" TIMESTAMP NULL,
+            "repairCompletedAt" TIMESTAMP NULL,
+            "diagnosisDuration" INTEGER NULL,
+            "repairDuration" INTEGER NULL,
             created_at TIMESTAMP NOT NULL DEFAULT NOW(),
             updated_at TIMESTAMP NOT NULL DEFAULT NOW()
           );
@@ -238,6 +320,180 @@ export const connectWithRetry = async (initialDelayMs = 2000): Promise<DataSourc
           );
         `);
         logger.info('Guaranteed service_ticket_items table exists.');
+
+        await Source.query(`
+          CREATE TABLE IF NOT EXISTS service_diagnoses (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            "ticketId" UUID NOT NULL REFERENCES service_tickets(id) ON DELETE CASCADE,
+            "problemFound" TEXT NOT NULL,
+            "rootCause" TEXT NOT NULL,
+            "technicianNotes" TEXT NULL,
+            "meterReading" INTEGER NOT NULL DEFAULT 0,
+            created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+            updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+          );
+        `);
+        logger.info('Guaranteed service_diagnoses table exists.');
+
+        await Source.query(`
+          CREATE TABLE IF NOT EXISTS service_estimates (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            "ticketId" UUID NOT NULL REFERENCES service_tickets(id) ON DELETE CASCADE,
+            "labourCost" NUMERIC(10,2) NOT NULL DEFAULT 0,
+            "totalCost" NUMERIC(10,2) NOT NULL DEFAULT 0,
+            status VARCHAR(50) NOT NULL DEFAULT 'DRAFT',
+            version INTEGER NOT NULL DEFAULT 1,
+            created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+            updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+          );
+        `);
+        logger.info('Guaranteed service_estimates table exists.');
+
+        await Source.query(`
+          CREATE TABLE IF NOT EXISTS service_estimate_revisions (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            "estimateId" UUID NOT NULL REFERENCES service_estimates(id) ON DELETE CASCADE,
+            "ticketId" UUID NOT NULL REFERENCES service_tickets(id) ON DELETE CASCADE,
+            version INTEGER NOT NULL,
+            "labourCost" NUMERIC(10,2) NOT NULL DEFAULT 0,
+            "totalCost" NUMERIC(10,2) NOT NULL DEFAULT 0,
+            status VARCHAR(50) NOT NULL,
+            reason TEXT NULL,
+            created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+            updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+          );
+        `);
+        logger.info('Guaranteed service_estimate_revisions table exists.');
+
+        await Source.query(`
+          CREATE TABLE IF NOT EXISTS service_estimate_items (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            "estimateId" UUID NULL REFERENCES service_estimates(id) ON DELETE CASCADE,
+            "revisionId" UUID NULL REFERENCES service_estimate_revisions(id) ON DELETE CASCADE,
+            "itemSource" VARCHAR(50) NOT NULL,
+            "sparePartId" UUID NULL,
+            sku VARCHAR(255) NULL,
+            "partName" VARCHAR(255) NOT NULL,
+            quantity INTEGER NOT NULL DEFAULT 1,
+            "unitPrice" NUMERIC(10,2) NULL,
+            "totalPrice" NUMERIC(10,2) NULL,
+            "isFree" BOOLEAN NOT NULL DEFAULT FALSE,
+            "isApproved" BOOLEAN NOT NULL DEFAULT TRUE,
+            created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+            updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+          );
+        `);
+        logger.info('Guaranteed service_estimate_items table exists.');
+
+        await Source.query(`
+          CREATE TABLE IF NOT EXISTS service_reports (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            "ticketId" UUID NOT NULL REFERENCES service_tickets(id) ON DELETE CASCADE,
+            "workPerformed" TEXT NOT NULL,
+            "resolutionDetails" TEXT NOT NULL,
+            "meterReading" INTEGER NOT NULL DEFAULT 0,
+            "startTime" TIMESTAMP NOT NULL,
+            "endTime" TIMESTAMP NOT NULL,
+            "totalTimeSpent" INTEGER NOT NULL,
+            "customerRemarks" TEXT NULL,
+            "technicianRemarks" TEXT NULL,
+            "customerSignature" TEXT NULL,
+            "technicianSignature" TEXT NULL,
+            created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+            updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+          );
+        `);
+        logger.info('Guaranteed service_reports table exists.');
+
+        await Source.query(`
+          CREATE TABLE IF NOT EXISTS machine_service_history (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            "productId" UUID NULL,
+            "serialNumber" VARCHAR(255) NOT NULL,
+            "ticketId" UUID NOT NULL REFERENCES service_tickets(id) ON DELETE CASCADE,
+            "serviceDate" TIMESTAMP NOT NULL,
+            "serviceContext" VARCHAR(255) NOT NULL,
+            "meterReading" INTEGER NOT NULL DEFAULT 0,
+            "partsUsed" JSONB NULL,
+            "totalCost" NUMERIC(10,2) NOT NULL DEFAULT 0,
+            "customerCharge" NUMERIC(10,2) NOT NULL DEFAULT 0,
+            created_at TIMESTAMP NOT NULL DEFAULT NOW()
+          );
+        `);
+        logger.info('Guaranteed machine_service_history table exists.');
+
+        await Source.query(`
+          CREATE TABLE IF NOT EXISTS consumable_yield_history (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            "productId" UUID NULL,
+            "serialNumber" VARCHAR(255) NOT NULL,
+            "tonerSku" VARCHAR(255) NOT NULL,
+            "installedDate" TIMESTAMP NOT NULL,
+            "installedMeterReading" INTEGER NOT NULL,
+            "replacedDate" TIMESTAMP NULL,
+            "replacedMeterReading" INTEGER NULL,
+            "yieldPages" INTEGER NULL,
+            "ticketId" UUID NOT NULL REFERENCES service_tickets(id) ON DELETE CASCADE,
+            created_at TIMESTAMP NOT NULL DEFAULT NOW()
+          );
+        `);
+        logger.info('Guaranteed consumable_yield_history table exists.');
+
+        await Source.query(`
+          CREATE TABLE IF NOT EXISTS inventory_reservations (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            "ticketId" UUID NOT NULL REFERENCES service_tickets(id) ON DELETE CASCADE,
+            "sparePartId" UUID NOT NULL REFERENCES spare_parts(id) ON DELETE CASCADE,
+            quantity INTEGER NOT NULL DEFAULT 1,
+            status VARCHAR(50) NOT NULL DEFAULT 'RESERVED',
+            created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+            updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+          );
+        `);
+        logger.info('Guaranteed inventory_reservations table exists.');
+
+        await Source.query(`
+          CREATE TABLE IF NOT EXISTS service_ticket_activities (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            "ticketId" UUID NOT NULL REFERENCES service_tickets(id) ON DELETE CASCADE,
+            "activityType" VARCHAR(50) NOT NULL,
+            description TEXT NOT NULL,
+            "performedBy" UUID NULL,
+            created_at TIMESTAMP NOT NULL DEFAULT NOW()
+          );
+        `);
+        logger.info('Guaranteed service_ticket_activities table exists.');
+
+        // Service Contracts schema
+        try {
+          await Source.query(`
+            DO $$
+            BEGIN
+              IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'service_contracts_contracttype_enum') THEN
+                CREATE TYPE service_contracts_contracttype_enum AS ENUM ('FSMA', 'SMA', 'AMC');
+              END IF;
+            END
+            $$;
+          `);
+          await Source.query(`
+            CREATE TABLE IF NOT EXISTS service_contracts (
+              id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+              "productId" UUID NOT NULL,
+              "customerId" UUID NOT NULL,
+              "contractType" service_contracts_contracttype_enum NOT NULL,
+              "startDate" TIMESTAMP NOT NULL,
+              "endDate" TIMESTAMP NOT NULL,
+              "contractValue" NUMERIC(12,2) NOT NULL DEFAULT 0,
+              "coverageRules" JSONB NOT NULL,
+              status VARCHAR(50) NOT NULL DEFAULT 'ACTIVE',
+              created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+              updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+            );
+          `);
+          logger.info('Guaranteed service_contracts table and enum exist.');
+        } catch (contractSchemaErr) {
+          logger.error('Failed to create service_contracts schema:', contractSchemaErr);
+        }
       }
       return Source;
     } catch (error: unknown) {

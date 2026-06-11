@@ -65,28 +65,48 @@ async function runPreMigrations() {
     // Drop the old broken enum type if it exists from failed TypeORM synchronize attempts
     await client.query(`DROP TYPE IF EXISTS invoices_status_enum_old CASCADE;`);
 
-    // Ensure status enum exists/has correct values
+    // Ensure status enum type exists
     await client.query(`
       DO $$ BEGIN
-        ALTER TYPE invoices_status_enum ADD VALUE IF NOT EXISTS 'TEMPLATE';
-        ALTER TYPE invoices_status_enum ADD VALUE IF NOT EXISTS 'ASSIGNED';
-        ALTER TYPE invoices_status_enum ADD VALUE IF NOT EXISTS 'CUSTOMER_ACCEPTED';
-        ALTER TYPE invoices_status_enum ADD VALUE IF NOT EXISTS 'CUSTOMER_REJECTED';
-        ALTER TYPE invoices_status_enum ADD VALUE IF NOT EXISTS 'EMPLOYEE_APPROVED';
-        ALTER TYPE invoices_status_enum ADD VALUE IF NOT EXISTS 'WAITING_FINANCE_APPROVAL';
-        ALTER TYPE invoices_status_enum ADD VALUE IF NOT EXISTS 'FINANCE_APPROVED';
-        ALTER TYPE invoices_status_enum ADD VALUE IF NOT EXISTS 'FINANCE_REJECTED';
-        ALTER TYPE invoices_status_enum ADD VALUE IF NOT EXISTS 'ACTIVE_CONTRACT';
-        ALTER TYPE invoices_status_enum ADD VALUE IF NOT EXISTS 'INVOICED';
-        ALTER TYPE invoices_status_enum ADD VALUE IF NOT EXISTS 'EXPIRED';
-        ALTER TYPE invoices_status_enum ADD VALUE IF NOT EXISTS 'RETAKEN';
-        ALTER TYPE invoices_status_enum ADD VALUE IF NOT EXISTS 'SUPERSEDED';
-        ALTER TYPE invoices_status_enum ADD VALUE IF NOT EXISTS 'CANCELLED';
-        ALTER TYPE invoices_status_enum ADD VALUE IF NOT EXISTS 'PAID';
-      EXCEPTION
-        WHEN duplicate_object THEN null;
+        IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'invoices_status_enum') THEN
+          CREATE TYPE invoices_status_enum AS ENUM (
+            'DRAFT', 'SENT', 'CUSTOMER_ACCEPTED', 'CUSTOMER_REJECTED', 'EMPLOYEE_APPROVED',
+            'WAITING_FINANCE_APPROVAL', 'FINANCE_APPROVED', 'FINANCE_REJECTED', 'ACTIVE_CONTRACT',
+            'INVOICED', 'PAID', 'EXPIRED', 'CANCELLED', 'RETAKEN', 'SUPERSEDED', 'TEMPLATE', 'ASSIGNED'
+          );
+        END IF;
       END $$;
     `);
+
+    // Ensure all status enum values are present in case the enum type existed but was missing new values
+    const enumValues = [
+      'TEMPLATE',
+      'ASSIGNED',
+      'CUSTOMER_ACCEPTED',
+      'CUSTOMER_REJECTED',
+      'EMPLOYEE_APPROVED',
+      'WAITING_FINANCE_APPROVAL',
+      'FINANCE_APPROVED',
+      'FINANCE_REJECTED',
+      'ACTIVE_CONTRACT',
+      'INVOICED',
+      'EXPIRED',
+      'RETAKEN',
+      'SUPERSEDED',
+      'CANCELLED',
+      'PAID',
+      'DRAFT',
+      'SENT',
+    ];
+
+    for (const val of enumValues) {
+      try {
+        await client.query(`ALTER TYPE invoices_status_enum ADD VALUE IF NOT EXISTS '${val}';`);
+      } catch (err) {
+        // If duplicate_object error is thrown (in case postgres version doesn't support IF NOT EXISTS fully or other db issue), ignore it
+        logger.debug(`Skipped enum value ${val}: ${(err as Error).message}`);
+      }
+    }
 
     // Ensure billType enum exists
     await client.query(`

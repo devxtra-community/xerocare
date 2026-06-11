@@ -31,6 +31,12 @@ export interface Product {
   description?: string;
   hs_code?: string;
   warranty?: string;
+  ownership?: 'RENT' | 'LEASE' | 'SALE' | 'EXTERNAL';
+  meter_reading?: number;
+  customer_id?: string | null;
+  warranty_start_date?: string;
+  warranty_end_date?: string;
+  warranty_max_pages?: number;
   features?: { subHeading: string; description: string }[];
   consumables?: Array<{
     partName?: string;

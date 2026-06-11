@@ -99,6 +99,12 @@ const menuItems = [
     href: '/employee/service',
     modules: ['service'],
   },
+  {
+    title: 'Service Contracts',
+    icon: FileText,
+    href: '/employee/service/contracts',
+    modules: ['service'],
+  },
 ];
 
 /**

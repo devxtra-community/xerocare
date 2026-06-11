@@ -11,10 +11,15 @@ const http_proxy_middleware_1 = require("http-proxy-middleware");
 const health_1 = __importDefault(require("./routes/health"));
 const customerUpdatedConsumer_1 = require("./events/consumers/customerUpdatedConsumer");
 const invoiceRoutes_1 = __importDefault(require("./routes/invoiceRoutes"));
+const invoiceController_1 = require("./controllers/invoiceController");
 const httplogger_1 = require("./middleware/httplogger");
 const logger_1 = require("./config/logger");
 const errorHandler_1 = require("./middleware/errorHandler");
 const rateLimitter_1 = require("./middleware/rateLimitter");
+const authMiddleware_1 = require("./middleware/authMiddleware");
+const roleMiddleware_1 = require("./middleware/roleMiddleware");
+const serviceRoleMiddleware_1 = require("./middleware/serviceRoleMiddleware");
+const userRole_1 = require("./constants/userRole");
 /*
  * This is the main setup for the API Gateway.
  * Think of the Gateway as the "Front Door" of our system.
@@ -82,6 +87,7 @@ app.get('/', (_req, res) => {
  * We process these directly here at the gateway for convenience.
  */
 app.use('/b/invoices', express_1.default.json({ limit: '50mb' }), express_1.default.urlencoded({ limit: '50mb', extended: true }), invoiceRoutes_1.default);
+app.get('/b/audit-logs/:entityId', authMiddleware_1.authMiddleware, (0, roleMiddleware_1.requireRole)(userRole_1.UserRole.MANAGER, userRole_1.UserRole.FINANCE, userRole_1.UserRole.ADMIN), invoiceController_1.getAuditLogs);
 /**
  * Safety: Prevention of Automated Attacks (Rate Limiting)
  * We limit how many times someone can try to login or request a password reset
@@ -102,6 +108,12 @@ function createServiceProxy(target) {
     return (0, http_proxy_middleware_1.createProxyMiddleware)({
         target,
         changeOrigin: true,
+        pathRewrite: {
+            '^/i/': '/',
+            '^/b/': '/',
+            '^/c/': '/',
+            '^/e/': '/',
+        },
         proxyTimeout: 60000, // Wait up to 60 seconds for a response
         timeout: 60000, // If nothing happens for 60 seconds, close the connection
         secure: false, // Trust our own internal network connections
@@ -152,6 +164,32 @@ for (const [key, value] of Object.entries(requiredEnvVars)) {
  * - "/c" goes to CRM (Customer Management)
  */
 app.use('/e', createServiceProxy(EMPLOYEE_SERVICE_URL));
+// --- Service Management Module Gateway Routes ---
+app.post('/i/service/tickets', authMiddleware_1.authMiddleware, (0, serviceRoleMiddleware_1.requireServiceRole)(['SERVICE_HELP_DESK']), createServiceProxy(VENDOR_INVENTORY_SERVICE_URL));
+app.get('/i/service/tickets', authMiddleware_1.authMiddleware, (0, serviceRoleMiddleware_1.requireServiceRole)(['SERVICE_HELP_DESK', 'SERVICE_TECHNICIAN']), createServiceProxy(VENDOR_INVENTORY_SERVICE_URL));
+app.get('/i/service/tickets/:id', authMiddleware_1.authMiddleware, (0, serviceRoleMiddleware_1.requireServiceRole)(['SERVICE_HELP_DESK', 'SERVICE_TECHNICIAN']), createServiceProxy(VENDOR_INVENTORY_SERVICE_URL));
+app.put('/i/service/tickets/:id', authMiddleware_1.authMiddleware, (0, serviceRoleMiddleware_1.requireServiceRole)(['SERVICE_HELP_DESK']), createServiceProxy(VENDOR_INVENTORY_SERVICE_URL));
+app.post('/i/service/tickets/:id/assign', authMiddleware_1.authMiddleware, (0, serviceRoleMiddleware_1.requireServiceRole)(['SERVICE_HELP_DESK']), createServiceProxy(VENDOR_INVENTORY_SERVICE_URL));
+app.post('/i/service/tickets/:id/diagnose', authMiddleware_1.authMiddleware, (0, serviceRoleMiddleware_1.requireServiceRole)(['SERVICE_TECHNICIAN']), createServiceProxy(VENDOR_INVENTORY_SERVICE_URL));
+app.post('/i/service/tickets/:id/quote', authMiddleware_1.authMiddleware, (0, serviceRoleMiddleware_1.requireServiceRole)(['SERVICE_TECHNICIAN']), createServiceProxy(VENDOR_INVENTORY_SERVICE_URL));
+app.post('/i/service/tickets/:id/customer-approve', authMiddleware_1.authMiddleware, (0, serviceRoleMiddleware_1.requireServiceRole)(['SERVICE_HELP_DESK']), createServiceProxy(VENDOR_INVENTORY_SERVICE_URL));
+app.post('/i/service/tickets/:id/customer-reject', authMiddleware_1.authMiddleware, (0, serviceRoleMiddleware_1.requireServiceRole)(['SERVICE_HELP_DESK']), createServiceProxy(VENDOR_INVENTORY_SERVICE_URL));
+app.post('/i/service/tickets/:id/start', authMiddleware_1.authMiddleware, (0, serviceRoleMiddleware_1.requireServiceRole)(['SERVICE_TECHNICIAN']), createServiceProxy(VENDOR_INVENTORY_SERVICE_URL));
+app.post('/i/service/tickets/:id/complete', authMiddleware_1.authMiddleware, (0, serviceRoleMiddleware_1.requireServiceRole)(['SERVICE_TECHNICIAN']), createServiceProxy(VENDOR_INVENTORY_SERVICE_URL));
+app.post('/i/service/tickets/:id/cancel', authMiddleware_1.authMiddleware, (0, serviceRoleMiddleware_1.requireServiceRole)([], false), // Only ADMIN and MANAGER allowed
+createServiceProxy(VENDOR_INVENTORY_SERVICE_URL));
+app.get('/i/service/technicians', authMiddleware_1.authMiddleware, (0, serviceRoleMiddleware_1.requireServiceRole)(['SERVICE_HELP_DESK', 'SERVICE_TECHNICIAN']), createServiceProxy(VENDOR_INVENTORY_SERVICE_URL));
+app.get('/i/service/customers/:customerId/history', authMiddleware_1.authMiddleware, (0, serviceRoleMiddleware_1.requireServiceRole)(['SERVICE_HELP_DESK', 'SERVICE_TECHNICIAN']), createServiceProxy(VENDOR_INVENTORY_SERVICE_URL));
+app.post('/i/service/contracts', authMiddleware_1.authMiddleware, (0, serviceRoleMiddleware_1.requireServiceRole)(['SERVICE_HELP_DESK']), createServiceProxy(VENDOR_INVENTORY_SERVICE_URL));
+app.get('/i/service/contracts', authMiddleware_1.authMiddleware, (0, serviceRoleMiddleware_1.requireServiceRole)(['SERVICE_HELP_DESK', 'SERVICE_TECHNICIAN']), createServiceProxy(VENDOR_INVENTORY_SERVICE_URL));
+app.get('/i/service/contracts/:id', authMiddleware_1.authMiddleware, (0, serviceRoleMiddleware_1.requireServiceRole)(['SERVICE_HELP_DESK', 'SERVICE_TECHNICIAN']), createServiceProxy(VENDOR_INVENTORY_SERVICE_URL));
+app.put('/i/service/contracts/:id', authMiddleware_1.authMiddleware, (0, serviceRoleMiddleware_1.requireServiceRole)(['SERVICE_HELP_DESK']), createServiceProxy(VENDOR_INVENTORY_SERVICE_URL));
+app.delete('/i/service/contracts/:id', authMiddleware_1.authMiddleware, (0, serviceRoleMiddleware_1.requireServiceRole)(['SERVICE_HELP_DESK']), createServiceProxy(VENDOR_INVENTORY_SERVICE_URL));
+app.post('/b/service-quotation', authMiddleware_1.authMiddleware, (0, serviceRoleMiddleware_1.requireServiceRole)(['SERVICE_TECHNICIAN']), createServiceProxy(BILLING_SERVICE_URL));
+// Barcode scan and print endpoints with explicit role checks at the Gateway
+app.get('/i/inventory/scan', authMiddleware_1.authMiddleware, (0, roleMiddleware_1.requireRole)(userRole_1.UserRole.ADMIN, userRole_1.UserRole.FINANCE, userRole_1.UserRole.MANAGER, userRole_1.UserRole.EMPLOYEE), createServiceProxy(VENDOR_INVENTORY_SERVICE_URL));
+app.get('/i/inventory/products/barcode-pdf', authMiddleware_1.authMiddleware, (0, roleMiddleware_1.requireRole)(userRole_1.UserRole.ADMIN, userRole_1.UserRole.MANAGER), createServiceProxy(VENDOR_INVENTORY_SERVICE_URL));
+app.get('/i/inventory/spare-parts/barcode-pdf', authMiddleware_1.authMiddleware, (0, roleMiddleware_1.requireRole)(userRole_1.UserRole.ADMIN, userRole_1.UserRole.MANAGER), createServiceProxy(VENDOR_INVENTORY_SERVICE_URL));
 app.use('/i', createServiceProxy(VENDOR_INVENTORY_SERVICE_URL));
 app.use('/b', createServiceProxy(BILLING_SERVICE_URL));
 app.use('/c', createServiceProxy(CRM_SERVICE_URL));

@@ -26,12 +26,14 @@ export enum ServiceTicketStatus {
 
 export enum ServiceContext {
   RENT = 'RENT',
+  WARRANTY = 'WARRANTY',
   LEASE_UNDER_WARRANTY = 'LEASE_UNDER_WARRANTY',
   FSMA = 'FSMA',
   SMA = 'SMA',
   AMC = 'AMC',
   CHARGEABLE = 'CHARGEABLE',
   LEASE_EXPIRED = 'LEASE_EXPIRED',
+  EXTERNAL_MACHINE = 'EXTERNAL_MACHINE',
 }
 
 export enum JobType {
@@ -110,6 +112,24 @@ export class ServiceTicket {
 
   @Column({ type: 'timestamp', nullable: true })
   scheduledVisitDate?: Date | null;
+
+  @Column({ type: 'timestamp', nullable: true })
+  diagnosisStartedAt?: Date | null;
+
+  @Column({ type: 'timestamp', nullable: true })
+  diagnosisCompletedAt?: Date | null;
+
+  @Column({ type: 'timestamp', nullable: true })
+  repairStartedAt?: Date | null;
+
+  @Column({ type: 'timestamp', nullable: true })
+  repairCompletedAt?: Date | null;
+
+  @Column({ type: 'integer', nullable: true })
+  diagnosisDuration?: number | null; // in minutes
+
+  @Column({ type: 'integer', nullable: true })
+  repairDuration?: number | null; // in minutes
 
   @Column({ type: 'timestamp', nullable: true })
   completedAt?: Date | null;
