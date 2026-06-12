@@ -1221,12 +1221,22 @@ export class BillingService {
     // Callback to ven_inv_service for Service Tickets
     if (invoice.serviceTicketId) {
       try {
+        const { sign } = await import('jsonwebtoken');
+        const token = sign(
+          { userId: 'billing_service', role: 'ADMIN' },
+          process.env.ACCESS_SECRET as string,
+          { expiresIn: '1m' },
+        );
+
         const venInvUrl = process.env.VENDOR_INVENTORY_SERVICE_URL || 'http://localhost:3003';
         await globalThis.fetch(
           `${venInvUrl}/service/tickets/${invoice.serviceTicketId}/quotation-link`,
           {
             method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
             body: JSON.stringify({
               serviceQuotationId: invoice.id,
               status: 'FINANCE_APPROVED',
@@ -1236,6 +1246,19 @@ export class BillingService {
         logger.info(
           `[BillingService] Sent finance approval callback for service ticket ${invoice.serviceTicketId}`,
         );
+
+        if (invoice.billType === 'SERVICE') {
+          await globalThis.fetch(
+            `${venInvUrl}/service/tickets/${invoice.serviceTicketId}/finance-approved`,
+            {
+              method: 'PATCH',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`,
+              },
+            },
+          );
+        }
       } catch (callbackErr) {
         logger.error('[BillingService] Failed to call service ticket callback:', callbackErr);
       }
@@ -1941,12 +1964,22 @@ export class BillingService {
     // Callback to ven_inv_service for Service Tickets
     if (invoice.serviceTicketId) {
       try {
+        const { sign } = await import('jsonwebtoken');
+        const token = sign(
+          { userId: 'billing_service', role: 'ADMIN' },
+          process.env.ACCESS_SECRET as string,
+          { expiresIn: '1m' },
+        );
+
         const venInvUrl = process.env.VENDOR_INVENTORY_SERVICE_URL || 'http://localhost:3003';
         await globalThis.fetch(
           `${venInvUrl}/service/tickets/${invoice.serviceTicketId}/quotation-link`,
           {
             method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
             body: JSON.stringify({
               serviceQuotationId: invoice.id,
               status: 'FINANCE_REJECTED',
@@ -1956,6 +1989,20 @@ export class BillingService {
         logger.info(
           `[BillingService] Sent finance rejection callback for service ticket ${invoice.serviceTicketId}`,
         );
+
+        if (invoice.billType === 'SERVICE') {
+          await globalThis.fetch(
+            `${venInvUrl}/service/tickets/${invoice.serviceTicketId}/finance-rejected`,
+            {
+              method: 'PATCH',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`,
+              },
+              body: JSON.stringify({ reason }),
+            },
+          );
+        }
       } catch (callbackErr) {
         logger.error('[BillingService] Failed to call service ticket callback:', callbackErr);
       }

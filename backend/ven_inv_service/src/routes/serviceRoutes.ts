@@ -35,6 +35,8 @@ router.post(
 router.post('/tickets/:id/start-repair', controller.startRepair);
 router.post('/tickets/:id/quote', controller.submitQuotation);
 router.patch('/tickets/:id/quotation-link', controller.patchQuotationLink);
+router.patch('/tickets/:id/finance-approved', controller.financeApproved);
+router.patch('/tickets/:id/finance-rejected', controller.financeRejected);
 router.post('/tickets/:id/customer-approve', controller.customerApprove);
 router.post('/tickets/:id/customer-reject', controller.customerReject);
 router.post('/tickets/:id/start', controller.startService);
@@ -48,5 +50,8 @@ router.get('/machines/:serialNumber/context', controller.getMachineContext);
 router.get('/machines/:serialNumber/yield-history', controller.getMachineYieldHistory);
 router.get('/finance/dashboard', controller.getFinanceDashboard);
 router.post('/spare-parts/:id/mark-damaged', controller.markSparePartDamaged);
+
+router.get('/tickets/:id/report', controller.generateReportPDF);
+router.get('/machine/:productId/history', controller.getMachineHistory);
 
 export default router;

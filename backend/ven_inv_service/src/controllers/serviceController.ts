@@ -19,15 +19,21 @@ import {
   ServiceEstimateItemSource,
 } from '../entities/serviceEstimateItemEntity';
 import { ServiceReport } from '../entities/serviceReportEntity';
-import { MachineServiceHistory, PartUsed } from '../entities/machineServiceHistoryEntity';
+import { MachineServiceHistory } from '../entities/machineServiceHistoryEntity';
 import { ConsumableYieldHistory } from '../entities/consumableYieldHistoryEntity';
-import { InventoryReservation, ReservationStatus } from '../entities/inventoryReservationEntity';
+import { InventoryReservation } from '../entities/inventoryReservationEntity';
 import { ServiceTicketActivity } from '../entities/serviceTicketActivityEntity';
 import { ServiceContract, ServiceContractType } from '../entities/serviceContractEntity';
+import { ServicePartUsageLog } from '../entities/servicePartUsageLogEntity';
 import { NotificationPublisher } from '../events/publisher/notificationPublisher';
 import axios from 'axios';
 import { logger } from '../config/logger';
 import { BILLING_ENDPOINTS, CRM_ENDPOINTS } from '../constants/serviceUrls';
+import {
+  getFinanceEmployeesByBranch,
+  getCustomerName,
+  getHelpDeskEmployeesByBranch,
+} from '../helpers/serviceHelpers';
 
 const CRM_SERVICE_URL = process.env.CRM_SERVICE_URL || 'http://localhost:3005';
 const BILLING_SERVICE_URL = process.env.BILLING_SERVICE_URL || 'http://localhost:3004';
@@ -118,8 +124,8 @@ export class ServiceController {
     const reservation = reservationRepo.create({
       ticketId,
       sparePartId,
-      quantity,
-      status: ReservationStatus.RESERVED,
+      reservedQuantity: quantity,
+      status: 'RESERVED',
     });
     await reservationRepo.save(reservation);
   }
@@ -132,16 +138,16 @@ export class ServiceController {
     const reservationRepo = Source.getRepository(InventoryReservation);
 
     const reservations = await reservationRepo.find({
-      where: { ticketId, status: ReservationStatus.RESERVED },
+      where: { ticketId, status: 'RESERVED' },
     });
     for (const res of reservations) {
       const part = await sparePartRepo.findOne({ where: { id: res.sparePartId } });
       if (part) {
-        part.quantity += res.quantity;
-        part.reserved_quantity = Math.max(0, part.reserved_quantity - res.quantity);
+        part.quantity += res.reservedQuantity;
+        part.reserved_quantity = Math.max(0, part.reserved_quantity - res.reservedQuantity);
         await sparePartRepo.save(part);
       }
-      res.status = ReservationStatus.RELEASED;
+      res.status = 'RELEASED';
       await reservationRepo.save(res);
     }
   }
@@ -154,16 +160,16 @@ export class ServiceController {
     const reservationRepo = Source.getRepository(InventoryReservation);
 
     const reservations = await reservationRepo.find({
-      where: { ticketId, status: ReservationStatus.RESERVED },
+      where: { ticketId, status: 'RESERVED' },
     });
     for (const res of reservations) {
       const part = await sparePartRepo.findOne({ where: { id: res.sparePartId } });
       if (part) {
-        part.reserved_quantity = Math.max(0, part.reserved_quantity - res.quantity);
-        part.consumed_quantity += res.quantity;
+        part.reserved_quantity = Math.max(0, part.reserved_quantity - res.reservedQuantity);
+        part.consumed_quantity += res.reservedQuantity;
         await sparePartRepo.save(part);
       }
-      res.status = ReservationStatus.CONSUMED;
+      res.status = 'CONSUMED';
       await reservationRepo.save(res);
     }
   }
@@ -176,11 +182,15 @@ export class ServiceController {
     contractReferenceId: string | null;
     productId: string | null;
     jobType: JobType;
+    track: 'A' | 'B';
+    linkedInvoiceId: string | null;
   }> {
     let serviceContext = ServiceContext.CHARGEABLE;
     let contractReferenceId: string | null = null;
     let productId: string | null = null;
     let jobType = JobType.ONSITE;
+    let track: 'A' | 'B' = 'B';
+    let linkedInvoiceId: string | null = null;
 
     const product = await Source.getRepository(Product).findOne({
       where: { serial_no: serialNumber },
@@ -188,108 +198,179 @@ export class ServiceController {
     if (product) {
       productId = product.id;
 
-      const getActiveContract = async (prodId: string) => {
-        const contract = await Source.getRepository(ServiceContract).findOne({
-          where: {
-            productId: prodId,
-            status: 'ACTIVE',
-          },
-        });
-        if (contract) {
-          const now = new Date();
-          if (now >= contract.startDate && now <= contract.endDate) {
-            return contract;
-          }
-        }
-        return null;
-      };
+      // Step 1 - Check if machine is on RENT
+      const rentInvoice = await Source.query(
+        `
+        SELECT i.id, i.type, i."billType", i."contractStatus"
+        FROM invoices i
+        JOIN product_allocations pa ON i.id = pa."contractId"
+        WHERE i.type = 'PROFORMA' 
+          AND i."billType" = 'RENT' 
+          AND i."contractStatus" = 'ACTIVE' 
+          AND pa.status = 'ALLOCATED'
+          AND (pa."productId" = $1 OR pa."serialNumber" = $2)
+        LIMIT 1;
+      `,
+        [productId, serialNumber],
+      );
 
-      const mapContractTypeToServiceContext = (type: string) => {
-        if (type === 'FSMA') return ServiceContext.FSMA;
-        if (type === 'SMA') return ServiceContext.SMA;
-        if (type === 'AMC') return ServiceContext.AMC;
-        return ServiceContext.CHARGEABLE;
-      };
-
-      const ownership = product.ownership; // RENT, LEASE, SALE, EXTERNAL
-
-      if (ownership === 'RENT') {
+      if (rentInvoice && rentInvoice.length > 0) {
         serviceContext = ServiceContext.RENT;
-      } else if (ownership === 'LEASE') {
-        const now = new Date();
-        const start = product.warranty_start_date
-          ? new Date(product.warranty_start_date)
-          : product.created_at
-            ? new Date(product.created_at)
-            : new Date(product.MFD);
-        const end = product.warranty_end_date
-          ? new Date(product.warranty_end_date)
-          : new Date(start.getTime() + 365 * 24 * 60 * 60 * 1000);
-        const maxPages = product.warranty_max_pages || 200000;
-        const currentPages = product.meter_reading || 0;
-        const isLeaseWarrantyActive = now <= end && currentPages <= maxPages;
+        jobType = JobType.WARRANTY_ONSITE;
+        track = 'A';
+        linkedInvoiceId = rentInvoice[0].id;
+      } else {
+        // Step 2 - Check if machine is under SALE warranty
+        const saleInvoice = await Source.query(
+          `
+          SELECT i.id, i."createdAt", i."effectiveFrom", ii.warranty
+          FROM invoices i
+          JOIN invoice_items ii ON i.id = ii."invoiceId"
+          WHERE i.type = 'FINAL'
+            AND i."billType" = 'SALE'
+            AND ii."productId" = $1
+          LIMIT 1;
+        `,
+          [productId],
+        );
 
-        if (isLeaseWarrantyActive) {
-          serviceContext = ServiceContext.LEASE_UNDER_WARRANTY;
-        } else {
-          const activeContract = await getActiveContract(product.id);
-          if (activeContract) {
-            serviceContext = mapContractTypeToServiceContext(activeContract.contractType);
-            contractReferenceId = activeContract.id;
-          } else {
-            serviceContext = ServiceContext.CHARGEABLE;
+        let isSaleWarrantyActive = false;
+        if (saleInvoice && saleInvoice.length > 0) {
+          const invoice = saleInvoice[0];
+          const saleDate = new Date(invoice.effectiveFrom || invoice.createdAt);
+          const warrantyStr = invoice.warranty || product.warranty || '12';
+          const warrantyMonths = parseInt(warrantyStr, 10) || 12;
+          const warrantyEndDate = new Date(saleDate);
+          warrantyEndDate.setMonth(warrantyEndDate.getMonth() + warrantyMonths);
+
+          const allocation = await Source.query(
+            `
+            SELECT * FROM product_allocations 
+            WHERE "productId" = $1 
+            ORDER BY "createdAt" DESC 
+            LIMIT 1
+          `,
+            [productId],
+          );
+
+          let copiesUsed = 0;
+          if (allocation && allocation.length > 0) {
+            const alloc = allocation[0];
+            copiesUsed =
+              (alloc.currentBwA4 || 0) +
+              (alloc.currentBwA3 || 0) * 2 +
+              (alloc.currentColorA4 || 0) +
+              (alloc.currentColorA3 || 0) * 2;
+          } else if (product.meter_reading) {
+            copiesUsed = product.meter_reading;
+          }
+
+          const warrantyMaxCopies = product.warranty_max_pages || 200000;
+          const currentDate = new Date();
+          if (currentDate <= warrantyEndDate && copiesUsed < warrantyMaxCopies) {
+            serviceContext = ServiceContext.WARRANTY;
+            track = 'A';
+            linkedInvoiceId = invoice.id;
+            isSaleWarrantyActive = true;
           }
         }
-      } else if (ownership === 'SALE') {
-        const now = new Date();
-        const start = product.warranty_start_date
-          ? new Date(product.warranty_start_date)
-          : product.created_at
-            ? new Date(product.created_at)
-            : new Date(product.MFD);
-        const end = product.warranty_end_date
-          ? new Date(product.warranty_end_date)
-          : new Date(start.getTime() + 365 * 24 * 60 * 60 * 1000);
-        const maxPages = product.warranty_max_pages || 200000;
-        const currentPages = product.meter_reading || 0;
-        const isSaleWarrantyActive = now <= end && currentPages <= maxPages;
 
-        if (isSaleWarrantyActive) {
-          serviceContext = ServiceContext.WARRANTY;
-        } else {
-          const activeContract = await getActiveContract(product.id);
-          if (activeContract) {
-            serviceContext = mapContractTypeToServiceContext(activeContract.contractType);
-            contractReferenceId = activeContract.id;
-          } else {
-            serviceContext = ServiceContext.CHARGEABLE;
+        if (!isSaleWarrantyActive) {
+          // Step 3 - Check if machine is on LEASE
+          const leaseInvoice = await Source.query(
+            `
+            SELECT i.id, i."effectiveFrom", i."leaseTenureMonths", i."maxCopyLimit"
+            FROM invoices i
+            JOIN product_allocations pa ON i.id = pa."contractId"
+            WHERE i.type = 'PROFORMA'
+              AND i."billType" = 'LEASE'
+              AND i."contractStatus" = 'ACTIVE'
+              AND pa."productId" = $1
+            LIMIT 1;
+          `,
+            [productId],
+          );
+
+          if (leaseInvoice && leaseInvoice.length > 0) {
+            const lease = leaseInvoice[0];
+            const effectiveFrom = new Date(lease.effectiveFrom);
+            const leaseTenureMonths = Number(lease.leaseTenureMonths) || 0;
+            const warrantyEndDate = new Date(effectiveFrom);
+            warrantyEndDate.setMonth(warrantyEndDate.getMonth() + leaseTenureMonths);
+
+            const allocation = await Source.query(
+              `
+              SELECT * FROM product_allocations 
+              WHERE "productId" = $1 
+              ORDER BY "createdAt" DESC 
+              LIMIT 1
+            `,
+              [productId],
+            );
+
+            let copiesUsed = 0;
+            if (allocation && allocation.length > 0) {
+              const alloc = allocation[0];
+              copiesUsed =
+                (alloc.currentBwA4 || 0) +
+                (alloc.currentBwA3 || 0) * 2 +
+                (alloc.currentColorA4 || 0) +
+                (alloc.currentColorA3 || 0) * 2;
+            } else if (product.meter_reading) {
+              copiesUsed = product.meter_reading;
+            }
+
+            const maxCopyLimit = Number(lease.maxCopyLimit) || product.warranty_max_pages || 200000;
+            const currentDate = new Date();
+            if (currentDate <= warrantyEndDate && copiesUsed < maxCopyLimit) {
+              serviceContext = ServiceContext.LEASE_UNDER_WARRANTY;
+              track = 'A';
+              linkedInvoiceId = lease.id;
+            } else {
+              serviceContext = ServiceContext.LEASE_EXPIRED;
+              track = 'B';
+              linkedInvoiceId = lease.id;
+            }
           }
-        }
-      } else if (ownership === 'EXTERNAL') {
-        const activeContract = await getActiveContract(product.id);
-        if (activeContract) {
-          serviceContext = mapContractTypeToServiceContext(activeContract.contractType);
-          contractReferenceId = activeContract.id;
-        } else {
-          serviceContext = ServiceContext.CHARGEABLE;
+
+          // Step 4 - Check for active service contracts if not matched on active lease/sale warranty
+          if (
+            serviceContext !== ServiceContext.LEASE_UNDER_WARRANTY &&
+            serviceContext !== ServiceContext.LEASE_EXPIRED
+          ) {
+            const activeContract = await Source.getRepository(ServiceContract).findOne({
+              where: {
+                productId: productId,
+                status: 'ACTIVE',
+              },
+            });
+            if (activeContract) {
+              const now = new Date();
+              if (now >= activeContract.startDate && now <= activeContract.endDate) {
+                contractReferenceId = activeContract.id;
+                if (activeContract.contractType === 'FSMA') {
+                  serviceContext = ServiceContext.FSMA;
+                  track = 'A';
+                } else if (activeContract.contractType === 'SMA') {
+                  serviceContext = ServiceContext.SMA;
+                  track = 'A';
+                } else if (activeContract.contractType === 'AMC') {
+                  serviceContext = ServiceContext.AMC;
+                  track = 'B';
+                }
+              }
+            }
+          }
         }
       }
-    } else {
-      serviceContext = ServiceContext.CHARGEABLE; // Fallback context if no product
     }
 
-    const freeContexts = [
-      ServiceContext.RENT,
-      ServiceContext.WARRANTY,
-      ServiceContext.LEASE_UNDER_WARRANTY,
-      ServiceContext.FSMA,
-      ServiceContext.SMA,
-    ];
-    if (freeContexts.includes(serviceContext)) {
-      jobType = JobType.ONSITE;
+    // Lock job type to WARRANTY_ONSITE for Track A
+    if (track === 'A') {
+      jobType = JobType.WARRANTY_ONSITE;
     }
 
-    return { serviceContext, contractReferenceId, productId, jobType };
+    return { serviceContext, contractReferenceId, productId, jobType, track, linkedInvoiceId };
   }
 
   /**
@@ -309,6 +390,7 @@ export class ServiceController {
         issueDescription,
         jobType,
         scheduledVisitDate,
+        ticketType,
       } = req.body;
 
       const {
@@ -316,6 +398,8 @@ export class ServiceController {
         contractReferenceId,
         productId,
         jobType: finalJobType,
+        track,
+        linkedInvoiceId,
       } = await this.determineServiceContextAndJobType(serialNumber);
 
       const ticketRepo = Source.getRepository(ServiceTicket);
@@ -325,16 +409,7 @@ export class ServiceController {
       const count = await ticketRepo.count();
       const ticketNumber = `ST-${year}${month}-${String(count + 1).padStart(4, '0')}`;
 
-      const freeContexts = [
-        ServiceContext.RENT,
-        ServiceContext.WARRANTY,
-        ServiceContext.LEASE_UNDER_WARRANTY,
-        ServiceContext.FSMA,
-        ServiceContext.SMA,
-      ];
-      const status = freeContexts.includes(serviceContext)
-        ? ServiceTicketStatus.FREE_SERVICE
-        : ServiceTicketStatus.OPEN;
+      const status = track === 'A' ? ServiceTicketStatus.FREE_SERVICE : ServiceTicketStatus.OPEN;
 
       const branchId = req.user.branchId || req.body.branchId;
       if (!branchId) throw new Error('Branch ID is required');
@@ -356,13 +431,16 @@ export class ServiceController {
         scheduledVisitDate: scheduledVisitDate ? new Date(scheduledVisitDate) : null,
         createdBy: req.user.userId,
         branchId,
+        track,
+        linkedInvoiceId,
+        ticketType: ticketType || 'COMPLAINT',
       });
 
       await ticketRepo.save(ticket);
       await this.logActivity(
         ticket.id,
         'CREATION',
-        `Ticket ${ticket.ticketNumber} created under context ${ticket.serviceContext}`,
+        `Ticket ${ticket.ticketNumber} created under context ${ticket.serviceContext} (${track === 'A' ? 'Free Track A' : 'Chargeable Track B'})`,
         req.user.userId,
       );
 
@@ -469,8 +547,20 @@ export class ServiceController {
           (ticket.diagnosisCompletedAt.getTime() - ticket.diagnosisStartedAt.getTime()) / 60000,
         );
       }
-      ticket.status = ServiceTicketStatus.DIAGNOSED;
+
+      ticket.problemFound = problemFound;
+      ticket.rootCause = rootCause;
       ticket.diagnosisNotes = technicianNotes;
+      ticket.meterReadingAtService = meterReading || 0;
+
+      const isFreeContext = ticket.track === 'A';
+
+      if (isFreeContext) {
+        ticket.status = ServiceTicketStatus.FREE_SERVICE;
+      } else {
+        ticket.status = ServiceTicketStatus.DIAGNOSED;
+      }
+
       await ticketRepo.save(ticket);
 
       // Save Diagnosis Report
@@ -483,16 +573,6 @@ export class ServiceController {
         meterReading: meterReading || 0,
       });
       await diagnosisRepo.save(diagnosis);
-
-      // Enforce contexts
-      const freeContexts = [
-        ServiceContext.RENT,
-        ServiceContext.WARRANTY,
-        ServiceContext.LEASE_UNDER_WARRANTY,
-        ServiceContext.FSMA,
-        ServiceContext.SMA,
-      ];
-      const isFreeContext = freeContexts.includes(ticket.serviceContext);
 
       const itemRepo = Source.getRepository(ServiceTicketItem);
       const ticketItems: ServiceTicketItem[] = [];
@@ -566,18 +646,68 @@ export class ServiceController {
       ticket.items = ticketItems;
       await ticketRepo.save(ticket);
 
-      // If AMC or Chargeable workflow with parts, automatically generate a DRAFT Estimate
-      if (!isFreeContext && items && items.length > 0) {
+      // For Track A, automatically generate/send FOC Estimate to billing service
+      if (isFreeContext) {
+        const billingItems = ticketItems.map((item) => ({
+          itemSource: item.itemSource,
+          productId: item.sparePartId || null,
+          sparePartId: item.sparePartId || null,
+          partName: item.partName,
+          sku: item.sku,
+          quantity: item.quantity,
+          unitPrice: 0,
+          totalPrice: 0,
+          isFree: true,
+        }));
+        try {
+          const response = await axios.post(`${BILLING_SERVICE_URL}/invoices/service-quotation`, {
+            customerId: ticket.customerId,
+            branchId: ticket.branchId,
+            createdBy: req.user?.userId || 'SYSTEM',
+            serviceTicketId: ticket.id,
+            items: billingItems,
+            saleType: 'SERVICE',
+            status: 'APPROVED',
+          });
+          if (response.data?.success) {
+            ticket.linkedInvoiceId = response.data.data.id;
+            ticket.estimateSentToFinance = true;
+            await ticketRepo.save(ticket);
+          }
+        } catch (billingErr) {
+          logger.error('Failed to post FOC estimate to billing service:', billingErr);
+        }
+
+        await this.logActivity(
+          ticket.id,
+          'ESTIMATE_RECORDED',
+          `FOC estimate automatically created and sent to billing service.`,
+          req.user?.userId,
+        );
+      }
+
+      // If Track B workflow with parts or labor, automatically generate a DRAFT Estimate
+      const inputLabour = Number(req.body.labourCost) || 0;
+      const finalLabourCost =
+        ticket.serviceContext === ServiceContext.AMC ||
+        ticket.serviceContext === ServiceContext.RENT ||
+        ticket.serviceContext === ServiceContext.WARRANTY ||
+        ticket.serviceContext === ServiceContext.LEASE_UNDER_WARRANTY ||
+        ticket.serviceContext === ServiceContext.FSMA ||
+        ticket.serviceContext === ServiceContext.SMA
+          ? 0
+          : inputLabour;
+
+      if (!isFreeContext && ((items && items.length > 0) || finalLabourCost > 0)) {
         const estimateRepo = Source.getRepository(ServiceEstimate);
         const estItemRepo = Source.getRepository(ServiceEstimateItem);
 
-        const labourCost = 0;
-        let totalCost = labourCost;
+        let totalCost = finalLabourCost;
         const estItemsToSave: ServiceEstimateItem[] = [];
 
         const estimate = estimateRepo.create({
           ticketId: ticket.id,
-          labourCost,
+          labourCost: finalLabourCost,
           totalCost: 0,
           status: ServiceEstimateStatus.DRAFT,
           version: 1,
@@ -782,17 +912,24 @@ export class ServiceController {
       );
 
       try {
-        const empRes = await axios.get(`${EMPLOYEE_SERVICE_URL}/employee?job=FINANCE`);
-        const financeUsers = empRes.data.data || [];
-        for (const fUser of financeUsers) {
-          await NotificationPublisher.publishInAppRequest({
-            recipientId: fUser.id,
-            title: 'Finance Approval Required',
-            message: `Service Estimate for ticket ${ticket?.ticketNumber} is waiting finance approval.`,
-            type: 'TASK',
-            referenceId: estimate.id,
-            referenceType: 'QUOTATION',
-          });
+        const branchId = ticket?.branchId;
+        const financeEmployees = await getFinanceEmployeesByBranch(branchId);
+        const customerName = await getCustomerName(ticket?.customerId || undefined);
+        const totalCost = estimate.totalCost;
+
+        for (const financeEmployeeId of financeEmployees) {
+          try {
+            await NotificationPublisher.publishInAppRequest({
+              recipientId: financeEmployeeId,
+              title: 'Service Estimate Pending Approval',
+              message: `Service estimate for ticket ${ticket?.ticketNumber} (${customerName} — ${ticket?.productBrand} ${ticket?.productModel}) requires your review. Total: QAR ${totalCost}. Please approve or reject.`,
+              type: 'SERVICE_QUOTE_PENDING_FINANCE',
+              referenceId: ticket?.id || '',
+              referenceType: 'SERVICE_TICKET',
+            });
+          } catch (err) {
+            console.error('Notification failed (non-blocking):', err);
+          }
         }
       } catch (e) {
         logger.warn('Failed to notify finance users:', e);
@@ -1069,6 +1206,10 @@ export class ServiceController {
       revision.items = revisionItems;
       await revisionRepo.save(revision);
 
+      // Transition ticket status to WAITING_FINANCE_APPROVAL_2
+      ticket.status = ServiceTicketStatus.WAITING_FINANCE_APPROVAL_2;
+      await ticketRepo.save(ticket);
+
       await this.logActivity(
         String(ticketId),
         'ESTIMATE_REVISION_CREATED',
@@ -1112,6 +1253,13 @@ export class ServiceController {
       revision.status = 'FINANCE_APPROVED';
       await revisionRepo.save(revision);
 
+      const ticketRepo = Source.getRepository(ServiceTicket);
+      const ticket = await ticketRepo.findOne({ where: { id: revision.ticketId } });
+      if (ticket) {
+        ticket.status = ServiceTicketStatus.FINANCE_APPROVED_2;
+        await ticketRepo.save(ticket);
+      }
+
       await this.logActivity(
         revision.ticketId,
         'REVISION_FINANCE_APPROVED',
@@ -1140,6 +1288,13 @@ export class ServiceController {
 
       revision.status = 'APPROVED';
       await revisionRepo.save(revision);
+
+      const ticketRepo = Source.getRepository(ServiceTicket);
+      const ticket = await ticketRepo.findOne({ where: { id: revision.ticketId } });
+      if (ticket) {
+        ticket.status = ServiceTicketStatus.IN_PROGRESS;
+        await ticketRepo.save(ticket);
+      }
 
       const estimateRepo = Source.getRepository(ServiceEstimate);
       const activeEstimate = await estimateRepo.findOne({ where: { id: revision.estimateId } });
@@ -1270,17 +1425,13 @@ export class ServiceController {
         relations: ['items'],
       });
 
-      const partsUsedList: PartUsed[] = [];
       let totalPartsCost = 0;
       let totalConsumablesCost = 0;
-      let customerCharge = 0;
 
       const itemsToInspect = estimate ? estimate.items : ticket.items;
+      const usageLogRepo = Source.getRepository(ServicePartUsageLog);
 
       for (const item of itemsToInspect) {
-        const isItemFree = item.isFree;
-        const priceCharged = Number(item.totalPrice) || 0;
-
         let purchaseCost = 0;
         if (item.sparePartId) {
           const partDetails = await sparePartRepo.findOne({
@@ -1294,73 +1445,108 @@ export class ServiceController {
             } else {
               totalPartsCost += itemCost;
             }
+
+            // Yield page calculation for consumables if replaced
+            let yieldPages = 0;
+            if (this.isConsumable(partDetails.part_name, partDetails.sku)) {
+              const yieldRepo = Source.getRepository(ConsumableYieldHistory);
+              const activeYield = await yieldRepo.findOne({
+                where: {
+                  serialNumber: ticket.serialNumber,
+                  tonerSku: item.sku || '',
+                  replacedMeterReading: IsNull(),
+                },
+                order: { installedDate: 'DESC' },
+              });
+
+              if (activeYield) {
+                activeYield.replacedDate = new Date();
+                activeYield.replacedMeterReading = meterReading || 0;
+                activeYield.yieldPages = Math.max(
+                  0,
+                  (meterReading || 0) - activeYield.installedMeterReading,
+                );
+                await yieldRepo.save(activeYield);
+                yieldPages = activeYield.yieldPages;
+              }
+
+              const newYield = yieldRepo.create({
+                productId: ticket.productId || undefined,
+                serialNumber: ticket.serialNumber,
+                tonerSku: item.sku || '',
+                installedDate: new Date(),
+                installedMeterReading: meterReading || 0,
+                ticketId: ticket.id,
+              });
+              await yieldRepo.save(newYield);
+            }
+
+            // Save Part Usage Log
+            const usageLog = usageLogRepo.create({
+              ticketId: ticket.id,
+              productId: ticket.productId || '',
+              sparePartId: item.sparePartId,
+              sku: item.sku || '',
+              partName: item.partName || '',
+              quantityUsed: item.quantity,
+              unitCost: purchaseCost,
+              totalCost: itemCost,
+              replacedAt: new Date(),
+              calculatedYield: yieldPages || null,
+              isFree: item.isFree,
+              isConsumable: this.isConsumable(partDetails.part_name, partDetails.sku),
+              meterReadingAtReplacement: meterReading || null,
+              linkedInvoiceId: ticket.linkedInvoiceId || null,
+            });
+            await usageLogRepo.save(usageLog);
           }
         }
-
-        partsUsedList.push({
-          partName: item.partName || '',
-          sku: item.sku || '',
-          quantity: item.quantity || 0,
-          unitPrice: Number(item.unitPrice) || 0,
-          isFree: isItemFree,
-        });
-
-        customerCharge += priceCharged;
       }
 
       const labourCost = estimate ? Number(estimate.labourCost) : 0;
-      customerCharge += labourCost;
 
-      const totalCost = totalPartsCost + totalConsumablesCost + labourCost;
-
+      // Update Lifetime Machine History (Accumulated single record)
       const historyRepo = Source.getRepository(MachineServiceHistory);
-      const historyRecord = historyRepo.create({
-        productId: ticket.productId,
-        serialNumber: ticket.serialNumber,
-        ticketId: ticket.id,
-        serviceDate: new Date(),
-        serviceContext: ticket.serviceContext,
-        meterReading: meterReading || 0,
-        partsUsed: partsUsedList,
-        totalCost,
-        customerCharge,
+      let historyRecord = await historyRepo.findOne({
+        where: { productId: ticket.productId || undefined },
       });
+
+      let nextScheduledMaintenanceDate: Date | null = null;
+      if (ticket.serviceContext === ServiceContext.RENT) {
+        nextScheduledMaintenanceDate = new Date();
+        nextScheduledMaintenanceDate.setMonth(nextScheduledMaintenanceDate.getMonth() + 2);
+      }
+
+      if (historyRecord) {
+        historyRecord.totalServiceVisits += 1;
+        if (ticket.ticketType === 'PREVENTATIVE_MAINTENANCE') {
+          historyRecord.totalPreventativeVisits += 1;
+        }
+        historyRecord.lastServiceDate = new Date();
+        historyRecord.nextScheduledMaintenanceDate = nextScheduledMaintenanceDate;
+        historyRecord.totalPartsSpend =
+          Number(historyRecord.totalPartsSpend) + totalPartsCost + totalConsumablesCost;
+        historyRecord.totalLabourSpend = Number(historyRecord.totalLabourSpend) + labourCost;
+        historyRecord.totalLifetimeCost =
+          Number(historyRecord.totalPartsSpend) + Number(historyRecord.totalLabourSpend);
+      } else {
+        historyRecord = historyRepo.create({
+          productId: ticket.productId || '',
+          serialNumber: ticket.serialNumber,
+          totalServiceVisits: 1,
+          totalPreventativeVisits: ticket.ticketType === 'PREVENTATIVE_MAINTENANCE' ? 1 : 0,
+          lastServiceDate: new Date(),
+          nextScheduledMaintenanceDate,
+          totalPartsSpend: totalPartsCost + totalConsumablesCost,
+          totalLabourSpend: labourCost,
+          totalLifetimeCost: totalPartsCost + totalConsumablesCost + labourCost,
+        });
+      }
       await historyRepo.save(historyRecord);
 
-      // Consumable Yield / Toner yield logic
-      const yieldRepo = Source.getRepository(ConsumableYieldHistory);
-      for (const item of itemsToInspect) {
-        if (item.sku && this.isConsumable(item.partName, item.sku)) {
-          const activeYield = await yieldRepo.findOne({
-            where: {
-              serialNumber: ticket.serialNumber,
-              tonerSku: item.sku,
-              replacedMeterReading: IsNull(),
-            },
-            order: { installedDate: 'DESC' },
-          });
-
-          if (activeYield) {
-            activeYield.replacedDate = new Date();
-            activeYield.replacedMeterReading = meterReading || 0;
-            activeYield.yieldPages = Math.max(
-              0,
-              (meterReading || 0) - activeYield.installedMeterReading,
-            );
-            await yieldRepo.save(activeYield);
-          }
-
-          const newYield = yieldRepo.create({
-            productId: ticket.productId,
-            serialNumber: ticket.serialNumber,
-            tonerSku: item.sku,
-            installedDate: new Date(),
-            installedMeterReading: meterReading || 0,
-            ticketId: ticket.id,
-          });
-          await yieldRepo.save(newYield);
-        }
-      }
+      // Save report URL to ticket
+      ticket.reportUrl = `/i/service/tickets/${ticket.id}/report`;
+      await ticketRepo.save(ticket);
 
       await this.logActivity(
         ticket.id,
@@ -1604,54 +1790,31 @@ export class ServiceController {
     try {
       const serialNumber = req.params.serialNumber as string;
       const historyRepo = Source.getRepository(MachineServiceHistory);
-      const histories = await historyRepo.find({ where: { serialNumber: String(serialNumber) } });
+      const history = await historyRepo.findOne({ where: { serialNumber: String(serialNumber) } });
 
-      let totalPartsCost = 0;
-      let totalConsumablesCost = 0;
-      let totalLabourCost = 0;
-
-      const sparePartRepo = Source.getRepository(SparePart);
-
-      for (const hist of histories) {
-        const partsUsed = hist.partsUsed || [];
-        let histPartsCost = 0;
-        let histConsumablesCost = 0;
-
-        for (const pu of partsUsed) {
-          if (pu.sku) {
-            const part = await sparePartRepo.findOne({ where: { sku: pu.sku } });
-            if (part) {
-              const itemCost = (Number(part.purchase_price) || 0) * (pu.quantity || 1);
-              if (this.isConsumable(part.part_name, part.sku)) {
-                histConsumablesCost += itemCost;
-              } else {
-                histPartsCost += itemCost;
-              }
-            }
-          }
-        }
-
-        totalPartsCost += histPartsCost;
-        totalConsumablesCost += histConsumablesCost;
-
-        const histLabour = Math.max(
-          0,
-          Number(hist.totalCost) - histPartsCost - histConsumablesCost,
-        );
-        totalLabourCost += histLabour;
+      if (!history) {
+        return res.status(200).json({
+          success: true,
+          data: {
+            totalTicketsCount: 0,
+            totalPartsCost: 0,
+            totalConsumablesCost: 0,
+            totalLabourCost: 0,
+            lifetimeCost: 0,
+            history: [],
+          },
+        });
       }
-
-      const lifetimeCost = totalPartsCost + totalConsumablesCost + totalLabourCost;
 
       res.status(200).json({
         success: true,
         data: {
-          totalTicketsCount: histories.length,
-          totalPartsCost,
-          totalConsumablesCost,
-          totalLabourCost,
-          lifetimeCost,
-          history: histories,
+          totalTicketsCount: history.totalServiceVisits,
+          totalPartsCost: Number(history.totalPartsSpend) || 0,
+          totalConsumablesCost: 0,
+          totalLabourCost: Number(history.totalLabourSpend) || 0,
+          lifetimeCost: Number(history.totalLifetimeCost) || 0,
+          history: [history],
         },
       });
     } catch (error) {
@@ -1683,82 +1846,70 @@ export class ServiceController {
   getFinanceDashboard = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { branchId, startDate, endDate } = req.query;
-      const historyRepo = Source.getRepository(MachineServiceHistory);
+      const ticketRepo = Source.getRepository(ServiceTicket);
 
-      let query = historyRepo.createQueryBuilder('history');
+      let query = ticketRepo
+        .createQueryBuilder('ticket')
+        .where('ticket.status = :status', { status: ServiceTicketStatus.COMPLETED });
 
       if (branchId) {
-        query = query.innerJoin(
-          ServiceTicket,
-          'ticket',
-          'ticket.id = history.ticketId AND ticket.branchId = :branchId',
-          { branchId },
-        );
+        query = query.andWhere('ticket.branchId = :branchId', { branchId });
       }
 
       if (startDate) {
-        query = query.andWhere('history.serviceDate >= :startDate', {
+        query = query.andWhere('ticket.completedAt >= :startDate', {
           startDate: new Date(startDate as string),
         });
       }
 
       if (endDate) {
-        query = query.andWhere('history.serviceDate <= :endDate', {
+        query = query.andWhere('ticket.completedAt <= :endDate', {
           endDate: new Date(endDate as string),
         });
       }
 
-      const histories = await query.getMany();
+      const tickets = await query.getMany();
 
       let totalRevenue = 0;
       let totalPartsCost = 0;
-      let totalConsumablesCost = 0;
       let totalLaborCost = 0;
 
-      const sparePartRepo = Source.getRepository(SparePart);
+      const partUsageRepo = Source.getRepository(ServicePartUsageLog);
+      const estimateRepo = Source.getRepository(ServiceEstimate);
+      const ticketItemRepo = Source.getRepository(ServiceTicketItem);
 
-      for (const hist of histories) {
-        totalRevenue += Number(hist.customerCharge) || 0;
-
-        const partsUsed = hist.partsUsed || [];
-        let histPartsCost = 0;
-        let histConsumablesCost = 0;
-
-        for (const pu of partsUsed) {
-          if (pu.sku) {
-            const part = await sparePartRepo.findOne({ where: { sku: pu.sku } });
-            if (part) {
-              const itemCost = (Number(part.purchase_price) || 0) * (pu.quantity || 1);
-              if (this.isConsumable(part.part_name, part.sku)) {
-                histConsumablesCost += itemCost;
-              } else {
-                histPartsCost += itemCost;
-              }
-            }
-          }
+      for (const ticket of tickets) {
+        const usageLogs = await partUsageRepo.find({ where: { ticketId: ticket.id } });
+        for (const log of usageLogs) {
+          totalPartsCost += Number(log.totalCost) || 0;
         }
 
-        totalPartsCost += histPartsCost;
-        totalConsumablesCost += histConsumablesCost;
+        const estimate = await estimateRepo.findOne({
+          where: { ticketId: ticket.id, status: ServiceEstimateStatus.CUSTOMER_APPROVED },
+        });
+        const labour = estimate ? Number(estimate.labourCost) || 0 : 0;
+        totalLaborCost += labour;
 
-        const histLabour = Math.max(
-          0,
-          Number(hist.totalCost) - histPartsCost - histConsumablesCost,
-        );
-        totalLaborCost += histLabour;
+        const items = await ticketItemRepo.find({ where: { ticketId: ticket.id } });
+        let ticketRevenue = labour;
+        for (const item of items) {
+          if (!item.isFree) {
+            ticketRevenue += Number(item.totalPrice) || 0;
+          }
+        }
+        totalRevenue += ticketRevenue;
       }
 
-      const netServiceMargin =
-        totalRevenue - (totalPartsCost + totalConsumablesCost + totalLaborCost);
+      const netServiceMargin = totalRevenue - (totalPartsCost + totalLaborCost);
 
       res.status(200).json({
         success: true,
         data: {
           totalRevenue,
           totalPartsCost,
-          totalConsumablesCost,
           totalLaborCost,
           netServiceMargin,
+          ticketsCount: tickets.length,
         },
       });
     } catch (error) {
@@ -1974,6 +2125,108 @@ export class ServiceController {
   };
 
   /**
+   * PATCH /service/tickets/:id/finance-approved
+   */
+  financeApproved = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const id = req.params.id as string;
+      const ticketRepo = Source.getRepository(ServiceTicket);
+      const ticket = await ticketRepo.findOne({ where: { id: String(id) } });
+      if (!ticket) throw new Error('Ticket not found');
+
+      ticket.status = ServiceTicketStatus.QUOTED;
+      await ticketRepo.save(ticket);
+
+      await this.logActivity(
+        id,
+        'FINANCE_APPROVED',
+        `Service ticket estimate approved by Finance. Status set to QUOTED.`,
+        req.user?.userId,
+      );
+
+      // Notify assigned technician
+      if (ticket.assignedTechnicianId) {
+        try {
+          await NotificationPublisher.publishInAppRequest({
+            recipientId: ticket.assignedTechnicianId,
+            title: 'Estimate Approved by Finance',
+            message: `Service estimate for ticket ${ticket.ticketNumber} has been approved by Finance.`,
+            type: 'TASK',
+            referenceId: ticket.id,
+            referenceType: 'SERVICE_TICKET',
+          });
+        } catch (err) {
+          logger.error('Failed to notify technician about finance approval:', err);
+        }
+      }
+
+      // Notify all SERVICE_HELP_DESK employees in branch
+      try {
+        const helpdeskEmployees = await getHelpDeskEmployeesByBranch(ticket.branchId);
+        for (const empId of helpdeskEmployees) {
+          await NotificationPublisher.publishInAppRequest({
+            recipientId: empId,
+            title: 'Estimate Approved by Finance',
+            message: `Service estimate for ticket ${ticket.ticketNumber} has been approved by Finance. Status is now QUOTED.`,
+            type: 'TASK',
+            referenceId: ticket.id,
+            referenceType: 'SERVICE_TICKET',
+          });
+        }
+      } catch (err) {
+        logger.error('Failed to notify help desk about finance approval:', err);
+      }
+
+      res.status(200).json({ success: true, data: ticket });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  /**
+   * PATCH /service/tickets/:id/finance-rejected
+   */
+  financeRejected = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const id = req.params.id as string;
+      const { reason } = req.body;
+      const ticketRepo = Source.getRepository(ServiceTicket);
+      const ticket = await ticketRepo.findOne({ where: { id: String(id) } });
+      if (!ticket) throw new Error('Ticket not found');
+
+      ticket.status = ServiceTicketStatus.DIAGNOSED;
+      await ticketRepo.save(ticket);
+
+      await this.logActivity(
+        id,
+        'FINANCE_REJECTED',
+        `Service ticket estimate rejected by Finance. Reason: ${reason || 'N/A'}. Status set back to DIAGNOSED.`,
+        req.user?.userId,
+      );
+
+      // Notify assigned technician with rejection reason
+      if (ticket.assignedTechnicianId) {
+        try {
+          await NotificationPublisher.publishInAppRequest({
+            recipientId: ticket.assignedTechnicianId,
+            title: 'Estimate Rejected by Finance',
+            message: `Service estimate for ticket ${ticket.ticketNumber} was rejected by Finance. Reason: ${reason || 'No reason provided'}. Please revise.`,
+            type: 'TASK',
+            referenceId: ticket.id,
+            referenceType: 'SERVICE_TICKET',
+          });
+        } catch (err) {
+          logger.error('Failed to notify technician about finance rejection:', err);
+        }
+      }
+
+      res.status(200).json({ success: true, data: ticket });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  /**
    * POST /service/tickets/:id/customer-approve
    */
   customerApprove = async (req: Request, res: Response, next: NextFunction) => {
@@ -2177,6 +2430,234 @@ export class ServiceController {
       if (!contract) throw new Error('Service Contract not found');
       await contractRepo.remove(contract);
       res.status(200).json({ success: true, message: 'Service Contract deleted successfully' });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  /**
+   * GET /service/tickets/:id/report
+   */
+  generateReportPDF = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const id = req.params.id as string;
+      const ticketRepo = Source.getRepository(ServiceTicket);
+      const ticket = await ticketRepo.findOne({
+        where: { id: String(id) },
+        relations: ['items'],
+      });
+      if (!ticket) throw new Error('Ticket not found');
+
+      const reportRepo = Source.getRepository(ServiceReport);
+      const report = await reportRepo.findOne({ where: { ticketId: ticket.id } });
+
+      const { default: PDFDocument } = await import('pdfkit');
+      const doc = new PDFDocument({ margin: 50 });
+
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename=Service_Report_${ticket.ticketNumber}.pdf`,
+      );
+
+      doc.pipe(res);
+
+      // Draw Professional Header
+      doc.rect(0, 0, 612, 100).fill('#0f172a');
+      doc.fillColor('#ffffff').fontSize(24).font('Helvetica-Bold').text('XEROCARE ERP', 50, 30);
+      doc.fontSize(12).font('Helvetica').text('Official Service & Maintenance Report', 50, 60);
+
+      // Reset color
+      doc.fillColor('#334155');
+
+      // Ticket Summary Box
+      doc.font('Helvetica-Bold').fontSize(14).text('Ticket Summary', 50, 120);
+      doc.moveTo(50, 140).lineTo(562, 140).stroke('#cbd5e1');
+
+      doc.font('Helvetica-Bold').fontSize(10);
+      doc.text('Ticket Number:', 50, 155);
+      doc.text('Service Context:', 50, 175);
+      doc.text('Customer ID:', 50, 195);
+      doc.text('Serial Number:', 50, 215);
+
+      doc.text('Technician:', 320, 155);
+      doc.text('Status:', 320, 175);
+      doc.text('Scheduled Visit:', 320, 195);
+      doc.text('Completed At:', 320, 215);
+
+      doc.font('Helvetica');
+      doc.text(ticket.ticketNumber || '', 150, 155);
+      doc.text(ticket.serviceContext || '', 150, 175);
+      doc.text(ticket.customerId || 'N/A', 150, 195);
+      doc.text(ticket.serialNumber || '', 150, 215);
+
+      doc.text(ticket.assignedTechnicianId || 'Unassigned', 420, 155);
+      doc.text(ticket.status || '', 420, 175);
+      doc.text(
+        ticket.scheduledVisitDate
+          ? new Date(ticket.scheduledVisitDate).toLocaleDateString()
+          : 'N/A',
+        420,
+        195,
+      );
+      doc.text(
+        ticket.completedAt ? new Date(ticket.completedAt).toLocaleDateString() : 'N/A',
+        420,
+        215,
+      );
+
+      // Diagnosis & Resolution Box
+      doc.font('Helvetica-Bold').fontSize(14).text('Diagnosis & Work Details', 50, 250);
+      doc.moveTo(50, 270).lineTo(562, 270).stroke('#cbd5e1');
+
+      doc.font('Helvetica-Bold').fontSize(10);
+      doc.text('Problem Found:', 50, 285);
+      doc
+        .font('Helvetica')
+        .text(ticket.problemFound || report?.workPerformed || 'N/A', 150, 285, { width: 400 });
+
+      doc.font('Helvetica-Bold').text('Root Cause:', 50, 315);
+      doc.font('Helvetica').text(ticket.rootCause || 'N/A', 150, 315, { width: 400 });
+
+      doc.font('Helvetica-Bold').text('Resolution/Work:', 50, 345);
+      doc
+        .font('Helvetica')
+        .text(report?.resolutionDetails || ticket.completionNotes || 'N/A', 150, 345, {
+          width: 400,
+        });
+
+      doc.font('Helvetica-Bold').text('Meter Reading:', 50, 375);
+      doc
+        .font('Helvetica')
+        .text(String(report?.meterReading || ticket.meterReadingAtService || 0), 150, 375);
+
+      // Parts Consumed Table
+      let currentY = 410;
+      doc.font('Helvetica-Bold').fontSize(14).text('Parts & Consumables Consumed', 50, currentY);
+      currentY += 20;
+      doc.moveTo(50, currentY).lineTo(562, currentY).stroke('#cbd5e1');
+      currentY += 15;
+
+      doc.font('Helvetica-Bold').fontSize(10);
+      doc.text('Part Name / SKU', 50, currentY);
+      doc.text('Quantity', 320, currentY);
+      doc.text('Unit Price', 420, currentY);
+      doc.text('Total Price', 500, currentY);
+      currentY += 15;
+
+      doc.font('Helvetica');
+      const itemsToRender = ticket.items || [];
+      if (itemsToRender.length === 0) {
+        doc.text('No parts or consumables were replaced.', 50, currentY);
+        currentY += 20;
+      } else {
+        itemsToRender.forEach((item) => {
+          doc.text(`${item.partName} (SKU: ${item.sku || 'N/A'})`, 50, currentY, { width: 250 });
+          doc.text(String(item.quantity), 320, currentY);
+          doc.text(`QAR ${Number(item.unitPrice).toFixed(2)}`, 420, currentY);
+          doc.text(`QAR ${Number(item.totalPrice).toFixed(2)}`, 500, currentY);
+          currentY += 20;
+        });
+      }
+
+      currentY += 10;
+      // Signatures & Remarks Box
+      doc.font('Helvetica-Bold').fontSize(14).text('Signatures & Remarks', 50, currentY);
+      currentY += 20;
+      doc.moveTo(50, currentY).lineTo(562, currentY).stroke('#cbd5e1');
+      currentY += 15;
+
+      doc.font('Helvetica-Bold').text('Customer Remarks:', 50, currentY);
+      doc
+        .font('Helvetica')
+        .text(report?.customerRemarks || 'No remarks provided.', 50, currentY + 15, { width: 230 });
+
+      doc.font('Helvetica-Bold').text('Technician Remarks:', 320, currentY);
+      doc
+        .font('Helvetica')
+        .text(report?.technicianRemarks || 'No remarks provided.', 320, currentY + 15, {
+          width: 230,
+        });
+
+      currentY += 80;
+
+      doc.font('Helvetica-Bold').text('Customer Signature:', 50, currentY);
+      if (report?.customerSignature) {
+        doc.font('Helvetica').text('[Signed digitally]', 50, currentY + 15);
+      } else {
+        doc.font('Helvetica').text('___________________________', 50, currentY + 15);
+      }
+
+      doc.font('Helvetica-Bold').text('Technician Signature:', 320, currentY);
+      if (report?.technicianSignature) {
+        doc.font('Helvetica').text('[Signed digitally]', 320, currentY + 15);
+      } else {
+        doc.font('Helvetica').text('___________________________', 320, currentY + 15);
+      }
+
+      // Footer
+      doc
+        .fontSize(8)
+        .fillColor('#64748b')
+        .text('Xerocare ERP — Service Workflow Management. All rights reserved.', 50, 720, {
+          align: 'center',
+        });
+
+      doc.end();
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  /**
+   * GET /service/machine/:productId/history
+   */
+  getMachineHistory = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      let productId = req.params.productId as string;
+      const ticketRepo = Source.getRepository(ServiceTicket);
+
+      // If productId is not a UUID, check if it's a serial number
+      if (
+        productId &&
+        !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(productId)
+      ) {
+        const ticket = await ticketRepo.findOne({ where: { serialNumber: productId } });
+        if (ticket && ticket.productId) {
+          productId = ticket.productId;
+        }
+      }
+
+      const historyRepo = Source.getRepository(MachineServiceHistory);
+      const history = await historyRepo.findOne({ where: { productId: productId } });
+
+      const tickets = await ticketRepo.find({
+        where: { productId: productId },
+        relations: ['items'],
+        order: { created_at: 'DESC' },
+      });
+
+      const partUsageRepo = Source.getRepository(ServicePartUsageLog);
+      const partLogs = await partUsageRepo.find({
+        where: { productId: productId },
+        order: { replacedAt: 'DESC' },
+      });
+
+      const yieldRepo = Source.getRepository(ConsumableYieldHistory);
+      const yields = await yieldRepo.find({
+        where: { productId: productId },
+        order: { installedDate: 'DESC' },
+      });
+
+      res.status(200).json({
+        success: true,
+        data: {
+          history: history || null,
+          tickets,
+          partLogs,
+          yields,
+        },
+      });
     } catch (error) {
       next(error);
     }

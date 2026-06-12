@@ -79,6 +79,7 @@ export const diagnoseServiceTicket = async (
     rootCause: string;
     technicianNotes: string;
     meterReading: number;
+    labourCost?: number;
     items: Partial<ServiceTicketItem>[];
   },
 ): Promise<ServiceTicket> => {
@@ -374,4 +375,46 @@ export const getMachineContext = async (
 }> => {
   const response = await api.get(`/i/service/machines/${serialNumber}/context`);
   return response.data.data;
+};
+
+export interface MachineHistoryResponse {
+  history: {
+    totalServiceVisits: number;
+    totalPreventativeVisits: number;
+    lastServiceDate: string | null;
+    nextScheduledMaintenanceDate: string | null;
+    totalPartsSpend: number;
+    totalLabourSpend: number;
+    totalLifetimeCost: number;
+  } | null;
+  tickets: ServiceTicket[];
+  partLogs: {
+    id: string;
+    ticketId: string;
+    sparePartId: string | null;
+    partName: string;
+    sku: string | null;
+    quantityUsed: number;
+    unitCost: number;
+    totalCost: number;
+    isFree: boolean;
+    isConsumable: boolean;
+    replacedAt: string;
+    calculatedYield: number | null;
+  }[];
+  yields: ConsumableYieldHistory[];
+}
+
+export const getMachineHistory = async (
+  productIdOrSerial: string,
+): Promise<MachineHistoryResponse> => {
+  const response = await api.get(`/i/service/machine/${productIdOrSerial}/history`);
+  return response.data.data;
+};
+
+export const downloadServiceReport = async (ticketId: string): Promise<Blob> => {
+  const response = await api.get(`/i/service/tickets/${ticketId}/report`, {
+    responseType: 'blob',
+  });
+  return response.data;
 };

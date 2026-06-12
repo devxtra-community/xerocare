@@ -1,19 +1,4 @@
-import {
-  Entity,
-  PrimaryGeneratedColumn,
-  Column,
-  CreateDateColumn,
-  UpdateDateColumn,
-  ManyToOne,
-  JoinColumn,
-} from 'typeorm';
-import { SparePart } from './sparePartEntity';
-
-export enum ReservationStatus {
-  RESERVED = 'RESERVED',
-  CONSUMED = 'CONSUMED',
-  RELEASED = 'RELEASED',
-}
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn } from 'typeorm';
 
 @Entity('inventory_reservations')
 export class InventoryReservation {
@@ -26,23 +11,15 @@ export class InventoryReservation {
   @Column({ type: 'uuid' })
   sparePartId!: string;
 
-  @ManyToOne(() => SparePart, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'sparePartId' })
-  sparePart!: SparePart;
+  @Column({ type: 'int' })
+  reservedQuantity!: number;
 
-  @Column({ type: 'int', default: 1 })
-  quantity!: number;
-
-  @Column({
-    type: 'enum',
-    enum: ReservationStatus,
-    default: ReservationStatus.RESERVED,
-  })
-  status!: ReservationStatus;
+  @Column({ type: 'varchar', default: 'RESERVED' })
+  status!: 'RESERVED' | 'CONSUMED' | 'RELEASED';
 
   @CreateDateColumn()
-  created_at!: Date;
+  reservedAt!: Date;
 
-  @UpdateDateColumn()
-  updated_at!: Date;
+  @Column({ type: 'timestamp', nullable: true })
+  consumedAt!: Date | null;
 }

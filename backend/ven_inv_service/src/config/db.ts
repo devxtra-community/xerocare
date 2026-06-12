@@ -37,6 +37,7 @@ import { ServiceReport } from '../entities/serviceReportEntity';
 import { MachineServiceHistory } from '../entities/machineServiceHistoryEntity';
 import { ConsumableYieldHistory } from '../entities/consumableYieldHistoryEntity';
 import { InventoryReservation } from '../entities/inventoryReservationEntity';
+import { ServicePartUsageLog } from '../entities/servicePartUsageLogEntity';
 import { ServiceTicketActivity } from '../entities/serviceTicketActivityEntity';
 import { ServiceContract } from '../entities/serviceContractEntity';
 
@@ -78,6 +79,7 @@ export const Source = new DataSource({
     MachineServiceHistory,
     ConsumableYieldHistory,
     InventoryReservation,
+    ServicePartUsageLog,
     ServiceTicketActivity,
     ServiceContract,
   ],
@@ -231,6 +233,12 @@ export const connectWithRetry = async (initialDelayMs = 2000): Promise<DataSourc
 
               BEGIN
                 ALTER TYPE service_tickets_servicecontext_enum ADD VALUE 'EXTERNAL_MACHINE';
+              EXCEPTION
+                WHEN duplicate_object THEN NULL;
+              END;
+
+              BEGIN
+                ALTER TYPE service_tickets_jobtype_enum ADD VALUE 'WARRANTY_ONSITE';
               EXCEPTION
                 WHEN duplicate_object THEN NULL;
               END;
@@ -405,22 +413,116 @@ export const connectWithRetry = async (initialDelayMs = 2000): Promise<DataSourc
         `);
         logger.info('Guaranteed service_reports table exists.');
 
+        // --- Migration Redesign Block ---
+        // 1. Add status values to service_tickets_status_enum
+        const newStatuses = [
+          'ESTIMATE_RECORDED',
+          'ADDITIONAL_ESTIMATE_PENDING',
+          'WAITING_FINANCE_APPROVAL_2',
+          'FINANCE_APPROVED_2',
+        ];
+        for (const statusVal of newStatuses) {
+          try {
+            await Source.query(
+              `ALTER TYPE service_tickets_status_enum ADD VALUE IF NOT EXISTS '${statusVal}'`,
+            );
+          } catch {
+            // Ignore if already exists
+          }
+        }
+
+        // 2. Add columns to service_tickets
+        await Source.query(`
+          ALTER TABLE service_tickets ADD COLUMN IF NOT EXISTS track VARCHAR(1);
+          ALTER TABLE service_tickets ADD COLUMN IF NOT EXISTS ticket_type VARCHAR(30) DEFAULT 'COMPLAINT';
+          ALTER TABLE service_tickets ADD COLUMN IF NOT EXISTS estimate_sent_to_finance BOOLEAN DEFAULT FALSE;
+          ALTER TABLE service_tickets ADD COLUMN IF NOT EXISTS repair_started_at TIMESTAMP;
+          ALTER TABLE service_tickets ADD COLUMN IF NOT EXISTS problem_found TEXT;
+          ALTER TABLE service_tickets ADD COLUMN IF NOT EXISTS root_cause TEXT;
+          ALTER TABLE service_tickets ADD COLUMN IF NOT EXISTS work_performed TEXT;
+          ALTER TABLE service_tickets ADD COLUMN IF NOT EXISTS resolution_details TEXT;
+          ALTER TABLE service_tickets ADD COLUMN IF NOT EXISTS additional_estimate_count INT DEFAULT 0;
+          ALTER TABLE service_tickets ADD COLUMN IF NOT EXISTS linked_invoice_id UUID;
+          ALTER TABLE service_tickets ADD COLUMN IF NOT EXISTS meter_reading_at_service INT;
+          ALTER TABLE service_tickets ADD COLUMN IF NOT EXISTS report_url VARCHAR(500);
+        `);
+        logger.info('Added columns to service_tickets for Redesign.');
+
+        // 3. Drop and recreate machine_service_history to support new redesign structure
+        // We check if "totalPartsSpend" column exists; if not, we drop it.
+        const checkHistoryCol = await Source.query(`
+          SELECT column_name 
+          FROM information_schema.columns 
+          WHERE table_name='machine_service_history' AND column_name='totalPartsSpend';
+        `);
+        if (checkHistoryCol.length === 0) {
+          logger.info('Upgrading machine_service_history table to new design...');
+          await Source.query(`DROP TABLE IF EXISTS machine_service_history CASCADE;`);
+        }
+
         await Source.query(`
           CREATE TABLE IF NOT EXISTS machine_service_history (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            "productId" UUID NULL,
+            "productId" UUID UNIQUE NOT NULL,
             "serialNumber" VARCHAR(255) NOT NULL,
-            "ticketId" UUID NOT NULL REFERENCES service_tickets(id) ON DELETE CASCADE,
-            "serviceDate" TIMESTAMP NOT NULL,
-            "serviceContext" VARCHAR(255) NOT NULL,
-            "meterReading" INTEGER NOT NULL DEFAULT 0,
-            "partsUsed" JSONB NULL,
-            "totalCost" NUMERIC(10,2) NOT NULL DEFAULT 0,
-            "customerCharge" NUMERIC(10,2) NOT NULL DEFAULT 0,
-            created_at TIMESTAMP NOT NULL DEFAULT NOW()
+            "totalServiceVisits" INT DEFAULT 0,
+            "totalPreventativeVisits" INT DEFAULT 0,
+            "lastServiceDate" TIMESTAMP,
+            "nextScheduledMaintenanceDate" TIMESTAMP,
+            "totalPartsSpend" DECIMAL(12,2) DEFAULT 0,
+            "totalLabourSpend" DECIMAL(12,2) DEFAULT 0,
+            "totalLifetimeCost" DECIMAL(12,2) DEFAULT 0,
+            "updatedAt" TIMESTAMP DEFAULT NOW()
           );
         `);
-        logger.info('Guaranteed machine_service_history table exists.');
+        logger.info('Guaranteed machine_service_history table exists (new redesign).');
+
+        // 4. Create service_part_usage_logs table
+        await Source.query(`
+          CREATE TABLE IF NOT EXISTS service_part_usage_logs (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            "productId" UUID NOT NULL,
+            "ticketId" UUID NOT NULL,
+            "sparePartId" UUID NULL,
+            "partName" VARCHAR(255) NOT NULL,
+            "sku" VARCHAR(255) NULL,
+            "quantityUsed" INT NOT NULL,
+            "unitCost" DECIMAL(12,2) NOT NULL,
+            "totalCost" DECIMAL(12,2) NOT NULL,
+            "isFree" BOOLEAN DEFAULT false,
+            "isConsumable" BOOLEAN DEFAULT false,
+            "meterReadingAtReplacement" INT NULL,
+            "previousMeterReading" INT NULL,
+            "calculatedYield" INT NULL,
+            "linkedInvoiceId" VARCHAR(255) NULL,
+            "replacedAt" TIMESTAMP DEFAULT NOW()
+          );
+        `);
+        logger.info('Guaranteed service_part_usage_logs table exists.');
+
+        // 5. Drop and recreate inventory_reservations to support new redesign structure
+        const checkReservationCol = await Source.query(`
+          SELECT column_name 
+          FROM information_schema.columns 
+          WHERE table_name='inventory_reservations' AND column_name='reservedQuantity';
+        `);
+        if (checkReservationCol.length === 0) {
+          logger.info('Upgrading inventory_reservations table to new design...');
+          await Source.query(`DROP TABLE IF EXISTS inventory_reservations CASCADE;`);
+        }
+
+        await Source.query(`
+          CREATE TABLE IF NOT EXISTS inventory_reservations (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            "ticketId" UUID NOT NULL,
+            "sparePartId" UUID NOT NULL,
+            "reservedQuantity" INT NOT NULL,
+            status VARCHAR(50) NOT NULL DEFAULT 'RESERVED',
+            "reservedAt" TIMESTAMP DEFAULT NOW(),
+            "consumedAt" TIMESTAMP NULL
+          );
+        `);
+        logger.info('Guaranteed inventory_reservations table exists (new redesign).');
 
         await Source.query(`
           CREATE TABLE IF NOT EXISTS consumable_yield_history (
@@ -438,19 +540,6 @@ export const connectWithRetry = async (initialDelayMs = 2000): Promise<DataSourc
           );
         `);
         logger.info('Guaranteed consumable_yield_history table exists.');
-
-        await Source.query(`
-          CREATE TABLE IF NOT EXISTS inventory_reservations (
-            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            "ticketId" UUID NOT NULL REFERENCES service_tickets(id) ON DELETE CASCADE,
-            "sparePartId" UUID NOT NULL REFERENCES spare_parts(id) ON DELETE CASCADE,
-            quantity INTEGER NOT NULL DEFAULT 1,
-            status VARCHAR(50) NOT NULL DEFAULT 'RESERVED',
-            created_at TIMESTAMP NOT NULL DEFAULT NOW(),
-            updated_at TIMESTAMP NOT NULL DEFAULT NOW()
-          );
-        `);
-        logger.info('Guaranteed inventory_reservations table exists.');
 
         await Source.query(`
           CREATE TABLE IF NOT EXISTS service_ticket_activities (

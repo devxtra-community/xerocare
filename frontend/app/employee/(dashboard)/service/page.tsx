@@ -31,8 +31,6 @@ import {
   startDiagnosis,
   startRepair,
   getTicketEstimates,
-  getMachineLifetimeCost,
-  getMachineYieldHistory,
   createServiceEstimate,
   submitEstimateForApproval,
   approveEstimateFinance,
@@ -45,6 +43,11 @@ import {
   ServiceEstimate,
   ServiceEstimateRevision,
   ServiceEstimateItem,
+  getMachineHistory,
+  downloadServiceReport,
+  MachineHistoryResponse,
+  ServiceTicketItem,
+  ConsumableYieldHistory,
 } from '@/lib/serviceTicket';
 import { ServiceContract } from '@/lib/serviceContract';
 
@@ -230,6 +233,8 @@ export default function ServiceDashboardPage() {
   const [selectedMachineSerial, setSelectedMachineSerial] = useState('');
   const [machineCostData, setMachineCostData] = useState<MachineLifetimeCostUI | null>(null);
   const [machineYieldData, setMachineYieldData] = useState<ConsumableYieldUI[]>([]);
+  const [machinePartLogs, setMachinePartLogs] = useState<MachineHistoryResponse['partLogs']>([]);
+  const [activeIntelTab, setActiveIntelTab] = useState<'visits' | 'parts' | 'yields'>('visits');
   const [loadingMachineIntel, setLoadingMachineIntel] = useState(false);
 
   const [completeForm, setCompleteForm] = useState({
@@ -352,6 +357,7 @@ export default function ServiceDashboardPage() {
     problemFound: string;
     rootCause: string;
     meterReading: number;
+    labourCost: number;
     items: Array<{
       itemSource: 'SPARE_PART' | 'CUSTOM';
       sparePartId: string;
@@ -368,6 +374,7 @@ export default function ServiceDashboardPage() {
     problemFound: '',
     rootCause: '',
     meterReading: 0,
+    labourCost: 0,
     items: [],
   });
 
@@ -732,6 +739,7 @@ export default function ServiceDashboardPage() {
         rootCause: diagnosisForm.rootCause || 'Undetermined root cause',
         technicianNotes: diagnosisForm.notes,
         meterReading: Number(diagnosisForm.meterReading) || 0,
+        labourCost: Number(diagnosisForm.labourCost) || 0,
         items: diagnosisForm.items.map((it) => ({
           itemSource: it.itemSource,
           sparePartId: it.sparePartId || undefined,
@@ -750,6 +758,7 @@ export default function ServiceDashboardPage() {
         problemFound: '',
         rootCause: '',
         meterReading: 0,
+        labourCost: 0,
         items: [],
       });
       await fetchInitialData();
@@ -862,37 +871,43 @@ export default function ServiceDashboardPage() {
     setShowEstimatesModal(true);
   };
 
-  const fetchMachineIntel = async (serial: string) => {
+  const fetchMachineIntel = async (serial: string, productId?: string) => {
     try {
       setLoadingMachineIntel(true);
-      const [cost, yields] = await Promise.all([
-        getMachineLifetimeCost(serial),
-        getMachineYieldHistory(serial),
-      ]);
+      const data = await getMachineHistory(productId || serial);
 
       const mappedCost: MachineLifetimeCostUI = {
-        totalServiceVisits: cost.totalTicketsCount,
-        totalSparePartsCost: cost.totalPartsCost,
-        totalLabourCost: cost.totalLabourCost,
-        totalLifetimeCost: cost.lifetimeCost,
-        visitLogs: ((cost.history || []) as Record<string, unknown>[]).map((h) => ({
-          ticketNumber: h.ticketId as string,
-          serviceContext: h.serviceContext as string,
-          date: h.serviceDate as string,
-          meterReading: h.meterReading as number,
-          cost: Number(h.totalCost) || 0,
-        })),
+        totalServiceVisits: data.history?.totalServiceVisits || data.tickets.length,
+        totalSparePartsCost: Number(data.history?.totalPartsSpend) || 0,
+        totalLabourCost: Number(data.history?.totalLabourSpend) || 0,
+        totalLifetimeCost: Number(data.history?.totalLifetimeCost) || 0,
+        visitLogs: (data.tickets || []).map((t: ServiceTicket) => {
+          let ticketCost = 0;
+          t.items?.forEach((item: ServiceTicketItem) => {
+            ticketCost += Number(item.totalPrice) || 0;
+          });
+          return {
+            ticketNumber: t.ticketNumber,
+            serviceContext: t.serviceContext,
+            date: t.completedAt || t.created_at,
+            meterReading: 0,
+            cost: ticketCost,
+          };
+        }),
       };
 
-      const mappedYields: ConsumableYieldUI[] = (yields || []).map((y) => ({
-        id: y.id,
-        consumableSku: y.tonerSku,
-        actualYield: y.yieldPages || 0,
-        targetYield: 10000,
-      }));
+      const mappedYields: ConsumableYieldUI[] = (data.yields || []).map(
+        (y: ConsumableYieldHistory) => ({
+          id: y.id,
+          consumableSku: y.tonerSku,
+          actualYield: y.yieldPages || 0,
+          targetYield: 10000,
+        }),
+      );
 
       setMachineCostData(mappedCost);
       setMachineYieldData(mappedYields);
+      setMachinePartLogs(data.partLogs || []);
     } catch (err) {
       console.error('Failed to load machine intel:', err);
       toastError('Failed to load machine intel data');
@@ -901,12 +916,14 @@ export default function ServiceDashboardPage() {
     }
   };
 
-  const handleOpenMachineIntel = async (serial: string) => {
+  const handleOpenMachineIntel = async (serial: string, productId?: string) => {
     setSelectedMachineSerial(serial);
     setMachineCostData(null);
     setMachineYieldData([]);
+    setMachinePartLogs([]);
+    setActiveIntelTab('visits');
     setShowMachineIntelModal(true);
-    await fetchMachineIntel(serial);
+    await fetchMachineIntel(serial, productId);
   };
 
   const handleCreateEstimate = async (e: React.FormEvent) => {
@@ -1608,6 +1625,7 @@ export default function ServiceDashboardPage() {
   const isHelpDesk = user?.employeeJob === 'SERVICE_HELP_DESK';
   const isTechnician = user?.employeeJob === 'SERVICE_TECHNICIAN';
   const isManagerOrAdmin = user?.role === 'MANAGER' || user?.role === 'ADMIN';
+  const canManageFinance = user?.role === 'FINANCE' || isManagerOrAdmin;
 
   return (
     <div className="bg-slate-50 min-h-full p-4 sm:p-6 space-y-6">
@@ -1871,6 +1889,7 @@ export default function ServiceDashboardPage() {
                                       problemFound: '',
                                       rootCause: '',
                                       meterReading: 0,
+                                      labourCost: 0,
                                       items: [],
                                     });
                                     setShowDiagnoseModal(true);
@@ -3534,6 +3553,30 @@ export default function ServiceDashboardPage() {
                   </div>
                 </div>
 
+                {['CHARGEABLE', 'LEASE_EXPIRED', 'EXTERNAL_MACHINE'].includes(
+                  selectedTicket.serviceContext,
+                ) && (
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                      Labor Cost / Service Charge (QAR)
+                    </label>
+                    <Input
+                      type="number"
+                      required
+                      min={0}
+                      placeholder="Enter labor/service charge"
+                      value={diagnosisForm.labourCost || ''}
+                      onChange={(e) =>
+                        setDiagnosisForm({
+                          ...diagnosisForm,
+                          labourCost: parseFloat(e.target.value) || 0,
+                        })
+                      }
+                      className="h-9 text-xs bg-slate-50 border-slate-200 rounded-xl"
+                    />
+                  </div>
+                )}
+
                 <div className="border-t border-slate-100 pt-4 space-y-3">
                   <div className="flex items-center justify-between">
                     <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
@@ -4325,6 +4368,33 @@ export default function ServiceDashboardPage() {
 
                 {/* Action buttons relevant to current status */}
                 <div className="flex items-center justify-end gap-2 border-t border-slate-100 pt-3">
+                  {selectedTicket.status === 'COMPLETED' && (
+                    <Button
+                      size="sm"
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white h-8 px-3 rounded-lg font-bold gap-1 mr-auto"
+                      onClick={async () => {
+                        try {
+                          const blob = await downloadServiceReport(selectedTicket.id);
+                          const url = window.URL.createObjectURL(blob);
+                          const a = document.createElement('a');
+                          a.href = url;
+                          a.download = `Service_Report_${selectedTicket.ticketNumber}.pdf`;
+                          document.body.appendChild(a);
+                          a.click();
+                          a.remove();
+                          window.URL.revokeObjectURL(url);
+                          toastSuccess('PDF Report downloaded successfully!');
+                        } catch (err) {
+                          console.error(err);
+                          toastError('Failed to download PDF Report.');
+                        }
+                      }}
+                    >
+                      <FileText className="size-3.5" />
+                      Download PDF Report
+                    </Button>
+                  )}
+
                   {isHelpDesk && selectedTicket.status === 'OPEN' && (
                     <Button
                       size="sm"
@@ -4370,6 +4440,7 @@ export default function ServiceDashboardPage() {
                               problemFound: '',
                               rootCause: '',
                               meterReading: 0,
+                              labourCost: 0,
                               items: [],
                             });
                             setShowDiagnoseModal(true);
@@ -4538,7 +4609,8 @@ export default function ServiceDashboardPage() {
                           <p>
                             Parts/Items Cost:{' '}
                             <span className="font-semibold text-slate-800">
-                              QAR {Number(est.partsCost || 0).toFixed(2)}
+                              QAR{' '}
+                              {Number(est.partsCost ?? est.totalCost - est.labourCost).toFixed(2)}
                             </span>
                           </p>
                           <p>
@@ -4574,21 +4646,31 @@ export default function ServiceDashboardPage() {
                         {/* Internal Finance Action Triggers */}
                         {est.status === 'WAITING_FINANCE_APPROVAL' && (
                           <div className="flex gap-2 pt-1.5">
-                            <Button
-                              size="sm"
-                              className="bg-green-600 hover:bg-green-700 text-white text-[11px] h-8 px-3 rounded-lg"
-                              onClick={() => handleApproveFinance(est.id)}
-                            >
-                              Approve (Finance)
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="destructive"
-                              className="text-[11px] h-8 px-3 rounded-lg"
-                              onClick={() => handleRejectFinance(est.id, 'Finance budget rejected')}
-                            >
-                              Reject (Finance)
-                            </Button>
+                            {canManageFinance ? (
+                              <>
+                                <Button
+                                  size="sm"
+                                  className="bg-green-600 hover:bg-green-700 text-white text-[11px] h-8 px-3 rounded-lg"
+                                  onClick={() => handleApproveFinance(est.id)}
+                                >
+                                  Approve (Finance)
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="destructive"
+                                  className="text-[11px] h-8 px-3 rounded-lg"
+                                  onClick={() =>
+                                    handleRejectFinance(est.id, 'Finance budget rejected')
+                                  }
+                                >
+                                  Reject (Finance)
+                                </Button>
+                              </>
+                            ) : (
+                              <div className="text-[11px] text-amber-600 bg-amber-50 px-2.5 py-1.5 rounded border border-amber-100 flex items-center gap-1.5">
+                                <span>⏳ Estimate submitted to Finance. Awaiting approval.</span>
+                              </div>
+                            )}
                           </div>
                         )}
 
@@ -4655,7 +4737,8 @@ export default function ServiceDashboardPage() {
                           <p>
                             Additional Parts:{' '}
                             <span className="font-semibold text-slate-800">
-                              QAR {Number(rev.partsCost || 0).toFixed(2)}
+                              QAR{' '}
+                              {Number(rev.partsCost ?? rev.totalCost - rev.labourCost).toFixed(2)}
                             </span>
                           </p>
                           <p>
@@ -4687,13 +4770,19 @@ export default function ServiceDashboardPage() {
                         {/* Revision Approvals */}
                         {rev.status === 'WAITING_FINANCE_APPROVAL' && (
                           <div className="flex gap-2 pt-1.5">
-                            <Button
-                              size="sm"
-                              className="bg-green-600 hover:bg-green-700 text-white text-[11px] h-8 px-3 rounded-lg"
-                              onClick={() => handleApproveRevisionFinance(rev.id)}
-                            >
-                              Approve Finance (Rev)
-                            </Button>
+                            {canManageFinance ? (
+                              <Button
+                                size="sm"
+                                className="bg-green-600 hover:bg-green-700 text-white text-[11px] h-8 px-3 rounded-lg"
+                                onClick={() => handleApproveRevisionFinance(rev.id)}
+                              >
+                                Approve Finance (Rev)
+                              </Button>
+                            ) : (
+                              <div className="text-[11px] text-amber-600 bg-amber-50 px-2.5 py-1.5 rounded border border-amber-100 flex items-center gap-1.5">
+                                <span>⏳ Estimate submitted to Finance. Awaiting approval.</span>
+                              </div>
+                            )}
                           </div>
                         )}
 
@@ -4988,100 +5077,209 @@ export default function ServiceDashboardPage() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {/* Consumable Yield Performance Log */}
-                    <div className="space-y-3">
-                      <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                        Consumable Yield Tracking Logs
-                      </h3>
-                      {machineYieldData.length === 0 ? (
-                        <p className="text-xs text-slate-400 bg-slate-50 p-4 rounded-xl border border-slate-100 italic">
-                          No consumable yield events recorded for this machine.
-                        </p>
-                      ) : (
-                        <div className="border border-slate-100 rounded-xl overflow-hidden shadow-sm">
-                          <Table>
-                            <TableHeader className="bg-slate-50">
-                              <TableRow>
-                                <TableHead className="text-[10px] py-2 h-8 font-bold">
-                                  Consumable SKU
-                                </TableHead>
-                                <TableHead className="text-[10px] py-2 h-8 font-bold text-right">
-                                  Yield (Pages)
-                                </TableHead>
-                                <TableHead className="text-[10px] py-2 h-8 font-bold text-center">
-                                  Efficiency
-                                </TableHead>
-                              </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                              {machineYieldData.map((y, idx) => {
-                                const target = y.targetYield || 10000;
-                                const actual = y.actualYield || 0;
-                                const yieldPct = Math.min(200, Math.round((actual / target) * 100));
-                                return (
-                                  <TableRow key={y.id || idx} className="hover:bg-slate-50/30">
-                                    <TableCell className="py-2.5 text-xs font-semibold text-slate-700">
-                                      {y.consumableSku}
-                                    </TableCell>
-                                    <TableCell className="py-2.5 text-xs text-slate-600 text-right font-mono font-bold">
-                                      {actual.toLocaleString()}
-                                    </TableCell>
-                                    <TableCell className="py-2.5 text-xs text-center font-bold">
-                                      <span
-                                        className={`px-2 py-0.5 rounded text-[10px] ${yieldPct >= 90 ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-rose-50 text-rose-700 border border-rose-200'}`}
-                                      >
-                                        {yieldPct}%
-                                      </span>
-                                    </TableCell>
-                                  </TableRow>
-                                );
-                              })}
-                            </TableBody>
-                          </Table>
-                        </div>
-                      )}
-                    </div>
+                  {/* Tab Selector */}
+                  <div className="flex border-b border-slate-200">
+                    <button
+                      type="button"
+                      onClick={() => setActiveIntelTab('visits')}
+                      className={`px-4 py-2 text-xs font-bold border-b-2 transition-all ${
+                        activeIntelTab === 'visits'
+                          ? 'border-primary text-primary font-black'
+                          : 'border-transparent text-slate-500 hover:text-slate-700'
+                      }`}
+                    >
+                      Service Visits ({machineCostData?.visitLogs?.length || 0})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setActiveIntelTab('parts')}
+                      className={`px-4 py-2 text-xs font-bold border-b-2 transition-all ${
+                        activeIntelTab === 'parts'
+                          ? 'border-primary text-primary font-black'
+                          : 'border-transparent text-slate-500 hover:text-slate-700'
+                      }`}
+                    >
+                      Consumed Parts ({machinePartLogs?.length || 0})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setActiveIntelTab('yields')}
+                      className={`px-4 py-2 text-xs font-bold border-b-2 transition-all ${
+                        activeIntelTab === 'yields'
+                          ? 'border-primary text-primary font-black'
+                          : 'border-transparent text-slate-500 hover:text-slate-700'
+                      }`}
+                    >
+                      Toner Yield Analytics ({machineYieldData?.length || 0})
+                    </button>
+                  </div>
 
+                  <div className="pt-2">
                     {/* Machine Visit History Logs */}
-                    <div className="space-y-3">
-                      <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                        Historical Service Visits
-                      </h3>
-                      {!machineCostData?.visitLogs || machineCostData.visitLogs.length === 0 ? (
-                        <p className="text-xs text-slate-400 bg-slate-50 p-4 rounded-xl border border-slate-100 italic">
-                          No service visits logged for this machine.
-                        </p>
-                      ) : (
-                        <div className="space-y-3">
-                          {machineCostData.visitLogs.map((log, idx) => (
-                            <div
-                              key={idx}
-                              className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 space-y-1 shadow-sm"
-                            >
-                              <div className="flex items-center justify-between">
-                                <span className="text-[11px] font-bold text-slate-700">
-                                  {log.ticketNumber} | {log.serviceContext}
-                                </span>
-                                <span className="text-[10px] text-slate-400">
-                                  {new Date(log.date).toLocaleDateString()}
-                                </span>
+                    {activeIntelTab === 'visits' && (
+                      <div className="space-y-3 animate-in fade-in duration-200">
+                        <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                          Historical Service Visits
+                        </h3>
+                        {!machineCostData?.visitLogs || machineCostData.visitLogs.length === 0 ? (
+                          <p className="text-xs text-slate-400 bg-slate-50 p-4 rounded-xl border border-slate-100 italic">
+                            No service visits logged for this machine.
+                          </p>
+                        ) : (
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {machineCostData.visitLogs.map((log, idx) => (
+                              <div
+                                key={idx}
+                                className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 space-y-1 shadow-sm"
+                              >
+                                <div className="flex items-center justify-between">
+                                  <span className="text-[11px] font-bold text-slate-700">
+                                    {log.ticketNumber} | {log.serviceContext}
+                                  </span>
+                                  <span className="text-[10px] text-slate-400">
+                                    {new Date(log.date).toLocaleDateString()}
+                                  </span>
+                                </div>
+                                <p className="text-xs text-slate-600">
+                                  Meter Reading:{' '}
+                                  <span className="font-semibold">{log.meterReading || 'N/A'}</span>
+                                </p>
+                                <p className="text-xs text-slate-600">
+                                  Total Cost:{' '}
+                                  <span className="font-bold text-slate-800">
+                                    QAR {log.cost.toFixed(2)}
+                                  </span>
+                                </p>
                               </div>
-                              <p className="text-xs text-slate-600">
-                                Meter Reading:{' '}
-                                <span className="font-semibold">{log.meterReading || 'N/A'}</span>
-                              </p>
-                              <p className="text-xs text-slate-600">
-                                Total Cost:{' '}
-                                <span className="font-bold text-slate-800">
-                                  QAR {log.cost.toFixed(2)}
-                                </span>
-                              </p>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Consumed Parts Log */}
+                    {activeIntelTab === 'parts' && (
+                      <div className="space-y-3 animate-in fade-in duration-200">
+                        <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                          Consumed Parts & Consumables Log
+                        </h3>
+                        {!machinePartLogs || machinePartLogs.length === 0 ? (
+                          <p className="text-xs text-slate-400 bg-slate-50 p-4 rounded-xl border border-slate-100 italic">
+                            No spare parts or consumables replaced yet.
+                          </p>
+                        ) : (
+                          <div className="border border-slate-100 rounded-xl overflow-hidden shadow-sm">
+                            <Table>
+                              <TableHeader className="bg-slate-50">
+                                <TableRow>
+                                  <TableHead className="text-[10px] py-2 h-8 font-bold">
+                                    Part Name / SKU
+                                  </TableHead>
+                                  <TableHead className="text-[10px] py-2 h-8 font-bold text-center">
+                                    Type
+                                  </TableHead>
+                                  <TableHead className="text-[10px] py-2 h-8 font-bold text-center">
+                                    Qty
+                                  </TableHead>
+                                  <TableHead className="text-[10px] py-2 h-8 font-bold text-right">
+                                    Cost (QAR)
+                                  </TableHead>
+                                  <TableHead className="text-[10px] py-2 h-8 font-bold text-center">
+                                    Replaced At
+                                  </TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {machinePartLogs.map(
+                                  (log: MachineHistoryResponse['partLogs'][number]) => (
+                                    <TableRow key={log.id} className="hover:bg-slate-50/30">
+                                      <TableCell className="py-2.5 text-xs font-semibold text-slate-700">
+                                        {log.partName} {log.sku ? `(${log.sku})` : ''}
+                                      </TableCell>
+                                      <TableCell className="py-2.5 text-xs text-center">
+                                        <span
+                                          className={`px-2 py-0.5 rounded text-[10px] ${log.isConsumable ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-blue-50 text-blue-700 border border-blue-200'}`}
+                                        >
+                                          {log.isConsumable ? 'Consumable' : 'Spare Part'}
+                                        </span>
+                                      </TableCell>
+                                      <TableCell className="py-2.5 text-xs text-center font-mono font-bold">
+                                        {log.quantityUsed}
+                                      </TableCell>
+                                      <TableCell className="py-2.5 text-xs text-right font-mono font-bold">
+                                        {Number(log.totalCost).toFixed(2)}
+                                      </TableCell>
+                                      <TableCell className="py-2.5 text-xs text-center text-slate-500">
+                                        {new Date(log.replacedAt).toLocaleDateString()}
+                                      </TableCell>
+                                    </TableRow>
+                                  ),
+                                )}
+                              </TableBody>
+                            </Table>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Consumable Yield Performance Log */}
+                    {activeIntelTab === 'yields' && (
+                      <div className="space-y-3 animate-in fade-in duration-200">
+                        <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                          Consumable Yield Tracking Logs
+                        </h3>
+                        {machineYieldData.length === 0 ? (
+                          <p className="text-xs text-slate-400 bg-slate-50 p-4 rounded-xl border border-slate-100 italic">
+                            No consumable yield events recorded for this machine.
+                          </p>
+                        ) : (
+                          <div className="border border-slate-100 rounded-xl overflow-hidden shadow-sm">
+                            <Table>
+                              <TableHeader className="bg-slate-50">
+                                <TableRow>
+                                  <TableHead className="text-[10px] py-2 h-8 font-bold">
+                                    Consumable SKU
+                                  </TableHead>
+                                  <TableHead className="text-[10px] py-2 h-8 font-bold text-right">
+                                    Yield (Pages)
+                                  </TableHead>
+                                  <TableHead className="text-[10px] py-2 h-8 font-bold text-center">
+                                    Efficiency
+                                  </TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {machineYieldData.map((y, idx) => {
+                                  const target = y.targetYield || 10000;
+                                  const actual = y.actualYield || 0;
+                                  const yieldPct = Math.min(
+                                    200,
+                                    Math.round((actual / target) * 100),
+                                  );
+                                  return (
+                                    <TableRow key={y.id || idx} className="hover:bg-slate-50/30">
+                                      <TableCell className="py-2.5 text-xs font-semibold text-slate-700">
+                                        {y.consumableSku}
+                                      </TableCell>
+                                      <TableCell className="py-2.5 text-xs text-slate-600 text-right font-mono font-bold">
+                                        {actual.toLocaleString()}
+                                      </TableCell>
+                                      <TableCell className="py-2.5 text-xs text-center font-bold">
+                                        <span
+                                          className={`px-2 py-0.5 rounded text-[10px] ${yieldPct >= 90 ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-rose-50 text-rose-700 border border-rose-200'}`}
+                                        >
+                                          {yieldPct}%
+                                        </span>
+                                      </TableCell>
+                                    </TableRow>
+                                  );
+                                })}
+                              </TableBody>
+                            </Table>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               )}

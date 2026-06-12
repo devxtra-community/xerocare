@@ -90,6 +90,11 @@ export default function FinanceSidebar() {
           href: '/finance/quotations',
         },
         {
+          title: 'Service Estimates',
+          icon: FileQuestion,
+          href: '/finance/service-estimates',
+        },
+        {
           title: 'Returns',
           icon: RotateCcw,
           href: '/finance/returns',

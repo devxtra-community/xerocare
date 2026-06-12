@@ -1,45 +1,37 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn } from 'typeorm';
-
-export interface PartUsed {
-  partName: string;
-  sku: string;
-  quantity: number;
-  unitPrice: number;
-  isFree: boolean;
-}
+import { Entity, PrimaryGeneratedColumn, Column, UpdateDateColumn } from 'typeorm';
 
 @Entity('machine_service_history')
 export class MachineServiceHistory {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
 
-  @Column({ type: 'uuid', nullable: true })
-  productId?: string | null;
+  @Column({ type: 'uuid', unique: true })
+  productId!: string; // Links to Product entity
 
   @Column({ type: 'varchar' })
   serialNumber!: string;
 
-  @Column({ type: 'uuid' })
-  ticketId!: string;
+  @Column({ type: 'int', default: 0 })
+  totalServiceVisits!: number;
 
-  @Column({ type: 'timestamp' })
-  serviceDate!: Date;
+  @Column({ type: 'int', default: 0 })
+  totalPreventativeVisits!: number;
 
-  @Column({ type: 'varchar' })
-  serviceContext!: string;
+  @Column({ type: 'timestamp', nullable: true })
+  lastServiceDate!: Date | null;
 
-  @Column({ type: 'integer', default: 0 })
-  meterReading!: number;
+  @Column({ type: 'timestamp', nullable: true })
+  nextScheduledMaintenanceDate!: Date | null; // For RENT: lastServiceDate + 2 months
 
-  @Column({ type: 'jsonb', nullable: true })
-  partsUsed?: PartUsed[]; // Array of { partName: string, sku: string, quantity: number, unitPrice: number, isFree: boolean }
+  @Column({ type: 'decimal', precision: 12, scale: 2, default: 0 })
+  totalPartsSpend!: number; // Lifetime cost of all parts used (even if FOC)
 
-  @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
-  totalCost!: number;
+  @Column({ type: 'decimal', precision: 12, scale: 2, default: 0 })
+  totalLabourSpend!: number; // Lifetime labour cost (even if FOC)
 
-  @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
-  customerCharge!: number;
+  @Column({ type: 'decimal', precision: 12, scale: 2, default: 0 })
+  totalLifetimeCost!: number; // totalPartsSpend + totalLabourSpend
 
-  @CreateDateColumn()
-  created_at!: Date;
+  @UpdateDateColumn()
+  updatedAt!: Date;
 }

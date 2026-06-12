@@ -79,6 +79,8 @@ export interface Invoice {
   contractConfirmationUrl?: string;
   emailSentAt?: string;
   type?: 'QUOTATION' | 'PROFORMA' | 'FINAL';
+  billType?: string;
+  serviceTicketId?: string;
   saleType: string;
   layoutId?: string;
   layout_id?: string;
@@ -917,6 +919,14 @@ export const updateInvoiceStatus = async (id: string, status: string): Promise<I
  */
 export const requestValidityExtension = async (id: string): Promise<Invoice> => {
   const response = await api.post(`/b/invoices/${id}/request-validity-extension`);
+  return response.data.data;
+};
+
+/**
+ * Retrieves pending service estimates waiting for finance approval.
+ */
+export const getPendingServiceEstimates = async (): Promise<Invoice[]> => {
+  const response = await api.get('/b/invoices?billType=SERVICE&status=WAITING_FINANCE_APPROVAL');
   return response.data.data;
 };
 

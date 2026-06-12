@@ -119,7 +119,7 @@ async function runPreMigrations() {
       END $$;
     `);
 
-    // Ensure columns exist on invoices table
+    // Ensure columns exist on invoices and invoice_items tables
     try {
       await client.query(`
         ALTER TABLE invoices 
@@ -127,11 +127,15 @@ async function runPreMigrations() {
         ADD COLUMN IF NOT EXISTS "serviceTicketId" UUID NULL,
         ADD COLUMN IF NOT EXISTS "maxCopyLimit" INTEGER NULL;
       `);
+      await client.query(`
+        ALTER TABLE invoice_items 
+        ADD COLUMN IF NOT EXISTS warranty VARCHAR(255) NULL;
+      `);
       logger.info(
-        'Guaranteed billType, serviceTicketId, and maxCopyLimit columns exist on invoices table.',
+        'Guaranteed billType, serviceTicketId, and maxCopyLimit columns exist on invoices table, and warranty column exists on invoice_items table.',
       );
     } catch (colErr) {
-      logger.warn('Failed to ensure invoices columns (table might not exist yet):', colErr);
+      logger.warn('Failed to ensure invoices or invoice_items columns:', colErr);
     }
     logger.info('Pre-migration enum values added successfully');
 
