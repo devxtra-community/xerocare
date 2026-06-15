@@ -2617,7 +2617,7 @@ function QuotationFormModal({
               {quotationType === 'RENT' && (
                 <div className="space-y-5 mb-6">
                   {/* Rent Type Selector Moved to Top */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="bg-card p-4 rounded-xl border border-blue-200 shadow-sm space-y-2 bg-blue-50/30">
                       <label className="text-[11px] font-bold text-blue-600 uppercase flex items-center gap-2">
                         <span className="w-2 h-2 rounded-full bg-blue-400" /> Rent Type / Model
@@ -2833,21 +2833,57 @@ function QuotationFormModal({
                                             }
                                             className="h-7 text-xs flex-1"
                                           />
-                                          <Input
-                                            placeholder="To"
-                                            type="number"
-                                            value={slab.to}
-                                            onChange={(e) =>
-                                              updateSlab(
-                                                index,
-                                                'bwSlabRanges',
-                                                sIdx,
-                                                'to',
-                                                e.target.value,
-                                              )
-                                            }
-                                            className="h-7 text-xs flex-1"
-                                          />
+                                          <div className="relative flex-1">
+                                            <Input
+                                              placeholder="To"
+                                              type={slab.to === '1000000' ? 'text' : 'number'}
+                                              value={slab.to === '1000000' ? 'UNLIMITED' : slab.to}
+                                              onChange={(e) =>
+                                                updateSlab(
+                                                  index,
+                                                  'bwSlabRanges',
+                                                  sIdx,
+                                                  'to',
+                                                  e.target.value,
+                                                )
+                                              }
+                                              className={`h-7 text-xs pr-14 ${slab.to === '1000000' ? 'font-bold text-blue-600 bg-blue-50/50' : ''}`}
+                                            />
+                                            <div className="absolute right-0 top-0 flex items-center h-7 gap-0.5 pr-0.5">
+                                              <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className="h-6 px-1 text-[8px] font-bold text-blue-600 hover:bg-blue-100"
+                                                onClick={() =>
+                                                  updateSlab(
+                                                    index,
+                                                    'bwSlabRanges',
+                                                    sIdx,
+                                                    'to',
+                                                    '100000',
+                                                  )
+                                                }
+                                              >
+                                                100K
+                                              </Button>
+                                              <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className="h-6 px-1 text-[10px] font-bold text-blue-600 hover:bg-blue-100"
+                                                onClick={() =>
+                                                  updateSlab(
+                                                    index,
+                                                    'bwSlabRanges',
+                                                    sIdx,
+                                                    'to',
+                                                    slab.to === '1000000' ? '' : '1000000',
+                                                  )
+                                                }
+                                              >
+                                                {slab.to === '1000000' ? '✕' : '∞'}
+                                              </Button>
+                                            </div>
+                                          </div>
                                           <Input
                                             placeholder="Rate"
                                             type="number"
@@ -2907,21 +2943,57 @@ function QuotationFormModal({
                                             }
                                             className="h-7 text-xs flex-1"
                                           />
-                                          <Input
-                                            placeholder="To"
-                                            type="number"
-                                            value={slab.to}
-                                            onChange={(e) =>
-                                              updateSlab(
-                                                index,
-                                                'colorSlabRanges',
-                                                sIdx,
-                                                'to',
-                                                e.target.value,
-                                              )
-                                            }
-                                            className="h-7 text-xs flex-1"
-                                          />
+                                          <div className="relative flex-1">
+                                            <Input
+                                              placeholder="To"
+                                              type={slab.to === '1000000' ? 'text' : 'number'}
+                                              value={slab.to === '1000000' ? 'UNLIMITED' : slab.to}
+                                              onChange={(e) =>
+                                                updateSlab(
+                                                  index,
+                                                  'colorSlabRanges',
+                                                  sIdx,
+                                                  'to',
+                                                  e.target.value,
+                                                )
+                                              }
+                                              className={`h-7 text-xs pr-14 ${slab.to === '1000000' ? 'font-bold text-blue-600 bg-blue-50/50' : ''}`}
+                                            />
+                                            <div className="absolute right-0 top-0 flex items-center h-7 gap-0.5 pr-0.5">
+                                              <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className="h-6 px-1 text-[8px] font-bold text-blue-600 hover:bg-blue-100"
+                                                onClick={() =>
+                                                  updateSlab(
+                                                    index,
+                                                    'colorSlabRanges',
+                                                    sIdx,
+                                                    'to',
+                                                    '100000',
+                                                  )
+                                                }
+                                              >
+                                                100K
+                                              </Button>
+                                              <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className="h-6 px-1 text-[10px] font-bold text-blue-600 hover:bg-blue-100"
+                                                onClick={() =>
+                                                  updateSlab(
+                                                    index,
+                                                    'colorSlabRanges',
+                                                    sIdx,
+                                                    'to',
+                                                    slab.to === '1000000' ? '' : '1000000',
+                                                  )
+                                                }
+                                              >
+                                                {slab.to === '1000000' ? '✕' : '∞'}
+                                              </Button>
+                                            </div>
+                                          </div>
                                           <Input
                                             placeholder="Rate"
                                             type="number"
@@ -2985,21 +3057,57 @@ function QuotationFormModal({
                                           }
                                           className="h-7 text-xs flex-1"
                                         />
-                                        <Input
-                                          placeholder="To"
-                                          type="number"
-                                          value={slab.to}
-                                          onChange={(e) =>
-                                            updateSlab(
-                                              index,
-                                              'comboSlabRanges',
-                                              sIdx,
-                                              'to',
-                                              e.target.value,
-                                            )
-                                          }
-                                          className="h-7 text-xs flex-1"
-                                        />
+                                        <div className="relative flex-1">
+                                          <Input
+                                            placeholder="To"
+                                            type={slab.to === '1000000' ? 'text' : 'number'}
+                                            value={slab.to === '1000000' ? 'UNLIMITED' : slab.to}
+                                            onChange={(e) =>
+                                              updateSlab(
+                                                index,
+                                                'comboSlabRanges',
+                                                sIdx,
+                                                'to',
+                                                e.target.value,
+                                              )
+                                            }
+                                            className={`h-7 text-xs pr-14 ${slab.to === '1000000' ? 'font-bold text-blue-600 bg-blue-50/50' : ''}`}
+                                          />
+                                          <div className="absolute right-0 top-0 flex items-center h-7 gap-0.5 pr-0.5">
+                                            <Button
+                                              variant="ghost"
+                                              size="sm"
+                                              className="h-6 px-1 text-[8px] font-bold text-blue-600 hover:bg-blue-100"
+                                              onClick={() =>
+                                                updateSlab(
+                                                  index,
+                                                  'comboSlabRanges',
+                                                  sIdx,
+                                                  'to',
+                                                  '100000',
+                                                )
+                                              }
+                                            >
+                                              100K
+                                            </Button>
+                                            <Button
+                                              variant="ghost"
+                                              size="sm"
+                                              className="h-6 px-1 text-[10px] font-bold text-blue-600 hover:bg-blue-100"
+                                              onClick={() =>
+                                                updateSlab(
+                                                  index,
+                                                  'comboSlabRanges',
+                                                  sIdx,
+                                                  'to',
+                                                  slab.to === '1000000' ? '' : '1000000',
+                                                )
+                                              }
+                                            >
+                                              {slab.to === '1000000' ? '✕' : '∞'}
+                                            </Button>
+                                          </div>
+                                        </div>
                                         <Input
                                           placeholder="Rate"
                                           type="number"
@@ -3037,62 +3145,50 @@ function QuotationFormModal({
 
                   {/* Rent Config - Remaining Fields */}
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="bg-card p-4 rounded-xl border border-slate-100 shadow-sm space-y-2">
-                      <label className="text-[11px] font-bold text-muted-foreground uppercase">
-                        Billing Period
-                      </label>
-                      <Select value={rentPeriod} onValueChange={setRentPeriod}>
-                        <SelectTrigger className="h-9 text-sm">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="MONTHLY">Monthly</SelectItem>
-                          <SelectItem value="QUARTERLY">Quarterly</SelectItem>
-                          <SelectItem value="HALF_YEARLY">Half Yearly</SelectItem>
-                          <SelectItem value="YEARLY">Yearly</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="bg-card p-4 rounded-xl border border-slate-100 shadow-sm space-y-2">
-                      <label className="text-[11px] font-bold text-muted-foreground uppercase flex items-center justify-between">
-                        <span>Periodic Rent ({rentPeriod.replace('_', ' ')})</span>
-                      </label>
-                      <Input
-                        type="number"
-                        placeholder="0.00"
-                        value={monthlyRent}
-                        onChange={(e) => setMonthlyRent(e.target.value)}
-                        className="h-9 text-sm"
-                      />
-                    </div>
-                    <div className="bg-card p-4 rounded-xl border border-slate-100 shadow-sm space-y-2">
-                      <label className="text-[11px] font-bold text-muted-foreground uppercase">
-                        Advance / Caution Deposit (QAR)
-                      </label>
-                      <Input
-                        type="number"
-                        placeholder="0.00"
-                        value={advanceAmount}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          setAdvanceAmount(val);
-                          setSecurityDepositAmount(val);
-                        }}
-                        className="h-9 text-sm"
-                      />
-                    </div>
-                    <div className="bg-card p-4 rounded-xl border border-slate-100 shadow-sm space-y-2">
-                      <label className="text-[11px] font-bold text-muted-foreground uppercase">
-                        Discount (%)
-                      </label>
-                      <Input
-                        type="number"
-                        placeholder="0"
-                        value={discountPercent}
-                        onChange={(e) => setDiscountPercent(e.target.value)}
-                        className="h-9 text-sm"
-                      />
-                    </div>
+                    {rentType !== 'CPC' && rentType !== 'CPC_COMBO' && (
+                      <>
+                        <div className="bg-card p-4 rounded-xl border border-slate-100 shadow-sm space-y-2">
+                          <label className="text-[11px] font-bold text-muted-foreground uppercase flex items-center justify-between">
+                            <span>Periodic Rent ({rentPeriod.replace('_', ' ')})</span>
+                          </label>
+                          <Input
+                            type="number"
+                            placeholder="0.00"
+                            value={monthlyRent}
+                            onChange={(e) => setMonthlyRent(e.target.value)}
+                            className="h-9 text-sm"
+                          />
+                        </div>
+                        <div className="bg-card p-4 rounded-xl border border-slate-100 shadow-sm space-y-2">
+                          <label className="text-[11px] font-bold text-muted-foreground uppercase">
+                            Advance / Caution Deposit (QAR)
+                          </label>
+                          <Input
+                            type="number"
+                            placeholder="0.00"
+                            value={advanceAmount}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setAdvanceAmount(val);
+                              setSecurityDepositAmount(val);
+                            }}
+                            className="h-9 text-sm"
+                          />
+                        </div>
+                        <div className="bg-card p-4 rounded-xl border border-slate-100 shadow-sm space-y-2">
+                          <label className="text-[11px] font-bold text-muted-foreground uppercase">
+                            Discount (%)
+                          </label>
+                          <Input
+                            type="number"
+                            placeholder="0"
+                            value={discountPercent}
+                            onChange={(e) => setDiscountPercent(e.target.value)}
+                            className="h-9 text-sm"
+                          />
+                        </div>
+                      </>
+                    )}
                   </div>
 
                   {/* Agreement Details (Shared for Rent/Lease) */}
@@ -3190,7 +3286,7 @@ function QuotationFormModal({
               {quotationType === 'LEASE' && (
                 <div className="space-y-5 mb-6">
                   {/* Lease Type Selector Moved to Top */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="bg-card p-4 rounded-xl border border-purple-200 shadow-sm space-y-2 bg-purple-50/30">
                       <label className="text-[11px] font-bold text-purple-600 uppercase flex items-center gap-2">
                         <span className="w-2 h-2 rounded-full bg-purple-400" /> Lease Type
@@ -3205,6 +3301,23 @@ function QuotationFormModal({
                         <SelectContent>
                           <SelectItem value="EMI">EMI (Equated Monthly Instalment)</SelectItem>
                           <SelectItem value="FSM">FSM (Full Service Maintenance)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="bg-card p-4 rounded-xl border border-slate-100 shadow-sm space-y-2">
+                      <label className="text-[11px] font-bold text-muted-foreground uppercase">
+                        Billing Period
+                      </label>
+                      <Select value={rentPeriod} onValueChange={setRentPeriod}>
+                        <SelectTrigger className="h-9 text-sm">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="MONTHLY">Monthly</SelectItem>
+                          <SelectItem value="QUARTERLY">Quarterly</SelectItem>
+                          <SelectItem value="HALF_YEARLY">Half Yearly</SelectItem>
+                          <SelectItem value="YEARLY">Yearly</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -3410,21 +3523,57 @@ function QuotationFormModal({
                                             }
                                             className="h-7 text-xs flex-1"
                                           />
-                                          <Input
-                                            placeholder="To"
-                                            type="number"
-                                            value={slab.to}
-                                            onChange={(e) =>
-                                              updateSlab(
-                                                index,
-                                                'bwSlabRanges',
-                                                sIdx,
-                                                'to',
-                                                e.target.value,
-                                              )
-                                            }
-                                            className="h-7 text-xs flex-1"
-                                          />
+                                          <div className="relative flex-1">
+                                            <Input
+                                              placeholder="To"
+                                              type={slab.to === '1000000' ? 'text' : 'number'}
+                                              value={slab.to === '1000000' ? 'UNLIMITED' : slab.to}
+                                              onChange={(e) =>
+                                                updateSlab(
+                                                  index,
+                                                  'bwSlabRanges',
+                                                  sIdx,
+                                                  'to',
+                                                  e.target.value,
+                                                )
+                                              }
+                                              className={`h-7 text-xs pr-14 ${slab.to === '1000000' ? 'font-bold text-blue-600 bg-blue-50/50' : ''}`}
+                                            />
+                                            <div className="absolute right-0 top-0 flex items-center h-7 gap-0.5 pr-0.5">
+                                              <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className="h-6 px-1 text-[8px] font-bold text-blue-600 hover:bg-blue-100"
+                                                onClick={() =>
+                                                  updateSlab(
+                                                    index,
+                                                    'bwSlabRanges',
+                                                    sIdx,
+                                                    'to',
+                                                    '100000',
+                                                  )
+                                                }
+                                              >
+                                                100K
+                                              </Button>
+                                              <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className="h-6 px-1 text-[10px] font-bold text-blue-600 hover:bg-blue-100"
+                                                onClick={() =>
+                                                  updateSlab(
+                                                    index,
+                                                    'bwSlabRanges',
+                                                    sIdx,
+                                                    'to',
+                                                    slab.to === '1000000' ? '' : '1000000',
+                                                  )
+                                                }
+                                              >
+                                                {slab.to === '1000000' ? '✕' : '∞'}
+                                              </Button>
+                                            </div>
+                                          </div>
                                           <Input
                                             placeholder="Rate"
                                             type="number"
@@ -3484,21 +3633,57 @@ function QuotationFormModal({
                                             }
                                             className="h-7 text-xs flex-1"
                                           />
-                                          <Input
-                                            placeholder="To"
-                                            type="number"
-                                            value={slab.to}
-                                            onChange={(e) =>
-                                              updateSlab(
-                                                index,
-                                                'colorSlabRanges',
-                                                sIdx,
-                                                'to',
-                                                e.target.value,
-                                              )
-                                            }
-                                            className="h-7 text-xs flex-1"
-                                          />
+                                          <div className="relative flex-1">
+                                            <Input
+                                              placeholder="To"
+                                              type={slab.to === '1000000' ? 'text' : 'number'}
+                                              value={slab.to === '1000000' ? 'UNLIMITED' : slab.to}
+                                              onChange={(e) =>
+                                                updateSlab(
+                                                  index,
+                                                  'colorSlabRanges',
+                                                  sIdx,
+                                                  'to',
+                                                  e.target.value,
+                                                )
+                                              }
+                                              className={`h-7 text-xs pr-14 ${slab.to === '1000000' ? 'font-bold text-blue-600 bg-blue-50/50' : ''}`}
+                                            />
+                                            <div className="absolute right-0 top-0 flex items-center h-7 gap-0.5 pr-0.5">
+                                              <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className="h-6 px-1 text-[8px] font-bold text-blue-600 hover:bg-blue-100"
+                                                onClick={() =>
+                                                  updateSlab(
+                                                    index,
+                                                    'colorSlabRanges',
+                                                    sIdx,
+                                                    'to',
+                                                    '100000',
+                                                  )
+                                                }
+                                              >
+                                                100K
+                                              </Button>
+                                              <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className="h-6 px-1 text-[10px] font-bold text-blue-600 hover:bg-blue-100"
+                                                onClick={() =>
+                                                  updateSlab(
+                                                    index,
+                                                    'colorSlabRanges',
+                                                    sIdx,
+                                                    'to',
+                                                    slab.to === '1000000' ? '' : '1000000',
+                                                  )
+                                                }
+                                              >
+                                                {slab.to === '1000000' ? '✕' : '∞'}
+                                              </Button>
+                                            </div>
+                                          </div>
                                           <Input
                                             placeholder="Rate"
                                             type="number"
@@ -3562,21 +3747,57 @@ function QuotationFormModal({
                                           }
                                           className="h-7 text-xs flex-1"
                                         />
-                                        <Input
-                                          placeholder="To"
-                                          type="number"
-                                          value={slab.to}
-                                          onChange={(e) =>
-                                            updateSlab(
-                                              index,
-                                              'comboSlabRanges',
-                                              sIdx,
-                                              'to',
-                                              e.target.value,
-                                            )
-                                          }
-                                          className="h-7 text-xs flex-1"
-                                        />
+                                        <div className="relative flex-1">
+                                          <Input
+                                            placeholder="To"
+                                            type={slab.to === '1000000' ? 'text' : 'number'}
+                                            value={slab.to === '1000000' ? 'UNLIMITED' : slab.to}
+                                            onChange={(e) =>
+                                              updateSlab(
+                                                index,
+                                                'comboSlabRanges',
+                                                sIdx,
+                                                'to',
+                                                e.target.value,
+                                              )
+                                            }
+                                            className={`h-7 text-xs pr-14 ${slab.to === '1000000' ? 'font-bold text-blue-600 bg-blue-50/50' : ''}`}
+                                          />
+                                          <div className="absolute right-0 top-0 flex items-center h-7 gap-0.5 pr-0.5">
+                                            <Button
+                                              variant="ghost"
+                                              size="sm"
+                                              className="h-6 px-1 text-[8px] font-bold text-blue-600 hover:bg-blue-100"
+                                              onClick={() =>
+                                                updateSlab(
+                                                  index,
+                                                  'comboSlabRanges',
+                                                  sIdx,
+                                                  'to',
+                                                  '100000',
+                                                )
+                                              }
+                                            >
+                                              100K
+                                            </Button>
+                                            <Button
+                                              variant="ghost"
+                                              size="sm"
+                                              className="h-6 px-1 text-[10px] font-bold text-blue-600 hover:bg-blue-100"
+                                              onClick={() =>
+                                                updateSlab(
+                                                  index,
+                                                  'comboSlabRanges',
+                                                  sIdx,
+                                                  'to',
+                                                  slab.to === '1000000' ? '' : '1000000',
+                                                )
+                                              }
+                                            >
+                                              {slab.to === '1000000' ? '✕' : '∞'}
+                                            </Button>
+                                          </div>
+                                        </div>
                                         <Input
                                           placeholder="Rate"
                                           type="number"
@@ -3666,52 +3887,56 @@ function QuotationFormModal({
                         />
                       </div>
                     )}
-                    {leaseType === 'FSM' && (
-                      <div className="bg-card p-4 rounded-xl border border-purple-100 shadow-sm space-y-2">
-                        <label className="text-[11px] font-bold text-purple-600 uppercase flex items-center justify-between">
-                          <span>Periodic Rent ({rentPeriod.replace('_', ' ')})</span>
-                          <span className="text-[9px] lowercase">(auto)</span>
-                        </label>
-                        <Input
-                          type="number"
-                          value={monthlyRent}
-                          onChange={(e) => {
-                            setLastEditedLease('PERIODIC');
-                            setMonthlyRent(e.target.value);
-                            if (!e.target.value) setTotalLeaseAmount('');
-                          }}
-                          className="h-9 text-sm font-bold text-blue-700"
-                        />
-                      </div>
+                    {rentType !== 'CPC' && rentType !== 'CPC_COMBO' && (
+                      <>
+                        {leaseType === 'FSM' && (
+                          <div className="bg-card p-4 rounded-xl border border-purple-100 shadow-sm space-y-2">
+                            <label className="text-[11px] font-bold text-purple-600 uppercase flex items-center justify-between">
+                              <span>Periodic Rent ({rentPeriod.replace('_', ' ')})</span>
+                              <span className="text-[9px] lowercase">(auto)</span>
+                            </label>
+                            <Input
+                              type="number"
+                              value={monthlyRent}
+                              onChange={(e) => {
+                                setLastEditedLease('PERIODIC');
+                                setMonthlyRent(e.target.value);
+                                if (!e.target.value) setTotalLeaseAmount('');
+                              }}
+                              className="h-9 text-sm font-bold text-blue-700"
+                            />
+                          </div>
+                        )}
+                        <div className="bg-card p-4 rounded-xl border border-slate-100 shadow-sm space-y-2">
+                          <label className="text-[11px] font-bold text-muted-foreground uppercase">
+                            Advance / Caution Deposit (QAR)
+                          </label>
+                          <Input
+                            type="number"
+                            placeholder="0.00"
+                            value={advanceAmount}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setAdvanceAmount(val);
+                              setSecurityDepositAmount(val);
+                            }}
+                            className="h-9 text-sm"
+                          />
+                        </div>
+                        <div className="bg-card p-4 rounded-xl border border-slate-100 shadow-sm space-y-2">
+                          <label className="text-[11px] font-bold text-muted-foreground uppercase">
+                            Discount (%)
+                          </label>
+                          <Input
+                            type="number"
+                            placeholder="0"
+                            value={discountPercent}
+                            onChange={(e) => setDiscountPercent(e.target.value)}
+                            className="h-9 text-sm"
+                          />
+                        </div>
+                      </>
                     )}
-                    <div className="bg-card p-4 rounded-xl border border-slate-100 shadow-sm space-y-2">
-                      <label className="text-[11px] font-bold text-muted-foreground uppercase">
-                        Advance / Caution Deposit (QAR)
-                      </label>
-                      <Input
-                        type="number"
-                        placeholder="0.00"
-                        value={advanceAmount}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          setAdvanceAmount(val);
-                          setSecurityDepositAmount(val);
-                        }}
-                        className="h-9 text-sm"
-                      />
-                    </div>
-                    <div className="bg-card p-4 rounded-xl border border-slate-100 shadow-sm space-y-2">
-                      <label className="text-[11px] font-bold text-muted-foreground uppercase">
-                        Discount (%)
-                      </label>
-                      <Input
-                        type="number"
-                        placeholder="0"
-                        value={discountPercent}
-                        onChange={(e) => setDiscountPercent(e.target.value)}
-                        className="h-9 text-sm"
-                      />
-                    </div>
                   </div>
 
                   {/* Agreement Details (Shared for Rent/Lease) */}
