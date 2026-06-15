@@ -334,7 +334,17 @@ export default function EmployeeSalesTable({ mode = 'EMPLOYEE' }: EmployeeSalesT
                     className={`${index % 2 ? 'bg-blue-50/10' : 'bg-card'} hover:bg-muted/50 transition-colors`}
                   >
                     <TableCell className="text-blue-500 font-bold tracking-tight">
-                      {inv.invoiceNumber}
+                      {(() => {
+                        const rtn = inv.creditNotes?.find((cn) => cn.status === 'PRODUCT_REPLACED');
+                        if (rtn?.creditNoteNo) {
+                          const match = rtn.creditNoteNo.match(/(\d+)$/);
+                          const formatted = match
+                            ? `RTN-INV-${String(parseInt(match[1], 10)).padStart(4, '0')}`
+                            : `RTN-INV-${rtn.creditNoteNo}`;
+                          return <span className="text-rose-600">{formatted}</span>;
+                        }
+                        return inv.invoiceNumber;
+                      })()}
                     </TableCell>
                     <TableCell className="font-bold text-slate-700">
                       {inv.customerName || 'Walk-in'}

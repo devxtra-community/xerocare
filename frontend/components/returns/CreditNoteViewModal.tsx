@@ -255,6 +255,20 @@ export default function CreditNoteViewModal({ record, open, onClose }: Props) {
             </div>
           )}
 
+          {/* Payment Mode (if selected) */}
+          {record.paymentMode && (
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2 flex items-center gap-1.5">
+                <Banknote className="h-3 w-3" /> Settlement Method
+              </p>
+              <div className="rounded-xl bg-indigo-50 border border-indigo-100 px-4 py-3">
+                <p className="text-xs font-bold text-indigo-700 leading-relaxed uppercase tracking-wider">
+                  {record.paymentMode.replace('_', ' ')}
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* Rejection Reason */}
           {record.rejectionReason && (
             <div>

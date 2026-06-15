@@ -45,6 +45,7 @@ import RentPremiumQuotation from '../../public/quatationLayouts/rentquatation/pr
 import LeaseNormalQuotation from '../../public/quatationLayouts/leasequatation/normal/leasenormalquatation';
 import LeaseStandardQuotation from '../../public/quatationLayouts/leasequatation/standerd/leasestanterdquatation';
 import LeasePremiumQuotation from '../../public/quatationLayouts/leasequatation/premium/leasepremiumqutation';
+import ReturnInvoiceLayout from '../../public/quatationLayouts/ReturnInvoiceLayout';
 
 interface ProductMeta {
   brandRelation?: { name?: string };
@@ -92,6 +93,13 @@ export function InvoiceViewDialog({
   const [productDetails, setProductDetails] = useState<Record<string, ProductMeta>>({});
   const [isRejecting, setIsRejecting] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
+  // Controls whether the return invoice view or original invoice is shown
+  const [showingOriginalInvoice, setShowingOriginalInvoice] = useState(false);
+  const [showReturnSidebar, setShowReturnSidebar] = useState(false);
+
+  // Detect if this invoice has a completed return / replacement
+  const returnCreditNote = invoice.creditNotes?.find((cn) => cn.status === 'PRODUCT_REPLACED');
+  const isReturnInvoice = !!returnCreditNote;
 
   const currentUser = getUserFromToken();
   const canViewTimeline = currentUser && ['MANAGER', 'FINANCE', 'ADMIN'].includes(currentUser.role);
@@ -621,6 +629,22 @@ export function InvoiceViewDialog({
       ? invoice.monthlyLeaseAmount || invoice.totalAmount || 0
       : invoice.totalAmount || 0,
   };
+
+  // ── Return Invoice shortcut ───────────────────────────────────────────────
+  if (isReturnInvoice && !showingOriginalInvoice) {
+    return (
+      <Dialog open onOpenChange={(v) => !v && onClose()}>
+        <DialogContent className="sm:max-w-5xl rounded-none border-none shadow-2xl p-0 overflow-hidden bg-white flex flex-col h-[98vh]">
+          <DialogTitle className="sr-only">Return / Replacement Invoice</DialogTitle>
+          <ReturnInvoiceLayout
+            invoice={invoice}
+            onClose={onClose}
+            onViewOriginalInvoice={() => setShowingOriginalInvoice(true)}
+          />
+        </DialogContent>
+      </Dialog>
+    );
+  }
 
   return (
     <Dialog open onOpenChange={(v) => !v && onClose()}>
@@ -1290,6 +1314,7 @@ export function InvoiceViewDialog({
           </div>
           {/* Credit Exchange Details Sidebar */}
           {invoice.creditNotes &&
+            showReturnSidebar &&
             invoice.creditNotes.some((cn) => cn.status === 'PRODUCT_REPLACED') && (
               <div className="w-full md:w-[350px] shrink-0 border-t md:border-t-0 md:border-l border-violet-100 bg-violet-50/20 p-6 overflow-y-auto max-h-[45vh] md:max-h-full space-y-6">
                 <div className="flex items-center gap-2 text-violet-700">
@@ -1417,6 +1442,32 @@ export function InvoiceViewDialog({
             >
               Close
             </Button>
+            {isReturnInvoice && showingOriginalInvoice && (
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowingOriginalInvoice(false)}
+                  className="gap-2 border-rose-200 text-rose-700 hover:bg-rose-50 font-black text-[11px] uppercase tracking-widest"
+                >
+                  <RotateCcw size={13} />
+                  Back to Return Invoice
+                </Button>
+                <Button
+                  variant={showReturnSidebar ? 'secondary' : 'outline'}
+                  size="sm"
+                  onClick={() => setShowReturnSidebar(!showReturnSidebar)}
+                  className={`gap-2 font-black text-[11px] uppercase tracking-widest ${
+                    showReturnSidebar
+                      ? 'bg-violet-600 text-white hover:bg-violet-700 border-none'
+                      : 'border-violet-200 text-violet-700 hover:bg-violet-50'
+                  }`}
+                >
+                  <RotateCcw size={13} className={showReturnSidebar ? 'animate-spin-once' : ''} />
+                  {showReturnSidebar ? 'Hide Return Details' : 'Show Return Details'}
+                </Button>
+              </div>
+            )}
           </div>
           <div className="flex gap-2">
             {onReject && !isRejecting && (

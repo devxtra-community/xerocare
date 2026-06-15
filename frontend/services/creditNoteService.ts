@@ -28,7 +28,7 @@ export const sendToFinance = async (id: string) => {
 
 export const approveCreditNote = async (
   id: string,
-  data: { financeNote: string; damageReason: string },
+  data: { financeNote: string; damageReason: string; paymentMode: string },
 ) => {
   return api.post(`/b/credit-notes/${id}/approve`, data);
 };

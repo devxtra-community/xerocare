@@ -52,6 +52,11 @@ function StatusBadge({ status }: { status: string }) {
     EXPIRED: 'bg-red-50 text-red-700 border-red-200',
     CUSTOMER_ACCEPTED: 'bg-green-50 text-green-700 border-green-200',
     CUSTOMER_REJECTED: 'bg-red-50 text-red-700 border-red-200',
+    CANCELLED: 'bg-slate-50 text-slate-600 border-slate-200',
+    CREDIT_EXCHANGE: 'bg-purple-50 text-purple-700 border-purple-200',
+    PRODUCT_REPLACED: 'bg-purple-50 text-purple-700 border-purple-200',
+    CREDIT_RETURN: 'bg-purple-50 text-purple-700 border-purple-200',
+    CASH_REFUND: 'bg-purple-50 text-purple-700 border-purple-200',
   };
   const label: Record<string, string> = {
     DRAFT: 'DRAFT',
@@ -75,8 +80,10 @@ function StatusBadge({ status }: { status: string }) {
     WAITING_FINANCE_APPROVAL: 'PENDING FINANCE',
     EXPIRED: 'EXPIRED',
     CANCELLED: 'CANCELLED',
-    CREDIT_EXCHANGE: 'CREDIT EXCHANGE',
-    PRODUCT_REPLACED: 'EXCHANGE REALIZED',
+    CREDIT_EXCHANGE: 'CREDIT RETURN',
+    PRODUCT_REPLACED: 'REPLACED',
+    CREDIT_RETURN: 'CREDIT RETURN',
+    CASH_REFUND: 'CASH REFUND',
   };
   return (
     <Badge
@@ -446,10 +453,26 @@ export default function FinanceQuotationTable({
                     >
                       <TableCell className="py-3 px-3">
                         <div
-                          className="text-blue-500 font-semibold tracking-tight truncate text-xs"
-                          title={q.invoiceNumber?.replace(/^INV-/i, 'QTN-')}
+                          className={`${q.creditNotes?.some((cn) => cn.status === 'PRODUCT_REPLACED') ? 'text-rose-500' : 'text-blue-500'} font-semibold tracking-tight truncate text-xs`}
+                          title={(() => {
+                            const cn = q.creditNotes?.find((c) => c.status === 'PRODUCT_REPLACED');
+                            if (cn) {
+                              const match = cn.creditNoteNo?.match(/(\d+)$/);
+                              const num = match ? parseInt(match[1], 10) : 0;
+                              return `RTN-INV-${String(num).padStart(4, '0')}`;
+                            }
+                            return q.invoiceNumber?.replace(/^INV-/i, 'QTN-');
+                          })()}
                         >
-                          {q.invoiceNumber?.replace(/^INV-/i, 'QTN-')}
+                          {(() => {
+                            const cn = q.creditNotes?.find((c) => c.status === 'PRODUCT_REPLACED');
+                            if (cn) {
+                              const match = cn.creditNoteNo?.match(/(\d+)$/);
+                              const num = match ? parseInt(match[1], 10) : 0;
+                              return `RTN-INV-${String(num).padStart(4, '0')}`;
+                            }
+                            return q.invoiceNumber?.replace(/^INV-/i, 'QTN-');
+                          })()}
                         </div>
                       </TableCell>
                       <TableCell className="py-3 px-3">
@@ -506,7 +529,16 @@ export default function FinanceQuotationTable({
                         </div>
                       </TableCell>
                       <TableCell className="py-3 px-3">
-                        <StatusBadge status={q.status} />
+                        {(() => {
+                          const cn = q.creditNotes?.find((c) => c.status === 'PRODUCT_REPLACED');
+                          if (cn) {
+                            let s = 'PRODUCT_REPLACED';
+                            if (cn.type === 'DIRECT_REFUND') s = 'CASH_REFUND';
+                            else if (cn.type === 'CREDIT_EXCHANGE') s = 'CREDIT_EXCHANGE';
+                            return <StatusBadge status={s} />;
+                          }
+                          return <StatusBadge status={q.status} />;
+                        })()}
                       </TableCell>
                       <TableCell className="py-3 px-3">
                         <div className="text-muted-foreground font-medium truncate text-xs">

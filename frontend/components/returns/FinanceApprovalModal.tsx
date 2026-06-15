@@ -24,17 +24,18 @@ import { CreditNoteRecord } from '@/lib/invoice';
 interface Props {
   open: boolean;
   onClose: () => void;
-  onConfirm: (data: { financeNote: string; damageReason: string }) => void;
+  onConfirm: (data: { financeNote: string; damageReason: string; paymentMode: string }) => void;
   record: CreditNoteRecord | null;
 }
 
 export default function FinanceApprovalModal({ open, onClose, onConfirm, record }: Props) {
   const [financeNote, setFinanceNote] = useState('');
   const [damageReason, setDamageReason] = useState('');
+  const [paymentMode, setPaymentMode] = useState('');
 
   const handleSubmit = () => {
-    if (!financeNote || !damageReason) return;
-    onConfirm({ financeNote, damageReason });
+    if (!financeNote || !damageReason || !paymentMode) return;
+    onConfirm({ financeNote, damageReason, paymentMode });
   };
 
   return (
@@ -72,6 +73,20 @@ export default function FinanceApprovalModal({ open, onClose, onConfirm, record 
           </div>
 
           <div className="grid gap-2">
+            <Label>Payment Mode</Label>
+            <Select onValueChange={setPaymentMode}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select payment mode" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="CASH">Cash</SelectItem>
+                <SelectItem value="CHECK">Check</SelectItem>
+                <SelectItem value="BANK_TRANSFER">Bank Transfer</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="grid gap-2">
             <Label>Finance Note / Reason</Label>
             <Textarea
               placeholder="Enter approval note..."
@@ -88,7 +103,7 @@ export default function FinanceApprovalModal({ open, onClose, onConfirm, record 
           </Button>
           <Button
             onClick={handleSubmit}
-            disabled={!financeNote || !damageReason}
+            disabled={!financeNote || !damageReason || !paymentMode}
             className="bg-green-600 hover:bg-green-700"
           >
             Approve Return

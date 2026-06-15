@@ -20,6 +20,7 @@ import RentPremiumQuotation from '../../public/quatationLayouts/rentquatation/pr
 import LeaseNormalQuotation from '../../public/quatationLayouts/leasequatation/normal/leasenormalquatation';
 import LeaseStandardQuotation from '../../public/quatationLayouts/leasequatation/standerd/leasestanterdquatation';
 import LeasePremiumQuotation from '../../public/quatationLayouts/leasequatation/premium/leasepremiumqutation';
+import ReturnInvoiceLayout from '../../public/quatationLayouts/ReturnInvoiceLayout';
 import {
   Invoice,
   sendEmailNotification,
@@ -78,7 +79,11 @@ export function QuotationViewDialog({
   const [isSendingCustomer, setIsSendingCustomer] = useState(false);
   const [isRequestingExtension, setIsRequestingExtension] = useState(false);
   const [productDetails, setProductDetails] = useState<Record<string, ProductMeta>>({});
+  const [showingOriginalInvoice, setShowingOriginalInvoice] = useState(false);
   const router = useRouter();
+
+  const returnCreditNote = quotation.creditNotes?.find((cn) => cn.status === 'PRODUCT_REPLACED');
+  const isReturnInvoice = !!returnCreditNote;
 
   const isExpired = quotation.effectiveTo ? new Date() > new Date(quotation.effectiveTo) : false;
   const isExtensionRequested =
@@ -883,7 +888,16 @@ export function QuotationViewDialog({
 
   return (
     <Dialog open onOpenChange={(v) => !v && onClose()}>
-      {useTemplate ? (
+      {isReturnInvoice && !showingOriginalInvoice ? (
+        <DialogContent className="sm:max-w-5xl rounded-none border-none shadow-sm p-0 overflow-hidden bg-white flex flex-col h-[95vh]">
+          <DialogTitle className="sr-only">Return Invoice</DialogTitle>
+          <ReturnInvoiceLayout
+            invoice={quotation}
+            onClose={onClose}
+            onViewOriginalInvoice={() => setShowingOriginalInvoice(true)}
+          />
+        </DialogContent>
+      ) : useTemplate ? (
         <DialogContent className="sm:max-w-5xl rounded-none border-none shadow-sm p-0 overflow-hidden bg-white flex flex-col max-h-[95vh]">
           <DialogTitle className="sr-only">Quotation Document</DialogTitle>
           {quotation.status === 'RETAKEN' && (

@@ -78,6 +78,17 @@ function parseProductLabel(raw: string) {
   return { short, sub };
 }
 
+function getDisplayInvoiceNumber(inv: Invoice) {
+  const rtn = inv.creditNotes?.find((cn) => cn.status === 'PRODUCT_REPLACED');
+  if (rtn?.creditNoteNo) {
+    const match = rtn.creditNoteNo.match(/(\d+)$/);
+    return match
+      ? `RTN-INV-${String(parseInt(match[1], 10)).padStart(4, '0')}`
+      : `RTN-INV-${rtn.creditNoteNo}`;
+  }
+  return inv.invoiceNumber || inv.id.slice(0, 8);
+}
+
 const RETURN_TYPES = [
   {
     value: 'DIRECT_REFUND',
@@ -285,9 +296,37 @@ export default function CreditNoteFormModal({ open, onClose, onSave, record }: P
   };
 
   /* ── derived ── */
-  const invoiceItems = (selectedInvoice?.items || []).filter(
-    (i: GlobalInvoiceItem) => (i.quantity || 0) > 0 && (i.productId || i.itemType === 'PRODUCT'),
-  ) as unknown as ReturnInvoiceItem[];
+  const invoiceItems = (() => {
+    if (!selectedInvoice) return [];
+    const items = [...(selectedInvoice.items || [])];
+
+    // If this invoice has a replacement, that replacement is now the active product for this "invoice" record
+    const replacement = selectedInvoice.creditNotes?.find((cn) => cn.status === 'PRODUCT_REPLACED');
+    if (replacement && replacement.replacementProductId) {
+      // Add the replacement product to the selectable list if not already there
+      const alreadyHas = items.some((i) => i.productId === replacement.replacementProductId);
+      if (!alreadyHas) {
+        items.push({
+          productId: replacement.replacementProductId,
+          description: replacement.replacementProductName || 'Replacement Product',
+          quantity: 1,
+          unitPrice: replacement.replacementAmount || 0,
+          totalAmount: replacement.replacementAmount || 0,
+          serialNumber: replacement.replacementSerialNumber,
+          itemType: 'PRODUCT',
+        } as unknown as GlobalInvoiceItem);
+      }
+    }
+
+    return items.filter(
+      (i: GlobalInvoiceItem) =>
+        (i.quantity || 0) > 0 &&
+        (i.productId ||
+          i.itemType === 'PRODUCT' ||
+          i.description.includes('HP') ||
+          i.description.includes('Canon')),
+    ) as unknown as ReturnInvoiceItem[];
+  })();
 
   const productImageUrl = productMeta?.imageUrl;
   const productBrand = productMeta?.brand || productMeta?.model?.brandRelation?.name || '—';
@@ -298,7 +337,7 @@ export default function CreditNoteFormModal({ open, onClose, onSave, record }: P
   const soldDate = selectedInvoice?.createdAt
     ? format(new Date(selectedInvoice.createdAt), 'dd MMM yyyy')
     : '—';
-  const invoiceNumber = selectedInvoice?.invoiceNumber || '—';
+  const invoiceNumber = selectedInvoice ? getDisplayInvoiceNumber(selectedInvoice) : '—';
   const canSubmit = !!selectedCustomer && !!selectedInvoice && !!selectedProduct;
 
   /* ── render ── */
@@ -447,7 +486,7 @@ export default function CreditNoteFormModal({ open, onClose, onSave, record }: P
                       <SelectContent>
                         {invoices.map((i) => (
                           <SelectItem key={i.id} value={i.id}>
-                            {i.invoiceNumber || i.id.slice(0, 8)} — {i.status}
+                            {getDisplayInvoiceNumber(i)} — {i.status}
                           </SelectItem>
                         ))}
                       </SelectContent>

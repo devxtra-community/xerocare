@@ -89,6 +89,7 @@ export interface CreditNoteRecord {
   financeNote?: string;
   damageReason?: string;
   rejectionReason?: string;
+  paymentMode?: string;
   replacementProductId?: string;
   replacementProductName?: string;
   replacementSerialNumber?: string;
@@ -183,9 +184,15 @@ export interface Invoice {
     productName: string;
     modelName: string;
     brand: string;
+    serialNumber?: string;
     replacementProductId?: string;
     replacementProductName?: string;
     replacementSerialNumber?: string;
+    notes?: string;
+    damageReason?: string;
+    financeNote?: string;
+    paymentMode?: string;
+    createdAt?: string;
   }>;
   productAllocations?: Array<{
     id: string;

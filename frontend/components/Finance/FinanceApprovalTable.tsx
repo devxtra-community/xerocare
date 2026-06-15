@@ -372,15 +372,32 @@ export default function FinanceApprovalTable({ saleType }: FinanceApprovalTableP
               <TableRow key={inv.id}>
                 <TableCell className="font-bold">
                   <div className="flex flex-col">
-                    <span>{inv.invoiceNumber}</span>
+                    <span
+                      className={
+                        inv.creditNotes?.some((cn) => cn.status === 'PRODUCT_REPLACED')
+                          ? 'text-rose-600'
+                          : ''
+                      }
+                    >
+                      {(() => {
+                        const cn = inv.creditNotes?.find((c) => c.status === 'PRODUCT_REPLACED');
+                        if (cn) {
+                          const match = cn.creditNoteNo?.match(/(\d+)$/);
+                          const num = match ? parseInt(match[1], 10) : 0;
+                          return `RTN-INV-${String(num).padStart(4, '0')}`;
+                        }
+                        return inv.invoiceNumber;
+                      })()}
+                    </span>
                     {(() => {
-                      const completedExchange = inv.creditNotes?.find(
-                        (cn) => cn.status === 'PRODUCT_REPLACED' && cn.type === 'CREDIT_EXCHANGE',
-                      );
-                      if (completedExchange) {
+                      const cn = inv.creditNotes?.find((cn) => cn.status === 'PRODUCT_REPLACED');
+                      if (cn) {
+                        let label = 'EXCHANGED';
+                        if (cn.type === 'DIRECT_REFUND') label = 'CASH REFUND';
+                        else if (cn.type === 'CREDIT_EXCHANGE') label = 'CREDIT RETURN';
                         return (
-                          <Badge className="w-fit bg-violet-100 text-violet-600 border-none text-[8px] h-3 px-1 mt-0.5">
-                            EXCHANGED
+                          <Badge className="w-fit bg-purple-100 text-purple-600 border-none text-[8px] h-3 px-1 mt-0.5">
+                            {label}
                           </Badge>
                         );
                       }

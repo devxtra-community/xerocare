@@ -40,7 +40,11 @@ export default function AdminReturnsPage() {
     fetchData();
   }, []);
 
-  const handleApprove = async (approvalData: { financeNote: string; damageReason: string }) => {
+  const handleApprove = async (approvalData: {
+    financeNote: string;
+    damageReason: string;
+    paymentMode: string;
+  }) => {
     try {
       if (!selectedRecord) return;
       const res = await approveCreditNote(selectedRecord.id, approvalData);
