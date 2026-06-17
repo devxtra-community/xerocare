@@ -23,6 +23,7 @@ export class OtpService {
       type: 'OTP',
       email,
       otp,
+      purpose,
     }).catch((err) => {
       logger.error('Failed to queue OTP email', err);
     });

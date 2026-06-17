@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import {
@@ -14,36 +14,116 @@ import {
   FileText,
   User,
   GraduationCap,
+  Loader2,
 } from 'lucide-react';
+import { getEmployeeById, getEmployeeIdProof, Employee } from '@/lib/employee';
+import { formatCurrency } from '@/lib/format';
+import { toast } from 'sonner';
 
 export default function EmployeeProfilePage() {
   const params = useParams();
   const router = useRouter();
   const id = params.id as string;
 
-  // Mock employee data
-  const employee = {
-    id: id || '1',
-    name: 'Arjun Mehta',
-    role: 'Senior Sales Executive',
-    department: 'Sales',
-    status: 'Active',
-    email: 'arjun@xerocare.com',
-    phone: '+91 9876543210',
-    address: '45, Skyline Apartments, Hitech City, Hyderabad - 500081',
-    joiningDate: '15 Jan 2023',
-    visaExpire: '12 Jun 2025',
-    salary: 'QAR 85,000 / month',
-    attendance: '94%',
-    leaves: '4 / 12',
-    performance: 'Excellent',
-    idProof: 'AadharCard_Arjun.pdf',
-    visaCopy: 'Visa_Arjun_2025.pdf',
-    education: 'MBA in Marketing, IIM Bangalore',
+  const [employee, setEmployee] = useState<Employee | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [viewingDoc, setViewingDoc] = useState(false);
+
+  useEffect(() => {
+    async function fetchEmployee() {
+      try {
+        setLoading(true);
+        const res = await getEmployeeById(id);
+        if (res && res.success && res.data) {
+          setEmployee(res.data);
+        } else {
+          toast.error('Failed to load employee profile');
+        }
+      } catch (err) {
+        console.error('Failed to load employee details:', err);
+        toast.error('Failed to connect to employee service');
+      } finally {
+        setLoading(false);
+      }
+    }
+    if (id) {
+      fetchEmployee();
+    }
+  }, [id]);
+
+  const handleViewIdProof = async () => {
+    if (viewingDoc) return;
+    try {
+      setViewingDoc(true);
+      const res = await getEmployeeIdProof(id);
+      if (res && res.success && res.data?.url) {
+        window.open(res.data.url, '_blank');
+      } else {
+        toast.error('Failed to fetch the document URL');
+      }
+    } catch (err) {
+      console.error('Error fetching document:', err);
+      toast.error('Failed to load ID Proof document');
+    } finally {
+      setViewingDoc(false);
+    }
   };
 
+  if (loading) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-muted/50 p-6 space-y-4">
+        <Loader2 className="h-10 w-10 animate-spin text-blue-600" />
+        <p className="text-sm font-medium text-slate-500">Loading employee details...</p>
+      </div>
+    );
+  }
+
+  if (!employee) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-muted/50 p-6 space-y-4">
+        <p className="text-lg font-bold text-slate-800">Employee not found</p>
+        <Button onClick={() => router.back()} className="bg-blue-600 hover:bg-blue-700 text-white">
+          <ArrowLeft className="h-4 w-4 mr-2" /> Go Back
+        </Button>
+      </div>
+    );
+  }
+
+  const fullName = `${employee.first_name || ''} ${employee.last_name || ''}`.trim() || 'Unknown';
+
+  // Format role
+  let roleDisplay = employee.role || 'Staff';
+  if (employee.role === 'MANAGER') roleDisplay = 'Branch Manager';
+  else if (employee.role === 'HR') roleDisplay = 'HR Specialist';
+  else if (employee.role === 'FINANCE') roleDisplay = 'Finance Manager';
+
+  // Format department
+  let deptDisplay = 'Other';
+  if (employee.role === 'MANAGER') deptDisplay = 'Management';
+  else if (employee.role === 'HR') deptDisplay = 'Human Resources';
+  else if (employee.role === 'FINANCE') deptDisplay = employee.finance_job || 'Finance';
+  else if (employee.role === 'EMPLOYEE') deptDisplay = employee.employee_job || 'Employee';
+
+  const joiningDate = employee.createdAt
+    ? new Date(employee.createdAt).toLocaleDateString('en-US', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+      })
+    : '—';
+
+  const visaExpire = employee.expire_date
+    ? new Date(employee.expire_date).toLocaleDateString('en-US', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+      })
+    : '—';
+
+  const statusLabel = employee.status === 'ACTIVE' ? 'Active' : 'Inactive';
+
   return (
-    <div className="min-h-screen bg-muted/50/50 p-6 space-y-8">
+    <div className="min-h-screen bg-muted/50 p-6 space-y-8">
       {/* HEADER */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-4">
@@ -56,27 +136,27 @@ export default function EmployeeProfilePage() {
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div className="flex items-center gap-4">
-            <div className="h-12 w-12 rounded-full bg-primary flex items-center justify-center text-white text-xl font-medium shadow-sm">
-              {employee.name.charAt(0)}
+            <div className="h-12 w-12 rounded-full bg-blue-600 flex items-center justify-center text-white text-xl font-medium shadow-sm">
+              {fullName.charAt(0)}
             </div>
             <div>
               <h3 className="text-lg font-semibold text-primary flex items-center gap-3">
-                {employee.name}
-                <span className="px-2 py-0.5 rounded-full text-xs bg-green-50 text-green-700 font-medium border border-green-100">
-                  {employee.status}
+                {fullName}
+                <span
+                  className={`px-2 py-0.5 rounded-full text-xs font-medium border ${
+                    employee.status === 'ACTIVE'
+                      ? 'bg-green-50 text-green-700 border-green-100'
+                      : 'bg-orange-50 text-orange-700 border-orange-100'
+                  }`}
+                >
+                  {statusLabel}
                 </span>
               </h3>
               <p className="text-sm text-muted-foreground">
-                {employee.role} &middot; {employee.department}
+                {roleDisplay} &middot; {deptDisplay}
               </p>
             </div>
           </div>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" className="bg-card gap-2 h-9 font-medium px-4">
-            <Mail className="h-4 w-4" /> Message
-          </Button>
-          <Button className="gap-2 h-9 font-medium px-4">Edit Profile</Button>
         </div>
       </div>
 
@@ -90,9 +170,13 @@ export default function EmployeeProfilePage() {
             </h4>
             <div className="space-y-5">
               <InfoRow icon={<Mail />} label="Email" value={employee.email} isCritical />
-              <InfoRow icon={<Phone />} label="Phone" value={employee.phone} />
-              <InfoRow icon={<MapPin />} label="Address" value={employee.address} />
-              <InfoRow icon={<GraduationCap />} label="Education" value={employee.education} />
+              <InfoRow icon={<Phone />} label="Phone" value={employee.phone || '—'} />
+              <InfoRow
+                icon={<MapPin />}
+                label="Branch"
+                value={employee.branch?.name || 'Main Branch'}
+              />
+              <InfoRow icon={<GraduationCap />} label="Education" value="Not Provided" />
             </div>
           </div>
 
@@ -101,9 +185,20 @@ export default function EmployeeProfilePage() {
               <ShieldCheck className="h-4 w-4 text-muted-foreground" /> Documents
             </h4>
             <div className="space-y-3">
-              <DocumentRow name="VisaCopy_2025.pdf" size="2.4 MB" />
-              <DocumentRow name="ID_Proof_Aadhar.pdf" size="1.2 MB" />
-              <DocumentRow name="Joining_Letter.pdf" size="845 KB" />
+              {employee.id_proof_key ? (
+                <DocumentRow
+                  name="ID Proof / Passport Document"
+                  size="S3 Key Scan copy"
+                  onView={handleViewIdProof}
+                  loading={viewingDoc}
+                />
+              ) : (
+                <div className="text-center py-4">
+                  <p className="text-xs text-muted-foreground">
+                    No documents uploaded for this employee.
+                  </p>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -116,29 +211,23 @@ export default function EmployeeProfilePage() {
             </h4>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-8">
               <div className="space-y-6">
-                <InfoRow
-                  icon={<Calendar />}
-                  label="Joining Date"
-                  value={employee.joiningDate}
-                  isCritical
-                />
+                <InfoRow icon={<Calendar />} label="Joining Date" value={joiningDate} isCritical />
+                <InfoRow icon={<Briefcase />} label="Department" value={deptDisplay} isCritical />
                 <InfoRow
                   icon={<Briefcase />}
-                  label="Department"
-                  value={employee.department}
-                  isCritical
+                  label="Monthly Salary"
+                  value={
+                    employee.salary ? `${formatCurrency(Number(employee.salary))} / month` : '—'
+                  }
                 />
-                <InfoRow icon={<Calendar />} label="Probation End" value="15 Apr 2023" />
               </div>
               <div className="space-y-6">
+                <InfoRow icon={<ShieldCheck />} label="Visa Expiry" value={visaExpire} isCritical />
                 <InfoRow
-                  icon={<ShieldCheck />}
-                  label="Visa Expiry"
-                  value={employee.visaExpire}
-                  isCritical
+                  icon={<User />}
+                  label="Report To"
+                  value={employee.reporting_manager || 'Main Manager'}
                 />
-                <InfoRow icon={<User />} label="Report To" value="Riyas (Manager)" />
-                <InfoRow icon={<Calendar />} label="Last Promotion" value="N/A" />
               </div>
             </div>
           </div>
@@ -173,7 +262,17 @@ function InfoRow({
   );
 }
 
-function DocumentRow({ name, size }: { name: string; size: string }) {
+function DocumentRow({
+  name,
+  size,
+  onView,
+  loading,
+}: {
+  name: string;
+  size: string;
+  onView: () => void;
+  loading: boolean;
+}) {
   return (
     <div className="flex items-center justify-between p-3 rounded-lg border border-gray-100 hover:bg-muted/50 transition-colors">
       <div className="flex items-center gap-3">
@@ -189,8 +288,10 @@ function DocumentRow({ name, size }: { name: string; size: string }) {
         variant="ghost"
         size="sm"
         className="text-primary hover:text-primary hover:bg-transparent px-2 h-8"
+        onClick={onView}
+        disabled={loading}
       >
-        View
+        {loading ? 'Opening...' : 'View'}
       </Button>
     </div>
   );

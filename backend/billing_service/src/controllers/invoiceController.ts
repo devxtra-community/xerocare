@@ -1392,7 +1392,19 @@ export const getInvoiceAuditLogs = async (req: Request, res: Response, next: Nex
 
 export const createServiceQuotation = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { customerId, branchId, createdBy, serviceTicketId, items, saleType, status } = req.body;
+    const {
+      customerId,
+      branchId,
+      createdBy,
+      serviceTicketId,
+      items,
+      saleType,
+      status,
+      visitChargeAmount,
+      visitChargeMethod,
+      totalDiscountAmount,
+      technicianNoteToFinance,
+    } = req.body;
     const invoice = await billingService.createServiceQuotation({
       customerId,
       branchId,
@@ -1401,6 +1413,10 @@ export const createServiceQuotation = async (req: Request, res: Response, next: 
       items,
       saleType,
       status,
+      visitChargeAmount,
+      visitChargeMethod,
+      totalDiscountAmount,
+      technicianNoteToFinance,
     });
     return res.status(201).json({
       success: true,
@@ -1466,6 +1482,51 @@ export const getCustomerBillingHistory = async (
     return res.status(200).json({
       success: true,
       data: grouped,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const reviseEstimate = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = req.params.id as string;
+    const { items, visitChargeAmount, visitChargeMethod, discountAmount, technicianNoteToFinance } =
+      req.body;
+    const userId = req.user?.userId || 'SYSTEM';
+
+    const result = await billingService.reviseEstimate(
+      id,
+      { items, visitChargeAmount, visitChargeMethod, discountAmount, technicianNoteToFinance },
+      userId,
+    );
+
+    return res.status(200).json({
+      success: true,
+      data: result,
+      message: 'Estimate revised and submitted to finance successfully',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const financeExtendValidity = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = req.params.id as string;
+    const { extensionDays, extensionFee } = req.body;
+    const userId = req.user?.userId || 'SYSTEM';
+
+    const result = await billingService.financeExtendValidity(
+      id,
+      { extensionDays, extensionFee },
+      userId,
+    );
+
+    return res.status(200).json({
+      success: true,
+      data: result,
+      message: 'Estimate approved with validity extension successfully',
     });
   } catch (error) {
     next(error);

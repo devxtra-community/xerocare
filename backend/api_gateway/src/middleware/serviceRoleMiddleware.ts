@@ -18,8 +18,11 @@ export const requireServiceRole = (allowedJobs: string[], allowManagerAdmin = tr
       return next();
     }
 
-    // Check if employee has one of the allowed jobs
-    if (role === 'EMPLOYEE' && employeeJob && allowedJobs.includes(employeeJob)) {
+    // Check if employee has one of the allowed jobs or if user is FINANCE and FINANCE is allowed
+    if (
+      (role === 'EMPLOYEE' && employeeJob && allowedJobs.includes(employeeJob)) ||
+      (role === 'FINANCE' && allowedJobs.includes('FINANCE'))
+    ) {
       return next();
     }
 

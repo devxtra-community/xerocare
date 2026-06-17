@@ -129,38 +129,50 @@ export default function RfqDetails({ id, basePath }: RfqDetailsProps) {
    * Priority: registered Model name → registered SparePart name → custom name fields → raw ID.
    */
   const getItemName = (item: Record<string, unknown>): string => {
+    const customProductName = item.custom_product_name || item.customProductName;
+    const customSparePartName = item.custom_spare_part_name || item.customSparePartName;
+    const productId = item.product_id || item.productId;
+    const modelId = item.model_id || item.modelId;
+    const sparePartId = item.spare_part_id || item.sparePartId;
+
     // Custom names take highest priority (free-text items)
-    if (item.custom_product_name) return item.custom_product_name as string;
-    if (item.custom_spare_part_name) return item.custom_spare_part_name as string;
+    if (customProductName) return customProductName as string;
+    if (customSparePartName) return customSparePartName as string;
 
     // Registered product lookup
-    if (item.product_id) {
-      const p = products.find((pr) => pr.id === item.product_id);
+    if (productId) {
+      const p = products.find((pr) => pr.id === productId);
       if (p) return p.name;
     }
     // Registered model lookup
-    if (item.model_id) {
-      const model = models.find((m) => m.id === item.model_id);
-      if (model) return model.model_name || model.model_no || (item.model_id as string);
+    if (modelId) {
+      const model = models.find((m) => m.id === modelId);
+      if (model) return model.model_name || model.model_no || (modelId as string);
     }
     // Registered spare part lookup
-    if (item.spare_part_id) {
-      const sp = spareParts.find((s) => s.id === item.spare_part_id);
+    if (sparePartId) {
+      const sp = spareParts.find((s) => s.id === sparePartId);
       if (sp) return sp.part_name;
     }
-    return (item.model_id || item.spare_part_id || item.product_id || 'Unknown') as string;
+    return (modelId || sparePartId || productId || 'Unknown') as string;
   };
 
   const getBrandName = (item: Record<string, unknown>): string => {
-    if (item.custom_brand_name) return item.custom_brand_name as string;
+    const customBrandName = item.custom_brand_name || item.customBrandName;
+    const brandId = item.brand_id || item.brandId;
+    const modelId = item.model_id || item.modelId;
+    const sparePartId = item.spare_part_id || item.sparePartId;
+    const productId = item.product_id || item.productId;
 
-    if (item.brand_id) {
-      const b = brands.find((br) => br.id === item.brand_id);
+    if (customBrandName) return customBrandName as string;
+
+    if (brandId) {
+      const b = brands.find((br) => br.id === brandId);
       if (b) return b.name;
     }
 
-    if (item.model_id) {
-      const model = models.find((m) => m.id === item.model_id);
+    if (modelId) {
+      const model = models.find((m) => m.id === modelId);
       if (model) {
         const b = brands.find((br) => br.id === (model as { brand_id?: string }).brand_id);
         if (b) return b.name;
@@ -168,8 +180,8 @@ export default function RfqDetails({ id, basePath }: RfqDetailsProps) {
       }
     }
 
-    if (item.spare_part_id) {
-      const sp = spareParts.find((s) => s.id === item.spare_part_id);
+    if (sparePartId) {
+      const sp = spareParts.find((s) => s.id === sparePartId);
       if (sp) {
         if (sp.brand) return sp.brand;
         const b = brands.find((br) => br.id === (sp as { brand_id?: string }).brand_id);
@@ -177,11 +189,11 @@ export default function RfqDetails({ id, basePath }: RfqDetailsProps) {
       }
     }
 
-    if (item.product_id) {
-      const p = products.find((pr) => pr.id === item.product_id);
-      const modelId = p?.model?.id || (p as { model_id?: string })?.model_id;
-      if (modelId) {
-        const model = models.find((m) => m.id === modelId);
+    if (productId) {
+      const p = products.find((pr) => pr.id === productId);
+      const mId = p?.model?.id || (p as { model_id?: string })?.model_id;
+      if (mId) {
+        const model = models.find((m) => m.id === mId);
         if (model) {
           const b = brands.find((br) => br.id === (model as { brand_id?: string }).brand_id);
           if (b) return b.name;
@@ -679,7 +691,7 @@ export default function RfqDetails({ id, basePath }: RfqDetailsProps) {
                             );
                             return (
                               <div
-                                className={`text-xl font-black ${vs.isCheapest ? 'text-green-600' : 'text-slate-900'}`}
+                                className={`text-xl font-black ${vs.isCheapest && (comparison.vendorsSummary as unknown[]).length > 1 ? 'text-green-600' : 'text-slate-900'}`}
                               >
                                 {formatCurrency(
                                   vs.totalAmount as number,
@@ -688,13 +700,14 @@ export default function RfqDetails({ id, basePath }: RfqDetailsProps) {
                               </div>
                             );
                           })()}
-                          {!!(vs as { isCheapest?: boolean }).isCheapest && (
-                            <div className="mt-2 flex justify-center">
-                              <Badge className="bg-green-600 hover:bg-green-600 animate-pulse text-[10px] px-3">
-                                Cheapest Option
-                              </Badge>
-                            </div>
-                          )}
+                          {!!(vs as { isCheapest?: boolean }).isCheapest &&
+                            (comparison.vendorsSummary as unknown[]).length > 1 && (
+                              <div className="mt-2 flex justify-center">
+                                <Badge className="bg-green-600 hover:bg-green-600 animate-pulse text-[10px] px-3">
+                                  Cheapest Option
+                                </Badge>
+                              </div>
+                            )}
                         </td>
                       ),
                     )}

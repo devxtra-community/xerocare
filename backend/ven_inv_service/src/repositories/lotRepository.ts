@@ -280,6 +280,24 @@ export class LotRepository {
   }
 
   /**
+   * Links a spare part to a custom lot item.
+   */
+  async linkSparePartToLotItem(
+    lotId: string,
+    customSparePartName: string,
+    sparePartId: string,
+    transactionManager?: EntityManager,
+  ): Promise<void> {
+    const repo = transactionManager
+      ? transactionManager.getRepository(LotItem)
+      : this.repo.manager.getRepository(LotItem);
+    await repo.update(
+      { lotId, customSparePartName, itemType: LotItemType.SPARE_PART },
+      { sparePartId },
+    );
+  }
+
+  /**
    * Retrieves all lots with relations, optionally filtered by branch.
    */
   async getAllLots(branchId?: string) {

@@ -1,6 +1,14 @@
 import { Request, Response, NextFunction } from 'express';
+import { AppError } from '../errors/appError';
 import { Source } from '../config/db';
 import { IsNull, FindOptionsWhere } from 'typeorm';
+import {
+  generateServiceQuotationPdf,
+  generateServiceCompletionBillPdf,
+  PdfPerson,
+} from '../utils/servicePdfGenerator';
+import { sendServicePdfEmail } from '../utils/emailService';
+import { sendWhatsappMessage } from '../utils/whatsapp';
 import {
   ServiceTicket,
   ServiceTicketStatus,
@@ -27,6 +35,7 @@ import { ServiceContract, ServiceContractType } from '../entities/serviceContrac
 import { ServicePartUsageLog } from '../entities/servicePartUsageLogEntity';
 import { NotificationPublisher } from '../events/publisher/notificationPublisher';
 import axios from 'axios';
+import { sign } from 'jsonwebtoken';
 import { logger } from '../config/logger';
 import { BILLING_ENDPOINTS, CRM_ENDPOINTS } from '../constants/serviceUrls';
 import {
@@ -35,11 +44,35 @@ import {
   getHelpDeskEmployeesByBranch,
 } from '../helpers/serviceHelpers';
 
+const ACCESS_SECRET = process.env.ACCESS_SECRET || 'secret';
 const CRM_SERVICE_URL = process.env.CRM_SERVICE_URL || 'http://localhost:3005';
 const BILLING_SERVICE_URL = process.env.BILLING_SERVICE_URL || 'http://localhost:3004';
 const EMPLOYEE_SERVICE_URL = process.env.EMPLOYEE_SERVICE_URL || 'http://localhost:3002';
 
+interface ReviseEstimateItem {
+  itemSource?: ServiceItemSource;
+  sparePartId?: string;
+  sku?: string;
+  partName?: string;
+  description?: string;
+  quantity: number;
+  unitPrice: number;
+  isFree?: boolean;
+}
+
 export class ServiceController {
+  private async generateBillNumber(): Promise<string> {
+    const now = new Date();
+    const yearMonth = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const ticketRepo = Source.getRepository(ServiceTicket);
+    const count = await ticketRepo
+      .createQueryBuilder('ticket')
+      .where('ticket.completion_bill_number LIKE :pattern', { pattern: `SCB-${yearMonth}-%` })
+      .getCount();
+    const nextNum = String(count + 1).padStart(4, '0');
+    return `SCB-${yearMonth}-${nextNum}`;
+  }
+
   /**
    * Helper to fetch admins and managers for notifications.
    */
@@ -535,11 +568,50 @@ export class ServiceController {
    */
   diagnoseTicket = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { problemFound, rootCause, technicianNotes, meterReading, items } = req.body;
+      const {
+        problemFound,
+        rootCause,
+        technicianNotes,
+        meterReading,
+        items,
+        labourCost,
+        visitChargeAmount,
+        visitChargeMethod,
+        discountAmount,
+        technicianNoteToFinance,
+      } = req.body;
       const id = req.params.id as string;
       const ticketRepo = Source.getRepository(ServiceTicket);
       const ticket = await ticketRepo.findOne({ where: { id: String(id) } });
       if (!ticket) throw new Error('Ticket not found');
+
+      const isFreeContext = ticket.track === 'A';
+
+      // Validate discount <= total maxDiscountableAmount across parts
+      if (!isFreeContext) {
+        let totalMaxDiscount = 0;
+        const sparePartRepo = Source.getRepository(SparePart);
+        if (items && Array.isArray(items)) {
+          for (const itemData of items) {
+            if (itemData.itemSource === ServiceItemSource.SPARE_PART && itemData.sparePartId) {
+              const part = await sparePartRepo.findOne({
+                where: { id: String(itemData.sparePartId) },
+              });
+              if (part) {
+                totalMaxDiscount +=
+                  (Number(part.maxDiscountableAmount) || 0) * (itemData.quantity || 1);
+              }
+            }
+          }
+        }
+
+        if (Number(discountAmount || 0) > totalMaxDiscount) {
+          throw new AppError(
+            `Discount of QAR ${discountAmount} exceeds the maximum allowed discount of QAR ${totalMaxDiscount} for the selected parts.`,
+            400,
+          );
+        }
+      }
 
       ticket.diagnosisCompletedAt = new Date();
       if (ticket.diagnosisStartedAt) {
@@ -553,12 +625,12 @@ export class ServiceController {
       ticket.diagnosisNotes = technicianNotes;
       ticket.meterReadingAtService = meterReading || 0;
 
-      const isFreeContext = ticket.track === 'A';
-
       if (isFreeContext) {
         ticket.status = ServiceTicketStatus.FREE_SERVICE;
       } else {
-        ticket.status = ServiceTicketStatus.DIAGNOSED;
+        ticket.status = ServiceTicketStatus.WAITING_FINANCE_APPROVAL;
+        ticket.visitChargeAmount = Number(visitChargeAmount) || 0;
+        ticket.visitChargeMethod = visitChargeMethod || null;
       }
 
       await ticketRepo.save(ticket);
@@ -660,15 +732,31 @@ export class ServiceController {
           isFree: true,
         }));
         try {
-          const response = await axios.post(`${BILLING_SERVICE_URL}/invoices/service-quotation`, {
-            customerId: ticket.customerId,
-            branchId: ticket.branchId,
-            createdBy: req.user?.userId || 'SYSTEM',
-            serviceTicketId: ticket.id,
-            items: billingItems,
-            saleType: 'SERVICE',
-            status: 'APPROVED',
-          });
+          const token = sign(
+            { userId: 'ven_inv_service', role: 'ADMIN' },
+            ACCESS_SECRET as string,
+            {
+              expiresIn: '1m',
+            },
+          );
+
+          const response = await axios.post(
+            `${BILLING_SERVICE_URL}/invoices/service-quotation`,
+            {
+              customerId: ticket.customerId,
+              branchId: ticket.branchId,
+              createdBy: req.user?.userId || 'SYSTEM',
+              serviceTicketId: ticket.id,
+              items: billingItems,
+              saleType: 'SERVICE',
+              status: 'APPROVED',
+            },
+            {
+              headers: {
+                Authorization: `Bearer ${token}`,
+              },
+            },
+          );
           if (response.data?.success) {
             ticket.linkedInvoiceId = response.data.data.id;
             ticket.estimateSentToFinance = true;
@@ -686,8 +774,8 @@ export class ServiceController {
         );
       }
 
-      // If Track B workflow with parts or labor, automatically generate a DRAFT Estimate
-      const inputLabour = Number(req.body.labourCost) || 0;
+      // If Track B workflow with parts or labor, automatically generate a WAITING_FINANCE_APPROVAL Estimate
+      const inputLabour = Number(labourCost) || 0;
       const finalLabourCost =
         ticket.serviceContext === ServiceContext.AMC ||
         ticket.serviceContext === ServiceContext.RENT ||
@@ -698,7 +786,7 @@ export class ServiceController {
           ? 0
           : inputLabour;
 
-      if (!isFreeContext && ((items && items.length > 0) || finalLabourCost > 0)) {
+      if (!isFreeContext && ((ticketItems && ticketItems.length > 0) || finalLabourCost > 0)) {
         const estimateRepo = Source.getRepository(ServiceEstimate);
         const estItemRepo = Source.getRepository(ServiceEstimateItem);
 
@@ -709,7 +797,7 @@ export class ServiceController {
           ticketId: ticket.id,
           labourCost: finalLabourCost,
           totalCost: 0,
-          status: ServiceEstimateStatus.DRAFT,
+          status: ServiceEstimateStatus.WAITING_FINANCE_APPROVAL,
           version: 1,
         });
         await estimateRepo.save(estimate);
@@ -743,9 +831,64 @@ export class ServiceController {
         await this.logActivity(
           ticket.id,
           'ESTIMATE_CREATED',
-          `Draft Estimate Version 1 automatically created. Total: ${totalCost}`,
+          `Estimate Version 1 created in WAITING_FINANCE_APPROVAL status. Total: ${totalCost}`,
           req.user?.userId,
         );
+
+        // Generate billing invoice for Track B
+        const billingItems = ticketItems.map((item) => ({
+          description: item.partName,
+          quantity: item.quantity,
+          unitPrice: Number(item.unitPrice) || 0,
+          isFree: item.isFree,
+        }));
+
+        billingItems.push({
+          description: 'Labor Cost / Service Charge',
+          quantity: 1,
+          unitPrice: Number(finalLabourCost) || 0,
+          isFree: false,
+        });
+
+        try {
+          const token = sign(
+            { userId: 'ven_inv_service', role: 'ADMIN' },
+            ACCESS_SECRET as string,
+            {
+              expiresIn: '1m',
+            },
+          );
+
+          const response = await axios.post(
+            `${BILLING_SERVICE_URL}/invoices/service-quotation`,
+            {
+              customerId: ticket.customerId,
+              branchId: ticket.branchId,
+              createdBy: req.user?.userId || 'SYSTEM',
+              serviceTicketId: ticket.id,
+              items: billingItems,
+              visitChargeAmount: Number(visitChargeAmount) || 0,
+              visitChargeMethod: visitChargeMethod || null,
+              discountAmount: Number(discountAmount) || 0,
+              technicianNoteToFinance: technicianNoteToFinance || null,
+              saleType: 'PRODUCT_SALE',
+              status: 'WAITING_FINANCE_APPROVAL',
+            },
+            {
+              headers: {
+                Authorization: `Bearer ${token}`,
+              },
+            },
+          );
+          if (response.data?.success) {
+            ticket.serviceQuotationId = response.data.data.id;
+            ticket.linkedInvoiceId = response.data.data.id;
+            ticket.estimateSentToFinance = true;
+            await ticketRepo.save(ticket);
+          }
+        } catch (billingErr) {
+          logger.error('Failed to post estimate to billing service:', billingErr);
+        }
       }
 
       await this.logActivity(
@@ -901,6 +1044,61 @@ export class ServiceController {
       const ticket = await ticketRepo.findOne({ where: { id: String(id) } });
       if (ticket) {
         ticket.status = ServiceTicketStatus.WAITING_FINANCE_APPROVAL;
+
+        // Post the Track B estimate to the billing service to generate a service quotation
+        const billingItems = (estimate.items || [])
+          .filter((it) => it.isApproved)
+          .map((it) => ({
+            description: it.partName || it.sku || 'Spare Part',
+            quantity: Number(it.quantity) || 1,
+            unitPrice: Number(it.unitPrice) || 0,
+            isFree: !!it.isFree,
+          }));
+
+        if (Number(estimate.labourCost) > 0) {
+          billingItems.push({
+            description: 'Labour Charges',
+            quantity: 1,
+            unitPrice: Number(estimate.labourCost),
+            isFree: false,
+          });
+        }
+
+        try {
+          const token = sign(
+            { userId: 'ven_inv_service', role: 'ADMIN' },
+            ACCESS_SECRET as string,
+            {
+              expiresIn: '1m',
+            },
+          );
+
+          const response = await axios.post(
+            `${BILLING_SERVICE_URL}/invoices/service-quotation`,
+            {
+              customerId: ticket.customerId,
+              branchId: ticket.branchId,
+              createdBy: req.user?.userId || 'SYSTEM',
+              serviceTicketId: ticket.id,
+              items: billingItems,
+              saleType: 'SERVICE',
+              status: 'WAITING_FINANCE_APPROVAL',
+            },
+            {
+              headers: {
+                Authorization: `Bearer ${token}`,
+              },
+            },
+          );
+
+          if (response.data?.success) {
+            ticket.serviceQuotationId = response.data.data.id;
+            ticket.estimateSentToFinance = true;
+          }
+        } catch (billingErr) {
+          logger.error('Failed to post Track B estimate to billing service:', billingErr);
+        }
+
         await ticketRepo.save(ticket);
       }
 
@@ -993,6 +1191,10 @@ export class ServiceController {
     try {
       const estimateId = req.params.estimateId as string;
       const { remarks } = req.body;
+      if (!remarks || !remarks.trim()) {
+        throw new AppError('Rejection remarks are required', 400);
+      }
+
       const estimateRepo = Source.getRepository(ServiceEstimate);
       const estimate = await estimateRepo.findOne({ where: { id: String(estimateId) } });
       if (!estimate) throw new Error('Estimate not found');
@@ -1005,6 +1207,28 @@ export class ServiceController {
       if (ticket) {
         ticket.status = ServiceTicketStatus.FINANCE_REJECTED;
         await ticketRepo.save(ticket);
+
+        // Call billing service to reject invoice
+        try {
+          const token = sign(
+            { userId: 'ven_inv_service', role: 'ADMIN' },
+            ACCESS_SECRET as string,
+            {
+              expiresIn: '1m',
+            },
+          );
+          await axios.post(
+            `${BILLING_SERVICE_URL}/invoices/${ticket.serviceQuotationId}/finance-reject`,
+            { reason: remarks },
+            {
+              headers: {
+                Authorization: `Bearer ${token}`,
+              },
+            },
+          );
+        } catch (err) {
+          logger.error('Failed to reject invoice in billing service:', err);
+        }
 
         await this.logActivity(
           ticket.id,
@@ -1218,11 +1442,10 @@ export class ServiceController {
       );
 
       try {
-        const empRes = await axios.get(`${EMPLOYEE_SERVICE_URL}/employee?job=FINANCE`);
-        const financeUsers = empRes.data.data || [];
-        for (const fUser of financeUsers) {
+        const financeEmployees = await getFinanceEmployeesByBranch(ticket.branchId);
+        for (const financeEmployeeId of financeEmployees) {
           await NotificationPublisher.publishInAppRequest({
-            recipientId: fUser.id,
+            recipientId: financeEmployeeId,
             title: 'Estimate Revision Approval Required',
             message: `Service Estimate Revision v${version} for ticket ${ticket.ticketNumber} is waiting finance approval.`,
             type: 'TASK',
@@ -1297,7 +1520,9 @@ export class ServiceController {
       }
 
       const estimateRepo = Source.getRepository(ServiceEstimate);
-      const activeEstimate = await estimateRepo.findOne({ where: { id: revision.estimateId } });
+      const activeEstimate = await estimateRepo.findOne({
+        where: { id: String(revision.estimateId) },
+      });
       if (activeEstimate) {
         activeEstimate.version = revision.version;
         activeEstimate.labourCost = Number(activeEstimate.labourCost) + Number(revision.labourCost);
@@ -1395,6 +1620,9 @@ export class ServiceController {
       ticket.status = ServiceTicketStatus.COMPLETED;
       ticket.completedAt = new Date();
       ticket.completionNotes = resolutionDetails;
+      if (!ticket.completionBillNumber) {
+        ticket.completionBillNumber = await this.generateBillNumber();
+      }
       await ticketRepo.save(ticket);
 
       // Save Service Report
@@ -2030,7 +2258,13 @@ export class ServiceController {
    */
   submitQuotation = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { laborCost } = req.body;
+      const {
+        laborCost,
+        visitChargeAmount,
+        visitChargeMethod,
+        discountAmount,
+        technicianNoteToFinance,
+      } = req.body;
       const id = req.params.id as string;
       const ticketRepo = Source.getRepository(ServiceTicket);
       const ticket = await ticketRepo.findOne({
@@ -2038,6 +2272,25 @@ export class ServiceController {
         relations: ['items'],
       });
       if (!ticket) throw new Error('Ticket not found');
+
+      // Validate discount <= total maxDiscountableAmount across parts
+      let totalMaxDiscount = 0;
+      const sparePartRepo = Source.getRepository(SparePart);
+      for (const item of ticket.items) {
+        if (item.sparePartId) {
+          const part = await sparePartRepo.findOne({ where: { id: item.sparePartId } });
+          if (part) {
+            totalMaxDiscount += (Number(part.maxDiscountableAmount) || 0) * (item.quantity || 1);
+          }
+        }
+      }
+
+      if (Number(discountAmount || 0) > totalMaxDiscount) {
+        throw new AppError(
+          `Discount of QAR ${discountAmount} exceeds the maximum allowed discount of QAR ${totalMaxDiscount} for the selected parts.`,
+          400,
+        );
+      }
 
       const isFreeContext = [
         ServiceContext.RENT,
@@ -2067,13 +2320,26 @@ export class ServiceController {
         createdBy: ticket.createdBy,
         serviceTicketId: ticket.id,
         items,
+        visitChargeAmount: Number(visitChargeAmount) || 0,
+        visitChargeMethod: visitChargeMethod || null,
+        discountAmount: Number(discountAmount) || 0,
+        technicianNoteToFinance: technicianNoteToFinance || null,
         saleType: 'PRODUCT_SALE',
         status: isFreeContext ? 'CUSTOMER_ACCEPTED' : 'WAITING_FINANCE_APPROVAL',
       };
 
+      const token = sign({ userId: 'ven_inv_service', role: 'ADMIN' }, ACCESS_SECRET as string, {
+        expiresIn: '1m',
+      });
+
       const quoteRes = await axios.post(
         `${BILLING_SERVICE_URL}${BILLING_ENDPOINTS.SERVICE_QUOTATION}`,
         billingPayload,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
       );
       const quotation = quoteRes.data.data;
 
@@ -2084,6 +2350,8 @@ export class ServiceController {
       }
 
       ticket.serviceQuotationId = quotation.id;
+      ticket.visitChargeAmount = Number(visitChargeAmount) || 0;
+      ticket.visitChargeMethod = visitChargeMethod || null;
       await ticketRepo.save(ticket);
 
       res.status(200).json({
@@ -2136,6 +2404,58 @@ export class ServiceController {
 
       ticket.status = ServiceTicketStatus.QUOTED;
       await ticketRepo.save(ticket);
+
+      const estimateRepo = Source.getRepository(ServiceEstimate);
+      const estimate = await estimateRepo.findOne({
+        where: { ticketId: String(id), status: ServiceEstimateStatus.WAITING_FINANCE_APPROVAL },
+      });
+      if (estimate) {
+        estimate.status = ServiceEstimateStatus.FINANCE_APPROVED;
+        await estimateRepo.save(estimate);
+      }
+
+      // Update the latest pending revision for the ticket
+      const revisionRepo = Source.getRepository(ServiceEstimateRevision);
+      const latestRevision = await revisionRepo.findOne({
+        where: { ticketId: String(id), financeDecision: IsNull() },
+        order: { submittedAt: 'DESC' },
+      });
+      if (latestRevision) {
+        latestRevision.financeDecision = 'APPROVED';
+        latestRevision.financeDecisionBy = req.user?.userId || 'FINANCE';
+        latestRevision.financeDecisionAt = new Date();
+
+        let validUntilDate = new Date();
+        validUntilDate.setDate(validUntilDate.getDate() + 30);
+
+        try {
+          const token = sign(
+            { userId: 'ven_inv_service', role: 'ADMIN' },
+            ACCESS_SECRET as string,
+            {
+              expiresIn: '1m',
+            },
+          );
+          const approveRes = await axios.post(
+            `${BILLING_SERVICE_URL}/invoices/${ticket.serviceQuotationId}/finance-approve-quotation`,
+            {},
+            {
+              headers: {
+                Authorization: `Bearer ${token}`,
+              },
+            },
+          );
+          const invoice = approveRes.data.data;
+          if (invoice && invoice.estimateValidUntil) {
+            validUntilDate = new Date(invoice.estimateValidUntil);
+          }
+        } catch (err) {
+          logger.error('Failed to approve invoice in billing service:', err);
+        }
+
+        latestRevision.validUntil = validUntilDate;
+        await revisionRepo.save(latestRevision);
+      }
 
       await this.logActivity(
         id,
@@ -2190,17 +2510,52 @@ export class ServiceController {
     try {
       const id = req.params.id as string;
       const { reason } = req.body;
+      if (!reason || !reason.trim()) {
+        throw new AppError('Rejection reason is required', 400);
+      }
       const ticketRepo = Source.getRepository(ServiceTicket);
       const ticket = await ticketRepo.findOne({ where: { id: String(id) } });
       if (!ticket) throw new Error('Ticket not found');
 
-      ticket.status = ServiceTicketStatus.DIAGNOSED;
+      ticket.status = ServiceTicketStatus.FINANCE_REJECTED;
       await ticketRepo.save(ticket);
+
+      // Update the latest pending revision for the ticket
+      const revisionRepo = Source.getRepository(ServiceEstimateRevision);
+      const latestRevision = await revisionRepo.findOne({
+        where: { ticketId: String(id), financeDecision: IsNull() },
+        order: { submittedAt: 'DESC' },
+      });
+      if (latestRevision) {
+        latestRevision.financeDecision = 'REJECTED';
+        latestRevision.financeDecisionBy = req.user?.userId || 'FINANCE';
+        latestRevision.financeDecisionAt = new Date();
+        latestRevision.financeDecisionNote = reason;
+        await revisionRepo.save(latestRevision);
+      }
+
+      // Call billing service to reject invoice
+      try {
+        const token = sign({ userId: 'ven_inv_service', role: 'ADMIN' }, ACCESS_SECRET as string, {
+          expiresIn: '1m',
+        });
+        await axios.post(
+          `${BILLING_SERVICE_URL}/invoices/${ticket.serviceQuotationId}/finance-reject`,
+          { reason },
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          },
+        );
+      } catch (err) {
+        logger.error('Failed to reject invoice in billing service:', err);
+      }
 
       await this.logActivity(
         id,
         'FINANCE_REJECTED',
-        `Service ticket estimate rejected by Finance. Reason: ${reason || 'N/A'}. Status set back to DIAGNOSED.`,
+        `Service ticket estimate rejected by Finance. Reason: ${reason}. Status set to FINANCE_REJECTED.`,
         req.user?.userId,
       );
 
@@ -2210,7 +2565,7 @@ export class ServiceController {
           await NotificationPublisher.publishInAppRequest({
             recipientId: ticket.assignedTechnicianId,
             title: 'Estimate Rejected by Finance',
-            message: `Service estimate for ticket ${ticket.ticketNumber} was rejected by Finance. Reason: ${reason || 'No reason provided'}. Please revise.`,
+            message: `Service estimate for ticket ${ticket.ticketNumber} was rejected by Finance. Reason: ${reason}. Please revise.`,
             type: 'TASK',
             referenceId: ticket.id,
             referenceType: 'SERVICE_TICKET',
@@ -2221,6 +2576,72 @@ export class ServiceController {
       }
 
       res.status(200).json({ success: true, data: ticket });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  extendValidity = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { id } = req.params;
+      const { newDate } = req.body;
+      if (!newDate) throw new Error('New validity date is required');
+
+      const ticketRepo = Source.getRepository(ServiceTicket);
+      const ticket = await ticketRepo.findOne({ where: { id: String(id) } });
+      if (!ticket) throw new Error('Ticket not found');
+      if (!ticket.serviceQuotationId) throw new Error('Ticket has no quotation');
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const targetDate = new Date(newDate);
+      targetDate.setHours(0, 0, 0, 0);
+      const diffTime = targetDate.getTime() - today.getTime();
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      const extensionDays = diffDays - 30;
+
+      // Call billing service to extend validity
+      try {
+        const token = sign({ userId: 'ven_inv_service', role: 'ADMIN' }, ACCESS_SECRET as string, {
+          expiresIn: '1m',
+        });
+        await axios.post(
+          `${BILLING_SERVICE_URL}/invoices/${ticket.serviceQuotationId}/finance-extend-validity`,
+          { extensionDays, extensionFee: 0 },
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          },
+        );
+      } catch (err) {
+        logger.error('Failed to extend validity in billing service:', err);
+        throw new Error('Failed to extend validity in billing service');
+      }
+
+      // Also update latest revision's validUntil
+      const revisionRepo = Source.getRepository(ServiceEstimateRevision);
+      const latestRevision = await revisionRepo.findOne({
+        where: { ticketId: String(id) },
+        order: { submittedAt: 'DESC' },
+      });
+      if (latestRevision) {
+        latestRevision.financeDecision = 'APPROVED';
+        latestRevision.validUntil = new Date(newDate);
+        await revisionRepo.save(latestRevision);
+      }
+
+      ticket.status = ServiceTicketStatus.QUOTED;
+      await ticketRepo.save(ticket);
+
+      await this.logActivity(
+        String(id),
+        'VALIDITY_EXTENDED',
+        `Service estimate validity extended until ${newDate} by Finance. Status set to QUOTED.`,
+        req.user?.userId,
+      );
+
+      res.status(200).json({ success: true, message: 'Validity extended successfully' });
     } catch (error) {
       next(error);
     }
@@ -2657,6 +3078,580 @@ export class ServiceController {
           partLogs,
           yields,
         },
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  /**
+   * Helper to fetch customer details from CRM service
+   */
+  private async fetchCustomerDetails(
+    customerId: string | undefined | null,
+  ): Promise<PdfPerson | null> {
+    if (!customerId) return null;
+    try {
+      const token = sign({ userId: 'ven_inv_service', role: 'ADMIN' }, ACCESS_SECRET as string, {
+        expiresIn: '5m',
+      });
+      const response = await axios.get(`${CRM_SERVICE_URL}/customers/${customerId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      return response.data?.data;
+    } catch (err) {
+      logger.error('Error fetching customer details:', err);
+      return null;
+    }
+  }
+
+  /**
+   * Helper to fetch employee details by ID
+   */
+  private async fetchEmployeeDetails(
+    employeeId: string | undefined | null,
+  ): Promise<PdfPerson | null> {
+    if (!employeeId) return null;
+    try {
+      const token = sign({ userId: 'ven_inv_service', role: 'ADMIN' }, ACCESS_SECRET as string, {
+        expiresIn: '5m',
+      });
+      const response = await axios.get(`${EMPLOYEE_SERVICE_URL}/employee/${employeeId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      return response.data?.data;
+    } catch (err) {
+      logger.error('Error fetching employee details:', err);
+      return null;
+    }
+  }
+
+  /**
+   * GET /service/tickets/:id/quotation-pdf
+   */
+  getQuotationPdf = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const id = req.params.id as string;
+      const ticketRepo = Source.getRepository(ServiceTicket);
+      const ticket = await ticketRepo.findOne({ where: { id: String(id) } });
+      if (!ticket) {
+        return res.status(404).json({ success: false, message: 'Service ticket not found' });
+      }
+
+      const estimateRepo = Source.getRepository(ServiceEstimate);
+      const estimate = await estimateRepo.findOne({
+        where: { ticketId: ticket.id },
+        relations: ['items'],
+        order: { created_at: 'DESC' },
+      });
+
+      if (!estimate) {
+        return res
+          .status(404)
+          .json({ success: false, message: 'Estimate not found for this ticket' });
+      }
+
+      // Fetch customer details
+      const customer = await this.fetchCustomerDetails(ticket.customerId);
+
+      // Fetch branch details
+      const branchRepo = Source.getRepository(Branch);
+      const branch = await branchRepo.findOne({ where: { id: ticket.branchId } });
+
+      // Fetch finance approver
+      const activityRepo = Source.getRepository(ServiceTicketActivity);
+      const activity = await activityRepo.findOne({
+        where: { ticketId: ticket.id, activityType: 'FINANCE_APPROVED' },
+        order: { created_at: 'DESC' },
+      });
+      const financeApprover =
+        activity && activity.performedBy
+          ? await this.fetchEmployeeDetails(activity.performedBy)
+          : null;
+
+      const pdfBuffer = await generateServiceQuotationPdf(
+        ticket,
+        estimate,
+        customer,
+        branch,
+        financeApprover,
+      );
+
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `inline; filename=Quotation_${ticket.ticketNumber}.pdf`);
+      return res.end(pdfBuffer);
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  /**
+   * GET /service/tickets/:id/completion-bill-pdf
+   */
+  getCompletionBillPdf = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const id = req.params.id as string;
+      const ticketRepo = Source.getRepository(ServiceTicket);
+      const ticket = await ticketRepo.findOne({ where: { id: String(id) } });
+      if (!ticket) {
+        return res.status(404).json({ success: false, message: 'Service ticket not found' });
+      }
+
+      if (ticket.status !== ServiceTicketStatus.COMPLETED) {
+        return res.status(400).json({
+          success: false,
+          message: 'Completion bill is only available for completed tickets',
+        });
+      }
+
+      // Fetch parts usage logs
+      const usageLogRepo = Source.getRepository(ServicePartUsageLog);
+      const usageLogs = await usageLogRepo.find({ where: { ticketId: ticket.id } });
+
+      // Fetch customer details
+      const customer = await this.fetchCustomerDetails(ticket.customerId);
+
+      // Fetch branch details
+      const branchRepo = Source.getRepository(Branch);
+      const branch = await branchRepo.findOne({ where: { id: ticket.branchId } });
+
+      // Fetch technician
+      const technician = await this.fetchEmployeeDetails(ticket.assignedTechnicianId);
+
+      const pdfBuffer = await generateServiceCompletionBillPdf(
+        ticket,
+        usageLogs,
+        customer,
+        branch,
+        technician,
+      );
+
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader(
+        'Content-Disposition',
+        `inline; filename=Completion_Bill_${ticket.ticketNumber}.pdf`,
+      );
+      return res.end(pdfBuffer);
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  /**
+   * POST /service/tickets/:id/send-quotation
+   */
+  sendQuotation = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const id = req.params.id as string;
+      const { sendToPhone, sendToEmail } = req.body;
+
+      const ticketRepo = Source.getRepository(ServiceTicket);
+      const ticket = await ticketRepo.findOne({ where: { id: String(id) } });
+      if (!ticket) {
+        return res.status(404).json({ success: false, message: 'Service ticket not found' });
+      }
+
+      const estimateRepo = Source.getRepository(ServiceEstimate);
+      const estimate = await estimateRepo.findOne({
+        where: { ticketId: ticket.id },
+        relations: ['items'],
+        order: { created_at: 'DESC' },
+      });
+
+      if (!estimate) {
+        return res.status(404).json({ success: false, message: 'Estimate not found' });
+      }
+
+      const customer = await this.fetchCustomerDetails(ticket.customerId);
+      const branchRepo = Source.getRepository(Branch);
+      const branch = await branchRepo.findOne({ where: { id: ticket.branchId } });
+
+      const activityRepo = Source.getRepository(ServiceTicketActivity);
+      const activity = await activityRepo.findOne({
+        where: { ticketId: ticket.id, activityType: 'FINANCE_APPROVED' },
+        order: { created_at: 'DESC' },
+      });
+      const financeApprover =
+        activity && activity.performedBy
+          ? await this.fetchEmployeeDetails(activity.performedBy)
+          : null;
+
+      const pdfBuffer = await generateServiceQuotationPdf(
+        ticket,
+        estimate,
+        customer,
+        branch,
+        financeApprover,
+      );
+
+      const emailToUse = sendToEmail || customer?.email;
+      const phoneToUse = sendToPhone || customer?.phone;
+
+      if (!emailToUse && !phoneToUse) {
+        return res.status(400).json({
+          success: false,
+          message: 'No email or phone number provided or available on customer record',
+        });
+      }
+
+      let emailSent = false;
+      let whatsappSent = false;
+
+      if (emailToUse) {
+        const subject = `Service Quotation - ${ticket.ticketNumber}`;
+        const bodyText = `Dear Customer,
+
+Please find attached the service quotation ${ticket.ticketNumber} for your approval.
+
+Machine Details:
+Brand: ${ticket.productBrand}
+Model: ${ticket.productModel}
+Serial No: ${ticket.serialNumber}
+
+Total Estimated cost: QAR ${Number(estimate.totalCost).toFixed(2)}
+
+Please review and approve the quotation to start the service.
+
+Best regards,
+Xerocare Technical Services`;
+
+        await sendServicePdfEmail(
+          emailToUse,
+          subject,
+          bodyText,
+          pdfBuffer,
+          `Quotation_${ticket.ticketNumber}.pdf`,
+        );
+        emailSent = true;
+      }
+
+      if (phoneToUse) {
+        const downloadUrl = `http://localhost:3001/i/service/tickets/${ticket.id}/quotation-pdf`;
+        const customerName = customer
+          ? `${customer.firstName || ''} ${customer.lastName || ''}`.trim()
+          : 'Valued Customer';
+
+        const message = `*Xerocare Technical Services*
+
+Dear ${customerName},
+
+Your service quotation is ready.
+
+📋 *Quotation No:* SQ-${ticket.ticketNumber.replace('ST-', '')}
+🖨️ *Machine:* ${ticket.productBrand} ${ticket.productModel} (SN: ${ticket.serialNumber})
+💰 *Total Estimate:* QAR ${Number(estimate.totalCost).toFixed(2)}
+
+Download your quotation: ${downloadUrl}
+
+For queries contact us at +974 4455 6677`;
+
+        await sendWhatsappMessage(phoneToUse, message);
+        whatsappSent = true;
+      }
+
+      return res.status(200).json({
+        success: true,
+        message: 'Quotation sent successfully',
+        data: { emailSent, whatsappSent, emailToUse, phoneToUse },
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  /**
+   * POST /service/tickets/:id/send-completion-bill
+   */
+  sendCompletionBill = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const id = req.params.id as string;
+      const { sendToPhone, sendToEmail } = req.body;
+
+      const ticketRepo = Source.getRepository(ServiceTicket);
+      const ticket = await ticketRepo.findOne({ where: { id: String(id) } });
+      if (!ticket) {
+        return res.status(404).json({ success: false, message: 'Service ticket not found' });
+      }
+
+      if (ticket.status !== ServiceTicketStatus.COMPLETED) {
+        return res.status(400).json({
+          success: false,
+          message: 'Service completion bill is only available for completed tickets',
+        });
+      }
+
+      const usageLogRepo = Source.getRepository(ServicePartUsageLog);
+      const usageLogs = await usageLogRepo.find({ where: { ticketId: ticket.id } });
+
+      const customer = await this.fetchCustomerDetails(ticket.customerId);
+      const branchRepo = Source.getRepository(Branch);
+      const branch = await branchRepo.findOne({ where: { id: ticket.branchId } });
+      const technician = await this.fetchEmployeeDetails(ticket.assignedTechnicianId);
+
+      const pdfBuffer = await generateServiceCompletionBillPdf(
+        ticket,
+        usageLogs,
+        customer,
+        branch,
+        technician,
+      );
+
+      const emailToUse = sendToEmail || customer?.email;
+      const phoneToUse = sendToPhone || customer?.phone;
+
+      if (!emailToUse && !phoneToUse) {
+        return res.status(400).json({
+          success: false,
+          message: 'No email or phone number provided or available on customer record',
+        });
+      }
+
+      let emailSent = false;
+      let whatsappSent = false;
+
+      if (emailToUse) {
+        const subject = `Service Completion Bill - ${ticket.ticketNumber}`;
+        const bodyText = `Dear Customer,
+
+Your service request under ticket ${ticket.ticketNumber} has been successfully completed.
+
+Please find attached the completion bill: ${ticket.completionBillNumber || 'N/A'}.
+
+Best regards,
+Xerocare Technical Services`;
+
+        await sendServicePdfEmail(
+          emailToUse,
+          subject,
+          bodyText,
+          pdfBuffer,
+          `Completion_Bill_${ticket.ticketNumber}.pdf`,
+        );
+        emailSent = true;
+      }
+
+      if (phoneToUse) {
+        const downloadUrl = `http://localhost:3001/i/service/tickets/${ticket.id}/completion-bill-pdf`;
+        const customerName = customer
+          ? `${customer.firstName || ''} ${customer.lastName || ''}`.trim()
+          : 'Valued Customer';
+
+        const message = `*Xerocare Technical Services*
+
+Dear ${customerName},
+
+Your service job has been completed.
+
+📋 *Bill No:* ${ticket.completionBillNumber || 'N/A'}
+🖨️ *Machine:* ${ticket.productBrand} ${ticket.productModel} (SN: ${ticket.serialNumber})
+✅ *Status:* Completed
+
+Download your Completion Bill: ${downloadUrl}
+
+For queries contact us at +974 4455 6677`;
+
+        await sendWhatsappMessage(phoneToUse, message);
+        whatsappSent = true;
+      }
+
+      return res.status(200).json({
+        success: true,
+        message: 'Completion bill sent successfully',
+        data: { emailSent, whatsappSent, emailToUse, phoneToUse },
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  reviseEstimate = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const id = req.params.id as string;
+      const {
+        items: rawItems,
+        visitChargeAmount,
+        visitChargeMethod,
+        discountAmount,
+        technicianNoteToFinance,
+        revisionType,
+      } = req.body;
+      const items = rawItems as ReviseEstimateItem[];
+
+      if (!technicianNoteToFinance) {
+        throw new AppError(
+          'Technician note to finance is required explaining the reason for revision',
+          400,
+        );
+      }
+
+      const ticketRepo = Source.getRepository(ServiceTicket);
+      const ticket = await ticketRepo.findOne({
+        where: { id: String(id) },
+        relations: ['items'],
+      });
+      if (!ticket) throw new AppError('Ticket not found', 404);
+
+      if (!ticket.serviceQuotationId) {
+        throw new AppError('Ticket does not have an active estimate to revise', 400);
+      }
+
+      const { role, employeeJob, userId } = req.user || {};
+      if (role === 'EMPLOYEE' && employeeJob === 'SERVICE_TECHNICIAN') {
+        if (ticket.assignedTechnicianId !== userId) {
+          throw new AppError(
+            'Access denied: You are not the assigned technician for this ticket',
+            403,
+          );
+        }
+      }
+
+      // Validate discount <= total maxDiscountableAmount across parts
+      let totalMaxDiscount = 0;
+      const sparePartRepo = Source.getRepository(SparePart);
+      for (const item of items) {
+        if (item.sparePartId) {
+          const part = await sparePartRepo.findOne({ where: { id: item.sparePartId } });
+          if (part) {
+            totalMaxDiscount += (Number(part.maxDiscountableAmount) || 0) * (item.quantity || 1);
+          }
+        }
+      }
+
+      if (Number(discountAmount || 0) > totalMaxDiscount) {
+        throw new AppError(
+          `Discount of QAR ${discountAmount} exceeds the maximum allowed discount of QAR ${totalMaxDiscount} for the selected parts.`,
+          400,
+        );
+      }
+
+      const token = sign({ userId: 'ven_inv_service', role: 'ADMIN' }, ACCESS_SECRET as string, {
+        expiresIn: '1m',
+      });
+
+      // 1. Fetch current invoice to create a revision snapshot
+      const getInvoiceRes = await axios.get(
+        `${BILLING_SERVICE_URL}/invoices/${ticket.serviceQuotationId}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      );
+      const invoice = getInvoiceRes.data.data;
+
+      // Create new ServiceEstimateRevision record (snapshot current state before update)
+      const revisionRepo = Source.getRepository(ServiceEstimateRevision);
+      const newRevision = revisionRepo.create({
+        invoiceId: invoice.id,
+        ticketId: ticket.id,
+        revisionNumber: invoice.revisionCount || 0,
+        revisionType: revisionType || 'DISCOUNT',
+        itemsSnapshot: invoice.items || {},
+        totalAmount: Number(invoice.totalAmount) || 0,
+        discountApplied: Number(invoice.totalDiscountAmount) || 0,
+        visitChargeAmount: Number(invoice.visitChargeAmount) || 0,
+        technicianNoteToFinance: invoice.technicianNoteToFinance || null,
+        submittedBy: userId || 'SYSTEM',
+        financeDecision: null,
+        financeDecisionBy: null,
+        financeDecisionNote: null,
+        financeDecisionAt: null,
+        validUntil: invoice.estimateValidUntil ? new Date(invoice.estimateValidUntil) : null,
+      });
+      await revisionRepo.save(newRevision);
+
+      // Update service ticket items in local db
+      const ticketItemRepo = Source.getRepository(ServiceTicketItem);
+      await ticketItemRepo.delete({ ticketId: ticket.id });
+
+      const newTicketItems = items.map((it: ReviseEstimateItem) => {
+        return ticketItemRepo.create({
+          ticketId: ticket.id,
+          itemSource: it.itemSource || ServiceItemSource.SPARE_PART,
+          sparePartId: it.sparePartId || null,
+          sku: it.sku || null,
+          partName: it.partName || it.description || 'Spare Part',
+          quantity: it.quantity,
+          unitPrice: Number(it.unitPrice) || 0,
+          totalPrice: (Number(it.quantity) || 1) * (Number(it.unitPrice) || 0),
+          isFree: !!it.isFree,
+        });
+      });
+      await ticketItemRepo.save(newTicketItems);
+
+      // Update ticket fields
+      ticket.status = ServiceTicketStatus.WAITING_FINANCE_APPROVAL;
+      ticket.visitChargeAmount = Number(visitChargeAmount) || 0;
+      ticket.visitChargeMethod = visitChargeMethod || null;
+      await ticketRepo.save(ticket);
+
+      // Log activity
+      await this.logActivity(
+        ticket.id,
+        'ESTIMATE_REVISED',
+        `Estimate revised by technician. Revision number: ${newRevision.revisionNumber}. Reason: ${technicianNoteToFinance}`,
+        userId,
+      );
+
+      // Call billing service to update the invoice
+      const isFreeContext = [
+        ServiceContext.RENT,
+        ServiceContext.WARRANTY,
+        ServiceContext.LEASE_UNDER_WARRANTY,
+        ServiceContext.FSMA,
+        ServiceContext.SMA,
+      ].includes(ticket.serviceContext);
+
+      const billingItems = items.map((it: ReviseEstimateItem) => ({
+        description: it.partName || it.description || 'Spare Part',
+        quantity: it.quantity,
+        unitPrice: isFreeContext ? 0 : Number(it.unitPrice) || 0,
+        isFree: isFreeContext ? true : !!it.isFree,
+      }));
+
+      const billingPayload = {
+        items: billingItems,
+        visitChargeAmount: Number(visitChargeAmount) || 0,
+        visitChargeMethod: visitChargeMethod || null,
+        discountAmount: Number(discountAmount) || 0,
+        technicianNoteToFinance,
+      };
+
+      const reviseRes = await axios.patch(
+        `${BILLING_SERVICE_URL}/invoices/${ticket.serviceQuotationId}/revise-estimate`,
+        billingPayload,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      );
+
+      return res.status(200).json({
+        success: true,
+        data: {
+          ticket,
+          invoice: reviseRes.data.data,
+          revision: newRevision,
+        },
+        message: 'Estimate revised and submitted to finance successfully',
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  getRevisions = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const id = req.params.id as string;
+      const revisionRepo = Source.getRepository(ServiceEstimateRevision);
+      const revisions = await revisionRepo.find({
+        where: { ticketId: String(id) },
+        order: { submittedAt: 'DESC' },
+      });
+      return res.status(200).json({
+        success: true,
+        data: revisions,
       });
     } catch (error) {
       next(error);

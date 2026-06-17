@@ -43,6 +43,7 @@ export default function DashboardHeader({ title = 'Dashboard' }: { title?: strin
     name: '',
     email: '',
     initial: '',
+    role: '',
   });
 
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -68,13 +69,24 @@ export default function DashboardHeader({ title = 'Dashboard' }: { title?: strin
       try {
         const res = await getProfile();
         if (res.success && res.data) {
-          const { first_name, last_name, name, email } = res.data;
+          const { first_name, last_name, name, email, role } = res.data;
+
+          const formattedRole = role
+            ? role === 'HR' || role === 'IT'
+              ? role
+              : role.charAt(0).toUpperCase() + role.slice(1).toLowerCase()
+            : '';
+
           const fullName =
-            name || (first_name ? `${first_name}${last_name ? ' ' + last_name : ''}` : 'User');
+            name ||
+            (first_name
+              ? `${first_name}${last_name ? ' ' + last_name : ''}`
+              : formattedRole || 'User');
           setUser({
             name: fullName,
             email: email || '',
             initial: fullName.charAt(0).toUpperCase(),
+            role: formattedRole,
           });
         }
       } catch (error) {
@@ -238,7 +250,14 @@ export default function DashboardHeader({ title = 'Dashboard' }: { title?: strin
                   className="hidden sm:flex flex-col min-w-0 items-start"
                   suppressHydrationWarning
                 >
-                  <span className="text-sm font-medium truncate text-white">{user.name}</span>
+                  <div className="flex items-center gap-1.5 max-w-full">
+                    <span className="text-sm font-medium truncate text-white">{user.name}</span>
+                    {user.role && (
+                      <span className="text-[10px] text-white/85 bg-white/10 px-1.5 py-0.5 rounded font-semibold whitespace-nowrap shrink-0">
+                        {user.role}
+                      </span>
+                    )}
+                  </div>
                   <span className="text-xs text-white/70 truncate">{user.email}</span>
                 </div>
                 <ChevronDown className="hidden sm:block h-4 w-4 text-white/70" />
@@ -253,7 +272,14 @@ export default function DashboardHeader({ title = 'Dashboard' }: { title?: strin
                   {user.initial}
                 </div>
                 <div className="flex flex-col min-w-0">
-                  <span className="text-sm font-bold text-slate-900 truncate">{user.name}</span>
+                  <div className="flex items-center gap-1.5 max-w-full">
+                    <span className="text-sm font-bold text-slate-900 truncate">{user.name}</span>
+                    {user.role && (
+                      <span className="text-[9px] bg-primary/10 text-primary px-1.5 py-0.5 rounded-full font-bold whitespace-nowrap shrink-0">
+                        {user.role}
+                      </span>
+                    )}
+                  </div>
                   <span className="text-[10px] text-slate-500 truncate font-medium">
                     {user.email}
                   </span>

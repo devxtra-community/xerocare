@@ -108,6 +108,13 @@ async function runPreMigrations() {
       }
     }
 
+    // Ensure SERVICE value exists in invoices_saletype_enum
+    try {
+      await client.query(`ALTER TYPE invoices_saletype_enum ADD VALUE IF NOT EXISTS 'SERVICE';`);
+    } catch (err) {
+      logger.debug(`Skipped adding SERVICE to invoices_saletype_enum: ${(err as Error).message}`);
+    }
+
     // Ensure billType enum exists
     await client.query(`
       DO $$ BEGIN
@@ -125,14 +132,24 @@ async function runPreMigrations() {
         ALTER TABLE invoices 
         ADD COLUMN IF NOT EXISTS "billType" invoices_billtype_enum NULL,
         ADD COLUMN IF NOT EXISTS "serviceTicketId" UUID NULL,
-        ADD COLUMN IF NOT EXISTS "maxCopyLimit" INTEGER NULL;
+        ADD COLUMN IF NOT EXISTS "maxCopyLimit" INTEGER NULL,
+        ADD COLUMN IF NOT EXISTS estimate_valid_until TIMESTAMP,
+        ADD COLUMN IF NOT EXISTS estimate_expired BOOLEAN DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS total_discount_amount DECIMAL(10,2) DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS visit_charge_amount DECIMAL(10,2) DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS visit_charge_method VARCHAR(30),
+        ADD COLUMN IF NOT EXISTS validity_extension_days INT,
+        ADD COLUMN IF NOT EXISTS validity_extension_fee DECIMAL(10,2) DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS validity_extension_fee_added BOOLEAN DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS technician_note_to_finance TEXT,
+        ADD COLUMN IF NOT EXISTS revision_count INT DEFAULT 0;
       `);
       await client.query(`
         ALTER TABLE invoice_items 
         ADD COLUMN IF NOT EXISTS warranty VARCHAR(255) NULL;
       `);
       logger.info(
-        'Guaranteed billType, serviceTicketId, and maxCopyLimit columns exist on invoices table, and warranty column exists on invoice_items table.',
+        'Guaranteed billType, serviceTicketId, maxCopyLimit, and service estimate validity columns exist on invoices table, and warranty column exists on invoice_items table.',
       );
     } catch (colErr) {
       logger.warn('Failed to ensure invoices or invoice_items columns:', colErr);

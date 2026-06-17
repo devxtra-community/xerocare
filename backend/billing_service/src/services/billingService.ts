@@ -1161,6 +1161,13 @@ export class BillingService {
       invoice.effectiveTo = payload.effectiveTo;
     }
 
+    if (invoice.billType === 'SERVICE') {
+      const validUntil = new Date();
+      validUntil.setDate(validUntil.getDate() + 30);
+      invoice.estimateValidUntil = validUntil;
+      invoice.estimateExpired = false;
+    }
+
     const saved = await this.invoiceRepo.save(invoice);
     await logAudit(
       invoice.id,
@@ -1857,10 +1864,11 @@ export class BillingService {
     if (
       invoice.status !== InvoiceStatus.EMPLOYEE_APPROVED &&
       (invoice.status as string) !== 'TRANSACTION_COMPLETED' &&
-      invoice.status !== InvoiceStatus.FINANCE_APPROVED
+      invoice.status !== InvoiceStatus.FINANCE_APPROVED &&
+      invoice.status !== InvoiceStatus.WAITING_FINANCE_APPROVAL
     ) {
       throw new AppError(
-        'Only Employee Approved, Finance Approved, or Converted quotations can be rejected by Finance',
+        'Only Employee Approved, Finance Approved, Waiting Finance Approval, or Converted quotations can be rejected by Finance',
         400,
       );
     }
@@ -3621,9 +3629,22 @@ export class BillingService {
     }[];
     saleType: string;
     status: string;
+    visitChargeAmount?: number;
+    visitChargeMethod?: string | null;
+    totalDiscountAmount?: number;
+    technicianNoteToFinance?: string | null;
   }) {
     const invoiceNumber = await this.invoiceRepo.generateInvoiceNumber();
     const invoiceRepo = Source.getRepository(Invoice);
+    const itemsTotal = payload.items.reduce(
+      (sum, item) => sum + item.quantity * (item.isFree ? 0 : item.unitPrice),
+      0,
+    );
+    const visitCharge = Number(payload.visitChargeAmount) || 0;
+    const discount = Number(payload.totalDiscountAmount) || 0;
+    const finalTotal =
+      itemsTotal + (payload.visitChargeMethod === 'ADDED_TO_ESTIMATE' ? visitCharge : 0) - discount;
+
     const invoice = invoiceRepo.create({
       invoiceNumber,
       customerId: payload.customerId || undefined,
@@ -3633,10 +3654,11 @@ export class BillingService {
       saleType: payload.saleType as SaleType,
       status: payload.status as InvoiceStatus,
       billType: BillType.SERVICE,
-      totalAmount: payload.items.reduce(
-        (sum, item) => sum + item.quantity * (item.isFree ? 0 : item.unitPrice),
-        0,
-      ),
+      visitChargeAmount: visitCharge,
+      visitChargeMethod: payload.visitChargeMethod || null,
+      totalDiscountAmount: discount,
+      technicianNoteToFinance: payload.technicianNoteToFinance || null,
+      totalAmount: finalTotal,
     });
 
     const savedInvoice = await invoiceRepo.save(invoice);
@@ -3661,5 +3683,220 @@ export class BillingService {
 
     savedInvoice.items = invoiceItems;
     return savedInvoice;
+  }
+
+  async reviseEstimate(
+    id: string,
+    payload: {
+      items: { description: string; quantity: number; unitPrice: number; isFree?: boolean }[];
+      visitChargeAmount: number;
+      visitChargeMethod: string;
+      discountAmount: number;
+      technicianNoteToFinance: string;
+    },
+    userId: string,
+  ): Promise<Invoice> {
+    logger.info(`Estimate ${id} revised by user ${userId}`);
+    const invoice = await this.invoiceRepo.findById(id);
+    if (!invoice) throw new AppError('Quotation not found', 404);
+
+    if (invoice.billType !== BillType.SERVICE) {
+      throw new AppError('Only service quotations can be revised', 400);
+    }
+
+    if (
+      invoice.status === InvoiceStatus.CUSTOMER_ACCEPTED ||
+      invoice.status === InvoiceStatus.ACTIVE_CONTRACT ||
+      invoice.status === InvoiceStatus.PAID
+    ) {
+      throw new AppError(
+        'Cannot revise an estimate that has already been approved by the customer',
+        400,
+      );
+    }
+
+    // Clear existing items
+    await this.invoiceRepo.clearItems(invoice.id);
+
+    const invoiceItemRepo = Source.getRepository(InvoiceItem);
+    const invoiceItems = payload.items.map((it) => {
+      const invItem = new InvoiceItem();
+      invItem.invoice = invoice;
+      invItem.itemType = ItemType.PRODUCT;
+      invItem.description = it.description;
+      invItem.quantity = it.quantity;
+      invItem.unitPrice = it.isFree ? 0 : it.unitPrice;
+      return invItem;
+    });
+    await invoiceItemRepo.save(invoiceItems);
+
+    const itemsTotal = payload.items.reduce(
+      (sum, item) => sum + item.quantity * (item.isFree ? 0 : item.unitPrice),
+      0,
+    );
+    const visitCharge = Number(payload.visitChargeAmount) || 0;
+    const discount = Number(payload.discountAmount) || 0;
+    const finalTotal =
+      itemsTotal + (payload.visitChargeMethod === 'ADDED_TO_ESTIMATE' ? visitCharge : 0) - discount;
+
+    invoice.visitChargeAmount = visitCharge;
+    invoice.visitChargeMethod = payload.visitChargeMethod || null;
+    invoice.totalDiscountAmount = discount;
+    invoice.technicianNoteToFinance = payload.technicianNoteToFinance;
+    invoice.totalAmount = finalTotal;
+
+    invoice.status = InvoiceStatus.WAITING_FINANCE_APPROVAL;
+    invoice.estimateExpired = false;
+    invoice.revisionCount = (invoice.revisionCount || 0) + 1;
+
+    const saved = await this.invoiceRepo.save(invoice);
+
+    // Break circular reference
+    invoiceItems.forEach((item) => {
+      delete (item as { invoice?: unknown }).invoice;
+    });
+    saved.items = invoiceItems;
+
+    // Notify Finance Staff
+    if (saved.branchId) {
+      try {
+        const { NotificationPublisher } = await import('../events/publisher/notificationPublisher');
+        const { SERVICE_ESTIMATE_REVISED } = await import('../constants/notificationTypes');
+        const { getFinanceEmployeesByBranch, getCustomerName } = await import('./billingHelpers');
+
+        const customerName = await getCustomerName(saved.customerId);
+        const financeIds = await getFinanceEmployeesByBranch(saved.branchId);
+
+        for (const financeId of financeIds) {
+          try {
+            await NotificationPublisher.publishInAppRequest({
+              recipientId: financeId,
+              title: 'Estimate Revision Submitted',
+              message: `A revised service estimate for customer ${customerName} (ticket ${invoice.serviceTicketId}) has been submitted for review.`,
+              type: SERVICE_ESTIMATE_REVISED,
+              referenceId: saved.id,
+              referenceType: 'QUOTATION',
+            });
+          } catch (err) {
+            logger.error(
+              `Failed to publish service estimate revised notification to finance employee ${financeId}`,
+              err,
+            );
+          }
+        }
+      } catch (err) {
+        logger.error('Failed to notify finance staff about estimate revision', err);
+      }
+    }
+
+    return saved;
+  }
+
+  async financeExtendValidity(
+    id: string,
+    payload: {
+      extensionDays: number;
+      extensionFee: number;
+    },
+    userId: string,
+  ): Promise<Invoice> {
+    const invoice = await this.invoiceRepo.findById(id);
+    if (!invoice) throw new AppError('Quotation not found', 404);
+
+    if (
+      invoice.status !== InvoiceStatus.EMPLOYEE_APPROVED &&
+      invoice.status !== InvoiceStatus.WAITING_FINANCE_APPROVAL
+    ) {
+      throw new AppError('Quotation must be in a pending approval state', 400);
+    }
+
+    const days = Number(payload.extensionDays) || 0;
+    const fee = Number(payload.extensionFee) || 0;
+
+    const baseValidUntil = new Date();
+    const totalDays = 30 + days;
+    baseValidUntil.setDate(baseValidUntil.getDate() + totalDays);
+
+    invoice.estimateValidUntil = baseValidUntil;
+    invoice.estimateExpired = false;
+    invoice.validityExtensionDays = days;
+    invoice.validityExtensionFee = fee;
+
+    const oldStatus = invoice.status;
+    invoice.status = InvoiceStatus.FINANCE_APPROVED;
+    invoice.financeApprovedBy = userId;
+    invoice.financeApprovedAt = new Date();
+
+    if (fee > 0) {
+      invoice.validityExtensionFeeAdded = true;
+      const invoiceItemRepo = Source.getRepository(InvoiceItem);
+      const feeItem = new InvoiceItem();
+      feeItem.invoice = invoice;
+      feeItem.itemType = ItemType.PRICING_RULE;
+      feeItem.description = `Validity Extension Fee (${days} Days)`;
+      feeItem.quantity = 1;
+      feeItem.unitPrice = fee;
+      await invoiceItemRepo.save(feeItem);
+
+      invoice.totalAmount = Number(invoice.totalAmount || 0) + fee;
+    }
+
+    const saved = await this.invoiceRepo.save(invoice);
+    await logAudit(
+      invoice.id,
+      'STATUS_CHANGE',
+      userId,
+      `Finance approved quotation with validity extension. Days: ${days}, Fee: ${fee}.`,
+      oldStatus,
+      InvoiceStatus.FINANCE_APPROVED,
+    );
+
+    // Callbacks to ven_inv_service
+    if (invoice.serviceTicketId) {
+      try {
+        const { sign } = await import('jsonwebtoken');
+        const token = sign(
+          { userId: 'billing_service', role: 'ADMIN' },
+          process.env.ACCESS_SECRET as string,
+          { expiresIn: '1m' },
+        );
+
+        const venInvUrl = process.env.VENDOR_INVENTORY_SERVICE_URL || 'http://localhost:3003';
+        await globalThis.fetch(
+          `${venInvUrl}/service/tickets/${invoice.serviceTicketId}/quotation-link`,
+          {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              serviceQuotationId: invoice.id,
+              status: 'FINANCE_APPROVED',
+            }),
+          },
+        );
+        logger.info(
+          `[BillingService] Sent finance approval callback for service ticket ${invoice.serviceTicketId}`,
+        );
+
+        if (invoice.billType === 'SERVICE') {
+          await globalThis.fetch(
+            `${venInvUrl}/service/tickets/${invoice.serviceTicketId}/finance-approved`,
+            {
+              method: 'PATCH',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`,
+              },
+            },
+          );
+        }
+      } catch (callbackErr) {
+        logger.error('[BillingService] Failed to call service ticket callback:', callbackErr);
+      }
+    }
+
+    return saved;
   }
 }

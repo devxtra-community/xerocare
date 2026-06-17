@@ -306,17 +306,6 @@ export default function VendorTable({ basePath = '/admin' }: { basePath?: string
             className: 'font-semibold text-[11px] text-primary uppercase',
           },
           {
-            id: 'details',
-            header: 'DETAILS',
-            className: 'font-semibold text-[11px] text-primary uppercase',
-            cell: (v: Vendor) => (
-              <div className="flex flex-col text-[11px] text-muted-foreground w-max leading-tight gap-1">
-                <span className="font-medium text-slate-800">{v.phone}</span>
-                <span>{v.email}</span>
-              </div>
-            ),
-          },
-          {
             id: 'orders',
             header: 'ORDERS',
             cell: (v: Vendor) => v.totalOrders,
@@ -391,7 +380,7 @@ export default function VendorTable({ basePath = '/admin' }: { basePath?: string
                   size="icon"
                   className="h-8 w-8 text-indigo-500 hover:text-indigo-700 hover:bg-indigo-50"
                   title="Create RFQ"
-                  onClick={() => router.push(`${basePath}/rfqs`)}
+                  onClick={() => router.push(`${basePath}/rfqs/create?vendorId=${v.id}`)}
                 >
                   <Send className="h-4 w-4" />
                 </Button>

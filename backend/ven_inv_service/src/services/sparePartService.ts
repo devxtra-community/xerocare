@@ -96,24 +96,22 @@ export class SparePartService {
       }
     }
 
-    // If lotId is present, ensure we have warehouse/vendor info (often cached/already fetched above)
-    if (lotId && (!warehouseId || !vendorId)) {
+    // If lotId is present, ensure we have warehouse/vendor info and lot is received
+    if (lotId) {
       const lot = await this.lotService.getLotById(lotId);
       if (lot) {
         if (!warehouseId) warehouseId = lot.warehouse_id;
         if (!vendorId) vendorId = lot.vendorId;
+
+        if (lot.status !== LotStatus.RECEIVED) {
+          throw new Error(
+            'Inventory cannot be created until the lot is received. Please confirm the lot reception first.',
+          );
+        }
       }
     }
 
     if (lotId && sku) {
-      // Guard: inventory cannot be created before lot is received
-      const lot = await this.lotService.getLotById(lotId);
-      if (lot.status !== LotStatus.RECEIVED) {
-        throw new Error(
-          'Inventory cannot be created until the lot is received. Please confirm the lot reception first.',
-        );
-      }
-
       // IMPROVED DUPLICATE DETECTION: If it's the same lot and same sku, it's definitely the same part.
       // Prioritize sku over fuzzy name matching.
       const existingByCode = await this.repo.findMasterBySkuAndLot(sku, lotId);
@@ -129,11 +127,10 @@ export class SparePartService {
         await deleteCached(`sparepart:${existingByCode.id}`);
 
         // Track usage on existing lot item
+        await this.lotService.linkSparePartToLotItem(lotId, data.part_name, existingByCode.id);
         await this.lotService.validateAndTrackUsage(lotId, LotItemType.SPARE_PART, sku, quantity);
         return { success: true, message: 'Existing spare part updated via SKU' };
       }
-
-      await this.lotService.validateAndTrackUsage(lotId, LotItemType.SPARE_PART, sku, quantity);
     }
 
     // Fallback fuzzy matching by name/model/etc.
@@ -157,8 +154,21 @@ export class SparePartService {
       }
 
       await deleteCached(`sparepart:${existingPart.id}`);
+
+      if (lotId) {
+        await this.lotService.linkSparePartToLotItem(lotId, data.part_name, existingPart.id);
+        await this.lotService.validateAndTrackUsage(
+          lotId,
+          LotItemType.SPARE_PART,
+          existingPart.sku || sku || '',
+          quantity,
+        );
+      }
+
       return { success: true, message: 'Existing spare part stock incremented' };
     }
+
+    const generatedSku = sku || generateSku();
 
     const sparePart = await this.repo.createMaster({
       part_name: data.part_name,
@@ -173,13 +183,23 @@ export class SparePartService {
       lot_id: lotId,
       warehouse_id: warehouseId,
       vendor_id: vendorId,
-      sku: sku || generateSku(),
+      sku: generatedSku,
       mpn: data.mpn,
       description: data.description,
       yield: data.yield,
     });
 
     await setCached(`sparepart:${sparePart.id}`, sparePart, 3600);
+
+    if (lotId) {
+      await this.lotService.linkSparePartToLotItem(lotId, data.part_name, sparePart.id);
+      await this.lotService.validateAndTrackUsage(
+        lotId,
+        LotItemType.SPARE_PART,
+        generatedSku,
+        quantity,
+      );
+    }
 
     return { success: true, message: 'Spare part and stock processed' };
   }

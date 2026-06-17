@@ -4,8 +4,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Search, Plus, X, Eye, Copy, List, Info, FileText, Layers, Package } from 'lucide-react';
-import { useSearchParams } from 'next/navigation';
+import { Search, Plus, X, Eye, Copy } from 'lucide-react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import {
   Select,
@@ -28,217 +28,8 @@ import { commonService, Vendor, Warehouse } from '@/services/commonService';
 import { getBrands, Brand } from '@/lib/brand';
 import { toast } from 'sonner';
 import { formatCurrency } from '@/lib/format';
-import Barcode from 'react-barcode';
 
 // Local interfaces removed in favor of imports from @/lib/lot
-
-function ProductViewModal({ product, onClose }: { product: Product; onClose: () => void }) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-      <div className="bg-white rounded-2xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
-        <div className="flex justify-between items-center px-6 py-4 border-b bg-slate-50">
-          <div>
-            <h2 className="text-xl font-medium text-slate-800">Product Details</h2>
-            <p className="text-xs text-slate-500 font-normal uppercase tracking-wider mt-0.5">
-              Ref: {product.serial_no}
-            </p>
-          </div>
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-slate-200 rounded-full transition-colors"
-          >
-            <X size={20} className="text-slate-500" />
-          </button>
-        </div>
-
-        <div className="flex-1 overflow-y-auto p-6 scrollbar-hide">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-            {/* Left Column: Image & Basic Info */}
-            <div className="lg:col-span-4 space-y-6">
-              <div className="aspect-square relative rounded-xl border border-slate-200 bg-slate-50 overflow-hidden shadow-inner flex items-center justify-center">
-                {product.imageUrl ? (
-                  <Image
-                    src={product.imageUrl}
-                    alt={product.name}
-                    fill
-                    className="object-contain p-4"
-                    unoptimized
-                  />
-                ) : (
-                  <Package size={48} className="text-slate-300" />
-                )}
-              </div>
-
-              <div className="space-y-4">
-                <div className="bg-blue-50 p-4 rounded-xl border border-blue-100">
-                  <p className="text-[10px] font-medium text-blue-600 tracking-widest uppercase mb-1">
-                    Sale Price
-                  </p>
-                  <p className="text-2xl font-semibold text-blue-800">
-                    {formatCurrency(product.sale_price)}
-                  </p>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
-                    <p className="text-[9px] font-medium text-slate-400 uppercase mb-0.5">
-                      Wholesale
-                    </p>
-                    <p className="text-sm font-normal text-slate-700">
-                      {formatCurrency(product.wholesale_price || 0)}
-                    </p>
-                  </div>
-                  <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
-                    <p className="text-[9px] font-medium text-slate-400 uppercase mb-0.5">
-                      Tax Rate
-                    </p>
-                    <p className="text-sm font-normal text-slate-700">{product.tax_rate}%</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Barcode Card */}
-              <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex flex-col items-center justify-center">
-                <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 self-start">
-                  Product Barcode
-                </p>
-                <div className="bg-white p-2 rounded-lg border border-slate-200 flex items-center justify-center w-full shadow-sm">
-                  <Barcode
-                    value={product.barcode_id || `XC-P-${product.serial_no}`}
-                    width={1.5}
-                    height={50}
-                    fontSize={12}
-                    margin={5}
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Right Column: Detailed Specs */}
-            <div className="lg:col-span-8 space-y-8">
-              <div>
-                <h3 className="text-lg font-semibold text-slate-800 flex items-center gap-2 mb-4">
-                  <Info size={18} className="text-primary" /> Specifications
-                </h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-4 text-sm">
-                  <div className="flex justify-between py-2 border-b border-slate-50">
-                    <span className="text-slate-500 font-normal">Product Name</span>
-                    <span className="text-slate-800 font-normal">{product.name}</span>
-                  </div>
-                  <div className="flex justify-between py-2 border-b border-slate-50">
-                    <span className="text-slate-500 font-normal">Brand</span>
-                    <span className="text-slate-800 font-normal">{product.brand}</span>
-                  </div>
-                  <div className="flex justify-between py-2 border-b border-slate-50">
-                    <span className="text-slate-500 font-normal">Model</span>
-                    <span className="text-slate-800 font-normal">
-                      {product.model?.model_no || product.model_id}
-                    </span>
-                  </div>
-                  <div className="flex justify-between py-2 border-b border-slate-50">
-                    <div className="flex justify-between py-2 border-b border-slate-50">
-                      <span className="text-slate-500 font-normal">Print Colour</span>
-                      <span className="text-slate-800 font-normal">{product.print_colour}</span>
-                    </div>
-                    <div className="flex justify-between py-2 border-b border-slate-50">
-                      <span className="text-slate-500 font-normal">HS Code</span>
-                      <span className="text-slate-800 font-mono text-[11px] font-normal">
-                        {product.hs_code || '-'}
-                      </span>
-                    </div>
-                    <div className="flex justify-between py-2 border-b border-slate-50">
-                      <span className="text-slate-500 font-normal">Lot ID</span>
-                      <span className="text-slate-800 font-mono text-[11px] font-normal">
-                        {product.lot?.lotNumber || '-'}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {product.description && (
-                <div>
-                  <h3 className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2">
-                    <FileText size={14} className="text-slate-400" /> Description
-                  </h3>
-                  <div className="bg-slate-50 p-5 rounded-xl border border-slate-100 text-sm text-slate-700 whitespace-pre-wrap leading-relaxed shadow-sm">
-                    {product.description}
-                  </div>
-                </div>
-              )}
-
-              {product.features && product.features.length > 0 && (
-                <div>
-                  <h3 className="text-[11px] font-semibold text-emerald-600 uppercase tracking-widest mb-3 flex items-center gap-2">
-                    <List size={14} className="text-emerald-500" /> Key Features
-                  </h3>
-                  <div className="bg-emerald-50/20 p-5 rounded-xl border border-emerald-100 shadow-sm space-y-4">
-                    {product.features.map((f, i) => (
-                      <div key={i} className="group">
-                        <div className="flex items-center gap-2 mb-1">
-                          <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                          <p className="text-[13px] font-semibold text-emerald-800 uppercase tracking-tight italic">
-                            {f.subHeading}
-                          </p>
-                        </div>
-                        <p className="text-sm text-slate-700 leading-relaxed font-normal ml-3.5">
-                          {f.description}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {product.consumables && product.consumables.length > 0 && (
-                <div>
-                  <h3 className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2">
-                    <Layers size={14} className="text-slate-400" /> Replacement Consumables
-                  </h3>
-                  <div className="overflow-hidden border border-slate-200 rounded-xl">
-                    <table className="w-full text-left text-xs border-collapse">
-                      <thead className="bg-slate-50 text-slate-500 border-b border-slate-200">
-                        <tr>
-                          <th className="px-4 py-2 font-semibold uppercase tracking-wider">
-                            Part Number
-                          </th>
-                          <th className="px-4 py-2 font-semibold uppercase tracking-wider">Desc</th>
-                          <th className="px-4 py-2 font-semibold uppercase tracking-wider">
-                            Yield
-                          </th>
-                          <th className="px-4 py-2 font-semibold uppercase tracking-wider text-right">
-                            Price
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100">
-                        {product.consumables.map((c, i) => (
-                          <tr key={i} className="hover:bg-slate-50 transition-colors">
-                            <td className="px-4 py-2 font-normal text-slate-800">{c.partName}</td>
-                            <td className="px-4 py-2 text-slate-600">{c.description}</td>
-                            <td className="px-4 py-2 text-slate-600">{c.yield}</td>
-                            <td className="px-4 py-2 font-normal text-primary text-right">
-                              {formatCurrency(Number(c.price))}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        <div className="px-6 py-4 bg-slate-50 border-t flex justify-end">
-          <Button onClick={onClose} className="px-8 font-bold">
-            Close
-          </Button>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 /**
  * Manager Product Management Page.
@@ -252,11 +43,11 @@ export default function ManagerProduct() {
   const [formOpen, setFormOpen] = useState(false);
   const [bulkDialogOpen, setBulkDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Product | null>(null);
-  const [viewingProduct, setViewingProduct] = useState<Product | null>(null);
   const [deleting, setDeleting] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const searchParams = useSearchParams();
+  const router = useRouter();
   const [initialLotId, setInitialLotId] = useState<string | undefined>(undefined);
   const [initialItemId, setInitialItemId] = useState<string | undefined>(undefined);
 
@@ -297,7 +88,31 @@ export default function ManagerProduct() {
     if (lotId) {
       setInitialLotId(lotId);
       setInitialItemId(itemId || undefined);
-      setBulkDialogOpen(true);
+
+      if (itemId) {
+        setFormOpen(true);
+      } else {
+        const checkLotProducts = async () => {
+          try {
+            const lot = await lotService.getLotById(lotId);
+            const productItems = lot?.items?.filter((item) => item.itemType === 'MODEL') || [];
+
+            if (productItems.length > 1) {
+              setBulkDialogOpen(true);
+            } else if (productItems.length === 1) {
+              setInitialItemId(productItems[0].id);
+              setFormOpen(true);
+            } else {
+              toast.error('No products found in this lot');
+            }
+          } catch (err) {
+            console.error('Failed to fetch lot for routing:', err);
+            setBulkDialogOpen(true);
+          }
+        };
+
+        checkLotProducts();
+      }
     }
   }, [searchParams]);
 
@@ -440,12 +255,6 @@ export default function ManagerProduct() {
           },
           { id: 'price', header: 'PRICE', cell: (p: Product) => formatCurrency(p.sale_price) },
           {
-            id: 'hs_code',
-            header: 'HS CODE',
-            cell: (p: Product) => <span className="font-mono text-[11px]">{p.hs_code || '-'}</span>,
-          },
-          { id: 'color', header: 'PRINT COLOUR', accessorKey: 'print_colour' as keyof Product },
-          {
             id: 'status',
             header: 'STATUS',
             cell: (p: Product) => (
@@ -467,7 +276,7 @@ export default function ManagerProduct() {
               <div className="flex gap-3 text-sm">
                 <button
                   className="text-blue-500 hover:text-blue-700 transition-colors"
-                  onClick={() => setViewingProduct(p)}
+                  onClick={() => router.push(`/manager/products/${p.id}`)}
                   title="View Details"
                 >
                   <Eye size={18} />
@@ -499,14 +308,16 @@ export default function ManagerProduct() {
         onLimitChange={setLimit}
       />
 
-      {viewingProduct && (
-        <ProductViewModal product={viewingProduct} onClose={() => setViewingProduct(null)} />
-      )}
-
       {formOpen && (
         <ProductFormModal
           initialData={editing}
-          onClose={() => setFormOpen(false)}
+          initialLotId={initialLotId}
+          initialItemId={initialItemId}
+          onClose={() => {
+            setFormOpen(false);
+            setInitialLotId(undefined);
+            setInitialItemId(undefined);
+          }}
           onConfirm={handleSave}
         />
       )}
@@ -557,10 +368,14 @@ function ProductFormModal({
   initialData,
   onClose,
   onConfirm,
+  initialLotId,
+  initialItemId,
 }: {
   initialData: Product | null;
   onClose: () => void;
   onConfirm: () => void;
+  initialLotId?: string;
+  initialItemId?: string;
 }) {
   // Load dependencies
   const [models, setModels] = useState<Model[]>([]);
@@ -607,7 +422,7 @@ function ProductFormModal({
     print_colour: initialData?.print_colour || 'BLACK_WHITE',
     max_discount_amount: initialData?.max_discount_amount ?? '',
     wholesale_price: initialData?.wholesale_price ?? '',
-    lot_id: initialData?.lot_id || '', // Check if initialData has lot_id support if needed
+    lot_id: initialData?.lot_id || initialLotId || '',
     description: initialData?.description || '',
     hs_code: initialData?.hs_code || '',
     consumables: initialData?.consumables || [],
@@ -621,7 +436,7 @@ function ProductFormModal({
   // If editing, we might have initialData.model.brandRelation.id
   // Ideally we track selectedBrandId explicitly for the dropdown.
   const [selectedBrandId, setSelectedBrandId] = useState<string>('');
-  const [selectedLotItemId, setSelectedLotItemId] = useState<string>('');
+  const [selectedLotItemId, setSelectedLotItemId] = useState<string>(initialItemId || '');
 
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string>(initialData?.imageUrl || '');
@@ -665,35 +480,71 @@ function ProductFormModal({
     loadDependencies();
   }, []);
 
-  // Initialize selectedBrandId and selectedLotItemId when models and initialData are ready
+  // Initialize selectedBrandId and selectedLotItemId when models and initialData/initialLotId are ready
   useEffect(() => {
-    if (initialData && models.length > 0) {
-      const relevantModel = models.find(
-        (m) => m.id === (initialData.model_id || initialData.model?.id),
-      );
-      if (relevantModel?.brandRelation?.id) {
-        setSelectedBrandId(relevantModel.brandRelation.id);
-      } else if (initialData.brand) {
-        // Fallback: try to find brand by name
-        const brandByName = brands.find((b) => b.name === initialData.brand);
-        if (brandByName) setSelectedBrandId(brandByName.id);
-      }
-
-      // If there's a lot_id, try to find the lot item and auto-fill the selection
-      if (initialData.lot_id && lots.length > 0) {
-        const lot = lots.find((l) => l.id === initialData.lot_id);
-        const item = lot?.items?.find(
-          (i: LotItem) =>
-            i.itemType === 'MODEL' &&
-            (i.modelId === initialData.model_id || i.model?.id === initialData.model_id),
+    if (models.length > 0 && lots.length > 0) {
+      if (initialData) {
+        const relevantModel = models.find(
+          (m) => m.id === (initialData.model_id || initialData.model?.id),
         );
-        if (item) {
-          // Use item.id as the selection value (same as what the options use)
-          setSelectedLotItemId(item.id || item.modelId || '');
+        if (relevantModel?.brandRelation?.id) {
+          setSelectedBrandId(relevantModel.brandRelation.id);
+        } else if (initialData.brand) {
+          const brandByName = brands.find((b) => b.name === initialData.brand);
+          if (brandByName) setSelectedBrandId(brandByName.id);
+        }
+
+        // If there's a lot_id, try to find the lot item and auto-fill the selection
+        if (initialData.lot_id) {
+          const lot = lots.find((l) => l.id === initialData.lot_id);
+          const item = lot?.items?.find(
+            (i: LotItem) =>
+              i.itemType === 'MODEL' &&
+              (i.modelId === initialData.model_id || i.model?.id === initialData.model_id),
+          );
+          if (item) {
+            setSelectedLotItemId(item.id || item.modelId || '');
+          }
+        }
+      } else if (initialLotId) {
+        const lot = lots.find((l) => l.id === initialLotId);
+        if (lot) {
+          const item = lot.items?.find((i: LotItem) => {
+            if (initialItemId) {
+              return (
+                (i.id === initialItemId ||
+                  i.modelId === initialItemId ||
+                  i.model?.id === initialItemId) &&
+                i.itemType === 'MODEL'
+              );
+            }
+            return i.itemType === 'MODEL';
+          });
+
+          if (item) {
+            const modelId = item.modelId || item.model?.id || '';
+            const model = models.find((m) => m.id === modelId);
+            const brandId = model?.brandRelation?.id || model?.brand?.id || model?.brand_id || '';
+
+            setSelectedLotItemId(item.id || modelId || '');
+            setSelectedBrandId(brandId);
+
+            setForm((prev) => ({
+              ...prev,
+              lot_id: initialLotId,
+              model_id: modelId,
+              brand: model?.brandRelation?.name || model?.brand?.name || '',
+              vendor_id: lot.vendorId || lot.vendor?.id || prev.vendor_id || '',
+              warehouse_id: lot.warehouseId || lot.warehouse_id || prev.warehouse_id || '',
+              purchase_price: item.unitPrice ?? prev.purchase_price,
+              name: item.customProductName || model?.model_name || prev.name,
+              description: model?.description || prev.description,
+            }));
+          }
         }
       }
     }
-  }, [initialData, models, brands, lots]);
+  }, [initialData, initialLotId, initialItemId, models, brands, lots]);
 
   // Filter models based on selectedBrandId
   const filteredModels = selectedBrandId
@@ -1038,6 +889,11 @@ function ProductFormModal({
                           model_id: modelId,
                           brand: model?.brandRelation?.name || model?.brand?.name || '',
                           vendor_id: lot?.vendorId || lot?.vendor?.id || form.vendor_id || '',
+                          warehouse_id:
+                            lot?.warehouseId || lot?.warehouse_id || form.warehouse_id || '',
+                          purchase_price: item.unitPrice ?? form.purchase_price,
+                          name: item.customProductName || model?.model_name || form.name,
+                          description: model?.description || form.description,
                         });
                       }
                     }}

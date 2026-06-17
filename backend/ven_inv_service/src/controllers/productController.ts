@@ -46,6 +46,7 @@ export const addproduct = async (req: Request, res: Response, next: NextFunction
       brand,
       MFD,
       sale_price,
+      purchase_price,
       tax_rate,
       print_colour,
       max_discount_amount,
@@ -102,6 +103,7 @@ export const addproduct = async (req: Request, res: Response, next: NextFunction
       brand,
       MFD,
       sale_price: sale_price ? Number(sale_price) : 0,
+      purchase_price: purchase_price ? Number(purchase_price) : undefined,
       tax_rate: tax_rate ? Number(tax_rate) : 0,
       print_colour,
       max_discount_amount:
@@ -193,6 +195,8 @@ export const updateproduct = async (req: Request, res: Response, next: NextFunct
 
     if (payload.sale_price !== undefined && payload.sale_price !== '')
       payload.sale_price = Number(payload.sale_price);
+    if (payload.purchase_price !== undefined && payload.purchase_price !== '')
+      payload.purchase_price = Number(payload.purchase_price);
     if (payload.tax_rate !== undefined && payload.tax_rate !== '')
       payload.tax_rate = Number(payload.tax_rate);
     if (payload.max_discount_amount !== undefined && payload.max_discount_amount !== '')

@@ -109,12 +109,12 @@ export default function FinanceServiceEstimatesPage() {
 
   const filtered = estimates.filter((e) => {
     const query = search.toLowerCase();
-    return (
+    const matchesSearch =
       e.invoiceNumber?.toLowerCase().includes(query) ||
       e.customerName?.toLowerCase().includes(query) ||
       e.employeeName?.toLowerCase().includes(query) ||
-      (e.serviceTicketId && e.serviceTicketId.toLowerCase().includes(query))
-    );
+      (e.serviceTicketId && e.serviceTicketId.toLowerCase().includes(query));
+    return e.billType === 'SERVICE' && e.status === 'WAITING_FINANCE_APPROVAL' && matchesSearch;
   });
 
   if (loading) {
@@ -126,13 +126,17 @@ export default function FinanceServiceEstimatesPage() {
     );
   }
 
+  const pendingCount = estimates.filter(
+    (e) => e.billType === 'SERVICE' && e.status === 'WAITING_FINANCE_APPROVAL',
+  ).length;
+
   return (
     <main className="p-4 sm:p-6 max-w-7xl mx-auto space-y-6">
       {/* Stats Header */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <StatCard
           title="Pending Service Estimates"
-          value={String(estimates.length)}
+          value={String(pendingCount)}
           subtitle="Waiting for Finance approval"
         />
       </div>

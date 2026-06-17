@@ -57,6 +57,8 @@ import {
   createServiceQuotation,
   getContractBySerial,
   getCustomerBillingHistory,
+  reviseEstimate,
+  financeExtendValidity,
 } from '../controllers/invoiceController';
 import { uploadMeterImage } from '../middlewares/uploadMiddleware';
 import { authMiddleware } from '../middlewares/authMiddleware';
@@ -490,5 +492,8 @@ router.get('/audit-logs/:id', authMiddleware, getInvoiceAuditLogs);
 router.post('/service-quotation', createServiceQuotation);
 router.get('/invoices/contract/serial/:serialNumber', getContractBySerial);
 router.get('/invoices/customer/:customerId/history', getCustomerBillingHistory);
+
+router.patch('/:id/revise-estimate', authMiddleware, reviseEstimate);
+router.post('/:id/finance-extend-validity', authMiddleware, financeExtendValidity);
 
 export default router;

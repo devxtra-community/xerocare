@@ -29,16 +29,35 @@ export async function sendEmployeeWelcomeMail(to: string, password: string) {
   });
 }
 
-export async function sendOtpMail(to: string, otp: string) {
+export async function sendOtpMail(to: string, otp: string, purpose?: string) {
+  let subject = 'Your OTP Verification Code';
+  let bodyTitle = 'OTP Verification';
+  let bodyParagraph = 'Your security code is:';
+
+  if (purpose === 'FORGOT_PASSWORD') {
+    subject = 'Forgot Password OTP';
+    bodyTitle = 'Reset Password OTP';
+    bodyParagraph =
+      'You requested to reset your password. Use the following security code to change your password:';
+  } else if (purpose === 'LOGIN') {
+    subject = 'Your Login OTP';
+    bodyTitle = 'Login OTP Verification';
+    bodyParagraph = 'Use the following security code to complete your login:';
+  }
+
   await mailer.sendMail({
     from: process.env.MAIL_USER,
     to,
-    subject: 'Your Login OTP',
+    subject,
     html: `
-      <h2>OTP Verification</h2>
-      <p>Your OTP is:</p>
-      <h1>${otp}</h1>
-      <p>This OTP is valid for 5 minutes.</p>
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e5e7eb; border-radius: 8px; color: #374151;">
+        <h2 style="color: #1e3a8a; border-bottom: 2px solid #eff6ff; padding-bottom: 10px; margin-top: 0;">${bodyTitle}</h2>
+        <p style="font-size: 16px; line-height: 1.5;">${bodyParagraph}</p>
+        <div style="background-color: #f8fafc; padding: 20px; text-align: center; border-radius: 8px; margin: 20px 0;">
+          <span style="font-size: 32px; font-weight: bold; letter-spacing: 4px; color: #1e3a8a;">${otp}</span>
+        </div>
+        <p style="font-size: 14px; color: #6b7280; margin-bottom: 0;">This OTP is valid for 5 minutes. If you did not request this code, please ignore this email.</p>
+      </div>
     `,
   });
 }

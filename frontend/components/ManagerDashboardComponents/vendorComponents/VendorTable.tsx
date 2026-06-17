@@ -195,8 +195,8 @@ export default function VendorTable({
       </div>
 
       <div className="rounded-2xl border border-blue-100 bg-card overflow-hidden shadow-sm m-4 mt-0">
-        <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-gray-200">
-          <Table className="min-w-[1050px]">
+        <div className="overflow-x-hidden">
+          <Table className="w-full">
             <TableHeader className="bg-muted/50/50">
               <TableRow className="border-b border-blue-50/50 hover:bg-transparent">
                 <TableHead className="font-bold text-[10px] text-primary uppercase py-3 px-4">
@@ -206,9 +206,6 @@ export default function VendorTable({
                 <TableHead className="font-bold text-[10px] text-primary uppercase">Type</TableHead>
                 <TableHead className="font-bold text-[10px] text-primary uppercase">
                   Contact
-                </TableHead>
-                <TableHead className="font-bold text-[10px] text-primary uppercase">
-                  Details
                 </TableHead>
                 <TableHead className="text-right font-bold text-[10px] text-primary uppercase">
                   Orders
@@ -259,12 +256,6 @@ export default function VendorTable({
                       <span className="text-xs font-semibold text-gray-800">
                         {vendor.contactPerson}
                       </span>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex flex-col text-[10px] text-muted-foreground">
-                        <span className="font-medium">{vendor.phone}</span>
-                        <span className="font-medium">{vendor.email}</span>
-                      </div>
                     </TableCell>
                     <TableCell className="text-right text-xs font-bold text-gray-700">
                       {vendor.totalOrders}
@@ -326,7 +317,7 @@ export default function VendorTable({
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={10} className="text-center py-8 text-muted-foreground italic">
+                  <TableCell colSpan={9} className="text-center py-8 text-muted-foreground italic">
                     No vendors found matching your criteria.
                   </TableCell>
                 </TableRow>
