@@ -127,7 +127,7 @@ async function runPreMigrations() {
         ADD COLUMN IF NOT EXISTS "maxCopyLimit" INTEGER NULL;
       `);
       logger.info(
-        'Guaranteed billType, serviceTicketId, and maxCopyLimit columns exist on invoices table.',
+        'Guaranteed billType, serviceTicketId, maxCopyLimit columns exist on invoices table.',
       );
     } catch (colErr) {
       logger.warn('Failed to ensure invoices columns (table might not exist yet):', colErr);

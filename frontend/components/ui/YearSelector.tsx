@@ -22,7 +22,7 @@ export function YearSelector({
   selectedYear,
   onYearChange,
   startYear = 2024,
-  endYear = new Date().getFullYear(),
+  endYear = 2026, // Default to a static safe year for SSR
   showAllOption = true,
 }: YearSelectorProps) {
   const [availableYears, setAvailableYears] = React.useState<number[]>([]);

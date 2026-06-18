@@ -518,26 +518,6 @@ const LeaseStandardQuotation: React.FC<LeaseStandardQuotationProps> = ({
                       minHeight: '320px',
                     }}
                   >
-                    {/* Background Watermark Image */}
-                    {item.productImage && (
-                      <img
-                        src={item.productImage}
-                        alt="bg"
-                        style={{
-                          position: 'absolute',
-                          top: '50%',
-                          left: '50%',
-                          transform: 'translate(-50%, -50%)',
-                          width: '100%',
-                          height: '110%',
-                          objectFit: 'contain',
-                          opacity: 0.2,
-                          zIndex: 0,
-                          pointerEvents: 'none',
-                          filter: 'grayscale(100%)',
-                        }}
-                      />
-                    )}
                     <div
                       style={{
                         position: 'relative',
@@ -545,105 +525,132 @@ const LeaseStandardQuotation: React.FC<LeaseStandardQuotationProps> = ({
                         padding: '15px 8px',
                         textAlign: 'left',
                         display: 'flex',
-                        flexDirection: 'column',
-                        justifyContent: 'flex-start',
+                        flexDirection: 'row',
+                        justifyContent: 'space-between',
+                        alignItems: 'flex-start',
+                        gap: '20px',
                         height: '100%',
+                        width: '100%',
+                        boxSizing: 'border-box',
                       }}
                     >
-                      <div
-                        style={{
-                          marginBottom: '6px',
-                        }}
-                      >
-                        {item.productName}
-                      </div>
-                      <div
-                        style={{
-                          fontSize: '16px',
-                          color: '#1a1a1a',
-                          lineHeight: '1.6',
-                          fontWeight: '600',
-                          maxWidth: '95%',
-                        }}
-                      >
+                      <div style={{ flex: 1 }}>
+                        <div style={{ marginBottom: '6px' }}>{item.productName}</div>
                         <div
                           style={{
-                            fontSize: '13px',
-                            fontWeight: '800',
-                            color: '#dc2626',
-                            textTransform: 'uppercase',
-                            marginBottom: '6px',
+                            fontSize: '16px',
+                            color: '#1a1a1a',
+                            lineHeight: '1.6',
+                            fontWeight: '600',
+                            maxWidth: '95%',
                           }}
                         >
-                          Product Description
-                        </div>
-                        <div
-                          style={{ marginBottom: (item.features?.length ?? 0) > 0 ? '12px' : '0' }}
-                        >
-                          {item.description}
-                        </div>
-                        {(item.features || []).length > 0 && (
-                          <>
-                            <div
-                              style={{
-                                fontSize: '13px',
-                                fontWeight: '800',
-                                color: '#dc2626',
-                                textTransform: 'uppercase',
-                                marginBottom: '6px',
-                                marginTop: '16px',
-                              }}
-                            >
-                              Features
-                            </div>
-                            {(item.features || []).map((f, i) => (
-                              <div key={i} style={{ marginTop: '8px', fontSize: '15px' }}>
-                                {f.subHeading && (
-                                  <strong
-                                    style={{
-                                      color: '#dc2626',
-                                      display: 'block',
-                                      marginBottom: '4px',
-                                    }}
-                                  >
-                                    {f.subHeading}
-                                  </strong>
-                                )}
-                                {f.description && (
-                                  <div style={{ color: '#555' }}>{f.description}</div>
-                                )}
-                              </div>
-                            ))}
-                          </>
-                        )}
-                        {item.warranty && (
                           <div
                             style={{
-                              marginTop: '10px',
-                              fontSize: '12px',
-                              color: '#000',
-                              fontWeight: '400',
+                              fontSize: '13px',
+                              fontWeight: '800',
+                              color: '#dc2626',
                               textTransform: 'uppercase',
+                              marginBottom: '6px',
                             }}
                           >
-                            <span style={{ color: '#dc2626', fontWeight: '700' }}>Warranty: </span>
-                            {(() => {
-                              const parts = item.warranty.split(' ');
-                              if (parts.length >= 2) {
-                                return (
-                                  <>
-                                    <span style={{ color: '#dc2626' }}>
-                                      {parts[0]} {parts[1]}
-                                    </span>
-                                    <span> {parts.slice(2).join(' ')}</span>
-                                  </>
-                                );
-                              }
-                              return <span style={{ color: '#dc2626' }}>{item.warranty}</span>;
-                            })()}
+                            Product Description
                           </div>
-                        )}
+                          <div
+                            style={{
+                              marginBottom: (item.features?.length ?? 0) > 0 ? '12px' : '0',
+                            }}
+                          >
+                            {item.description}
+                          </div>
+                          {(item.features || []).length > 0 && (
+                            <>
+                              <div
+                                style={{
+                                  fontSize: '13px',
+                                  fontWeight: '800',
+                                  color: '#dc2626',
+                                  textTransform: 'uppercase',
+                                  marginBottom: '6px',
+                                  marginTop: '16px',
+                                }}
+                              >
+                                Features
+                              </div>
+                              {(item.features || []).map((f, i) => (
+                                <div key={i} style={{ marginTop: '8px', fontSize: '15px' }}>
+                                  {f.subHeading && (
+                                    <strong
+                                      style={{
+                                        color: '#dc2626',
+                                        display: 'block',
+                                        marginBottom: '4px',
+                                      }}
+                                    >
+                                      {f.subHeading}
+                                    </strong>
+                                  )}
+                                  {f.description && (
+                                    <div style={{ color: '#555' }}>{f.description}</div>
+                                  )}
+                                </div>
+                              ))}
+                            </>
+                          )}
+                          {item.warranty && (
+                            <div
+                              style={{
+                                marginTop: '10px',
+                                fontSize: '12px',
+                                color: '#000',
+                                fontWeight: '400',
+                                textTransform: 'uppercase',
+                              }}
+                            >
+                              <span style={{ color: '#dc2626', fontWeight: '700' }}>
+                                Warranty:{' '}
+                              </span>
+                              {(() => {
+                                const parts = item.warranty.split(' ');
+                                if (parts.length >= 2) {
+                                  return (
+                                    <>
+                                      <span style={{ color: '#dc2626' }}>
+                                        {parts[0]} {parts[1]}
+                                      </span>
+                                      <span> {parts.slice(2).join(' ')}</span>
+                                    </>
+                                  );
+                                }
+                                return <span style={{ color: '#dc2626' }}>{item.warranty}</span>;
+                              })()}
+                            </div>
+                          )}
+                        </div>
                       </div>
+                      {item.productImage && (
+                        <div
+                          style={{
+                            width: '350px',
+                            flexShrink: 0,
+                            display: 'flex',
+                            justifyContent: 'center',
+                            alignItems: 'center',
+                            padding: '10px',
+                          }}
+                        >
+                          <img
+                            src={item.productImage}
+                            alt="Product"
+                            style={{
+                              width: '100%',
+                              height: 'auto',
+                              objectFit: 'contain',
+                              borderRadius: '8px',
+                            }}
+                          />
+                        </div>
+                      )}
                     </div>
                   </td>
                   <td

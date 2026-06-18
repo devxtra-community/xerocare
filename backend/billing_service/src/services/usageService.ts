@@ -549,6 +549,7 @@ export class UsageService {
 
       // Return next period for UI convenience
       const nextPeriod = this.calculateNextPeriod(contract, new Date(payload.billingPeriodEnd));
+
       return { usage, nextPeriod };
     }
   }

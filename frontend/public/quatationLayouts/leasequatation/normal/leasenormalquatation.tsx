@@ -424,102 +424,159 @@ const LeaseNormalQuotation: React.FC<LeaseNormalQuotationProps> = ({
           </thead>
           <tbody>
             {lineItems.map((item, idx) => (
-              <tr
-                key={idx}
-                style={{
-                  backgroundColor: idx % 2 === 0 ? '#fff' : '#f7f7f7',
-                  borderBottom: '1px solid #eee',
-                }}
-              >
-                <td style={tdStyle()}>{idx + 1}</td>
-                <td style={{ ...tdStyle('left'), whiteSpace: 'pre-wrap' }}>
-                  <div
-                    style={{
-                      fontSize: '11px',
-                      color: '#1a1a1a',
-                      fontWeight: '300',
-                      maxWidth: '95%',
-                      lineHeight: '1.6',
-                    }}
+              <React.Fragment key={idx}>
+                {/* First Row: Sl, Description (with rowspan), and Data Columns */}
+                <tr
+                  style={{
+                    backgroundColor: idx % 2 === 0 ? '#fff' : '#f7f7f7',
+                  }}
+                >
+                  <td
+                    style={{ ...tdStyle(), verticalAlign: 'top' }}
+                    rowSpan={item.productImage ? 2 : 1}
+                  >
+                    {idx + 1}
+                  </td>
+                  <td
+                    style={{ ...tdStyle('left'), whiteSpace: 'pre-wrap', verticalAlign: 'top' }}
+                    rowSpan={item.productImage ? 2 : 1}
                   >
                     <div
                       style={{
-                        whiteSpace: 'pre-wrap',
-                        marginBottom: item.features?.length ? '12px' : '0',
+                        fontSize: '11px',
+                        color: '#1a1a1a',
+                        fontWeight: '300',
+                        lineHeight: '1.6',
                       }}
                     >
-                      {item.description}
-                    </div>
-                    {(item.features || []).length > 0 && (
-                      <>
-                        <div
-                          style={{
-                            fontSize: '13px',
-                            fontWeight: '300',
-                            color: '#10b981',
-                            textTransform: 'uppercase',
-                            marginBottom: '6px',
-                            marginTop: '16px',
-                          }}
-                        >
-                          Features
-                        </div>
-                        {(item.features || []).map((f, i) => (
-                          <div key={i} style={{ marginTop: '8px', fontSize: '11px' }}>
-                            {f.subHeading && (
-                              <div
-                                style={{ color: '#dc2626', display: 'block', marginBottom: '4px' }}
-                              >
-                                {f.subHeading}
-                              </div>
-                            )}
-                            {f.description && <div style={{ color: '#444' }}>{f.description}</div>}
-                          </div>
-                        ))}
-                      </>
-                    )}
-                    {item.warranty && (
                       <div
                         style={{
-                          marginTop: '12px',
-                          fontSize: '11px',
-                          color: '#1a1a1a',
-                          fontWeight: '300',
-                          lineHeight: '1.6',
+                          whiteSpace: 'pre-wrap',
+                          marginBottom: item.features?.length ? '12px' : '0',
                         }}
                       >
-                        <span style={{ color: '#dc2626', fontWeight: '300' }}>Warranty: </span>
-                        {(() => {
-                          const parts = item.warranty.split(' ');
-                          if (parts.length >= 2) {
-                            return (
-                              <>
-                                <span style={{ color: '#dc2626' }}>
-                                  {parts[0]} {parts[1]}
-                                </span>
-                                <span> {parts.slice(2).join(' ')}</span>
-                              </>
-                            );
-                          }
-                          return <span style={{ color: '#dc2626' }}>{item.warranty}</span>;
-                        })()}
+                        {item.description}
                       </div>
-                    )}
-                  </div>
-                </td>
-                <td style={tdStyle()}>{item.qty}</td>
-                <td style={tdStyle()}>{item.limit}</td>
-                {isFSM ? (
-                  <td style={{ ...tdStyle('right') }}>{item.excessRate || 'N/A'}</td>
-                ) : (
-                  <>
-                    <td style={{ ...tdStyle('right') }}>{fmt(Number(item.rate))}</td>
-                    <td style={{ ...tdStyle('right'), fontWeight: '300' }}>
-                      {fmt(item.qty * Number(item.rate))}
+                      {(item.features || []).length > 0 && (
+                        <>
+                          <div
+                            style={{
+                              fontSize: '13px',
+                              fontWeight: '300',
+                              color: '#10b981',
+                              textTransform: 'uppercase',
+                              marginBottom: '6px',
+                              marginTop: '16px',
+                            }}
+                          >
+                            Features
+                          </div>
+                          {(item.features || []).map((f, i) => (
+                            <div key={i} style={{ marginTop: '8px', fontSize: '11px' }}>
+                              {f.subHeading && (
+                                <div
+                                  style={{
+                                    color: '#dc2626',
+                                    display: 'block',
+                                    marginBottom: '4px',
+                                  }}
+                                >
+                                  {f.subHeading}
+                                </div>
+                              )}
+                              {f.description && (
+                                <div style={{ color: '#444' }}>{f.description}</div>
+                              )}
+                            </div>
+                          ))}
+                        </>
+                      )}
+                      {item.warranty && (
+                        <div
+                          style={{
+                            marginTop: '12px',
+                            fontSize: '11px',
+                            color: '#1a1a1a',
+                            fontWeight: '300',
+                            lineHeight: '1.6',
+                          }}
+                        >
+                          <span style={{ color: '#dc2626', fontWeight: '300' }}>Warranty: </span>
+                          {(() => {
+                            const parts = item.warranty.split(' ');
+                            if (parts.length >= 2) {
+                              return (
+                                <>
+                                  <span style={{ color: '#dc2626' }}>
+                                    {parts[0]} {parts[1]}
+                                  </span>
+                                  <span> {parts.slice(2).join(' ')}</span>
+                                </>
+                              );
+                            }
+                            return <span style={{ color: '#dc2626' }}>{item.warranty}</span>;
+                          })()}
+                        </div>
+                      )}
+                    </div>
+                  </td>
+                  <td style={tdStyle()}>{item.qty}</td>
+                  <td style={tdStyle()}>{item.limit}</td>
+                  {isFSM ? (
+                    <td style={{ ...tdStyle('right') }}>{item.excessRate || 'N/A'}</td>
+                  ) : (
+                    <>
+                      <td style={{ ...tdStyle('right') }}>{fmt(Number(item.rate))}</td>
+                      <td style={{ ...tdStyle('right'), fontWeight: '300' }}>
+                        {fmt(item.qty * Number(item.rate))}
+                      </td>
+                    </>
+                  )}
+                </tr>
+
+                {/* Second Row (Only for Image): Placed under the data columns */}
+                {item.productImage && (
+                  <tr
+                    style={{
+                      backgroundColor: idx % 2 === 0 ? '#fff' : '#f7f7f7',
+                      borderBottom: '1px solid #eee',
+                    }}
+                  >
+                    <td
+                      colSpan={isFSM ? 3 : 4}
+                      style={{
+                        padding: '10px',
+                        verticalAlign: 'top',
+                        textAlign: 'right',
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'flex-end',
+                          width: '100%',
+                        }}
+                      >
+                        <img
+                          src={item.productImage}
+                          alt="Product"
+                          style={{
+                            width: '350px',
+                            height: 'auto',
+                            objectFit: 'contain',
+                            borderRadius: '4px',
+                          }}
+                        />
+                      </div>
                     </td>
-                  </>
+                  </tr>
                 )}
-              </tr>
+                {!item.productImage && (
+                  <tr style={{ borderBottom: '1px solid #eee' }}>
+                    <td colSpan={isFSM ? 3 : 4}></td>
+                  </tr>
+                )}
+              </React.Fragment>
             ))}
           </tbody>
         </table>
@@ -933,39 +990,10 @@ const LeaseNormalQuotation: React.FC<LeaseNormalQuotationProps> = ({
           minHeight: '1px',
         }}
       >
-        <div>
-          <div style={{ fontSize: '12px', fontWeight: '300', color: '#333', marginBottom: '8px' }}>
-            Payment Instructions :
-          </div>
-          <div style={{ fontSize: '11px', color: '#666', lineHeight: '1.5' }}>
-            Payable as per the Lease Agreement.
-            <br />
-            Cheque should be in favor of:
-            <br />
-            <span style={{ fontWeight: '300', color: '#111' }}>
-              Xerocare Trading &amp; Services W.L.L
-            </span>
-          </div>
-
-          {lineItems?.[0]?.productImage && (
-            <div
-              style={{ marginTop: '20px', display: 'flex', alignItems: 'flex-end', flexGrow: 1 }}
-            >
-              <img
-                src={lineItems[0].productImage}
-                alt="Product"
-                style={{
-                  maxWidth: '600px',
-                  height: '100%',
-                  maxHeight: '600px',
-                  objectFit: 'contain',
-                  filter: 'grayscale(100%)',
-                  opacity: 0.8,
-                }}
-              />
-            </div>
-          )}
+        <div style={{ flex: 1, paddingRight: '20px' }}>
+          {/* Notes or other content can go here if needed */}
         </div>
+
         <div style={{ width: '280px' }}>
           <div style={{ padding: '0 15px' }}>
             <div

@@ -6,7 +6,11 @@ import SparePartTable from '@/components/ManagerDashboardComponents/inventoryCom
 import { YearSelector } from '@/components/ui/YearSelector';
 
 export default function ManagerInventoryPage() {
-  const [selectedYear, setSelectedYear] = useState<number | 'all'>(new Date().getFullYear());
+  const [selectedYear, setSelectedYear] = useState<number | 'all'>(2026); // Default to a static safe year for SSR
+
+  React.useEffect(() => {
+    setSelectedYear(new Date().getFullYear());
+  }, []);
 
   return (
     <div

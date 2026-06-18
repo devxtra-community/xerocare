@@ -884,6 +884,7 @@ export function QuotationViewDialog({
     totalLeaseValue: isFsmLease
       ? quotation.monthlyLeaseAmount || quotation.totalAmount || 0
       : quotation.totalAmount || 0,
+    notes: quotation.notes,
   };
 
   return (

@@ -1081,6 +1081,7 @@ function QuotationFormModal({
   const [leaseTenureMonths, setLeaseTenureMonths] = useState('12');
   const [totalLeaseAmount, setTotalLeaseAmount] = useState('');
   const [monthlyEmiAmount, setMonthlyEmiAmount] = useState('');
+
   const [lastEditedLease, setLastEditedLease] = useState<'TOTAL' | 'PERIODIC'>('TOTAL');
 
   // ── SECURITY DEPOSIT state ──────────────────────────────────────────────
@@ -1793,6 +1794,7 @@ function QuotationFormModal({
         securityDepositReference,
         securityDepositBank,
 
+        // Warranty
         // For FSM Leases, we need rentType and monthly rent mapped dynamically
         rentType: leaseType === 'FSM' ? (rentType as CreateInvoicePayload['rentType']) : undefined,
         monthlyRent: leaseType === 'FSM' && monthlyRent ? Number(monthlyRent) : undefined,
@@ -3286,8 +3288,8 @@ function QuotationFormModal({
               {quotationType === 'LEASE' && (
                 <div className="space-y-5 mb-6">
                   {/* Lease Type Selector Moved to Top */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="bg-card p-4 rounded-xl border border-purple-200 shadow-sm space-y-2 bg-purple-50/30">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div className="bg-card p-4 rounded-xl border border-purple-200 shadow-sm space-y-2 bg-purple-50/30 min-w-0 w-full">
                       <label className="text-[11px] font-bold text-purple-600 uppercase flex items-center gap-2">
                         <span className="w-2 h-2 rounded-full bg-purple-400" /> Lease Type
                       </label>
@@ -3295,8 +3297,8 @@ function QuotationFormModal({
                         value={leaseType}
                         onValueChange={(v) => setLeaseType(v as 'EMI' | 'FSM')}
                       >
-                        <SelectTrigger className="h-9 text-sm border-purple-100">
-                          <SelectValue />
+                        <SelectTrigger className="h-9 text-sm border-purple-100 w-full">
+                          <SelectValue placeholder="Select Lease Type" />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="EMI">EMI (Equated Monthly Instalment)</SelectItem>
@@ -3305,13 +3307,13 @@ function QuotationFormModal({
                       </Select>
                     </div>
 
-                    <div className="bg-card p-4 rounded-xl border border-slate-100 shadow-sm space-y-2">
+                    <div className="bg-card p-4 rounded-xl border border-slate-100 shadow-sm space-y-2 min-w-0 w-full">
                       <label className="text-[11px] font-bold text-muted-foreground uppercase">
                         Billing Period
                       </label>
                       <Select value={rentPeriod} onValueChange={setRentPeriod}>
-                        <SelectTrigger className="h-9 text-sm">
-                          <SelectValue />
+                        <SelectTrigger className="h-9 text-sm w-full">
+                          <SelectValue placeholder="Select Period" />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="MONTHLY">Monthly</SelectItem>
@@ -3323,14 +3325,14 @@ function QuotationFormModal({
                     </div>
 
                     {leaseType === 'FSM' && (
-                      <div className="bg-card p-4 rounded-xl border border-blue-200 shadow-sm space-y-2 bg-blue-50/30">
+                      <div className="bg-card p-4 rounded-xl border border-blue-200 shadow-sm space-y-2 bg-blue-50/30 min-w-0 w-full">
                         <label className="text-[11px] font-bold text-blue-600 uppercase flex items-center gap-2">
                           <span className="w-2 h-2 rounded-full bg-blue-400" /> Service Billing Type
                           (FSM)
                         </label>
                         <Select value={rentType} onValueChange={setRentType}>
-                          <SelectTrigger className="h-9 text-sm border-blue-100">
-                            <SelectValue />
+                          <SelectTrigger className="h-9 text-sm border-blue-100 w-full">
+                            <SelectValue placeholder="Select Billing Type" />
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="FIXED_LIMIT">Fixed Limit (BW + Color)</SelectItem>
