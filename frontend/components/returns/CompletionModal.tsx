@@ -92,7 +92,7 @@ export default function CompletionModal({ open, onClose, onConfirm, record }: Pr
     };
 
     fetchStock();
-  }, [open, record?.productId, record?.serialNumber]);
+  }, [open, record?.productId, record?.serialNumber, isExchange]);
 
   const handleSelectUnit = (product: Product) => {
     setSelectedProduct(product);

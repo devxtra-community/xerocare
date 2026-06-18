@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import {
@@ -135,39 +135,6 @@ export default function CreditNoteFormModal({ open, onClose, onSave, record }: P
   const [loadingCustomer, setLoadingCustomer] = useState(false);
   const [viewQuotation, setViewQuotation] = useState(false);
 
-  /* ── lifecycle ── */
-  useEffect(() => {
-    if (open) {
-      fetchCustomers();
-      if (record) {
-        setSelectedCustomer(record.customerId);
-        setSelectedInvoiceId(record.invoiceId);
-        // We need to fetch the invoice and product details too
-        handleInvoiceChange(record.invoiceId);
-        setSelectedProductId(record.productId);
-        setReturnType(record.type);
-        setNotes(record.notes || '');
-      }
-    } else {
-      resetForm();
-    }
-  }, [open, record]);
-
-  useEffect(() => {
-    if (selectedCustomer) {
-      fetchInvoices(selectedCustomer);
-      fetchCustomerDetails(selectedCustomer);
-    }
-  }, [selectedCustomer]);
-
-  useEffect(() => {
-    if (selectedProduct?.productId) {
-      fetchProductMeta(selectedProduct.productId);
-    } else {
-      setProductMeta(null);
-    }
-  }, [selectedProduct]);
-
   /* ── reset ── */
   const resetForm = () => {
     setSelectedCustomer('');
@@ -192,7 +159,7 @@ export default function CreditNoteFormModal({ open, onClose, onSave, record }: P
     }
   };
 
-  const fetchCustomerDetails = async (id: string) => {
+  const fetchCustomerDetails = useCallback(async (id: string) => {
     setLoadingCustomer(true);
     try {
       setCustomerDetails(await getCustomerById(id));
@@ -201,56 +168,95 @@ export default function CreditNoteFormModal({ open, onClose, onSave, record }: P
     } finally {
       setLoadingCustomer(false);
     }
-  };
+  }, []);
 
-  const fetchInvoices = async (customerId: string) => {
-    setLoadingInvoices(true);
-    if (!record) {
-      setSelectedInvoiceId('');
-      setSelectedInvoice(null);
+  const fetchInvoices = useCallback(
+    async (customerId: string) => {
+      setLoadingInvoices(true);
+      if (!record) {
+        setSelectedInvoiceId('');
+        setSelectedInvoice(null);
+        setSelectedProductId('');
+        setSelectedProduct(null);
+        setProductMeta(null);
+      }
+      try {
+        const res = await getInvoicesByCustomerId(customerId);
+        if (res.data.success) {
+          const fetchedInvoices = res.data.data || [];
+          setInvoices(fetchedInvoices);
+
+          // If editing and we haven't set the selectedInvoice yet
+          if (record && !selectedInvoice) {
+            const inv = fetchedInvoices.find((i: Invoice) => i.id === record.invoiceId);
+            if (inv) {
+              setSelectedInvoice(inv);
+              const prod = (inv.items || []).find(
+                (p: GlobalInvoiceItem) => p.productId === record.productId,
+              );
+              if (prod) setSelectedProduct(prod as unknown as ReturnInvoiceItem);
+            }
+          }
+        }
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setLoadingInvoices(false);
+      }
+    },
+    [record, selectedInvoice],
+  );
+
+  const handleInvoiceChange = useCallback(
+    async (invoiceId: string) => {
+      setSelectedInvoiceId(invoiceId);
       setSelectedProductId('');
       setSelectedProduct(null);
       setProductMeta(null);
-    }
-    try {
-      const res = await getInvoicesByCustomerId(customerId);
-      if (res.data.success) {
-        const fetchedInvoices = res.data.data || [];
-        setInvoices(fetchedInvoices);
-
-        // If editing and we haven't set the selectedInvoice yet
-        if (record && !selectedInvoice) {
-          const inv = fetchedInvoices.find((i: Invoice) => i.id === record.invoiceId);
-          if (inv) {
-            setSelectedInvoice(inv);
-            const prod = (inv.items || []).find(
-              (p: GlobalInvoiceItem) => p.productId === record.productId,
-            );
-            if (prod) setSelectedProduct(prod as unknown as ReturnInvoiceItem);
-          }
-        }
+      try {
+        const res = await getInvoiceById(invoiceId);
+        setSelectedInvoice(
+          res.data.success ? res.data.data : invoices.find((i) => i.id === invoiceId),
+        );
+      } catch {
+        setSelectedInvoice(invoices.find((i) => i.id === invoiceId) || null);
       }
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoadingInvoices(false);
-    }
-  };
+    },
+    [invoices],
+  );
 
-  const handleInvoiceChange = async (invoiceId: string) => {
-    setSelectedInvoiceId(invoiceId);
-    setSelectedProductId('');
-    setSelectedProduct(null);
-    setProductMeta(null);
-    try {
-      const res = await getInvoiceById(invoiceId);
-      setSelectedInvoice(
-        res.data.success ? res.data.data : invoices.find((i) => i.id === invoiceId),
-      );
-    } catch {
-      setSelectedInvoice(invoices.find((i) => i.id === invoiceId) || null);
+  /* ── lifecycle ── */
+  useEffect(() => {
+    if (open) {
+      fetchCustomers();
+      if (record) {
+        setSelectedCustomer(record.customerId);
+        setSelectedInvoiceId(record.invoiceId);
+        // We need to fetch the invoice and product details too
+        handleInvoiceChange(record.invoiceId);
+        setSelectedProductId(record.productId);
+        setReturnType(record.type);
+        setNotes(record.notes || '');
+      }
+    } else {
+      resetForm();
     }
-  };
+  }, [open, record, handleInvoiceChange]);
+
+  useEffect(() => {
+    if (selectedCustomer) {
+      fetchInvoices(selectedCustomer);
+      fetchCustomerDetails(selectedCustomer);
+    }
+  }, [selectedCustomer, fetchInvoices, fetchCustomerDetails]);
+
+  useEffect(() => {
+    if (selectedProduct?.productId) {
+      fetchProductMeta(selectedProduct.productId);
+    } else {
+      setProductMeta(null);
+    }
+  }, [selectedProduct]);
 
   const handleProductChange = (key: string) => {
     setSelectedProductId(key);

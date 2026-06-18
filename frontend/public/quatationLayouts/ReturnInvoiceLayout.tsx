@@ -141,7 +141,7 @@ export default function ReturnInvoiceLayout({
       }
     };
     fetchDetails();
-  }, [creditNote?.replacementProductId, invoice.id]);
+  }, [creditNote?.replacementProductId, invoice.id, invoice.items]);
 
   if (!creditNote) return null;
 

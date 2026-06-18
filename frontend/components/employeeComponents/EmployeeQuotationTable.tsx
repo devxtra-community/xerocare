@@ -334,7 +334,7 @@ export default function EmployeeQuotationTable() {
   ).length;
 
   // ── Product name helpers (must be defined before `filtered`) ────────────
-  const getCleanProductName = (name: string) => {
+  const getCleanProductName = useCallback((name: string) => {
     let clean = name.replace(/^(Black & White - |Color - |Combined - )/i, '');
     clean = clean.replace(/(\s*-\s*SN-[^,]+|\s*\(SN-[^)]+\)|\s*\(Serial[^)]+\))/gi, '');
     const lastDashIndex = clean.lastIndexOf(' - ');
@@ -342,41 +342,51 @@ export default function EmployeeQuotationTable() {
       clean = clean.substring(0, lastDashIndex).trim();
     }
     return clean.trim();
-  };
+  }, []);
 
-  const getProductNames = (invoice: Invoice) => {
-    if (!invoice.items || invoice.items.length === 0) return 'No items';
-    const productItems = invoice.items.filter(
-      (item) => item.itemType !== 'PRICING_RULE' && item.description,
-    );
-    if (productItems.length === 0) {
-      const allWithDesc = invoice.items.filter((item) => item.description);
-      if (allWithDesc.length === 0) return 'N/A';
-      return allWithDesc.map((item) => getCleanProductName(item.description)).join(', ');
-    }
-    return productItems.map((item) => getCleanProductName(item.description)).join(', ');
-  };
+  const getProductNames = useCallback(
+    (invoice: Invoice) => {
+      if (!invoice.items || invoice.items.length === 0) return 'No items';
+      const productItems = invoice.items.filter(
+        (item) => item.itemType !== 'PRICING_RULE' && item.description,
+      );
+      if (productItems.length === 0) {
+        const allWithDesc = invoice.items.filter((item) => item.description);
+        if (allWithDesc.length === 0) return 'N/A';
+        return allWithDesc.map((item) => getCleanProductName(item.description)).join(', ');
+      }
+      return productItems.map((item) => getCleanProductName(item.description)).join(', ');
+    },
+    [getCleanProductName],
+  );
 
   // Filter
-  const filtered = quotations.filter((q) => {
-    const s = search.toLowerCase();
-    return (
-      q.invoiceNumber?.toLowerCase().includes(s) ||
-      q.invoiceNumber?.toLowerCase().replace('inv-', 'qty-').includes(s) ||
-      q.customerName?.toLowerCase().includes(s) ||
-      getProductNames(q).toLowerCase().includes(s) ||
-      q.saleType?.toLowerCase().includes(s) ||
-      q.status?.toLowerCase().includes(s) ||
-      getProductNames(q)?.toLowerCase().includes(s)
-    );
-  });
+  const filtered = useMemo(() => {
+    return quotations.filter((q) => {
+      const s = search.toLowerCase();
+      return (
+        q.invoiceNumber?.toLowerCase().includes(s) ||
+        q.invoiceNumber?.toLowerCase().replace('inv-', 'qty-').includes(s) ||
+        q.customerName?.toLowerCase().includes(s) ||
+        getProductNames(q).toLowerCase().includes(s) ||
+        q.saleType?.toLowerCase().includes(s) ||
+        q.status?.toLowerCase().includes(s) ||
+        getProductNames(q)?.toLowerCase().includes(s)
+      );
+    });
+  }, [quotations, search, getProductNames]);
 
   useEffect(() => {
     setTotal(filtered.length);
   }, [filtered.length, setTotal]);
-  const paginated = filtered.slice((page - 1) * limit, page * limit);
 
-  const paginatedIds = paginated.map((q) => q.id).join(',');
+  const paginated = useMemo(() => {
+    return filtered.slice((page - 1) * limit, page * limit);
+  }, [filtered, page, limit]);
+
+  const paginatedIds = useMemo(() => {
+    return paginated.map((q) => q.id).join(',');
+  }, [paginated]);
 
   useEffect(() => {
     if (!paginatedIds) return;
@@ -403,7 +413,7 @@ export default function EmployeeQuotationTable() {
       }
     };
     fetchVisibleBalances();
-  }, [paginatedIds]);
+  }, [paginatedIds, paginated]);
 
   const handleView = async (id: string) => {
     try {

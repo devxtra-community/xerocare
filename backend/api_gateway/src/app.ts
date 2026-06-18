@@ -282,6 +282,36 @@ app.get(
   createServiceProxy(VENDOR_INVENTORY_SERVICE_URL),
 );
 app.post(
+  '/i/service/contracts',
+  authMiddleware,
+  requireServiceRole(['SERVICE_HELP_DESK']),
+  createServiceProxy(VENDOR_INVENTORY_SERVICE_URL),
+);
+app.get(
+  '/i/service/contracts',
+  authMiddleware,
+  requireServiceRole(['SERVICE_HELP_DESK', 'SERVICE_TECHNICIAN']),
+  createServiceProxy(VENDOR_INVENTORY_SERVICE_URL),
+);
+app.get(
+  '/i/service/contracts/:id',
+  authMiddleware,
+  requireServiceRole(['SERVICE_HELP_DESK', 'SERVICE_TECHNICIAN']),
+  createServiceProxy(VENDOR_INVENTORY_SERVICE_URL),
+);
+app.put(
+  '/i/service/contracts/:id',
+  authMiddleware,
+  requireServiceRole(['SERVICE_HELP_DESK']),
+  createServiceProxy(VENDOR_INVENTORY_SERVICE_URL),
+);
+app.delete(
+  '/i/service/contracts/:id',
+  authMiddleware,
+  requireServiceRole(['SERVICE_HELP_DESK']),
+  createServiceProxy(VENDOR_INVENTORY_SERVICE_URL),
+);
+app.post(
   '/b/service-quotation',
   authMiddleware,
   requireServiceRole(['SERVICE_TECHNICIAN']),

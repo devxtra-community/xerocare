@@ -115,6 +115,15 @@ export class SparePart {
   @Column({ type: 'int', default: 0 })
   quantity!: number;
 
+  @Column({ type: 'int', default: 0 })
+  reserved_quantity!: number;
+
+  @Column({ type: 'int', default: 0 })
+  consumed_quantity!: number;
+
+  @Column({ type: 'int', default: 0 })
+  damaged_quantity!: number;
+
   @Column({ nullable: true })
   image_url?: string;
 

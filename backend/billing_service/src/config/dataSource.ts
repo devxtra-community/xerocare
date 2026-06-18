@@ -67,31 +67,48 @@ async function runPreMigrations() {
     // Drop the old broken enum type if it exists from failed TypeORM synchronize attempts
     await client.query(`DROP TYPE IF EXISTS invoices_status_enum_old CASCADE;`);
 
-    // Ensure status enum exists/has correct values
+    // Ensure status enum type exists
     await client.query(`
       DO $$ BEGIN
         IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'invoices_status_enum') THEN
-          CREATE TYPE invoices_status_enum AS ENUM ('DRAFT', 'SENT', 'PAID', 'CANCELLED');
+          CREATE TYPE invoices_status_enum AS ENUM (
+            'DRAFT', 'SENT', 'CUSTOMER_ACCEPTED', 'CUSTOMER_REJECTED', 'EMPLOYEE_APPROVED',
+            'WAITING_FINANCE_APPROVAL', 'FINANCE_APPROVED', 'FINANCE_REJECTED', 'ACTIVE_CONTRACT',
+            'INVOICED', 'PAID', 'EXPIRED', 'CANCELLED', 'RETAKEN', 'SUPERSEDED', 'TEMPLATE', 'ASSIGNED'
+          );
         END IF;
-        
-        ALTER TYPE invoices_status_enum ADD VALUE IF NOT EXISTS 'TEMPLATE';
-        ALTER TYPE invoices_status_enum ADD VALUE IF NOT EXISTS 'ASSIGNED';
-        ALTER TYPE invoices_status_enum ADD VALUE IF NOT EXISTS 'CUSTOMER_ACCEPTED';
-        ALTER TYPE invoices_status_enum ADD VALUE IF NOT EXISTS 'CUSTOMER_REJECTED';
-        ALTER TYPE invoices_status_enum ADD VALUE IF NOT EXISTS 'EMPLOYEE_APPROVED';
-        ALTER TYPE invoices_status_enum ADD VALUE IF NOT EXISTS 'WAITING_FINANCE_APPROVAL';
-        ALTER TYPE invoices_status_enum ADD VALUE IF NOT EXISTS 'FINANCE_APPROVED';
-        ALTER TYPE invoices_status_enum ADD VALUE IF NOT EXISTS 'FINANCE_REJECTED';
-        ALTER TYPE invoices_status_enum ADD VALUE IF NOT EXISTS 'ACTIVE_CONTRACT';
-        ALTER TYPE invoices_status_enum ADD VALUE IF NOT EXISTS 'INVOICED';
-        ALTER TYPE invoices_status_enum ADD VALUE IF NOT EXISTS 'EXPIRED';
-        ALTER TYPE invoices_status_enum ADD VALUE IF NOT EXISTS 'RETAKEN';
-        ALTER TYPE invoices_status_enum ADD VALUE IF NOT EXISTS 'SUPERSEDED';
-        ALTER TYPE invoices_status_enum ADD VALUE IF NOT EXISTS 'PAID';
-      EXCEPTION
-        WHEN duplicate_object THEN null;
       END $$;
     `);
+
+    // Ensure all status enum values are present in case the enum type existed but was missing new values
+    const enumValues = [
+      'TEMPLATE',
+      'ASSIGNED',
+      'CUSTOMER_ACCEPTED',
+      'CUSTOMER_REJECTED',
+      'EMPLOYEE_APPROVED',
+      'WAITING_FINANCE_APPROVAL',
+      'FINANCE_APPROVED',
+      'FINANCE_REJECTED',
+      'ACTIVE_CONTRACT',
+      'INVOICED',
+      'EXPIRED',
+      'RETAKEN',
+      'SUPERSEDED',
+      'CANCELLED',
+      'PAID',
+      'DRAFT',
+      'SENT',
+    ];
+
+    for (const val of enumValues) {
+      try {
+        await client.query(`ALTER TYPE invoices_status_enum ADD VALUE IF NOT EXISTS '${val}';`);
+      } catch (err) {
+        // If duplicate_object error is thrown (in case postgres version doesn't support IF NOT EXISTS fully or other db issue), ignore it
+        logger.debug(`Skipped enum value ${val}: ${(err as Error).message}`);
+      }
+    }
 
     // Ensure billType enum exists
     await client.query(`
@@ -118,7 +135,7 @@ async function runPreMigrations() {
       END $$;
     `);
 
-    // Ensure columns exist on invoices table
+    // Ensure columns exist on invoices and invoice_items tables
     try {
       await client.query(`
         ALTER TABLE invoices 
@@ -126,58 +143,16 @@ async function runPreMigrations() {
         ADD COLUMN IF NOT EXISTS "serviceTicketId" UUID NULL,
         ADD COLUMN IF NOT EXISTS "maxCopyLimit" INTEGER NULL;
       `);
+      await client.query(`
+        ALTER TABLE invoice_items 
+        ADD COLUMN IF NOT EXISTS warranty VARCHAR(255) NULL;
+      `);
       logger.info(
-        'Guaranteed billType, serviceTicketId, maxCopyLimit columns exist on invoices table.',
+        'Guaranteed billType, serviceTicketId, and maxCopyLimit columns exist on invoices table, and warranty column exists on invoice_items table.',
       );
     } catch (colErr) {
-      logger.warn('Failed to ensure invoices columns (table might not exist yet):', colErr);
+      logger.warn('Failed to ensure invoices or invoice_items columns:', colErr);
     }
-
-    // Ensure credit_notes table and columns exist
-    try {
-      await client.query(`
-        CREATE TABLE IF NOT EXISTS credit_notes (
-          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-          "creditNoteNo" VARCHAR(255) NOT NULL UNIQUE,
-          "invoice_id" UUID NOT NULL REFERENCES invoices(id),
-          "customerId" UUID NOT NULL,
-          "branchId" UUID NOT NULL,
-          "productId" UUID NOT NULL,
-          "productName" VARCHAR(255) NOT NULL,
-          "modelName" VARCHAR(255) NOT NULL,
-          "brand" VARCHAR(255) NOT NULL,
-          "serialNumber" VARCHAR(255) NULL,
-          "productAmount" NUMERIC(12,2) NOT NULL,
-          "type" credit_note_type_enum NOT NULL,
-          "status" credit_note_status_enum NOT NULL DEFAULT 'DRAFT',
-          "sellerEmployeeId" UUID NOT NULL,
-          "notes" TEXT NULL,
-          "financeNote" TEXT NULL,
-          "damageReason" damage_reason_enum NULL,
-          "rejectionReason" TEXT NULL,
-          "replacementProductId" UUID NULL,
-          "replacementSerialNumber" VARCHAR(255) NULL,
-          "replacementAmount" NUMERIC(12,2) NULL,
-          "replacementDiscount" NUMERIC(12,2) DEFAULT 0,
-          "createdAt" TIMESTAMP NOT NULL DEFAULT NOW(),
-          "updatedAt" TIMESTAMP NOT NULL DEFAULT NOW()
-        );
-
-        -- Add missing columns for existing tables
-        ALTER TABLE credit_notes 
-        ADD COLUMN IF NOT EXISTS "customerName" VARCHAR(255) NULL,
-        ADD COLUMN IF NOT EXISTS "invoiceNumber" VARCHAR(255) NULL,
-        ADD COLUMN IF NOT EXISTS "replacementDiscount" NUMERIC(12,2) DEFAULT 0,
-        ADD COLUMN IF NOT EXISTS "replacementProductName" VARCHAR(255) NULL;
-
-        -- Update them to be NOT NULL if we want, but keeping NULL for legacy data compatibility
-        -- or update old records with a placeholder if needed.
-      `);
-      logger.info('Guaranteed credit_notes table and columns exist.');
-    } catch (tableErr) {
-      logger.warn('Failed to ensure credit_notes columns:', tableErr);
-    }
-
     logger.info('Pre-migration enum values added successfully');
 
     // Run legacy status updates

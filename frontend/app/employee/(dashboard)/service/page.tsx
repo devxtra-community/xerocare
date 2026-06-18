@@ -21,7 +21,6 @@ import {
   submitServiceQuotation,
   approveServiceQuotation,
   rejectServiceQuotation,
-  startServiceTicket,
   completeServiceTicket,
   cancelServiceTicket,
   getTechnicians,
@@ -29,7 +28,28 @@ import {
   ServiceTicket,
   ServiceTechnicianInfo,
   CustomerServiceHistory,
+  startDiagnosis,
+  startRepair,
+  getTicketEstimates,
+  createServiceEstimate,
+  submitEstimateForApproval,
+  approveEstimateFinance,
+  rejectEstimateFinance,
+  approveEstimateCustomer,
+  rejectEstimateCustomer,
+  createEstimateRevision,
+  approveRevisionFinance,
+  approveRevisionCustomer,
+  ServiceEstimate,
+  ServiceEstimateRevision,
+  ServiceEstimateItem,
+  getMachineHistory,
+  downloadServiceReport,
+  MachineHistoryResponse,
+  ServiceTicketItem,
+  ConsumableYieldHistory,
 } from '@/lib/serviceTicket';
+import { ServiceContract } from '@/lib/serviceContract';
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import {
@@ -122,6 +142,55 @@ interface MachineAllocation {
   remainingCopies?: string;
   purchaseDate?: string;
   contractType?: string;
+  meterReading?: number;
+}
+
+function ActiveTimer({ startTime }: { startTime: string }) {
+  const [elapsed, setElapsed] = useState('');
+  useEffect(() => {
+    const start = new Date(startTime).getTime();
+    const update = () => {
+      const diff = Math.max(0, Date.now() - start);
+      const hrs = Math.floor(diff / 3600000);
+      const mins = Math.floor((diff % 3600000) / 60000);
+      const secs = Math.floor((diff % 60000) / 1000);
+      const pad = (n: number) => String(n).padStart(2, '0');
+      setElapsed(`${hrs > 0 ? `${hrs}:` : ''}${pad(mins)}:${pad(secs)}`);
+    };
+    update();
+    const interval = setInterval(update, 1000);
+    return () => clearInterval(interval);
+  }, [startTime]);
+
+  return (
+    <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-red-50 border border-red-200 text-red-600 rounded-md font-mono text-[11px] font-bold shadow-sm animate-pulse">
+      <span className="w-2 h-2 rounded-full bg-red-500 block"></span>
+      <span>{elapsed}</span>
+    </div>
+  );
+}
+
+interface VisitLog {
+  ticketNumber: string;
+  serviceContext: string;
+  date: string;
+  meterReading: number;
+  cost: number;
+}
+
+interface MachineLifetimeCostUI {
+  totalServiceVisits: number;
+  totalSparePartsCost: number;
+  totalLabourCost: number;
+  totalLifetimeCost: number;
+  visitLogs: VisitLog[];
+}
+
+interface ConsumableYieldUI {
+  id: string;
+  consumableSku: string;
+  actualYield: number;
+  targetYield: number;
 }
 
 export default function ServiceDashboardPage() {
@@ -147,6 +216,36 @@ export default function ServiceDashboardPage() {
   const [showIntelModal, setShowIntelModal] = useState(false);
   const [showCreateLeadModal, setShowCreateLeadModal] = useState(false);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
+
+  // New states for ERP service workflow
+  const [showEstimatesModal, setShowEstimatesModal] = useState(false);
+  const [estimatesData, setEstimatesData] = useState<{
+    estimates: ServiceEstimate[];
+    revisions: ServiceEstimateRevision[];
+  } | null>(null);
+  const [newEstLabour, setNewEstLabour] = useState<number>(0);
+  const [newEstItems, setNewEstItems] = useState<Partial<ServiceEstimateItem>[]>([]);
+  // const [showRevisionForm, setShowRevisionForm] = useState(false);
+  const [newRevLabour, setNewRevLabour] = useState<number>(0);
+  const [newRevItems, setNewRevItems] = useState<Partial<ServiceEstimateItem>[]>([]);
+
+  const [showMachineIntelModal, setShowMachineIntelModal] = useState(false);
+  const [selectedMachineSerial, setSelectedMachineSerial] = useState('');
+  const [machineCostData, setMachineCostData] = useState<MachineLifetimeCostUI | null>(null);
+  const [machineYieldData, setMachineYieldData] = useState<ConsumableYieldUI[]>([]);
+  const [machinePartLogs, setMachinePartLogs] = useState<MachineHistoryResponse['partLogs']>([]);
+  const [activeIntelTab, setActiveIntelTab] = useState<'visits' | 'parts' | 'yields'>('visits');
+  const [loadingMachineIntel, setLoadingMachineIntel] = useState(false);
+
+  const [completeForm, setCompleteForm] = useState({
+    workPerformed: '',
+    resolutionDetails: '',
+    meterReading: 0,
+    customerRemarks: '',
+    technicianRemarks: '',
+    customerSignature: 'Customer Signed',
+    technicianSignature: 'Technician Signed',
+  });
 
   // Confirm Dialog State
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -203,9 +302,48 @@ export default function ServiceDashboardPage() {
 
   const [creationPath, setCreationPath] = useState<'existing' | 'new'>('existing');
   const [activeMachineTab, setActiveMachineTab] = useState<
-    'rented' | 'leased' | 'purchased' | 'contract'
+    'rented' | 'leased' | 'purchased' | 'contract' | 'external'
   >('rented');
   const [selectedMachine, setSelectedMachine] = useState<MachineAllocation | null>(null);
+  const [machineContextLoading, setMachineContextLoading] = useState(false);
+  const [machineContextData, setMachineContextData] = useState<{
+    serviceContext: string;
+    contractReferenceId: string | null;
+    productId: string | null;
+    coverage: {
+      labour: boolean;
+      consumables: boolean;
+      travel: boolean;
+    };
+    contract: ServiceContract | null;
+  } | null>(null);
+
+  useEffect(() => {
+    if (selectedMachine?.serialNumber) {
+      setMachineContextLoading(true);
+      import('@/lib/serviceTicket').then(({ getMachineContext }) => {
+        getMachineContext(selectedMachine.serialNumber)
+          .then((res) => {
+            setMachineContextData(res);
+            setNewTicket((prev) => ({
+              ...prev,
+              serviceContext: res.serviceContext,
+              contractReferenceId: res.contractReferenceId || '',
+            }));
+          })
+          .catch((err) => {
+            console.error('Error fetching machine context:', err);
+            setMachineContextData(null);
+          })
+          .finally(() => {
+            setMachineContextLoading(false);
+          });
+      });
+    } else {
+      setMachineContextData(null);
+    }
+  }, [selectedMachine?.serialNumber]);
+
   const [isOtherMachine, setIsOtherMachine] = useState(false);
   const [modalIntelData, setModalIntelData] = useState<CustomerServiceHistory | null>(null);
   const [loadingModalIntel, setLoadingModalIntel] = useState(false);
@@ -216,6 +354,10 @@ export default function ServiceDashboardPage() {
 
   const [diagnosisForm, setDiagnosisForm] = useState<{
     notes: string;
+    problemFound: string;
+    rootCause: string;
+    meterReading: number;
+    labourCost: number;
     items: Array<{
       itemSource: 'SPARE_PART' | 'CUSTOM';
       sparePartId: string;
@@ -229,6 +371,10 @@ export default function ServiceDashboardPage() {
     }>;
   }>({
     notes: '',
+    problemFound: '',
+    rootCause: '',
+    meterReading: 0,
+    labourCost: 0,
     items: [],
   });
 
@@ -555,17 +701,71 @@ export default function ServiceDashboardPage() {
     }
   };
 
+  const handleStartDiagnosis = async (ticketId: string) => {
+    try {
+      setLoading(true);
+      await startDiagnosis(ticketId);
+      await fetchInitialData();
+      toastSuccess('Diagnosis phase started successfully!');
+    } catch (error) {
+      console.error('Failed to start diagnosis:', error);
+      toastError('Failed to start diagnosis.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleStartRepair = async (ticketId: string) => {
+    try {
+      setLoading(true);
+      await startRepair(ticketId);
+      await fetchInitialData();
+      toastSuccess('Repair phase started successfully!');
+    } catch (error) {
+      console.error('Failed to start repair:', error);
+      toastError('Failed to start repair.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleDiagnose = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedTicket) return;
     try {
       setSubmitting(true);
-      await diagnoseServiceTicket(selectedTicket.id, diagnosisForm.notes, diagnosisForm.items);
+      await diagnoseServiceTicket(selectedTicket.id, {
+        problemFound: diagnosisForm.problemFound || 'General breakdown',
+        rootCause: diagnosisForm.rootCause || 'Undetermined root cause',
+        technicianNotes: diagnosisForm.notes,
+        meterReading: Number(diagnosisForm.meterReading) || 0,
+        labourCost: Number(diagnosisForm.labourCost) || 0,
+        items: diagnosisForm.items.map((it) => ({
+          itemSource: it.itemSource,
+          sparePartId: it.sparePartId || undefined,
+          customPartName: it.customPartName || undefined,
+          customPartBrand: it.customPartBrand || undefined,
+          customPartDescription: it.customPartDescription || undefined,
+          partName: it.partName,
+          quantity: Number(it.quantity) || 1,
+          unitPrice: Number(it.unitPrice) || 0,
+          isFree: !!it.isFree,
+        })),
+      });
       setShowDiagnoseModal(false);
-      setDiagnosisForm({ notes: '', items: [] });
+      setDiagnosisForm({
+        notes: '',
+        problemFound: '',
+        rootCause: '',
+        meterReading: 0,
+        labourCost: 0,
+        items: [],
+      });
       await fetchInitialData();
+      toastSuccess('Diagnosis recorded successfully!');
     } catch (error) {
       console.error('Failed to save diagnosis:', error);
+      toastError('Failed to save diagnosis.');
     } finally {
       setSubmitting(false);
     }
@@ -587,38 +787,55 @@ export default function ServiceDashboardPage() {
     }
   };
 
-  const handleStartService = async (ticketId: string) => {
-    try {
-      setLoading(true);
-      await startServiceTicket(ticketId);
-      await fetchInitialData();
-      toastSuccess('Service job started successfully!');
-    } catch (error) {
-      console.error('Failed to start ticket:', error);
-      toastError('Failed to start service job.');
-    } finally {
-      setLoading(false);
-    }
-  };
+  // const handleStartService = async (ticketId: string) => {
+  //   try {
+  //     setLoading(true);
+  //     await startServiceTicket(ticketId);
+  //     await fetchInitialData();
+  //     toastSuccess('Service job started successfully!');
+  //   } catch (error) {
+  //     console.error('Failed to start ticket:', error);
+  //     toastError('Failed to start service job.');
+  //   } finally {
+  //     setLoading(false);
+  //   }
+  // };
 
-  const handleStartServiceClick = (ticketId: string, ticketNo?: string) => {
-    setConfirmConfig({
-      title: 'Start Service Job',
-      description: `You are about to begin work on ticket ${ticketNo || ticketId}. This will notify the customer and update the ticket status to In Progress.`,
-      type: 'positive',
-      confirmText: 'Start Work',
-      onConfirm: () => handleStartService(ticketId),
-    });
-    setConfirmOpen(true);
-  };
+  // const handleStartServiceClick = (ticketId: string, ticketNo?: string) => {
+  //   setConfirmConfig({
+  //     title: 'Start Service Job',
+  //     description: `You are about to begin work on ticket ${ticketNo || ticketId}. This will notify the customer and update the ticket status to In Progress.`,
+  //     type: 'positive',
+  //     confirmText: 'Start Work',
+  //     onConfirm: () => handleStartService(ticketId),
+  //   });
+  //   setConfirmOpen(true);
+  // };
 
   const handleCompleteService = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedTicket) return;
     try {
       setSubmitting(true);
-      await completeServiceTicket(selectedTicket.id, completionNotes);
+      await completeServiceTicket(selectedTicket.id, {
+        workPerformed: completeForm.workPerformed || 'Standard service repair',
+        resolutionDetails: completeForm.resolutionDetails || completionNotes,
+        meterReading: Number(completeForm.meterReading) || 0,
+        customerRemarks: completeForm.customerRemarks || undefined,
+        technicianRemarks: completeForm.technicianRemarks || undefined,
+        customerSignature: completeForm.customerSignature || 'Customer Signed',
+        technicianSignature: completeForm.technicianSignature || 'Technician Signed',
+      });
       setShowCompleteModal(false);
+      setCompleteForm({
+        workPerformed: '',
+        resolutionDetails: '',
+        meterReading: 0,
+        customerRemarks: '',
+        technicianRemarks: '',
+        customerSignature: 'Customer Signed',
+        technicianSignature: 'Technician Signed',
+      });
       setCompletionNotes('');
       await fetchInitialData();
       toastSuccess('Service job completed successfully!');
@@ -628,6 +845,311 @@ export default function ServiceDashboardPage() {
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const fetchEstimates = async (ticketId: string) => {
+    try {
+      const data = await getTicketEstimates(ticketId);
+      setEstimatesData(data);
+    } catch (err) {
+      console.error('Failed to fetch estimates:', err);
+    }
+  };
+
+  const handleOpenEstimates = async (ticket: ServiceTicket) => {
+    if (isHelpDesk) {
+      toastError('Help Desk does not have authority to manage estimates.');
+      return;
+    }
+    setSelectedTicket(ticket);
+    await fetchEstimates(ticket.id);
+    setNewEstLabour(0);
+    setNewEstItems([]);
+    // setShowRevisionForm(false);
+    setNewRevLabour(0);
+    setNewRevItems([]);
+    setShowEstimatesModal(true);
+  };
+
+  const fetchMachineIntel = async (serial: string, productId?: string) => {
+    try {
+      setLoadingMachineIntel(true);
+      const data = await getMachineHistory(productId || serial);
+
+      const mappedCost: MachineLifetimeCostUI = {
+        totalServiceVisits: data.history?.totalServiceVisits || data.tickets.length,
+        totalSparePartsCost: Number(data.history?.totalPartsSpend) || 0,
+        totalLabourCost: Number(data.history?.totalLabourSpend) || 0,
+        totalLifetimeCost: Number(data.history?.totalLifetimeCost) || 0,
+        visitLogs: (data.tickets || []).map((t: ServiceTicket) => {
+          let ticketCost = 0;
+          t.items?.forEach((item: ServiceTicketItem) => {
+            ticketCost += Number(item.totalPrice) || 0;
+          });
+          return {
+            ticketNumber: t.ticketNumber,
+            serviceContext: t.serviceContext,
+            date: t.completedAt || t.created_at,
+            meterReading: 0,
+            cost: ticketCost,
+          };
+        }),
+      };
+
+      const mappedYields: ConsumableYieldUI[] = (data.yields || []).map(
+        (y: ConsumableYieldHistory) => ({
+          id: y.id,
+          consumableSku: y.tonerSku,
+          actualYield: y.yieldPages || 0,
+          targetYield: 10000,
+        }),
+      );
+
+      setMachineCostData(mappedCost);
+      setMachineYieldData(mappedYields);
+      setMachinePartLogs(data.partLogs || []);
+    } catch (err) {
+      console.error('Failed to load machine intel:', err);
+      toastError('Failed to load machine intel data');
+    } finally {
+      setLoadingMachineIntel(false);
+    }
+  };
+
+  const handleOpenMachineIntel = async (serial: string, productId?: string) => {
+    setSelectedMachineSerial(serial);
+    setMachineCostData(null);
+    setMachineYieldData([]);
+    setMachinePartLogs([]);
+    setActiveIntelTab('visits');
+    setShowMachineIntelModal(true);
+    await fetchMachineIntel(serial, productId);
+  };
+
+  const handleCreateEstimate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedTicket) return;
+    try {
+      setSubmitting(true);
+      await createServiceEstimate(selectedTicket.id, newEstLabour, newEstItems);
+      await fetchEstimates(selectedTicket.id);
+      setNewEstLabour(0);
+      setNewEstItems([]);
+      toastSuccess('Draft estimate created!');
+    } catch (err) {
+      console.error(err);
+      toastError('Failed to create estimate.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleSubmitEstimate = async (ticketId: string) => {
+    try {
+      setSubmitting(true);
+      await submitEstimateForApproval(ticketId);
+      await fetchEstimates(ticketId);
+      await fetchInitialData();
+      toastSuccess('Estimate submitted for internal approval.');
+    } catch (err) {
+      console.error(err);
+      toastError('Failed to submit estimate.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleApproveFinance = async (estimateId: string) => {
+    try {
+      setSubmitting(true);
+      await approveEstimateFinance(estimateId);
+      if (selectedTicket) await fetchEstimates(selectedTicket.id);
+      await fetchInitialData();
+      toastSuccess('Finance approved the estimate!');
+    } catch (err) {
+      console.error(err);
+      toastError('Failed to approve estimate.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleRejectFinance = async (estimateId: string, remarks?: string) => {
+    try {
+      setSubmitting(true);
+      await rejectEstimateFinance(estimateId, remarks);
+      if (selectedTicket) await fetchEstimates(selectedTicket.id);
+      await fetchInitialData();
+      toastSuccess('Finance rejected the estimate.');
+    } catch (err) {
+      console.error(err);
+      toastError('Failed to reject estimate.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleApproveCustomer = async (estimateId: string) => {
+    try {
+      setSubmitting(true);
+      await approveEstimateCustomer(estimateId);
+      if (selectedTicket) await fetchEstimates(selectedTicket.id);
+      await fetchInitialData();
+      toastSuccess('Customer approved the estimate!');
+    } catch (err) {
+      console.error(err);
+      toastError('Failed to approve estimate.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleRejectCustomer = async (estimateId: string) => {
+    try {
+      setSubmitting(true);
+      await rejectEstimateCustomer(estimateId);
+      if (selectedTicket) await fetchEstimates(selectedTicket.id);
+      await fetchInitialData();
+      toastSuccess('Customer rejected the estimate.');
+    } catch (err) {
+      console.error(err);
+      toastError('Failed to reject estimate.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleCreateRevision = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedTicket) return;
+    try {
+      setSubmitting(true);
+      await createEstimateRevision(selectedTicket.id, newRevLabour, newRevItems);
+      await fetchEstimates(selectedTicket.id);
+      setNewRevLabour(0);
+      setNewRevItems([]);
+      // setShowRevisionForm(false);
+      toastSuccess('Estimate revision created successfully!');
+    } catch (err) {
+      console.error(err);
+      toastError('Failed to create revision.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleApproveRevisionFinance = async (revisionId: string) => {
+    try {
+      setSubmitting(true);
+      await approveRevisionFinance(revisionId);
+      if (selectedTicket) await fetchEstimates(selectedTicket.id);
+      await fetchInitialData();
+      toastSuccess('Finance approved the revision!');
+    } catch (err) {
+      console.error(err);
+      toastError('Failed to approve revision.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleApproveRevisionCustomer = async (revisionId: string) => {
+    try {
+      setSubmitting(true);
+      await approveRevisionCustomer(revisionId);
+      if (selectedTicket) await fetchEstimates(selectedTicket.id);
+      await fetchInitialData();
+      toastSuccess('Customer approved the revision!');
+    } catch (err) {
+      console.error(err);
+      toastError('Failed to approve revision.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const addEstimateItem = () => {
+    setNewEstItems((prev) => [
+      ...prev,
+      {
+        itemSource: 'SPARE_PART',
+        sparePartId: '',
+        customPartName: '',
+        customPartBrand: '',
+        customPartDescription: '',
+        partName: '',
+        quantity: 1,
+        unitPrice: 0,
+        isFree: false,
+      },
+    ]);
+  };
+
+  const updateEstimateItem = (index: number, key: string, value: string | number | boolean) => {
+    const updated = [...newEstItems];
+    if (key === 'sparePartId') {
+      const part = spareParts.find((p) => p.id === value);
+      if (part) {
+        updated[index] = {
+          ...updated[index],
+          sparePartId: value as string,
+          partName: part.part_name,
+          unitPrice: Number(part.base_price) || 0,
+        };
+      }
+    } else {
+      updated[index] = {
+        ...updated[index],
+        [key]: value as never,
+      };
+    }
+    setNewEstItems(updated);
+  };
+
+  const removeEstimateItem = (index: number) => {
+    setNewEstItems((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const addRevisionItem = () => {
+    setNewRevItems((prev) => [
+      ...prev,
+      {
+        itemSource: 'SPARE_PART',
+        sparePartId: '',
+        customPartName: '',
+        customPartBrand: '',
+        customPartDescription: '',
+        partName: '',
+        quantity: 1,
+        unitPrice: 0,
+        isFree: false,
+      },
+    ]);
+  };
+
+  const updateRevisionItem = (index: number, key: string, value: string | number | boolean) => {
+    const updated = [...newRevItems];
+    if (key === 'sparePartId') {
+      const part = spareParts.find((p) => p.id === value);
+      if (part) {
+        updated[index] = {
+          ...updated[index],
+          sparePartId: value as string,
+          partName: part.part_name,
+          unitPrice: Number(part.base_price) || 0,
+        };
+      }
+    } else {
+      updated[index] = {
+        ...updated[index],
+        [key]: value as never,
+      };
+    }
+    setNewRevItems(updated);
+  };
+
+  const removeRevisionItem = (index: number) => {
+    setNewRevItems((prev) => prev.filter((_, i) => i !== index));
   };
 
   const handleCancelTicket = async (ticketId: string) => {
@@ -928,6 +1450,24 @@ export default function ServiceDashboardPage() {
     return list;
   };
 
+  const getExternalMachines = (): MachineAllocation[] => {
+    if (!modalIntelData?.assignedProducts) return [];
+    const list: MachineAllocation[] = [];
+    modalIntelData.assignedProducts.forEach((prod) => {
+      if (prod.ownership === 'EXTERNAL') {
+        list.push({
+          id: prod.id,
+          modelName: prod.name,
+          serialNumber: prod.serial_no,
+          brandName: prod.brand,
+          type: 'EXTERNAL',
+          meterReading: prod.meter_reading || 0,
+        });
+      }
+    });
+    return list;
+  };
+
   const getContractMachines = (): MachineAllocation[] => {
     const list: MachineAllocation[] = [];
     const contractTypes = ['AMC', 'FSMA', 'SMA'];
@@ -1085,6 +1625,7 @@ export default function ServiceDashboardPage() {
   const isHelpDesk = user?.employeeJob === 'SERVICE_HELP_DESK';
   const isTechnician = user?.employeeJob === 'SERVICE_TECHNICIAN';
   const isManagerOrAdmin = user?.role === 'MANAGER' || user?.role === 'ADMIN';
+  const canManageFinance = user?.role === 'FINANCE' || isManagerOrAdmin;
 
   return (
     <div className="bg-slate-50 min-h-full p-4 sm:p-6 space-y-6">
@@ -1193,19 +1734,29 @@ export default function ServiceDashboardPage() {
               No service tickets found matching your selection.
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <Table>
+            <div className="overflow-hidden">
+              <Table className="w-full table-fixed">
                 <TableHeader className="bg-slate-50/50">
                   <TableRow>
-                    <TableHead className="font-bold text-xs text-slate-600">Ticket No</TableHead>
-                    <TableHead className="font-bold text-xs text-slate-600">
+                    <TableHead className="font-bold text-xs text-slate-600 py-2 px-2 w-[11%]">
+                      Ticket No
+                    </TableHead>
+                    <TableHead className="font-bold text-xs text-slate-600 py-2 px-2 w-[28%]">
                       Brand / Model
                     </TableHead>
-                    <TableHead className="font-bold text-xs text-slate-600">Context</TableHead>
-                    <TableHead className="font-bold text-xs text-slate-600">Job Type</TableHead>
-                    <TableHead className="font-bold text-xs text-slate-600">Visit Date</TableHead>
-                    <TableHead className="font-bold text-xs text-slate-600">Status</TableHead>
-                    <TableHead className="font-bold text-xs text-slate-600 text-right">
+                    <TableHead className="font-bold text-xs text-slate-600 py-2 px-2 w-[11%]">
+                      Context
+                    </TableHead>
+                    <TableHead className="font-bold text-xs text-slate-600 py-2 px-2 w-[8%]">
+                      Job Type
+                    </TableHead>
+                    <TableHead className="font-bold text-xs text-slate-600 py-2 px-2 w-[10%]">
+                      Visit Date
+                    </TableHead>
+                    <TableHead className="font-bold text-xs text-slate-600 py-2 px-2 w-[12%]">
+                      Status
+                    </TableHead>
+                    <TableHead className="font-bold text-xs text-slate-600 py-2 px-2 text-right w-[20%]">
                       Actions
                     </TableHead>
                   </TableRow>
@@ -1220,7 +1771,7 @@ export default function ServiceDashboardPage() {
                       }}
                       className="hover:bg-slate-50 cursor-pointer transition-colors"
                     >
-                      <TableCell className="font-mono text-xs font-bold text-blue-600">
+                      <TableCell className="py-2 px-2 font-mono text-xs font-bold text-blue-600 truncate">
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
@@ -1232,65 +1783,76 @@ export default function ServiceDashboardPage() {
                           {ticket.ticketNumber}
                         </button>
                       </TableCell>
-                      <TableCell>
-                        <div className="text-xs font-bold text-slate-700">
+                      <TableCell className="py-2 px-2 truncate">
+                        <div className="text-xs font-bold text-slate-700 truncate">
                           {formatMachineName(
                             ticket.productBrand,
                             ticket.productModel,
                             ticket.productName,
                           )}
                         </div>
-                        <div className="text-[10px] text-slate-400 font-mono">
-                          SN: {ticket.serialNumber || 'N/A'}
+                        <div className="text-[10px] text-slate-400 font-mono mt-0.5 truncate">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (ticket.serialNumber) {
+                                handleOpenMachineIntel(ticket.serialNumber);
+                              }
+                            }}
+                            className="text-[10px] text-blue-600 hover:text-blue-800 font-mono font-bold hover:underline focus:outline-none"
+                          >
+                            SN: {ticket.serialNumber || 'N/A'}
+                          </button>
                         </div>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="py-2 px-2">
                         <Badge context={ticket.serviceContext} />
                       </TableCell>
-                      <TableCell className="text-xs text-slate-500 font-medium">
+                      <TableCell className="py-2 px-2 text-xs text-slate-500 font-medium truncate">
                         {ticket.jobType}
                       </TableCell>
-                      <TableCell className="text-xs text-slate-500 font-medium">
+                      <TableCell className="py-2 px-2 text-xs text-slate-500 font-medium truncate">
                         {ticket.scheduledVisitDate
                           ? new Date(ticket.scheduledVisitDate).toLocaleDateString()
                           : 'Unscheduled'}
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="py-2 px-2">
                         <Badge status={ticket.status} />
                       </TableCell>
                       <TableCell
-                        className="text-right p-3 actions-cell"
+                        className="text-right py-2 px-2 actions-cell"
                         onClick={(e) => e.stopPropagation()}
                       >
-                        <div className="flex items-center justify-end gap-1.5">
+                        <div className="flex items-center justify-end gap-1">
                           {/* HELP DESK ACTIONS */}
                           {isHelpDesk && ticket.status === 'OPEN' && (
                             <Button
-                              size="default"
-                              className="bg-blue-600 hover:bg-[#1e3a8a] text-white h-9 px-4 rounded-lg font-bold gap-1.5"
+                              size="sm"
+                              className="bg-blue-600 hover:bg-[#1e3a8a] text-white h-7 px-2 rounded-md text-[11px] font-bold gap-1"
                               onClick={() => {
                                 setSelectedTicket(ticket);
                                 setShowAssignModal(true);
                               }}
                             >
-                              <UserPlus className="size-4" />
-                              Assign Technician
+                              <UserPlus className="size-3.5" />
+                              Assign Tech
                             </Button>
                           )}
 
                           {isHelpDesk && ticket.status === 'FINANCE_APPROVED' && (
                             <>
                               <Button
-                                size="default"
-                                className="bg-green-600 hover:bg-[#14532d] text-white h-9 px-4 rounded-lg font-bold"
+                                size="sm"
+                                className="bg-green-600 hover:bg-[#14532d] text-white h-7 px-2 rounded-md text-[11px] font-bold"
                                 onClick={() => handleApproveQuotation(ticket.id)}
                               >
                                 Approve
                               </Button>
                               <Button
-                                size="default"
+                                size="sm"
                                 variant="destructive"
-                                className="h-9 px-4 rounded-lg font-bold"
+                                className="h-7 px-2 rounded-md text-[11px] font-bold"
                                 onClick={() => handleRejectQuotation(ticket.id)}
                               >
                                 Reject
@@ -1299,63 +1861,102 @@ export default function ServiceDashboardPage() {
                           )}
 
                           {/* TECHNICIAN ACTIONS */}
-                          {isTechnician && ticket.status === 'ASSIGNED' && (
-                            <Button
-                              size="default"
-                              className="bg-green-600 hover:bg-[#14532d] text-white h-9 px-4 rounded-lg font-bold gap-1.5"
-                              onClick={() =>
-                                handleStartServiceClick(ticket.id, ticket.ticketNumber)
-                              }
-                            >
-                              <Play className="size-4 fill-current" />
-                              Start Work
-                            </Button>
-                          )}
-
-                          {isTechnician && ticket.status === 'IN_PROGRESS' && (
-                            <Button
-                              size="default"
-                              className="bg-amber-600 hover:bg-[#b45309] text-white h-9 px-4 rounded-lg font-bold"
-                              onClick={() => {
-                                setSelectedTicket(ticket);
-                                setDiagnosisForm({ notes: '', items: [] });
-                                setShowDiagnoseModal(true);
-                              }}
-                            >
-                              Diagnose
-                            </Button>
-                          )}
+                          {isTechnician &&
+                            ticket.status === 'ASSIGNED' &&
+                            !ticket.diagnosisStartedAt && (
+                              <Button
+                                size="sm"
+                                className="bg-blue-600 hover:bg-blue-700 text-white h-7 px-2 rounded-md text-[11px] font-bold gap-1"
+                                onClick={() => handleStartDiagnosis(ticket.id)}
+                              >
+                                <Play className="size-3.5 fill-current" />
+                                Diagnose
+                              </Button>
+                            )}
 
                           {isTechnician &&
+                            ticket.status === 'ASSIGNED' &&
+                            ticket.diagnosisStartedAt && (
+                              <div className="flex items-center gap-1">
+                                <ActiveTimer startTime={ticket.diagnosisStartedAt.toString()} />
+                                <Button
+                                  size="sm"
+                                  className="bg-amber-600 hover:bg-amber-700 text-white h-7 px-2 rounded-md text-[11px] font-bold"
+                                  onClick={() => {
+                                    setSelectedTicket(ticket);
+                                    setDiagnosisForm({
+                                      notes: '',
+                                      problemFound: '',
+                                      rootCause: '',
+                                      meterReading: 0,
+                                      labourCost: 0,
+                                      items: [],
+                                    });
+                                    setShowDiagnoseModal(true);
+                                  }}
+                                >
+                                  Diagnose
+                                </Button>
+                              </div>
+                            )}
+
+                          {/* ESTIMATE WORKFLOW FOR ALL PARTIES */}
+                          {!isHelpDesk &&
                             (ticket.status === 'DIAGNOSED' ||
-                              ticket.status === 'FINANCE_REJECTED') && (
+                              ticket.status === 'WAITING_FINANCE_APPROVAL' ||
+                              ticket.status === 'FINANCE_APPROVED' ||
+                              ticket.status === 'FINANCE_REJECTED' ||
+                              ticket.status === 'CUSTOMER_APPROVED' ||
+                              ticket.status === 'CUSTOMER_REJECTED') && (
                               <Button
-                                size="default"
-                                className="bg-indigo-600 hover:bg-indigo-700 text-white h-9 px-4 rounded-lg font-bold"
-                                onClick={() => {
-                                  setSelectedTicket(ticket);
-                                  setQuoteForm({ laborCost: 0 });
-                                  setShowQuoteModal(true);
-                                }}
+                                size="sm"
+                                className="bg-indigo-600 hover:bg-indigo-700 text-white h-7 px-2 rounded-md text-[11px] font-bold"
+                                onClick={() => handleOpenEstimates(ticket)}
                               >
-                                Submit Quote
+                                Estimates
                               </Button>
                             )}
 
                           {isTechnician &&
                             (ticket.status === 'CUSTOMER_APPROVED' ||
-                              ticket.status === 'FREE_SERVICE') && (
+                              ticket.status === 'FREE_SERVICE') &&
+                            !ticket.repairStartedAt && (
                               <Button
-                                size="default"
-                                className="bg-green-600 hover:bg-[#14532d] text-white h-9 px-4 rounded-lg font-bold"
-                                onClick={() => {
-                                  setSelectedTicket(ticket);
-                                  setCompletionNotes('');
-                                  setShowCompleteModal(true);
-                                }}
+                                size="sm"
+                                className="bg-green-600 hover:bg-green-700 text-white h-7 px-2 rounded-md text-[11px] font-bold gap-1"
+                                onClick={() => handleStartRepair(ticket.id)}
                               >
-                                Complete Job
+                                <Play className="size-3.5 fill-current" />
+                                Repair
                               </Button>
+                            )}
+
+                          {isTechnician &&
+                            ticket.status === 'IN_PROGRESS' &&
+                            ticket.repairStartedAt && (
+                              <div className="flex items-center gap-1">
+                                <ActiveTimer startTime={ticket.repairStartedAt.toString()} />
+                                <Button
+                                  size="sm"
+                                  className="bg-green-600 hover:bg-green-700 text-white h-7 px-2 rounded-md text-[11px] font-bold"
+                                  onClick={() => {
+                                    setSelectedTicket(ticket);
+                                    setCompleteForm({
+                                      workPerformed: '',
+                                      resolutionDetails: '',
+                                      meterReading: 0,
+                                      customerRemarks: '',
+                                      technicianRemarks: '',
+                                      customerSignature: 'Customer Signed',
+                                      technicianSignature: 'Technician Signed',
+                                    });
+                                    setCompletionNotes('');
+                                    setShowCompleteModal(true);
+                                  }}
+                                >
+                                  Complete
+                                </Button>
+                              </div>
                             )}
 
                           {/* MANAGER/ADMIN ACTIONS */}
@@ -1363,9 +1964,9 @@ export default function ServiceDashboardPage() {
                             ticket.status !== 'COMPLETED' &&
                             ticket.status !== 'CANCELLED' && (
                               <Button
-                                size="default"
+                                size="sm"
                                 variant="destructive"
-                                className="h-9 px-4 rounded-lg font-bold"
+                                className="h-7 px-2 rounded-md text-[11px] font-bold"
                                 onClick={() =>
                                   handleCancelTicketClick(ticket.id, ticket.ticketNumber)
                                 }
@@ -1375,15 +1976,15 @@ export default function ServiceDashboardPage() {
                             )}
 
                           <Button
-                            size="default"
+                            size="sm"
                             variant="outline"
-                            className="border-blue-600 text-blue-600 hover:bg-blue-50 h-9 px-4 rounded-lg font-bold"
+                            className="border-blue-600 text-blue-600 hover:bg-blue-50 h-7 px-2 rounded-md text-[11px] font-bold"
                             onClick={() => {
                               setSelectedTicket(ticket);
                               setShowDetailsModal(true);
                             }}
                           >
-                            View Details
+                            Details
                           </Button>
                         </div>
                       </TableCell>
@@ -1561,6 +2162,17 @@ export default function ServiceDashboardPage() {
                                 }`}
                               >
                                 Purchased ({getPurchasedMachines().length})
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setActiveMachineTab('external')}
+                                className={`px-3 py-1 text-xs font-semibold rounded-lg shrink-0 transition ${
+                                  activeMachineTab === 'external'
+                                    ? 'bg-white text-slate-800 shadow-sm border border-slate-200'
+                                    : 'text-slate-500 hover:bg-slate-100'
+                                }`}
+                              >
+                                External ({getExternalMachines().length})
                               </button>
                               {getContractMachines().length > 0 && (
                                 <button
@@ -1855,6 +2467,64 @@ export default function ServiceDashboardPage() {
                                   )}
                                 </>
                               )}
+
+                              {activeMachineTab === 'external' && (
+                                <>
+                                  {getExternalMachines().length === 0 ? (
+                                    <p className="text-[11px] text-slate-400 py-3 text-center">
+                                      No external machines found.
+                                    </p>
+                                  ) : (
+                                    getExternalMachines().map((machine) => (
+                                      <div
+                                        key={machine.id + '-' + machine.serialNumber}
+                                        onClick={() => {
+                                          setSelectedMachine(machine);
+                                          setNewTicket((prev) => ({
+                                            ...prev,
+                                            productId: machine.id,
+                                            contractReferenceId: '',
+                                            productBrand: machine.brandName || 'Xerox',
+                                            productModel: machine.modelName,
+                                            productName: machine.modelName,
+                                            serialNumber: machine.serialNumber,
+                                            serviceContext: 'CHARGEABLE',
+                                            jobType: 'ONSITE',
+                                          }));
+                                        }}
+                                        className={`p-2.5 border rounded-xl cursor-pointer text-xs transition flex flex-col gap-1 ${
+                                          selectedMachine?.serialNumber === machine.serialNumber
+                                            ? 'border-primary bg-primary/5 shadow-sm'
+                                            : 'border-slate-100 bg-white hover:border-slate-200'
+                                        }`}
+                                      >
+                                        <div className="flex justify-between items-start">
+                                          <span className="font-bold text-slate-800">
+                                            {machine.modelName}
+                                          </span>
+                                          <span className="text-[10px] bg-slate-100 text-slate-600 font-bold px-1.5 py-0.5 rounded">
+                                            EXTERNAL
+                                          </span>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-1 text-[11px] text-slate-500">
+                                          <div>
+                                            Serial:{' '}
+                                            <span className="font-mono text-slate-700 font-semibold">
+                                              {machine.serialNumber}
+                                            </span>
+                                          </div>
+                                          <div>
+                                            Current Meter:{' '}
+                                            <span className="font-semibold text-slate-700">
+                                              {machine.meterReading}
+                                            </span>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    ))
+                                  )}
+                                </>
+                              )}
                             </div>
 
                             <div className="pt-2 border-t border-slate-100 flex justify-end">
@@ -2006,6 +2676,151 @@ export default function ServiceDashboardPage() {
                                   }
                                   className="h-9 text-xs bg-white border-slate-200 rounded-xl focus-visible:ring-primary font-mono"
                                 />
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* DYNAMIC COVERAGE PREVIEW PANEL */}
+                    {selectedMachine && (
+                      <div className="border border-slate-100 rounded-2xl p-4 bg-slate-50/50 space-y-3 mt-3 animate-in fade-in slide-in-from-bottom-2 duration-200">
+                        <h4 className="text-xs font-bold text-slate-700 border-b border-slate-100 pb-1.5 flex items-center justify-between">
+                          <span>Machine & Coverage Details</span>
+                          {machineContextLoading ? (
+                            <span className="text-[10px] text-slate-400 font-normal animate-pulse">
+                              Checking coverage...
+                            </span>
+                          ) : (
+                            <span className="text-[10px] bg-blue-100 text-blue-800 font-bold px-2 py-0.5 rounded-full uppercase">
+                              {machineContextData?.serviceContext || 'CHARGEABLE'}
+                            </span>
+                          )}
+                        </h4>
+
+                        {machineContextLoading ? (
+                          <div className="py-4 text-center text-xs text-slate-400">
+                            Loading machine coverage context...
+                          </div>
+                        ) : (
+                          <div className="space-y-3">
+                            <div className="grid grid-cols-2 gap-2 text-xs">
+                              <div>
+                                <span className="text-slate-400 block text-[10px] uppercase font-bold tracking-wider">
+                                  Machine Model
+                                </span>
+                                <span className="font-semibold text-slate-800">
+                                  {selectedMachine.modelName}
+                                </span>
+                              </div>
+                              <div>
+                                <span className="text-slate-400 block text-[10px] uppercase font-bold tracking-wider">
+                                  Serial Number
+                                </span>
+                                <span className="font-mono font-semibold text-slate-800">
+                                  {selectedMachine.serialNumber}
+                                </span>
+                              </div>
+                              <div>
+                                <span className="text-slate-400 block text-[10px] uppercase font-bold tracking-wider">
+                                  Ownership Status
+                                </span>
+                                <span className="font-semibold text-slate-800 uppercase">
+                                  {selectedMachine.type || 'UNKNOWN'}
+                                </span>
+                              </div>
+                              <div>
+                                <span className="text-slate-400 block text-[10px] uppercase font-bold tracking-wider">
+                                  Warranty / Contract Expiry
+                                </span>
+                                <span className="font-semibold text-slate-800">
+                                  {machineContextData?.contract?.endDate
+                                    ? new Date(
+                                        machineContextData.contract.endDate,
+                                      ).toLocaleDateString()
+                                    : selectedMachine.effectiveTo || 'None'}
+                                </span>
+                              </div>
+                            </div>
+
+                            {machineContextData?.contract && (
+                              <div className="p-2.5 bg-blue-50/50 border border-blue-100/50 rounded-xl space-y-1">
+                                <div className="flex justify-between items-center text-xs">
+                                  <span className="font-bold text-blue-800">
+                                    Active {machineContextData.contract.contractType} Agreement
+                                  </span>
+                                  <span className="font-bold text-blue-700 text-[10px]">
+                                    Valued: QAR{' '}
+                                    {Number(machineContextData.contract.contractValue).toFixed(2)}
+                                  </span>
+                                </div>
+                                <p className="text-[11px] text-blue-600/80">
+                                  Period:{' '}
+                                  {new Date(
+                                    machineContextData.contract.startDate,
+                                  ).toLocaleDateString()}{' '}
+                                  →{' '}
+                                  {new Date(
+                                    machineContextData.contract.endDate,
+                                  ).toLocaleDateString()}
+                                </p>
+                              </div>
+                            )}
+
+                            <div className="p-3 bg-white border border-slate-100 rounded-xl space-y-2">
+                              <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 block">
+                                Coverage Checklist
+                              </span>
+                              <div className="grid grid-cols-3 gap-2">
+                                <div className="flex items-center gap-1.5 text-xs">
+                                  {machineContextData?.coverage?.labour ? (
+                                    <span className="text-emerald-500 font-bold">✓</span>
+                                  ) : (
+                                    <span className="text-rose-500 font-bold">✗</span>
+                                  )}
+                                  <span
+                                    className={
+                                      machineContextData?.coverage?.labour
+                                        ? 'text-slate-700 font-medium'
+                                        : 'text-slate-400 line-through'
+                                    }
+                                  >
+                                    Labour Cost
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-1.5 text-xs">
+                                  {machineContextData?.coverage?.consumables ? (
+                                    <span className="text-emerald-500 font-bold">✓</span>
+                                  ) : (
+                                    <span className="text-rose-500 font-bold">✗</span>
+                                  )}
+                                  <span
+                                    className={
+                                      machineContextData?.coverage?.consumables
+                                        ? 'text-slate-700 font-medium'
+                                        : 'text-slate-400 line-through'
+                                    }
+                                  >
+                                    Consumables
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-1.5 text-xs">
+                                  {machineContextData?.coverage?.travel ? (
+                                    <span className="text-emerald-500 font-bold">✓</span>
+                                  ) : (
+                                    <span className="text-rose-500 font-bold">✗</span>
+                                  )}
+                                  <span
+                                    className={
+                                      machineContextData?.coverage?.travel
+                                        ? 'text-slate-700 font-medium'
+                                        : 'text-slate-400 line-through'
+                                    }
+                                  >
+                                    Travel & Transport
+                                  </span>
+                                </div>
                               </div>
                             </div>
                           </div>
@@ -2671,18 +3486,96 @@ export default function ServiceDashboardPage() {
                   </p>
                 </div>
 
-                <div>
-                  <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
-                    Diagnosis Notes
-                  </label>
-                  <Textarea
-                    required
-                    placeholder="Provide details of the findings, diagnostic tests run, and repairs needed..."
-                    value={diagnosisForm.notes}
-                    onChange={(e) => setDiagnosisForm({ ...diagnosisForm, notes: e.target.value })}
-                    className="bg-slate-50 border-slate-200 rounded-xl text-xs focus-visible:ring-primary min-h-[80px]"
-                  />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                      Problem Found / Symptoms
+                    </label>
+                    <Input
+                      required
+                      placeholder="e.g. Paper jams in duplexer, toner leaking"
+                      value={diagnosisForm.problemFound}
+                      onChange={(e) =>
+                        setDiagnosisForm({ ...diagnosisForm, problemFound: e.target.value })
+                      }
+                      className="h-9 text-xs bg-slate-50 border-slate-200 rounded-xl"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                      Root Cause
+                    </label>
+                    <Input
+                      required
+                      placeholder="e.g. Worn duplex rollers, cracked toner cartridge"
+                      value={diagnosisForm.rootCause}
+                      onChange={(e) =>
+                        setDiagnosisForm({ ...diagnosisForm, rootCause: e.target.value })
+                      }
+                      className="h-9 text-xs bg-slate-50 border-slate-200 rounded-xl"
+                    />
+                  </div>
                 </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                      Current Meter Reading
+                    </label>
+                    <Input
+                      type="number"
+                      required
+                      min={0}
+                      placeholder="Enter current page count"
+                      value={diagnosisForm.meterReading || ''}
+                      onChange={(e) =>
+                        setDiagnosisForm({
+                          ...diagnosisForm,
+                          meterReading: parseInt(e.target.value, 10) || 0,
+                        })
+                      }
+                      className="h-9 text-xs bg-slate-50 border-slate-200 rounded-xl"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                      Diagnosis Notes
+                    </label>
+                    <Textarea
+                      required
+                      placeholder="Provide details of the findings, diagnostic tests run, and repairs needed..."
+                      value={diagnosisForm.notes}
+                      onChange={(e) =>
+                        setDiagnosisForm({ ...diagnosisForm, notes: e.target.value })
+                      }
+                      className="bg-slate-50 border-slate-200 rounded-xl text-xs focus-visible:ring-primary min-h-[40px]"
+                    />
+                  </div>
+                </div>
+
+                {['CHARGEABLE', 'LEASE_EXPIRED', 'EXTERNAL_MACHINE'].includes(
+                  selectedTicket.serviceContext,
+                ) && (
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                      Labor Cost / Service Charge (QAR)
+                    </label>
+                    <Input
+                      type="number"
+                      required
+                      min={0}
+                      placeholder="Enter labor/service charge"
+                      value={diagnosisForm.labourCost || ''}
+                      onChange={(e) =>
+                        setDiagnosisForm({
+                          ...diagnosisForm,
+                          labourCost: parseFloat(e.target.value) || 0,
+                        })
+                      }
+                      className="h-9 text-xs bg-slate-50 border-slate-200 rounded-xl"
+                    />
+                  </div>
+                )}
 
                 <div className="border-t border-slate-100 pt-4 space-y-3">
                   <div className="flex items-center justify-between">
@@ -2922,27 +3815,126 @@ export default function ServiceDashboardPage() {
       {/* COMPLETE SERVICE JOB MODAL */}
       {showCompleteModal && selectedTicket && (
         <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
-          <Card className="w-full max-w-md bg-white border-none shadow-xl rounded-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+          <Card className="w-full max-w-2xl bg-white border-none shadow-xl rounded-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
             <CardHeader className="bg-slate-50 border-b border-slate-100 p-6">
               <CardTitle className="text-base font-bold text-slate-800">
                 Complete Service Job
               </CardTitle>
               <CardDescription className="text-xs">
-                Confirm completion of repair. This will decrement inventory spare part stock levels.
+                Confirm completion of repair. This will decrement inventory spare part stock levels
+                and record machine lifetime analytics.
               </CardDescription>
             </CardHeader>
             <form onSubmit={handleCompleteService}>
-              <CardContent className="p-6 space-y-4">
+              <CardContent className="p-6 space-y-4 max-h-[60vh] overflow-y-auto">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                      Work Performed
+                    </label>
+                    <Textarea
+                      required
+                      placeholder="Detail work done, tests completed..."
+                      value={completeForm.workPerformed}
+                      onChange={(e) =>
+                        setCompleteForm({ ...completeForm, workPerformed: e.target.value })
+                      }
+                      className="bg-slate-50 border-slate-200 rounded-xl text-xs focus-visible:ring-primary min-h-[60px]"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                      Resolution Details
+                    </label>
+                    <Textarea
+                      required
+                      placeholder="Detail resolution, e.g. feed path cleaned..."
+                      value={completeForm.resolutionDetails}
+                      onChange={(e) =>
+                        setCompleteForm({ ...completeForm, resolutionDetails: e.target.value })
+                      }
+                      className="bg-slate-50 border-slate-200 rounded-xl text-xs focus-visible:ring-primary min-h-[60px]"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                      Completion Meter Reading
+                    </label>
+                    <Input
+                      type="number"
+                      required
+                      min={0}
+                      placeholder="Enter the machine's current page count"
+                      value={completeForm.meterReading || ''}
+                      onChange={(e) =>
+                        setCompleteForm({
+                          ...completeForm,
+                          meterReading: parseInt(e.target.value, 10) || 0,
+                        })
+                      }
+                      className="h-9 text-xs bg-slate-50 border-slate-200 rounded-xl"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                      Customer Remarks
+                    </label>
+                    <Input
+                      placeholder="Optional feedback from the client..."
+                      value={completeForm.customerRemarks}
+                      onChange={(e) =>
+                        setCompleteForm({ ...completeForm, customerRemarks: e.target.value })
+                      }
+                      className="h-9 text-xs bg-slate-50 border-slate-200 rounded-xl"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                      Technician Remarks
+                    </label>
+                    <Input
+                      placeholder="Optional technician notes..."
+                      value={completeForm.technicianRemarks}
+                      onChange={(e) =>
+                        setCompleteForm({ ...completeForm, technicianRemarks: e.target.value })
+                      }
+                      className="h-9 text-xs bg-slate-50 border-slate-200 rounded-xl"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                      Customer Signature (Digital)
+                    </label>
+                    <Input
+                      required
+                      placeholder="Name or signature string"
+                      value={completeForm.customerSignature}
+                      onChange={(e) =>
+                        setCompleteForm({ ...completeForm, customerSignature: e.target.value })
+                      }
+                      className="h-9 text-xs bg-slate-50 border-slate-200 rounded-xl"
+                    />
+                  </div>
+                </div>
+
                 <div>
                   <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
-                    Completion Notes
+                    Technician Signature (Digital)
                   </label>
-                  <Textarea
+                  <Input
                     required
-                    placeholder="Detail work done, tests completed, and confirmation that the client device is fully functional..."
-                    value={completionNotes}
-                    onChange={(e) => setCompletionNotes(e.target.value)}
-                    className="bg-slate-50 border-slate-200 rounded-xl text-xs focus-visible:ring-primary min-h-[100px]"
+                    placeholder="Technician signature string"
+                    value={completeForm.technicianSignature}
+                    onChange={(e) =>
+                      setCompleteForm({ ...completeForm, technicianSignature: e.target.value })
+                    }
+                    className="h-9 text-xs bg-slate-50 border-slate-200 rounded-xl"
                   />
                 </div>
               </CardContent>
@@ -3132,6 +4124,8 @@ export default function ServiceDashboardPage() {
           setSelectedTicket(null);
         }}
         title="Service Ticket Details"
+        maxWidth="4xl"
+        contentClassName="mt-2"
       >
         {selectedTicket &&
           (() => {
@@ -3141,9 +4135,9 @@ export default function ServiceDashboardPage() {
             );
 
             return (
-              <div className="space-y-6 text-slate-800">
+              <div className="space-y-4 text-slate-800">
                 {/* TOP HEADER SECTION */}
-                <div className="bg-slate-50 border border-slate-200/60 rounded-2xl p-4 sm:p-5 flex flex-wrap items-center justify-between gap-4">
+                <div className="bg-slate-50 border border-slate-200/60 rounded-2xl p-3 sm:p-4 flex flex-wrap items-center justify-between gap-3">
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
                       <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
@@ -3153,7 +4147,7 @@ export default function ServiceDashboardPage() {
                         {selectedTicket.jobType}
                       </span>
                     </div>
-                    <h3 className="text-xl font-bold tracking-tight text-slate-900 font-mono">
+                    <h3 className="text-lg font-bold tracking-tight text-slate-900 font-mono">
                       {selectedTicket.ticketNumber}
                     </h3>
                   </div>
@@ -3163,18 +4157,18 @@ export default function ServiceDashboardPage() {
                   </div>
                 </div>
 
-                {/* CORE METADATA GRID */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* CORE INFO GRID (4 Columns side-by-side) */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                   {/* Visit Date */}
-                  <div className="bg-white border border-slate-100 rounded-xl p-3.5 flex items-center gap-3 shadow-sm">
-                    <div className="p-2.5 bg-blue-50 rounded-lg text-blue-600 shrink-0">
-                      <Calendar size={18} />
+                  <div className="bg-white border border-slate-100 rounded-xl p-3 flex items-center gap-2.5 shadow-sm min-w-0">
+                    <div className="p-2 bg-blue-50 rounded-lg text-blue-600 shrink-0">
+                      <Calendar size={16} />
                     </div>
-                    <div>
-                      <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                    <div className="min-w-0">
+                      <span className="block text-[9px] font-bold text-slate-400 uppercase tracking-wider">
                         Scheduled Visit
                       </span>
-                      <span className="text-sm font-semibold text-slate-800">
+                      <span className="text-xs font-semibold text-slate-800 block truncate">
                         {selectedTicket.scheduledVisitDate
                           ? new Date(selectedTicket.scheduledVisitDate).toLocaleDateString(
                               undefined,
@@ -3191,135 +4185,134 @@ export default function ServiceDashboardPage() {
                   </div>
 
                   {/* Technician */}
-                  <div className="bg-white border border-slate-100 rounded-xl p-3.5 flex items-center gap-3 shadow-sm">
-                    <div className="p-2.5 bg-indigo-50 rounded-lg text-indigo-600 shrink-0">
-                      <Wrench size={18} />
+                  <div className="bg-white border border-slate-100 rounded-xl p-3 flex items-center gap-2.5 shadow-sm min-w-0">
+                    <div className="p-2 bg-indigo-50 rounded-lg text-indigo-600 shrink-0">
+                      <Wrench size={16} />
                     </div>
-                    <div>
-                      <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                    <div className="min-w-0">
+                      <span className="block text-[9px] font-bold text-slate-400 uppercase tracking-wider">
                         Assigned Technician
                       </span>
-                      <span className="text-sm font-semibold text-slate-800">
+                      <span className="text-xs font-semibold text-slate-800 block truncate">
                         {technician
                           ? `${technician.first_name || ''} ${technician.last_name || ''}`.trim()
                           : 'Not Assigned'}
                       </span>
                     </div>
                   </div>
-                </div>
 
-                {/* CUSTOMER & MACHINE INFO */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {/* Customer Info Card */}
-                  <div className="border border-slate-200/60 rounded-xl p-4 space-y-3 bg-white shadow-sm">
-                    <div className="flex items-center gap-2 border-b border-slate-50 pb-2">
-                      <User size={16} className="text-slate-400" />
-                      <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                  <div className="border border-slate-200/60 rounded-xl p-3 space-y-1.5 bg-white shadow-sm min-w-0">
+                    <div className="flex items-center gap-1.5 border-b border-slate-50 pb-1">
+                      <User size={14} className="text-slate-400 shrink-0" />
+                      <h4 className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">
                         Customer Info
                       </h4>
                     </div>
-                    <div className="space-y-2">
-                      <div>
-                        <a
-                          href={`/employee/customer?id=${customer?.id}`}
-                          onClick={(e) => e.stopPropagation()}
-                          className="text-blue-600 hover:text-blue-800 hover:underline font-bold text-sm block"
-                        >
-                          {customer ? customer.name : 'Unknown Customer'}
-                        </a>
-                      </div>
+                    <div className="space-y-0.5 min-w-0">
+                      <a
+                        href={`/employee/customer?id=${customer?.id}`}
+                        onClick={(e) => e.stopPropagation()}
+                        className="text-blue-600 hover:text-blue-800 hover:underline font-bold text-xs block truncate"
+                      >
+                        {customer ? customer.name : 'Unknown Customer'}
+                      </a>
                       {customer?.email && (
-                        <div className="flex items-center gap-1.5 text-xs text-slate-500">
-                          <Mail size={12} className="text-slate-400" />
+                        <div className="flex items-center gap-1 text-[10px] text-slate-500 min-w-0">
+                          <Mail size={10} className="text-slate-400 shrink-0" />
                           <span className="truncate">{customer.email}</span>
                         </div>
                       )}
                       {customer?.phone && (
-                        <div className="flex items-center gap-1.5 text-xs text-slate-500">
-                          <Phone size={12} className="text-slate-400" />
-                          <span>{customer.phone}</span>
+                        <div className="flex items-center gap-1 text-[10px] text-slate-500">
+                          <Phone size={10} className="text-slate-400 shrink-0" />
+                          <span className="truncate">{customer.phone}</span>
                         </div>
                       )}
                     </div>
                   </div>
 
                   {/* Machine Details Card */}
-                  <div className="border border-slate-200/60 rounded-xl p-4 space-y-3 bg-white shadow-sm">
-                    <div className="flex items-center gap-2 border-b border-slate-50 pb-2">
-                      <Laptop size={16} className="text-slate-400" />
-                      <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                  <div className="border border-slate-200/60 rounded-xl p-3 space-y-1.5 bg-white shadow-sm min-w-0">
+                    <div className="flex items-center gap-1.5 border-b border-slate-50 pb-1">
+                      <Laptop size={14} className="text-slate-400 shrink-0" />
+                      <h4 className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">
                         Machine Details
                       </h4>
                     </div>
-                    <div className="space-y-2">
-                      <div>
-                        <span className="font-bold text-slate-800 text-sm block">
-                          {formatMachineName(
-                            selectedTicket.productBrand,
-                            selectedTicket.productModel,
-                            selectedTicket.productName,
-                          )}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                          Serial Number:
-                        </span>
-                        <span className="text-xs font-mono font-semibold bg-slate-50 border border-slate-100 rounded px-1.5 py-0.5 text-slate-600">
-                          {selectedTicket.serialNumber || 'N/A'}
-                        </span>
+                    <div className="space-y-0.5 min-w-0">
+                      <span className="font-bold text-slate-800 text-xs block truncate">
+                        {formatMachineName(
+                          selectedTicket.productBrand,
+                          selectedTicket.productModel,
+                          selectedTicket.productName,
+                        )}
+                      </span>
+                      <div className="flex flex-wrap items-center gap-1 min-w-0">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (selectedTicket.serialNumber) {
+                              setShowDetailsModal(false);
+                              handleOpenMachineIntel(selectedTicket.serialNumber);
+                            }
+                          }}
+                          className="text-[10px] font-mono font-bold bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded px-1.5 py-0.5 text-blue-600 hover:text-blue-800 transition-colors focus:outline-none truncate"
+                        >
+                          SN: {selectedTicket.serialNumber || 'N/A'} (View)
+                        </button>
                       </div>
                     </div>
                   </div>
                 </div>
 
-                {/* NOTES / DESCRIPTIONS CALLOUTS */}
-                <div className="space-y-3.5">
+                {/* NOTES / DESCRIPTIONS CALLOUTS (3 Columns side-by-side) */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   {/* Issue Description */}
-                  <div className="bg-amber-50/45 border border-amber-200/50 rounded-xl p-4 space-y-1.5 shadow-sm">
-                    <div className="flex items-center gap-1.5 text-amber-800 font-bold text-xs uppercase tracking-wider">
-                      <FileText size={14} />
+                  <div className="bg-amber-50/45 border border-amber-200/50 rounded-xl p-3 space-y-1 shadow-sm">
+                    <div className="flex items-center gap-1 text-amber-800 font-bold text-[10px] uppercase tracking-wider">
+                      <FileText size={12} />
                       <span>Issue Description</span>
                     </div>
-                    <p className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed">
+                    <p className="text-xs text-slate-700 whitespace-pre-wrap leading-relaxed">
                       {selectedTicket.issueDescription || 'No description provided.'}
                     </p>
                   </div>
 
                   {/* Diagnosis Notes */}
-                  <div className="bg-purple-50/45 border border-purple-200/50 rounded-xl p-4 space-y-1.5 shadow-sm">
-                    <div className="flex items-center gap-1.5 text-purple-800 font-bold text-xs uppercase tracking-wider">
-                      <Activity size={14} />
+                  <div className="bg-purple-50/45 border border-purple-200/50 rounded-xl p-3 space-y-1 shadow-sm">
+                    <div className="flex items-center gap-1 text-purple-800 font-bold text-[10px] uppercase tracking-wider">
+                      <Activity size={12} />
                       <span>Diagnosis Notes</span>
                     </div>
                     {selectedTicket.diagnosisNotes ? (
-                      <p className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed">
+                      <p className="text-xs text-slate-700 whitespace-pre-wrap leading-relaxed">
                         {selectedTicket.diagnosisNotes}
                       </p>
                     ) : (
-                      <span className="text-xs text-slate-400 italic">Not yet submitted</span>
+                      <span className="text-[11px] text-slate-400 italic">Not yet submitted</span>
                     )}
                   </div>
 
                   {/* Completion Notes */}
-                  <div className="bg-emerald-50/45 border border-emerald-200/50 rounded-xl p-4 space-y-1.5 shadow-sm">
-                    <div className="flex items-center gap-1.5 text-emerald-800 font-bold text-xs uppercase tracking-wider">
-                      <CheckCircle2 size={14} />
+                  <div className="bg-emerald-50/45 border border-emerald-200/50 rounded-xl p-3 space-y-1 shadow-sm">
+                    <div className="flex items-center gap-1 text-emerald-800 font-bold text-[10px] uppercase tracking-wider">
+                      <CheckCircle2 size={12} />
                       <span>Completion Notes</span>
                     </div>
                     {selectedTicket.completionNotes ? (
-                      <p className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed">
+                      <p className="text-xs text-slate-700 whitespace-pre-wrap leading-relaxed">
                         {selectedTicket.completionNotes}
                       </p>
                     ) : (
-                      <span className="text-xs text-slate-400 italic">Not yet completed</span>
+                      <span className="text-[11px] text-slate-400 italic">Not yet completed</span>
                     )}
                   </div>
                 </div>
 
                 {/* Items & Spare Parts Used */}
                 {selectedTicket.items && selectedTicket.items.length > 0 && (
-                  <div className="border-t border-slate-100 pt-4">
+                  <div className="border-t border-slate-100 pt-3">
                     <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">
                       Spare Parts / Items Used
                     </h4>
@@ -3327,16 +4320,16 @@ export default function ServiceDashboardPage() {
                       <Table>
                         <TableHeader className="bg-slate-50/50">
                           <TableRow>
-                            <TableHead className="h-8 text-[10px] font-bold text-slate-500 py-1">
+                            <TableHead className="h-8 text-[10px] font-bold text-slate-500 py-1 px-2">
                               Part Name
                             </TableHead>
-                            <TableHead className="h-8 text-[10px] font-bold text-slate-500 py-1 text-center">
+                            <TableHead className="h-8 text-[10px] font-bold text-slate-500 py-1 text-center px-2">
                               Qty
                             </TableHead>
-                            <TableHead className="h-8 text-[10px] font-bold text-slate-500 py-1 text-right">
+                            <TableHead className="h-8 text-[10px] font-bold text-slate-500 py-1 text-right px-2">
                               Unit Price
                             </TableHead>
-                            <TableHead className="h-8 text-[10px] font-bold text-slate-500 py-1 text-right">
+                            <TableHead className="h-8 text-[10px] font-bold text-slate-500 py-1 text-right px-2">
                               Total
                             </TableHead>
                           </TableRow>
@@ -3344,19 +4337,19 @@ export default function ServiceDashboardPage() {
                         <TableBody>
                           {selectedTicket.items.map((item, index: number) => (
                             <TableRow key={item.id || index} className="hover:bg-slate-50/20">
-                              <TableCell className="py-2 text-xs font-semibold text-slate-700">
+                              <TableCell className="py-1 px-2 text-xs font-semibold text-slate-700">
                                 {item.partName}
                               </TableCell>
-                              <TableCell className="py-2 text-xs text-slate-600 text-center">
+                              <TableCell className="py-1 px-2 text-xs text-slate-600 text-center">
                                 {item.quantity}
                               </TableCell>
-                              <TableCell className="py-2 text-xs text-slate-600 text-right">
+                              <TableCell className="py-1 px-2 text-xs text-slate-600 text-right">
                                 QAR{' '}
                                 {item.unitPrice.toLocaleString(undefined, {
                                   minimumFractionDigits: 2,
                                 })}
                               </TableCell>
-                              <TableCell className="py-2 text-xs font-bold text-slate-700 text-right">
+                              <TableCell className="py-1 px-2 text-xs font-bold text-slate-700 text-right">
                                 {item.isFree ? (
                                   <span className="text-emerald-600 font-bold text-[10px] uppercase">
                                     FOC
@@ -3374,88 +4367,161 @@ export default function ServiceDashboardPage() {
                 )}
 
                 {/* Action buttons relevant to current status */}
-                <div className="flex items-center justify-end gap-2 border-t border-slate-100 pt-4">
+                <div className="flex items-center justify-end gap-2 border-t border-slate-100 pt-3">
+                  {selectedTicket.status === 'COMPLETED' && (
+                    <Button
+                      size="sm"
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white h-8 px-3 rounded-lg font-bold gap-1 mr-auto"
+                      onClick={async () => {
+                        try {
+                          const blob = await downloadServiceReport(selectedTicket.id);
+                          const url = window.URL.createObjectURL(blob);
+                          const a = document.createElement('a');
+                          a.href = url;
+                          a.download = `Service_Report_${selectedTicket.ticketNumber}.pdf`;
+                          document.body.appendChild(a);
+                          a.click();
+                          a.remove();
+                          window.URL.revokeObjectURL(url);
+                          toastSuccess('PDF Report downloaded successfully!');
+                        } catch (err) {
+                          console.error(err);
+                          toastError('Failed to download PDF Report.');
+                        }
+                      }}
+                    >
+                      <FileText className="size-3.5" />
+                      Download PDF Report
+                    </Button>
+                  )}
+
                   {isHelpDesk && selectedTicket.status === 'OPEN' && (
                     <Button
-                      size="default"
-                      className="bg-blue-600 hover:bg-[#1e3a8a] text-white h-9 px-4 rounded-lg font-bold gap-1.5"
+                      size="sm"
+                      className="bg-blue-600 hover:bg-[#1e3a8a] text-white h-8 px-3 rounded-lg font-bold gap-1"
                       onClick={() => {
                         setShowDetailsModal(false);
                         setShowAssignModal(true);
                       }}
                     >
-                      <UserPlus className="size-4" />
-                      Assign Technician
-                    </Button>
-                  )}
-
-                  {isTechnician && selectedTicket.status === 'ASSIGNED' && (
-                    <Button
-                      size="default"
-                      className="bg-green-600 hover:bg-[#14532d] text-white h-9 px-4 rounded-lg font-bold gap-1.5"
-                      onClick={() => {
-                        setShowDetailsModal(false);
-                        handleStartServiceClick(selectedTicket.id, selectedTicket.ticketNumber);
-                      }}
-                    >
-                      <Play className="size-4 fill-current" />
-                      Start Work
-                    </Button>
-                  )}
-
-                  {isTechnician && selectedTicket.status === 'IN_PROGRESS' && (
-                    <Button
-                      size="default"
-                      className="bg-amber-600 hover:bg-[#b45309] text-white h-9 px-4 rounded-lg font-bold"
-                      onClick={() => {
-                        setShowDetailsModal(false);
-                        setDiagnosisForm({ notes: '', items: [] });
-                        setShowDiagnoseModal(true);
-                      }}
-                    >
-                      Diagnose
+                      <UserPlus className="size-3.5" />
+                      Assign Tech
                     </Button>
                   )}
 
                   {isTechnician &&
-                    (selectedTicket.status === 'DIAGNOSED' ||
-                      selectedTicket.status === 'FINANCE_REJECTED') && (
+                    selectedTicket.status === 'ASSIGNED' &&
+                    !selectedTicket.diagnosisStartedAt && (
                       <Button
-                        size="default"
-                        className="bg-indigo-600 hover:bg-indigo-700 text-white h-9 px-4 rounded-lg font-bold"
+                        size="sm"
+                        className="bg-blue-600 hover:bg-blue-700 text-white h-8 px-3 rounded-lg font-bold gap-1"
                         onClick={() => {
                           setShowDetailsModal(false);
-                          setQuoteForm({ laborCost: 0 });
-                          setShowQuoteModal(true);
+                          handleStartDiagnosis(selectedTicket.id);
                         }}
                       >
-                        Submit Quote
+                        <Play className="size-3.5 fill-current" />
+                        Start Diagnosis
+                      </Button>
+                    )}
+
+                  {isTechnician &&
+                    selectedTicket.status === 'ASSIGNED' &&
+                    selectedTicket.diagnosisStartedAt && (
+                      <div className="flex items-center gap-1.5">
+                        <ActiveTimer startTime={selectedTicket.diagnosisStartedAt.toString()} />
+                        <Button
+                          size="sm"
+                          className="bg-amber-600 hover:bg-amber-700 text-white h-8 px-3 rounded-lg font-bold"
+                          onClick={() => {
+                            setShowDetailsModal(false);
+                            setDiagnosisForm({
+                              notes: '',
+                              problemFound: '',
+                              rootCause: '',
+                              meterReading: 0,
+                              labourCost: 0,
+                              items: [],
+                            });
+                            setShowDiagnoseModal(true);
+                          }}
+                        >
+                          Diagnose
+                        </Button>
+                      </div>
+                    )}
+
+                  {!isHelpDesk &&
+                    (selectedTicket.status === 'DIAGNOSED' ||
+                      selectedTicket.status === 'WAITING_FINANCE_APPROVAL' ||
+                      selectedTicket.status === 'FINANCE_APPROVED' ||
+                      selectedTicket.status === 'FINANCE_REJECTED' ||
+                      selectedTicket.status === 'CUSTOMER_APPROVED' ||
+                      selectedTicket.status === 'CUSTOMER_REJECTED') && (
+                      <Button
+                        size="sm"
+                        className="bg-indigo-600 hover:bg-indigo-700 text-white h-8 px-3 rounded-lg font-bold"
+                        onClick={() => {
+                          setShowDetailsModal(false);
+                          handleOpenEstimates(selectedTicket);
+                        }}
+                      >
+                        Estimates
                       </Button>
                     )}
 
                   {isTechnician &&
                     (selectedTicket.status === 'CUSTOMER_APPROVED' ||
-                      selectedTicket.status === 'FREE_SERVICE') && (
+                      selectedTicket.status === 'FREE_SERVICE') &&
+                    !selectedTicket.repairStartedAt && (
                       <Button
-                        size="default"
-                        className="bg-green-600 hover:bg-[#14532d] text-white h-9 px-4 rounded-lg font-bold"
+                        size="sm"
+                        className="bg-green-600 hover:bg-green-700 text-white h-8 px-3 rounded-lg font-bold gap-1"
                         onClick={() => {
                           setShowDetailsModal(false);
-                          setCompletionNotes('');
-                          setShowCompleteModal(true);
+                          handleStartRepair(selectedTicket.id);
                         }}
                       >
-                        Complete Job
+                        <Play className="size-3.5 fill-current" />
+                        Start Repair
                       </Button>
+                    )}
+
+                  {isTechnician &&
+                    selectedTicket.status === 'IN_PROGRESS' &&
+                    selectedTicket.repairStartedAt && (
+                      <div className="flex items-center gap-1.5">
+                        <ActiveTimer startTime={selectedTicket.repairStartedAt.toString()} />
+                        <Button
+                          size="sm"
+                          className="bg-green-600 hover:bg-green-700 text-white h-8 px-3 rounded-lg font-bold"
+                          onClick={() => {
+                            setShowDetailsModal(false);
+                            setCompleteForm({
+                              workPerformed: '',
+                              resolutionDetails: '',
+                              meterReading: 0,
+                              customerRemarks: '',
+                              technicianRemarks: '',
+                              customerSignature: 'Customer Signed',
+                              technicianSignature: 'Technician Signed',
+                            });
+                            setCompletionNotes('');
+                            setShowCompleteModal(true);
+                          }}
+                        >
+                          Complete Job
+                        </Button>
+                      </div>
                     )}
 
                   {isManagerOrAdmin &&
                     selectedTicket.status !== 'COMPLETED' &&
                     selectedTicket.status !== 'CANCELLED' && (
                       <Button
-                        size="default"
+                        size="sm"
                         variant="destructive"
-                        className="h-9 px-4 rounded-lg font-bold"
+                        className="h-8 px-3 rounded-lg font-bold"
                         onClick={() => {
                           setShowDetailsModal(false);
                           handleCancelTicketClick(selectedTicket.id, selectedTicket.ticketNumber);
@@ -3466,13 +4532,13 @@ export default function ServiceDashboardPage() {
                     )}
 
                   <Button
-                    size="default"
+                    size="sm"
                     variant="outline"
                     onClick={() => {
                       setShowDetailsModal(false);
                       setSelectedTicket(null);
                     }}
-                    className="text-slate-500 border-slate-300 hover:bg-slate-50 h-9 px-4 rounded-lg font-bold"
+                    className="text-slate-500 border-slate-300 hover:bg-slate-50 h-8 px-3 rounded-lg font-bold"
                   >
                     Close
                   </Button>
@@ -3481,6 +4547,746 @@ export default function ServiceDashboardPage() {
             );
           })()}
       </DetailDialog>
+
+      {/* ESTIMATES AND REVISIONS WORKFLOW MODAL */}
+      {showEstimatesModal && selectedTicket && estimatesData && (
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
+          <Card className="w-full max-w-4xl bg-white border-none shadow-2xl rounded-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <CardHeader className="bg-slate-50 border-b border-slate-100 p-5 flex items-center justify-between">
+              <div>
+                <CardTitle className="text-base font-bold text-slate-800 flex items-center gap-2">
+                  <DollarSign className="text-primary" size={18} /> Cost Estimates & Revisions
+                  Workflow
+                </CardTitle>
+                <CardDescription className="text-xs">
+                  Ticket #{selectedTicket.ticketNumber} | Context:{' '}
+                  <span className="font-bold text-slate-700">{selectedTicket.serviceContext}</span>
+                </CardDescription>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowEstimatesModal(false)}
+                className="text-slate-400 hover:text-slate-600 font-bold"
+              >
+                Close
+              </Button>
+            </CardHeader>
+            <CardContent className="p-5 grid grid-cols-1 lg:grid-cols-2 gap-6 max-h-[70vh] overflow-y-auto">
+              {/* Left Column: Existing Estimates & Revisions */}
+              <div className="space-y-4">
+                <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                  Approval Timeline & History
+                </h3>
+
+                {estimatesData.estimates.length === 0 ? (
+                  <div className="text-xs text-slate-400 bg-slate-50 p-4 rounded-xl border border-slate-100 italic">
+                    No cost estimates registered yet. Submit labor and parts below.
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {/* Baseline Estimates */}
+                    {estimatesData.estimates.map((est) => (
+                      <div
+                        key={est.id}
+                        className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-2.5"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-slate-700">
+                            Baseline Estimate (v{est.version})
+                          </span>
+                          <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border border-indigo-200 text-indigo-700 bg-indigo-50">
+                            {est.status}
+                          </span>
+                        </div>
+                        <div className="text-xs space-y-1 text-slate-600">
+                          <p>
+                            Labor Cost:{' '}
+                            <span className="font-semibold text-slate-800">
+                              QAR {Number(est.labourCost || 0).toFixed(2)}
+                            </span>
+                          </p>
+                          <p>
+                            Parts/Items Cost:{' '}
+                            <span className="font-semibold text-slate-800">
+                              QAR{' '}
+                              {Number(est.partsCost ?? est.totalCost - est.labourCost).toFixed(2)}
+                            </span>
+                          </p>
+                          <p>
+                            Total Cost:{' '}
+                            <span className="font-bold text-slate-900 text-sm">
+                              QAR {Number(est.totalCost || 0).toFixed(2)}
+                            </span>
+                          </p>
+                        </div>
+
+                        {/* Items List */}
+                        {est.items && est.items.length > 0 && (
+                          <div className="bg-white border border-slate-100 rounded-lg p-2 text-[11px] space-y-1">
+                            <span className="font-bold text-slate-500 block mb-1">
+                              Declared Parts:
+                            </span>
+                            {est.items.map((item, idx) => (
+                              <div
+                                key={idx}
+                                className="flex justify-between text-slate-600 border-b border-slate-50 pb-0.5 last:border-b-0"
+                              >
+                                <span>
+                                  {item.partName} x {item.quantity}
+                                </span>
+                                <span className="font-mono">
+                                  QAR {(item.unitPrice * item.quantity).toFixed(2)}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Internal Finance Action Triggers */}
+                        {est.status === 'WAITING_FINANCE_APPROVAL' && (
+                          <div className="flex gap-2 pt-1.5">
+                            {canManageFinance ? (
+                              <>
+                                <Button
+                                  size="sm"
+                                  className="bg-green-600 hover:bg-green-700 text-white text-[11px] h-8 px-3 rounded-lg"
+                                  onClick={() => handleApproveFinance(est.id)}
+                                >
+                                  Approve (Finance)
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="destructive"
+                                  className="text-[11px] h-8 px-3 rounded-lg"
+                                  onClick={() =>
+                                    handleRejectFinance(est.id, 'Finance budget rejected')
+                                  }
+                                >
+                                  Reject (Finance)
+                                </Button>
+                              </>
+                            ) : (
+                              <div className="text-[11px] text-amber-600 bg-amber-50 px-2.5 py-1.5 rounded border border-amber-100 flex items-center gap-1.5">
+                                <span>⏳ Estimate submitted to Finance. Awaiting approval.</span>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Customer Action Triggers (Simulated or Actionable) */}
+                        {est.status === 'FINANCE_APPROVED' && (
+                          <div className="flex gap-2 pt-1.5 bg-yellow-50/50 p-2.5 rounded-lg border border-yellow-100">
+                            <span className="text-[10px] text-yellow-800 font-bold block mb-1 w-full">
+                              Customer Action:
+                            </span>
+                            <div className="flex gap-2">
+                              <Button
+                                size="sm"
+                                className="bg-green-600 hover:bg-green-700 text-white text-[11px] h-8 px-3 rounded-lg"
+                                onClick={() => handleApproveCustomer(est.id)}
+                              >
+                                Approve (Customer)
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="destructive"
+                                className="text-[11px] h-8 px-3 rounded-lg"
+                                onClick={() => handleRejectCustomer(est.id)}
+                              >
+                                Reject (Customer)
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Submit draft option */}
+                        {est.status === 'DRAFT' && (
+                          <Button
+                            size="sm"
+                            className="bg-primary hover:bg-primary/90 text-white text-[11px] h-8 px-3 rounded-lg w-full mt-1.5"
+                            onClick={() => handleSubmitEstimate(selectedTicket.id)}
+                          >
+                            Submit to Finance for Approval
+                          </Button>
+                        )}
+                      </div>
+                    ))}
+
+                    {/* Revisions list */}
+                    {estimatesData.revisions.map((rev) => (
+                      <div
+                        key={rev.id}
+                        className="bg-purple-50/55 border border-purple-200 rounded-xl p-4 space-y-2.5"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-purple-800">
+                            Estimate Revision (v{rev.version})
+                          </span>
+                          <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border border-purple-300 text-purple-700 bg-purple-50">
+                            {rev.status}
+                          </span>
+                        </div>
+                        <div className="text-xs space-y-1 text-slate-600">
+                          <p>
+                            Additional Labor:{' '}
+                            <span className="font-semibold text-slate-800">
+                              QAR {Number(rev.labourCost || 0).toFixed(2)}
+                            </span>
+                          </p>
+                          <p>
+                            Additional Parts:{' '}
+                            <span className="font-semibold text-slate-800">
+                              QAR{' '}
+                              {Number(rev.partsCost ?? rev.totalCost - rev.labourCost).toFixed(2)}
+                            </span>
+                          </p>
+                          <p>
+                            Additional Total:{' '}
+                            <span className="font-bold text-slate-900">
+                              QAR {Number(rev.totalCost || 0).toFixed(2)}
+                            </span>
+                          </p>
+                        </div>
+
+                        {rev.items && rev.items.length > 0 && (
+                          <div className="bg-white border border-slate-100 rounded-lg p-2 text-[11px] space-y-1">
+                            <span className="font-bold text-slate-500 block mb-1">
+                              Additional Parts:
+                            </span>
+                            {rev.items.map((item, idx) => (
+                              <div key={idx} className="flex justify-between text-slate-600">
+                                <span>
+                                  {item.partName} x {item.quantity}
+                                </span>
+                                <span className="font-mono">
+                                  QAR {(item.unitPrice * item.quantity).toFixed(2)}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Revision Approvals */}
+                        {rev.status === 'WAITING_FINANCE_APPROVAL' && (
+                          <div className="flex gap-2 pt-1.5">
+                            {canManageFinance ? (
+                              <Button
+                                size="sm"
+                                className="bg-green-600 hover:bg-green-700 text-white text-[11px] h-8 px-3 rounded-lg"
+                                onClick={() => handleApproveRevisionFinance(rev.id)}
+                              >
+                                Approve Finance (Rev)
+                              </Button>
+                            ) : (
+                              <div className="text-[11px] text-amber-600 bg-amber-50 px-2.5 py-1.5 rounded border border-amber-100 flex items-center gap-1.5">
+                                <span>⏳ Estimate submitted to Finance. Awaiting approval.</span>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {rev.status === 'FINANCE_APPROVED' && (
+                          <div className="flex gap-2 pt-1.5">
+                            <Button
+                              size="sm"
+                              className="bg-green-600 hover:bg-green-700 text-white text-[11px] h-8 px-3 rounded-lg"
+                              onClick={() => handleApproveRevisionCustomer(rev.id)}
+                            >
+                              Approve Customer (Rev)
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Right Column: Dynamic Form to Create / Revise */}
+              <div className="border-l border-slate-100 pl-6 space-y-6">
+                {/* Check if baseline is customer approved, in which case we allow a revision */}
+                {estimatesData.estimates.some((e) => e.status === 'CUSTOMER_APPROVED') ? (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+                        Create Estimate Revision
+                      </h3>
+                      <span className="text-[10px] text-emerald-600 font-bold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">
+                        Baseline Approved
+                      </span>
+                    </div>
+
+                    <form onSubmit={handleCreateRevision} className="space-y-4">
+                      <div>
+                        <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                          Additional Labor Cost (QAR)
+                        </label>
+                        <Input
+                          type="number"
+                          required
+                          min={0}
+                          value={newRevLabour || ''}
+                          onChange={(e) => setNewRevLabour(parseFloat(e.target.value) || 0)}
+                          className="h-9 text-xs bg-slate-50 border-slate-200 rounded-xl"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                            Additional Parts required
+                          </label>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={addRevisionItem}
+                            className="text-[10px] h-7 px-2.5 rounded-lg border-slate-200 text-primary gap-1"
+                          >
+                            <Plus size={10} /> Add Part
+                          </Button>
+                        </div>
+
+                        {newRevItems.map((item, idx) => (
+                          <div
+                            key={idx}
+                            className="bg-slate-50 p-3 rounded-lg border border-slate-100 space-y-2"
+                          >
+                            <SearchableSelect
+                              options={spareParts.map((sp) => ({
+                                value: sp.id,
+                                label: `${sp.part_name} (${sp.sku})`,
+                                description: `Price: QAR ${sp.base_price.toFixed(2)}`,
+                              }))}
+                              value={item.sparePartId}
+                              onValueChange={(val) => updateRevisionItem(idx, 'sparePartId', val)}
+                              placeholder="Select spare part..."
+                              className="h-8 text-[11px] w-full"
+                            />
+                            <div className="grid grid-cols-2 gap-2">
+                              <Input
+                                type="number"
+                                required
+                                min={1}
+                                value={item.quantity}
+                                onChange={(e) =>
+                                  updateRevisionItem(
+                                    idx,
+                                    'quantity',
+                                    parseInt(e.target.value, 10) || 1,
+                                  )
+                                }
+                                className="h-8 text-[11px] bg-white"
+                                placeholder="Qty"
+                              />
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => removeRevisionItem(idx)}
+                                className="text-red-500 text-[10px] h-8"
+                              >
+                                Remove
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      <Button
+                        type="submit"
+                        disabled={submitting}
+                        className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl text-xs py-2.5"
+                      >
+                        {submitting && <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />} Submit
+                        Revision for Approval
+                      </Button>
+                    </form>
+                  </div>
+                ) : estimatesData.estimates.length === 0 ? (
+                  <div className="space-y-4">
+                    <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+                      Create Draft Estimate
+                    </h3>
+                    <form onSubmit={handleCreateEstimate} className="space-y-4">
+                      <div>
+                        <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                          Labor / Service Charge (QAR)
+                        </label>
+                        <Input
+                          type="number"
+                          required
+                          min={0}
+                          value={newEstLabour || ''}
+                          onChange={(e) => setNewEstLabour(parseFloat(e.target.value) || 0)}
+                          className="h-9 text-xs bg-slate-50 border-slate-200 rounded-xl"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                            Parts / Items Required
+                          </label>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={addEstimateItem}
+                            className="text-[10px] h-7 px-2.5 rounded-lg border-slate-200 text-primary gap-1"
+                          >
+                            <Plus size={10} /> Add Part
+                          </Button>
+                        </div>
+
+                        {newEstItems.map((item, idx) => (
+                          <div
+                            key={idx}
+                            className="bg-slate-50 p-3 rounded-lg border border-slate-100 space-y-2"
+                          >
+                            <SearchableSelect
+                              options={spareParts.map((sp) => ({
+                                value: sp.id,
+                                label: `${sp.part_name} (${sp.sku})`,
+                                description: `Price: QAR ${sp.base_price.toFixed(2)}`,
+                              }))}
+                              value={item.sparePartId}
+                              onValueChange={(val) => updateEstimateItem(idx, 'sparePartId', val)}
+                              placeholder="Select spare part..."
+                              className="h-8 text-[11px] w-full"
+                            />
+                            <div className="grid grid-cols-2 gap-2">
+                              <Input
+                                type="number"
+                                required
+                                min={1}
+                                value={item.quantity}
+                                onChange={(e) =>
+                                  updateEstimateItem(
+                                    idx,
+                                    'quantity',
+                                    parseInt(e.target.value, 10) || 1,
+                                  )
+                                }
+                                className="h-8 text-[11px] bg-white"
+                                placeholder="Qty"
+                              />
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => removeEstimateItem(idx)}
+                                className="text-red-500 text-[10px] h-8"
+                              >
+                                Remove
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      <Button
+                        type="submit"
+                        disabled={submitting}
+                        className="w-full bg-primary hover:bg-primary/95 text-white font-bold rounded-xl text-xs py-2.5"
+                      >
+                        {submitting && <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />} Create
+                        Draft Estimate
+                      </Button>
+                    </form>
+                  </div>
+                ) : (
+                  <div className="text-xs text-slate-400 bg-slate-50 border border-slate-100 rounded-xl p-6 text-center italic">
+                    Estimate exists. Please wait for customer/finance approval before creating any
+                    revisions.
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* MACHINE HISTORICAL INTEL & YIELD ANALYTICS MODAL */}
+      {showMachineIntelModal && (
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
+          <Card className="w-full max-w-4xl bg-white border-none shadow-2xl rounded-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <CardHeader className="bg-slate-50 border-b border-slate-100 p-5 flex items-center justify-between">
+              <div>
+                <CardTitle className="text-base font-bold text-slate-800 flex items-center gap-2">
+                  <Activity className="text-primary" size={18} /> Machine History & Consumable Yield
+                  Intel
+                </CardTitle>
+                <CardDescription className="text-xs font-mono">
+                  Serial Number: {selectedMachineSerial}
+                </CardDescription>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowMachineIntelModal(false)}
+                className="text-slate-400 hover:text-slate-600 font-bold"
+              >
+                Close
+              </Button>
+            </CardHeader>
+            <CardContent className="p-5 space-y-6 max-h-[75vh] overflow-y-auto">
+              {loadingMachineIntel ? (
+                <div className="text-center py-20">
+                  <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
+                  <span className="text-xs text-slate-400 mt-2 block font-medium">
+                    Loading machine intel history...
+                  </span>
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  {/* KPI Cards Grid */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="bg-slate-50 border border-slate-100 rounded-xl p-3.5 shadow-sm text-center">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
+                        Total Repair Visits
+                      </span>
+                      <span className="text-xl font-black text-slate-800">
+                        {machineCostData?.totalServiceVisits || 0}
+                      </span>
+                    </div>
+                    <div className="bg-slate-50 border border-slate-100 rounded-xl p-3.5 shadow-sm text-center">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
+                        Total Spare Parts Cost
+                      </span>
+                      <span className="text-xl font-black text-slate-800 font-mono">
+                        QAR {(machineCostData?.totalSparePartsCost || 0).toFixed(2)}
+                      </span>
+                    </div>
+                    <div className="bg-slate-50 border border-slate-100 rounded-xl p-3.5 shadow-sm text-center">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
+                        Total Labor Cost
+                      </span>
+                      <span className="text-xl font-black text-slate-800 font-mono">
+                        QAR {(machineCostData?.totalLabourCost || 0).toFixed(2)}
+                      </span>
+                    </div>
+                    <div className="bg-slate-50 border border-slate-100 rounded-xl p-3.5 shadow-sm text-center bg-blue-50/50 border-blue-100">
+                      <span className="text-[10px] font-bold text-blue-700 uppercase tracking-wider block mb-1">
+                        Total Lifetime Cost
+                      </span>
+                      <span className="text-xl font-black text-blue-900 font-mono">
+                        QAR {(machineCostData?.totalLifetimeCost || 0).toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Tab Selector */}
+                  <div className="flex border-b border-slate-200">
+                    <button
+                      type="button"
+                      onClick={() => setActiveIntelTab('visits')}
+                      className={`px-4 py-2 text-xs font-bold border-b-2 transition-all ${
+                        activeIntelTab === 'visits'
+                          ? 'border-primary text-primary font-black'
+                          : 'border-transparent text-slate-500 hover:text-slate-700'
+                      }`}
+                    >
+                      Service Visits ({machineCostData?.visitLogs?.length || 0})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setActiveIntelTab('parts')}
+                      className={`px-4 py-2 text-xs font-bold border-b-2 transition-all ${
+                        activeIntelTab === 'parts'
+                          ? 'border-primary text-primary font-black'
+                          : 'border-transparent text-slate-500 hover:text-slate-700'
+                      }`}
+                    >
+                      Consumed Parts ({machinePartLogs?.length || 0})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setActiveIntelTab('yields')}
+                      className={`px-4 py-2 text-xs font-bold border-b-2 transition-all ${
+                        activeIntelTab === 'yields'
+                          ? 'border-primary text-primary font-black'
+                          : 'border-transparent text-slate-500 hover:text-slate-700'
+                      }`}
+                    >
+                      Toner Yield Analytics ({machineYieldData?.length || 0})
+                    </button>
+                  </div>
+
+                  <div className="pt-2">
+                    {/* Machine Visit History Logs */}
+                    {activeIntelTab === 'visits' && (
+                      <div className="space-y-3 animate-in fade-in duration-200">
+                        <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                          Historical Service Visits
+                        </h3>
+                        {!machineCostData?.visitLogs || machineCostData.visitLogs.length === 0 ? (
+                          <p className="text-xs text-slate-400 bg-slate-50 p-4 rounded-xl border border-slate-100 italic">
+                            No service visits logged for this machine.
+                          </p>
+                        ) : (
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {machineCostData.visitLogs.map((log, idx) => (
+                              <div
+                                key={idx}
+                                className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 space-y-1 shadow-sm"
+                              >
+                                <div className="flex items-center justify-between">
+                                  <span className="text-[11px] font-bold text-slate-700">
+                                    {log.ticketNumber} | {log.serviceContext}
+                                  </span>
+                                  <span className="text-[10px] text-slate-400">
+                                    {new Date(log.date).toLocaleDateString()}
+                                  </span>
+                                </div>
+                                <p className="text-xs text-slate-600">
+                                  Meter Reading:{' '}
+                                  <span className="font-semibold">{log.meterReading || 'N/A'}</span>
+                                </p>
+                                <p className="text-xs text-slate-600">
+                                  Total Cost:{' '}
+                                  <span className="font-bold text-slate-800">
+                                    QAR {log.cost.toFixed(2)}
+                                  </span>
+                                </p>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Consumed Parts Log */}
+                    {activeIntelTab === 'parts' && (
+                      <div className="space-y-3 animate-in fade-in duration-200">
+                        <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                          Consumed Parts & Consumables Log
+                        </h3>
+                        {!machinePartLogs || machinePartLogs.length === 0 ? (
+                          <p className="text-xs text-slate-400 bg-slate-50 p-4 rounded-xl border border-slate-100 italic">
+                            No spare parts or consumables replaced yet.
+                          </p>
+                        ) : (
+                          <div className="border border-slate-100 rounded-xl overflow-hidden shadow-sm">
+                            <Table>
+                              <TableHeader className="bg-slate-50">
+                                <TableRow>
+                                  <TableHead className="text-[10px] py-2 h-8 font-bold">
+                                    Part Name / SKU
+                                  </TableHead>
+                                  <TableHead className="text-[10px] py-2 h-8 font-bold text-center">
+                                    Type
+                                  </TableHead>
+                                  <TableHead className="text-[10px] py-2 h-8 font-bold text-center">
+                                    Qty
+                                  </TableHead>
+                                  <TableHead className="text-[10px] py-2 h-8 font-bold text-right">
+                                    Cost (QAR)
+                                  </TableHead>
+                                  <TableHead className="text-[10px] py-2 h-8 font-bold text-center">
+                                    Replaced At
+                                  </TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {machinePartLogs.map(
+                                  (log: MachineHistoryResponse['partLogs'][number]) => (
+                                    <TableRow key={log.id} className="hover:bg-slate-50/30">
+                                      <TableCell className="py-2.5 text-xs font-semibold text-slate-700">
+                                        {log.partName} {log.sku ? `(${log.sku})` : ''}
+                                      </TableCell>
+                                      <TableCell className="py-2.5 text-xs text-center">
+                                        <span
+                                          className={`px-2 py-0.5 rounded text-[10px] ${log.isConsumable ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-blue-50 text-blue-700 border border-blue-200'}`}
+                                        >
+                                          {log.isConsumable ? 'Consumable' : 'Spare Part'}
+                                        </span>
+                                      </TableCell>
+                                      <TableCell className="py-2.5 text-xs text-center font-mono font-bold">
+                                        {log.quantityUsed}
+                                      </TableCell>
+                                      <TableCell className="py-2.5 text-xs text-right font-mono font-bold">
+                                        {Number(log.totalCost).toFixed(2)}
+                                      </TableCell>
+                                      <TableCell className="py-2.5 text-xs text-center text-slate-500">
+                                        {new Date(log.replacedAt).toLocaleDateString()}
+                                      </TableCell>
+                                    </TableRow>
+                                  ),
+                                )}
+                              </TableBody>
+                            </Table>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Consumable Yield Performance Log */}
+                    {activeIntelTab === 'yields' && (
+                      <div className="space-y-3 animate-in fade-in duration-200">
+                        <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                          Consumable Yield Tracking Logs
+                        </h3>
+                        {machineYieldData.length === 0 ? (
+                          <p className="text-xs text-slate-400 bg-slate-50 p-4 rounded-xl border border-slate-100 italic">
+                            No consumable yield events recorded for this machine.
+                          </p>
+                        ) : (
+                          <div className="border border-slate-100 rounded-xl overflow-hidden shadow-sm">
+                            <Table>
+                              <TableHeader className="bg-slate-50">
+                                <TableRow>
+                                  <TableHead className="text-[10px] py-2 h-8 font-bold">
+                                    Consumable SKU
+                                  </TableHead>
+                                  <TableHead className="text-[10px] py-2 h-8 font-bold text-right">
+                                    Yield (Pages)
+                                  </TableHead>
+                                  <TableHead className="text-[10px] py-2 h-8 font-bold text-center">
+                                    Efficiency
+                                  </TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {machineYieldData.map((y, idx) => {
+                                  const target = y.targetYield || 10000;
+                                  const actual = y.actualYield || 0;
+                                  const yieldPct = Math.min(
+                                    200,
+                                    Math.round((actual / target) * 100),
+                                  );
+                                  return (
+                                    <TableRow key={y.id || idx} className="hover:bg-slate-50/30">
+                                      <TableCell className="py-2.5 text-xs font-semibold text-slate-700">
+                                        {y.consumableSku}
+                                      </TableCell>
+                                      <TableCell className="py-2.5 text-xs text-slate-600 text-right font-mono font-bold">
+                                        {actual.toLocaleString()}
+                                      </TableCell>
+                                      <TableCell className="py-2.5 text-xs text-center font-bold">
+                                        <span
+                                          className={`px-2 py-0.5 rounded text-[10px] ${yieldPct >= 90 ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-rose-50 text-rose-700 border border-rose-200'}`}
+                                        >
+                                          {yieldPct}%
+                                        </span>
+                                      </TableCell>
+                                    </TableRow>
+                                  );
+                                })}
+                              </TableBody>
+                            </Table>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       <ConfirmDialog
         isOpen={confirmOpen}

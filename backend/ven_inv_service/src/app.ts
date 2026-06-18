@@ -110,6 +110,11 @@ const startServer = async () => {
     const { startDLQMonitor } = await import('./services/dlqMonitorService');
     await startDLQMonitor();
 
+    // Start Preventative Maintenance Scheduler
+    const { startPreventativeMaintenanceScheduler } =
+      await import('./services/preventativeMaintenanceJob');
+    startPreventativeMaintenanceScheduler();
+
     const PORT = process.env.PORT;
 
     // Start listening for requests from our staff

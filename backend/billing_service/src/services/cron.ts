@@ -11,6 +11,8 @@ import { getBranchManagerEmail } from './billingHelpers';
 const EXCHANGE = 'domain_events';
 const INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
+import { NotificationPublisher } from '../events/publisher/notificationPublisher';
+
 export async function expireContractsJob() {
   logger.info('[CRON] Running daily Contract Expiry & Status Update Job...');
 
@@ -20,45 +22,112 @@ export async function expireContractsJob() {
     await channel.assertExchange(EXCHANGE, 'topic', { durable: true });
 
     // --- Query 1: Contracts expiring in exactly 30 days ---
-    const targetDate = new Date();
-    targetDate.setDate(targetDate.getDate() + 30);
-    const targetDateStr = targetDate.toISOString().split('T')[0];
+    const target30 = new Date();
+    target30.setDate(target30.getDate() + 30);
+    const target30Str = target30.toISOString().split('T')[0];
 
-    logger.info(`[CRON] Querying contracts expiring on ${targetDateStr}...`);
+    logger.info(`[CRON] Querying contracts expiring on ${target30Str}...`);
 
-    const expiringContracts = await invoiceRepo.find({
+    const expiring30 = await invoiceRepo.find({
       where: {
         type: InvoiceType.PROFORMA,
         status: InvoiceStatus.ACTIVE_CONTRACT,
-        effectiveTo: targetDateStr as unknown as Date,
+        effectiveTo: target30Str as unknown as Date,
       },
     });
 
-    logger.info(
-      `[CRON] Found ${expiringContracts.length} contract(s) expiring in exactly 30 days.`,
-    );
+    logger.info(`[CRON] Found ${expiring30.length} contract(s) expiring in exactly 30 days.`);
 
-    for (const contract of expiringContracts) {
+    for (const contract of expiring30) {
+      // 1. Email branch manager
+      const managerEmail =
+        (await getBranchManagerEmail(contract.branchId)) || 'manager@xerocare.com';
+      await NotificationPublisher.publishEmailRequest({
+        recipient: managerEmail,
+        subject: `Contract Expiring in 30 Days - Contract ${contract.invoiceNumber}`,
+        body: `Lease/Service Contract ${contract.invoiceNumber} is set to expire in 30 days on ${contract.effectiveTo}.\n\nPlease contact the customer to negotiate renewal terms.`,
+        invoiceId: contract.id,
+      });
+
+      // 2. In-app notification (WARNING)
+      const branchResult = await Source.query(
+        `SELECT manager_id FROM branches WHERE id = $1 LIMIT 1`,
+        [contract.branchId],
+      );
+      const managerId = branchResult?.[0]?.manager_id;
+      if (managerId) {
+        await NotificationPublisher.publishInAppRequest({
+          recipientId: managerId,
+          title: 'Contract Expiring in 30 Days',
+          message: `Contract ${contract.invoiceNumber} will expire in 30 days.`,
+          type: 'WARNING',
+          referenceId: contract.id,
+          referenceType: 'CONTRACT',
+        });
+      }
+
+      // Legacy rabbitmq publish
       const payload = {
         contractId: contract.id,
         invoiceNumber: contract.invoiceNumber,
         customerId: contract.customerId,
         effectiveTo: contract.effectiveTo,
       };
-
       channel.publish(
         EXCHANGE,
         BillingEventType.CONTRACT_EXPIRING_SOON,
         Buffer.from(JSON.stringify(payload)),
         { persistent: true },
       );
-
-      logger.info(
-        `[CRON] Published contract.expiring.soon event for contract ${contract.invoiceNumber}`,
-      );
     }
 
-    // --- Query 2: Active contracts past their effectiveTo date ---
+    // --- Query 2: Contracts expiring in exactly 7 days ---
+    const target7 = new Date();
+    target7.setDate(target7.getDate() + 7);
+    const target7Str = target7.toISOString().split('T')[0];
+
+    logger.info(`[CRON] Querying contracts expiring on ${target7Str}...`);
+
+    const expiring7 = await invoiceRepo.find({
+      where: {
+        type: InvoiceType.PROFORMA,
+        status: InvoiceStatus.ACTIVE_CONTRACT,
+        effectiveTo: target7Str as unknown as Date,
+      },
+    });
+
+    logger.info(`[CRON] Found ${expiring7.length} contract(s) expiring in exactly 7 days.`);
+
+    for (const contract of expiring7) {
+      // 1. Email branch manager
+      const managerEmail =
+        (await getBranchManagerEmail(contract.branchId)) || 'manager@xerocare.com';
+      await NotificationPublisher.publishEmailRequest({
+        recipient: managerEmail,
+        subject: `Contract Expiring in 7 Days - Contract ${contract.invoiceNumber}`,
+        body: `Lease/Service Contract ${contract.invoiceNumber} is expiring in 7 days on ${contract.effectiveTo}.\n\nRenew urgently!`,
+        invoiceId: contract.id,
+      });
+
+      // 2. In-app notification (CRITICAL_WARNING)
+      const branchResult = await Source.query(
+        `SELECT manager_id FROM branches WHERE id = $1 LIMIT 1`,
+        [contract.branchId],
+      );
+      const managerId = branchResult?.[0]?.manager_id;
+      if (managerId) {
+        await NotificationPublisher.publishInAppRequest({
+          recipientId: managerId,
+          title: 'Contract Expiring in 7 Days',
+          message: `Contract ${contract.invoiceNumber} will expire in 7 days.`,
+          type: 'CRITICAL_WARNING',
+          referenceId: contract.id,
+          referenceType: 'CONTRACT',
+        });
+      }
+    }
+
+    // --- Query 3: Active contracts past their effectiveTo date ---
     const today = new Date();
     const todayStr = today.toISOString().split('T')[0];
 
@@ -80,7 +149,34 @@ export async function expireContractsJob() {
 
       logger.info(`[CRON] Updated status to EXPIRED for contract ${contract.invoiceNumber}`);
 
-      // Publish event
+      // 1. Email branch manager
+      const managerEmail =
+        (await getBranchManagerEmail(contract.branchId)) || 'manager@xerocare.com';
+      await NotificationPublisher.publishEmailRequest({
+        recipient: managerEmail,
+        subject: `Contract Expired - Contract ${contract.invoiceNumber}`,
+        body: `Lease/Service Contract ${contract.invoiceNumber} has expired.\n\nThe service context for associated machines has reverted to CHARGEABLE.`,
+        invoiceId: contract.id,
+      });
+
+      // 2. In-app notification (EXPIRY)
+      const branchResult = await Source.query(
+        `SELECT manager_id FROM branches WHERE id = $1 LIMIT 1`,
+        [contract.branchId],
+      );
+      const managerId = branchResult?.[0]?.manager_id;
+      if (managerId) {
+        await NotificationPublisher.publishInAppRequest({
+          recipientId: managerId,
+          title: 'Contract Expired',
+          message: `Contract ${contract.invoiceNumber} has expired today.`,
+          type: 'EXPIRY',
+          referenceId: contract.id,
+          referenceType: 'CONTRACT',
+        });
+      }
+
+      // Legacy rabbitmq publish
       const payload = {
         contractId: contract.id,
         invoiceNumber: contract.invoiceNumber,
