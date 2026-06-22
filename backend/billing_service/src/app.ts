@@ -73,8 +73,9 @@ const startServer = async () => {
     await getRabbitChannel();
 
     // Start Contract Expiry Scheduler
-    const { startContractExpiryScheduler } = await import('./services/cron');
+    const { startContractExpiryScheduler, startReminderCronJobs } = await import('./services/cron');
     startContractExpiryScheduler();
+    startReminderCronJobs();
 
     const PORT = process.env.PORT || 3004;
 

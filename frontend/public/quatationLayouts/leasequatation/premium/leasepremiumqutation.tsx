@@ -883,7 +883,7 @@ const LeasePremiumQuotation: React.FC<LeasePremiumQuotationProps> = ({
                 color: TEXT_MUTED,
               }}
             >
-              <span>Total Lease Value</span>
+              <span>Subtotal (Before VAT)</span>
               <span style={{ fontWeight: '400', color: TEXT_WHITE }}>
                 QAR {fmt(totals.subTotal)}
               </span>
@@ -896,7 +896,7 @@ const LeasePremiumQuotation: React.FC<LeasePremiumQuotationProps> = ({
                 color: TEXT_MUTED,
               }}
             >
-              <span>Tax (0%)</span>
+              <span>VAT Amount</span>
               <span style={{ fontWeight: '400', color: TEXT_WHITE }}>QAR {fmt(totals.tax)}</span>
             </div>
             <div
@@ -910,7 +910,7 @@ const LeasePremiumQuotation: React.FC<LeasePremiumQuotationProps> = ({
                 fontWeight: '800',
               }}
             >
-              <span>GRAND TOTAL</span>
+              <span>GRAND TOTAL (INCLUDING VAT)</span>
               <span>QAR {fmt(totals.total)}</span>
             </div>
 

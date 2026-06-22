@@ -23,6 +23,7 @@ export class InventoryRepository {
       .leftJoin('warehouse.branch', 'branch')
       .select([
         'model.id AS id',
+        'product.id AS product_id',
         'model.model_no AS model_no',
         'model.model_name AS model_name',
         'product.name AS product_name',
@@ -104,6 +105,7 @@ export class InventoryRepository {
       .innerJoin('product.warehouse', 'warehouse')
       .innerJoin('warehouse.branch', 'branch')
       .select([
+        'product.id AS product_id',
         'model.id AS model_id',
         'model.model_no AS model_no',
         'model.model_name AS model_name',
@@ -131,7 +133,8 @@ export class InventoryRepository {
     }
 
     const result = await query
-      .groupBy('model.id')
+      .groupBy('product.id')
+      .addGroupBy('model.id')
       .addGroupBy('model.model_no')
       .addGroupBy('model.model_name')
       .addGroupBy('spare_part.part_name')
@@ -148,6 +151,7 @@ export class InventoryRepository {
       .getRawMany();
 
     return result.map((row) => ({
+      product_id: row.product_id,
       model_id: row.model_id,
       model_no: row.part_code || row.model_no,
       model_name: row.model_name,
@@ -177,6 +181,7 @@ export class InventoryRepository {
       .leftJoin('product.model', 'model')
       .leftJoin('model.brandRelation', 'brandRelation')
       .select([
+        'product.id AS product_id',
         'model.id AS model_id',
         'model.model_no AS model_no',
         'model.model_name AS model_name',
@@ -197,7 +202,8 @@ export class InventoryRepository {
     }
 
     const result = await query
-      .groupBy('model.id')
+      .groupBy('product.id')
+      .addGroupBy('model.id')
       .addGroupBy('model.model_no')
       .addGroupBy('model.model_name')
       .addGroupBy('product.name')
@@ -207,6 +213,7 @@ export class InventoryRepository {
       .getRawMany();
 
     return result.map((row) => ({
+      product_id: row.product_id,
       model_id: row.model_id,
       model_no: row.model_no,
       model_name: row.model_name,

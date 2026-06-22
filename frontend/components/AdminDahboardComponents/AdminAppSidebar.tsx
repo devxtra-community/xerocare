@@ -67,6 +67,11 @@ const menuItems = [
     href: '/admin/human-resource',
   },
   {
+    title: 'Customers',
+    icon: Users,
+    href: '/admin/customers',
+  },
+  {
     title: 'Warehouse',
     icon: Package,
     href: '/admin/warehouse',

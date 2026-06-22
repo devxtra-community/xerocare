@@ -1,5 +1,6 @@
 'use client';
 import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   Table,
   TableBody,
@@ -39,6 +40,7 @@ export default function InventoryTable({
   warehouseId,
   selectedYear,
 }: InventoryTableProps) {
+  const router = useRouter();
   const { page, limit, total, setPage, setTotal, totalPages } = usePagination(8);
   const [data, setData] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -270,6 +272,11 @@ export default function InventoryTable({
                         variant="ghost"
                         size="icon"
                         className="h-7 w-7 text-gray-400 hover:text-primary hover:bg-primary/5"
+                        onClick={() => {
+                          if (item.product_id) {
+                            router.push(`/manager/products/${item.product_id}`);
+                          }
+                        }}
                       >
                         <Eye className="h-3.5 w-3.5" />
                       </Button>

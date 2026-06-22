@@ -56,6 +56,7 @@ interface ProductMeta {
   inventory?: { description?: string }[];
   image?: string;
   consumables?: InternalConsumable[];
+  tax_rate?: number;
 }
 
 interface InvoiceViewDialogProps {
@@ -116,11 +117,18 @@ export function InvoiceViewDialog({
               if (m) {
                 try {
                   const productsForModel = await getAllProducts({ modelId: m.id }).catch(() => []);
+                  const typedM = m as unknown as ProductMeta;
+                  const firstProduct = productsForModel[0];
+                  if (
+                    firstProduct &&
+                    (firstProduct as { tax_rate?: number }).tax_rate !== undefined
+                  ) {
+                    typedM.tax_rate = Number((firstProduct as { tax_rate?: number }).tax_rate);
+                  }
                   const productWithImage = productsForModel.find(
                     (p: { imageUrl?: string; image_url?: string }) => p.imageUrl || p.image_url,
                   );
                   if (productWithImage) {
-                    const typedM = m as unknown as ProductMeta;
                     typedM.imageUrl =
                       productWithImage.imageUrl ||
                       (productWithImage as { image_url?: string }).image_url;
@@ -443,7 +451,7 @@ export function InvoiceViewDialog({
       qty: qty,
       unitPrice: unitP,
       specialPrice: discountedPrice,
-      vat: 0,
+      vat: ((discountedPrice * Number(item.metadata?.tax_rate || 0)) / 100) * qty,
       amount: subAmt,
       productImage: item.metadata?.imageUrl || item.metadata?.image_url || item.metadata?.image,
       discount: disc,
@@ -464,15 +472,23 @@ export function InvoiceViewDialog({
     (acc, it) => acc + it.discount * it.qty,
     0,
   );
-  const finalDiscountTotal = Math.max(totalDiscountFromItems, invoice.discountAmount || 0);
+  const finalDiscountTotal = Math.max(totalDiscountFromItems, Number(invoice.discountAmount || 0));
 
-  const finalTotalAmount =
-    invoice.totalAmount || templateLineItems.reduce((acc, it) => acc + it.amount, 0);
+  const finalVatTotal = templateLineItems.reduce((acc, it) => acc + (it.vat || 0), 0);
+  const netAmount = totalBeforeDiscount - finalDiscountTotal;
+  const isVatAlreadyIncluded =
+    invoice.totalAmount &&
+    Math.abs(Number(invoice.totalAmount) - (netAmount + finalVatTotal)) < 0.05;
+  const finalTotalAmount = isVatAlreadyIncluded
+    ? Number(invoice.totalAmount)
+    : Number(invoice.totalAmount || netAmount) + finalVatTotal;
 
   const templateTotals = {
-    subTotal: totalBeforeDiscount,
+    subTotal: isVatAlreadyIncluded
+      ? Number(invoice.totalAmount) - finalVatTotal + finalDiscountTotal
+      : totalBeforeDiscount,
     discountTotal: finalDiscountTotal,
-    vatTotal: 0,
+    vatTotal: finalVatTotal,
     total: finalTotalAmount,
     payment: finalTotalAmount,
     balanceDue: finalTotalAmount,
@@ -553,6 +569,13 @@ export function InvoiceViewDialog({
     discountedMonthlyRent: (invoice.monthlyRent || 0) * (1 - (invoice.discountPercent || 0) / 100),
   };
 
+  const rentTaxRate = Number(enrichedItems[0]?.metadata?.tax_rate || 0);
+  const rentSubTotal =
+    Number(invoice.monthlyRent || 0) ||
+    (invoice.items || []).reduce((acc, it) => acc + (it.quantity || 0) * (it.unitPrice || 0), 0);
+  const rentTaxAmount = (rentSubTotal * rentTaxRate) / 100;
+  const rentTotalAmount = rentSubTotal + rentTaxAmount;
+
   const isFsmLease = invoice.leaseType === 'FSM';
   const leaseTemplateLineItems = (invoice.items || [])
     .filter((it) => it.itemType === 'PRODUCT' || !it.itemType)
@@ -605,11 +628,18 @@ export function InvoiceViewDialog({
     endDate: invoice.effectiveTo
       ? new Date(invoice.effectiveTo).toLocaleDateString('en-GB')
       : 'TBD',
-    monthlyEmi: isFsmLease ? invoice.monthlyRent || 0 : invoice.monthlyEmiAmount || 0,
+    monthlyEmi: isFsmLease
+      ? Number(invoice.monthlyRent || 0)
+      : Number(invoice.monthlyEmiAmount || 0),
     totalLeaseValue: isFsmLease
-      ? invoice.monthlyLeaseAmount || invoice.totalAmount || 0
-      : invoice.totalAmount || 0,
+      ? Number(invoice.monthlyLeaseAmount || invoice.totalAmount || 0)
+      : Number(invoice.totalAmount || 0),
   };
+
+  const leaseTaxRate = Number(enrichedItems[0]?.metadata?.tax_rate || 0);
+  const leaseSubTotal = Number(leaseAgreementDetails.totalLeaseValue || 0);
+  const leaseTaxAmount = (leaseSubTotal * leaseTaxRate) / 100;
+  const leaseTotalAmount = leaseSubTotal + leaseTaxAmount;
 
   return (
     <Dialog open onOpenChange={(v) => !v && onClose()}>
@@ -668,6 +698,7 @@ export function InvoiceViewDialog({
               <div className="flex-1">
                 {isProductNormal && (
                   <ProductNormalQuotation
+                    isInvoice={true}
                     productName={templateProductName}
                     modelName={templateModelName}
                     billTo={templateBillTo}
@@ -679,6 +710,7 @@ export function InvoiceViewDialog({
                 )}
                 {isProductStandard && (
                   <ProductStandardQuotation
+                    isInvoice={true}
                     productName={templateProductName}
                     modelName={templateModelName}
                     billTo={templateBillTo}
@@ -702,6 +734,7 @@ export function InvoiceViewDialog({
 
                 {isSpareNormal && (
                   <SparePartsNormalQuotation
+                    isInvoice={true}
                     productName={templateProductName}
                     modelName={templateModelName}
                     billTo={templateBillTo}
@@ -741,14 +774,9 @@ export function InvoiceViewDialog({
                     lineItems={rentTemplateLineItems}
                     agreementDetails={rentAgreementDetails}
                     totals={{
-                      subTotal:
-                        invoice.monthlyRent ||
-                        (invoice.items || []).reduce(
-                          (acc, it) => acc + (it.quantity || 0) * (it.unitPrice || 0),
-                          0,
-                        ),
-                      tax: 0,
-                      total: invoice.totalAmount || 0,
+                      subTotal: rentSubTotal,
+                      tax: rentTaxAmount,
+                      total: rentTotalAmount,
                     }}
                   />
                 )}
@@ -759,14 +787,9 @@ export function InvoiceViewDialog({
                     lineItems={rentTemplateLineItems}
                     agreementDetails={rentAgreementDetails}
                     totals={{
-                      subTotal:
-                        invoice.monthlyRent ||
-                        (invoice.items || []).reduce(
-                          (acc, it) => acc + (it.quantity || 0) * (it.unitPrice || 0),
-                          0,
-                        ),
-                      tax: 0,
-                      total: invoice.totalAmount || 0,
+                      subTotal: rentSubTotal,
+                      tax: rentTaxAmount,
+                      total: rentTotalAmount,
                     }}
                   />
                 )}
@@ -777,14 +800,9 @@ export function InvoiceViewDialog({
                     lineItems={rentTemplateLineItems}
                     agreementDetails={rentAgreementDetails}
                     totals={{
-                      subTotal:
-                        invoice.monthlyRent ||
-                        (invoice.items || []).reduce(
-                          (acc, it) => acc + (it.quantity || 0) * (it.unitPrice || 0),
-                          0,
-                        ),
-                      tax: 0,
-                      total: invoice.totalAmount || 0,
+                      subTotal: rentSubTotal,
+                      tax: rentTaxAmount,
+                      total: rentTotalAmount,
                     }}
                   />
                 )}
@@ -796,9 +814,9 @@ export function InvoiceViewDialog({
                     lineItems={leaseTemplateLineItems}
                     leaseDetails={leaseAgreementDetails}
                     totals={{
-                      subTotal: leaseAgreementDetails.totalLeaseValue,
-                      tax: 0,
-                      total: leaseAgreementDetails.totalLeaseValue,
+                      subTotal: leaseSubTotal,
+                      tax: leaseTaxAmount,
+                      total: leaseTotalAmount,
                     }}
                   />
                 )}
@@ -809,9 +827,9 @@ export function InvoiceViewDialog({
                     lineItems={leaseTemplateLineItems}
                     leaseDetails={leaseAgreementDetails}
                     totals={{
-                      subTotal: leaseAgreementDetails.totalLeaseValue,
-                      tax: 0,
-                      total: leaseAgreementDetails.totalLeaseValue,
+                      subTotal: leaseSubTotal,
+                      tax: leaseTaxAmount,
+                      total: leaseTotalAmount,
                     }}
                   />
                 )}
@@ -822,9 +840,9 @@ export function InvoiceViewDialog({
                     lineItems={leaseTemplateLineItems}
                     leaseDetails={leaseAgreementDetails}
                     totals={{
-                      subTotal: leaseAgreementDetails.totalLeaseValue,
-                      tax: 0,
-                      total: leaseAgreementDetails.totalLeaseValue,
+                      subTotal: leaseSubTotal,
+                      tax: leaseTaxAmount,
+                      total: leaseTotalAmount,
                     }}
                   />
                 )}

@@ -1,4 +1,4 @@
-import { getRabbitChannel } from '../config/rabbitmq';
+import { createRabbitChannel } from '../config/rabbitmq';
 import { ProductStatus } from '../entities/productEntity';
 import { logger } from '../config/logger';
 import { ProductRepository } from '../repositories/productRepository';
@@ -38,7 +38,7 @@ function isBillType(value: unknown): value is BillType {
  * Consumer bootstrap
  */
 export async function startProductStatusConsumer() {
-  const channel = await getRabbitChannel();
+  const channel = await createRabbitChannel();
 
   await channel.assertExchange(EXCHANGE, 'topic', { durable: true });
   await channel.assertQueue(QUEUE, { durable: true });

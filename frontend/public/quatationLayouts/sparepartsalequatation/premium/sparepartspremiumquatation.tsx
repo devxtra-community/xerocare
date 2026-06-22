@@ -613,7 +613,7 @@ const SparePartsPremiumQuotation: React.FC<SparePartsPremiumQuotationProps> = ({
               }}
             >
               <span style={{ color: mutedText, fontWeight: '400', fontSize: '11px' }}>
-                SUB TOTAL
+                SUBTOTAL (BEFORE VAT)
               </span>
               <span style={{ fontWeight: '400' }}>QAR {fmt(totals.subTotal)}</span>
             </div>
@@ -629,6 +629,19 @@ const SparePartsPremiumQuotation: React.FC<SparePartsPremiumQuotationProps> = ({
               <span style={{ fontWeight: '400', fontSize: '11px' }}>DISCOUNT</span>
               <span style={{ fontWeight: '400' }}>- QAR {fmt(totals.discountTotal || 0)}</span>
             </div>
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                padding: '10px 0',
+                borderBottom: '1px solid rgba(255,255,255,0.1)',
+              }}
+            >
+              <span style={{ color: mutedText, fontWeight: '400', fontSize: '11px' }}>
+                VAT AMOUNT
+              </span>
+              <span style={{ fontWeight: '400' }}>QAR {fmt(totals.vatTotal)}</span>
+            </div>
 
             <div
               style={{
@@ -643,7 +656,9 @@ const SparePartsPremiumQuotation: React.FC<SparePartsPremiumQuotationProps> = ({
                 boxShadow: '0 4px 10px rgba(220, 38, 38, 0.2)',
               }}
             >
-              <span style={{ fontWeight: '900', fontSize: '14px' }}>TOTAL</span>
+              <span style={{ fontWeight: '900', fontSize: '14px' }}>
+                GRAND TOTAL (INCLUDING VAT)
+              </span>
               <span style={{ fontWeight: '900', fontSize: '20px' }}>QAR {fmt(totals.total)}</span>
             </div>
 

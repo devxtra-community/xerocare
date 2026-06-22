@@ -99,6 +99,12 @@ export const createQuotation = async (req: Request, res: Response, next: NextFun
       monthlyEmiAmount: payload.monthlyEmiAmount,
       totalLeaseAmount: payload.totalLeaseAmount,
       monthlyLeaseAmount: payload.monthlyLeaseAmount,
+      validityDays:
+        req.body.validityDays !== undefined
+          ? Number(req.body.validityDays)
+          : req.body.validity_days !== undefined
+            ? Number(req.body.validity_days)
+            : undefined,
 
       // Security Deposit
       securityDepositAmount: req.body.securityDepositAmount,
@@ -1527,6 +1533,82 @@ export const financeExtendValidity = async (req: Request, res: Response, next: N
       success: true,
       data: result,
       message: 'Estimate approved with validity extension successfully',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const reassignCustomer = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = req.params.id as string;
+    const { newCustomerId, discountAmount } = req.body;
+    const userId = req.user?.userId || 'SYSTEM';
+
+    if (!newCustomerId) {
+      throw new AppError('newCustomerId is required', 400);
+    }
+
+    const result = await billingService.reassignCustomer(id, userId, {
+      newCustomerId,
+      discountAmount: discountAmount !== undefined ? Number(discountAmount) : undefined,
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: result,
+      message: 'Quotation reassigned to new customer successfully',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const recordPayment = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = req.params.id as string;
+    const { mode, reference, bank, amount, transactionDate, remarks, isSecurityDeposit } = req.body;
+    const userId = req.user?.userId || 'SYSTEM';
+
+    if (!mode) {
+      throw new AppError('Payment mode is required', 400);
+    }
+    if (amount === undefined || isNaN(Number(amount)) || Number(amount) <= 0) {
+      throw new AppError('A valid payment amount greater than 0 is required', 400);
+    }
+
+    const result = await billingService.recordPayment(
+      id,
+      {
+        paymentMode: mode,
+        referenceNumber: reference,
+        amount: Number(amount),
+        transactionDate,
+        remarks: remarks || (bank ? `Bank: ${bank}` : undefined),
+        isSecurityDeposit: !!isSecurityDeposit,
+      },
+      userId,
+    );
+
+    return res.status(200).json({
+      success: true,
+      data: result,
+      message: 'Payment recorded successfully',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getInvoiceLedger = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = req.params.id as string;
+    const result = await billingService.getInvoiceLedger(id);
+
+    return res.status(200).json({
+      success: true,
+      data: result,
+      message: 'Ledger and transactions fetched successfully',
     });
   } catch (error) {
     next(error);

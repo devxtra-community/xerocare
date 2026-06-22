@@ -27,6 +27,7 @@ export interface SparePartInventoryItem {
   description?: string;
   yield?: string;
   maxDiscountableAmount?: number;
+  max_discount_amount?: number;
 }
 
 export interface PaginatedResponse<T> {
@@ -55,10 +56,20 @@ export const sparePartService = {
 
     // Map lot_number to lotNumber for consistency
     const mapItems = (items: SparePartInventoryItem[]) => {
-      return items.map((item) => ({
-        ...item,
-        lotNumber: item.lotNumber || item.lot_number || '-',
-      }));
+      return items.map((item) => {
+        const maxDiscount =
+          item.maxDiscountableAmount !== undefined
+            ? Number(item.maxDiscountableAmount)
+            : item.max_discount_amount !== undefined
+              ? Number(item.max_discount_amount)
+              : 0;
+        return {
+          ...item,
+          lotNumber: item.lotNumber || item.lot_number || '-',
+          maxDiscountableAmount: maxDiscount,
+          max_discount_amount: maxDiscount,
+        };
+      });
     };
 
     // Support new paginated backend

@@ -336,6 +336,21 @@ export class Invoice {
   @Column({ name: 'revision_count', type: 'int', default: 0 })
   revisionCount!: number;
 
+  @Column({ name: 'expiry_date', type: 'timestamp', nullable: true })
+  expiryDate?: Date | null;
+
+  @Column({ name: 'validity_days', type: 'integer', default: 30 })
+  validityDays!: number;
+
+  @Column({ name: 'is_converted', type: 'boolean', default: false })
+  isConverted!: boolean;
+
+  @Column({ name: 'conversion_date', type: 'timestamp', nullable: true })
+  conversionDate?: Date | null;
+
+  @Column({ name: 'not_converted_reason', type: 'text', nullable: true })
+  notConvertedReason?: string | null;
+
   @DeleteDateColumn()
   deletedAt?: Date;
 }

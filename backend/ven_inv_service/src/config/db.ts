@@ -120,6 +120,24 @@ export const connectWithRetry = async (initialDelayMs = 2000): Promise<DataSourc
           ADD COLUMN IF NOT EXISTS max_discountable_amount DECIMAL(10,2) DEFAULT 0
         `);
         logger.info('Guaranteed tax_rate and max_discount_amount exist on spare_parts table.');
+        // Ensure max_discountable_amount exists on model / models table
+        try {
+          await Source.query(`
+            ALTER TABLE model 
+            ADD COLUMN IF NOT EXISTS max_discountable_amount DECIMAL(10,2) DEFAULT 0
+          `);
+          logger.info('Guaranteed max_discountable_amount exists on model table.');
+        } catch (err) {
+          logger.warn('Could not add max_discountable_amount to model table:', err);
+        }
+        try {
+          await Source.query(`
+            ALTER TABLE models 
+            ADD COLUMN IF NOT EXISTS max_discountable_amount DECIMAL(10,2) DEFAULT 0
+          `);
+        } catch {
+          // ignore
+        }
         // Ensure warranty column exists on products table
         await Source.query(`
           ALTER TABLE products 

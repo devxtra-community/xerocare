@@ -108,3 +108,20 @@ export const syncQuantities = async (req: Request, res: Response) => {
     throw new AppError('Failed to sync quantities', 500);
   }
 };
+
+/**
+ * Retrieves a single model by ID.
+ */
+export const getModelById = async (req: Request, res: Response) => {
+  try {
+    const id = req.params.id as string;
+    const model = await service.getModelById(id);
+    if (!model) {
+      return res.status(404).json({ message: 'Model not found', success: false });
+    }
+    return res.status(200).json({ data: model, success: true });
+  } catch (error) {
+    logger.error('Error in getModelById:', error);
+    throw new AppError('Error fetching model', 500);
+  }
+};

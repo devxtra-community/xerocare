@@ -83,7 +83,9 @@ export interface BulkProductRow {
   lot_id?: string;
   description?: string;
   hs_code?: string;
+  features?: { subHeading: string; description: string }[];
   consumables?: { partName: string; description: string; yield: string; price: string }[];
+  imageUrl?: string;
 }
 
 /**
@@ -156,9 +158,31 @@ export const productService = {
   },
 
   /**
+   * Get a single product by its ID.
+   */
+  getProductById: async (id: string): Promise<Product> => {
+    const response = await api.get(`/i/products/${id}`);
+    return response.data.data;
+  },
+
+  /**
    * Remove a product from our active list.
    */
   deleteProduct: async (id: string): Promise<void> => {
     await api.delete(`/i/products/${id}`);
+  },
+
+  /**
+   * Upload an image file for a product and return its URL.
+   */
+  uploadProductImage: async (file: File): Promise<{ success: boolean; imageUrl: string }> => {
+    const formData = new FormData();
+    formData.append('image', file);
+    const response = await api.post('/i/products/upload-image', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
   },
 };

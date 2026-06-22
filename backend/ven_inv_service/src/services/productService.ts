@@ -107,11 +107,13 @@ export class ProductService {
           hs_code: row.hs_code,
           warranty: row.warranty,
           consumables: row.consumables,
+          imageUrl: row.imageUrl,
+          features: row.features,
         });
 
         await this.model.syncModelQuantities(modelDetails.id);
 
-        await setCached(`product:${product.id}`, product, 3600);
+        await deleteCached(`product:${product.id}`);
 
         await this.modelService.syncToRedis(modelDetails.id);
 
@@ -194,7 +196,7 @@ export class ProductService {
 
       await this.model.syncModelQuantities(modelDetails.id);
 
-      await setCached(`product:${product.id}`, product, 3600);
+      await deleteCached(`product:${product.id}`);
 
       await this.modelService.syncToRedis(modelDetails.id);
 

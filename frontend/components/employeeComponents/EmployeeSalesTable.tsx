@@ -56,8 +56,15 @@ export default function EmployeeSalesTable({ mode = 'EMPLOYEE' }: EmployeeSalesT
   const [allModels, setAllModels] = useState<unknown[]>([]);
 
   const currentUser = getUserFromToken();
-  const isManagerOrAdmin =
-    currentUser && (currentUser.role === 'ADMIN' || currentUser.role === 'MANAGER');
+  const canDoDirectSale =
+    currentUser &&
+    (currentUser.role === 'ADMIN' ||
+      currentUser.role === 'MANAGER' ||
+      currentUser.role === 'FINANCE' ||
+      (currentUser.role === 'EMPLOYEE' &&
+        (currentUser.employeeJob === 'SALES' ||
+          currentUser.employeeJob === 'RENT_AND_LEASE' ||
+          currentUser.employeeJob === 'MANAGER')));
 
   useEffect(() => {
     const fetchSuggestions = async () => {
@@ -516,7 +523,7 @@ export default function EmployeeSalesTable({ mode = 'EMPLOYEE' }: EmployeeSalesT
                   Select an approved quotation to finalize as a sale.
                 </span>
               </Button>
-              {isManagerOrAdmin && (
+              {canDoDirectSale && (
                 <Button
                   variant="outline"
                   className="flex flex-col items-start p-6 h-auto hover:bg-slate-50 border-2 hover:border-primary transition-all text-left gap-1 rounded-xl"

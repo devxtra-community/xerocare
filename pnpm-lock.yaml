@@ -195,6 +195,9 @@ importers:
       multer-s3:
         specifier: ^3.0.1
         version: 3.0.1(@aws-sdk/client-s3@3.966.0)
+      node-cron:
+        specifier: ^4.4.1
+        version: 4.4.1
       pdfkit:
         specifier: ^0.17.2
         version: 0.17.2
@@ -235,6 +238,9 @@ importers:
       '@types/node':
         specifier: ^25.0.2
         version: 25.0.6
+      '@types/node-cron':
+        specifier: ^3.0.11
+        version: 3.0.11
       '@types/pg':
         specifier: ^8.20.0
         version: 8.20.0
@@ -3208,6 +3214,12 @@ packages:
     resolution:
       {
         integrity: sha512-C3Z9v9Evij2yST3RSBktxP9STm6OdMc5uR1xF1SGr98uv8dUlAL2hqwrZ3GVB3uyMyiegnscEK6PGtYvNrjTjw==,
+      }
+
+  '@types/node-cron@3.0.11':
+    resolution:
+      {
+        integrity: sha512-0ikrnug3/IyneSHqCBeslAhlK2aBfYek1fGo4bP4QnZPmiqSGRK+Oy7ZMisLWkesffJvQ1cqAcBnJC+8+nxIAg==,
       }
 
   '@types/node@14.18.63':
@@ -7035,6 +7047,13 @@ packages:
         integrity: sha512-/bRZty2mXUIFY/xU5HLvveNHlswNJej+RnxBjOMkidWfwZzgTbPG1E3K5TOxRLOR+5hX7bSofy8yf1hZevMS8A==,
       }
     engines: { node: ^18 || ^20 || >= 21 }
+
+  node-cron@4.4.1:
+    resolution:
+      {
+        integrity: sha512-1e4Gku1qeKx1ywNnMoA0o5hiZ8iA4klH84TIszTHZAME68xVIjLkiBo5KrtowbcOJn8MQqJG/yWHjC/dFdMWyQ==,
+      }
+    engines: { node: '>=20' }
 
   node-gyp-build@4.8.4:
     resolution:
@@ -11227,6 +11246,8 @@ snapshots:
     dependencies:
       '@types/express': 5.0.6
 
+  '@types/node-cron@3.0.11': {}
+
   '@types/node@14.18.63': {}
 
   '@types/node@20.19.28':
@@ -13580,6 +13601,8 @@ snapshots:
   node-addon-api@7.1.1: {}
 
   node-addon-api@8.5.0: {}
+
+  node-cron@4.4.1: {}
 
   node-gyp-build@4.8.4: {}
 

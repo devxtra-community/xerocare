@@ -11,6 +11,8 @@ import { ProductAllocation } from '../entities/productAllocationEntity';
 import { ReturnCredit } from '../entities/returnCreditEntity';
 import { PaymentLedger } from '../entities/paymentLedgerEntity';
 import { QuotationTemplateAssignment } from '../entities/quotationTemplateAssignmentEntity';
+import { InvoiceLedger } from '../entities/invoiceLedgerEntity';
+import { PaymentTransaction } from '../entities/paymentTransactionEntity';
 
 import { logger } from './logger';
 import { UsageRecordItem } from '../entities/usageRecordItemEntity';
@@ -36,6 +38,8 @@ export const Source = new DataSource({
     PaymentLedger,
     QuotationTemplateAssignment,
     AuditLog,
+    InvoiceLedger,
+    PaymentTransaction,
   ],
   poolSize: 1,
   extra: {
@@ -108,11 +112,14 @@ async function runPreMigrations() {
       }
     }
 
-    // Ensure SERVICE value exists in invoices_saletype_enum
-    try {
-      await client.query(`ALTER TYPE invoices_saletype_enum ADD VALUE IF NOT EXISTS 'SERVICE';`);
-    } catch (err) {
-      logger.debug(`Skipped adding SERVICE to invoices_saletype_enum: ${(err as Error).message}`);
+    // Ensure new values exist in invoices_saletype_enum
+    const saleTypeValues = ['PRODUCT_SALE', 'SPAREPART_SALE', 'SERVICE'];
+    for (const val of saleTypeValues) {
+      try {
+        await client.query(`ALTER TYPE invoices_saletype_enum ADD VALUE IF NOT EXISTS '${val}';`);
+      } catch (err) {
+        logger.debug(`Skipped adding ${val} to invoices_saletype_enum: ${(err as Error).message}`);
+      }
     }
 
     // Ensure billType enum exists
@@ -142,19 +149,53 @@ async function runPreMigrations() {
         ADD COLUMN IF NOT EXISTS validity_extension_fee DECIMAL(10,2) DEFAULT 0,
         ADD COLUMN IF NOT EXISTS validity_extension_fee_added BOOLEAN DEFAULT FALSE,
         ADD COLUMN IF NOT EXISTS technician_note_to_finance TEXT,
-        ADD COLUMN IF NOT EXISTS revision_count INT DEFAULT 0;
+        ADD COLUMN IF NOT EXISTS revision_count INT DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS expiry_date TIMESTAMP,
+        ADD COLUMN IF NOT EXISTS validity_days INT DEFAULT 30,
+        ADD COLUMN IF NOT EXISTS is_converted BOOLEAN DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS conversion_date TIMESTAMP,
+        ADD COLUMN IF NOT EXISTS not_converted_reason TEXT;
       `);
       await client.query(`
         ALTER TABLE invoice_items 
-        ADD COLUMN IF NOT EXISTS warranty VARCHAR(255) NULL;
+        ADD COLUMN IF NOT EXISTS warranty VARCHAR(255) NULL,
+        ADD COLUMN IF NOT EXISTS "discountAmount" DECIMAL(12, 2) DEFAULT 0;
       `);
       logger.info(
         'Guaranteed billType, serviceTicketId, maxCopyLimit, and service estimate validity columns exist on invoices table, and warranty column exists on invoice_items table.',
       );
+
+      // Create new ledger/payment tables if not exists
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS invoice_ledger (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            invoice_id UUID REFERENCES invoices(id) ON DELETE CASCADE,
+            total_amount DECIMAL(12,2) NOT NULL DEFAULT 0,
+            paid_amount DECIMAL(12,2) NOT NULL DEFAULT 0,
+            balance_amount DECIMAL(12,2) NOT NULL DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+      `);
+
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS payment_transactions (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            invoice_id UUID REFERENCES invoices(id) ON DELETE CASCADE,
+            transaction_date TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            payment_mode VARCHAR(50) NOT NULL,
+            reference_number VARCHAR(100),
+            amount DECIMAL(12,2) NOT NULL,
+            recorded_by UUID,
+            remarks TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+      `);
+      logger.info('Guaranteed invoice_ledger and payment_transactions tables exist.');
     } catch (colErr) {
       logger.warn('Failed to ensure invoices or invoice_items columns:', colErr);
     }
-    logger.info('Pre-migration enum values added successfully');
+    logger.info('Pre-migration enum values and tables added successfully');
 
     // Run legacy status updates
     logger.info('Running pre-migration legacy status updates...');

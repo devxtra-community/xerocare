@@ -1,5 +1,6 @@
 'use client';
 import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   Table,
   TableBody,
@@ -22,15 +23,19 @@ import api from '@/lib/api';
 import { formatCurrency } from '@/lib/format';
 import { usePagination } from '@/hooks/usePagination';
 import Pagination from '@/components/Pagination';
+import { toast } from 'sonner';
+import { productService, Product } from '@/services/productService';
+import { ProductFormModal } from '@/components/productComponents/ProductFormModal';
 
 interface InventoryItem {
+  product_id?: string;
   id: string;
   model_no: string;
   model_name: string;
   product_name: string;
   brand: string;
   description: string;
-  total_quantity: number;
+  total_qty: number;
   available_qty: number;
   rented_qty: number;
   lease_qty: number;
@@ -58,9 +63,12 @@ interface InventoryResponse {
  * Allows drilling down into specific inventory segments.
  */
 export default function InventoryProductsTable({ selectedYear }: { selectedYear: number | 'all' }) {
+  const router = useRouter();
   const { page: currentPage, limit, total, setPage, setTotal, totalPages } = usePagination(10);
   const [data, setData] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [isFormOpen, setIsFormOpen] = useState(false);
 
   // Filter States
   const [productFilter, setProductFilter] = useState('');
@@ -336,7 +344,7 @@ export default function InventoryProductsTable({ selectedYear }: { selectedYear:
                       {item.warehouse_name || '-'}
                     </TableCell>
                     <TableCell className="px-6 py-4 text-center font-bold text-blue-600">
-                      {item.total_quantity}
+                      {item.total_qty}
                     </TableCell>
                     <TableCell className="px-6 py-4 text-center">
                       <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
@@ -362,6 +370,11 @@ export default function InventoryProductsTable({ selectedYear }: { selectedYear:
                           variant="ghost"
                           size="icon"
                           className="h-8 w-8 text-gray-400 hover:text-primary"
+                          onClick={() => {
+                            if (item.product_id) {
+                              router.push(`/admin/products/${item.product_id}`);
+                            }
+                          }}
                         >
                           <Eye className="h-4 w-4" />
                         </Button>
@@ -369,6 +382,18 @@ export default function InventoryProductsTable({ selectedYear }: { selectedYear:
                           variant="ghost"
                           size="icon"
                           className="h-8 w-8 text-gray-400 hover:text-primary"
+                          onClick={async () => {
+                            if (item.product_id) {
+                              try {
+                                const prod = await productService.getProductById(item.product_id);
+                                setEditingProduct(prod);
+                                setIsFormOpen(true);
+                              } catch (err) {
+                                console.error(err);
+                                toast.error('Failed to load product details');
+                              }
+                            }
+                          }}
                         >
                           <Edit2 className="h-4 w-4" />
                         </Button>
@@ -397,6 +422,20 @@ export default function InventoryProductsTable({ selectedYear }: { selectedYear:
           />
         </div>
       </div>
+      {isFormOpen && (
+        <ProductFormModal
+          initialData={editingProduct}
+          onClose={() => {
+            setIsFormOpen(false);
+            setEditingProduct(null);
+          }}
+          onConfirm={() => {
+            setIsFormOpen(false);
+            setEditingProduct(null);
+            fetchData();
+          }}
+        />
+      )}
     </div>
   );
 }

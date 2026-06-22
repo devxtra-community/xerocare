@@ -374,6 +374,12 @@ app.get(
   createServiceProxy(VENDOR_INVENTORY_SERVICE_URL),
 );
 
+app.get(
+  ['/i/spareparts/:id/stock', '/i/spare-parts/:id/stock'],
+  authMiddleware,
+  createServiceProxy(VENDOR_INVENTORY_SERVICE_URL),
+);
+
 app.use('/i', createServiceProxy(VENDOR_INVENTORY_SERVICE_URL));
 app.use('/b', createServiceProxy(BILLING_SERVICE_URL));
 app.use('/c', createServiceProxy(CRM_SERVICE_URL));

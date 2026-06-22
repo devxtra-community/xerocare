@@ -5,6 +5,11 @@ let channel: amqp.Channel;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let connection: any;
 
+export async function createRabbitChannel(): Promise<amqp.Channel> {
+  await getRabbitChannel();
+  return await connection.createChannel();
+}
+
 export async function getRabbitChannel() {
   if (channel) return channel;
 

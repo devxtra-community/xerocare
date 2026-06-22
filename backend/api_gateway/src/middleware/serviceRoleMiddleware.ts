@@ -13,8 +13,11 @@ export const requireServiceRole = (allowedJobs: string[], allowManagerAdmin = tr
 
     const { role, employeeJob } = req.user;
 
-    // ADMIN and MANAGER always have full access by default
-    if (allowManagerAdmin && (role === 'ADMIN' || role === 'MANAGER')) {
+    // ADMIN and MANAGER always have full access by default. Also allow employee managers.
+    if (
+      allowManagerAdmin &&
+      (role === 'ADMIN' || role === 'MANAGER' || employeeJob === 'MANAGER')
+    ) {
       return next();
     }
 

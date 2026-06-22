@@ -723,9 +723,9 @@ const ProductPremiumQuotation: React.FC<ProductPremiumQuotationProps> = ({
                   gap: '8px',
                 }}
               >
-                <span>Subtotal:</span>
+                <span>Subtotal (Before VAT):</span>
                 <span>Discount:</span>
-                <span>VAT Total:</span>
+                <span>VAT Amount:</span>
               </div>
               <div
                 style={{
@@ -760,7 +760,7 @@ const ProductPremiumQuotation: React.FC<ProductPremiumQuotationProps> = ({
                 style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
               >
                 <span style={{ fontWeight: '500', fontSize: '16px', textTransform: 'uppercase' }}>
-                  Total:
+                  Grand Total (Including VAT):
                 </span>
                 <span style={{ fontWeight: '500', fontSize: '18px' }}>
                   QAR {fmt(totals.balanceDue)}

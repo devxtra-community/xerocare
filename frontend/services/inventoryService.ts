@@ -1,6 +1,7 @@
 import api from '@/lib/api';
 
 export interface InventoryItem {
+  product_id?: string;
   warehouse_id?: string;
   warehouse_name?: string;
   model_id: string;

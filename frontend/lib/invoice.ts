@@ -79,6 +79,8 @@ export interface Invoice {
   contractConfirmationUrl?: string;
   emailSentAt?: string;
   type?: 'QUOTATION' | 'PROFORMA' | 'FINAL';
+  isConverted?: boolean;
+  expiryDate?: string;
   billType?: string;
   serviceTicketId?: string;
   saleType: string;

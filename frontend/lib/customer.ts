@@ -6,6 +6,8 @@ export interface Customer {
   email?: string;
   phone?: string;
   address?: string;
+  branch_id?: string;
+  location?: string;
 
   isActive: boolean;
   createdAt: string;

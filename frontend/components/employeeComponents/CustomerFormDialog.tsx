@@ -29,6 +29,16 @@ interface CustomerFormDialogProps {
   onSubmit: (customerData: Partial<CreateCustomerData>) => Promise<void>;
 }
 
+const COUNTRY_CODES = [
+  { code: '+974', flag: '🇶🇦', name: 'Qatar', native: 'قطر' },
+  { code: '+971', flag: '🇦🇪', name: 'UAE', native: 'الإمارات' },
+  { code: '+91', flag: '🇮🇳', name: 'India', native: 'भारत' },
+  { code: '+966', flag: '🇸🇦', name: 'Saudi Arabia', native: 'السعودية' },
+  { code: '+968', flag: '🇴🇲', name: 'Oman', native: 'عُمان' },
+  { code: '+965', flag: '🇰🇼', name: 'Kuwait', native: 'الكويت' },
+  { code: '+973', flag: '🇧🇭', name: 'Bahrain', native: 'البحرين' },
+];
+
 /**
  * Modal dialog for creating or editing customer profiles.
  * Handles form validation and pre-fills data when editing existing customers.
@@ -40,6 +50,8 @@ export default function CustomerFormDialog({
   onSubmit,
 }: CustomerFormDialogProps) {
   const [loading, setLoading] = useState(false);
+  const [countryCode, setCountryCode] = useState('+974');
+  const [rawPhone, setRawPhone] = useState('');
   const [formData, setFormData] = useState<Partial<CreateCustomerData>>({
     name: '',
     email: '',
@@ -58,6 +70,27 @@ export default function CustomerFormDialog({
         address: customer.address || '',
         status: customer.isActive ? 'ACTIVE' : 'INACTIVE',
       });
+
+      if (customer.phone) {
+        const cleaned = customer.phone.trim();
+        const found = COUNTRY_CODES.find((c) => cleaned.startsWith(c.code));
+        if (found) {
+          setCountryCode(found.code);
+          setRawPhone(cleaned.slice(found.code.length).trim());
+        } else {
+          const match = cleaned.match(/^(\+\d+)\s*(.*)$/);
+          if (match) {
+            setCountryCode(match[1]);
+            setRawPhone(match[2]);
+          } else {
+            setCountryCode('+974');
+            setRawPhone(cleaned);
+          }
+        }
+      } else {
+        setCountryCode('+974');
+        setRawPhone('');
+      }
     } else {
       setFormData({
         name: '',
@@ -66,6 +99,8 @@ export default function CustomerFormDialog({
         address: '',
         status: 'ACTIVE',
       });
+      setCountryCode('+974');
+      setRawPhone('');
     }
   }, [customer, open]);
 
@@ -82,7 +117,8 @@ export default function CustomerFormDialog({
     e.preventDefault();
     setLoading(true);
     try {
-      await onSubmit(formData);
+      const finalPhone = rawPhone.trim() ? `${countryCode} ${rawPhone.trim()}` : '';
+      await onSubmit({ ...formData, phone: finalPhone });
       onOpenChange(false);
     } catch (error) {
       console.error(error);
@@ -152,13 +188,44 @@ export default function CustomerFormDialog({
                 <Label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider pl-1">
                   Phone Number
                 </Label>
-                <div className="relative">
-                  <Input
-                    name="phone"
-                    value={formData.phone || ''}
-                    onChange={handleChange}
-                    placeholder="+1 234 567 890"
-                    className="h-12 rounded-xl bg-muted/50 border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400 pl-11"
+                <div className="flex items-center h-12 rounded-xl bg-muted/50 border border-transparent focus-within:ring-2 focus-within:ring-blue-400 focus-within:bg-card focus-within:border-transparent transition-all overflow-hidden relative shadow-sm">
+                  {/* Country Flag Selector */}
+                  <Select value={countryCode} onValueChange={setCountryCode}>
+                    <SelectTrigger className="h-full border-none bg-transparent hover:bg-muted/50 focus:ring-0 focus-visible:ring-0 shadow-none px-3 flex gap-1.5 items-center shrink-0 w-auto rounded-none rounded-l-xl data-[state=open]:bg-muted/50 transition-colors">
+                      <span className="text-xl leading-none select-none">
+                        {COUNTRY_CODES.find((c) => c.code === countryCode)?.flag || '🇶🇦'}
+                      </span>
+                    </SelectTrigger>
+                    <SelectContent
+                      className="rounded-xl border-none shadow-xl max-h-[300px]"
+                      position="popper"
+                    >
+                      {COUNTRY_CODES.map((c) => (
+                        <SelectItem key={c.code} value={c.code} className="cursor-pointer">
+                          <div className="flex items-center gap-2 py-0.5">
+                            <span className="text-lg">{c.flag}</span>
+                            <span className="font-semibold text-foreground text-sm">
+                              {c.name} {c.native ? `(${c.native})` : ''}
+                            </span>
+                            <span className="text-muted-foreground text-xs font-semibold ml-auto pr-4">
+                              {c.code}
+                            </span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  {/* Vertical Divider */}
+                  <div className="h-6 w-[1px] bg-gray-200 dark:bg-gray-800 shrink-0" />
+
+                  {/* Phone Number Input */}
+                  <input
+                    type="tel"
+                    value={rawPhone}
+                    onChange={(e) => setRawPhone(e.target.value)}
+                    placeholder="5555 6666"
+                    className="flex-1 h-full px-4 bg-transparent outline-none border-none text-sm text-foreground placeholder:text-muted-foreground"
                   />
                 </div>
               </div>
