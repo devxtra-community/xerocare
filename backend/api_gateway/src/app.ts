@@ -6,10 +6,15 @@ import { createProxyMiddleware } from 'http-proxy-middleware';
 import healthRouter from './routes/health';
 import { startCustomerConsumer } from './events/consumers/customerUpdatedConsumer';
 import invoiceRouter from './routes/invoiceRoutes';
+import { getAuditLogs } from './controllers/invoiceController';
 import { httpLogger } from './middleware/httplogger';
 import { logger } from './config/logger';
 import { errorHandler } from './middleware/errorHandler';
 import { otpSendLimiter, otpVerifyLimiter, loginLimiter } from './middleware/rateLimitter';
+import { authMiddleware } from './middleware/authMiddleware';
+import { requireRole } from './middleware/roleMiddleware';
+import { requireServiceRole } from './middleware/serviceRoleMiddleware';
+import { UserRole } from './constants/userRole';
 
 /*
  * This is the main setup for the API Gateway.
@@ -97,6 +102,13 @@ app.use(
   invoiceRouter,
 );
 
+app.get(
+  '/b/audit-logs/:entityId',
+  authMiddleware,
+  requireRole(UserRole.MANAGER, UserRole.FINANCE, UserRole.ADMIN),
+  getAuditLogs,
+);
+
 /**
  * Safety: Prevention of Automated Attacks (Rate Limiting)
  * We limit how many times someone can try to login or request a password reset
@@ -121,6 +133,12 @@ function createServiceProxy(target: string) {
   return createProxyMiddleware({
     target,
     changeOrigin: true,
+    pathRewrite: {
+      '^/i/': '/',
+      '^/b/': '/',
+      '^/c/': '/',
+      '^/e/': '/',
+    },
     proxyTimeout: 60_000, // Wait up to 60 seconds for a response
     timeout: 60_000, // If nothing happens for 60 seconds, close the connection
     secure: false, // Trust our own internal network connections
@@ -177,6 +195,149 @@ for (const [key, value] of Object.entries(requiredEnvVars)) {
  * - "/c" goes to CRM (Customer Management)
  */
 app.use('/e', createServiceProxy(EMPLOYEE_SERVICE_URL));
+
+// --- Service Management Module Gateway Routes ---
+app.post(
+  '/i/service/tickets',
+  authMiddleware,
+  requireRole(UserRole.ADMIN, UserRole.MANAGER, UserRole.EMPLOYEE),
+  createServiceProxy(VENDOR_INVENTORY_SERVICE_URL),
+);
+app.get(
+  '/i/service/tickets',
+  authMiddleware,
+  requireRole(UserRole.ADMIN, UserRole.MANAGER, UserRole.FINANCE, UserRole.EMPLOYEE),
+  createServiceProxy(VENDOR_INVENTORY_SERVICE_URL),
+);
+app.get(
+  '/i/service/tickets/:id',
+  authMiddleware,
+  requireRole(UserRole.ADMIN, UserRole.MANAGER, UserRole.FINANCE, UserRole.EMPLOYEE),
+  createServiceProxy(VENDOR_INVENTORY_SERVICE_URL),
+);
+app.put(
+  '/i/service/tickets/:id',
+  authMiddleware,
+  requireServiceRole(['SERVICE_HELP_DESK']),
+  createServiceProxy(VENDOR_INVENTORY_SERVICE_URL),
+);
+app.post(
+  '/i/service/tickets/:id/assign',
+  authMiddleware,
+  requireServiceRole(['SERVICE_HELP_DESK']),
+  createServiceProxy(VENDOR_INVENTORY_SERVICE_URL),
+);
+app.post(
+  '/i/service/tickets/:id/diagnose',
+  authMiddleware,
+  requireServiceRole(['SERVICE_TECHNICIAN']),
+  createServiceProxy(VENDOR_INVENTORY_SERVICE_URL),
+);
+app.post(
+  '/i/service/tickets/:id/quote',
+  authMiddleware,
+  requireServiceRole(['SERVICE_TECHNICIAN']),
+  createServiceProxy(VENDOR_INVENTORY_SERVICE_URL),
+);
+app.post(
+  '/i/service/tickets/:id/customer-approve',
+  authMiddleware,
+  requireServiceRole(['SERVICE_HELP_DESK']),
+  createServiceProxy(VENDOR_INVENTORY_SERVICE_URL),
+);
+app.post(
+  '/i/service/tickets/:id/customer-reject',
+  authMiddleware,
+  requireServiceRole(['SERVICE_HELP_DESK']),
+  createServiceProxy(VENDOR_INVENTORY_SERVICE_URL),
+);
+app.post(
+  '/i/service/tickets/:id/start',
+  authMiddleware,
+  requireServiceRole(['SERVICE_TECHNICIAN']),
+  createServiceProxy(VENDOR_INVENTORY_SERVICE_URL),
+);
+app.post(
+  '/i/service/tickets/:id/complete',
+  authMiddleware,
+  requireServiceRole(['SERVICE_TECHNICIAN']),
+  createServiceProxy(VENDOR_INVENTORY_SERVICE_URL),
+);
+app.post(
+  '/i/service/tickets/:id/cancel',
+  authMiddleware,
+  requireServiceRole([], false), // Only ADMIN and MANAGER allowed
+  createServiceProxy(VENDOR_INVENTORY_SERVICE_URL),
+);
+app.get(
+  '/i/service/technicians',
+  authMiddleware,
+  requireRole(UserRole.ADMIN, UserRole.MANAGER, UserRole.FINANCE, UserRole.EMPLOYEE),
+  createServiceProxy(VENDOR_INVENTORY_SERVICE_URL),
+);
+app.get(
+  '/i/service/customers/:customerId/history',
+  authMiddleware,
+  requireRole(UserRole.ADMIN, UserRole.MANAGER, UserRole.FINANCE, UserRole.EMPLOYEE),
+  createServiceProxy(VENDOR_INVENTORY_SERVICE_URL),
+);
+app.post(
+  '/i/service/contracts',
+  authMiddleware,
+  requireServiceRole(['SERVICE_HELP_DESK']),
+  createServiceProxy(VENDOR_INVENTORY_SERVICE_URL),
+);
+app.get(
+  '/i/service/contracts',
+  authMiddleware,
+  requireServiceRole(['SERVICE_HELP_DESK', 'SERVICE_TECHNICIAN']),
+  createServiceProxy(VENDOR_INVENTORY_SERVICE_URL),
+);
+app.get(
+  '/i/service/contracts/:id',
+  authMiddleware,
+  requireServiceRole(['SERVICE_HELP_DESK', 'SERVICE_TECHNICIAN']),
+  createServiceProxy(VENDOR_INVENTORY_SERVICE_URL),
+);
+app.put(
+  '/i/service/contracts/:id',
+  authMiddleware,
+  requireServiceRole(['SERVICE_HELP_DESK']),
+  createServiceProxy(VENDOR_INVENTORY_SERVICE_URL),
+);
+app.delete(
+  '/i/service/contracts/:id',
+  authMiddleware,
+  requireServiceRole(['SERVICE_HELP_DESK']),
+  createServiceProxy(VENDOR_INVENTORY_SERVICE_URL),
+);
+app.post(
+  '/b/service-quotation',
+  authMiddleware,
+  requireServiceRole(['SERVICE_TECHNICIAN']),
+  createServiceProxy(BILLING_SERVICE_URL),
+);
+
+// Barcode scan and print endpoints with explicit role checks at the Gateway
+app.get(
+  '/i/inventory/scan',
+  authMiddleware,
+  requireRole(UserRole.ADMIN, UserRole.FINANCE, UserRole.MANAGER, UserRole.EMPLOYEE),
+  createServiceProxy(VENDOR_INVENTORY_SERVICE_URL),
+);
+app.get(
+  '/i/inventory/products/barcode-pdf',
+  authMiddleware,
+  requireRole(UserRole.ADMIN, UserRole.MANAGER),
+  createServiceProxy(VENDOR_INVENTORY_SERVICE_URL),
+);
+app.get(
+  '/i/inventory/spare-parts/barcode-pdf',
+  authMiddleware,
+  requireRole(UserRole.ADMIN, UserRole.MANAGER),
+  createServiceProxy(VENDOR_INVENTORY_SERVICE_URL),
+);
+
 app.use('/i', createServiceProxy(VENDOR_INVENTORY_SERVICE_URL));
 app.use('/b', createServiceProxy(BILLING_SERVICE_URL));
 app.use('/c', createServiceProxy(CRM_SERVICE_URL));

@@ -46,6 +46,9 @@ import {
   retakeQuotationAssignment,
   bulkRetakeQuotationAssignments,
   getEmployeeAssignedQuotations,
+  updateStatus,
+  deleteInvoice,
+  getAuditLogs,
 } from '../controllers/invoiceController';
 
 /**
@@ -300,10 +303,16 @@ router.post('/', requireRole(UserRole.EMPLOYEE), createInvoice);
  */
 router.post('/direct-sale', requireRole(UserRole.EMPLOYEE), createDirectSale);
 
-/**
- * Update the details of a price estimate (Quotation).
- */
 router.put('/:id', requireRole(UserRole.EMPLOYEE), updateQuotation);
+
+/**
+ * Update the status of an invoice or quotation.
+ */
+router.put(
+  '/:id/status',
+  requireRole(UserRole.ADMIN, UserRole.FINANCE, UserRole.MANAGER, UserRole.EMPLOYEE),
+  updateStatus,
+);
 
 // --- Manager Quotation Template & Assignment System ---
 router.post(
@@ -379,6 +388,20 @@ router.get(
   '/:id',
   requireRole(UserRole.ADMIN, UserRole.FINANCE, UserRole.MANAGER, UserRole.EMPLOYEE),
   getInvoiceById,
+);
+
+/**
+ * Delete a specific invoice or template.
+ */
+router.delete('/:id', requireRole(UserRole.MANAGER, UserRole.ADMIN), deleteInvoice);
+
+/**
+ * Get audit logs for an invoice/contract.
+ */
+router.get(
+  '/audit-logs/:entityId',
+  requireRole(UserRole.MANAGER, UserRole.FINANCE, UserRole.ADMIN),
+  getAuditLogs,
 );
 
 export default router;

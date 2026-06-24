@@ -14,6 +14,8 @@ import {
   ChevronDown,
   RotateCcw,
   FilePlus2,
+  Eye,
+  Pencil,
 } from 'lucide-react';
 import { formatCurrency } from '@/lib/format';
 import { toast } from 'sonner';
@@ -51,11 +53,14 @@ import {
   bulkRetakeQuotationAssignments,
   deleteInvoice,
   Invoice,
+  InvoiceItem,
   CreateInvoicePayload,
+  updateQuotation,
 } from '@/lib/invoice';
 import { getAllEmployees, Employee } from '@/lib/employee';
 import { usePagination } from '@/hooks/usePagination';
 import Pagination from '@/components/Pagination';
+import { QuotationViewDialog } from '../../employeeComponents/QuotationViewDialog';
 
 // ─── Status Badge ─────────────────────────────────────────────────────────────
 
@@ -155,11 +160,34 @@ export default function ManagerQuotationTemplateTable() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loadingEmployees, setLoadingEmployees] = useState(false);
   const [selectedEmployeeIds, setSelectedEmployeeIds] = useState<string[]>([]);
+  const [initialEmployeeIds, setInitialEmployeeIds] = useState<string[]>([]);
+  const [activeAssignments, setActiveAssignments] = useState<
+    Array<{
+      id: string;
+      employeeId: string;
+      assignedAt: string;
+      assignedBy: string;
+      cloneId: string | null;
+      customerId: string | null;
+      status: string;
+    }>
+  >([]);
 
   // Drill-down State
   const [expandedTemplateId, setExpandedTemplateId] = useState<string | null>(null);
   const [assignments, setAssignments] = useState<TemplateAssignment[]>([]);
   const [loadingAssignments, setLoadingAssignments] = useState(false);
+
+  // View / Edit Modal States
+  const [viewDialogOpen, setViewDialogOpen] = useState(false);
+  const [viewingTemplate, setViewingTemplate] = useState<Invoice | null>(null);
+  const [editTemplateOpen, setEditTemplateOpen] = useState(false);
+  const [editingTemplate, setEditingTemplate] = useState<Invoice | null>(null);
+
+  // Delete Modal States
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [templateIdToDelete, setTemplateIdToDelete] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const [search, setSearch] = useState('');
 
@@ -204,23 +232,70 @@ export default function ManagerQuotationTemplateTable() {
     }
   };
 
-  const handleOpenAssignModal = (template: Invoice) => {
+  const handleOpenAssignModal = async (template: Invoice) => {
     setSelectedTemplate(template);
     setSelectedEmployeeIds([]);
+    setInitialEmployeeIds([]);
+    setActiveAssignments([]);
     setAssignModalOpen(true);
     fetchEmployees();
+
+    try {
+      const data = await getTemplateAssignments(template.id);
+      const assignmentsTyped = data as unknown as Array<{
+        id: string;
+        employeeId: string;
+        assignedAt: string;
+        assignedBy: string;
+        cloneId: string | null;
+        customerId: string | null;
+        status: string;
+      }>;
+      const active = assignmentsTyped.filter(
+        (asg) =>
+          asg.status && !['RETAKEN', 'DELETED', 'SUPERSEDED'].includes(asg.status.toUpperCase()),
+      );
+      const activeIds = active.map((asg) => asg.employeeId);
+      setSelectedEmployeeIds(activeIds);
+      setInitialEmployeeIds(activeIds);
+      setActiveAssignments(assignmentsTyped);
+    } catch (err) {
+      console.error('Failed to fetch assignments:', err);
+    }
   };
 
   const handleAssignSubmit = async () => {
     if (!selectedTemplate) return;
-    if (selectedEmployeeIds.length === 0) {
-      toast.error('Please select at least one employee.');
-      return;
-    }
 
     try {
-      await assignQuotationTemplate(selectedTemplate.id, selectedEmployeeIds);
-      toast.success('Template assigned to employees successfully.');
+      const toAssign = selectedEmployeeIds.filter((id) => !initialEmployeeIds.includes(id));
+      const toRetake = initialEmployeeIds.filter((id) => !selectedEmployeeIds.includes(id));
+
+      if (toAssign.length === 0 && toRetake.length === 0) {
+        toast.info('No changes made to assignments.');
+        setAssignModalOpen(false);
+        return;
+      }
+
+      // 1. Assign new employees
+      if (toAssign.length > 0) {
+        await assignQuotationTemplate(selectedTemplate.id, toAssign);
+      }
+
+      // 2. Retake (unassign) unselected employees
+      for (const empId of toRetake) {
+        const asg = activeAssignments.find(
+          (a) =>
+            a.employeeId === empId &&
+            a.status &&
+            !['DELETED', 'RETAKEN', 'SUPERSEDED'].includes(a.status.toUpperCase()),
+        );
+        if (asg && asg.cloneId) {
+          await retakeQuotationAssignment(asg.cloneId);
+        }
+      }
+
+      toast.success('Template assignments updated successfully.');
       setAssignModalOpen(false);
       // Refresh assignments if expanded
       if (expandedTemplateId === selectedTemplate.id) {
@@ -228,7 +303,7 @@ export default function ManagerQuotationTemplateTable() {
       }
     } catch (error: unknown) {
       const err = error as { response?: { data?: { message?: string } } };
-      toast.error(err.response?.data?.message || 'Failed to assign template.');
+      toast.error(err.response?.data?.message || 'Failed to update template assignments.');
     }
   };
 
@@ -278,18 +353,28 @@ export default function ManagerQuotationTemplateTable() {
     }
   };
 
-  const handleDeleteTemplate = async (templateId: string) => {
-    if (!confirm('Are you sure you want to delete this template?')) return;
+  const promptDeleteTemplate = (templateId: string) => {
+    setTemplateIdToDelete(templateId);
+    setDeleteConfirmOpen(true);
+  };
+
+  const handleDeleteTemplate = async () => {
+    if (!templateIdToDelete) return;
+    setIsDeleting(true);
     try {
-      await deleteInvoice(templateId);
+      await deleteInvoice(templateIdToDelete);
       toast.success('Template deleted successfully.');
       fetchTemplates();
-      if (expandedTemplateId === templateId) {
+      if (expandedTemplateId === templateIdToDelete) {
         setExpandedTemplateId(null);
       }
+      setDeleteConfirmOpen(false);
+      setTemplateIdToDelete(null);
     } catch (error: unknown) {
       const err = error as { response?: { data?: { message?: string } } };
       toast.error(err.response?.data?.message || 'Failed to delete template.');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -345,6 +430,20 @@ export default function ManagerQuotationTemplateTable() {
     } catch (error: unknown) {
       const err = error as { response?: { data?: { message?: string } } };
       toast.error(err.response?.data?.message || 'Failed to create template.');
+    }
+  };
+
+  const handleEditSubmit = async (payload: CreateInvoicePayload) => {
+    if (!editingTemplate) return;
+    try {
+      await updateQuotation(editingTemplate.id, payload);
+      fetchTemplates();
+      setEditTemplateOpen(false);
+      setEditingTemplate(null);
+      toast.success('Quotation template updated successfully.');
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { message?: string } } };
+      toast.error(err.response?.data?.message || 'Failed to update template.');
     }
   };
 
@@ -465,17 +564,41 @@ export default function ManagerQuotationTemplateTable() {
                           <Button
                             variant="outline"
                             size="sm"
+                            onClick={() => {
+                              setViewingTemplate(q);
+                              setViewDialogOpen(true);
+                            }}
+                            className="h-8 text-xs font-bold text-slate-600 border-slate-200 hover:bg-background hover:text-slate-600 gap-1"
+                          >
+                            <Eye size={12} />
+                            View
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
                             onClick={() => handleOpenAssignModal(q)}
-                            className="h-8 text-xs font-bold text-primary border-primary/20 hover:bg-primary/5 gap-1"
+                            className="h-8 text-xs font-bold text-primary border-primary/20 hover:bg-background hover:text-primary gap-1"
                           >
                             <UserPlus size={12} />
                             Assign
                           </Button>
                           <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setEditingTemplate(q);
+                              setEditTemplateOpen(true);
+                            }}
+                            className="h-8 text-xs font-bold text-amber-600 border-amber-200 hover:bg-background hover:text-amber-600 gap-1"
+                          >
+                            <Pencil size={12} />
+                            Edit
+                          </Button>
+                          <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => handleDeleteTemplate(q.id)}
-                            className="h-8 w-8 p-0 text-red-500 hover:text-red-600 hover:bg-red-50"
+                            onClick={() => promptDeleteTemplate(q.id)}
+                            className="h-8 w-8 p-0 text-red-500 hover:bg-transparent hover:text-red-500"
                             title="Delete Template"
                           >
                             <Trash2 className="h-4 w-4" />
@@ -676,6 +799,67 @@ export default function ManagerQuotationTemplateTable() {
       {formOpen && (
         <QuotationTemplateFormModal onClose={() => setFormOpen(false)} onConfirm={handleCreate} />
       )}
+
+      {viewDialogOpen && viewingTemplate && (
+        <QuotationViewDialog
+          quotation={viewingTemplate}
+          onClose={() => {
+            setViewDialogOpen(false);
+            setViewingTemplate(null);
+          }}
+        />
+      )}
+
+      {editTemplateOpen && editingTemplate && (
+        <QuotationTemplateFormModal
+          template={editingTemplate}
+          onClose={() => {
+            setEditTemplateOpen(false);
+            setEditingTemplate(null);
+          }}
+          onConfirm={handleEditSubmit}
+        />
+      )}
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <DialogContent className="sm:max-w-md bg-white border border-slate-100 rounded-xl shadow-lg p-6 flex flex-col gap-4">
+          <div className="flex items-center gap-3 text-red-600">
+            <div className="h-10 w-10 shrink-0 rounded-full bg-red-50 flex items-center justify-center">
+              <Trash2 className="h-5 w-5" />
+            </div>
+            <div>
+              <DialogTitle className="text-base font-bold text-slate-800">
+                Delete Quotation Template
+              </DialogTitle>
+              <DialogDescription className="text-xs text-slate-500 mt-0.5">
+                This action cannot be undone. Are you sure you want to delete this template?
+              </DialogDescription>
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-3 pt-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setDeleteConfirmOpen(false);
+                setTemplateIdToDelete(null);
+              }}
+              disabled={isDeleting}
+              className="text-xs font-bold uppercase tracking-wider text-slate-500 border-slate-200"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleDeleteTemplate}
+              disabled={isDeleting}
+              className="bg-red-600 hover:bg-red-700 text-white font-bold text-xs uppercase tracking-wider px-6 gap-1"
+            >
+              {isDeleting ? 'Deleting...' : 'Yes, Delete'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -739,39 +923,141 @@ interface SaleItem {
 function QuotationTemplateFormModal({
   onClose,
   onConfirm,
+  template,
 }: {
   onClose: () => void;
   onConfirm: (data: CreateInvoicePayload) => Promise<void>;
+  template?: Invoice;
 }) {
-  const [step, setStep] = useState<1 | 2>(1);
-  const [activeCategory, setActiveCategory] = useState<'SALE' | 'RENT' | 'LEASE' | null>(null);
+  const [step, setStep] = useState<1 | 2>(template ? 2 : 1);
+  const [activeCategory, setActiveCategory] = useState<'SALE' | 'RENT' | 'LEASE' | null>(() => {
+    if (template) {
+      if (template.saleType === 'PRODUCT_SALE' || template.saleType === 'SALE') return 'SALE';
+      return template.saleType as 'RENT' | 'LEASE';
+    }
+    return null;
+  });
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [selectedLayoutCategory, setSelectedLayoutCategory] = useState<string | null>('product');
-  const [selectedLayoutStyle, setSelectedLayoutStyle] = useState<string | null>('normal');
+  const [selectedLayoutCategory, setSelectedLayoutCategory] = useState<string | null>(() => {
+    if (template?.layoutId) {
+      return template.layoutId.split(':')[0] || 'product';
+    }
+    return 'product';
+  });
+  const [selectedLayoutStyle, setSelectedLayoutStyle] = useState<string | null>(() => {
+    if (template?.layoutId) {
+      return template.layoutId.split(':')[1] || 'normal';
+    }
+    return 'normal';
+  });
 
   // ── SALE state ──────────────────────────────────────────────────────────
-  const [saleItems, setSaleItems] = useState<SaleItem[]>([]);
-  const [notes, setNotes] = useState('');
+  const [saleItems, setSaleItems] = useState<SaleItem[]>(() => {
+    if (template?.items) {
+      return template.items.map((it: InvoiceItem) => {
+        const bwSlabs = (it.bwSlabRanges || []).map((s) => ({
+          from: s.from !== undefined ? String(s.from) : '',
+          to: s.to !== undefined ? String(s.to) : '',
+          rate: s.rate !== undefined ? String(s.rate) : '',
+        }));
+        const colorSlabs = (it.colorSlabRanges || []).map((s) => ({
+          from: s.from !== undefined ? String(s.from) : '',
+          to: s.to !== undefined ? String(s.to) : '',
+          rate: s.rate !== undefined ? String(s.rate) : '',
+        }));
+        const comboSlabs = (it.comboSlabRanges || []).map((s) => ({
+          from: s.from !== undefined ? String(s.from) : '',
+          to: s.to !== undefined ? String(s.to) : '',
+          rate: s.rate !== undefined ? String(s.rate) : '',
+        }));
+
+        const isManual = !it.productId;
+
+        return {
+          description: it.description || '',
+          quantity: it.quantity || 1,
+          basePrice: it.unitPrice || 0,
+          unitPrice: (it.unitPrice || 0) - (it.discount || 0),
+          discount: it.discount || 0,
+          maxDiscount: 0,
+          isManual,
+          productId: it.productId,
+          modelId: it.modelId,
+          itemType: it.itemType === 'SPAREPART' ? 'SPAREPART' : 'PRODUCT',
+          isEditable: isManual || !it.productId || it.unitPrice === 0,
+          bwIncludedLimit: it.bwIncludedLimit,
+          colorIncludedLimit: it.colorIncludedLimit,
+          combinedIncludedLimit: it.combinedIncludedLimit,
+          bwExcessRate: it.bwExcessRate,
+          colorExcessRate: it.colorExcessRate,
+          combinedExcessRate: it.combinedExcessRate,
+          bwSlabRanges: bwSlabs,
+          colorSlabRanges: colorSlabs,
+          comboSlabRanges: comboSlabs,
+        };
+      });
+    }
+    return [];
+  });
+  const [notes, setNotes] = useState(template?.notes || '');
   const [validDays] = useState(30);
 
   // ── RENT state ──────────────────────────────────────────────────────────
-  const [rentType, setRentType] = useState('FIXED_LIMIT');
-  const [rentPeriod, setRentPeriod] = useState('MONTHLY');
-  const [monthlyRent, setMonthlyRent] = useState('');
-  const [advanceAmount] = useState('');
-  const [discountPercent, setDiscountPercent] = useState('');
-  const [durationMonths, setDurationMonths] = useState('12');
+  const [rentType, setRentType] = useState<string>(template?.rentType || 'FIXED_LIMIT');
+  const [rentPeriod, setRentPeriod] = useState<string>(template?.rentPeriod || 'MONTHLY');
+  const [monthlyRent, setMonthlyRent] = useState(
+    template?.monthlyRent !== undefined && template?.monthlyRent !== null
+      ? String(template.monthlyRent)
+      : '',
+  );
+  const [advanceAmount, setAdvanceAmount] = useState(
+    template?.advanceAmount !== undefined && template?.advanceAmount !== null
+      ? String(template.advanceAmount)
+      : '',
+  );
+  const [discountPercent, setDiscountPercent] = useState(
+    template?.discountPercent !== undefined && template?.discountPercent !== null
+      ? String(template.discountPercent)
+      : '',
+  );
+  const [durationMonths, setDurationMonths] = useState(() => {
+    if (template?.effectiveFrom && template?.effectiveTo) {
+      const from = new Date(template.effectiveFrom);
+      const to = new Date(template.effectiveTo);
+      const months = Math.round((to.getTime() - from.getTime()) / (1000 * 60 * 60 * 24 * 30.4375));
+      return String(months || 12);
+    }
+    return '12';
+  });
 
   // ── LEASE state ─────────────────────────────────────────────────────────
-  const [leaseType, setLeaseType] = useState<'EMI' | 'FSM'>('EMI');
-  const [leaseTenureMonths, setLeaseTenureMonths] = useState('12');
-  const [totalLeaseAmount, setTotalLeaseAmount] = useState('');
-  const [monthlyEmiAmount, setMonthlyEmiAmount] = useState('');
+  const [leaseType, setLeaseType] = useState<string>(template?.leaseType || 'EMI');
+  const [leaseTenureMonths, setLeaseTenureMonths] = useState(
+    template?.leaseTenureMonths !== undefined && template?.leaseTenureMonths !== null
+      ? String(template.leaseTenureMonths)
+      : '12',
+  );
+  const [totalLeaseAmount, setTotalLeaseAmount] = useState(
+    template?.totalLeaseAmount !== undefined && template?.totalLeaseAmount !== null
+      ? String(template.totalLeaseAmount)
+      : '',
+  );
+  const [monthlyEmiAmount, setMonthlyEmiAmount] = useState(
+    template?.monthlyEmiAmount !== undefined && template?.monthlyEmiAmount !== null
+      ? String(template.monthlyEmiAmount)
+      : '',
+  );
   const [lastEditedLease, setLastEditedLease] = useState<'TOTAL' | 'PERIODIC'>('TOTAL');
 
   // ── SECURITY DEPOSIT state ──────────────────────────────────────────────
-  const [securityDepositAmount, setSecurityDepositAmount] = useState('');
-  const [securityDepositMode, setSecurityDepositMode] = useState<'CASH' | 'CHEQUE'>('CASH');
+  const [securityDepositAmount, setSecurityDepositAmount] = useState(
+    template?.securityDepositAmount !== undefined && template?.securityDepositAmount !== null
+      ? String(template.securityDepositAmount)
+      : '',
+  );
+  const [securityDepositMode, setSecurityDepositMode] = useState<string>(
+    template?.securityDepositMode || 'CASH',
+  );
 
   // ── Auto-Calculators ───────────────────────────────────────────────────
   const getPeriodsForRent = (period: string, duration: number) => {
@@ -836,15 +1122,7 @@ function QuotationTemplateFormModal({
       itemType: 'PRODUCT' | 'SPAREPART' = 'PRODUCT';
 
     const pr = item as Product;
-    const brand = pr.brand || pr.model?.brandRelation?.name || '';
-    const modelName = pr.model?.model_name || pr.model?.model_no || '';
-    const productName = pr.name || '';
-
-    description = `${brand} ${modelName} ${productName}`.trim().replace(/\s+/g, ' ');
-
-    if (!description) {
-      description = pr.description || pr.model?.description || 'Product';
-    }
+    description = pr.name || pr.description || pr.model?.description || 'Product';
 
     basePrice = pr.sale_price || 0;
     maxDiscount = pr.max_discount_amount || 0;
@@ -910,12 +1188,21 @@ function QuotationTemplateFormModal({
       if (field === 'quantity') {
         item.quantity = Math.max(1, Number(val));
       } else if (field === 'discount') {
-        const disc = Math.max(0, Number(val));
+        let disc = Math.max(0, Number(val));
+        if (item.maxDiscount > 0 && disc > item.maxDiscount) {
+          toast.warning(`Maximum discount allowed is QAR ${item.maxDiscount}`);
+          disc = item.maxDiscount;
+        }
+        if (disc > item.basePrice) {
+          toast.error('Discount cannot exceed price');
+          disc = item.basePrice;
+        }
         item.discount = disc;
         item.unitPrice = item.basePrice - disc;
       } else if (field === 'basePrice' && item.isEditable) {
-        item.basePrice = Number(val);
-        item.unitPrice = Number(val) - item.discount;
+        const bp = Number(val);
+        item.basePrice = bp;
+        item.unitPrice = bp - item.discount;
       } else {
         (item as unknown as Record<string, string | number>)[field as string] = val;
       }
@@ -1093,7 +1380,7 @@ function QuotationTemplateFormModal({
           })),
         }));
       } else if (activeCategory === 'LEASE') {
-        payload.leaseType = leaseType;
+        payload.leaseType = leaseType as 'EMI' | 'FSM';
         payload.leaseTenureMonths = Number(leaseTenureMonths);
         payload.totalLeaseAmount = Number(totalLeaseAmount);
 
@@ -1104,6 +1391,7 @@ function QuotationTemplateFormModal({
 
         if (securityDepositAmount) {
           payload.securityDepositAmount = Number(securityDepositAmount);
+          payload.advanceAmount = Number(securityDepositAmount);
           payload.securityDepositMode =
             securityDepositMode as NonNullable<CreateInvoicePayload>['securityDepositMode'];
         }
@@ -1158,10 +1446,12 @@ function QuotationTemplateFormModal({
       <DialogContent className="sm:max-w-4xl max-h-[92vh] flex flex-col bg-white border border-slate-100 rounded-xl shadow-lg p-6 overflow-hidden">
         <DialogHeader>
           <DialogTitle className="text-xl font-bold text-slate-800">
-            Create Quotation Template
+            {template ? 'Edit Quotation Template' : 'Create Quotation Template'}
           </DialogTitle>
           <DialogDescription className="text-xs text-slate-500">
-            Configure product-focused template quotation without attaching customer info
+            {template
+              ? 'Update the details and items of your quotation template'
+              : 'Configure product-focused template quotation without attaching customer info'}
           </DialogDescription>
         </DialogHeader>
 
@@ -1520,7 +1810,7 @@ function QuotationTemplateFormModal({
             {(activeCategory === 'RENT' || activeCategory === 'LEASE') && (
               <div className="space-y-3 bg-slate-50 p-4 rounded-xl border border-slate-100">
                 <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-500">
-                  Required Security Deposit
+                  Advance / Caution Deposit
                 </h4>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">
@@ -1528,7 +1818,11 @@ function QuotationTemplateFormModal({
                     <Input
                       type="number"
                       value={securityDepositAmount}
-                      onChange={(e) => setSecurityDepositAmount(e.target.value)}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setSecurityDepositAmount(val);
+                        setAdvanceAmount(val);
+                      }}
                       placeholder="e.g. 1000"
                       className="text-xs h-9 bg-white"
                     />

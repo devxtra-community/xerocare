@@ -5,11 +5,14 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { createInvoice, CreateInvoicePayload } from '@/lib/invoice';
 import { CustomerSelect, SelectableCustomer } from './CustomerSelect';
 import { ProductSelect, SelectableItem } from './ProductSelect';
+import { Product } from '@/lib/product';
+import { SparePart } from '@/lib/spare-part';
 import { formatCurrency } from '@/lib/format';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Trash2, Receipt, Users, Package, Save, ArrowLeft } from 'lucide-react';
+import { Trash2, Receipt, Users, Package, Save, ArrowLeft, Scan } from 'lucide-react';
 import { toast } from 'sonner';
+import api from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Table,
@@ -25,6 +28,8 @@ interface InvoiceItemRow {
   description: string;
   quantity: number;
   unitPrice: number;
+  productId?: string;
+  sparePartId?: string;
 }
 
 /**
@@ -41,19 +46,24 @@ export default function InvoiceForm() {
   const [customer, setCustomer] = useState<SelectableCustomer | undefined>();
   const [items, setItems] = useState<InvoiceItemRow[]>([]);
   const [loading, setLoading] = useState(false);
+  const [scanQuery, setScanQuery] = useState('');
 
   const addItem = (item: SelectableItem) => {
     let description = '';
     let unitPrice = 0;
+    let productId: string | undefined = undefined;
+    let sparePartId: string | undefined = undefined;
 
     if ('part_name' in item) {
       // It's a SparePart
       description = item.part_name;
       unitPrice = Number(item.base_price) || 0;
+      sparePartId = item.id;
     } else {
       // It's a Product
       description = item.name;
       unitPrice = item.sale_price || 0;
+      productId = item.id;
     }
 
     const newItem: InvoiceItemRow = {
@@ -61,9 +71,51 @@ export default function InvoiceForm() {
       description,
       quantity: 1,
       unitPrice,
+      productId,
+      sparePartId,
     };
     setItems([...items, newItem]);
     toast.info(`Added ${description}`);
+  };
+
+  const handleBarcodeScan = async (code: string) => {
+    try {
+      const response = await api.get(`/i/inventory/scan?code=${code}`);
+      const { type, item, warning } = response.data;
+
+      if (warning) {
+        toast.warning(warning);
+      }
+
+      if (type === 'PRODUCT') {
+        const pr = item as Product;
+        const exists = items.some((si) => si.productId === pr.id);
+        if (exists) {
+          toast.warning(`Product "${pr.name}" (SN: ${pr.serial_no}) has already been added.`);
+          return;
+        }
+        addItem(pr);
+      } else if (type === 'SPARE_PART') {
+        const sp = item as SparePart;
+        const existingIndex = items.findIndex((si) => si.sparePartId === sp.id);
+        if (existingIndex > -1) {
+          setItems(
+            items.map((it, idx) =>
+              idx === existingIndex ? { ...it, quantity: it.quantity + 1 } : it,
+            ),
+          );
+          toast.success(`Incremented quantity for "${sp.part_name || 'Spare Part'}"`);
+        } else {
+          addItem(sp);
+        }
+      }
+    } catch (err: unknown) {
+      toast.error('Scan failed', {
+        description:
+          (err as { response?: { data?: { message?: string } } }).response?.data?.message ||
+          (err as Error).message,
+      });
+    }
   };
 
   const updateItem = (id: string, field: keyof InvoiceItemRow, value: string | number) => {
@@ -189,11 +241,50 @@ export default function InvoiceForm() {
                 <Package size={14} /> Add Inventory
               </CardTitle>
             </CardHeader>
-            <CardContent className="pt-6">
-              <ProductSelect onSelect={addItem} />
-              <p className="text-[10px] text-slate-400 mt-3 font-medium leading-relaxed">
-                Search for products by name or SKU. Selected items will be added to the invoice
-                table on the right.
+            <CardContent className="pt-6 space-y-4">
+              {/* Barcode Scanner Input */}
+              <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 shadow-inner space-y-2">
+                <label className="text-[10px] font-bold text-slate-500 uppercase flex items-center gap-1.5 pl-0.5">
+                  <Scan size={12} className="text-primary animate-pulse" /> Scan Barcode
+                </label>
+                <div className="flex gap-2">
+                  <Input
+                    type="text"
+                    placeholder="Scan barcode ID (e.g. XC-P-...) and Enter..."
+                    value={scanQuery}
+                    onChange={(e) => setScanQuery(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        if (scanQuery.trim()) {
+                          handleBarcodeScan(scanQuery.trim());
+                          setScanQuery('');
+                        }
+                      }
+                    }}
+                    className="bg-white rounded-lg border-slate-200 h-9 text-xs"
+                  />
+                  <Button
+                    type="button"
+                    onClick={() => {
+                      if (scanQuery.trim()) {
+                        handleBarcodeScan(scanQuery.trim());
+                        setScanQuery('');
+                      }
+                    }}
+                    className="rounded-lg h-9 px-3 shrink-0 text-xs font-bold"
+                  >
+                    Scan
+                  </Button>
+                </div>
+              </div>
+
+              <div className="w-full">
+                <ProductSelect onSelect={addItem} />
+              </div>
+              <p className="text-[10px] text-slate-400 font-medium leading-relaxed">
+                Scan barcode or search for items by name/SKU. Selected items will be added to the
+                invoice table on the right.
               </p>
             </CardContent>
           </Card>

@@ -42,7 +42,7 @@ export function InvoiceAccountView({ invoiceId, onClose, open }: InvoiceAccountV
   const [remarks, setRemarks] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  const fetchSummary = async () => {
+  const fetchSummary = React.useCallback(async () => {
     try {
       setLoading(true);
       const data = await getAccountSummary(invoiceId);
@@ -53,14 +53,14 @@ export function InvoiceAccountView({ invoiceId, onClose, open }: InvoiceAccountV
     } finally {
       setLoading(false);
     }
-  };
+  }, [invoiceId]);
 
   useEffect(() => {
     if (open && invoiceId) {
       fetchSummary();
       setShowForm(false);
     }
-  }, [open, invoiceId, fetchSummary]); // Fixed missing dependency warning
+  }, [open, invoiceId, fetchSummary]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

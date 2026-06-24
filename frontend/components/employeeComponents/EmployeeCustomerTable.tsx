@@ -24,6 +24,7 @@ import {
   CreateCustomerData,
 } from '@/lib/customer';
 import CustomerFormDialog from './CustomerFormDialog';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { toast } from 'sonner';
 
 /**
@@ -83,15 +84,26 @@ export default function EmployeeCustomerTable() {
     setDialogOpen(true);
   };
 
-  const handleDeleteCustomer = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this customer?')) return;
+  // Delete States
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deletingCustomerId, setDeletingCustomerId] = useState<string | null>(null);
+
+  const handleDeleteClick = (id: string) => {
+    setDeletingCustomerId(id);
+    setDeleteOpen(true);
+  };
+
+  const executeDeleteCustomer = async () => {
+    if (!deletingCustomerId) return;
     try {
-      await deleteCustomer(id);
+      await deleteCustomer(deletingCustomerId);
       toast.success('Customer deleted successfully');
       fetchCustomers();
     } catch (error) {
       console.error(error);
       toast.error('Failed to delete customer');
+    } finally {
+      setDeleteOpen(false);
     }
   };
 
@@ -255,7 +267,7 @@ export default function EmployeeCustomerTable() {
                           variant="ghost"
                           size="icon"
                           className="h-8 w-8 text-muted-foreground hover:text-red-600 hover:bg-red-50"
-                          onClick={() => handleDeleteCustomer(customer.id)}
+                          onClick={() => handleDeleteClick(customer.id)}
                           title="Delete Customer"
                         >
                           <Trash2 className="h-4 w-4" />
@@ -285,6 +297,16 @@ export default function EmployeeCustomerTable() {
         onOpenChange={setDialogOpen}
         customer={selectedCustomer}
         onSubmit={handleFormSubmit}
+      />
+
+      <ConfirmDialog
+        isOpen={deleteOpen}
+        onClose={() => setDeleteOpen(false)}
+        title="Delete Customer"
+        description="Are you sure you want to delete this customer? This action cannot be undone."
+        type="destructive"
+        confirmText="Delete Customer"
+        onConfirm={executeDeleteCustomer}
       />
     </div>
   );

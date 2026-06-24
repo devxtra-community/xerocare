@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
+import { Modal } from '@/components/ui/Modal';
 import { Search, Loader2, Eye, Coins } from 'lucide-react';
 import {
   Table,
@@ -38,6 +39,31 @@ export default function EmployeeOrdersTable({
   const [search, setSearch] = useState('');
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
+
+  // Custom Rejection States
+  const [rejectOpen, setRejectOpen] = useState(false);
+  const [rejectReason, setRejectReason] = useState('');
+  const [rejectingInvoiceId, setRejectingInvoiceId] = useState<string | null>(null);
+
+  const handleRejectClick = (invoiceId: string) => {
+    setRejectingInvoiceId(invoiceId);
+    setRejectReason('');
+    setRejectOpen(true);
+  };
+
+  const handleConfirmReject = async () => {
+    if (!rejectingInvoiceId || !rejectReason.trim()) return;
+    try {
+      const { financeRejectInvoice } = await import('@/lib/invoice');
+      await financeRejectInvoice(rejectingInvoiceId, rejectReason.trim());
+      toast.success('Order Rejected');
+      setRejectOpen(false);
+      setDetailsOpen(false);
+      window.location.reload();
+    } catch {
+      toast.error('Failed to reject');
+    }
+  };
 
   const { page, limit, total, setPage, setTotal, totalPages } = usePagination(10);
 
@@ -119,7 +145,8 @@ export default function EmployeeOrdersTable({
     return items.reduce((sum, item) => sum + (item.quantity || 0), 0);
   };
 
-  const getCleanCustomerName = (name: string) => {
+  const getCleanCustomerName = (name: string | null | undefined) => {
+    if (!name) return 'N/A';
     // Remove color/type information that might be appended to the name
     // e.g., "John Doe (Color)" -> "John Doe"
     return name.split('(')[0].trim();
@@ -402,24 +429,44 @@ export default function EmployeeOrdersTable({
           onReject={
             mode === 'FINANCE' && selectedInvoice.status === 'PENDING'
               ? async () => {
-                  // In QuotationViewDialog, we might need a reason, but let's match simple reject for now
-                  // or I'll add a simple reason prompt
-                  const reason = prompt('Enter rejection reason:');
-                  if (!reason) return;
-                  try {
-                    const { financeRejectInvoice } = await import('@/lib/invoice');
-                    await financeRejectInvoice(selectedInvoice.id, reason);
-                    toast.success('Order Rejected');
-                    setDetailsOpen(false);
-                    window.location.reload();
-                  } catch {
-                    toast.error('Failed to reject');
-                  }
+                  handleRejectClick(selectedInvoice.id);
                 }
               : undefined
           }
         />
       )}
+
+      <Modal isOpen={rejectOpen} onClose={() => setRejectOpen(false)} title="Reject Order">
+        <div className="space-y-4">
+          <p className="text-xs text-slate-500">
+            Please enter a reason for rejecting this order. The sales representative will see this
+            reason.
+          </p>
+          <Input
+            placeholder="Rejection Reason"
+            value={rejectReason}
+            onChange={(e) => setRejectReason(e.target.value)}
+            className="w-full text-xs"
+          />
+          <div className="flex items-center justify-end gap-2 pt-2">
+            <Button
+              variant="outline"
+              onClick={() => setRejectOpen(false)}
+              className="h-9 text-xs px-4"
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleConfirmReject}
+              disabled={!rejectReason.trim()}
+              className="h-9 text-xs px-4 font-bold"
+            >
+              Reject Order
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

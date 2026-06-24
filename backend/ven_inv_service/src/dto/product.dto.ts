@@ -20,6 +20,8 @@ export interface AddProductDTO {
   description?: string;
   features?: { subHeading: string; description: string }[];
   hs_code?: string;
+  warranty?: string;
+  consumables?: { partName: string; description: string; yield: string; price: string }[];
 }
 
 export interface BulkProductRow {
@@ -43,4 +45,6 @@ export interface BulkProductRow {
   description?: string;
   features?: { subHeading: string; description: string }[];
   hs_code?: string;
+  warranty?: string;
+  consumables?: { partName: string; description: string; yield: string; price: string }[];
 }

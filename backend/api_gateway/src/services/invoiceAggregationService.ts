@@ -13,7 +13,24 @@ const CRM_SERVICE_URL = process.env.CRM_SERVICE_URL || 'http://127.0.0.1:3005';
 type InvoiceType = 'QUOTATION' | 'PROFORMA' | 'FINAL';
 type RentType = 'FIXED_LIMIT' | 'FIXED_COMBO' | 'CPC' | 'CPC_COMBO';
 type RentPeriod = 'MONTHLY' | 'QUARTERLY' | 'HALF_YEARLY' | 'YEARLY';
-type InvoiceStatus = 'DRAFT' | 'SENT' | 'APPROVED' | 'REJECTED' | 'ISSUED' | 'PAID' | 'CANCELLED';
+type InvoiceStatus =
+  | 'TEMPLATE'
+  | 'ASSIGNED'
+  | 'DRAFT'
+  | 'SENT'
+  | 'CUSTOMER_ACCEPTED'
+  | 'CUSTOMER_REJECTED'
+  | 'EMPLOYEE_APPROVED'
+  | 'WAITING_FINANCE_APPROVAL'
+  | 'FINANCE_APPROVED'
+  | 'FINANCE_REJECTED'
+  | 'ACTIVE_CONTRACT'
+  | 'INVOICED'
+  | 'PAID'
+  | 'EXPIRED'
+  | 'CANCELLED'
+  | 'RETAKEN'
+  | 'SUPERSEDED';
 
 interface CollectionAlert {
   contractId: string;
@@ -98,10 +115,10 @@ interface Invoice {
 interface AggregatedInvoice extends Invoice {
   employeeName: string;
   branchName: string;
-  customerName: string;
-  customerPhone?: string;
-  customerEmail?: string;
-  customerAddress?: string;
+  customerName: string | null;
+  customerPhone?: string | null;
+  customerEmail?: string | null;
+  customerAddress?: string | null;
 }
 
 const employeeCache = new Map<string, { name: string; timestamp: number }>();
@@ -109,7 +126,13 @@ const branchCache = new Map<string, { name: string; timestamp: number }>();
 
 const customerCache = new Map<
   string,
-  { name: string; phone?: string; email?: string; address?: string; timestamp: number }
+  {
+    name: string | null;
+    phone?: string | null;
+    email?: string | null;
+    address?: string | null;
+    timestamp: number;
+  }
 >();
 const CACHE_TTL = 10 * 60 * 1000; // 5 minutes
 
@@ -141,8 +164,13 @@ const fetchCustomerDetails = async (
   id: string | undefined,
   url: string,
   token: string,
-): Promise<{ name: string; phone?: string; email?: string; address?: string }> => {
-  const defaultRes = { name: 'Walk-in Customer', phone: 'N/A', email: '' };
+): Promise<{
+  name: string | null;
+  phone?: string | null;
+  email?: string | null;
+  address?: string | null;
+}> => {
+  const defaultRes = { name: null, phone: null, email: null, address: null };
   if (!id) return defaultRes;
 
   // Check Local Cache
@@ -638,16 +666,7 @@ export class InvoiceAggregationService {
    */
   async updateQuotation(
     id: string,
-    payload: {
-      rentType?: RentType;
-      rentPeriod?: RentPeriod;
-      monthlyRent?: number;
-      advanceAmount?: number;
-      discountPercent?: number;
-      effectiveFrom?: string;
-      effectiveTo?: string;
-      pricingItems?: unknown[];
-    },
+    payload: Record<string, unknown>,
     token: string,
   ): Promise<AggregatedInvoice> {
     try {
@@ -1733,6 +1752,66 @@ export class InvoiceAggregationService {
         );
       }
       throw new AppError('Internal Gateway Error while fetching assigned quotations', 500);
+    }
+  }
+
+  async updateStatus(id: string, status: string, token: string) {
+    try {
+      const response = await axios.put<{ data: Invoice }>(
+        `${BILLING_SERVICE_URL}/invoices/${id}/status`,
+        { status },
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
+      return response.data.data;
+    } catch (error: unknown) {
+      if (axios.isAxiosError(error)) {
+        logger.error('Axios error in update status', {
+          message: error.message,
+          responseStatus: error.response?.status,
+          responseData: error.response?.data,
+        });
+        throw new AppError(
+          error.response?.data?.message || 'Failed to update status',
+          error.response?.status || 500,
+        );
+      }
+      throw new AppError('Internal Gateway Error during status update', 500);
+    }
+  }
+
+  async deleteInvoice(id: string, token: string) {
+    try {
+      const response = await axios.delete(`${BILLING_SERVICE_URL}/invoices/${id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      return response.data;
+    } catch (error: unknown) {
+      if (axios.isAxiosError(error)) {
+        throw new AppError(
+          error.response?.data?.message || 'Failed to delete template',
+          error.response?.status || 500,
+        );
+      }
+      throw new AppError('Internal Gateway Error during deletion', 500);
+    }
+  }
+
+  async getAuditLogs(entityId: string, token: string) {
+    try {
+      const response = await axios.get(`${BILLING_SERVICE_URL}/invoices/audit-logs/${entityId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      return response.data;
+    } catch (error: unknown) {
+      if (axios.isAxiosError(error)) {
+        throw new AppError(
+          error.response?.data?.message || 'Failed to fetch audit logs',
+          error.response?.status || 500,
+        );
+      }
+      throw new AppError('Internal Gateway Error during audit logs fetch', 500);
     }
   }
 }

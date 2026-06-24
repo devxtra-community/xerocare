@@ -1,4 +1,4 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, DeleteDateColumn } from 'typeorm';
 import { Invoice } from './invoiceEntity';
 import { ItemType } from './enums/itemType';
 
@@ -75,11 +75,17 @@ export class InvoiceItem {
   @Column({ type: 'varchar', nullable: true })
   serialNumber?: string;
 
-  @Column({ type: 'uuid', nullable: true })
+  @Column({ type: 'varchar', nullable: true })
   modelId?: string;
+
+  @Column({ type: 'varchar', nullable: true })
+  warranty?: string;
 
   @ManyToOne(() => Invoice, (invoice) => invoice.items, {
     onDelete: 'CASCADE',
   })
   invoice!: Invoice;
+
+  @DeleteDateColumn()
+  deletedAt?: Date;
 }

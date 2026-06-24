@@ -6,7 +6,7 @@ import DashboardHeader from '@/components/DashboardHeader';
 export default function ManagerLayout({ children }: { children: React.ReactNode }) {
   return (
     <SidebarProvider>
-      <div className="flex min-h-screen w-full">
+      <div className="flex min-h-screen w-full" suppressHydrationWarning>
         <ManagerSidebar />
 
         <SidebarInset className="bg-background min-h-screen w-full flex flex-col">

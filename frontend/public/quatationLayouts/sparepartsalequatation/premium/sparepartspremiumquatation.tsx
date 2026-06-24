@@ -2,7 +2,8 @@ import React from 'react';
 
 export interface QuotationLineItem {
   brand: string;
-  modelNo: string;
+  modelNo?: string;
+  modelName?: string;
   slNo: string;
   description: string;
   qty: number;
@@ -14,6 +15,8 @@ export interface QuotationLineItem {
   productName?: string;
   discount?: number;
   mpn?: string;
+  warranty?: string;
+  features?: { subHeading: string; description: string }[];
 }
 
 export interface SparePartsPremiumQuotationProps {
@@ -519,6 +522,33 @@ const SparePartsPremiumQuotation: React.FC<SparePartsPremiumQuotationProps> = ({
                         Product Description
                       </div>
                       {item.description}
+                      {item.warranty && (
+                        <div
+                          style={{
+                            marginTop: '8px',
+                            fontSize: '12px',
+                            color: textColor,
+                            fontWeight: '400',
+                            textTransform: 'uppercase',
+                          }}
+                        >
+                          <span style={{ color: '#ff4d4d', fontWeight: '700' }}>Warranty: </span>
+                          {(() => {
+                            const parts = item.warranty.split(' ');
+                            if (parts.length >= 2) {
+                              return (
+                                <>
+                                  <span style={{ color: '#ff4d4d' }}>
+                                    {parts[0]} {parts[1]}
+                                  </span>
+                                  <span> {parts.slice(2).join(' ')}</span>
+                                </>
+                              );
+                            }
+                            return <span style={{ color: '#ff4d4d' }}>{item.warranty}</span>;
+                          })()}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </td>
@@ -582,10 +612,10 @@ const SparePartsPremiumQuotation: React.FC<SparePartsPremiumQuotationProps> = ({
                 borderBottom: '1px solid rgba(255,255,255,0.1)',
               }}
             >
-              <span style={{ color: mutedText, fontWeight: '700', fontSize: '11px' }}>
+              <span style={{ color: mutedText, fontWeight: '400', fontSize: '11px' }}>
                 SUB TOTAL
               </span>
-              <span style={{ fontWeight: '700' }}>QAR {fmt(totals.subTotal)}</span>
+              <span style={{ fontWeight: '400' }}>QAR {fmt(totals.subTotal)}</span>
             </div>
             <div
               style={{
@@ -596,8 +626,8 @@ const SparePartsPremiumQuotation: React.FC<SparePartsPremiumQuotationProps> = ({
                 color: '#f87171',
               }}
             >
-              <span style={{ fontWeight: '700', fontSize: '11px' }}>DISCOUNT</span>
-              <span style={{ fontWeight: '700' }}>- QAR {fmt(totals.discountTotal || 0)}</span>
+              <span style={{ fontWeight: '400', fontSize: '11px' }}>DISCOUNT</span>
+              <span style={{ fontWeight: '400' }}>- QAR {fmt(totals.discountTotal || 0)}</span>
             </div>
 
             <div

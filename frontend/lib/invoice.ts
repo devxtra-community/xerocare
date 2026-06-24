@@ -4,6 +4,7 @@ export interface InvoiceItem {
   id?: string;
   itemType?: 'PRICING_RULE' | 'PRODUCT' | 'SPAREPART';
   description: string;
+  warranty?: string;
   // Fixed
   bwIncludedLimit?: number;
   colorIncludedLimit?: number;
@@ -31,18 +32,88 @@ export interface InvoiceItem {
   initialColorA3Count?: number;
 }
 
+export type InvoiceStatus =
+  | 'TEMPLATE'
+  | 'ASSIGNED'
+  | 'DRAFT'
+  | 'SENT'
+  | 'CUSTOMER_ACCEPTED'
+  | 'CUSTOMER_REJECTED'
+  | 'EMPLOYEE_APPROVED'
+  | 'WAITING_FINANCE_APPROVAL'
+  | 'FINANCE_APPROVED'
+  | 'FINANCE_REJECTED'
+  | 'ACTIVE_CONTRACT'
+  | 'ACTIVE_LEASE'
+  | 'PARTIAL'
+  | 'INVOICED'
+  | 'PAID'
+  | 'EXPIRED'
+  | 'CANCELLED'
+  | 'RETAKEN'
+  | 'SUPERSEDED'
+  | 'REJECTED'
+  | 'SENT_TO_CUSTOMER'
+  | 'PENDING'
+  | 'TRANSACTION_COMPLETED'
+  | 'VALIDITY_EXTENSION_REQUESTED'
+  | 'FINAL'
+  | 'APPROVED'
+  | 'ACCEPTED'
+  | 'PENDING_CONFIRMATION'
+  | 'ISSUED'
+  | 'OPEN'
+  | 'FREE_SERVICE'
+  | 'DIAGNOSED'
+  | 'QUOTED'
+  | 'REFUNDED';
+
+export interface CreditNoteRecord {
+  id: string;
+  creditNoteNo: string;
+  invoiceId: string;
+  invoiceNumber: string;
+  customerId: string;
+  customerName: string;
+  branchId: string;
+  productId: string;
+  productName: string;
+  modelName: string;
+  brand: string;
+  serialNumber?: string;
+  productAmount: number;
+  type: 'DIRECT_REFUND' | 'REPLACEMENT' | 'CREDIT_EXCHANGE';
+  status: 'DRAFT' | 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED' | 'COMPLETED' | 'PRODUCT_REPLACED';
+  sellerEmployeeId: string;
+  notes?: string;
+  financeNote?: string;
+  damageReason?: string;
+  rejectionReason?: string;
+  paymentMode?: string;
+  replacementProductId?: string;
+  replacementProductName?: string;
+  replacementSerialNumber?: string;
+  replacementAmount?: number;
+  replacementDiscount?: number;
+  createdAt?: string;
+  updatedAt?: string;
+  invoice?: Invoice;
+}
+
 export interface Invoice {
   id: string;
   invoiceNumber: string;
   branchId: string;
-  customerId: string;
+  customerId: string | null;
   createdBy: string;
   totalAmount: number;
-  status: string;
+  status: InvoiceStatus;
   contractStatus?: 'PENDING_CONFIRMATION' | 'ACTIVE' | 'COMPLETED' | 'CANCELLED';
   contractConfirmationUrl?: string;
   emailSentAt?: string;
   type?: 'QUOTATION' | 'PROFORMA' | 'FINAL';
+  billType?: string;
+  serviceTicketId?: string;
   saleType: string;
   layoutId?: string;
   layout_id?: string;
@@ -78,6 +149,7 @@ export interface Invoice {
   securityDepositMode?: 'CASH' | 'CHEQUE' | 'UPI' | 'BANK_TRANSFER';
   securityDepositReference?: string;
   securityDepositReceivedDate?: string;
+  securityDepositBank?: string;
 
   // Audit Fields
   employeeApprovedBy?: string;
@@ -103,6 +175,27 @@ export interface Invoice {
   displayAmount?: number; // Backend aggregated lifetime total
   usageRevenue?: number; // Sum of all recorded EMIs/UsageRecords
   invoiceHistory?: Invoice[];
+  creditNotes?: Array<{
+    id: string;
+    creditNoteNo: string;
+    type: string;
+    status: string;
+    productAmount: number;
+    replacementAmount?: number;
+    replacementDiscount: number;
+    productName: string;
+    modelName: string;
+    brand: string;
+    serialNumber?: string;
+    replacementProductId?: string;
+    replacementProductName?: string;
+    replacementSerialNumber?: string;
+    notes?: string;
+    damageReason?: string;
+    financeNote?: string;
+    paymentMode?: string;
+    createdAt?: string;
+  }>;
   productAllocations?: Array<{
     id: string;
     productId: string;
@@ -122,6 +215,16 @@ export interface Invoice {
     endTimestamp?: string;
   }>;
 }
+
+export interface CreateCreditNotePayload {
+  invoiceId: string;
+  productId: string;
+  productAmount: number;
+  type: 'DIRECT_REFUND' | 'REPLACEMENT' | 'CREDIT_EXCHANGE';
+  notes?: string;
+}
+
+export type UpdateCreditNotePayload = Partial<CreateCreditNotePayload>;
 
 export interface UsageRecord {
   id: string;
@@ -234,6 +337,7 @@ export interface CreateInvoicePayload {
     itemType?: 'PRODUCT' | 'PRICING_RULE' | 'SPAREPART';
     productId?: string;
     modelId?: string;
+    warranty?: string;
   }[];
   startDate?: string;
   endDate?: string;
@@ -465,6 +569,22 @@ export const getBranchSalesTotals = async (
   const url = year
     ? `/b/invoices/sales/branch-totals?year=${year}`
     : '/b/invoices/sales/branch-totals';
+  const response = await api.get(url);
+  return response.data.data;
+};
+
+/**
+ * Retrieves daily/weekly sales trend data for the current branch.
+ * @param period Time range e.g. '1M', '1Y'
+ * @param year Optional year to filter by
+ */
+export const getBranchSalesOverview = async (
+  period: string = '1Y',
+  year?: number,
+): Promise<{ date: string; saleType: string; totalSales: number }[]> => {
+  const url = year
+    ? `/b/invoices/sales/branch-overview?period=${period}&year=${year}`
+    : `/b/invoices/sales/branch-overview?period=${period}`;
   const response = await api.get(url);
   return response.data.data;
 };
@@ -867,6 +987,14 @@ export const requestValidityExtension = async (id: string): Promise<Invoice> => 
 };
 
 /**
+ * Retrieves pending service estimates waiting for finance approval.
+ */
+export const getPendingServiceEstimates = async (): Promise<Invoice[]> => {
+  const response = await api.get('/b/invoices?billType=SERVICE&status=WAITING_FINANCE_APPROVAL');
+  return response.data.data;
+};
+
+/**
  * Finance approves a quotation pricing or validity extension.
  */
 export const financeApproveQuotation = async (
@@ -979,5 +1107,24 @@ export const getEmployeeAssignedQuotations = async (): Promise<Invoice[]> => {
  */
 export const deleteInvoice = async (id: string): Promise<unknown> => {
   const response = await api.delete(`/b/invoices/${id}`);
+  return response.data.data;
+};
+
+export interface AuditLog {
+  id: string;
+  entityId: string;
+  action: string;
+  performedBy: string;
+  oldValue?: string;
+  newValue?: string;
+  details?: string;
+  createdAt: string;
+}
+
+/**
+ * Fetch audit logs for a specific entity ID.
+ */
+export const getAuditLogs = async (entityId: string): Promise<AuditLog[]> => {
+  const response = await api.get(`/b/audit-logs/${entityId}`);
   return response.data.data;
 };

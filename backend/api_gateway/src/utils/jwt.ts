@@ -11,5 +11,6 @@ export const verifyAccessToken = (token: string) => {
     userId: string;
     role: string;
     branchId?: string;
+    employeeJob?: string;
   };
 };

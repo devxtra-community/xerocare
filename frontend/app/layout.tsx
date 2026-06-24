@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from 'next/font/google';
 import './globals.css';
 import { ToasterProvider } from '@/components/ToasterProvider';
 import QueryProvider from '@/components/QueryProvider';
+import { ToastProvider } from '@/components/ui/ToastProvider';
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -38,8 +39,10 @@ export default function RootLayout({
         {/* Helper Tools: These work in the background to handle data (Query) 
             and show pop-up notifications (Toaster) to the user. */}
         <QueryProvider>
-          {children}
-          <ToasterProvider />
+          <ToastProvider>
+            {children}
+            <ToasterProvider />
+          </ToastProvider>
         </QueryProvider>
       </body>
     </html>

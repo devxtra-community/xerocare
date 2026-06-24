@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Loader2, ArrowRightLeft, Send, Mail, Phone } from 'lucide-react';
+import { Loader2, ArrowRightLeft, Send, Mail, Phone, Copy } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
@@ -20,6 +20,7 @@ import RentPremiumQuotation from '../../public/quatationLayouts/rentquatation/pr
 import LeaseNormalQuotation from '../../public/quatationLayouts/leasequatation/normal/leasenormalquatation';
 import LeaseStandardQuotation from '../../public/quatationLayouts/leasequatation/standerd/leasestanterdquatation';
 import LeasePremiumQuotation from '../../public/quatationLayouts/leasequatation/premium/leasepremiumqutation';
+import ReturnInvoiceLayout from '../../public/quatationLayouts/ReturnInvoiceLayout';
 import {
   Invoice,
   sendEmailNotification,
@@ -31,20 +32,24 @@ import { toast } from 'sonner';
 interface ProductMeta {
   brandRelation?: { name?: string };
   brand?: string;
-  model?: { model_name?: string; id?: string; description?: string };
+  model?: { model_name?: string; model_no?: string; id?: string; description?: string };
   model_name?: string;
   model_no?: string;
   serial_no?: string;
+  serialNo?: string;
   imageUrl?: string;
   image_url?: string;
   mpn?: string;
   name?: string;
+  product_name?: string;
   part_name?: string;
   description?: string;
+  warranty?: string;
   features?: { subHeading: string; description: string }[];
   yield?: string;
   inventory?: { description?: string }[];
   image?: string;
+  sku?: string;
 }
 
 interface QuotationViewDialogProps {
@@ -55,6 +60,7 @@ interface QuotationViewDialogProps {
   onReject?: () => void;
   onStatusChange?: (status: string) => Promise<void>;
   onConvertSuccess?: () => void;
+  onCreateNewFromExisting?: (id: string) => void;
   showDistribution?: boolean;
 }
 
@@ -66,16 +72,23 @@ export function QuotationViewDialog({
   onReject,
   onStatusChange,
   onConvertSuccess,
+  onCreateNewFromExisting,
   showDistribution = false,
 }: QuotationViewDialogProps) {
   const [sending, setSending] = useState(false);
   const [isSendingCustomer, setIsSendingCustomer] = useState(false);
   const [isRequestingExtension, setIsRequestingExtension] = useState(false);
   const [productDetails, setProductDetails] = useState<Record<string, ProductMeta>>({});
+  const [showingOriginalInvoice, setShowingOriginalInvoice] = useState(false);
   const router = useRouter();
 
+  const returnCreditNote = quotation.creditNotes?.find((cn) => cn.status === 'PRODUCT_REPLACED');
+  const isReturnInvoice = !!returnCreditNote;
+
   const isExpired = quotation.effectiveTo ? new Date() > new Date(quotation.effectiveTo) : false;
-  const isExtensionRequested = quotation.status === 'VALIDITY_EXTENSION_REQUESTED';
+  const isExtensionRequested =
+    quotation.status === 'VALIDITY_EXTENSION_REQUESTED' ||
+    quotation.status === 'WAITING_FINANCE_APPROVAL';
 
   // We determine if we are in finance view by checking if they can approve/reject, OR if the status is already finalized
 
@@ -137,36 +150,54 @@ export function QuotationViewDialog({
                   const productWithImage = productsForModel.find(
                     (p: { imageUrl?: string; image_url?: string }) => p.imageUrl || p.image_url,
                   );
+                  const productWithDesc = productsForModel.find(
+                    (p: { description?: string }) => p.description && p.description.length > 5,
+                  );
+                  const productWithFeatures = productsForModel.find(
+                    (p: { features?: { subHeading: string; description: string }[] }) =>
+                      p.features && p.features.length > 0,
+                  );
+
+                  const typedM = m as unknown as ProductMeta;
+
                   if (productWithImage) {
-                    const typedM = m as unknown as ProductMeta;
                     typedM.imageUrl =
                       productWithImage.imageUrl ||
                       (productWithImage as { image_url?: string }).image_url;
-                    if (
-                      !typedM.description &&
-                      (productWithImage as { description?: string }).description
-                    ) {
-                      typedM.description = (
-                        productWithImage as { description?: string }
-                      ).description;
+                  }
+
+                  const bestProd = productWithDesc || productWithImage || productsForModel[0];
+                  if (bestProd) {
+                    // Copy name and description from the best available product
+                    if ((bestProd as { name?: string }).name) {
+                      typedM.name = (bestProd as { name?: string }).name;
                     }
-                    if (
-                      (!typedM.features || typedM.features.length === 0) &&
-                      (
-                        productWithImage as {
-                          features?: { subHeading: string; description: string }[];
-                        }
-                      ).features
-                    ) {
-                      typedM.features = (
-                        productWithImage as {
-                          features?: { subHeading: string; description: string }[];
-                        }
-                      ).features;
+                    if ((bestProd as { description?: string }).description) {
+                      const prodDesc = (bestProd as { description?: string }).description || '';
+                      if (!typedM.description || prodDesc.length > typedM.description.length) {
+                        typedM.description = prodDesc;
+                      }
                     }
                   }
+
+                  const featProd = (productWithFeatures || bestProd) as ProductMeta;
+                  if (
+                    featProd &&
+                    (!typedM.features || typedM.features.length === 0) &&
+                    featProd.features
+                  ) {
+                    typedM.features = featProd.features;
+                  }
+
+                  // Add warranty enrichment
+                  const warrantyProd = productsForModel.find(
+                    (p: { warranty?: string }) => p.warranty,
+                  );
+                  if (warrantyProd && !typedM.warranty) {
+                    typedM.warranty = warrantyProd.warranty;
+                  }
                 } catch (e) {
-                  console.error('Failed to fetch product for model image', e);
+                  console.error('Failed to fetch product for model enrichment', e);
                 }
                 details[item.modelId] = m as unknown as ProductMeta;
               }
@@ -604,10 +635,16 @@ export function QuotationViewDialog({
     const hsCodePart = exHS ? `[HS: ${exHS}] ` : '';
 
     return {
-      productName: exPN || item.metadata?.name || item.metadata?.part_name || 'PRODUCT',
+      productName:
+        exPN ||
+        item.metadata?.name ||
+        item.metadata?.product_name ||
+        item.metadata?.part_name ||
+        'PRODUCT',
       brand: exBN || item.metadata?.brandRelation?.name || item.metadata?.brand || 'Xerocare',
-      modelNo: exMN || item.metadata?.model?.model_name || item.metadata?.model_name || 'Generic',
-      slNo: item.allocation?.serialNumber || item.metadata?.serial_no || 'TBD',
+      modelNo: exMN || item.metadata?.model?.model_no || item.metadata?.model_no || 'Generic',
+      modelName: item.metadata?.model?.model_name || item.metadata?.model_name || 'N/A',
+      slNo: item.allocation?.serialNumber || item.sn || item.serialNumber || 'TBD',
       description: (hsCodePart + cleanDesc).trim(),
       features: (item.metadata?.features as { subHeading: string; description: string }[]) || [],
       qty: qty,
@@ -619,6 +656,7 @@ export function QuotationViewDialog({
       discount: disc,
       mpn: item.metadata?.mpn || extractTag('MPN'),
       consumables: consumables,
+      warranty: item.warranty || item.metadata?.warranty || '',
     };
   });
 
@@ -721,10 +759,12 @@ export function QuotationViewDialog({
       const fallbackName = descParts.slice(2).join(' ') || 'PRODUCT';
 
       return {
-        productName: pMeta?.name || fallbackName,
+        productName: pMeta?.name || pMeta?.product_name || fallbackName,
         brand: pMeta?.brandRelation?.name || pMeta?.brand || fallbackBrand,
-        model: pMeta?.model_name || pMeta?.model_no || fallbackModel,
-        slNo: pMeta?.serial_no || item.sn || 'TBD',
+        model: pMeta?.model_no || pMeta?.model_name || fallbackModel,
+        modelName: pMeta?.model_name || 'N/A',
+        modelNo: pMeta?.model_no || fallbackModel,
+        slNo: item.sn || 'TBD',
         description: pMeta?.description || item.description || '',
         features: pMeta?.features || [],
         qty: item.quantity || 1,
@@ -734,6 +774,7 @@ export function QuotationViewDialog({
         bwSlabs: item.bwSlabRanges || [],
         colorSlabs: item.colorSlabRanges || [],
         comboSlabs: item.comboSlabRanges || [],
+        warranty: item.warranty || pMeta?.warranty || '',
       };
     });
 
@@ -800,10 +841,12 @@ export function QuotationViewDialog({
       }
 
       return {
-        productName: pMeta?.name || fallbackName,
+        productName: pMeta?.name || pMeta?.product_name || fallbackName,
         brand: pMeta?.brandRelation?.name || pMeta?.brand || fallbackBrand,
-        model: pMeta?.model_name || pMeta?.model_no || fallbackModel,
-        slNo: pMeta?.serial_no || item.sn || 'TBD',
+        model: pMeta?.model_no || pMeta?.model_name || fallbackModel,
+        modelName: pMeta?.model_name || 'N/A',
+        modelNo: pMeta?.model_no || fallbackModel,
+        slNo: item.sn || 'TBD',
         description: pMeta?.description || item.description || '',
         features: pMeta?.features || [],
         qty: item.quantity || 1,
@@ -815,6 +858,7 @@ export function QuotationViewDialog({
         comboSlabs: item.comboSlabRanges || [],
         productImage: pMeta?.imageUrl,
         discount: item.discount || 0,
+        warranty: pMeta?.warranty || '',
       };
     });
 
@@ -840,15 +884,25 @@ export function QuotationViewDialog({
     totalLeaseValue: isFsmLease
       ? quotation.monthlyLeaseAmount || quotation.totalAmount || 0
       : quotation.totalAmount || 0,
+    notes: quotation.notes,
   };
 
   return (
     <Dialog open onOpenChange={(v) => !v && onClose()}>
-      {useTemplate ? (
-        <DialogContent className="sm:max-w-5xl rounded-none border-none shadow-2xl p-0 overflow-hidden bg-white flex flex-col max-h-[95vh]">
+      {isReturnInvoice && !showingOriginalInvoice ? (
+        <DialogContent className="sm:max-w-5xl rounded-none border-none shadow-sm p-0 overflow-hidden bg-white flex flex-col h-[95vh]">
+          <DialogTitle className="sr-only">Return Invoice</DialogTitle>
+          <ReturnInvoiceLayout
+            invoice={quotation}
+            onClose={onClose}
+            onViewOriginalInvoice={() => setShowingOriginalInvoice(true)}
+          />
+        </DialogContent>
+      ) : useTemplate ? (
+        <DialogContent className="sm:max-w-5xl rounded-none border-none shadow-sm p-0 overflow-hidden bg-white flex flex-col max-h-[95vh]">
           <DialogTitle className="sr-only">Quotation Document</DialogTitle>
           {quotation.status === 'RETAKEN' && (
-            <div className="bg-red-500 text-white font-bold text-xs px-6 py-2.5 flex items-center justify-between shrink-0 border-b border-red-600">
+            <div className="bg-red-500 text-white font-normal text-xs px-6 py-2.5 flex items-center justify-between shrink-0 border-b border-red-600">
               <span className="uppercase tracking-wider">
                 ⚠️ Retaken by Manager — Editing is Locked
               </span>
@@ -1052,10 +1106,10 @@ export function QuotationViewDialog({
           {/* Footer Actions */}
           <div className="px-6 pb-4 pt-4 bg-slate-50 shrink-0 border-t border-slate-200 flex justify-between items-center">
             <div className="flex items-center gap-2 px-3 py-1 bg-white border border-slate-200 rounded-full shadow-sm">
-              <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">
+              <span className="text-[9px] font-normal uppercase tracking-widest text-slate-400">
                 Status:
               </span>
-              <span className="text-[9px] font-black uppercase tracking-widest text-blue-600">
+              <span className="text-[9px] font-normal uppercase tracking-widest text-blue-600">
                 {quotation.status?.replace(/_/g, ' ')}
               </span>
             </div>
@@ -1078,7 +1132,7 @@ export function QuotationViewDialog({
                       size="sm"
                       onClick={() => handleSendCustomer('EMAIL')}
                       disabled={isSendingCustomer}
-                      className="h-9 px-4 rounded-md font-black uppercase text-[11px] tracking-widest border-red-200 text-red-700 hover:bg-red-50 gap-2"
+                      className="h-9 px-4 rounded-md font-normal uppercase text-[11px] tracking-widest border-red-200 text-red-700 hover:bg-red-50 gap-2"
                     >
                       <Mail size={14} /> Gmail
                     </Button>
@@ -1087,7 +1141,7 @@ export function QuotationViewDialog({
                       size="sm"
                       onClick={() => handleSendCustomer('WHATSAPP')}
                       disabled={isSendingCustomer}
-                      className="h-9 px-4 rounded-md font-black uppercase text-[11px] tracking-widest border-green-200 text-emerald-700 hover:bg-green-50 gap-2"
+                      className="h-9 px-4 rounded-md font-normal uppercase text-[11px] tracking-widest border-green-200 text-emerald-700 hover:bg-green-50 gap-2"
                     >
                       <Phone size={14} /> WhatsApp
                     </Button>
@@ -1097,7 +1151,7 @@ export function QuotationViewDialog({
                 variant="ghost"
                 size="sm"
                 onClick={onClose}
-                className="h-9 text-[11px] font-black uppercase tracking-widest text-slate-500 hover:text-red-600"
+                className="h-9 text-[11px] font-normal uppercase tracking-widest text-slate-500 hover:text-red-600"
               >
                 Close
               </Button>
@@ -1108,7 +1162,7 @@ export function QuotationViewDialog({
                     onClick={handleSend}
                     disabled={sending}
                     size="sm"
-                    className="h-9 bg-red-700 hover:bg-red-800 text-white font-black text-[11px] uppercase tracking-widest px-10 gap-2 shadow-lg shadow-red-100 rounded-md ml-2"
+                    className="h-9 bg-red-700 hover:bg-red-800 text-white font-normal text-[11px] uppercase tracking-widest px-10 gap-2 shadow-lg shadow-red-100 rounded-md ml-2"
                   >
                     {sending ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
                     Send to Finance
@@ -1118,10 +1172,10 @@ export function QuotationViewDialog({
           </div>
         </DialogContent>
       ) : (
-        <DialogContent className="sm:max-w-4xl rounded-none border-none shadow-2xl p-0 overflow-hidden bg-white flex flex-col max-h-[90vh]">
+        <DialogContent className="sm:max-w-4xl rounded-none border-none shadow-sm p-0 overflow-hidden bg-white flex flex-col max-h-[90vh]">
           <DialogTitle className="sr-only">Quotation Document</DialogTitle>
           {quotation.status === 'RETAKEN' && (
-            <div className="bg-red-500 text-white font-bold text-xs px-6 py-2.5 flex items-center justify-between shrink-0 border-b border-red-600">
+            <div className="bg-red-500 text-white font-normal text-xs px-6 py-2.5 flex items-center justify-between shrink-0 border-b border-red-600">
               <span className="uppercase tracking-wider">
                 ⚠️ Retaken by Manager — Editing is Locked
               </span>
@@ -1164,23 +1218,23 @@ export function QuotationViewDialog({
                 <div className="grid grid-cols-1 gap-2 flex-grow max-w-[450px]">
                   <div className="flex">
                     <div className="bg-slate-50 border-x border-t border-slate-200 px-8 py-1 rounded-t-lg">
-                      <p className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">
+                      <p className="text-[11px] font-normal text-slate-400 uppercase tracking-[0.2em]">
                         Project
                       </p>
                     </div>
                   </div>
                   <div className="border border-slate-200 rounded-b-2xl rounded-tr-2xl p-4 bg-white shadow-xl flex flex-col gap-1 -mt-[1px]">
-                    <p className="text-[11px] font-black text-slate-400 uppercase tracking-tight">
+                    <p className="text-[11px] font-normal text-slate-400 uppercase tracking-tight">
                       Name/Address
                     </p>
                     <div className="border-l-[4px] border-red-600 pl-4">
-                      <p className="text-xl font-black text-slate-800 uppercase leading-tight tracking-tight">
+                      <p className="text-xl font-normal text-slate-800 uppercase leading-tight tracking-tight">
                         {quotation.customerName || 'N/A'}
                       </p>
-                      <p className="text-xs font-black text-slate-600 uppercase tracking-tight mt-0.5">
+                      <p className="text-xs font-normal text-slate-600 uppercase tracking-tight mt-0.5">
                         {quotation.customerEmail || 'No Email'}
                       </p>
-                      <p className="text-xs font-black text-slate-600 uppercase tracking-tight mt-0.5">
+                      <p className="text-xs font-normal text-slate-600 uppercase tracking-tight mt-0.5">
                         {quotation.customerPhone || 'No Phone'}
                       </p>
                     </div>
@@ -1189,15 +1243,15 @@ export function QuotationViewDialog({
 
                 {/* Right: Quotation Info */}
                 <div className="flex flex-col items-end gap-5 lg:min-w-[320px]">
-                  <h2 className="text-[20px] font-black text-red-700 uppercase tracking-tighter italic mr-4">
+                  <h2 className="text-[20px] font-normal text-red-700 uppercase tracking-tighter italic mr-4">
                     {quotation.saleType
                       ? `${quotation.saleType.replace(/_/g, ' ')} QUOTATION`
                       : 'QUOTATION'}
                   </h2>
                   <div className="flex gap-0 border-2 border-red-700 rounded-3xl overflow-hidden shadow-xl">
                     <div className="bg-red-50/50 border-r-2 border-red-700 px-6 py-2 min-w-[140px] text-center">
-                      <p className="text-[11px] font-black text-red-700 uppercase mb-0">Date</p>
-                      <p className="text-sm font-black text-slate-800">
+                      <p className="text-[11px] font-normal text-red-700 uppercase mb-0">Date</p>
+                      <p className="text-sm font-normal text-slate-800">
                         {new Date(quotation.createdAt)
                           .toLocaleDateString(undefined, {
                             day: '2-digit',
@@ -1208,15 +1262,15 @@ export function QuotationViewDialog({
                       </p>
                     </div>
                     <div className="bg-white px-6 py-2 min-w-[140px] text-center">
-                      <p className="text-[11px] font-black text-red-700 uppercase mb-0">
+                      <p className="text-[11px] font-normal text-red-700 uppercase mb-0">
                         Estimate No.
                       </p>
-                      <p className="text-sm font-black text-slate-800">
+                      <p className="text-sm font-normal text-slate-800">
                         {quotation.invoiceNumber.split('-').pop()}
                       </p>
                     </div>
                   </div>
-                  <div className="flex gap-8 text-[12px] font-black text-slate-600 uppercase tracking-tight mt-1 px-4">
+                  <div className="flex gap-8 text-[12px] font-normal text-slate-600 uppercase tracking-tight mt-1 px-4">
                     <p>
                       Payment Method - <span className="text-red-700">Due on receipt</span>
                     </p>
@@ -1224,11 +1278,11 @@ export function QuotationViewDialog({
                       Rep - <span className="text-red-700">{quotation.employeeName || 'RSHD'}</span>
                     </p>
                   </div>
-                  <div className="flex gap-10 text-[12px] font-black text-slate-600 uppercase tracking-tight px-4">
+                  <div className="flex gap-10 text-[12px] font-normal text-slate-600 uppercase tracking-tight px-4">
                     <span className="opacity-0">Placeholder</span>
                     <p>
                       Due Date{' '}
-                      <span className="text-red-700 ml-8 font-black">
+                      <span className="text-red-700 ml-8 font-normal">
                         {new Date(quotation.createdAt)
                           .toLocaleDateString(undefined, {
                             day: '2-digit',
@@ -1243,49 +1297,63 @@ export function QuotationViewDialog({
               </div>
 
               {/* Brand / Model / Sl No / MPN - Large Row */}
-              <div className="flex justify-center gap-12 py-4 border-b border-slate-100 uppercase overflow-x-auto scrollbar-hide">
-                <div className="flex gap-3 items-center shrink-0">
-                  <span className="text-[11px] font-black text-slate-400 tracking-widest">
+              <div className="flex justify-center gap-10 py-5 border-b border-slate-100 uppercase overflow-x-auto scrollbar-hide bg-slate-50/50 rounded-xl mb-6">
+                <div className="flex flex-col gap-1 shrink-0 px-4">
+                  <span className="text-[10px] font-normal text-slate-400 tracking-widest">
+                    PRODUCT
+                  </span>
+                  <span className="text-sm font-normal text-slate-900 truncate max-w-[150px]">
+                    {enrichedItems[0]?.metadata?.name ||
+                      enrichedItems[0]?.metadata?.product_name ||
+                      enrichedItems[0]?.metadata?.part_name ||
+                      'N/A'}
+                  </span>
+                </div>
+                <div className="flex flex-col gap-1 shrink-0 border-l border-slate-200 pl-6 px-4">
+                  <span className="text-[10px] font-normal text-slate-400 tracking-widest">
                     BRAND
                   </span>
-                  <span className="text-base font-black text-slate-900 leading-none">
+                  <span className="text-sm font-normal text-slate-900">
                     {enrichedItems[0]?.metadata?.brandRelation?.name ||
                       enrichedItems[0]?.metadata?.brand ||
                       'N/A'}
                   </span>
                 </div>
-                <div className="flex gap-3 items-center shrink-0 border-l border-slate-100 pl-8">
-                  <span className="text-[11px] font-black text-slate-400 tracking-widest">
-                    MODEL
+                <div className="flex flex-col gap-1 shrink-0 border-l border-slate-200 pl-6 px-4">
+                  <span className="text-[10px] font-normal text-slate-400 tracking-widest">
+                    MODEL NAME
                   </span>
-                  <span className="text-base font-black text-slate-900 leading-none">
+                  <span className="text-sm font-normal text-slate-900">
                     {enrichedItems[0]?.metadata?.model?.model_name ||
                       enrichedItems[0]?.metadata?.model_name ||
                       'N/A'}
                   </span>
                 </div>
-                <div className="flex gap-3 items-center shrink-0 border-l border-slate-100 pl-8">
-                  <span className="text-[11px] font-black text-slate-400 tracking-widest">
-                    SL NO
+                <div className="flex flex-col gap-1 shrink-0 border-l border-slate-200 pl-6 px-4">
+                  <span className="text-[10px] font-normal text-slate-400 tracking-widest">
+                    MODEL NO
                   </span>
-                  <span className="text-base font-black text-slate-900 leading-none">
-                    {quotation.type === 'QUOTATION'
-                      ? 'TBD UPON DISPATCH'
-                      : enrichedItems[0]?.allocation?.serialNumber ||
-                        enrichedItems[0]?.metadata?.serial_no ||
-                        (!isRent && !isLease ? 'N/A' : 'TBD UPON DISPATCH')}
+                  <span className="text-sm font-normal text-slate-900">
+                    {enrichedItems[0]?.metadata?.model?.model_no ||
+                      enrichedItems[0]?.metadata?.model_no ||
+                      'N/A'}
                   </span>
                 </div>
-                <div className="flex gap-3 items-center shrink-0 border-l border-slate-100 pl-8">
-                  <span className="text-[11px] font-black text-slate-400 tracking-widest">MPN</span>
-                  <span className="text-base font-black text-red-600 leading-none">
-                    {enrichedItems[0]?.metadata?.mpn || 'N/A'}
+                <div className="flex flex-col gap-1 shrink-0 border-l border-slate-200 pl-6 px-4">
+                  <span className="text-[10px] font-normal text-slate-400 tracking-widest">
+                    SL NO
+                  </span>
+                  <span className="text-sm font-normal text-slate-900">
+                    {enrichedItems[0]?.allocation?.serialNumber ||
+                      enrichedItems[0]?.sn ||
+                      enrichedItems[0]?.serialNumber ||
+                      'TBD'}
                   </span>
                 </div>
               </div>
 
               {/* Greeting Section */}
-              <div className="text-[12px] font-black text-slate-800 space-y-2 leading-relaxed opacity-90">
+              <div className="text-[12px] font-normal text-slate-800 space-y-2 leading-relaxed opacity-90">
                 <p>Dear Sir/ Madam</p>
                 <p>Thanks for your valuable inquiry .</p>
                 <p>
@@ -1296,66 +1364,66 @@ export function QuotationViewDialog({
               </div>
 
               {/* Main Items Table */}
-              <div className="space-y-0 text-slate-800 font-bold">
-                <div className="border-[3px] border-red-700 rounded-t-2xl overflow-hidden shadow-2xl bg-white">
+              <div className="space-y-0 text-slate-800 font-normal">
+                <div className="border border-red-700 rounded-t-2xl overflow-hidden shadow-sm bg-white">
                   <table className="w-full">
                     <thead>
                       {isSale && (
-                        <tr className="bg-red-700 text-white">
-                          <th className="text-left py-4 px-8 text-[12px] font-black uppercase tracking-widest border-r border-red-600/40 w-full">
+                        <tr className="bg-transparent text-black border-b border-slate-900">
+                          <th className="text-left py-4 px-8 text-[12px] font-normal uppercase tracking-widest border-r border-red-600/40 w-full">
                             Description
                           </th>
-                          <th className="text-center py-4 px-6 text-[12px] font-black uppercase tracking-widest border-r border-red-600/40">
+                          <th className="text-center py-4 px-6 text-[12px] font-normal uppercase tracking-widest border-r border-red-600/40">
                             Quantity
                           </th>
-                          <th className="text-center py-4 px-6 text-[12px] font-black uppercase tracking-widest border-r border-red-600/40">
+                          <th className="text-center py-4 px-6 text-[12px] font-normal uppercase tracking-widest border-r border-red-600/40">
                             Discount
                           </th>
-                          <th className="text-right py-4 px-8 text-[12px] font-black uppercase tracking-widest border-r border-red-600/40">
+                          <th className="text-right py-4 px-8 text-[12px] font-normal uppercase tracking-widest border-r border-red-600/40">
                             Rate
                           </th>
-                          <th className="text-right py-4 pr-10 text-[12px] font-black uppercase tracking-widest">
+                          <th className="text-right py-4 pr-10 text-[12px] font-normal uppercase tracking-widest">
                             Total
                           </th>
                         </tr>
                       )}
                       {(isRent || isLease) && (
-                        <tr className="bg-red-700 text-white">
-                          <th className="text-left py-4 px-8 text-[12px] font-black uppercase tracking-widest border-r border-red-600/40">
+                        <tr className="bg-transparent text-black border-b border-slate-900">
+                          <th className="text-left py-4 px-8 text-[12px] font-normal uppercase tracking-widest border-r border-red-600/40">
                             MPN
                           </th>
-                          <th className="text-left py-4 px-8 text-[12px] font-black uppercase tracking-widest border-r border-red-600/40">
+                          <th className="text-left py-4 px-8 text-[12px] font-normal uppercase tracking-widest border-r border-red-600/40">
                             Product Name
                           </th>
-                          <th className="text-left py-4 px-8 text-[12px] font-black uppercase tracking-widest border-r border-red-600/40">
+                          <th className="text-left py-4 px-8 text-[12px] font-normal uppercase tracking-widest border-r border-red-600/40">
                             Description
                           </th>
-                          <th className="text-center py-4 px-6 text-[12px] font-black uppercase tracking-widest border-r border-red-600/40">
+                          <th className="text-center py-4 px-6 text-[12px] font-normal uppercase tracking-widest border-r border-red-600/40">
                             Qty
                           </th>
                           {quotation.rentType === 'FIXED_COMBO' ||
                           quotation.rentType === 'CPC_COMBO' ? (
                             <>
-                              <th className="text-center py-4 px-6 text-[12px] font-black uppercase tracking-widest border-r border-red-600/40">
+                              <th className="text-center py-4 px-6 text-[12px] font-normal uppercase tracking-widest border-r border-red-600/40">
                                 Combo Limit
                               </th>
-                              <th className="text-center py-4 pr-10 text-[12px] font-black uppercase tracking-widest">
+                              <th className="text-center py-4 pr-10 text-[12px] font-normal uppercase tracking-widest">
                                 Combo Rate
                               </th>
                             </>
                           ) : quotation.rentType === 'FIXED_FLAT' ? (
-                            <th className="text-center py-4 pr-10 text-[12px] font-black uppercase tracking-widest">
+                            <th className="text-center py-4 pr-10 text-[12px] font-normal uppercase tracking-widest">
                               Billing
                             </th>
                           ) : (
                             <>
-                              <th className="text-center py-4 px-6 text-[12px] font-black uppercase tracking-widest border-r border-red-600/40">
+                              <th className="text-center py-4 px-6 text-[12px] font-normal uppercase tracking-widest border-r border-red-600/40">
                                 B/W Limit
                               </th>
-                              <th className="text-center py-4 px-6 text-[12px] font-black uppercase tracking-widest border-r border-red-600/40">
+                              <th className="text-center py-4 px-6 text-[12px] font-normal uppercase tracking-widest border-r border-red-600/40">
                                 Color Limit
                               </th>
-                              <th className="text-center py-4 pr-10 text-[12px] font-black uppercase tracking-widest">
+                              <th className="text-center py-4 pr-10 text-[12px] font-normal uppercase tracking-widest">
                                 Excess (B/C)
                               </th>
                             </>
@@ -1396,20 +1464,16 @@ export function QuotationViewDialog({
                                   )}
                                   <div className="flex flex-col gap-3">
                                     <div className="space-y-1">
-                                      <p className="text-[12px] font-black text-red-600 uppercase tracking-widest flex items-center gap-2">
-                                        <span className="w-1.5 h-1.5 rounded-full bg-red-600" />
-                                        Product Description
-                                      </p>
-                                      <p className="text-[13px] text-slate-900 leading-relaxed font-black uppercase">
+                                      <p className="text-[13px] text-slate-900 leading-relaxed font-normal uppercase">
                                         {productDesc}
                                       </p>
                                     </div>
 
                                     {/* Features Display if present in description or metadata */}
                                     {detail?.features && (
-                                      <div className="space-y-2 pt-3 border-t border-red-100">
-                                        <p className="text-[12px] font-black text-red-600 uppercase tracking-widest flex items-center gap-2">
-                                          <span className="w-1.5 h-1.5 rounded-full bg-red-600" />
+                                      <div className="space-y-2 pt-3 border-t border-emerald-100">
+                                        <p className="text-[12px] font-normal text-emerald-600 uppercase tracking-widest flex items-center gap-2">
+                                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-600" />
                                           Features
                                         </p>
                                         <div className="grid grid-cols-1 gap-3">
@@ -1421,11 +1485,11 @@ export function QuotationViewDialog({
                                           ).map((f, fi) => (
                                             <div key={fi} className="space-y-1">
                                               {f.subHeading && (
-                                                <p className="text-[14px] font-black text-red-500 uppercase">
+                                                <p className="text-[14px] font-normal text-red-500 uppercase">
                                                   {f.subHeading}
                                                 </p>
                                               )}
-                                              <p className="text-[14px] text-slate-700 font-bold leading-tight">
+                                              <p className="text-[14px] text-slate-700 font-normal leading-tight">
                                                 {f.description}
                                               </p>
                                             </div>
@@ -1436,20 +1500,20 @@ export function QuotationViewDialog({
                                   </div>
                                 </div>
                               </td>
-                              <td className="py-3 px-3 text-center border-r-2 border-red-50 align-top font-black text-slate-900 text-sm">
+                              <td className="py-3 px-3 text-center border-r-2 border-red-50 align-top font-normal text-slate-900 text-sm">
                                 {item.quantity}
                               </td>
                               {isSale && (
                                 <>
-                                  <td className="py-3 px-3 text-center border-r-2 border-red-50 align-top font-black text-slate-900 text-sm">
+                                  <td className="py-3 px-3 text-center border-r-2 border-red-50 align-top font-normal text-slate-900 text-sm">
                                     {item.discount ? `${item.discount}%` : '0%'}
                                   </td>
-                                  <td className="py-3 px-4 text-right border-r-2 border-red-50 align-top font-black text-slate-800 text-sm">
+                                  <td className="py-3 px-4 text-right border-r-2 border-red-50 align-top font-normal text-slate-800 text-sm">
                                     {Number(item.unitPrice || 0).toLocaleString(undefined, {
                                       minimumFractionDigits: 2,
                                     })}
                                   </td>
-                                  <td className="py-3 pr-10 text-right align-top font-black text-slate-900 text-sm whitespace-nowrap">
+                                  <td className="py-3 pr-10 text-right align-top font-normal text-slate-900 text-sm whitespace-nowrap">
                                     {(
                                       (item.quantity || 0) * (item.unitPrice || 0)
                                     ).toLocaleString()}
@@ -1461,26 +1525,26 @@ export function QuotationViewDialog({
                                   {quotation.rentType === 'FIXED_COMBO' ||
                                   quotation.rentType === 'CPC_COMBO' ? (
                                     <>
-                                      <td className="py-3 px-3 text-center border-r-2 border-red-50 align-top font-black text-slate-900 text-sm">
+                                      <td className="py-3 px-3 text-center border-r-2 border-red-50 align-top font-normal text-slate-900 text-sm">
                                         {item.combinedIncludedLimit || 0}
                                       </td>
-                                      <td className="py-3 pr-10 text-center align-top font-black text-slate-900 text-sm whitespace-nowrap">
+                                      <td className="py-3 pr-10 text-center align-top font-normal text-slate-900 text-sm whitespace-nowrap">
                                         {Number(item.combinedExcessRate || 0).toFixed(3)}
                                       </td>
                                     </>
                                   ) : quotation.rentType === 'FIXED_FLAT' ? (
-                                    <td className="py-3 pr-10 text-center align-top font-black text-slate-900 text-sm italic opacity-50">
+                                    <td className="py-3 pr-10 text-center align-top font-normal text-slate-900 text-sm italic opacity-50">
                                       Included
                                     </td>
                                   ) : (
                                     <>
-                                      <td className="py-3 px-3 text-center border-r-2 border-red-50 align-top font-black text-slate-900 text-sm">
+                                      <td className="py-3 px-3 text-center border-r-2 border-red-50 align-top font-normal text-slate-900 text-sm">
                                         {item.bwIncludedLimit || 0}
                                       </td>
-                                      <td className="py-3 px-3 text-center border-r-2 border-red-50 align-top font-black text-slate-900 text-sm">
+                                      <td className="py-3 px-3 text-center border-r-2 border-red-50 align-top font-normal text-slate-900 text-sm">
                                         {item.colorIncludedLimit || 0}
                                       </td>
-                                      <td className="py-3 pr-10 text-center align-top font-black text-slate-900 text-sm whitespace-nowrap">
+                                      <td className="py-3 pr-10 text-center align-top font-normal text-slate-900 text-sm whitespace-nowrap">
                                         {(Number(item.bwExcessRate) || 0).toFixed(3)} /{' '}
                                         {(Number(item.colorExcessRate) || 0).toFixed(3)}
                                       </td>
@@ -1492,12 +1556,12 @@ export function QuotationViewDialog({
                             {item.bwSlabRanges?.length ||
                             item.colorSlabRanges?.length ||
                             item.comboSlabRanges?.length ? (
-                              <tr className="bg-red-50/10 border-b-2 border-red-50">
+                              <tr className="bg-red-50/10 border-b border-red-50">
                                 <td colSpan={7} className="py-3 px-8">
                                   <div className="grid grid-cols-3 gap-6 bg-white p-4 rounded-xl border border-red-100 shadow-[inset_0_2px_10px_rgba(0,0,0,0.02)]">
                                     {item.bwSlabRanges && item.bwSlabRanges.length > 0 && (
                                       <div>
-                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 border-b-2 border-red-50 pb-1">
+                                        <p className="text-[10px] font-normal text-slate-400 uppercase tracking-widest mb-2 border-b border-red-50 pb-1">
                                           Black & White Slabs
                                         </p>
                                         {item.bwSlabRanges.map(
@@ -1507,7 +1571,7 @@ export function QuotationViewDialog({
                                           ) => (
                                             <div
                                               key={sIdx}
-                                              className="flex justify-between text-[11px] font-bold text-slate-700 py-1"
+                                              className="flex justify-between text-[11px] font-normal text-slate-700 py-1"
                                             >
                                               <span>
                                                 {slab.from} - {slab.to || '∞'} copies
@@ -1522,7 +1586,7 @@ export function QuotationViewDialog({
                                     )}
                                     {item.colorSlabRanges && item.colorSlabRanges.length > 0 && (
                                       <div>
-                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 border-b-2 border-red-50 pb-1">
+                                        <p className="text-[10px] font-normal text-slate-400 uppercase tracking-widest mb-2 border-b border-red-50 pb-1">
                                           Color Slabs
                                         </p>
                                         {item.colorSlabRanges.map(
@@ -1532,7 +1596,7 @@ export function QuotationViewDialog({
                                           ) => (
                                             <div
                                               key={sIdx}
-                                              className="flex justify-between text-[11px] font-bold text-slate-700 py-1"
+                                              className="flex justify-between text-[11px] font-normal text-slate-700 py-1"
                                             >
                                               <span>
                                                 {slab.from} - {slab.to || '∞'} copies
@@ -1547,7 +1611,7 @@ export function QuotationViewDialog({
                                     )}
                                     {item.comboSlabRanges && item.comboSlabRanges.length > 0 && (
                                       <div>
-                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 border-b-2 border-red-50 pb-1">
+                                        <p className="text-[10px] font-normal text-slate-400 uppercase tracking-widest mb-2 border-b border-red-50 pb-1">
                                           Combined Slabs
                                         </p>
                                         {item.comboSlabRanges.map(
@@ -1557,7 +1621,7 @@ export function QuotationViewDialog({
                                           ) => (
                                             <div
                                               key={sIdx}
-                                              className="flex justify-between text-[11px] font-bold text-slate-700 py-1"
+                                              className="flex justify-between text-[11px] font-normal text-slate-700 py-1"
                                             >
                                               <span>
                                                 {slab.from} - {slab.to || '∞'} copies
@@ -1589,15 +1653,15 @@ export function QuotationViewDialog({
                     <div className="mt-12 px-10 pt-10 border-t-4 border-double border-slate-100 bg-slate-50/30 rounded-t-[3rem]">
                       <div className="flex items-center justify-between mb-8">
                         <div>
-                          <h3 className="text-2xl font-black text-slate-800 uppercase tracking-tighter">
+                          <h3 className="text-2xl font-normal text-slate-800 uppercase tracking-tighter">
                             Replacement Consumables
                           </h3>
-                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">
+                          <p className="text-[10px] font-normal text-slate-400 uppercase tracking-widest mt-1">
                             Supplementary Price List for Associated Products
                           </p>
                         </div>
                         <div className="bg-blue-600 px-4 py-1.5 rounded-full">
-                          <p className="text-[10px] font-black text-white uppercase tracking-widest">
+                          <p className="text-[10px] font-normal text-white uppercase tracking-widest">
                             Page 02
                           </p>
                         </div>
@@ -1615,31 +1679,31 @@ export function QuotationViewDialog({
                               className="mb-10 animate-in fade-in slide-in-from-bottom-4 duration-500"
                             >
                               <div className="flex items-center gap-4 mb-4 bg-white p-4 rounded-2xl border border-slate-100 shadow-sm leading-tight">
-                                <div className="bg-red-50 text-red-600 p-2.5 rounded-xl font-black text-xs">
+                                <div className="bg-red-50 text-red-600 p-2.5 rounded-xl font-normal text-xs">
                                   #{idx + 1}
                                 </div>
                                 <div>
-                                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                                  <p className="text-[10px] font-normal text-slate-400 uppercase tracking-widest">
                                     Pricing for:
                                   </p>
-                                  <p className="text-sm font-black text-slate-800 uppercase">
+                                  <p className="text-sm font-normal text-slate-800 uppercase">
                                     Product Order associated items
                                   </p>
                                 </div>
                               </div>
 
                               <div className="bg-white rounded-3xl border border-slate-100 shadow-xl overflow-hidden">
-                                <div className="grid grid-cols-12 gap-4 px-6 py-4 bg-slate-800 text-white">
-                                  <div className="col-span-3 text-[9px] font-black uppercase tracking-widest opacity-80">
-                                    Part Name
+                                <div className="grid grid-cols-12 gap-4 px-6 py-4 bg-transparent text-black border-y border-slate-900">
+                                  <div className="col-span-3 text-[9px] font-normal uppercase tracking-widest opacity-80">
+                                    Part Number
                                   </div>
-                                  <div className="col-span-4 text-[9px] font-black uppercase tracking-widest opacity-80">
+                                  <div className="col-span-4 text-[9px] font-normal uppercase tracking-widest opacity-80">
                                     Description
                                   </div>
-                                  <div className="col-span-3 text-[9px] font-black uppercase tracking-widest opacity-80">
+                                  <div className="col-span-3 text-[9px] font-normal uppercase tracking-widest opacity-80">
                                     Yield
                                   </div>
-                                  <div className="col-span-2 text-[9px] font-black uppercase tracking-widest opacity-80 text-right">
+                                  <div className="col-span-2 text-[9px] font-normal uppercase tracking-widest opacity-80 text-right">
                                     Price (QAR)
                                   </div>
                                 </div>
@@ -1654,16 +1718,16 @@ export function QuotationViewDialog({
                                         key={cIdx}
                                         className="grid grid-cols-12 gap-4 px-6 py-4 items-center hover:bg-slate-50/50 transition-colors"
                                       >
-                                        <div className="col-span-3 text-[11px] font-black text-slate-900">
+                                        <div className="col-span-3 text-[11px] font-normal text-slate-900">
                                           {parts[0]}
                                         </div>
-                                        <div className="col-span-4 text-[11px] font-bold text-slate-500 leading-relaxed">
+                                        <div className="col-span-4 text-[11px] font-normal text-slate-500 leading-relaxed">
                                           {parts[1]}
                                         </div>
-                                        <div className="col-span-3 text-[11px] font-bold text-slate-500">
+                                        <div className="col-span-3 text-[11px] font-normal text-slate-500">
                                           {parts[2]}
                                         </div>
-                                        <div className="col-span-2 text-[13px] font-black text-blue-700 text-right">
+                                        <div className="col-span-2 text-[13px] font-normal text-blue-700 text-right">
                                           {Number(parts[3] || 0).toLocaleString(undefined, {
                                             minimumFractionDigits: 2,
                                           })}
@@ -1679,7 +1743,7 @@ export function QuotationViewDialog({
 
                       <div className="mt-8 p-6 bg-blue-50/50 rounded-2xl border border-blue-100/50 border-dashed mb-10">
                         <p className="text-[11px] text-blue-800 leading-relaxed">
-                          <span className="font-black mr-2 uppercase tracking-tight italic">
+                          <span className="font-normal mr-2 uppercase tracking-tight italic">
                             Note:
                           </span>
                           The consumables listed above are supplementary options for the main
@@ -1697,14 +1761,14 @@ export function QuotationViewDialog({
                         variant="outline"
                         onClick={onReject}
                         size="sm"
-                        className="h-10 border-red-200 text-red-600 hover:bg-red-50 font-black text-[11px] uppercase tracking-widest px-8"
+                        className="h-10 border-red-200 text-red-600 hover:bg-red-50 font-normal text-[11px] uppercase tracking-widest px-8"
                       >
                         Reject Order
                       </Button>
                       <Button
                         onClick={onApprove}
                         size="sm"
-                        className="h-10 bg-green-600 hover:bg-green-700 text-white font-black text-[11px] uppercase tracking-widest px-10 shadow-lg shadow-green-100"
+                        className="h-10 bg-green-600 hover:bg-green-700 text-white font-normal text-[11px] uppercase tracking-widest px-10 shadow-lg shadow-green-100"
                       >
                         Approve Order
                       </Button>
@@ -1715,11 +1779,11 @@ export function QuotationViewDialog({
                 {/* Fixed Total Box precisely connected and styled */}
                 {isSale && (
                   <div className="flex justify-end mt-0">
-                    <div className="border-[3px] border-t-0 border-red-700 rounded-b-3xl px-8 py-2 bg-white flex items-center gap-8 shadow-[0_20px_50px_-12px_rgba(185,28,28,0.2)]">
-                      <p className="text-lg font-black text-red-700 uppercase tracking-[0.2em] border-r-2 border-red-100 pr-8 leading-none">
+                    <div className="border border-t-0 border-red-700 rounded-b-3xl px-8 py-2 bg-white flex items-center gap-8 shadow-[0_20px_50px_-12px_rgba(185,28,28,0.2)]">
+                      <p className="text-lg font-normal text-red-700 uppercase tracking-[0.2em] border-r-2 border-red-100 pr-8 leading-none">
                         Total
                       </p>
-                      <p className="text-2xl font-black text-slate-900 leading-none">
+                      <p className="text-2xl font-normal text-slate-900 leading-none">
                         QAR {Number(quotation.totalAmount || 0).toLocaleString()}
                       </p>
                     </div>
@@ -1728,48 +1792,45 @@ export function QuotationViewDialog({
 
                 {isRent && (
                   <div className="flex justify-between items-start mt-0 pl-12 pr-0">
-                    <div className="border-[3px] border-t-0 border-red-700 rounded-b-3xl px-6 py-3 bg-white flex flex-col shadow-[0_20px_50px_-12px_rgba(185,28,28,0.2)] min-w-[500px]">
-                      <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest border-b-2 border-red-50 flex pb-1.5 mb-2">
+                    <div className="border border-t-0 border-red-700 rounded-b-3xl px-6 py-3 bg-white flex flex-col shadow-[0_20px_50px_-12px_rgba(185,28,28,0.2)] min-w-[500px]">
+                      <p className="text-[11px] font-normal text-slate-400 uppercase tracking-widest border-b border-red-50 flex pb-1.5 mb-2">
                         Rent Agreement Details
                       </p>
                       <div className="grid grid-cols-6 gap-4">
                         <div>
-                          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
+                          <p className="text-[9px] font-normal text-slate-400 uppercase tracking-widest">
                             Type
                           </p>
-                          <p className="text-[12px] font-black text-slate-800 uppercase leading-none mt-1">
+                          <p className="text-[12px] font-normal text-slate-800 uppercase leading-none mt-1">
                             {quotation.rentType?.replace('_', ' ') || 'N/A'}
                           </p>
                         </div>
                         <div>
-                          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
+                          <p className="text-[9px] font-normal text-slate-400 uppercase tracking-widest">
                             Period
                           </p>
-                          <p className="text-[12px] font-black text-slate-800 uppercase leading-none mt-1">
+                          <p className="text-[12px] font-normal text-slate-800 uppercase leading-none mt-1">
                             {quotation.rentPeriod?.replace('_', ' ') || 'MONTHLY'}
                           </p>
                         </div>
                         <div>
-                          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
-                            Advance
+                          <p className="text-[9px] font-normal text-slate-400 uppercase tracking-widest">
+                            Advance / Deposit
                           </p>
-                          <p className="text-[12px] font-black text-slate-800 leading-none mt-1">
-                            QAR {(quotation.advanceAmount || 0).toLocaleString()}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
-                            Deposit
-                          </p>
-                          <p className="text-[12px] font-black text-slate-800 leading-none mt-1">
-                            QAR {(quotation.securityDepositAmount || 0).toLocaleString()}
+                          <p className="text-[12px] font-normal text-slate-800 leading-none mt-1">
+                            QAR{' '}
+                            {(
+                              quotation.advanceAmount ||
+                              quotation.securityDepositAmount ||
+                              0
+                            ).toLocaleString()}
                           </p>
                         </div>
                         <div>
-                          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
+                          <p className="text-[9px] font-normal text-slate-400 uppercase tracking-widest">
                             Start Date
                           </p>
-                          <p className="text-[12px] font-black text-slate-800 leading-none mt-1">
+                          <p className="text-[12px] font-normal text-slate-800 leading-none mt-1">
                             {quotation.effectiveFrom
                               ? new Date(quotation.effectiveFrom).toLocaleDateString(undefined, {
                                   day: '2-digit',
@@ -1780,10 +1841,10 @@ export function QuotationViewDialog({
                           </p>
                         </div>
                         <div>
-                          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
+                          <p className="text-[9px] font-normal text-slate-400 uppercase tracking-widest">
                             End Date
                           </p>
-                          <p className="text-[12px] font-black text-slate-800 leading-none mt-1">
+                          <p className="text-[12px] font-normal text-slate-800 leading-none mt-1">
                             {quotation.effectiveTo
                               ? new Date(quotation.effectiveTo).toLocaleDateString(undefined, {
                                   day: '2-digit',
@@ -1795,11 +1856,11 @@ export function QuotationViewDialog({
                         </div>
                       </div>
                     </div>
-                    <div className="border-[3px] border-t-0 border-red-700 rounded-b-3xl px-8 py-2 bg-white flex items-center gap-6 shadow-[0_20px_50px_-12px_rgba(185,28,28,0.2)]">
-                      <p className="text-lg font-black text-red-700 uppercase tracking-[0.1em] border-r-2 border-red-100 pr-6 leading-none">
+                    <div className="border border-t-0 border-red-700 rounded-b-3xl px-8 py-2 bg-white flex items-center gap-6 shadow-[0_20px_50px_-12px_rgba(185,28,28,0.2)]">
+                      <p className="text-lg font-normal text-red-700 uppercase tracking-[0.1em] border-r-2 border-red-100 pr-6 leading-none">
                         Monthly Rent
                       </p>
-                      <p className="text-xl font-black text-slate-900 leading-none">
+                      <p className="text-xl font-normal text-slate-900 leading-none">
                         QAR {Number(quotation.monthlyRent || 0).toLocaleString()}
                       </p>
                     </div>
@@ -1808,48 +1869,45 @@ export function QuotationViewDialog({
 
                 {isLease && (
                   <div className="flex justify-between items-start mt-0 overflow-hidden pl-12 pr-0">
-                    <div className="border-[3px] border-t-0 border-red-700 rounded-b-3xl px-6 py-3 bg-white flex flex-col shadow-[0_20px_50px_-12px_rgba(185,28,28,0.2)] min-w-[500px]">
-                      <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest border-b-2 border-red-50 flex pb-1.5 mb-2">
+                    <div className="border border-t-0 border-red-700 rounded-b-3xl px-6 py-3 bg-white flex flex-col shadow-[0_20px_50px_-12px_rgba(185,28,28,0.2)] min-w-[500px]">
+                      <p className="text-[11px] font-normal text-slate-400 uppercase tracking-widest border-b border-red-50 flex pb-1.5 mb-2">
                         Lease Contract Frame
                       </p>
                       <div className="grid grid-cols-6 gap-4">
                         <div>
-                          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
+                          <p className="text-[9px] font-normal text-slate-400 uppercase tracking-widest">
                             Type
                           </p>
-                          <p className="text-[12px] font-black text-slate-800 uppercase leading-none mt-1">
+                          <p className="text-[12px] font-normal text-slate-800 uppercase leading-none mt-1">
                             {quotation.leaseType || 'EMI'}
                           </p>
                         </div>
                         <div>
-                          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
+                          <p className="text-[9px] font-normal text-slate-400 uppercase tracking-widest">
                             Tenure
                           </p>
-                          <p className="text-[12px] font-black text-slate-800 uppercase leading-none mt-1">
+                          <p className="text-[12px] font-normal text-slate-800 uppercase leading-none mt-1">
                             {quotation.leaseTenureMonths} Months
                           </p>
                         </div>
                         <div>
-                          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
-                            Advance
+                          <p className="text-[9px] font-normal text-slate-400 uppercase tracking-widest">
+                            Advance / Deposit
                           </p>
-                          <p className="text-[12px] font-black text-slate-800 leading-none mt-1">
-                            QAR {(quotation.advanceAmount || 0).toLocaleString()}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
-                            Deposit
-                          </p>
-                          <p className="text-[12px] font-black text-slate-800 leading-none mt-1">
-                            QAR {(quotation.securityDepositAmount || 0).toLocaleString()}
+                          <p className="text-[12px] font-normal text-slate-800 leading-none mt-1">
+                            QAR{' '}
+                            {(
+                              quotation.advanceAmount ||
+                              quotation.securityDepositAmount ||
+                              0
+                            ).toLocaleString()}
                           </p>
                         </div>
                         <div>
-                          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
+                          <p className="text-[9px] font-normal text-slate-400 uppercase tracking-widest">
                             Start Date
                           </p>
-                          <p className="text-[12px] font-black text-slate-800 leading-none mt-1">
+                          <p className="text-[12px] font-normal text-slate-800 leading-none mt-1">
                             {quotation.effectiveFrom
                               ? new Date(quotation.effectiveFrom).toLocaleDateString(undefined, {
                                   day: '2-digit',
@@ -1860,10 +1918,10 @@ export function QuotationViewDialog({
                           </p>
                         </div>
                         <div>
-                          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
+                          <p className="text-[9px] font-normal text-slate-400 uppercase tracking-widest">
                             End Date
                           </p>
-                          <p className="text-[12px] font-black text-slate-800 leading-none mt-1">
+                          <p className="text-[12px] font-normal text-slate-800 leading-none mt-1">
                             {quotation.effectiveTo
                               ? new Date(quotation.effectiveTo).toLocaleDateString(undefined, {
                                   day: '2-digit',
@@ -1875,11 +1933,11 @@ export function QuotationViewDialog({
                         </div>
                       </div>
                     </div>
-                    <div className="border-[3px] border-t-0 border-red-700 rounded-b-3xl px-8 py-2 bg-white flex items-center gap-6 shadow-[0_20px_50px_-12px_rgba(185,28,28,0.2)]">
-                      <p className="text-lg font-black text-red-700 uppercase tracking-[0.1em] border-r-2 border-red-100 pr-6 leading-none">
+                    <div className="border border-t-0 border-red-700 rounded-b-3xl px-8 py-2 bg-white flex items-center gap-6 shadow-[0_20px_50px_-12px_rgba(185,28,28,0.2)]">
+                      <p className="text-lg font-normal text-red-700 uppercase tracking-[0.1em] border-r-2 border-red-100 pr-6 leading-none">
                         {quotation.leaseType === 'FSM' ? 'Monthly Lease' : 'Monthly EMI'}
                       </p>
-                      <p className="text-xl font-black text-slate-900 leading-none">
+                      <p className="text-xl font-normal text-slate-900 leading-none">
                         QAR{' '}
                         {Number(
                           quotation.leaseType === 'FSM'
@@ -1894,18 +1952,15 @@ export function QuotationViewDialog({
 
               {/* Footer Content precisely from reference */}
               <div className="grid grid-cols-2 gap-8 mt-4 pt-4 border-t border-slate-100 px-4">
-                <div className="text-[10px] font-black text-slate-800 space-y-1.5 leading-relaxed opacity-80">
+                <div className="text-[10px] font-normal text-slate-800 space-y-1.5 leading-relaxed opacity-80">
                   <p>Delivery : 7-10 days normal working days , After conformed LPO</p>
                   <p>Payment : CASH or PDC (Management approved for the credit terms)</p>
-                  <p>
-                    Warranty : 30 days in service of the parts , Not covered the of the consumables
-                    items ,
-                  </p>
+
                   <p>
                     Validity : 15 days estimated will valid , If not approved / paid with in 15 days
                     will not be valid , re-estimate will be charged .
                   </p>
-                  <p className="mt-4 font-black text-slate-800 italic leading-relaxed opacity-100">
+                  <p className="mt-4 font-normal text-slate-800 italic leading-relaxed opacity-100">
                     We trust you will find our offer competitive and look forward to hearing from
                     you at the earliest .<br />
                     Thanking you assuring you of our best attention all.
@@ -1914,21 +1969,21 @@ export function QuotationViewDialog({
 
                 <div className="flex flex-col justify-end items-end space-y-6">
                   <div className="text-right">
-                    <p className="text-[11px] font-black text-slate-950 uppercase tracking-widest mb-1 italic">
+                    <p className="text-[11px] font-normal text-slate-950 uppercase tracking-widest mb-1 italic">
                       Customer Sing: ..............................................................
                     </p>
                   </div>
                   <div className="text-right">
-                    <p className="text-[10px] font-black text-slate-900 uppercase tracking-tight opacity-70">
+                    <p className="text-[10px] font-normal text-slate-900 uppercase tracking-tight opacity-70">
                       Best Regards,
                     </p>
-                    <p className="text-[12px] font-black text-red-700 uppercase tracking-tight italic mt-1">
+                    <p className="text-[12px] font-normal text-red-700 uppercase tracking-tight italic mt-1">
                       XEROCARE TRADING & SERVICES WLL
                     </p>
-                    <p className="text-[10px] font-black text-slate-800 uppercase mt-2">
+                    <p className="text-[10px] font-normal text-slate-800 uppercase mt-2">
                       P.O.BOX 37494, DOHA-QATAR
                     </p>
-                    <p className="text-[10px] font-black text-slate-800 uppercase">
+                    <p className="text-[10px] font-normal text-slate-800 uppercase">
                       MOB: 7071 7282
                     </p>
                   </div>
@@ -1953,7 +2008,7 @@ export function QuotationViewDialog({
                       ].map((p) => (
                         <span
                           key={p}
-                          className="text-[10px] font-black uppercase tracking-widest italic text-slate-900 whitespace-nowrap"
+                          className="text-[10px] font-normal uppercase tracking-widest italic text-slate-900 whitespace-nowrap"
                         >
                           {p}
                         </span>
@@ -1969,11 +2024,11 @@ export function QuotationViewDialog({
           <div className="px-6 pb-4 pt-4 bg-slate-50 shrink-0 border-t border-slate-200 mt-0 z-20 flex justify-between items-center">
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-2 px-3 py-1 bg-white border border-slate-200 rounded-full shadow-sm">
-                <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">
+                <span className="text-[9px] font-normal uppercase tracking-widest text-slate-400">
                   Status:
                 </span>
                 <span
-                  className={`text-[9px] font-black uppercase tracking-widest ${
+                  className={`text-[9px] font-normal uppercase tracking-widest ${
                     quotation.status === 'FINANCE_APPROVED' ||
                     [
                       'ACCEPTED',
@@ -1983,7 +2038,9 @@ export function QuotationViewDialog({
                       'TRANSACTION_COMPLETED',
                       'PAID',
                       'ACTIVE_LEASE',
+                      'ACTIVE_CONTRACT',
                       'ISSUED',
+                      'INVOICED',
                     ].includes(quotation.status)
                       ? 'text-emerald-600'
                       : quotation.status === 'FINANCE_REJECTED' ||
@@ -2021,7 +2078,7 @@ export function QuotationViewDialog({
                       size="sm"
                       onClick={() => handleSendCustomer('EMAIL')}
                       disabled={isSendingCustomer}
-                      className="h-9 px-4 rounded-md font-black uppercase text-[11px] tracking-widest border-red-200 text-red-700 hover:bg-red-50 gap-2"
+                      className="h-9 px-4 rounded-md font-normal uppercase text-[11px] tracking-widest border-red-200 text-red-700 hover:bg-red-50 gap-2"
                     >
                       <Mail size={14} /> Gmail
                     </Button>
@@ -2030,7 +2087,7 @@ export function QuotationViewDialog({
                       size="sm"
                       onClick={() => handleSendCustomer('WHATSAPP')}
                       disabled={isSendingCustomer}
-                      className="h-9 px-4 rounded-md font-black uppercase text-[11px] tracking-widest border-green-200 text-emerald-700 hover:bg-green-50 gap-2"
+                      className="h-9 px-4 rounded-md font-normal uppercase text-[11px] tracking-widest border-green-200 text-emerald-700 hover:bg-green-50 gap-2"
                     >
                       <Phone size={14} /> WhatsApp
                     </Button>
@@ -2041,7 +2098,7 @@ export function QuotationViewDialog({
                 variant="ghost"
                 size="sm"
                 onClick={onClose}
-                className="h-9 text-[11px] font-black uppercase tracking-widest text-slate-500 hover:text-red-600"
+                className="h-9 text-[11px] font-normal uppercase tracking-widest text-slate-500 hover:text-red-600"
               >
                 Close
               </Button>
@@ -2052,7 +2109,7 @@ export function QuotationViewDialog({
                     variant="outline"
                     size="sm"
                     onClick={() => onStatusChange?.('ACCEPTED')}
-                    className="h-9 text-[11px] font-black uppercase tracking-widest border-green-200 text-green-700 hover:bg-green-50"
+                    className="h-9 text-[11px] font-normal uppercase tracking-widest border-green-200 text-green-700 hover:bg-green-50"
                   >
                     Mark as Accepted
                   </Button>
@@ -2060,11 +2117,26 @@ export function QuotationViewDialog({
                     variant="outline"
                     size="sm"
                     onClick={() => onStatusChange?.('REJECTED')}
-                    className="h-9 text-[11px] font-black uppercase tracking-widest border-red-200 text-red-700 hover:bg-red-50"
+                    className="h-9 text-[11px] font-normal uppercase tracking-widest border-red-200 text-red-700 hover:bg-red-50"
                   >
                     Mark as Rejected
                   </Button>
                 </>
+              )}
+
+              {!onApprove && onCreateNewFromExisting && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    onCreateNewFromExisting(quotation.id);
+                    onClose();
+                  }}
+                  className="h-9 text-[11px] font-normal uppercase tracking-widest border-amber-200 text-amber-700 hover:bg-amber-50 gap-2 ml-2"
+                >
+                  <Copy size={13} />
+                  Create New from this
+                </Button>
               )}
 
               {!onApprove &&
@@ -2074,7 +2146,7 @@ export function QuotationViewDialog({
                     onClick={handleSend}
                     disabled={sending}
                     size="sm"
-                    className="h-9 bg-red-700 hover:bg-red-800 text-white font-black text-[11px] uppercase tracking-widest px-10 gap-2 shadow-lg shadow-red-100 rounded-md ml-2"
+                    className="h-9 bg-red-700 hover:bg-red-800 text-white font-normal text-[11px] uppercase tracking-widest px-10 gap-2 shadow-lg shadow-red-100 rounded-md ml-2"
                   >
                     {sending ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
                     Send to Finance
@@ -2100,7 +2172,7 @@ export function QuotationViewDialog({
                       onClose();
                     }}
                     size="sm"
-                    className="h-9 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[11px] uppercase tracking-widest px-6 gap-2 shadow-lg shadow-emerald-100 rounded-md ml-2"
+                    className="h-9 bg-emerald-600 hover:bg-emerald-700 text-white font-normal text-[11px] uppercase tracking-widest px-6 gap-2 shadow-lg shadow-emerald-100 rounded-md ml-2"
                   >
                     <ArrowRightLeft size={14} />
                     Convert to{' '}
@@ -2121,7 +2193,7 @@ export function QuotationViewDialog({
                     onClick={handleRequestExtension}
                     disabled={isRequestingExtension}
                     size="sm"
-                    className="h-9 bg-amber-600 hover:bg-amber-700 text-white font-black text-[11px] uppercase tracking-widest px-6 gap-2 shadow-lg shadow-amber-100 rounded-md ml-2"
+                    className="h-9 bg-amber-600 hover:bg-amber-700 text-white font-normal text-[11px] uppercase tracking-widest px-6 gap-2 shadow-lg shadow-amber-100 rounded-md ml-2"
                   >
                     {isRequestingExtension ? (
                       <Loader2 size={14} className="animate-spin" />
@@ -2134,7 +2206,7 @@ export function QuotationViewDialog({
 
               {/* Pending Message */}
               {isExtensionRequested && (
-                <div className="flex items-center gap-2 px-4 py-1.5 bg-amber-50 border border-amber-200 rounded-md text-amber-700 font-bold text-[10px] uppercase tracking-wider">
+                <div className="flex items-center gap-2 px-4 py-1.5 bg-amber-50 border border-amber-200 rounded-md text-amber-700 font-normal text-[10px] uppercase tracking-wider">
                   <Loader2 size={12} className="animate-spin" />
                   Extension Pending Finance Approval
                 </div>

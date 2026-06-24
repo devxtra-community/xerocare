@@ -7,6 +7,7 @@ export enum ProductStatus {
   SOLD = 'SOLD',
   DAMAGED = 'DAMAGED',
   LEASE = 'LEASE',
+  RETURNED = 'RETURNED',
 }
 
 export interface Product {
@@ -29,7 +30,20 @@ export interface Product {
   imageUrl?: string;
   description?: string;
   hs_code?: string;
+  warranty?: string;
+  ownership?: 'RENT' | 'LEASE' | 'SALE' | 'EXTERNAL';
+  meter_reading?: number;
+  customer_id?: string | null;
+  warranty_start_date?: string;
+  warranty_end_date?: string;
+  warranty_max_pages?: number;
   features?: { subHeading: string; description: string }[];
+  consumables?: Array<{
+    partName?: string;
+    description?: string;
+    yield?: string;
+    price?: string | number;
+  }>;
   created_at: string;
   inventory?: {
     id: string;
@@ -59,6 +73,7 @@ export interface CreateProductData {
   tax_rate: number;
   product_status?: ProductStatus;
   hs_code?: string;
+  warranty?: string;
   features?: { subHeading: string; description: string }[];
 }
 
@@ -77,6 +92,7 @@ export interface UpdateProductData {
   tax_rate?: number;
   product_status?: ProductStatus;
   hs_code?: string;
+  warranty?: string;
   features?: { subHeading: string; description: string }[];
 }
 
@@ -107,9 +123,13 @@ export const getAllProducts = async (params?: {
  */
 export const getAvailableProductsByModel = async (modelId: string): Promise<Product[]> => {
   const allProducts = await getAllProducts({ modelId, limit: 1000 });
-  return allProducts.filter(
-    (p) => p.product_status === ProductStatus.AVAILABLE || p.product_status === ProductStatus.LEASE,
-  );
+  const allowed = [
+    ProductStatus.AVAILABLE,
+    ProductStatus.LEASE,
+    ProductStatus.RETURNED,
+    ProductStatus.DAMAGED,
+  ];
+  return allProducts.filter((p) => allowed.includes(p.product_status));
 };
 
 /**

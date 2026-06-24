@@ -47,7 +47,9 @@ export default function ReturnsManagement() {
       // Only show PAID or ISSUED invoices for returns
       setInvoices(
         data.filter(
-          (inv) => inv.saleType === 'SALE' && (inv.status === 'PAID' || inv.status === 'ISSUED'),
+          (inv) =>
+            inv.saleType === 'SALE' &&
+            (inv.status === 'PAID' || inv.status === 'INVOICED' || inv.status === 'ISSUED'),
         ),
       );
     } catch (error) {
@@ -62,7 +64,7 @@ export default function ReturnsManagement() {
     return invoices.filter(
       (inv) =>
         inv.invoiceNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        inv.customerName.toLowerCase().includes(searchTerm.toLowerCase()),
+        (inv.customerName?.toLowerCase() || '').includes(searchTerm.toLowerCase()),
     );
   }, [invoices, searchTerm]);
 
@@ -151,7 +153,9 @@ export default function ReturnsManagement() {
                       <td className="py-3 px-2 text-xs font-medium text-foreground">
                         {inv.invoiceNumber}
                       </td>
-                      <td className="py-3 px-2 text-xs text-gray-700">{inv.customerName}</td>
+                      <td className="py-3 px-2 text-xs text-gray-700">
+                        {inv.customerName || 'No Customer Assigned'}
+                      </td>
                       <td className="py-3 px-2 text-xs text-gray-700">
                         {new Date(inv.createdAt).toLocaleDateString()}
                       </td>

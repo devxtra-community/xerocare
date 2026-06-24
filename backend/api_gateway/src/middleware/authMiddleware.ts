@@ -10,6 +10,7 @@ declare global {
         userId: string;
         role: string;
         branchId?: string;
+        employeeJob?: string;
       };
     }
   }

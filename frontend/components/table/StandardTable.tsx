@@ -62,8 +62,11 @@ export function StandardTable<T>({
   const endItem = Math.min(page * limit, total);
 
   return (
-    <div className="rounded-2xl border bg-card shadow-sm overflow-hidden flex flex-col w-full">
-      <div className="overflow-x-auto">
+    <div
+      className="rounded-2xl border bg-card shadow-sm overflow-hidden flex flex-col w-full"
+      suppressHydrationWarning
+    >
+      <div className="overflow-x-auto" suppressHydrationWarning>
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/50 border-b hover:bg-muted/50">
@@ -126,8 +129,14 @@ export function StandardTable<T>({
       </div>
 
       {/* Pagination Footer */}
-      <div className="p-3 sm:px-4 sm:py-3 border-t bg-muted/20 flex flex-col sm:flex-row items-center justify-between gap-4">
-        <div className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground">
+      <div
+        className="p-3 sm:px-4 sm:py-3 border-t bg-muted/20 flex flex-col sm:flex-row items-center justify-between gap-4"
+        suppressHydrationWarning
+      >
+        <div
+          className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground"
+          suppressHydrationWarning
+        >
           <span className="whitespace-nowrap">Rows per page:</span>
           <Select
             value={limit.toString()}
@@ -147,11 +156,14 @@ export function StandardTable<T>({
           </Select>
         </div>
 
-        <div className="flex items-center gap-4 sm:gap-6">
-          <div className="text-xs sm:text-sm text-muted-foreground font-medium">
+        <div className="flex items-center gap-4 sm:gap-6" suppressHydrationWarning>
+          <div
+            className="text-xs sm:text-sm text-muted-foreground font-medium"
+            suppressHydrationWarning
+          >
             {startItem}-{endItem} of {total}
           </div>
-          <div className="flex items-center gap-1 sm:gap-2">
+          <div className="flex items-center gap-1 sm:gap-2" suppressHydrationWarning>
             <Button
               variant="outline"
               size="icon"

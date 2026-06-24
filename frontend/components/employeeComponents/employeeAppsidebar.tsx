@@ -73,13 +73,13 @@ const menuItems = [
     title: 'Rent',
     icon: Key,
     href: '/employee/rent',
-    modules: ['rent'],
+    modules: ['rent', 'reading'],
   },
   {
     title: 'Lease',
     icon: FileText,
     href: '/employee/lease',
-    modules: ['lease'],
+    modules: ['lease', 'reading'],
   },
   {
     title: 'Quotations',
@@ -92,6 +92,18 @@ const menuItems = [
     icon: RotateCcw,
     href: '/employee/sales/returns',
     modules: ['sales'],
+  },
+  {
+    title: 'Service',
+    icon: ClipboardList,
+    href: '/employee/service',
+    modules: ['service'],
+  },
+  {
+    title: 'Service Contracts',
+    icon: FileText,
+    href: '/employee/service/contracts',
+    modules: ['service'],
   },
 ];
 

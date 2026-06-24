@@ -5,7 +5,7 @@ import { logger } from '../config/logger';
 // Mirror of backend EmployeeJob enum
 export enum EmployeeJob {
   SALES = 'SALES',
-  RENT_LEASE = 'RENT_LEASE',
+  RENT_AND_LEASE = 'RENT_AND_LEASE',
   CRM = 'CRM',
   MANAGER = 'MANAGER',
 }

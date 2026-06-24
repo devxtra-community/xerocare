@@ -17,6 +17,8 @@ import { RentPeriod } from './enums/rentPeriod';
 import { LeaseType } from './enums/leaseType';
 import { ContractStatus } from './enums/contractStatus';
 import { ProductAllocation } from './productAllocationEntity';
+import { BillType } from './enums/billType';
+import { CreditNote } from './creditNoteEntity';
 
 export enum SecurityDepositMode {
   CASH = 'CASH',
@@ -76,8 +78,7 @@ export class Invoice {
   totalAmount!: number;
 
   @Column({
-    type: 'enum',
-    enum: InvoiceStatus,
+    type: 'varchar',
     default: InvoiceStatus.DRAFT,
   })
   status!: InvoiceStatus;
@@ -118,6 +119,9 @@ export class Invoice {
     cascade: false,
   })
   productAllocations?: ProductAllocation[];
+
+  @OneToMany(() => CreditNote, (cn) => cn.invoice)
+  creditNotes?: CreditNote[];
 
   @CreateDateColumn()
   createdAt!: Date;
@@ -292,6 +296,19 @@ export class Invoice {
 
   @Column({ type: 'varchar', nullable: true })
   retakenBy?: string | null;
+
+  @Column({
+    type: 'enum',
+    enum: BillType,
+    nullable: true,
+  })
+  billType?: BillType | null;
+
+  @Column({ type: 'uuid', nullable: true })
+  serviceTicketId?: string | null;
+
+  @Column({ type: 'integer', nullable: true })
+  maxCopyLimit?: number | null;
 
   @DeleteDateColumn()
   deletedAt?: Date;

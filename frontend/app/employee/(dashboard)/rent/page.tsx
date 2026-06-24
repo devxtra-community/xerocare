@@ -7,6 +7,8 @@ import EmployeeRentTable from '@/components/employeeComponents/EmployeeRentTable
 import { getMyInvoices, getBranchSalesTotals, Invoice } from '@/lib/invoice';
 import ProtectedRoute from '@/components/ProtectedRoute';
 
+export const dynamic = 'force-dynamic';
+
 export default function EmployeeRentPage() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [rentTotalOverride, setRentTotalOverride] = useState<number | undefined>(undefined);
@@ -35,18 +37,26 @@ export default function EmployeeRentPage() {
 
   return (
     <ProtectedRoute requiredModules={['rent']}>
-      <div className="bg-blue-100 min-h-full p-3 sm:p-4 md:p-6 space-y-6 sm:space-y-8">
-        <div className="flex flex-col space-y-4 sm:space-y-6">
-          <h3 className="text-xl sm:text-2xl font-bold text-primary">Rent Management</h3>
-          <EmployeeRentStats invoices={invoices} rentTotalOverride={rentTotalOverride} />
-          <EmployeeRentGraphs invoices={invoices} />
+      <React.Suspense
+        fallback={
+          <div className="flex items-center justify-center min-h-screen">
+            <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>
+          </div>
+        }
+      >
+        <div className="bg-blue-100 min-h-full p-3 sm:p-4 md:p-6 space-y-6 sm:space-y-8">
+          <div className="flex flex-col space-y-4 sm:space-y-6">
+            <h3 className="text-xl sm:text-2xl font-bold text-primary">Rent Management</h3>
+            <EmployeeRentStats invoices={invoices} rentTotalOverride={rentTotalOverride} />
+            <EmployeeRentGraphs invoices={invoices} />
 
-          <div className="space-y-3">
-            <h3 className="text-lg sm:text-xl font-bold text-primary">All Rentals</h3>
-            <EmployeeRentTable onRefresh={() => setRefreshTrigger((prev) => prev + 1)} />
+            <div className="space-y-3">
+              <h3 className="text-lg sm:text-xl font-bold text-primary">All Rentals</h3>
+              <EmployeeRentTable onRefresh={() => setRefreshTrigger((prev) => prev + 1)} />
+            </div>
           </div>
         </div>
-      </div>
+      </React.Suspense>
     </ProtectedRoute>
   );
 }

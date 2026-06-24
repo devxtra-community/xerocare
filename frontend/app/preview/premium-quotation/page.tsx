@@ -1,12 +1,13 @@
 'use client';
 
+import React, { Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import ProductPremiumQuotation from '../../../public/quatationLayouts/productsalequatation/premium/productpremiumquatation';
 import SparePartsPremiumQuotation from '../../../public/quatationLayouts/sparepartsalequatation/premium/sparepartspremiumquatation';
 import RentPremiumQuotation from '../../../public/quatationLayouts/rentquatation/premium/rentpremiumquatation';
 import LeasePremiumQuotation from '../../../public/quatationLayouts/leasequatation/premium/leasepremiumqutation';
 
-export default function PremiumQuotationPreviewPage() {
+function PremiumQuotationPreviewContent() {
   const searchParams = useSearchParams();
   const category = searchParams.get('category');
   const isSparePart = category === 'sparepart';
@@ -19,7 +20,6 @@ export default function PremiumQuotationPreviewPage() {
         <SparePartsPremiumQuotation />
       ) : isRental ? (
         <RentPremiumQuotation
-          // ... (existing rental mock data)
           billTo={{ name: 'XEROCARE W. L. L', email: 'mail@xerocare.com', phone: '+974 7071 7282' }}
           quotation={{
             number: 'EST-PRM-001',
@@ -101,5 +101,19 @@ export default function PremiumQuotationPreviewPage() {
         <ProductPremiumQuotation />
       )}
     </div>
+  );
+}
+
+export default function PremiumQuotationPreviewPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex items-center justify-center min-h-screen bg-gray-100">
+          <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-600"></div>
+        </div>
+      }
+    >
+      <PremiumQuotationPreviewContent />
+    </Suspense>
   );
 }

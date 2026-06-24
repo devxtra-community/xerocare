@@ -10,6 +10,8 @@ export interface RentLineItem {
   productName: string;
   brand: string;
   model: string;
+  modelName?: string;
+  modelNo?: string;
   slNo?: string;
   description: string;
   qty: number;
@@ -20,6 +22,7 @@ export interface RentLineItem {
   comboSlabs?: SlabRange[];
   image?: string;
   features?: { subHeading: string; description: string }[];
+  warranty?: string;
 }
 
 export interface RentAgreementDetails {
@@ -458,6 +461,33 @@ const RentStandardQuotation: React.FC<RentStandardQuotationProps> = ({
                           ))}
                         </>
                       )}
+                      {item.warranty && (
+                        <div
+                          style={{
+                            marginTop: '10px',
+                            fontSize: '12px',
+                            color: '#000',
+                            fontWeight: '400',
+                            textTransform: 'uppercase',
+                          }}
+                        >
+                          <span style={{ color: '#dc2626', fontWeight: '700' }}>Warranty: </span>
+                          {(() => {
+                            const parts = item.warranty.split(' ');
+                            if (parts.length >= 2) {
+                              return (
+                                <>
+                                  <span style={{ color: '#dc2626' }}>
+                                    {parts[0]} {parts[1]}
+                                  </span>
+                                  <span> {parts.slice(2).join(' ')}</span>
+                                </>
+                              );
+                            }
+                            return <span style={{ color: '#dc2626' }}>{item.warranty}</span>;
+                          })()}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </td>
@@ -498,10 +528,7 @@ const RentStandardQuotation: React.FC<RentStandardQuotationProps> = ({
                 PERIOD
               </th>
               <th style={{ padding: '8px 12px', textAlign: 'center', fontWeight: '800' }}>
-                ADVANCE
-              </th>
-              <th style={{ padding: '8px 12px', textAlign: 'center', fontWeight: '800' }}>
-                DEPOSIT
+                ADVANCE / DEPOSIT
               </th>
               <th style={{ padding: '8px 12px', textAlign: 'center', fontWeight: '800' }}>
                 MONTHS COUNT
@@ -523,10 +550,7 @@ const RentStandardQuotation: React.FC<RentStandardQuotationProps> = ({
                 {agreementDetails.period}
               </td>
               <td style={{ padding: '12px', textAlign: 'center', color: '#444' }}>
-                {fmt(agreementDetails.advance)}
-              </td>
-              <td style={{ padding: '12px', textAlign: 'center', color: '#444' }}>
-                {fmt(agreementDetails.deposit)}
+                {fmt(agreementDetails.advance || agreementDetails.deposit || 0)}
               </td>
               <td style={{ padding: '12px', textAlign: 'center', color: '#444' }}>
                 {agreementDetails.duration}
@@ -836,8 +860,8 @@ const RentStandardQuotation: React.FC<RentStandardQuotationProps> = ({
               fontSize: '12px',
             }}
           >
-            <span style={{ fontWeight: '700', color: '#333' }}>Sub Total</span>
-            <span style={{ fontWeight: '700' }}>QAR {fmt(totals.subTotal)}</span>
+            <span style={{ fontWeight: '400', color: '#333' }}>Sub Total</span>
+            <span style={{ fontWeight: '400' }}>QAR {fmt(totals.subTotal)}</span>
           </div>
           <div
             style={{
@@ -848,8 +872,8 @@ const RentStandardQuotation: React.FC<RentStandardQuotationProps> = ({
               fontSize: '12px',
             }}
           >
-            <span style={{ fontWeight: '700', color: '#333' }}>Tax (0%)</span>
-            <span style={{ fontWeight: '700' }}>QAR {fmt(totals.tax)}</span>
+            <span style={{ fontWeight: '400', color: '#333' }}>Tax (0%)</span>
+            <span style={{ fontWeight: '400' }}>QAR {fmt(totals.tax)}</span>
           </div>
           <div
             style={{

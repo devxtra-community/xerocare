@@ -24,6 +24,8 @@ import { Invoice, getInvoiceById, generateConsolidatedFinalInvoice } from '@/lib
 import { format } from 'date-fns';
 import { InvoiceDetailsDialog } from '../invoice/InvoiceDetailsDialog';
 import UsageRecordingModal from '@/components/Finance/UsageRecordingModal';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { useToast } from '@/components/ui/ToastProvider';
 
 interface UsageRecord {
   id: string;
@@ -52,6 +54,7 @@ interface RentHistoryViewProps {
  * Shows contract terms, usage records, invoices, and allows recording new usage or completing the contract.
  */
 export default function RentHistoryView({ contractId, isOpen, onClose }: RentHistoryViewProps) {
+  const { success: toastSuccess, error: toastError } = useToast();
   const [contract, setContract] = useState<Invoice | null>(null);
   const [usageRecords, setUsageRecords] = useState<UsageRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -61,6 +64,9 @@ export default function RentHistoryView({ contractId, isOpen, onClose }: RentHis
 
   // State for recording new usage
   const [isUsageModalOpen, setIsUsageModalOpen] = useState(false);
+
+  // Confirm Dialog State
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   const fetchData = useCallback(async () => {
     try {
@@ -83,21 +89,21 @@ export default function RentHistoryView({ contractId, isOpen, onClose }: RentHis
     }
   }, [isOpen, contractId, fetchData]);
 
-  const handleCompleteContract = async () => {
-    if (
-      !contract ||
-      !window.confirm(
-        'Are you sure you want to complete this contract? This will generate the FINAL consolidated invoice.',
-      )
-    )
-      return;
+  const handleCompleteContract = () => {
+    if (!contract) return;
+    setConfirmOpen(true);
+  };
+
+  const executeCompleteContract = async () => {
+    if (!contract) return;
     try {
       setLoading(true);
       await generateConsolidatedFinalInvoice(contract.id);
       await fetchData();
+      toastSuccess('Contract completed and final consolidated invoice generated successfully!');
     } catch (error) {
       console.error('Failed to complete contract:', error);
-      alert('Failed to complete contract. Please try again.');
+      toastError('Failed to complete contract. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -402,6 +408,17 @@ export default function RentHistoryView({ contractId, isOpen, onClose }: RentHis
           onSuccess={fetchData}
         />
       )}
+
+      {/* Confirm Dialog */}
+      <ConfirmDialog
+        isOpen={confirmOpen}
+        onClose={() => setConfirmOpen(false)}
+        title="Complete Contract"
+        description="Are you sure you want to complete this contract? This will generate the FINAL consolidated invoice."
+        type="destructive"
+        confirmText="Complete Contract"
+        onConfirm={executeCompleteContract}
+      />
     </>
   );
 }

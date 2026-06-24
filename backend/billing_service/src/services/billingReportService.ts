@@ -2,6 +2,8 @@ import { InvoiceRepository } from '../repositories/invoiceRepository';
 import { UsageRepository } from '../repositories/usageRepository';
 import { ReturnCreditRepository } from '../repositories/returnCreditRepository';
 import { InvoiceType } from '../entities/enums/invoiceType';
+import { CreditNote } from '../entities/creditNoteEntity';
+import { Source } from '../config/dataSource';
 import { ContractStatus } from '../entities/enums/contractStatus';
 import { AppError } from '../errors/appError';
 import { logger } from '../config/logger';
@@ -77,11 +79,44 @@ export class BillingReportService {
    */
   async getBranchSalesTotals(branchId: string, year?: number) {
     const sales = await this.invoiceRepo.getBranchSalesTotals(branchId, year);
+
+    // Reconcile Credit Exchange adjustments (replacementAmount - returnedAmount)
+    try {
+      const cnRepo = Source.getRepository(CreditNote);
+      const qb = cnRepo
+        .createQueryBuilder('cn')
+        .leftJoinAndSelect('cn.invoice', 'invoice')
+        .where('cn.status = :status', { status: 'PRODUCT_REPLACED' })
+        .andWhere('cn.type = :type', { type: 'CREDIT_EXCHANGE' });
+
+      if (branchId) qb.andWhere('cn.branchId = :branchId', { branchId });
+      if (year) qb.andWhere('EXTRACT(YEAR FROM cn.createdAt) = :year', { year });
+
+      const exchanges = await qb.getMany();
+      exchanges.forEach((cn) => {
+        const adjustment = Number(cn.replacementAmount || 0) - Number(cn.productAmount || 0);
+        if (adjustment !== 0) {
+          sales.totalSales += adjustment;
+          const saleType = cn.invoice?.saleType || 'PRODUCT_SALE';
+          const saleStat = sales.salesByType.find((s) => s.saleType === saleType);
+          if (saleStat) {
+            saleStat.total += adjustment;
+          } else {
+            sales.salesByType.push({ saleType, total: adjustment });
+          }
+        }
+      });
+    } catch (err) {
+      logger.error('Failed to reconcile exchange adjustments', err);
+    }
+
     const returns = await this.returnCreditRepo.getReturnTotalsByBranch(branchId, year);
 
     if (returns.totalReturns > 0) {
       sales.totalSales -= returns.totalReturns;
-      const saleStat = sales.salesByType.find((s) => s.saleType === 'SALE');
+      // Deduct from any product-related sale category
+      const targetTypes = ['SALE', 'PRODUCT_SALE', 'SPAREPART_SALE'];
+      const saleStat = sales.salesByType.find((s) => targetTypes.includes(s.saleType));
       if (saleStat) {
         saleStat.total -= returns.totalReturns;
       } else {
@@ -148,11 +183,43 @@ export class BillingReportService {
    */
   async getGlobalSalesTotals(year?: number) {
     const sales = await this.invoiceRepo.getGlobalSalesTotals(year);
+
+    // Reconcile Credit Exchange adjustments (replacementAmount - returnedAmount)
+    try {
+      const cnRepo = Source.getRepository(CreditNote);
+      const qb = cnRepo
+        .createQueryBuilder('cn')
+        .leftJoinAndSelect('cn.invoice', 'invoice')
+        .where('cn.status = :status', { status: 'PRODUCT_REPLACED' })
+        .andWhere('cn.type = :type', { type: 'CREDIT_EXCHANGE' });
+
+      if (year) qb.andWhere('EXTRACT(YEAR FROM cn.createdAt) = :year', { year });
+
+      const exchanges = await qb.getMany();
+      exchanges.forEach((cn) => {
+        const adjustment = Number(cn.replacementAmount || 0) - Number(cn.productAmount || 0);
+        if (adjustment !== 0) {
+          sales.totalSales += adjustment;
+          const saleType = cn.invoice?.saleType || 'PRODUCT_SALE';
+          const saleStat = sales.salesByType.find((s) => s.saleType === saleType);
+          if (saleStat) {
+            saleStat.total += adjustment;
+          } else {
+            sales.salesByType.push({ saleType, total: adjustment });
+          }
+        }
+      });
+    } catch (err) {
+      logger.error('Failed to reconcile exchange adjustments', err);
+    }
+
     const returns = await this.returnCreditRepo.getGlobalReturnTotals(year);
 
     if (returns.totalReturns > 0) {
       sales.totalSales -= returns.totalReturns;
-      const saleStat = sales.salesByType.find((s) => s.saleType === 'SALE');
+      // Deduct from any product-related sale category
+      const targetTypes = ['SALE', 'PRODUCT_SALE', 'SPAREPART_SALE'];
+      const saleStat = sales.salesByType.find((s) => targetTypes.includes(s.saleType));
       if (saleStat) {
         saleStat.total -= returns.totalReturns;
       } else {
@@ -1073,7 +1140,7 @@ export class BillingReportService {
       .text(
         customer
           ? `${customer.firstName} ${customer.lastName || ''}`.toUpperCase()
-          : 'WALKING CUSTOMER',
+          : 'NO CUSTOMER ASSIGNED',
         40,
         startY + 28,
       );
@@ -1081,8 +1148,8 @@ export class BillingReportService {
       .fillColor('#64748b')
       .font('Helvetica')
       .fontSize(8)
-      .text(customer?.email || 'mail@customer.com', 40, startY + 41);
-    doc.text(customer?.phone || '+974-0000-0000', 40, startY + 50);
+      .text(customer?.email || '—', 40, startY + 41);
+    doc.text(customer?.phone || '—', 40, startY + 50);
     doc
       .font('Helvetica-Oblique')
       .fontSize(9)
@@ -1487,7 +1554,7 @@ export class BillingReportService {
       .text(
         customer
           ? `${customer.firstName} ${customer.lastName || ''}`.toUpperCase()
-          : 'WALKING CUSTOMER',
+          : 'NO CUSTOMER ASSIGNED',
         40,
         startY + 28,
       );
@@ -1495,8 +1562,8 @@ export class BillingReportService {
       .fillColor('#64748b')
       .font('Helvetica')
       .fontSize(8)
-      .text(customer?.email || 'mail@customer.com', 40, startY + 41);
-    doc.text(customer?.phone || '+974-0000-0000', 40, startY + 50);
+      .text(customer?.email || '—', 40, startY + 41);
+    doc.text(customer?.phone || '—', 40, startY + 50);
     doc
       .font('Helvetica-Oblique')
       .fontSize(9)

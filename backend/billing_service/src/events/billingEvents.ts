@@ -4,6 +4,8 @@ export enum BillingEventType {
   NOTIFICATION_EMAIL = 'notification.email.request',
   NOTIFICATION_WHATSAPP = 'notification.whatsapp.request',
   NOTIFICATION_IN_APP = 'notification.in_app.request',
+  CONTRACT_EXPIRING_SOON = 'contract.expiring.soon',
+  CONTRACT_EXPIRED = 'contract.expired',
 }
 
 export interface InvoiceCreatedEvent {
@@ -30,10 +32,10 @@ export interface NotificationRequestEvent {
 }
 
 export interface InAppNotificationRequestEvent {
-  recipients?: string[];
-  notifyAdmins?: boolean;
+  recipientId: string;
   title: string;
   message: string;
-  type?: string;
-  data?: unknown;
+  type: string;
+  referenceId: string;
+  referenceType: 'QUOTATION' | 'TEMPLATE' | 'CONTRACT';
 }

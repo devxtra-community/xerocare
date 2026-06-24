@@ -6,6 +6,7 @@ function Card({ className, ...props }: React.ComponentProps<'div'>) {
   return (
     <div
       data-slot="card"
+      suppressHydrationWarning
       className={cn(
         'bg-card text-card-foreground flex flex-col gap-6 rounded-xl border py-5 px-3 shadow-sm',
         className,
@@ -19,6 +20,7 @@ function CardHeader({ className, ...props }: React.ComponentProps<'div'>) {
   return (
     <div
       data-slot="card-header"
+      suppressHydrationWarning
       className={cn(
         '@container/card-header grid auto-rows-min grid-rows-[auto_auto] items-start gap-2 px-8 has-data-[slot=card-action]:grid-cols-[1fr_auto] [.border-b]:pb-6',
         className,
@@ -32,6 +34,7 @@ function CardTitle({ className, ...props }: React.ComponentProps<'div'>) {
   return (
     <div
       data-slot="card-title"
+      suppressHydrationWarning
       className={cn('leading-none font-semibold', className)}
       {...props}
     />
@@ -42,6 +45,7 @@ function CardDescription({ className, ...props }: React.ComponentProps<'div'>) {
   return (
     <div
       data-slot="card-description"
+      suppressHydrationWarning
       className={cn('text-muted-foreground text-sm', className)}
       {...props}
     />
@@ -59,7 +63,14 @@ function CardAction({ className, ...props }: React.ComponentProps<'div'>) {
 }
 
 function CardContent({ className, ...props }: React.ComponentProps<'div'>) {
-  return <div data-slot="card-content" className={cn('px-6', className)} {...props} />;
+  return (
+    <div
+      data-slot="card-content"
+      suppressHydrationWarning
+      className={cn('px-6', className)}
+      {...props}
+    />
+  );
 }
 
 function CardFooter({ className, ...props }: React.ComponentProps<'div'>) {

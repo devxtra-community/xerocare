@@ -187,10 +187,18 @@ export class EmployeeService {
     role?: EmployeeRole,
     branchId?: string,
     search?: string,
+    job?: string,
   ) {
     const skip = (page - 1) * limit;
 
-    const { data, total } = await this.employeeRepo.findAll(skip, limit, role, branchId, search);
+    const { data, total } = await this.employeeRepo.findAll(
+      skip,
+      limit,
+      role,
+      branchId,
+      search,
+      job,
+    );
 
     return {
       employees: data,

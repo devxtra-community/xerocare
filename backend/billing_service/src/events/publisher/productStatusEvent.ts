@@ -8,7 +8,7 @@ const ROUTING_KEY = 'inventory.product.status.update';
 
 export async function emitProductStatusUpdate(payload: {
   productId: string;
-  billType: 'SALE' | 'RENT' | 'LEASE' | 'RETURNED';
+  billType: 'SALE' | 'RENT' | 'LEASE' | 'RETURNED' | 'DAMAGED';
   invoiceId: string;
   approvedBy: string;
   approvedAt: Date;

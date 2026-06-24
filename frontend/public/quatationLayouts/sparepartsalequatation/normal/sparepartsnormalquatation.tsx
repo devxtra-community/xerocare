@@ -1,8 +1,10 @@
 import React from 'react';
+import { numberToWords } from '@/lib/numberToWords';
 
 export interface QuotationLineItem {
   brand: string;
-  modelNo: string;
+  modelNo?: string;
+  modelName?: string;
   slNo: string;
   description: string;
   qty: number;
@@ -14,6 +16,8 @@ export interface QuotationLineItem {
   productName?: string;
   discount?: number;
   mpn?: string;
+  warranty?: string;
+  features?: { subHeading: string; description: string }[];
 }
 
 export interface SparePartsNormalQuotationProps {
@@ -57,15 +61,15 @@ export interface SparePartsNormalQuotationProps {
 const fmt = (n: number) =>
   n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-const ACCENT = '#00A389';
+const ACCENT = '#000000';
 
 const thStyle = (
   align: 'left' | 'center' | 'right' = 'left',
-  color = '#fff',
+  color = '#000',
 ): React.CSSProperties => ({
   padding: '10px 10px',
   textAlign: align,
-  fontWeight: '800',
+  fontWeight: '300',
   fontSize: '11px',
   letterSpacing: '0.5px',
   textTransform: 'uppercase',
@@ -131,8 +135,8 @@ const SparePartsNormalQuotation: React.FC<SparePartsNormalQuotationProps> = ({
       <div style={{ textAlign: 'center', marginBottom: '28px' }}>
         <div
           style={{
-            fontSize: '26px',
-            fontWeight: '800',
+            fontSize: '22px',
+            fontWeight: '300',
             color: ACCENT,
             textTransform: 'uppercase',
             letterSpacing: '2px',
@@ -145,7 +149,7 @@ const SparePartsNormalQuotation: React.FC<SparePartsNormalQuotationProps> = ({
       {/* ─── HEADER ─── */}
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '32px' }}>
         <div>
-          <div style={{ fontSize: '17px', fontWeight: '800', color: ACCENT, marginBottom: '6px' }}>
+          <div style={{ fontSize: '17px', fontWeight: '300', color: ACCENT, marginBottom: '6px' }}>
             {companyInfo.name}
           </div>
           <div style={{ fontSize: '12px', color: '#333', lineHeight: '1.5' }}>
@@ -173,7 +177,7 @@ const SparePartsNormalQuotation: React.FC<SparePartsNormalQuotationProps> = ({
             <div
               style={{
                 fontSize: '20px',
-                fontWeight: 'bold',
+                fontWeight: 'normal',
                 color: '#ccc',
                 border: '2px solid #ccc',
                 padding: '8px 16px',
@@ -199,7 +203,7 @@ const SparePartsNormalQuotation: React.FC<SparePartsNormalQuotationProps> = ({
           <div
             style={{
               fontSize: '13px',
-              fontWeight: '800',
+              fontWeight: '300',
               color: ACCENT,
               marginBottom: '6px',
               textTransform: 'uppercase',
@@ -207,7 +211,7 @@ const SparePartsNormalQuotation: React.FC<SparePartsNormalQuotationProps> = ({
           >
             Bill To
           </div>
-          <div style={{ fontSize: '14px', fontWeight: '700', marginBottom: '4px' }}>
+          <div style={{ fontSize: '14px', fontWeight: '300', marginBottom: '4px' }}>
             {billTo.name}
           </div>
           <div
@@ -224,18 +228,14 @@ const SparePartsNormalQuotation: React.FC<SparePartsNormalQuotationProps> = ({
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
           <div style={{ width: '230px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-              <span style={{ fontSize: '13px', fontWeight: '800', color: '#111' }}>
+              <span style={{ fontSize: '13px', fontWeight: '300', color: '#111' }}>
                 Quotation No :
               </span>
-              <span style={{ fontSize: '13px', fontWeight: '800' }}>{quotation.number}</span>
+              <span style={{ fontSize: '13px', fontWeight: '300' }}>{quotation.number}</span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
               <span style={{ fontSize: '12px', color: '#555' }}>Date :</span>
-              <span style={{ fontSize: '12px', fontWeight: '600' }}>{quotation.date}</span>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ fontSize: '12px', color: '#555' }}>Due Date :</span>
-              <span style={{ fontSize: '12px', fontWeight: '600' }}>{quotation.dueDate}</span>
+              <span style={{ fontSize: '12px', fontWeight: '300' }}>{quotation.dueDate}</span>
             </div>
           </div>
         </div>
@@ -254,7 +254,7 @@ const SparePartsNormalQuotation: React.FC<SparePartsNormalQuotationProps> = ({
         <div
           style={{
             fontSize: '11px',
-            fontWeight: '800',
+            fontWeight: '300',
             color: ACCENT,
             textTransform: 'uppercase',
             marginBottom: '10px',
@@ -267,13 +267,13 @@ const SparePartsNormalQuotation: React.FC<SparePartsNormalQuotationProps> = ({
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
           <div>
             <div style={{ fontSize: '10px', color: '#888', textTransform: 'uppercase' }}>Brand</div>
-            <div style={{ fontSize: '13px', fontWeight: '700' }}>
+            <div style={{ fontSize: '13px', fontWeight: '300' }}>
               {lineItems[0]?.brand || 'N/A'}
             </div>
           </div>
           <div>
             <div style={{ fontSize: '10px', color: '#888', textTransform: 'uppercase' }}>Model</div>
-            <div style={{ fontSize: '13px', fontWeight: '700' }}>
+            <div style={{ fontSize: '13px', fontWeight: '300' }}>
               {lineItems[0]?.modelNo || modelName || 'N/A'}
             </div>
           </div>
@@ -281,7 +281,7 @@ const SparePartsNormalQuotation: React.FC<SparePartsNormalQuotationProps> = ({
             <div style={{ fontSize: '10px', color: '#888', textTransform: 'uppercase' }}>
               Serial Number
             </div>
-            <div style={{ fontSize: '13px', fontWeight: '700' }}>{lineItems[0]?.slNo || 'TBD'}</div>
+            <div style={{ fontSize: '13px', fontWeight: '300' }}>{lineItems[0]?.slNo || 'TBD'}</div>
           </div>
         </div>
       </div>
@@ -291,10 +291,10 @@ const SparePartsNormalQuotation: React.FC<SparePartsNormalQuotationProps> = ({
         <div
           style={{
             fontSize: '13px',
-            fontWeight: '800',
+            fontWeight: '300',
             color: ACCENT,
             textTransform: 'uppercase',
-            borderBottom: `2px solid ${ACCENT}`,
+
             paddingBottom: '5px',
             marginBottom: '10px',
           }}
@@ -303,7 +303,9 @@ const SparePartsNormalQuotation: React.FC<SparePartsNormalQuotationProps> = ({
         </div>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
           <thead>
-            <tr style={{ backgroundColor: ACCENT, color: '#fff' }}>
+            <tr
+              style={{ backgroundColor: 'transparent', color: '#000', borderTop: '1px solid #000' }}
+            >
               <th style={{ ...thStyle(), width: '36px' }}>Sl.</th>
               <th style={{ ...thStyle(), width: '45%' }}>Description</th>
               <th style={thStyle('center')}>Qty</th>
@@ -318,31 +320,23 @@ const SparePartsNormalQuotation: React.FC<SparePartsNormalQuotationProps> = ({
               <tr
                 key={idx}
                 style={{
-                  backgroundColor: idx % 2 === 0 ? '#fff' : '#f4fbf9',
+                  backgroundColor: idx % 2 === 0 ? '#fff' : '#f7f7f7',
                   borderBottom: '1px solid #eee',
                 }}
               >
                 <td style={tdStyleHelper()}>{idx + 1}</td>
                 <td style={{ ...tdStyleHelper('left'), whiteSpace: 'pre-wrap' }}>
-                  <div
-                    style={{
-                      fontSize: '11px',
-                      color: '#1a1a1a',
-                      fontWeight: '600',
-                      maxWidth: '95%',
-                      lineHeight: '1.6',
-                    }}
-                  >
+                  <div style={{ fontSize: '11px', color: '#1a1a1a', lineHeight: '1.6' }}>
                     {item.productName && (
-                      <div style={{ fontWeight: '700', marginBottom: '4px', fontSize: '14px' }}>
+                      <div style={{ fontWeight: '300', marginBottom: '4px', fontSize: '14px' }}>
                         {item.productName}
                       </div>
                     )}
                     <div
                       style={{
                         fontSize: '13px',
-                        fontWeight: '800',
-                        color: '#dc2626',
+                        fontWeight: '300',
+                        color: '#000000',
                         textTransform: 'uppercase',
                         marginBottom: '6px',
                       }}
@@ -350,13 +344,68 @@ const SparePartsNormalQuotation: React.FC<SparePartsNormalQuotationProps> = ({
                       Product Description
                     </div>
                     <div>{item.description}</div>
+                    {(item.features || []).length > 0 && (
+                      <>
+                        <div
+                          style={{
+                            fontSize: '13px',
+                            fontWeight: '300',
+                            color: '#000000',
+                            textTransform: 'uppercase',
+                            marginBottom: '6px',
+                            marginTop: '16px',
+                          }}
+                        >
+                          Features
+                        </div>
+                        {(item.features || []).map((f, i) => (
+                          <div key={i} style={{ marginTop: '8px', fontSize: '11px' }}>
+                            {f.subHeading && (
+                              <div
+                                style={{ color: '#000000', display: 'block', marginBottom: '4px' }}
+                              >
+                                {f.subHeading}
+                              </div>
+                            )}
+                            {f.description && <div style={{ color: '#444' }}>{f.description}</div>}
+                          </div>
+                        ))}
+                      </>
+                    )}
+                    {item.warranty && (
+                      <div
+                        style={{
+                          marginTop: '12px',
+                          fontSize: '11px',
+                          color: '#1a1a1a',
+                          fontWeight: '300',
+                          lineHeight: '1.6',
+                        }}
+                      >
+                        <span style={{ color: '#000000', fontWeight: '300' }}>Warranty: </span>
+                        {(() => {
+                          const parts = item.warranty.split(' ');
+                          if (parts.length >= 2) {
+                            return (
+                              <>
+                                <span style={{ color: '#000000' }}>
+                                  {parts[0]} {parts[1]}
+                                </span>
+                                <span> {parts.slice(2).join(' ')}</span>
+                              </>
+                            );
+                          }
+                          return <span style={{ color: '#000000' }}>{item.warranty}</span>;
+                        })()}
+                      </div>
+                    )}
                   </div>
                 </td>
                 <td style={tdStyleHelper()}>{item.qty}</td>
                 <td style={tdStyleHelper()}>{fmt(item.unitPrice)}</td>
                 <td style={tdStyleHelper()}>{item.discount ? `${item.discount}%` : '0%'}</td>
                 <td style={tdStyleHelper()}>{fmt(item.vat)}</td>
-                <td style={{ ...tdStyleHelper('right'), fontWeight: '700' }}>{fmt(item.amount)}</td>
+                <td style={{ ...tdStyleHelper('right'), fontWeight: '300' }}>{fmt(item.amount)}</td>
               </tr>
             ))}
           </tbody>
@@ -367,31 +416,114 @@ const SparePartsNormalQuotation: React.FC<SparePartsNormalQuotationProps> = ({
       <div
         style={{
           display: 'flex',
-          justifyContent: 'flex-end',
+          justifyContent: lineItems?.[0]?.productImage ? 'space-between' : 'flex-end',
+          alignItems: 'stretch',
           marginBottom: '32px',
+          minHeight: '1px',
         }}
       >
+        {lineItems?.[0]?.productImage && (
+          <div style={{ paddingRight: '20px', display: 'flex', alignItems: 'flex-end' }}>
+            <img
+              src={lineItems[0].productImage}
+              alt="Product"
+              style={{
+                maxWidth: '600px',
+                height: '100%',
+                maxHeight: '600px',
+                objectFit: 'contain',
+                filter: 'grayscale(100%)',
+                opacity: 0.8,
+              }}
+            />
+          </div>
+        )}
         <div style={{ width: '250px' }}>
           {[
-            { label: 'Subtotal', value: fmt(totals.subTotal) },
-            { label: 'VAT Total', value: fmt(totals.vatTotal) },
-            { label: 'Total', value: `QAR ${fmt(totals.total)}`, isBold: true },
+            { label: 'Subtotal', value: totals.subTotal, num: totals.subTotal },
+            { label: 'VAT Total', value: totals.vatTotal, num: totals.vatTotal },
+            {
+              label: 'Total',
+              value: totals.total,
+              num: totals.total,
+              prefix: 'QAR ',
+              isBold: true,
+            },
+            { label: 'Payment', value: totals.payment, num: totals.payment },
           ].map((row, i) => (
             <div
               key={i}
               style={{
                 display: 'flex',
-                justifyContent: 'space-between',
+                flexDirection: 'column',
                 padding: '8px 0',
-                borderBottom: i === 2 ? `2px solid ${ACCENT}` : '1px solid #f0f0f0',
-                fontWeight: row.isBold ? '800' : '500',
-                color: row.isBold ? ACCENT : '#333',
+                borderBottom: i === 2 ? `1px solid ${ACCENT}` : '1px solid #f0f0f0',
               }}
             >
-              <span style={{ fontSize: '12px', textTransform: 'uppercase' }}>{row.label}</span>
-              <span style={{ fontSize: '14px' }}>{row.value}</span>
+              <div
+                style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+              >
+                <span
+                  style={{
+                    fontSize: '12px',
+                    textTransform: 'uppercase',
+                    color: row.isBold ? ACCENT : '#000',
+                    fontWeight: '300',
+                  }}
+                >
+                  {row.label}
+                </span>
+                <span
+                  style={{
+                    fontSize: '14px',
+                    color: row.isBold ? ACCENT : '#000',
+                    fontWeight: '300',
+                  }}
+                >
+                  {row.prefix || ''}
+                  {fmt(row.value)}
+                </span>
+              </div>
+              <div
+                style={{
+                  fontSize: '9px',
+                  color: '#111827',
+                  fontStyle: 'italic',
+                  textAlign: 'right',
+                  marginTop: '1px',
+                }}
+              >
+                {numberToWords(row.num)}
+              </div>
             </div>
           ))}
+
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              padding: '12px 0',
+              fontWeight: '300',
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: '13px', textTransform: 'uppercase' }}>Balance Due</span>
+              <span style={{ fontSize: '15px', color: '#000000', fontWeight: '300' }}>
+                QAR {fmt(totals.balanceDue)}
+              </span>
+            </div>
+            <div
+              style={{
+                fontSize: '9px',
+                color: '#111827',
+                fontStyle: 'italic',
+                textAlign: 'right',
+                marginTop: '4px',
+              }}
+            >
+              {numberToWords(totals.balanceDue)}
+            </div>
+          </div>
         </div>
       </div>
 
@@ -400,10 +532,10 @@ const SparePartsNormalQuotation: React.FC<SparePartsNormalQuotationProps> = ({
         <div
           style={{
             fontSize: '13px',
-            fontWeight: '800',
+            fontWeight: '300',
             color: ACCENT,
             textTransform: 'uppercase',
-            borderBottom: `2px solid ${ACCENT}`,
+
             paddingBottom: '5px',
             marginBottom: '12px',
           }}
@@ -436,7 +568,7 @@ const SparePartsNormalQuotation: React.FC<SparePartsNormalQuotationProps> = ({
             }}
           />
           <div style={{ borderTop: '1px solid #111', width: '100%', marginBottom: '6px' }}></div>
-          <div style={{ fontSize: '11px', fontWeight: '800', color: '#111' }}>
+          <div style={{ fontSize: '11px', fontWeight: '300', color: '#111' }}>
             AUTHORIZED SIGNATURE
           </div>
         </div>
@@ -445,7 +577,7 @@ const SparePartsNormalQuotation: React.FC<SparePartsNormalQuotationProps> = ({
       {/* ─── FOOTER ─── */}
       <div
         style={{
-          borderTop: `2px solid ${ACCENT}`,
+          borderTop: `1px solid ${ACCENT}`,
           paddingTop: '15px',
           display: 'flex',
           justifyContent: 'space-between',

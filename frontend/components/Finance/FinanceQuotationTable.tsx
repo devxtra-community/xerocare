@@ -36,36 +36,59 @@ import { QuotationViewDialog } from '../employeeComponents/QuotationViewDialog';
 
 function StatusBadge({ status }: { status: string }) {
   const map: Record<string, string> = {
-    DRAFT: 'bg-slate-100 text-slate-600',
-    EMPLOYEE_APPROVED: 'bg-blue-100 text-blue-600',
-    FINANCE_APPROVED: 'bg-green-100 text-green-700',
-    FINANCE_REJECTED: 'bg-red-100 text-red-700',
-    APPROVED: 'bg-green-100 text-green-700',
-    REJECTED: 'bg-red-100 text-red-700',
-    VALIDITY_EXTENSION_REQUESTED: 'bg-amber-100 text-amber-700',
-    PENDING: 'bg-yellow-100 text-yellow-700',
+    DRAFT: 'bg-slate-50 text-slate-600 border-slate-200',
+    EMPLOYEE_APPROVED: 'bg-blue-50 text-blue-600 border-blue-200',
+    FINANCE_APPROVED: 'bg-green-50 text-green-700 border-green-200',
+    FINANCE_REJECTED: 'bg-red-50 text-red-700 border-red-200',
+    APPROVED: 'bg-green-50 text-green-700 border-green-200',
+    REJECTED: 'bg-red-50 text-red-700 border-red-200',
+    VALIDITY_EXTENSION_REQUESTED: 'bg-amber-50 text-amber-700 border-amber-200',
+    WAITING_FINANCE_APPROVAL: 'bg-amber-50 text-amber-700 border-amber-200',
+    PENDING: 'bg-yellow-50 text-yellow-700 border-yellow-200',
+    ACTIVE_CONTRACT: 'bg-green-50 text-green-700 border-green-200',
+    ACTIVE_LEASE: 'bg-green-50 text-green-700 border-green-200',
+    INVOICED: 'bg-blue-50 text-blue-600 border-blue-200',
+    PAID: 'bg-green-50 text-green-700 border-green-200',
+    EXPIRED: 'bg-red-50 text-red-700 border-red-200',
+    CUSTOMER_ACCEPTED: 'bg-green-50 text-green-700 border-green-200',
+    CUSTOMER_REJECTED: 'bg-red-50 text-red-700 border-red-200',
+    CANCELLED: 'bg-slate-50 text-slate-600 border-slate-200',
+    CREDIT_EXCHANGE: 'bg-purple-50 text-purple-700 border-purple-200',
+    PRODUCT_REPLACED: 'bg-purple-50 text-purple-700 border-purple-200',
+    CREDIT_RETURN: 'bg-purple-50 text-purple-700 border-purple-200',
+    CASH_REFUND: 'bg-purple-50 text-purple-700 border-purple-200',
   };
   const label: Record<string, string> = {
-    DRAFT: 'DRAFT (IN PREPARATION)',
-    SENT: 'SENT TO CUSTOMER',
-    SENT_TO_CUSTOMER: 'SENT TO CUSTOMER',
-    EMPLOYEE_APPROVED: 'PENDING FINANCE REVIEW',
-    FINANCE_APPROVED: 'QUOTATION APPROVED',
-    FINANCE_REJECTED: 'QUOTATION REJECTED',
-    CUSTOMER_ACCEPTED: 'ACCEPTED BY CUSTOMER',
-    CUSTOMER_REJECTED: 'REJECTED BY CUSTOMER',
+    DRAFT: 'DRAFT',
+    SENT: 'SENT',
+    SENT_TO_CUSTOMER: 'SENT',
+    EMPLOYEE_APPROVED: 'PENDING REVIEW',
+    FINANCE_APPROVED: 'APPROVED',
+    FINANCE_REJECTED: 'REJECTED',
+    CUSTOMER_ACCEPTED: 'ACCEPTED',
+    CUSTOMER_REJECTED: 'REJECTED',
     ACCEPTED: 'APPROVED',
     APPROVED: 'APPROVED',
     REJECTED: 'REJECTED',
-    PENDING_CONFIRMATION: 'WAITING FOR ALLOCATION',
-    PAID: 'PROCESSED/PAID',
-    ACTIVE_LEASE: 'ACTIVE CONTRACT',
-    TRANSACTION_COMPLETED: 'PENDING FINANCE REVIEW',
-    VALIDITY_EXTENSION_REQUESTED: 'VALIDITY EXTENSION REQUESTED',
+    PENDING_CONFIRMATION: 'ALLOCATION PENDING',
+    PAID: 'PAID',
+    ACTIVE_LEASE: 'ACTIVE',
+    ACTIVE_CONTRACT: 'ACTIVE',
+    INVOICED: 'INVOICED',
+    TRANSACTION_COMPLETED: 'PENDING REVIEW',
+    VALIDITY_EXTENSION_REQUESTED: 'EXTENSION REQ.',
+    WAITING_FINANCE_APPROVAL: 'PENDING FINANCE',
+    EXPIRED: 'EXPIRED',
+    CANCELLED: 'CANCELLED',
+    CREDIT_EXCHANGE: 'CREDIT RETURN',
+    PRODUCT_REPLACED: 'REPLACED',
+    CREDIT_RETURN: 'CREDIT RETURN',
+    CASH_REFUND: 'CASH REFUND',
   };
   return (
     <Badge
-      className={`rounded-full px-3 py-0.5 text-[10px] font-bold tracking-wider shadow-none ${map[status] || (['FINANCE_APPROVED', 'PAID', 'ACTIVE_LEASE'].includes(status) ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-600')}`}
+      variant="outline"
+      className={`rounded-full px-2.5 py-0.5 text-[9px] font-semibold tracking-wider uppercase shadow-none border ${map[status] || 'bg-slate-50 text-slate-600 border-slate-200'}`}
     >
       {label[status] ?? status}
     </Badge>
@@ -77,11 +100,13 @@ function TypeBadge({ type }: { type: string }) {
     SALE: 'bg-blue-50 text-blue-600 border-blue-200',
     RENT: 'bg-orange-50 text-orange-600 border-orange-200',
     LEASE: 'bg-purple-50 text-purple-600 border-purple-200',
+    PRODUCT_SALE: 'bg-indigo-50 text-indigo-600 border-indigo-200',
+    SPAREPART_SALE: 'bg-cyan-50 text-cyan-600 border-cyan-200',
   };
   return (
     <Badge
       variant="outline"
-      className={`rounded-full px-3 py-0.5 text-[10px] font-bold tracking-wider ${map[type] ?? ''}`}
+      className={`rounded-full px-2.5 py-0.5 text-[9px] font-semibold tracking-wider ${map[type] ?? ''}`}
     >
       {type}
     </Badge>
@@ -189,7 +214,8 @@ export default function FinanceQuotationTable({
     (q) =>
       q.status === 'EMPLOYEE_APPROVED' ||
       q.status === 'PENDING' ||
-      q.status === 'VALIDITY_EXTENSION_REQUESTED',
+      q.status === 'VALIDITY_EXTENSION_REQUESTED' ||
+      q.status === 'WAITING_FINANCE_APPROVAL',
   ).length;
   const approved = quotations.filter(
     (q) =>
@@ -203,7 +229,9 @@ export default function FinanceQuotationTable({
         'SENT_TO_CUSTOMER',
         'PAID',
         'ACTIVE_LEASE',
+        'ACTIVE_CONTRACT',
         'ISSUED',
+        'INVOICED',
         'TRANSACTION_COMPLETED',
         'PENDING_CONFIRMATION',
       ].includes(q.status),
@@ -215,13 +243,46 @@ export default function FinanceQuotationTable({
       q.status === 'CUSTOMER_REJECTED',
   ).length;
 
+  // ── Product name helpers ───────────────────────────────────────────────
+  const getCleanProductName = (name: string) => {
+    let clean = name.replace(/^(Black & White - |Color - |Combined - )/i, '');
+    clean = clean.replace(/(\s*-\s*SN-[^,]+|\s*\(SN-[^)]+\)|\s*\(Serial[^)]+\))/gi, '');
+    const lastDashIndex = clean.lastIndexOf(' - ');
+    if (lastDashIndex !== -1 && clean.length - lastDashIndex < 25) {
+      clean = clean.substring(0, lastDashIndex).trim();
+    }
+    return clean.trim();
+  };
+
+  const getProductNames = (invoice: Invoice) => {
+    const completedExchange = invoice.creditNotes?.find(
+      (cn) => cn.status === 'PRODUCT_REPLACED' && cn.type === 'CREDIT_EXCHANGE',
+    );
+    if (completedExchange?.replacementProductName) {
+      return completedExchange.replacementProductName;
+    }
+
+    if (!invoice.items || invoice.items.length === 0) return '';
+    const productItems = invoice.items.filter(
+      (item) => item.itemType !== 'PRICING_RULE' && item.description,
+    );
+    if (productItems.length === 0) {
+      const allWithDesc = invoice.items.filter((item) => item.description);
+      if (allWithDesc.length === 0) return '';
+      return allWithDesc.map((item) => getCleanProductName(item.description)).join(', ');
+    }
+    return productItems.map((item) => getCleanProductName(item.description)).join(', ');
+  };
+
   const filtered = quotations.filter((q) => {
     const s = search.toLowerCase();
     return (
       q.invoiceNumber?.toLowerCase().includes(s) ||
+      q.invoiceNumber?.toLowerCase().replace(/^inv-/i, 'qtn-').includes(s) ||
       q.customerName?.toLowerCase().includes(s) ||
       q.employeeName?.toLowerCase().includes(s) ||
-      q.saleType?.toLowerCase().includes(s)
+      q.saleType?.toLowerCase().includes(s) ||
+      getProductNames(q).toLowerCase().includes(s)
     );
   });
 
@@ -327,7 +388,7 @@ export default function FinanceQuotationTable({
         <div className="relative max-w-sm">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-400" />
           <Input
-            placeholder="Search by number, customer, employee..."
+            placeholder="Search by number, customer, product, employee..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="pl-9 h-9 text-xs"
@@ -337,24 +398,43 @@ export default function FinanceQuotationTable({
 
       {/* Table */}
       <div className="rounded-2xl bg-card shadow-sm overflow-hidden border border-slate-100 p-4">
-        <div className="overflow-x-auto mb-4">
-          <Table className="min-w-[800px] sm:min-w-full">
-            <TableHeader className="bg-muted/50">
+        <div className="overflow-x-auto mb-4 scrollbar-none [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] [&_[data-slot=table-container]]:scrollbar-none [&_[data-slot=table-container]::-webkit-scrollbar]:hidden [&_[data-slot=table-container]]:[-ms-overflow-style:none] [&_[data-slot=table-container]]:[scrollbar-width:none]">
+          <Table className="w-full table-fixed">
+            <TableHeader className="bg-slate-50/50 border-b border-slate-100">
               <TableRow>
-                <TableHead className="text-primary font-bold">QT NUMBER</TableHead>
-                <TableHead className="text-primary font-bold">CUSTOMER</TableHead>
-                <TableHead className="text-primary font-bold">TYPE</TableHead>
-                <TableHead className="text-primary font-bold">AMOUNT</TableHead>
-                <TableHead className="text-primary font-bold">CREATED BY</TableHead>
-                <TableHead className="text-primary font-bold">STATUS</TableHead>
-                <TableHead className="text-primary font-bold">DATE</TableHead>
-                <TableHead className="text-primary font-bold text-center">ACTIONS</TableHead>
+                <TableHead className="text-slate-500 font-bold text-[10px] tracking-wider uppercase w-[11%] py-3 px-3">
+                  QT NUMBER
+                </TableHead>
+                <TableHead className="text-slate-500 font-bold text-[10px] tracking-wider uppercase w-[18%] py-3 px-3">
+                  PRODUCT
+                </TableHead>
+                <TableHead className="text-slate-500 font-bold text-[10px] tracking-wider uppercase w-[9%] py-3 px-3">
+                  CUSTOMER
+                </TableHead>
+                <TableHead className="text-slate-500 font-bold text-[10px] tracking-wider uppercase w-[9%] py-3 px-3">
+                  TYPE
+                </TableHead>
+                <TableHead className="text-slate-500 font-bold text-[10px] tracking-wider uppercase w-[9%] py-3 px-3">
+                  AMOUNT
+                </TableHead>
+                <TableHead className="text-slate-500 font-bold text-[10px] tracking-wider uppercase w-[12%] py-3 px-3">
+                  CREATED BY
+                </TableHead>
+                <TableHead className="text-slate-500 font-bold text-[10px] tracking-wider uppercase w-[14%] py-3 px-3">
+                  STATUS
+                </TableHead>
+                <TableHead className="text-slate-500 font-bold text-[10px] tracking-wider uppercase w-[9%] py-3 px-3">
+                  DATE
+                </TableHead>
+                <TableHead className="text-slate-500 font-bold text-[10px] tracking-wider uppercase text-center w-[9%] py-3 px-3">
+                  ACTIONS
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {paginated.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center py-14 text-muted-foreground">
+                  <TableCell colSpan={9} className="text-center py-14 text-muted-foreground">
                     <FilePlus2 className="h-10 w-10 mx-auto mb-2 opacity-20" />
                     No quotations found.
                   </TableCell>
@@ -364,44 +444,118 @@ export default function FinanceQuotationTable({
                   const isPending =
                     q.status === 'EMPLOYEE_APPROVED' ||
                     q.status === 'TRANSACTION_COMPLETED' ||
-                    q.status === 'VALIDITY_EXTENSION_REQUESTED';
+                    q.status === 'VALIDITY_EXTENSION_REQUESTED' ||
+                    q.status === 'WAITING_FINANCE_APPROVAL';
                   return (
                     <TableRow
                       key={q.id}
-                      className={`${isPending ? 'bg-blue-50/30 hover:bg-blue-50/50' : index % 2 ? 'bg-slate-50/30' : 'bg-card'} hover:bg-muted/40 transition-colors`}
+                      className={`${isPending ? 'bg-blue-50/20 hover:bg-blue-50/40' : index % 2 ? 'bg-slate-50/10' : 'bg-card'} hover:bg-slate-50/50 transition-colors border-b border-slate-100/50`}
                     >
-                      <TableCell className="text-blue-500 font-bold tracking-tight">
-                        {q.invoiceNumber}
+                      <TableCell className="py-3 px-3">
+                        <div
+                          className={`${q.creditNotes?.some((cn) => cn.status === 'PRODUCT_REPLACED') ? 'text-rose-500' : 'text-blue-500'} font-semibold tracking-tight truncate text-xs`}
+                          title={(() => {
+                            const cn = q.creditNotes?.find((c) => c.status === 'PRODUCT_REPLACED');
+                            if (cn) {
+                              const match = cn.creditNoteNo?.match(/(\d+)$/);
+                              const num = match ? parseInt(match[1], 10) : 0;
+                              return `RTN-INV-${String(num).padStart(4, '0')}`;
+                            }
+                            return q.invoiceNumber?.replace(/^INV-/i, 'QTN-');
+                          })()}
+                        >
+                          {(() => {
+                            const cn = q.creditNotes?.find((c) => c.status === 'PRODUCT_REPLACED');
+                            if (cn) {
+                              const match = cn.creditNoteNo?.match(/(\d+)$/);
+                              const num = match ? parseInt(match[1], 10) : 0;
+                              return `RTN-INV-${String(num).padStart(4, '0')}`;
+                            }
+                            return q.invoiceNumber?.replace(/^INV-/i, 'QTN-');
+                          })()}
+                        </div>
                       </TableCell>
-                      <TableCell className="font-bold text-slate-700">
-                        {q.customerName || 'Walk-in'}
+                      <TableCell className="py-3 px-3">
+                        <div
+                          className="font-semibold text-slate-700 truncate text-xs"
+                          title={getProductNames(q)}
+                        >
+                          {getProductNames(q) || '—'}
+                        </div>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="py-3 px-3">
+                        <div
+                          className="font-bold text-slate-700 truncate text-xs"
+                          title={q.customerName || 'Walk-in'}
+                        >
+                          {q.customerName || 'Walk-in'}
+                        </div>
+                      </TableCell>
+                      <TableCell className="py-3 px-3">
                         <TypeBadge type={q.saleType} />
                       </TableCell>
-                      <TableCell className="font-semibold text-foreground">
-                        {formatCurrency(q.totalAmount)}
+                      <TableCell className="py-3 px-3">
+                        <div className="font-semibold text-foreground truncate text-xs">
+                          {(() => {
+                            const completedExchange = q.creditNotes?.find(
+                              (cn) =>
+                                cn.status === 'PRODUCT_REPLACED' && cn.type === 'CREDIT_EXCHANGE',
+                            );
+                            if (
+                              completedExchange &&
+                              Number(completedExchange.replacementAmount) > 0
+                            ) {
+                              return (
+                                <div>
+                                  <div className="text-violet-700">
+                                    {formatCurrency(Number(completedExchange.replacementAmount))}
+                                  </div>
+                                  <div className="text-[9px] text-slate-400 line-through">
+                                    {formatCurrency(q.totalAmount)}
+                                  </div>
+                                </div>
+                              );
+                            }
+                            return formatCurrency(q.totalAmount);
+                          })()}
+                        </div>
                       </TableCell>
-                      <TableCell className="text-slate-600 text-sm">
-                        {q.employeeName || '—'}
+                      <TableCell className="py-3 px-3">
+                        <div
+                          className="text-slate-600 truncate text-xs"
+                          title={q.employeeName || '—'}
+                        >
+                          {q.employeeName || '—'}
+                        </div>
                       </TableCell>
-                      <TableCell>
-                        <StatusBadge status={q.status} />
+                      <TableCell className="py-3 px-3">
+                        {(() => {
+                          const cn = q.creditNotes?.find((c) => c.status === 'PRODUCT_REPLACED');
+                          if (cn) {
+                            let s = 'PRODUCT_REPLACED';
+                            if (cn.type === 'DIRECT_REFUND') s = 'CASH_REFUND';
+                            else if (cn.type === 'CREDIT_EXCHANGE') s = 'CREDIT_EXCHANGE';
+                            return <StatusBadge status={s} />;
+                          }
+                          return <StatusBadge status={q.status} />;
+                        })()}
                       </TableCell>
-                      <TableCell className="text-muted-foreground text-sm font-medium">
-                        {new Date(q.createdAt).toLocaleDateString(undefined, {
-                          day: '2-digit',
-                          month: 'short',
-                          year: 'numeric',
-                        })}
+                      <TableCell className="py-3 px-3">
+                        <div className="text-muted-foreground font-medium truncate text-xs">
+                          {new Date(q.createdAt).toLocaleDateString(undefined, {
+                            day: '2-digit',
+                            month: 'short',
+                            year: 'numeric',
+                          })}
+                        </div>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="py-3 px-3 text-center">
                         <div className="flex items-center justify-center gap-1">
                           {/* View */}
                           <Button
                             variant="ghost"
                             size="sm"
-                            className="h-8 w-8 p-0 text-blue-500 hover:bg-blue-50"
+                            className="h-8 w-8 p-0 text-blue-500 hover:bg-blue-50 rounded-lg"
                             title="View Details"
                             onClick={() => handleView(q.id)}
                           >
@@ -413,7 +567,7 @@ export default function FinanceQuotationTable({
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                className="h-8 w-8 p-0 text-green-600 hover:bg-green-50"
+                                className="h-8 w-8 p-0 text-green-600 hover:bg-green-50 rounded-lg"
                                 title="Approve"
                                 onClick={() => handleApprove(q)}
                               >
@@ -422,7 +576,7 @@ export default function FinanceQuotationTable({
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                className="h-8 w-8 p-0 text-red-500 hover:bg-red-50"
+                                className="h-8 w-8 p-0 text-red-500 hover:bg-red-50 rounded-lg"
                                 title="Reject"
                                 onClick={() => openReject(q)}
                               >
@@ -458,7 +612,8 @@ export default function FinanceQuotationTable({
           showDistribution={true}
           onApprove={
             viewQuotation.status === 'EMPLOYEE_APPROVED' ||
-            viewQuotation.status === 'VALIDITY_EXTENSION_REQUESTED'
+            viewQuotation.status === 'VALIDITY_EXTENSION_REQUESTED' ||
+            viewQuotation.status === 'WAITING_FINANCE_APPROVAL'
               ? () => {
                   handleApprove(viewQuotation);
                   setViewQuotation(null);
@@ -467,7 +622,8 @@ export default function FinanceQuotationTable({
           }
           onReject={
             viewQuotation.status === 'EMPLOYEE_APPROVED' ||
-            viewQuotation.status === 'VALIDITY_EXTENSION_REQUESTED'
+            viewQuotation.status === 'VALIDITY_EXTENSION_REQUESTED' ||
+            viewQuotation.status === 'WAITING_FINANCE_APPROVAL'
               ? () => {
                   openReject(viewQuotation);
                 }

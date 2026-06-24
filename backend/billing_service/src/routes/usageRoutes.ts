@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import {
   createUsageRecord,
   getUsageHistory,
@@ -10,15 +10,25 @@ import { requireRole } from '../middlewares/roleMiddleware';
 import { EmployeeRole } from '../constants/employeeRole';
 
 import { uploadMeterImage } from '../middlewares/uploadMiddleware';
+import { AppError } from '../errors/appError';
 
-// Create Usage (Finance Only for Monthly Collection? Or Employee for manual entry?)
-// Plan says: "Finance gets full control (usage...)". "Employee locked".
-// So usually Finance records usage. Or Customer uploads (Portal).
-// The route permissions should reflect this.
-// For now, let's allow FINANCE (and maybe EMPLOYEE for legacy flow, but restrict active lease edits?)
-// Plan says "Disable Employee edits post-approval".
-// And "Only Finance can manage Rent & Lease collections".
-// So this route should be restricted to FINANCE role.
+const requireUsageEntryPermission = (req: Request, res: Response, next: NextFunction) => {
+  if (!req.user) {
+    return next(new AppError('Not authenticated', 401));
+  }
+
+  const { role, employeeJob } = req.user;
+
+  if (role === 'ADMIN' || role === 'FINANCE') {
+    return next();
+  }
+
+  if (role === 'EMPLOYEE' && employeeJob === 'TECHNICIAN') {
+    return next();
+  }
+
+  return next(new AppError('Access denied: insufficient permissions', 403));
+};
 
 const router = Router();
 
@@ -27,8 +37,7 @@ const router = Router();
 router.post(
   '/',
   authMiddleware,
-  authMiddleware,
-  requireRole(EmployeeRole.FINANCE),
+  requireUsageEntryPermission,
   uploadMeterImage.single('file'),
   createUsageRecord,
 );

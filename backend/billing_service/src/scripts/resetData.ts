@@ -3,40 +3,37 @@ import { logger } from '../config/logger';
 
 async function resetData() {
   try {
-    if (!Source.isInitialized) {
-      await Source.initialize();
-      logger.info('Database initialized');
+    logger.info('Initializing database connection for billing service...');
+    await Source.initialize();
+    logger.info('Database connected.');
+
+    const tables = [
+      'credit_notes',
+      'return_credits',
+      'invoice_items',
+      'product_allocations',
+      'payment_ledger',
+      'usage_record_items',
+      'usage_records',
+      'device_meter_readings',
+      'invoices',
+      'quotation_template_assignments',
+      'audit_logs',
+    ];
+
+    logger.info('Clearing tables in billing service...');
+    for (const table of tables) {
+      try {
+        await Source.query(`TRUNCATE TABLE "${table}" CASCADE;`);
+        logger.info(`Truncated table: ${table}`);
+      } catch (err) {
+        logger.warn(`Could not truncate table ${table}: ${(err as Error).message}`);
+      }
     }
 
-    const queryRunner = Source.createQueryRunner();
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
-
-    try {
-      logger.info('Starting data reset...');
-
-      // Delete in reverse order of dependencies
-      await queryRunner.query('DELETE FROM usage_record_items');
-      await queryRunner.query('DELETE FROM usage_records');
-      await queryRunner.query('DELETE FROM device_meter_readings');
-      await queryRunner.query('DELETE FROM payment_ledgers');
-      await queryRunner.query('DELETE FROM return_credits');
-      await queryRunner.query('DELETE FROM product_allocations');
-      await queryRunner.query('DELETE FROM invoice_items');
-      await queryRunner.query('DELETE FROM invoices');
-
-      await queryRunner.commitTransaction();
-      logger.info('Data reset complete successfully.');
-    } catch (error) {
-      await queryRunner.rollbackTransaction();
-      logger.error('Data reset failed, transaction rolled back:', error);
-      throw error;
-    } finally {
-      await queryRunner.release();
-    }
-  } catch (error) {
-    logger.error('Error during resetData operation:', error);
-    process.exit(1);
+    logger.info('Data reset completed for billing service.');
+  } catch (err) {
+    logger.error('Error resetting data:', err);
   } finally {
     if (Source.isInitialized) {
       await Source.destroy();

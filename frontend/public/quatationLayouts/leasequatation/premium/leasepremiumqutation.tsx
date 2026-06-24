@@ -12,6 +12,8 @@ export interface LeaseLineItem {
   productName: string;
   brand: string;
   model: string;
+  modelName?: string;
+  modelNo?: string;
   slNo?: string;
   description: string;
   qty: number;
@@ -24,6 +26,7 @@ export interface LeaseLineItem {
   productImage?: string;
   discount?: number;
   features?: { subHeading: string; description: string }[];
+  warranty?: string;
 }
 
 export interface LeaseAgreementDetails {
@@ -403,25 +406,6 @@ const LeasePremiumQuotation: React.FC<LeasePremiumQuotationProps> = ({
                       minHeight: '320px',
                     }}
                   >
-                    {/* Product Watermark */}
-                    {it.productImage && (
-                      <img
-                        src={it.productImage}
-                        alt="Watermark"
-                        style={{
-                          position: 'absolute',
-                          top: '50%',
-                          left: '50%',
-                          transform: 'translate(-50%, -50%)',
-                          width: '100%',
-                          height: '110%',
-                          objectFit: 'contain',
-                          opacity: 0.1,
-                          filter: 'grayscale(100%)',
-                          pointerEvents: 'none',
-                        }}
-                      />
-                    )}
                     <div
                       style={{
                         position: 'relative',
@@ -429,78 +413,138 @@ const LeasePremiumQuotation: React.FC<LeasePremiumQuotationProps> = ({
                         padding: '25px 15px',
                         height: '100%',
                         display: 'flex',
-                        flexDirection: 'column',
-                        justifyContent: 'flex-start',
+                        flexDirection: 'row',
+                        justifyContent: 'space-between',
+                        alignItems: 'flex-start',
+                        gap: '20px',
+                        width: '100%',
+                        boxSizing: 'border-box',
                       }}
                     >
-                      <div
-                        style={{
-                          fontSize: '20px',
-                          fontWeight: '800',
-                          color: '#fff',
-                          marginBottom: '8px',
-                        }}
-                      >
-                        {it.productName}
-                      </div>
-                      <div
-                        style={{
-                          fontSize: '16px',
-                          color: TEXT_WHITE,
-                          fontWeight: '600',
-                          maxWidth: '95%',
-                          lineHeight: '1.6',
-                        }}
-                      >
+                      <div style={{ flex: 1 }}>
                         <div
                           style={{
-                            fontSize: '13px',
+                            fontSize: '20px',
                             fontWeight: '800',
-                            color: '#ff4d4d',
-                            textTransform: 'uppercase',
-                            marginBottom: '6px',
+                            color: '#fff',
+                            marginBottom: '8px',
                           }}
                         >
-                          Product Description
+                          {it.productName}
                         </div>
-                        <div style={{ marginBottom: it.features?.length ? '12px' : '0' }}>
-                          {it.description}
-                        </div>
-                        {(it.features || []).length > 0 && (
-                          <>
+                        <div
+                          style={{
+                            fontSize: '16px',
+                            color: TEXT_WHITE,
+                            fontWeight: '600',
+                            maxWidth: '95%',
+                            lineHeight: '1.6',
+                          }}
+                        >
+                          <div
+                            style={{
+                              fontSize: '13px',
+                              fontWeight: '800',
+                              color: '#ff4d4d',
+                              textTransform: 'uppercase',
+                              marginBottom: '6px',
+                            }}
+                          >
+                            Product Description
+                          </div>
+                          <div style={{ marginBottom: it.features?.length ? '12px' : '0' }}>
+                            {it.description}
+                          </div>
+                          {(it.features || []).length > 0 && (
+                            <>
+                              <div
+                                style={{
+                                  fontSize: '13px',
+                                  fontWeight: '800',
+                                  color: '#ff4d4d',
+                                  textTransform: 'uppercase',
+                                  marginBottom: '6px',
+                                  marginTop: '16px',
+                                }}
+                              >
+                                Features
+                              </div>
+                              {(it.features || []).map((f, i) => (
+                                <div key={i} style={{ marginTop: '8px', fontSize: '15px' }}>
+                                  {f.subHeading && (
+                                    <strong
+                                      style={{
+                                        color: '#ff4d4d',
+                                        display: 'block',
+                                        marginBottom: '4px',
+                                      }}
+                                    >
+                                      {f.subHeading}
+                                    </strong>
+                                  )}
+                                  {f.description && (
+                                    <div style={{ color: '#ccc' }}>{f.description}</div>
+                                  )}
+                                </div>
+                              ))}
+                            </>
+                          )}
+                          {it.warranty && (
                             <div
                               style={{
-                                fontSize: '13px',
-                                fontWeight: '800',
-                                color: '#ff4d4d',
+                                marginTop: '12px',
+                                fontSize: '12px',
+                                color: '#fff',
+                                fontWeight: '400',
                                 textTransform: 'uppercase',
-                                marginBottom: '6px',
-                                marginTop: '16px',
                               }}
                             >
-                              Features
+                              <span style={{ color: '#ff4d4d', fontWeight: '700' }}>
+                                Warranty:{' '}
+                              </span>
+                              {(() => {
+                                const parts = it.warranty.split(' ');
+                                if (parts.length >= 2) {
+                                  return (
+                                    <>
+                                      <span style={{ color: '#ff4d4d' }}>
+                                        {parts[0]} {parts[1]}
+                                      </span>
+                                      <span> {parts.slice(2).join(' ')}</span>
+                                    </>
+                                  );
+                                }
+                                return <span style={{ color: '#ff4d4d' }}>{it.warranty}</span>;
+                              })()}
                             </div>
-                            {(it.features || []).map((f, i) => (
-                              <div key={i} style={{ marginTop: '8px', fontSize: '15px' }}>
-                                {f.subHeading && (
-                                  <strong
-                                    style={{
-                                      color: '#ff4d4d',
-                                      display: 'block',
-                                      marginBottom: '4px',
-                                    }}
-                                  >
-                                    {f.subHeading}
-                                  </strong>
-                                )}
-                                {f.description && (
-                                  <div style={{ color: '#ccc' }}>{f.description}</div>
-                                )}
-                              </div>
-                            ))}
-                          </>
-                        )}
+                          )}
+                        </div>
                       </div>
+                      {it.productImage && (
+                        <div
+                          style={{
+                            width: '350px',
+                            flexShrink: 0,
+                            display: 'flex',
+                            justifyContent: 'center',
+                            alignItems: 'center',
+                            background: 'rgba(255,255,255,0.05)',
+                            padding: '15px',
+                            borderRadius: '15px',
+                            border: '1px solid rgba(255,255,255,0.1)',
+                          }}
+                        >
+                          <img
+                            src={it.productImage}
+                            alt="Product"
+                            style={{
+                              width: '100%',
+                              height: 'auto',
+                              objectFit: 'contain',
+                            }}
+                          />
+                        </div>
+                      )}
                     </div>
                   </td>
                   <td
@@ -809,8 +853,10 @@ const LeasePremiumQuotation: React.FC<LeasePremiumQuotationProps> = ({
               {[
                 { l: 'Lease Type', v: leaseDetails.leaseType },
                 { l: 'Tenure / Duration', v: leaseDetails.duration },
-                { l: 'Advance Payment', v: `QAR ${fmt(leaseDetails.advance)}` },
-                { l: 'Security Deposit', v: `QAR ${fmt(leaseDetails.deposit)}` },
+                {
+                  l: 'Advance / Deposit',
+                  v: `QAR ${fmt(leaseDetails.advance || leaseDetails.deposit || 0)}`,
+                },
                 { l: 'Start Date', v: leaseDetails.startDate || 'TBD' },
                 { l: 'End Date', v: leaseDetails.endDate || 'TBD' },
               ].map((it, i) => (
@@ -852,7 +898,7 @@ const LeasePremiumQuotation: React.FC<LeasePremiumQuotationProps> = ({
               }}
             >
               <span>Total Lease Value</span>
-              <span style={{ fontWeight: '700', color: TEXT_WHITE }}>
+              <span style={{ fontWeight: '400', color: TEXT_WHITE }}>
                 QAR {fmt(totals.subTotal)}
               </span>
             </div>
@@ -865,7 +911,7 @@ const LeasePremiumQuotation: React.FC<LeasePremiumQuotationProps> = ({
               }}
             >
               <span>Tax (0%)</span>
-              <span style={{ fontWeight: '700', color: TEXT_WHITE }}>QAR {fmt(totals.tax)}</span>
+              <span style={{ fontWeight: '400', color: TEXT_WHITE }}>QAR {fmt(totals.tax)}</span>
             </div>
             <div
               style={{

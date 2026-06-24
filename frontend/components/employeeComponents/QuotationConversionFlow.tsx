@@ -46,8 +46,12 @@ export function QuotationConversionFlow({
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Step 1: Serial number assignment per item
-  const allocatableItems = (quotation.items || []).filter(
-    (item) => item.itemType === 'PRODUCT' || item.itemType === 'SPAREPART',
+  const allocatableItems = React.useMemo(
+    () =>
+      (quotation.items || []).filter(
+        (item) => item.itemType === 'PRODUCT' || item.itemType === 'SPAREPART',
+      ),
+    [quotation.items],
   );
   const [serialUpdates, setSerialUpdates] = useState<SerialUpdate[]>(
     allocatableItems.map((item) => ({
@@ -92,7 +96,7 @@ export function QuotationConversionFlow({
       }
     };
     fetchAvailable();
-  }, [quotation]);
+  }, [quotation, allocatableItems]);
 
   // Step 2: Advance payment
   const prefilledAdvance = Number(quotation.advanceAmount || 0);
@@ -108,21 +112,15 @@ export function QuotationConversionFlow({
 
   // Step 2: Caution Deposit (Security Deposit)
   const prefilledCaution = Number(quotation.securityDepositAmount || 0);
-  const [cautionAmount, setCautionAmount] = useState(
-    prefilledCaution > 0 ? String(prefilledCaution) : '',
-  );
-  const [cautionMode, setCautionMode] = useState<
-    'CASH' | 'BANK_TRANSFER' | 'CHEQUE' | 'CREDIT_CARD'
-  >(
+  const [cautionAmount] = useState(prefilledCaution > 0 ? String(prefilledCaution) : '');
+  const [cautionMode] = useState<'CASH' | 'BANK_TRANSFER' | 'CHEQUE' | 'CREDIT_CARD'>(
     (quotation.securityDepositMode as unknown as
       | 'CASH'
       | 'BANK_TRANSFER'
       | 'CHEQUE'
       | 'CREDIT_CARD') || 'CASH',
   );
-  const [cautionReference, setCautionReference] = useState(
-    quotation.securityDepositReference || '',
-  );
+  const [cautionReference] = useState(quotation.securityDepositReference || '');
 
   const updateSerial = (index: number, productId: string) => {
     setSerialUpdates((prev) => {
@@ -250,7 +248,7 @@ export function QuotationConversionFlow({
               Serial Numbers
             </span>
             <span className="text-[9px] font-black uppercase tracking-widest opacity-70">
-              Advance Payment
+              Advance / Deposit
             </span>
             <span className="text-[9px] font-black uppercase tracking-widest opacity-70">
               Confirm
@@ -294,14 +292,36 @@ export function QuotationConversionFlow({
                         placeholder="Search by Serial Number, Brand, or Product Name..."
                         className="h-12 border-slate-200"
                         options={(update.modelId ? availableProducts[update.modelId] || [] : [])
-                          .filter((p) => p.product_status === 'AVAILABLE')
-                          .map((p) => ({
-                            value: p.id,
-                            label: `${p.serial_no} — ${p.brand?.toUpperCase() || ''} ${p.name}`,
-                            description: p.model?.model_name
-                              ? `Model: ${p.model.model_name}`
-                              : undefined,
-                          }))}
+                          .filter((p) =>
+                            ['AVAILABLE', 'RETURNED', 'DAMAGED'].includes(p.product_status),
+                          )
+                          .map((p) => {
+                            const statusColor =
+                              p.product_status === 'DAMAGED'
+                                ? 'text-red-600'
+                                : p.product_status === 'RETURNED'
+                                  ? 'text-green-600'
+                                  : 'text-slate-400';
+                            const statusLabel =
+                              p.product_status && p.product_status !== 'AVAILABLE' ? (
+                                <span className={`${statusColor} font-black ml-2`}>
+                                  [{p.product_status}]
+                                </span>
+                              ) : null;
+                            return {
+                              value: p.id,
+                              label: (
+                                <span className="flex items-center">
+                                  {p.serial_no} — {p.brand?.toUpperCase() || ''} {p.name}
+                                  {statusLabel}
+                                </span>
+                              ),
+                              searchText: `${p.serial_no} ${p.brand} ${p.name} ${p.product_status}`,
+                              description: p.model?.model_name
+                                ? `Model: ${p.model.model_name} • QAR ${Number(p.sale_price || 0).toLocaleString()}`
+                                : `QAR ${Number(p.sale_price || 0).toLocaleString()}`,
+                            };
+                          })}
                       />
                     )}
                   </div>
@@ -313,21 +333,22 @@ export function QuotationConversionFlow({
           {/* ── Step 2: Payment Entry ───────────────────────────────────── */}
           {step === 2 && (
             <div className="space-y-4">
-              {/* Advance Payment Card */}
+              {/* Advance Payment / Caution Deposit Card */}
               <div className="p-4 bg-slate-50/50 rounded-2xl border border-slate-100/80 space-y-3">
                 <div className="flex items-center justify-between">
                   <h4 className="text-xs font-black text-emerald-700 uppercase tracking-wider flex items-center gap-1.5">
                     <span className="h-2 w-2 rounded-full bg-emerald-500"></span>
-                    Advance Payment (Optional)
+                    Advance Payment / Caution Deposit (Optional)
                   </h4>
                 </div>
                 <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wide leading-relaxed">
-                  Record advance payment to initialize the financial ledger with this credit.
+                  Record advance payment / caution deposit to initialize the ledger and activate the
+                  contract.
                 </p>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="col-span-2">
                     <Label className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1 block">
-                      Advance Amount (QAR)
+                      Amount (QAR)
                     </Label>
                     <Input
                       type="number"
@@ -384,77 +405,6 @@ export function QuotationConversionFlow({
                 </div>
               </div>
 
-              {/* Caution Deposit Card */}
-              <div className="p-4 bg-slate-50/50 rounded-2xl border border-slate-100/80 space-y-3">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-xs font-black text-indigo-700 uppercase tracking-wider flex items-center gap-1.5">
-                    <span className="h-2 w-2 rounded-full bg-indigo-500"></span>
-                    Caution Deposit (Optional)
-                  </h4>
-                </div>
-                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wide leading-relaxed">
-                  Record caution / security deposit for contract activation.
-                </p>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="col-span-2">
-                    <Label className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1 block">
-                      Caution Deposit Amount (QAR)
-                    </Label>
-                    <Input
-                      type="number"
-                      value={cautionAmount}
-                      onChange={(e) => setCautionAmount(e.target.value)}
-                      placeholder="0.00"
-                      className="h-10 font-black text-indigo-600 text-sm border-slate-200 focus:border-indigo-300"
-                    />
-                  </div>
-                  {cautionAmount && Number(cautionAmount) > 0 && (
-                    <>
-                      <div>
-                        <Label className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1 block">
-                          Payment Mode
-                        </Label>
-                        <Select
-                          value={cautionMode}
-                          onValueChange={(
-                            val: 'CASH' | 'BANK_TRANSFER' | 'CHEQUE' | 'CREDIT_CARD',
-                          ) => setCautionMode(val)}
-                        >
-                          <SelectTrigger className="h-10 border-slate-200 font-bold text-xs">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="CASH" className="text-xs font-bold">
-                              Cash
-                            </SelectItem>
-                            <SelectItem value="BANK_TRANSFER" className="text-xs font-bold">
-                              Bank Transfer
-                            </SelectItem>
-                            <SelectItem value="CHEQUE" className="text-xs font-bold">
-                              Cheque
-                            </SelectItem>
-                            <SelectItem value="CREDIT_CARD" className="text-xs font-bold">
-                              Credit Card
-                            </SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div>
-                        <Label className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1 block">
-                          Reference #
-                        </Label>
-                        <Input
-                          value={cautionReference}
-                          onChange={(e) => setCautionReference(e.target.value)}
-                          placeholder="Ref/Cheque No"
-                          className="h-10 border-slate-200 font-bold text-xs"
-                        />
-                      </div>
-                    </>
-                  )}
-                </div>
-              </div>
-
               {/* Remarks Section */}
               <div className="p-3 bg-slate-50/20 rounded-xl border border-slate-100">
                 <Label className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1 block">
@@ -490,15 +440,11 @@ export function QuotationConversionFlow({
                   <span className="text-slate-700">{saleLabel}</span>
                 </div>
                 <div className="flex justify-between text-[11px] font-bold">
-                  <span className="text-slate-400 uppercase tracking-widest">Advance Amount</span>
+                  <span className="text-slate-400 uppercase tracking-widest">
+                    Advance / Caution Deposit
+                  </span>
                   <span className="text-emerald-600 font-black">
                     QAR {Number(advanceAmount || 0).toFixed(2)}
-                  </span>
-                </div>
-                <div className="flex justify-between text-[11px] font-bold">
-                  <span className="text-slate-400 uppercase tracking-widest">Caution Deposit</span>
-                  <span className="text-indigo-600 font-black">
-                    QAR {Number(cautionAmount || 0).toFixed(2)}
                   </span>
                 </div>
                 <div className="flex justify-between text-[11px] font-bold">

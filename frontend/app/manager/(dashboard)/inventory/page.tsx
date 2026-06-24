@@ -6,10 +6,17 @@ import SparePartTable from '@/components/ManagerDashboardComponents/inventoryCom
 import { YearSelector } from '@/components/ui/YearSelector';
 
 export default function ManagerInventoryPage() {
-  const [selectedYear, setSelectedYear] = useState<number | 'all'>(new Date().getFullYear());
+  const [selectedYear, setSelectedYear] = useState<number | 'all'>(2026); // Default to a static safe year for SSR
+
+  React.useEffect(() => {
+    setSelectedYear(new Date().getFullYear());
+  }, []);
 
   return (
-    <div className="bg-blue-100 min-h-screen p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6">
+    <div
+      className="bg-blue-100 min-h-screen p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6"
+      suppressHydrationWarning
+    >
       {/* INVENTORY */}
       <div className="space-y-3 sm:space-y-5">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">

@@ -7,6 +7,7 @@ export interface Product {
   model_id: string;
   model?: Model;
   model_no?: string;
+  barcode_id?: string;
   warehouse_id: string;
   warehouse_name?: string;
   vendor_id: string;
@@ -32,6 +33,7 @@ export interface Product {
   description?: string;
   hs_code?: string;
   features?: { subHeading: string; description: string }[];
+  consumables?: { partName: string; description: string; yield: string; price: string }[];
 }
 
 /**
@@ -56,6 +58,7 @@ export interface CreateProductDTO {
   description?: string;
   hs_code?: string;
   features?: { subHeading: string; description: string }[];
+  consumables?: { partName: string; description: string; yield: string; price: string }[];
 }
 
 /**
@@ -80,6 +83,7 @@ export interface BulkProductRow {
   lot_id?: string;
   description?: string;
   hs_code?: string;
+  consumables?: { partName: string; description: string; yield: string; price: string }[];
 }
 
 /**
@@ -114,6 +118,8 @@ export const productService = {
     page?: number;
     limit?: number;
     search?: string;
+    modelId?: string;
+    status?: string;
   }): Promise<PaginatedResponse<Product>> => {
     const response = await api.get('/i/products', { params });
     // Safety check: ensure we handle the data correctly whether it's one page or many.

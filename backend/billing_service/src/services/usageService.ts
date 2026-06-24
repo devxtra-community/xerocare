@@ -549,6 +549,7 @@ export class UsageService {
 
       // Return next period for UI convenience
       const nextPeriod = this.calculateNextPeriod(contract, new Date(payload.billingPeriodEnd));
+
       return { usage, nextPeriod };
     }
   }
@@ -1373,7 +1374,7 @@ export class UsageService {
       referenceContractId: contractId,
       grossAmount: totalRent + totalExcess,
       totalAmount: totalRent + totalExcess,
-      status: InvoiceStatus.ISSUED, // Default to ISSUED for final summary
+      status: InvoiceStatus.INVOICED, // Default to INVOICED for final summary
       customerId: contract.customerId,
       branchId: contract.branchId,
       createdBy: contract.createdBy,
@@ -1415,7 +1416,7 @@ export class UsageService {
       referenceContractId: contractId,
       grossAmount: totalRent + totalExcess,
       totalAmount: totalRent + totalExcess,
-      status: InvoiceStatus.ISSUED,
+      status: InvoiceStatus.INVOICED,
       customerId: contract.customerId,
       branchId: contract.branchId,
       createdBy: contract.createdBy,

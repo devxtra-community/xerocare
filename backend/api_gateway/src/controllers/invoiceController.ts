@@ -767,3 +767,41 @@ export const getEmployeeAssignedQuotations = async (
     next(error);
   }
 };
+
+export const updateStatus = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = req.params.id as string;
+    const token = req.headers.authorization?.split(' ')[1] || '';
+    const { status } = req.body;
+    const result = await invoiceAggregationService.updateStatus(id, status, token);
+    return res.status(200).json({
+      success: true,
+      data: result,
+      message: 'Status updated successfully',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const deleteInvoice = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = req.params.id as string;
+    const token = req.headers.authorization?.split(' ')[1] || '';
+    const result = await invoiceAggregationService.deleteInvoice(id, token);
+    return res.status(200).json(result);
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getAuditLogs = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const entityId = req.params.entityId as string;
+    const token = req.headers.authorization?.split(' ')[1] || '';
+    const result = await invoiceAggregationService.getAuditLogs(entityId, token);
+    return res.status(200).json(result);
+  } catch (error) {
+    next(error);
+  }
+};

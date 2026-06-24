@@ -8,6 +8,8 @@ export interface SlabRange {
 
 export interface RentLineItem {
   model: string;
+  modelName?: string;
+  modelNo?: string;
   brand: string;
   productName: string;
   slNo: string;
@@ -20,6 +22,7 @@ export interface RentLineItem {
   colorSlabs?: SlabRange[];
   comboSlabs?: SlabRange[];
   features?: { subHeading: string; description: string }[];
+  warranty?: string;
 }
 
 export interface RentPremiumQuotationProps {
@@ -540,41 +543,70 @@ const RentPremiumQuotation: React.FC<RentPremiumQuotationProps> = ({
                         </div>
                         <div style={{ marginBottom: item.features?.length ? '12px' : '0' }}>
                           {item.description}
-                        </div>
-                        {(item.features || []).length > 0 && (
-                          <>
+                          {(item.features || []).length > 0 && (
+                            <>
+                              <div
+                                style={{
+                                  fontSize: '13px',
+                                  fontWeight: '800',
+                                  color: '#ff4d4d',
+                                  textTransform: 'uppercase',
+                                  marginBottom: '6px',
+                                  marginTop: '16px',
+                                }}
+                              >
+                                Features
+                              </div>
+                              {(item.features || []).map((f, i: number) => (
+                                <div key={i} style={{ marginTop: '8px', fontSize: '15px' }}>
+                                  {f.subHeading && (
+                                    <strong
+                                      style={{
+                                        color: '#ff4d4d',
+                                        display: 'block',
+                                        marginBottom: '4px',
+                                      }}
+                                    >
+                                      {f.subHeading}
+                                    </strong>
+                                  )}
+                                  {f.description && (
+                                    <div style={{ color: '#ccc' }}>{f.description}</div>
+                                  )}
+                                </div>
+                              ))}
+                            </>
+                          )}
+                          {item.warranty && (
                             <div
                               style={{
+                                marginTop: '12px',
                                 fontSize: '13px',
-                                fontWeight: '800',
-                                color: '#ff4d4d',
+                                color: '#fff',
+                                fontWeight: '400',
                                 textTransform: 'uppercase',
-                                marginBottom: '6px',
-                                marginTop: '16px',
                               }}
                             >
-                              Features
+                              <span style={{ color: '#ff4d4d', fontWeight: '700' }}>
+                                Warranty:{' '}
+                              </span>
+                              {(() => {
+                                const parts = item.warranty.split(' ');
+                                if (parts.length >= 2) {
+                                  return (
+                                    <>
+                                      <span style={{ color: '#ff4d4d' }}>
+                                        {parts[0]} {parts[1]}
+                                      </span>
+                                      <span> {parts.slice(2).join(' ')}</span>
+                                    </>
+                                  );
+                                }
+                                return <span style={{ color: '#ff4d4d' }}>{item.warranty}</span>;
+                              })()}
                             </div>
-                            {(item.features || []).map((f, i: number) => (
-                              <div key={i} style={{ marginTop: '8px', fontSize: '15px' }}>
-                                {f.subHeading && (
-                                  <strong
-                                    style={{
-                                      color: '#ff4d4d',
-                                      display: 'block',
-                                      marginBottom: '4px',
-                                    }}
-                                  >
-                                    {f.subHeading}
-                                  </strong>
-                                )}
-                                {f.description && (
-                                  <div style={{ color: '#ccc' }}>{f.description}</div>
-                                )}
-                              </div>
-                            ))}
-                          </>
-                        )}
+                          )}
+                        </div>
                       </div>
                     </div>
                   </td>
@@ -654,8 +686,10 @@ const RentPremiumQuotation: React.FC<RentPremiumQuotationProps> = ({
                 { label: 'RENT TYPE', value: agreementDetails.rentType },
                 { label: 'PERIOD', value: agreementDetails.period },
                 { label: 'MONTHS COUNT', value: agreementDetails.duration },
-                { label: 'ADVANCE', value: `QAR ${fmt(agreementDetails.advance)}` },
-                { label: 'DEPOSIT', value: `QAR ${fmt(agreementDetails.deposit)}` },
+                {
+                  label: 'ADVANCE / DEPOSIT',
+                  value: `QAR ${fmt(agreementDetails.advance || agreementDetails.deposit || 0)}`,
+                },
                 { label: 'DISCOUNT', value: `${agreementDetails.discountPercent}%` },
                 { label: 'START DATE', value: quotation.contractStartDate || 'TBD' },
                 { label: 'END DATE', value: quotation.contractEndDate || 'TBD' },

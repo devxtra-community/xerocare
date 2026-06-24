@@ -11,7 +11,7 @@ import {
   CartesianGrid,
   Legend,
 } from 'recharts';
-import { getInvoices } from '@/lib/invoice';
+import { getBranchSalesOverview } from '@/lib/invoice';
 import { Loader2 } from 'lucide-react';
 import { ChartTooltipContent } from '@/components/ui/ChartTooltip';
 import { formatCompactNumber } from '@/lib/format';
@@ -37,15 +37,11 @@ export default function RevenueBreakdownChart({ selectedYear }: RevenueBreakdown
 
   useEffect(() => {
     const fetchData = async () => {
+      setLoading(true);
       try {
-        const invoices = await getInvoices();
-        const paidOnly = (invoices || []).filter((inv) => inv.status === 'PAID');
-
-        // Filter by year if necessary
-        const filteredInvoices =
-          selectedYear === 'all'
-            ? paidOnly
-            : paidOnly.filter((inv) => new Date(inv.createdAt).getFullYear() === selectedYear);
+        // Use the server-side aggregated branch sales overview
+        const year = selectedYear === 'all' ? undefined : (selectedYear as number | undefined);
+        const rawData = await getBranchSalesOverview('1Y', year);
 
         // Initialize all months with zero values
         const monthlyData: Record<string, MonthlyData> = {};
@@ -53,11 +49,11 @@ export default function RevenueBreakdownChart({ selectedYear }: RevenueBreakdown
           monthlyData[month] = { month, rent: 0, sale: 0, lease: 0 };
         });
 
-        // Populate with actual data
-        filteredInvoices.forEach((inv) => {
-          const date = new Date(inv.createdAt);
-          const monthName = MONTHS[date.getMonth()];
-          const rawType = (inv.saleType || '').toUpperCase();
+        // rawData rows: { date: 'YYYY-MM-DD', saleType: 'RENT'|'SALE'|..., totalSales: number }
+        (rawData || []).forEach((row) => {
+          const monthIdx = new Date(row.date).getMonth();
+          const monthName = MONTHS[monthIdx];
+          const rawType = (row.saleType || '').toUpperCase();
 
           let typeKey: 'rent' | 'sale' | 'lease' | null = null;
           if (rawType === 'RENT') typeKey = 'rent';
@@ -65,7 +61,7 @@ export default function RevenueBreakdownChart({ selectedYear }: RevenueBreakdown
           else if (['SALE', 'PRODUCT_SALE', 'SPAREPART_SALE'].includes(rawType)) typeKey = 'sale';
 
           if (monthlyData[monthName] && typeKey) {
-            monthlyData[monthName][typeKey] += Number(inv.totalAmount) || 0;
+            monthlyData[monthName][typeKey] += Number(row.totalSales) || 0;
           }
         });
 

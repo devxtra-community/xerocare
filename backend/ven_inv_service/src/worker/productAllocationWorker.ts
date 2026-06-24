@@ -1,4 +1,4 @@
-import { getRabbitChannel } from '../config/rabbitmq';
+import { getRabbitChannel, getRabbitConnection } from '../config/rabbitmq';
 import { logger } from '../config/logger';
 import { Source } from '../config/db';
 import { Product, ProductStatus } from '../entities/productEntity';
@@ -13,8 +13,32 @@ const ROUTING_KEY = 'inventory.product.allocate';
 export async function startProductAllocationConsumer() {
   const channel = await getRabbitChannel();
 
+  const DLX = 'dlx.inventory';
+  const DLQ = 'dlq.inventory';
+
+  await channel.assertExchange(DLX, 'topic', { durable: true });
+  await channel.assertQueue(DLQ, { durable: true });
+  await channel.bindQueue(DLQ, DLX, '#');
+
   await channel.assertExchange(EXCHANGE, 'topic', { durable: true });
-  await channel.assertQueue(QUEUE, { durable: true });
+
+  // Delete the old queue if it exists to allow changing the arguments safely
+  try {
+    const conn = await getRabbitConnection();
+    const tempChannel = await conn.createChannel();
+    await tempChannel.deleteQueue(QUEUE);
+    await tempChannel.close();
+  } catch {
+    // Ignore error if queue doesn't exist
+  }
+
+  await channel.assertQueue(QUEUE, {
+    durable: true,
+    arguments: {
+      'x-dead-letter-exchange': DLX,
+      'x-dead-letter-routing-key': 'inventory.product.allocate.dlq',
+    },
+  });
   await channel.bindQueue(QUEUE, EXCHANGE, ROUTING_KEY);
 
   channel.consume(QUEUE, async (msg) => {
@@ -133,6 +157,7 @@ export async function startProductAllocationConsumer() {
       channel.ack(msg);
     } catch (error) {
       logger.error('Product allocation consumer failed', error);
+      channel.nack(msg, false, false);
     }
   });
 

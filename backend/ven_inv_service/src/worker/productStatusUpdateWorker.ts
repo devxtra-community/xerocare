@@ -15,7 +15,7 @@ const ROUTING_KEY = 'inventory.product.status.update';
 /**
  * Allowed bill types
  */
-type BillType = 'SALE' | 'RENT' | 'LEASE' | 'RETURNED';
+type BillType = 'SALE' | 'RENT' | 'LEASE' | 'RETURNED' | 'DAMAGED';
 
 /**
  * BillType → ProductStatus mapping
@@ -24,14 +24,21 @@ const STATUS_MAP: Record<BillType, ProductStatus> = {
   SALE: ProductStatus.SOLD,
   RENT: ProductStatus.RENTED,
   LEASE: ProductStatus.LEASE,
-  RETURNED: ProductStatus.AVAILABLE,
+  RETURNED: ProductStatus.RETURNED,
+  DAMAGED: ProductStatus.DAMAGED,
 };
 
 /**
  * Runtime type guard for billType
  */
 function isBillType(value: unknown): value is BillType {
-  return value === 'SALE' || value === 'RENT' || value === 'LEASE' || value === 'RETURNED';
+  return (
+    value === 'SALE' ||
+    value === 'RENT' ||
+    value === 'LEASE' ||
+    value === 'RETURNED' ||
+    value === 'DAMAGED'
+  );
 }
 
 /**

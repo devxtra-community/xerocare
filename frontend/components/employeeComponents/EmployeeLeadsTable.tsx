@@ -23,6 +23,7 @@ import {
 import LeadDialog from './LeadDialog';
 import { Lead, getLeads, createLead, updateLead, deleteLead, CreateLeadData } from '@/lib/lead';
 import { toast } from 'sonner';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { usePagination } from '@/hooks/usePagination';
 import Pagination from '@/components/Pagination';
 
@@ -75,15 +76,25 @@ export default function EmployeeLeadsTable() {
     setDialogOpen(true);
   };
 
-  const handleDelete = async (id: string, isDeleted: boolean) => {
-    if (isDeleted) return; // Already deleted
-    if (!confirm('Are you sure you want to delete this lead?')) return;
+  // Delete States
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deletingLeadId, setDeletingLeadId] = useState<string | null>(null);
+
+  const handleDeleteClick = (id: string) => {
+    setDeletingLeadId(id);
+    setDeleteOpen(true);
+  };
+
+  const executeDeleteLead = async () => {
+    if (!deletingLeadId) return;
     try {
-      await deleteLead(id);
+      await deleteLead(deletingLeadId);
       toast.success('Lead deleted successfully');
       fetchLeads();
     } catch {
       toast.error('Failed to delete lead');
+    } finally {
+      setDeleteOpen(false);
     }
   };
 
@@ -307,7 +318,7 @@ export default function EmployeeLeadsTable() {
                             variant="ghost"
                             size="icon"
                             className="h-8 w-8 text-muted-foreground hover:text-red-600 hover:bg-red-50"
-                            onClick={() => handleDelete(lead._id, !!lead.isDeleted)}
+                            onClick={() => handleDeleteClick(lead._id)}
                             title="Delete Lead"
                           >
                             <Trash2 className="h-4 w-4" />
@@ -337,6 +348,16 @@ export default function EmployeeLeadsTable() {
         onOpenChange={setDialogOpen}
         initialData={currentLead}
         onSave={handleSave}
+      />
+
+      <ConfirmDialog
+        isOpen={deleteOpen}
+        onClose={() => setDeleteOpen(false)}
+        title="Delete Lead"
+        description="Are you sure you want to delete this lead? This action cannot be undone."
+        type="destructive"
+        confirmText="Delete Lead"
+        onConfirm={executeDeleteLead}
       />
     </div>
   );

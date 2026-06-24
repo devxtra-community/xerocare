@@ -37,10 +37,17 @@ export function ProductSelect({
 
         if (mode === 'PRODUCT' || mode === 'BOTH') {
           const fetchParams: { limit?: number; status?: string } = { limit: 10000 };
-          if (onlyAvailable) {
-            fetchParams.status = 'AVAILABLE';
-          }
+          // Fetch all products for the branch to handle local filtering of multi-status (AVAILABLE, RETURNED, DAMAGED)
           productsData = await getAllProducts(fetchParams);
+
+          if (onlyAvailable) {
+            const allowedStatuses = [
+              ProductStatus.AVAILABLE,
+              ProductStatus.RETURNED,
+              ProductStatus.DAMAGED,
+            ];
+            productsData = productsData.filter((p) => allowedStatuses.includes(p.product_status));
+          }
         }
         if (mode === 'SPAREPART' || mode === 'BOTH') {
           const allSpares = await getAllSpareParts({ limit: 10000 });
@@ -71,7 +78,7 @@ export function ProductSelect({
   };
 
   const options: SearchableSelectOption[] = items.map((item) => {
-    let label = '';
+    let label: React.ReactNode = '';
     let price = 0;
     let type = '';
 
@@ -82,17 +89,31 @@ export function ProductSelect({
       type = 'Spare Part';
     } else {
       // Product
-      label = `${item.name} ${item.model?.model_name ? `- ${item.model.model_name}` : ''}`;
+      const baseLabel = `${item.name} ${item.model?.model_name ? `- ${item.model.model_name}` : ''}`;
 
-      // Clearly highlight product status (in stock vs out of stock/rented/leased)
-      let statusLabel = '';
-      if (!item.product_status || item.product_status === ProductStatus.AVAILABLE) {
-        statusLabel = '[IN STOCK]';
-      } else {
-        statusLabel = `[${item.product_status.toUpperCase()}]`;
+      // Colorize brackets based on status
+      let statusNode: React.ReactNode = null;
+      if (item.product_status === ProductStatus.DAMAGED) {
+        statusNode = (
+          <span className="text-red-600 font-extrabold ml-1.5 animation-pulse"> [DAMAGED]</span>
+        );
+      } else if (item.product_status === ProductStatus.RETURNED) {
+        statusNode = <span className="text-green-600 font-extrabold ml-1.5"> [RETURNED]</span>;
+      } else if (item.product_status && item.product_status !== ProductStatus.AVAILABLE) {
+        statusNode = (
+          <span className="text-slate-400 font-bold ml-1.5">
+            {' '}
+            [{item.product_status.toUpperCase()}]
+          </span>
+        );
       }
 
-      label = `${statusLabel} ${label}`;
+      label = (
+        <span className="flex items-center">
+          {baseLabel}
+          {statusNode}
+        </span>
+      ) as React.ReactNode;
 
       price = item.sale_price || 0;
       type = 'Product';
@@ -100,7 +121,11 @@ export function ProductSelect({
 
     return {
       value: item.id,
-      label: label,
+      label: label as React.ReactNode,
+      searchText:
+        'part_name' in item
+          ? `${item.part_name} ${item.lotNumber}`
+          : `${item.name} ${item.model?.model_name || ''} ${item.product_status || ''}`,
       description: `${type} • QAR ${price.toLocaleString()}`,
       disabled: false,
     };

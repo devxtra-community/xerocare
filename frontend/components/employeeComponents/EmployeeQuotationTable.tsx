@@ -19,9 +19,12 @@ import {
   FileSignature,
   UserCheck,
   Wrench,
+  Copy,
+  Scan,
 } from 'lucide-react';
 import { formatCurrency } from '@/lib/format';
 import { toast } from 'sonner';
+import api from '@/lib/api';
 import {
   Table,
   TableBody,
@@ -67,7 +70,6 @@ import { getAllModels, Model } from '@/lib/model';
 import { QuotationViewDialog } from './QuotationViewDialog';
 import RentFormModal from './RentFormModal';
 import { InvoiceAccountView } from '../invoice/InvoiceAccountView';
-import { LayoutSelectionDialog } from './LayoutSelectionDialog';
 import { getAccountSummary } from '@/lib/payment';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -97,6 +99,7 @@ interface SaleItem {
   productName?: string;
   hsCode?: string;
   itemType: 'PRODUCT' | 'SPAREPART';
+  warranty?: string;
   isEditable: boolean;
   bwIncludedLimit?: number;
   colorIncludedLimit?: number;
@@ -129,6 +132,10 @@ function StatusBadge({ status }: { status: string }) {
     PENDING: 'bg-yellow-100 text-yellow-700',
     PAID: 'bg-green-100 text-green-700',
     ACTIVE_LEASE: 'bg-green-100 text-green-700',
+    ACTIVE_CONTRACT: 'bg-green-100 text-green-700',
+    INVOICED: 'bg-blue-100 text-blue-600',
+    CANCELLED: 'bg-slate-100 text-slate-600',
+    WAITING_FINANCE_APPROVAL: 'bg-amber-100 text-amber-700',
     TRANSACTION_COMPLETED: 'bg-green-100 text-green-700 font-bold border-green-200',
     ASSIGNED: 'bg-indigo-100 text-indigo-700',
     RETAKEN: 'bg-red-100 text-red-700',
@@ -152,6 +159,11 @@ function StatusBadge({ status }: { status: string }) {
     TRANSACTION_COMPLETED: 'ACCOUNTING COMPLETED',
     PAID: 'FULLY PAID',
     ACTIVE_LEASE: 'ACTIVE',
+    ACTIVE_CONTRACT: 'ACTIVE',
+    INVOICED: 'INVOICED',
+    CANCELLED: 'CANCELLED',
+    EXPIRED: 'EXPIRED',
+    WAITING_FINANCE_APPROVAL: 'WAITING FINANCE APPROVAL',
   };
 
   return (
@@ -201,6 +213,7 @@ export default function EmployeeQuotationTable() {
   const [viewOpen, setViewOpen] = useState(false);
   const [accountViewOpen, setAccountViewOpen] = useState(false);
   const [selectedQ, setSelectedQ] = useState<Invoice | null>(null);
+  const [sourceQuotationData, setSourceQuotationData] = useState<Invoice | null>(null);
   const [search, setSearch] = useState('');
   const [employeeJob, setEmployeeJob] = useState<EmployeeJob | null | undefined>(null);
   const [allBrands, setAllBrands] = useState<Brand[]>([]);
@@ -211,6 +224,11 @@ export default function EmployeeQuotationTable() {
   const [assignCustomerId, setAssignCustomerId] = useState('');
   const [assignCustomerNotes, setAssignCustomerNotes] = useState('');
   const [submittingAssignCustomer, setSubmittingAssignCustomer] = useState(false);
+
+  const [newFromExistingOpen, setNewFromExistingOpen] = useState(false);
+  const [newFromExistingCustomerId, setNewFromExistingCustomerId] = useState('');
+  const [newFromExistingNotes, setNewFromExistingNotes] = useState('');
+  const [submittingNewFromExisting, setSubmittingNewFromExisting] = useState(false);
 
   const handleAssignCustomerSubmit = async () => {
     if (!assignCustomerQId || !assignCustomerId) {
@@ -300,6 +318,9 @@ export default function EmployeeQuotationTable() {
       'FINANCE_APPROVED',
       'PAID',
       'ACTIVE_LEASE',
+      'ACTIVE_CONTRACT',
+      'ISSUED',
+      'INVOICED',
       'TRANSACTION_COMPLETED',
       'PENDING_CONFIRMATION',
       'SENT_TO_CUSTOMER',
@@ -312,23 +333,60 @@ export default function EmployeeQuotationTable() {
       q.status === 'FINANCE_REJECTED',
   ).length;
 
+  // ── Product name helpers (must be defined before `filtered`) ────────────
+  const getCleanProductName = useCallback((name: string) => {
+    let clean = name.replace(/^(Black & White - |Color - |Combined - )/i, '');
+    clean = clean.replace(/(\s*-\s*SN-[^,]+|\s*\(SN-[^)]+\)|\s*\(Serial[^)]+\))/gi, '');
+    const lastDashIndex = clean.lastIndexOf(' - ');
+    if (lastDashIndex !== -1 && clean.length - lastDashIndex < 25) {
+      clean = clean.substring(0, lastDashIndex).trim();
+    }
+    return clean.trim();
+  }, []);
+
+  const getProductNames = useCallback(
+    (invoice: Invoice) => {
+      if (!invoice.items || invoice.items.length === 0) return 'No items';
+      const productItems = invoice.items.filter(
+        (item) => item.itemType !== 'PRICING_RULE' && item.description,
+      );
+      if (productItems.length === 0) {
+        const allWithDesc = invoice.items.filter((item) => item.description);
+        if (allWithDesc.length === 0) return 'N/A';
+        return allWithDesc.map((item) => getCleanProductName(item.description)).join(', ');
+      }
+      return productItems.map((item) => getCleanProductName(item.description)).join(', ');
+    },
+    [getCleanProductName],
+  );
+
   // Filter
-  const filtered = quotations.filter((q) => {
-    const s = search.toLowerCase();
-    return (
-      q.invoiceNumber?.toLowerCase().includes(s) ||
-      q.customerName?.toLowerCase().includes(s) ||
-      q.saleType?.toLowerCase().includes(s) ||
-      q.status?.toLowerCase().includes(s)
-    );
-  });
+  const filtered = useMemo(() => {
+    return quotations.filter((q) => {
+      const s = search.toLowerCase();
+      return (
+        q.invoiceNumber?.toLowerCase().includes(s) ||
+        q.invoiceNumber?.toLowerCase().replace('inv-', 'qty-').includes(s) ||
+        q.customerName?.toLowerCase().includes(s) ||
+        getProductNames(q).toLowerCase().includes(s) ||
+        q.saleType?.toLowerCase().includes(s) ||
+        q.status?.toLowerCase().includes(s) ||
+        getProductNames(q)?.toLowerCase().includes(s)
+      );
+    });
+  }, [quotations, search, getProductNames]);
 
   useEffect(() => {
     setTotal(filtered.length);
   }, [filtered.length, setTotal]);
-  const paginated = filtered.slice((page - 1) * limit, page * limit);
 
-  const paginatedIds = paginated.map((q) => q.id).join(',');
+  const paginated = useMemo(() => {
+    return filtered.slice((page - 1) * limit, page * limit);
+  }, [filtered, page, limit]);
+
+  const paginatedIds = useMemo(() => {
+    return paginated.map((q) => q.id).join(',');
+  }, [paginated]);
 
   useEffect(() => {
     if (!paginatedIds) return;
@@ -355,30 +413,7 @@ export default function EmployeeQuotationTable() {
       }
     };
     fetchVisibleBalances();
-  }, [paginatedIds]);
-
-  const getCleanProductName = (name: string) => {
-    let clean = name.replace(/^(Black & White - |Color - |Combined - )/i, '');
-    clean = clean.replace(/(\s*-\s*SN-[^,]+|\s*\(SN-[^)]+\)|\s*\(Serial[^)]+\))/gi, '');
-    const lastDashIndex = clean.lastIndexOf(' - ');
-    if (lastDashIndex !== -1 && clean.length - lastDashIndex < 25) {
-      clean = clean.substring(0, lastDashIndex).trim();
-    }
-    return clean.trim();
-  };
-
-  const getProductNames = (invoice: Invoice) => {
-    if (!invoice.items || invoice.items.length === 0) return 'No items';
-    const productItems = invoice.items.filter(
-      (item) => item.itemType !== 'PRICING_RULE' && item.description,
-    );
-    if (productItems.length === 0) {
-      const allWithDesc = invoice.items.filter((item) => item.description);
-      if (allWithDesc.length === 0) return 'N/A';
-      return allWithDesc.map((item) => getCleanProductName(item.description)).join(', ');
-    }
-    return productItems.map((item) => getCleanProductName(item.description)).join(', ');
-  };
+  }, [paginatedIds, paginated]);
 
   const handleView = async (id: string) => {
     try {
@@ -387,6 +422,215 @@ export default function EmployeeQuotationTable() {
       setViewOpen(true);
     } catch {
       toast.error('Failed to load quotation details.');
+    }
+  };
+
+  const handleCreateNewFromExisting = async (id: string) => {
+    try {
+      const data = await getInvoiceById(id);
+      setSourceQuotationData(data);
+      setNewFromExistingCustomerId('');
+      setNewFromExistingNotes('');
+      setNewFromExistingOpen(true);
+    } catch {
+      toast.error('Failed to load quotation details.');
+    }
+  };
+
+  const handleNewFromExistingSubmit = async () => {
+    if (!sourceQuotationData || !newFromExistingCustomerId) {
+      toast.error('Please select a customer.');
+      return;
+    }
+    setSubmittingNewFromExisting(true);
+    try {
+      // Helper to parse description tags
+      const parseDescriptionTags = (desc: string) => {
+        let clean = desc || '';
+
+        let style: string | null = null;
+        if (clean.includes('[STD]')) {
+          style = 'standard';
+          clean = clean.replace('[STD]', '');
+        } else if (clean.includes('[PRM]')) {
+          style = 'premium';
+          clean = clean.replace('[PRM]', '');
+        }
+
+        let brand = '';
+        let model = '';
+        let productName = '';
+        let hsCode = '';
+        let isManual = false;
+
+        const bnMatch = clean.match(/\[BN:([^\]]*)\]/);
+        if (bnMatch) {
+          brand = bnMatch[1];
+          isManual = true;
+          clean = clean.replace(/\[BN:[^\]]*\]/, '');
+        }
+        const mnMatch = clean.match(/\[MN:([^\]]*)\]/);
+        if (mnMatch) {
+          model = mnMatch[1];
+          isManual = true;
+          clean = clean.replace(/\[MN:[^\]]*\]/, '');
+        }
+        const pnMatch = clean.match(/\[PN:([^\]]*)\]/);
+        if (pnMatch) {
+          productName = pnMatch[1];
+          isManual = true;
+          clean = clean.replace(/\[PN:[^\]]*\]/, '');
+        }
+        const hsMatch = clean.match(/\[HS:([^\]]*)\]/);
+        if (hsMatch) {
+          hsCode = hsMatch[1];
+          isManual = true;
+          clean = clean.replace(/\[HS:[^\]]*\]/, '');
+        }
+
+        let discountTag: number | undefined = undefined;
+        const discMatch = clean.match(/\[DISC:([^\]]*)\]/);
+        if (discMatch) {
+          discountTag = Number(discMatch[1]) || 0;
+          clean = clean.replace(/\[DISC:[^\]]*\]/, '');
+        }
+
+        const consumables: Consumable[] = [];
+        const consMatches = clean.match(/\[CONS:([^\]]*)\]/g);
+        if (consMatches) {
+          consMatches.forEach((m) => {
+            const inner = m.substring(6, m.length - 1);
+            const parts = inner.split('|');
+            consumables.push({
+              partName: parts[0] || '',
+              description: parts[1] || '',
+              yield: parts[2] || '',
+              price: parts[3] || '',
+            });
+          });
+          clean = clean.replace(/\[CONS:[^\]]*\]/g, '');
+        }
+
+        return {
+          cleanDescription: clean.trim(),
+          style,
+          brand,
+          model,
+          productName,
+          hsCode,
+          isManual,
+          discountTag,
+          consumables,
+        };
+      };
+
+      const sType = sourceQuotationData.saleType as QuotationType;
+
+      let baseNotes = sourceQuotationData.notes || '';
+      let styleTag = '';
+      const styleMatch = baseNotes.match(/\[STYLE:([^\]]*)\]/);
+      if (styleMatch) {
+        styleTag = `[STYLE:${styleMatch[1]}]`;
+        baseNotes = baseNotes.replace(/\[STYLE:[^\]]*\]/g, '').trim();
+      }
+
+      let finalNotes = newFromExistingNotes ? newFromExistingNotes.trim() : baseNotes;
+      if (styleTag) {
+        finalNotes = `${styleTag} ${finalNotes}`.trim();
+      }
+
+      // Map items
+      const mappedItems = (sourceQuotationData.items || []).map((item) => {
+        const parsed = parseDescriptionTags(item.description);
+
+        let desc = parsed.cleanDescription;
+        if (parsed.brand) desc = `[BN:${parsed.brand}] ${desc}`;
+        if (parsed.model) desc = `[MN:${parsed.model}] ${desc}`;
+        if (parsed.productName) desc = `[PN:${parsed.productName}] ${desc}`;
+        if (parsed.hsCode) desc = `[HS:${parsed.hsCode}] ${desc}`;
+        if (parsed.discountTag) desc = `[DISC:${parsed.discountTag}] ${desc}`;
+
+        if (parsed.consumables && parsed.consumables.length > 0) {
+          parsed.consumables.forEach((c) => {
+            const part = (c.partName || '').replace(/\|/g, ' ');
+            const d = (c.description || '').replace(/\|/g, ' ');
+            const y = (c.yield || '').replace(/\|/g, ' ');
+            const p = (c.price || '').replace(/\|/g, ' ');
+            desc = `[CONS:${part}|${d}|${y}|${p}] ${desc}`;
+          });
+        }
+
+        const mappedSlabs = (ranges?: Array<{ from: number; to: number; rate: number }>) => {
+          if (!ranges) return [];
+          return ranges.map((r) => ({
+            from: r.from,
+            to: r.to,
+            rate: r.rate,
+          }));
+        };
+
+        return {
+          description: desc,
+          quantity: item.quantity || 1,
+          unitPrice: item.unitPrice || 0,
+          discount: item.discount || 0,
+          productId: item.productId,
+          modelId: item.modelId,
+          itemType: item.itemType || 'PRODUCT',
+
+          bwIncludedLimit: item.bwIncludedLimit,
+          colorIncludedLimit: item.colorIncludedLimit,
+          combinedIncludedLimit: item.combinedIncludedLimit,
+          bwExcessRate: item.bwExcessRate,
+          colorExcessRate: item.colorExcessRate,
+          combinedExcessRate: item.combinedExcessRate,
+
+          bwSlabRanges: mappedSlabs(item.bwSlabRanges),
+          colorSlabRanges: mappedSlabs(item.colorSlabRanges),
+          comboSlabRanges: mappedSlabs(item.comboSlabRanges),
+        };
+      });
+
+      const payload: CreateInvoicePayload = {
+        customerId: newFromExistingCustomerId,
+        saleType: sType,
+        notes: finalNotes,
+        items: mappedItems,
+      };
+
+      if (sType === 'RENT') {
+        payload.rentType = sourceQuotationData.rentType as CreateInvoicePayload['rentType'];
+        payload.rentPeriod = sourceQuotationData.rentPeriod as CreateInvoicePayload['rentPeriod'];
+        payload.monthlyRent = sourceQuotationData.monthlyRent;
+        payload.advanceAmount = sourceQuotationData.advanceAmount;
+        payload.discountPercent = sourceQuotationData.discountPercent;
+        payload.effectiveFrom = sourceQuotationData.effectiveFrom;
+        payload.effectiveTo = sourceQuotationData.effectiveTo;
+      } else if (sType === 'LEASE') {
+        payload.leaseType = sourceQuotationData.leaseType as CreateInvoicePayload['leaseType'];
+        payload.leaseTenureMonths = sourceQuotationData.leaseTenureMonths;
+        payload.totalLeaseAmount = sourceQuotationData.totalLeaseAmount;
+        payload.monthlyEmiAmount = sourceQuotationData.monthlyEmiAmount;
+      }
+
+      if (sourceQuotationData.securityDepositAmount) {
+        payload.securityDepositAmount = sourceQuotationData.securityDepositAmount;
+        payload.securityDepositMode =
+          sourceQuotationData.securityDepositMode as CreateInvoicePayload['securityDepositMode'];
+        payload.securityDepositReference = sourceQuotationData.securityDepositReference;
+        payload.securityDepositBank = sourceQuotationData.securityDepositBank;
+      }
+
+      const newQ = await createInvoice(payload);
+      setQuotations((prev) => [newQ, ...prev]);
+      setNewFromExistingOpen(false);
+      setSourceQuotationData(null);
+      toast.success('New quotation created successfully from existing quotation.');
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { message?: string } } };
+      toast.error(err.response?.data?.message || 'Failed to create new quotation.');
+    } finally {
+      setSubmittingNewFromExisting(false);
     }
   };
 
@@ -477,7 +721,7 @@ export default function EmployeeQuotationTable() {
         <div className="relative max-w-sm">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-400" />
           <Input
-            placeholder="Search by number, customer, type..."
+            placeholder="Search by number, customer, product, type..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="pl-9 h-9 text-xs"
@@ -491,7 +735,7 @@ export default function EmployeeQuotationTable() {
           <Table className="min-w-[750px] sm:min-w-full">
             <TableHeader className="bg-muted/50">
               <TableRow>
-                <TableHead className="text-primary font-bold">QT NUMBER</TableHead>
+                <TableHead className="text-primary font-bold">QTY NUMBER</TableHead>
                 <TableHead className="text-primary font-bold">PRODUCT</TableHead>
                 <TableHead className="text-primary font-bold">CUSTOMER</TableHead>
                 <TableHead className="text-primary font-bold">PRICE</TableHead>
@@ -517,7 +761,7 @@ export default function EmployeeQuotationTable() {
                     className={`${index % 2 ? 'bg-blue-50/10' : 'bg-card'} hover:bg-muted/50 transition-colors`}
                   >
                     <TableCell className="text-blue-500 font-bold tracking-tight">
-                      {q.invoiceNumber}
+                      {q.invoiceNumber?.replace('INV-', 'QTY-')}
                     </TableCell>
                     <TableCell
                       className="font-semibold text-slate-700 max-w-[200px] truncate"
@@ -558,6 +802,15 @@ export default function EmployeeQuotationTable() {
                           title="View Quotation"
                         >
                           <Eye className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 w-8 p-0 text-amber-600 hover:text-amber-700 hover:bg-amber-50"
+                          onClick={() => handleCreateNewFromExisting(q.id)}
+                          title="Create New from this"
+                        >
+                          <Copy className="h-4 w-4" />
                         </Button>
                         {q.status === 'ASSIGNED' && (
                           <Button
@@ -604,7 +857,11 @@ export default function EmployeeQuotationTable() {
 
       {formOpen && (
         <QuotationFormModal
-          onClose={() => setFormOpen(false)}
+          initialData={sourceQuotationData}
+          onClose={() => {
+            setFormOpen(false);
+            setSourceQuotationData(null);
+          }}
           onConfirm={handleCreate}
           allowedTypes={allowedTypes}
           allBrands={allBrands}
@@ -633,6 +890,7 @@ export default function EmployeeQuotationTable() {
           onStatusChange={handleStatusChange}
           onSendToFinance={handleSendToFinance}
           onConvertSuccess={handleConvertSuccess}
+          onCreateNewFromExisting={handleCreateNewFromExisting}
           showDistribution={true}
         />
       )}
@@ -696,6 +954,63 @@ export default function EmployeeQuotationTable() {
           </DialogContent>
         </Dialog>
       )}
+
+      {newFromExistingOpen && sourceQuotationData && (
+        <Dialog open={newFromExistingOpen} onOpenChange={setNewFromExistingOpen}>
+          <DialogContent className="sm:max-w-md bg-white border border-slate-100 rounded-xl shadow-lg p-6">
+            <DialogHeader>
+              <DialogTitle className="text-lg font-bold text-slate-800">
+                Assign Customer
+              </DialogTitle>
+              <DialogDescription className="text-xs text-slate-500">
+                To activate this assigned quotation template, select the customer and provide
+                optional notes.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4 my-4">
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                  Select Customer
+                </label>
+                <CustomerSelect
+                  value={newFromExistingCustomerId}
+                  onChange={setNewFromExistingCustomerId}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                  Internal Notes / Remarks
+                </label>
+                <Textarea
+                  value={newFromExistingNotes}
+                  onChange={(e) => setNewFromExistingNotes(e.target.value)}
+                  placeholder="Enter notes about this assignment..."
+                  className="text-xs h-20"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 border-t pt-4">
+              <Button
+                variant="ghost"
+                onClick={() => setNewFromExistingOpen(false)}
+                className="text-xs font-bold uppercase tracking-wider text-slate-500"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleNewFromExistingSubmit}
+                disabled={submittingNewFromExisting}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs uppercase tracking-wider px-5"
+              >
+                {submittingNewFromExisting ? 'Creating...' : 'Confirm Assignment'}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }
@@ -736,12 +1051,14 @@ function QuotationFormModal({
   allowedTypes,
   allBrands,
   allModels,
+  initialData,
 }: {
   onClose: () => void;
   onConfirm: (data: CreateInvoicePayload) => Promise<void>;
   allowedTypes: QuotationType[];
   allBrands: Brand[];
   allModels: Model[];
+  initialData?: Invoice | null;
 }) {
   const [step, setStep] = useState<1 | 2>(1);
   const [activeCategory, setActiveCategory] = useState<'SALE' | 'RENT' | 'LEASE' | null>(null);
@@ -750,14 +1067,14 @@ function QuotationFormModal({
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedLayoutCategory, setSelectedLayoutCategory] = useState<string | null>('product');
-  const [selectedLayoutStyle, setSelectedLayoutStyle] = useState<string | null>('normal');
-  const [isLayoutSelectorOpen, setIsLayoutSelectorOpen] = useState(false);
+  const [selectedLayoutStyle] = useState<string | null>('normal');
 
   // ── SALE state ──────────────────────────────────────────────────────────
   const [customerId, setCustomerId] = useState('');
   const [saleItems, setSaleItems] = useState<SaleItem[]>([]);
   const [notes, setNotes] = useState('');
   const [validDays, setValidDays] = useState(30);
+  const [scanQuery, setScanQuery] = useState('');
 
   // ── RENT state ──────────────────────────────────────────────────────────
   const [rentType, setRentType] = useState('FIXED_LIMIT');
@@ -774,6 +1091,7 @@ function QuotationFormModal({
   const [leaseTenureMonths, setLeaseTenureMonths] = useState('12');
   const [totalLeaseAmount, setTotalLeaseAmount] = useState('');
   const [monthlyEmiAmount, setMonthlyEmiAmount] = useState('');
+
   const [lastEditedLease, setLastEditedLease] = useState<'TOTAL' | 'PERIODIC'>('TOTAL');
 
   // ── SECURITY DEPOSIT state ──────────────────────────────────────────────
@@ -781,6 +1099,198 @@ function QuotationFormModal({
   const [securityDepositMode, setSecurityDepositMode] = useState<'CASH' | 'CHEQUE'>('CASH');
   const [securityDepositReference, setSecurityDepositReference] = useState('');
   const [securityDepositBank, setSecurityDepositBank] = useState('');
+
+  useEffect(() => {
+    if (!initialData) return;
+
+    // Helper to parse description tags
+    const parseDescriptionTags = (desc: string) => {
+      let clean = desc || '';
+
+      let style: string | null = null;
+      if (clean.includes('[STD]')) {
+        style = 'standard';
+        clean = clean.replace('[STD]', '');
+      } else if (clean.includes('[PRM]')) {
+        style = 'premium';
+        clean = clean.replace('[PRM]', '');
+      }
+
+      let brand = '';
+      let model = '';
+      let productName = '';
+      let hsCode = '';
+      let isManual = false;
+
+      const bnMatch = clean.match(/\[BN:([^\]]*)\]/);
+      if (bnMatch) {
+        brand = bnMatch[1];
+        isManual = true;
+        clean = clean.replace(/\[BN:[^\]]*\]/, '');
+      }
+      const mnMatch = clean.match(/\[MN:([^\]]*)\]/);
+      if (mnMatch) {
+        model = mnMatch[1];
+        isManual = true;
+        clean = clean.replace(/\[MN:[^\]]*\]/, '');
+      }
+      const pnMatch = clean.match(/\[PN:([^\]]*)\]/);
+      if (pnMatch) {
+        productName = pnMatch[1];
+        isManual = true;
+        clean = clean.replace(/\[PN:[^\]]*\]/, '');
+      }
+      const hsMatch = clean.match(/\[HS:([^\]]*)\]/);
+      if (hsMatch) {
+        hsCode = hsMatch[1];
+        isManual = true;
+        clean = clean.replace(/\[HS:[^\]]*\]/, '');
+      }
+
+      let discountTag: number | undefined = undefined;
+      const discMatch = clean.match(/\[DISC:([^\]]*)\]/);
+      if (discMatch) {
+        discountTag = Number(discMatch[1]) || 0;
+        clean = clean.replace(/\[DISC:[^\]]*\]/, '');
+      }
+
+      const consumables: Consumable[] = [];
+      const consMatches = clean.match(/\[CONS:([^\]]*)\]/g);
+      if (consMatches) {
+        consMatches.forEach((m) => {
+          const inner = m.substring(6, m.length - 1);
+          const parts = inner.split('|');
+          consumables.push({
+            partName: parts[0] || '',
+            description: parts[1] || '',
+            yield: parts[2] || '',
+            price: parts[3] || '',
+          });
+        });
+        clean = clean.replace(/\[CONS:[^\]]*\]/g, '');
+      }
+
+      return {
+        cleanDescription: clean.trim(),
+        style,
+        brand,
+        model,
+        productName,
+        hsCode,
+        isManual,
+        discountTag,
+        consumables,
+      };
+    };
+
+    const sType = initialData.saleType as QuotationType;
+    setQuotationType(sType);
+
+    if (['PRODUCT_SALE', 'SPAREPART_SALE'].includes(sType)) {
+      setActiveCategory('SALE');
+      setSelectedLayoutCategory('product');
+    } else if (sType === 'RENT') {
+      setActiveCategory('RENT');
+      setSelectedLayoutCategory('rental');
+    } else if (sType === 'LEASE') {
+      setActiveCategory('LEASE');
+      setSelectedLayoutCategory('lease');
+    }
+
+    setCustomerId(initialData.customerId || '');
+
+    let rawNotes = initialData.notes || '';
+    if (rawNotes.includes('[STYLE:')) {
+      rawNotes = rawNotes.replace(/\[STYLE:[^\]]*\]/g, '').trim();
+    }
+    setNotes(rawNotes);
+
+    if (initialData.rentType) setRentType(initialData.rentType);
+    if (initialData.rentPeriod) setRentPeriod(initialData.rentPeriod);
+    if (initialData.monthlyRent) setMonthlyRent(String(initialData.monthlyRent));
+    if (initialData.advanceAmount) setAdvanceAmount(String(initialData.advanceAmount));
+    if (initialData.discountPercent) setDiscountPercent(String(initialData.discountPercent));
+    if (initialData.effectiveFrom) {
+      setEffectiveFrom(initialData.effectiveFrom.split('T')[0]);
+    }
+    if (initialData.effectiveTo) {
+      setEffectiveTo(initialData.effectiveTo.split('T')[0]);
+      if (initialData.effectiveFrom) {
+        const fromD = new Date(initialData.effectiveFrom);
+        const toD = new Date(initialData.effectiveTo);
+        const months =
+          (toD.getFullYear() - fromD.getFullYear()) * 12 + toD.getMonth() - fromD.getMonth();
+        if (months > 0) setDurationMonths(String(months));
+      }
+    }
+
+    if (initialData.leaseType) setLeaseType(initialData.leaseType);
+    if (initialData.leaseTenureMonths) setLeaseTenureMonths(String(initialData.leaseTenureMonths));
+    if (initialData.totalLeaseAmount) setTotalLeaseAmount(String(initialData.totalLeaseAmount));
+    if (initialData.monthlyEmiAmount) setMonthlyEmiAmount(String(initialData.monthlyEmiAmount));
+
+    if (initialData.securityDepositAmount)
+      setSecurityDepositAmount(String(initialData.securityDepositAmount));
+    if (initialData.securityDepositMode) {
+      setSecurityDepositMode(initialData.securityDepositMode === 'CHEQUE' ? 'CHEQUE' : 'CASH');
+    }
+    if (initialData.securityDepositReference)
+      setSecurityDepositReference(initialData.securityDepositReference);
+    if (initialData.securityDepositBank) setSecurityDepositBank(initialData.securityDepositBank);
+
+    if (initialData.items) {
+      const mappedItems: SaleItem[] = initialData.items.map((item) => {
+        const parsed = parseDescriptionTags(item.description);
+        const discountVal = item.discount || parsed.discountTag || 0;
+        const basePriceVal = item.unitPrice || 0;
+        const finalUnitPrice = basePriceVal - discountVal;
+
+        const mappedSlabs = (ranges?: Array<{ from: number; to: number; rate: number }>) => {
+          if (!ranges) return [];
+          return ranges.map((r) => ({
+            from: String(r.from),
+            to: String(r.to),
+            rate: String(r.rate),
+          }));
+        };
+
+        return {
+          description: parsed.cleanDescription,
+          quantity: item.quantity || 1,
+          basePrice: basePriceVal,
+          discount: discountVal,
+          unitPrice: finalUnitPrice,
+          maxDiscount: 0,
+          isManual: parsed.isManual,
+          productId: item.itemType === 'PRODUCT' ? item.productId : undefined,
+          sparePartId: item.itemType === 'SPAREPART' ? item.productId : undefined,
+          modelId: item.modelId,
+          itemType: (item.itemType === 'SPAREPART' ? 'SPAREPART' : 'PRODUCT') as
+            | 'PRODUCT'
+            | 'SPAREPART',
+          isEditable: parsed.isManual || !item.productId,
+
+          bwIncludedLimit: item.bwIncludedLimit,
+          colorIncludedLimit: item.colorIncludedLimit,
+          combinedIncludedLimit: item.combinedIncludedLimit,
+          bwExcessRate: item.bwExcessRate,
+          colorExcessRate: item.colorExcessRate,
+          combinedExcessRate: item.combinedExcessRate,
+
+          bwSlabRanges: mappedSlabs(item.bwSlabRanges),
+          colorSlabRanges: mappedSlabs(item.colorSlabRanges),
+          comboSlabRanges: mappedSlabs(item.comboSlabRanges),
+
+          brand: parsed.brand,
+          model: parsed.model,
+          productName: parsed.productName,
+          hsCode: parsed.hsCode,
+          consumables: parsed.consumables,
+        };
+      });
+      setSaleItems(mappedItems);
+    }
+  }, [initialData]);
 
   // ── Auto-Calculators ───────────────────────────────────────────────────
   const getPeriodsForRent = (period: string, duration: number) => {
@@ -860,7 +1370,9 @@ function QuotationFormModal({
       itemType: 'PRODUCT' | 'SPAREPART' = 'PRODUCT',
       productId: string | undefined = undefined,
       sparePartId: string | undefined = undefined,
-      modelId: string | undefined = undefined;
+      modelId: string | undefined = undefined,
+      warranty = '',
+      consumables: Consumable[] = [];
 
     const isSparePart = 'part_name' in item;
 
@@ -874,22 +1386,29 @@ function QuotationFormModal({
       itemType = 'SPAREPART';
     } else {
       const pr = item as Product;
-      const brand = pr.brand || pr.model?.brandRelation?.name || '';
-      const modelName = pr.model?.model_name || pr.model?.model_no || '';
-      const productName = pr.name || '';
-
-      description = `${brand} ${modelName} ${productName}`.trim().replace(/\s+/g, ' ');
-
-      // Fallback if built name is empty
-      if (!description) {
-        description = pr.description || pr.model?.description || 'Product';
-      }
+      description = pr.name || pr.description || pr.model?.description || 'Product';
 
       basePrice = pr.sale_price || 0;
       maxDiscount = pr.max_discount_amount || 0;
       productId = pr.id;
       modelId = pr.model?.id;
       itemType = 'PRODUCT';
+      warranty = pr.warranty || '';
+      consumables = pr.consumables
+        ? pr.consumables.map(
+            (c: {
+              partName?: string;
+              description?: string;
+              yield?: string;
+              price?: string | number;
+            }) => ({
+              partName: c.partName || '',
+              description: c.description || '',
+              yield: c.yield || '',
+              price: String(c.price || ''),
+            }),
+          )
+        : [];
     }
 
     setSaleItems((prev) => [
@@ -910,12 +1429,58 @@ function QuotationFormModal({
         bwSlabRanges: [],
         colorSlabRanges: [],
         comboSlabRanges: [],
+        warranty,
+        consumables,
       },
     ]);
     toast.success(`Added ${description}`);
   };
 
   const removeItem = (i: number) => setSaleItems((prev) => prev.filter((_, idx) => idx !== i));
+
+  const handleBarcodeScan = async (code: string) => {
+    try {
+      const response = await api.get(`/i/inventory/scan?code=${code}`);
+      const { type, item, warning } = response.data;
+
+      if (warning) {
+        toast.warning(warning);
+      }
+
+      if (type === 'PRODUCT') {
+        const pr = item as Product;
+        const exists = saleItems.some((si) => si.productId === pr.id);
+        if (exists) {
+          toast.warning(`Product "${pr.name}" (SN: ${pr.serial_no}) has already been added.`);
+          return;
+        }
+        addItem(pr);
+      } else if (type === 'SPARE_PART') {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const sp = item as any;
+        const existingIndex = saleItems.findIndex((si) => si.sparePartId === sp.id);
+        if (existingIndex > -1) {
+          setSaleItems((prev) => {
+            const updated = [...prev];
+            updated[existingIndex] = {
+              ...updated[existingIndex],
+              quantity: updated[existingIndex].quantity + 1,
+            };
+            return updated;
+          });
+          toast.success(`Incremented quantity for "${sp.part_name || 'Spare Part'}"`);
+        } else {
+          addItem(sp);
+        }
+      }
+    } catch (err: unknown) {
+      toast.error('Scan failed', {
+        description:
+          (err as { response?: { data?: { message?: string } } }).response?.data?.message ||
+          (err as Error).message,
+      });
+    }
+  };
 
   const addManualItem = () => {
     setSaleItems((prev) => [
@@ -1053,14 +1618,14 @@ function QuotationFormModal({
       } else if (field === 'productName') items[index] = { ...item, productName: String(value) };
       else if (field === 'hsCode') items[index] = { ...item, hsCode: String(value) };
       else if (field === 'discount') {
-        const d = Number(value);
+        let d = Number(value);
+        if (item.maxDiscount > 0 && d > item.maxDiscount) {
+          toast.warning(`Maximum discount allowed is QAR ${item.maxDiscount}`);
+          d = item.maxDiscount;
+        }
         if (d > item.basePrice) {
           toast.error('Discount cannot exceed price');
-          return prev;
-        }
-        if (item.maxDiscount > 0 && d > item.maxDiscount) {
-          toast.error(`Maximum discount allowed is ${item.maxDiscount}`);
-          return prev;
+          d = item.basePrice;
         }
         items[index] = { ...item, discount: d, unitPrice: item.basePrice - d };
       } else if (field === 'basePrice' && item.isEditable) {
@@ -1153,6 +1718,7 @@ function QuotationFormModal({
             sparePartId: it.sparePartId,
             modelId: it.modelId,
             itemType: it.itemType,
+            warranty: it.warranty,
           };
         }),
       };
@@ -1204,6 +1770,7 @@ function QuotationFormModal({
             description: desc,
             unitPrice: 0,
             productId: undefined,
+            warranty: it.warranty,
           };
         }),
         pricingItems: [],
@@ -1237,6 +1804,7 @@ function QuotationFormModal({
         securityDepositReference,
         securityDepositBank,
 
+        // Warranty
         // For FSM Leases, we need rentType and monthly rent mapped dynamically
         rentType: leaseType === 'FSM' ? (rentType as CreateInvoicePayload['rentType']) : undefined,
         monthlyRent: leaseType === 'FSM' && monthlyRent ? Number(monthlyRent) : undefined,
@@ -1270,6 +1838,7 @@ function QuotationFormModal({
             itemType: it.itemType,
             productId: undefined,
             modelId: it.modelId,
+            warranty: it.warranty,
             ...(leaseType === 'FSM'
               ? {
                   bwIncludedLimit: rentType === 'FIXED_LIMIT' ? it.bwIncludedLimit || 0 : 0,
@@ -1645,6 +2214,44 @@ function QuotationFormModal({
                           : 'Items'}
                     </h4>
                   </div>
+                  {/* Barcode Scanner Input */}
+                  <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 shadow-inner space-y-2">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase flex items-center gap-1.5 pl-0.5">
+                      <Scan size={12} className="text-primary animate-pulse" /> Scan Product or
+                      Spare Part Barcode
+                    </label>
+                    <div className="flex gap-2">
+                      <Input
+                        type="text"
+                        placeholder="Scan or enter barcode ID (e.g. XC-P-12345) and press Enter..."
+                        value={scanQuery}
+                        onChange={(e) => setScanQuery(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            if (scanQuery.trim()) {
+                              handleBarcodeScan(scanQuery.trim());
+                              setScanQuery('');
+                            }
+                          }
+                        }}
+                        className="bg-white rounded-lg border-slate-200"
+                      />
+                      <Button
+                        type="button"
+                        onClick={() => {
+                          if (scanQuery.trim()) {
+                            handleBarcodeScan(scanQuery.trim());
+                            setScanQuery('');
+                          }
+                        }}
+                        className="rounded-lg px-4 shrink-0 font-bold"
+                      >
+                        Scan
+                      </Button>
+                    </div>
+                  </div>
+
                   <div className="flex items-center gap-3">
                     <div className="flex-1 bg-card p-2 rounded-xl border border-border shadow-sm focus-within:ring-2 focus-within:ring-primary/20 transition-all">
                       <ProductSelect
@@ -1765,6 +2372,17 @@ function QuotationFormModal({
                                   />
                                 </div>
                                 <div className="md:col-span-2 space-y-1">
+                                  <label className="text-[9px] font-bold text-slate-400 uppercase">
+                                    Warranty
+                                  </label>
+                                  <Input
+                                    placeholder="e.g. 1 Year"
+                                    value={item.warranty}
+                                    onChange={(e) => updateItem(index, 'warranty', e.target.value)}
+                                    className="h-9 text-sm bg-slate-50/50"
+                                  />
+                                </div>
+                                <div className="md:col-span-2 space-y-1">
                                   <label className="text-[9px] font-bold text-slate-400 uppercase text-right block">
                                     Rate
                                   </label>
@@ -1813,6 +2431,18 @@ function QuotationFormModal({
                                 </div>
 
                                 <div className="md:col-span-2 space-y-1">
+                                  <label className="text-[9px] font-bold text-slate-400 uppercase">
+                                    Warranty
+                                  </label>
+                                  <Input
+                                    placeholder="e.g. 1 Year"
+                                    value={item.warranty}
+                                    onChange={(e) => updateItem(index, 'warranty', e.target.value)}
+                                    className="h-9 text-sm bg-slate-50/50"
+                                  />
+                                </div>
+
+                                <div className="md:col-span-2 space-y-1">
                                   <label className="text-[9px] font-bold text-slate-400 uppercase text-right block">
                                     Rate (QAR)
                                   </label>
@@ -1849,7 +2479,7 @@ function QuotationFormModal({
                             )}
                             {/* Replacement Consumables Section */}
                             {quotationType === 'PRODUCT_SALE' && (
-                              <div className="md:col-span-12 mt-6 pt-4 border-t border-slate-100">
+                              <div className="md:col-span-12 mt-2 pt-2 border-t border-slate-100">
                                 <div className="bg-slate-50/50 rounded-xl p-5 border border-slate-200/60 transition-all hover:bg-slate-50">
                                   <div className="flex items-center justify-between mb-4">
                                     <div className="flex items-center gap-3">
@@ -1999,7 +2629,7 @@ function QuotationFormModal({
               {quotationType === 'RENT' && (
                 <div className="space-y-5 mb-6">
                   {/* Rent Type Selector Moved to Top */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="bg-card p-4 rounded-xl border border-blue-200 shadow-sm space-y-2 bg-blue-50/30">
                       <label className="text-[11px] font-bold text-blue-600 uppercase flex items-center gap-2">
                         <span className="w-2 h-2 rounded-full bg-blue-400" /> Rent Type / Model
@@ -2215,21 +2845,57 @@ function QuotationFormModal({
                                             }
                                             className="h-7 text-xs flex-1"
                                           />
-                                          <Input
-                                            placeholder="To"
-                                            type="number"
-                                            value={slab.to}
-                                            onChange={(e) =>
-                                              updateSlab(
-                                                index,
-                                                'bwSlabRanges',
-                                                sIdx,
-                                                'to',
-                                                e.target.value,
-                                              )
-                                            }
-                                            className="h-7 text-xs flex-1"
-                                          />
+                                          <div className="relative flex-1">
+                                            <Input
+                                              placeholder="To"
+                                              type={slab.to === '1000000' ? 'text' : 'number'}
+                                              value={slab.to === '1000000' ? 'UNLIMITED' : slab.to}
+                                              onChange={(e) =>
+                                                updateSlab(
+                                                  index,
+                                                  'bwSlabRanges',
+                                                  sIdx,
+                                                  'to',
+                                                  e.target.value,
+                                                )
+                                              }
+                                              className={`h-7 text-xs pr-14 ${slab.to === '1000000' ? 'font-bold text-blue-600 bg-blue-50/50' : ''}`}
+                                            />
+                                            <div className="absolute right-0 top-0 flex items-center h-7 gap-0.5 pr-0.5">
+                                              <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className="h-6 px-1 text-[8px] font-bold text-blue-600 hover:bg-blue-100"
+                                                onClick={() =>
+                                                  updateSlab(
+                                                    index,
+                                                    'bwSlabRanges',
+                                                    sIdx,
+                                                    'to',
+                                                    '100000',
+                                                  )
+                                                }
+                                              >
+                                                100K
+                                              </Button>
+                                              <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className="h-6 px-1 text-[10px] font-bold text-blue-600 hover:bg-blue-100"
+                                                onClick={() =>
+                                                  updateSlab(
+                                                    index,
+                                                    'bwSlabRanges',
+                                                    sIdx,
+                                                    'to',
+                                                    slab.to === '1000000' ? '' : '1000000',
+                                                  )
+                                                }
+                                              >
+                                                {slab.to === '1000000' ? '✕' : '∞'}
+                                              </Button>
+                                            </div>
+                                          </div>
                                           <Input
                                             placeholder="Rate"
                                             type="number"
@@ -2289,21 +2955,57 @@ function QuotationFormModal({
                                             }
                                             className="h-7 text-xs flex-1"
                                           />
-                                          <Input
-                                            placeholder="To"
-                                            type="number"
-                                            value={slab.to}
-                                            onChange={(e) =>
-                                              updateSlab(
-                                                index,
-                                                'colorSlabRanges',
-                                                sIdx,
-                                                'to',
-                                                e.target.value,
-                                              )
-                                            }
-                                            className="h-7 text-xs flex-1"
-                                          />
+                                          <div className="relative flex-1">
+                                            <Input
+                                              placeholder="To"
+                                              type={slab.to === '1000000' ? 'text' : 'number'}
+                                              value={slab.to === '1000000' ? 'UNLIMITED' : slab.to}
+                                              onChange={(e) =>
+                                                updateSlab(
+                                                  index,
+                                                  'colorSlabRanges',
+                                                  sIdx,
+                                                  'to',
+                                                  e.target.value,
+                                                )
+                                              }
+                                              className={`h-7 text-xs pr-14 ${slab.to === '1000000' ? 'font-bold text-blue-600 bg-blue-50/50' : ''}`}
+                                            />
+                                            <div className="absolute right-0 top-0 flex items-center h-7 gap-0.5 pr-0.5">
+                                              <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className="h-6 px-1 text-[8px] font-bold text-blue-600 hover:bg-blue-100"
+                                                onClick={() =>
+                                                  updateSlab(
+                                                    index,
+                                                    'colorSlabRanges',
+                                                    sIdx,
+                                                    'to',
+                                                    '100000',
+                                                  )
+                                                }
+                                              >
+                                                100K
+                                              </Button>
+                                              <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className="h-6 px-1 text-[10px] font-bold text-blue-600 hover:bg-blue-100"
+                                                onClick={() =>
+                                                  updateSlab(
+                                                    index,
+                                                    'colorSlabRanges',
+                                                    sIdx,
+                                                    'to',
+                                                    slab.to === '1000000' ? '' : '1000000',
+                                                  )
+                                                }
+                                              >
+                                                {slab.to === '1000000' ? '✕' : '∞'}
+                                              </Button>
+                                            </div>
+                                          </div>
                                           <Input
                                             placeholder="Rate"
                                             type="number"
@@ -2367,21 +3069,57 @@ function QuotationFormModal({
                                           }
                                           className="h-7 text-xs flex-1"
                                         />
-                                        <Input
-                                          placeholder="To"
-                                          type="number"
-                                          value={slab.to}
-                                          onChange={(e) =>
-                                            updateSlab(
-                                              index,
-                                              'comboSlabRanges',
-                                              sIdx,
-                                              'to',
-                                              e.target.value,
-                                            )
-                                          }
-                                          className="h-7 text-xs flex-1"
-                                        />
+                                        <div className="relative flex-1">
+                                          <Input
+                                            placeholder="To"
+                                            type={slab.to === '1000000' ? 'text' : 'number'}
+                                            value={slab.to === '1000000' ? 'UNLIMITED' : slab.to}
+                                            onChange={(e) =>
+                                              updateSlab(
+                                                index,
+                                                'comboSlabRanges',
+                                                sIdx,
+                                                'to',
+                                                e.target.value,
+                                              )
+                                            }
+                                            className={`h-7 text-xs pr-14 ${slab.to === '1000000' ? 'font-bold text-blue-600 bg-blue-50/50' : ''}`}
+                                          />
+                                          <div className="absolute right-0 top-0 flex items-center h-7 gap-0.5 pr-0.5">
+                                            <Button
+                                              variant="ghost"
+                                              size="sm"
+                                              className="h-6 px-1 text-[8px] font-bold text-blue-600 hover:bg-blue-100"
+                                              onClick={() =>
+                                                updateSlab(
+                                                  index,
+                                                  'comboSlabRanges',
+                                                  sIdx,
+                                                  'to',
+                                                  '100000',
+                                                )
+                                              }
+                                            >
+                                              100K
+                                            </Button>
+                                            <Button
+                                              variant="ghost"
+                                              size="sm"
+                                              className="h-6 px-1 text-[10px] font-bold text-blue-600 hover:bg-blue-100"
+                                              onClick={() =>
+                                                updateSlab(
+                                                  index,
+                                                  'comboSlabRanges',
+                                                  sIdx,
+                                                  'to',
+                                                  slab.to === '1000000' ? '' : '1000000',
+                                                )
+                                              }
+                                            >
+                                              {slab.to === '1000000' ? '✕' : '∞'}
+                                            </Button>
+                                          </div>
+                                        </div>
                                         <Input
                                           placeholder="Rate"
                                           type="number"
@@ -2419,58 +3157,50 @@ function QuotationFormModal({
 
                   {/* Rent Config - Remaining Fields */}
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="bg-card p-4 rounded-xl border border-slate-100 shadow-sm space-y-2">
-                      <label className="text-[11px] font-bold text-muted-foreground uppercase">
-                        Billing Period
-                      </label>
-                      <Select value={rentPeriod} onValueChange={setRentPeriod}>
-                        <SelectTrigger className="h-9 text-sm">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="MONTHLY">Monthly</SelectItem>
-                          <SelectItem value="QUARTERLY">Quarterly</SelectItem>
-                          <SelectItem value="HALF_YEARLY">Half Yearly</SelectItem>
-                          <SelectItem value="YEARLY">Yearly</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="bg-card p-4 rounded-xl border border-slate-100 shadow-sm space-y-2">
-                      <label className="text-[11px] font-bold text-muted-foreground uppercase flex items-center justify-between">
-                        <span>Periodic Rent ({rentPeriod.replace('_', ' ')})</span>
-                      </label>
-                      <Input
-                        type="number"
-                        placeholder="0.00"
-                        value={monthlyRent}
-                        onChange={(e) => setMonthlyRent(e.target.value)}
-                        className="h-9 text-sm"
-                      />
-                    </div>
-                    <div className="bg-card p-4 rounded-xl border border-slate-100 shadow-sm space-y-2">
-                      <label className="text-[11px] font-bold text-muted-foreground uppercase">
-                        Advance Amount (QAR)
-                      </label>
-                      <Input
-                        type="number"
-                        placeholder="0.00"
-                        value={advanceAmount}
-                        onChange={(e) => setAdvanceAmount(e.target.value)}
-                        className="h-9 text-sm"
-                      />
-                    </div>
-                    <div className="bg-card p-4 rounded-xl border border-slate-100 shadow-sm space-y-2">
-                      <label className="text-[11px] font-bold text-muted-foreground uppercase">
-                        Discount (%)
-                      </label>
-                      <Input
-                        type="number"
-                        placeholder="0"
-                        value={discountPercent}
-                        onChange={(e) => setDiscountPercent(e.target.value)}
-                        className="h-9 text-sm"
-                      />
-                    </div>
+                    {rentType !== 'CPC' && rentType !== 'CPC_COMBO' && (
+                      <>
+                        <div className="bg-card p-4 rounded-xl border border-slate-100 shadow-sm space-y-2">
+                          <label className="text-[11px] font-bold text-muted-foreground uppercase flex items-center justify-between">
+                            <span>Periodic Rent ({rentPeriod.replace('_', ' ')})</span>
+                          </label>
+                          <Input
+                            type="number"
+                            placeholder="0.00"
+                            value={monthlyRent}
+                            onChange={(e) => setMonthlyRent(e.target.value)}
+                            className="h-9 text-sm"
+                          />
+                        </div>
+                        <div className="bg-card p-4 rounded-xl border border-slate-100 shadow-sm space-y-2">
+                          <label className="text-[11px] font-bold text-muted-foreground uppercase">
+                            Advance / Caution Deposit (QAR)
+                          </label>
+                          <Input
+                            type="number"
+                            placeholder="0.00"
+                            value={advanceAmount}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setAdvanceAmount(val);
+                              setSecurityDepositAmount(val);
+                            }}
+                            className="h-9 text-sm"
+                          />
+                        </div>
+                        <div className="bg-card p-4 rounded-xl border border-slate-100 shadow-sm space-y-2">
+                          <label className="text-[11px] font-bold text-muted-foreground uppercase">
+                            Discount (%)
+                          </label>
+                          <Input
+                            type="number"
+                            placeholder="0"
+                            value={discountPercent}
+                            onChange={(e) => setDiscountPercent(e.target.value)}
+                            className="h-9 text-sm"
+                          />
+                        </div>
+                      </>
+                    )}
                   </div>
 
                   {/* Agreement Details (Shared for Rent/Lease) */}
@@ -2515,19 +3245,7 @@ function QuotationFormModal({
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
-                      <div className="space-y-2">
-                        <label className="text-[10px] font-bold text-muted-foreground uppercase">
-                          Security Deposit Amount (QAR)
-                        </label>
-                        <Input
-                          type="number"
-                          placeholder="0.00"
-                          value={securityDepositAmount}
-                          onChange={(e) => setSecurityDepositAmount(e.target.value)}
-                          className="h-9 text-sm border-blue-100 focus:border-blue-400"
-                        />
-                      </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
                       <div className="space-y-2">
                         <label className="text-[10px] font-bold text-muted-foreground uppercase">
                           Deposit Mode
@@ -2580,8 +3298,8 @@ function QuotationFormModal({
               {quotationType === 'LEASE' && (
                 <div className="space-y-5 mb-6">
                   {/* Lease Type Selector Moved to Top */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="bg-card p-4 rounded-xl border border-purple-200 shadow-sm space-y-2 bg-purple-50/30">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div className="bg-card p-4 rounded-xl border border-purple-200 shadow-sm space-y-2 bg-purple-50/30 min-w-0 w-full">
                       <label className="text-[11px] font-bold text-purple-600 uppercase flex items-center gap-2">
                         <span className="w-2 h-2 rounded-full bg-purple-400" /> Lease Type
                       </label>
@@ -2589,8 +3307,8 @@ function QuotationFormModal({
                         value={leaseType}
                         onValueChange={(v) => setLeaseType(v as 'EMI' | 'FSM')}
                       >
-                        <SelectTrigger className="h-9 text-sm border-purple-100">
-                          <SelectValue />
+                        <SelectTrigger className="h-9 text-sm border-purple-100 w-full">
+                          <SelectValue placeholder="Select Lease Type" />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="EMI">EMI (Equated Monthly Instalment)</SelectItem>
@@ -2599,15 +3317,32 @@ function QuotationFormModal({
                       </Select>
                     </div>
 
+                    <div className="bg-card p-4 rounded-xl border border-slate-100 shadow-sm space-y-2 min-w-0 w-full">
+                      <label className="text-[11px] font-bold text-muted-foreground uppercase">
+                        Billing Period
+                      </label>
+                      <Select value={rentPeriod} onValueChange={setRentPeriod}>
+                        <SelectTrigger className="h-9 text-sm w-full">
+                          <SelectValue placeholder="Select Period" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="MONTHLY">Monthly</SelectItem>
+                          <SelectItem value="QUARTERLY">Quarterly</SelectItem>
+                          <SelectItem value="HALF_YEARLY">Half Yearly</SelectItem>
+                          <SelectItem value="YEARLY">Yearly</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
                     {leaseType === 'FSM' && (
-                      <div className="bg-card p-4 rounded-xl border border-blue-200 shadow-sm space-y-2 bg-blue-50/30">
+                      <div className="bg-card p-4 rounded-xl border border-blue-200 shadow-sm space-y-2 bg-blue-50/30 min-w-0 w-full">
                         <label className="text-[11px] font-bold text-blue-600 uppercase flex items-center gap-2">
                           <span className="w-2 h-2 rounded-full bg-blue-400" /> Service Billing Type
                           (FSM)
                         </label>
                         <Select value={rentType} onValueChange={setRentType}>
-                          <SelectTrigger className="h-9 text-sm border-blue-100">
-                            <SelectValue />
+                          <SelectTrigger className="h-9 text-sm border-blue-100 w-full">
+                            <SelectValue placeholder="Select Billing Type" />
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="FIXED_LIMIT">Fixed Limit (BW + Color)</SelectItem>
@@ -2800,21 +3535,57 @@ function QuotationFormModal({
                                             }
                                             className="h-7 text-xs flex-1"
                                           />
-                                          <Input
-                                            placeholder="To"
-                                            type="number"
-                                            value={slab.to}
-                                            onChange={(e) =>
-                                              updateSlab(
-                                                index,
-                                                'bwSlabRanges',
-                                                sIdx,
-                                                'to',
-                                                e.target.value,
-                                              )
-                                            }
-                                            className="h-7 text-xs flex-1"
-                                          />
+                                          <div className="relative flex-1">
+                                            <Input
+                                              placeholder="To"
+                                              type={slab.to === '1000000' ? 'text' : 'number'}
+                                              value={slab.to === '1000000' ? 'UNLIMITED' : slab.to}
+                                              onChange={(e) =>
+                                                updateSlab(
+                                                  index,
+                                                  'bwSlabRanges',
+                                                  sIdx,
+                                                  'to',
+                                                  e.target.value,
+                                                )
+                                              }
+                                              className={`h-7 text-xs pr-14 ${slab.to === '1000000' ? 'font-bold text-blue-600 bg-blue-50/50' : ''}`}
+                                            />
+                                            <div className="absolute right-0 top-0 flex items-center h-7 gap-0.5 pr-0.5">
+                                              <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className="h-6 px-1 text-[8px] font-bold text-blue-600 hover:bg-blue-100"
+                                                onClick={() =>
+                                                  updateSlab(
+                                                    index,
+                                                    'bwSlabRanges',
+                                                    sIdx,
+                                                    'to',
+                                                    '100000',
+                                                  )
+                                                }
+                                              >
+                                                100K
+                                              </Button>
+                                              <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className="h-6 px-1 text-[10px] font-bold text-blue-600 hover:bg-blue-100"
+                                                onClick={() =>
+                                                  updateSlab(
+                                                    index,
+                                                    'bwSlabRanges',
+                                                    sIdx,
+                                                    'to',
+                                                    slab.to === '1000000' ? '' : '1000000',
+                                                  )
+                                                }
+                                              >
+                                                {slab.to === '1000000' ? '✕' : '∞'}
+                                              </Button>
+                                            </div>
+                                          </div>
                                           <Input
                                             placeholder="Rate"
                                             type="number"
@@ -2874,21 +3645,57 @@ function QuotationFormModal({
                                             }
                                             className="h-7 text-xs flex-1"
                                           />
-                                          <Input
-                                            placeholder="To"
-                                            type="number"
-                                            value={slab.to}
-                                            onChange={(e) =>
-                                              updateSlab(
-                                                index,
-                                                'colorSlabRanges',
-                                                sIdx,
-                                                'to',
-                                                e.target.value,
-                                              )
-                                            }
-                                            className="h-7 text-xs flex-1"
-                                          />
+                                          <div className="relative flex-1">
+                                            <Input
+                                              placeholder="To"
+                                              type={slab.to === '1000000' ? 'text' : 'number'}
+                                              value={slab.to === '1000000' ? 'UNLIMITED' : slab.to}
+                                              onChange={(e) =>
+                                                updateSlab(
+                                                  index,
+                                                  'colorSlabRanges',
+                                                  sIdx,
+                                                  'to',
+                                                  e.target.value,
+                                                )
+                                              }
+                                              className={`h-7 text-xs pr-14 ${slab.to === '1000000' ? 'font-bold text-blue-600 bg-blue-50/50' : ''}`}
+                                            />
+                                            <div className="absolute right-0 top-0 flex items-center h-7 gap-0.5 pr-0.5">
+                                              <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className="h-6 px-1 text-[8px] font-bold text-blue-600 hover:bg-blue-100"
+                                                onClick={() =>
+                                                  updateSlab(
+                                                    index,
+                                                    'colorSlabRanges',
+                                                    sIdx,
+                                                    'to',
+                                                    '100000',
+                                                  )
+                                                }
+                                              >
+                                                100K
+                                              </Button>
+                                              <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className="h-6 px-1 text-[10px] font-bold text-blue-600 hover:bg-blue-100"
+                                                onClick={() =>
+                                                  updateSlab(
+                                                    index,
+                                                    'colorSlabRanges',
+                                                    sIdx,
+                                                    'to',
+                                                    slab.to === '1000000' ? '' : '1000000',
+                                                  )
+                                                }
+                                              >
+                                                {slab.to === '1000000' ? '✕' : '∞'}
+                                              </Button>
+                                            </div>
+                                          </div>
                                           <Input
                                             placeholder="Rate"
                                             type="number"
@@ -2952,21 +3759,57 @@ function QuotationFormModal({
                                           }
                                           className="h-7 text-xs flex-1"
                                         />
-                                        <Input
-                                          placeholder="To"
-                                          type="number"
-                                          value={slab.to}
-                                          onChange={(e) =>
-                                            updateSlab(
-                                              index,
-                                              'comboSlabRanges',
-                                              sIdx,
-                                              'to',
-                                              e.target.value,
-                                            )
-                                          }
-                                          className="h-7 text-xs flex-1"
-                                        />
+                                        <div className="relative flex-1">
+                                          <Input
+                                            placeholder="To"
+                                            type={slab.to === '1000000' ? 'text' : 'number'}
+                                            value={slab.to === '1000000' ? 'UNLIMITED' : slab.to}
+                                            onChange={(e) =>
+                                              updateSlab(
+                                                index,
+                                                'comboSlabRanges',
+                                                sIdx,
+                                                'to',
+                                                e.target.value,
+                                              )
+                                            }
+                                            className={`h-7 text-xs pr-14 ${slab.to === '1000000' ? 'font-bold text-blue-600 bg-blue-50/50' : ''}`}
+                                          />
+                                          <div className="absolute right-0 top-0 flex items-center h-7 gap-0.5 pr-0.5">
+                                            <Button
+                                              variant="ghost"
+                                              size="sm"
+                                              className="h-6 px-1 text-[8px] font-bold text-blue-600 hover:bg-blue-100"
+                                              onClick={() =>
+                                                updateSlab(
+                                                  index,
+                                                  'comboSlabRanges',
+                                                  sIdx,
+                                                  'to',
+                                                  '100000',
+                                                )
+                                              }
+                                            >
+                                              100K
+                                            </Button>
+                                            <Button
+                                              variant="ghost"
+                                              size="sm"
+                                              className="h-6 px-1 text-[10px] font-bold text-blue-600 hover:bg-blue-100"
+                                              onClick={() =>
+                                                updateSlab(
+                                                  index,
+                                                  'comboSlabRanges',
+                                                  sIdx,
+                                                  'to',
+                                                  slab.to === '1000000' ? '' : '1000000',
+                                                )
+                                              }
+                                            >
+                                              {slab.to === '1000000' ? '✕' : '∞'}
+                                            </Button>
+                                          </div>
+                                        </div>
                                         <Input
                                           placeholder="Rate"
                                           type="number"
@@ -3056,48 +3899,56 @@ function QuotationFormModal({
                         />
                       </div>
                     )}
-                    {leaseType === 'FSM' && (
-                      <div className="bg-card p-4 rounded-xl border border-purple-100 shadow-sm space-y-2">
-                        <label className="text-[11px] font-bold text-purple-600 uppercase flex items-center justify-between">
-                          <span>Periodic Rent ({rentPeriod.replace('_', ' ')})</span>
-                          <span className="text-[9px] lowercase">(auto)</span>
-                        </label>
-                        <Input
-                          type="number"
-                          value={monthlyRent}
-                          onChange={(e) => {
-                            setLastEditedLease('PERIODIC');
-                            setMonthlyRent(e.target.value);
-                            if (!e.target.value) setTotalLeaseAmount('');
-                          }}
-                          className="h-9 text-sm font-bold text-blue-700"
-                        />
-                      </div>
+                    {rentType !== 'CPC' && rentType !== 'CPC_COMBO' && (
+                      <>
+                        {leaseType === 'FSM' && (
+                          <div className="bg-card p-4 rounded-xl border border-purple-100 shadow-sm space-y-2">
+                            <label className="text-[11px] font-bold text-purple-600 uppercase flex items-center justify-between">
+                              <span>Periodic Rent ({rentPeriod.replace('_', ' ')})</span>
+                              <span className="text-[9px] lowercase">(auto)</span>
+                            </label>
+                            <Input
+                              type="number"
+                              value={monthlyRent}
+                              onChange={(e) => {
+                                setLastEditedLease('PERIODIC');
+                                setMonthlyRent(e.target.value);
+                                if (!e.target.value) setTotalLeaseAmount('');
+                              }}
+                              className="h-9 text-sm font-bold text-blue-700"
+                            />
+                          </div>
+                        )}
+                        <div className="bg-card p-4 rounded-xl border border-slate-100 shadow-sm space-y-2">
+                          <label className="text-[11px] font-bold text-muted-foreground uppercase">
+                            Advance / Caution Deposit (QAR)
+                          </label>
+                          <Input
+                            type="number"
+                            placeholder="0.00"
+                            value={advanceAmount}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setAdvanceAmount(val);
+                              setSecurityDepositAmount(val);
+                            }}
+                            className="h-9 text-sm"
+                          />
+                        </div>
+                        <div className="bg-card p-4 rounded-xl border border-slate-100 shadow-sm space-y-2">
+                          <label className="text-[11px] font-bold text-muted-foreground uppercase">
+                            Discount (%)
+                          </label>
+                          <Input
+                            type="number"
+                            placeholder="0"
+                            value={discountPercent}
+                            onChange={(e) => setDiscountPercent(e.target.value)}
+                            className="h-9 text-sm"
+                          />
+                        </div>
+                      </>
                     )}
-                    <div className="bg-card p-4 rounded-xl border border-slate-100 shadow-sm space-y-2">
-                      <label className="text-[11px] font-bold text-muted-foreground uppercase">
-                        Advance Amount (QAR)
-                      </label>
-                      <Input
-                        type="number"
-                        placeholder="0.00"
-                        value={advanceAmount}
-                        onChange={(e) => setAdvanceAmount(e.target.value)}
-                        className="h-9 text-sm"
-                      />
-                    </div>
-                    <div className="bg-card p-4 rounded-xl border border-slate-100 shadow-sm space-y-2">
-                      <label className="text-[11px] font-bold text-muted-foreground uppercase">
-                        Discount (%)
-                      </label>
-                      <Input
-                        type="number"
-                        placeholder="0"
-                        value={discountPercent}
-                        onChange={(e) => setDiscountPercent(e.target.value)}
-                        className="h-9 text-sm"
-                      />
-                    </div>
                   </div>
 
                   {/* Agreement Details (Shared for Rent/Lease) */}
@@ -3145,24 +3996,11 @@ function QuotationFormModal({
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
-                      <div className="space-y-2">
-                        <label className="text-[10px] font-bold text-muted-foreground uppercase">
-                          Security Deposit Amount (QAR)
-                        </label>
-                        <Input
-                          type="number"
-                          placeholder="0.00"
-                          value={securityDepositAmount}
-                          onChange={(e) => setSecurityDepositAmount(e.target.value)}
-                          className="h-9 text-sm border-blue-100 focus:border-blue-400"
-                        />
-                      </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
                       <div className="space-y-2">
                         <label className="text-[10px] font-bold text-muted-foreground uppercase">
                           Deposit Mode
                         </label>
-                        <span className="flex-1" />
                         <Select
                           value={securityDepositMode}
                           onValueChange={(v) => setSecurityDepositMode(v as 'CASH' | 'CHEQUE')}
@@ -3231,36 +4069,6 @@ function QuotationFormModal({
               </Button>
             )}
 
-            {step === 2 && (
-              <Button
-                variant="outline"
-                className="h-10 px-6 font-bold text-[11px] uppercase tracking-wider border-dashed border-slate-400 text-slate-600 hover:bg-slate-50 hover:border-slate-600 transition-all gap-2"
-                onClick={() => setIsLayoutSelectorOpen(true)}
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="14"
-                  height="14"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <rect x="3" y="3" width="7" height="9" rx="1" />
-                  <rect x="14" y="3" width="7" height="5" rx="1" />
-                  <rect x="14" y="12" width="7" height="9" rx="1" />
-                  <rect x="3" y="16" width="7" height="5" rx="1" />
-                </svg>
-                {selectedLayoutStyle
-                  ? `Layout: ${selectedLayoutStyle} (${
-                      selectedLayoutCategory === 'rental' ? 'rent' : selectedLayoutCategory
-                    })`
-                  : 'Select Layout'}
-              </Button>
-            )}
-
             {step === 1 ? (
               <Button
                 className="h-10 px-8 bg-blue-600 hover:bg-blue-700 text-white font-bold text-[11px] uppercase tracking-widest shadow-md shadow-blue-200"
@@ -3291,17 +4099,6 @@ function QuotationFormModal({
           </div>
         </div>
       </DialogContent>
-
-      <LayoutSelectionDialog
-        open={isLayoutSelectorOpen}
-        onOpenChange={setIsLayoutSelectorOpen}
-        selectedType={selectedLayoutCategory}
-        selectedStyle={selectedLayoutStyle}
-        onSelectLayout={(category, style) => {
-          setSelectedLayoutCategory(category);
-          setSelectedLayoutStyle(style);
-        }}
-      />
     </Dialog>
   );
 }

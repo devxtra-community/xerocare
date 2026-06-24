@@ -21,7 +21,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { CalendarDays, Loader2 } from 'lucide-react';
-import { getInvoices } from '@/lib/invoice';
+import { getBranchSalesOverview } from '@/lib/invoice';
 import { formatCompactNumber } from '@/lib/format';
 
 interface DailyData {
@@ -68,22 +68,13 @@ export default function DailyRevenueChart({
     const fetchData = async () => {
       setLoading(true);
       try {
-        const invoices = await getInvoices();
-        const paidOnly = (invoices || []).filter((inv) => inv.status === 'PAID');
+        // Use server-aggregated branch sales overview
+        const year = selectedYear === 'all' ? new Date().getFullYear() : (selectedYear as number);
+        const rawData = await getBranchSalesOverview('1Y', year);
 
-        // Filter by year and month
-        const now = new Date();
-        const yearToUse = selectedYear === 'all' ? now.getFullYear() : selectedYear;
-        const monthToUse = selectedMonth;
+        const daysInMonth = new Date(year, selectedMonth + 1, 0).getDate();
 
-        const filteredInvoices = paidOnly.filter((inv) => {
-          const date = new Date(inv.createdAt);
-          return date.getFullYear() === yearToUse && date.getMonth() === monthToUse;
-        });
-
-        const daysInMonth = new Date(yearToUse, monthToUse + 1, 0).getDate();
-
-        // Initialize data for all days of the current month
+        // Initialize data for all days of the selected month
         const fullMonthData: DailyData[] = Array.from({ length: daysInMonth }, (_, i) => ({
           day: `${i + 1}`,
           rent: 0,
@@ -91,11 +82,13 @@ export default function DailyRevenueChart({
           lease: 0,
         }));
 
-        // Map fetched data to the correct day
-        filteredInvoices.forEach((inv) => {
-          const date = new Date(inv.createdAt);
-          const dayIndex = date.getDate() - 1; // 0-based index
-          const rawType = (inv.saleType || '').toUpperCase();
+        // rawData rows: { date: 'YYYY-MM-DD', saleType: 'RENT'|..., totalSales: number }
+        (rawData || []).forEach((row) => {
+          const date = new Date(row.date);
+          if (date.getMonth() !== selectedMonth || date.getFullYear() !== year) return;
+
+          const dayIndex = date.getDate() - 1; // 0-based
+          const rawType = (row.saleType || '').toUpperCase();
 
           let typeKey: 'rent' | 'sale' | 'lease' | null = null;
           if (rawType === 'RENT') typeKey = 'rent';
@@ -103,7 +96,7 @@ export default function DailyRevenueChart({
           else if (['SALE', 'PRODUCT_SALE', 'SPAREPART_SALE'].includes(rawType)) typeKey = 'sale';
 
           if (fullMonthData[dayIndex] && typeKey) {
-            fullMonthData[dayIndex][typeKey] += Number(inv.totalAmount) || 0;
+            fullMonthData[dayIndex][typeKey] += Number(row.totalSales) || 0;
           }
         });
 

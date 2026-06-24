@@ -9,6 +9,7 @@ import { QuotationConversionFlow } from './QuotationConversionFlow';
 import { formatCurrency } from '@/lib/format';
 import { toast } from 'sonner';
 import DirectSaleFormModal from './DirectSaleFormModal';
+import { getUserFromToken } from '@/lib/auth';
 import {
   Table,
   TableBody,
@@ -53,6 +54,10 @@ export default function EmployeeSalesTable({ mode = 'EMPLOYEE' }: EmployeeSalesT
   const [directSaleFormOpen, setDirectSaleFormOpen] = useState(false);
   const [allBrands, setAllBrands] = useState<unknown[]>([]);
   const [allModels, setAllModels] = useState<unknown[]>([]);
+
+  const currentUser = getUserFromToken();
+  const isManagerOrAdmin =
+    currentUser && (currentUser.role === 'ADMIN' || currentUser.role === 'MANAGER');
 
   useEffect(() => {
     const fetchSuggestions = async () => {
@@ -309,7 +314,7 @@ export default function EmployeeSalesTable({ mode = 'EMPLOYEE' }: EmployeeSalesT
                 <TableHead className="text-primary font-bold">ITEMS</TableHead>
                 <TableHead className="text-primary font-bold">AMOUNT</TableHead>
                 <TableHead className="text-primary font-bold">TYPE</TableHead>
-                <TableHead className="text-primary font-bold">STATUS</TableHead>
+                <TableHead className="text-primary font-bold">PAYMENT STATUS</TableHead>
                 <TableHead className="text-primary font-bold">DATE</TableHead>
                 <TableHead className="text-primary font-bold text-center">ACTION</TableHead>
               </TableRow>
@@ -329,16 +334,44 @@ export default function EmployeeSalesTable({ mode = 'EMPLOYEE' }: EmployeeSalesT
                     className={`${index % 2 ? 'bg-blue-50/10' : 'bg-card'} hover:bg-muted/50 transition-colors`}
                   >
                     <TableCell className="text-blue-500 font-bold tracking-tight">
-                      {inv.invoiceNumber}
+                      {(() => {
+                        const rtn = inv.creditNotes?.find((cn) => cn.status === 'PRODUCT_REPLACED');
+                        if (rtn?.creditNoteNo) {
+                          const match = rtn.creditNoteNo.match(/(\d+)$/);
+                          const formatted = match
+                            ? `RTN-INV-${String(parseInt(match[1], 10)).padStart(4, '0')}`
+                            : `RTN-INV-${rtn.creditNoteNo}`;
+                          return <span className="text-rose-600">{formatted}</span>;
+                        }
+                        return inv.invoiceNumber;
+                      })()}
                     </TableCell>
                     <TableCell className="font-bold text-slate-700">
                       {inv.customerName || 'Walk-in'}
                     </TableCell>
                     <TableCell className="max-w-[250px]">
                       <div className="text-sm font-medium text-slate-700 truncate">
-                        {inv.items
-                          ?.map((item) => getCleanProductName(item.description))
-                          .join(', ') || 'No items'}
+                        {(() => {
+                          const completedExchange = inv.creditNotes?.find(
+                            (cn) =>
+                              cn.status === 'PRODUCT_REPLACED' && cn.type === 'CREDIT_EXCHANGE',
+                          );
+                          if (completedExchange?.replacementProductName) {
+                            return (
+                              <span className="text-violet-700 font-bold">
+                                {completedExchange.replacementProductName}
+                                <Badge className="ml-2 bg-violet-100 text-violet-600 border-none text-[8px] h-4">
+                                  EXCHANGED
+                                </Badge>
+                              </span>
+                            );
+                          }
+                          return (
+                            inv.items
+                              ?.map((item) => getCleanProductName(item.description))
+                              .join(', ') || 'No items'
+                          );
+                        })()}
                       </div>
                       {inv.items && inv.items.length > 1 && (
                         <span className="text-[10px] text-slate-400 font-semibold uppercase">
@@ -347,7 +380,24 @@ export default function EmployeeSalesTable({ mode = 'EMPLOYEE' }: EmployeeSalesT
                       )}
                     </TableCell>
                     <TableCell className="font-semibold text-foreground">
-                      {formatCurrency(inv.totalAmount)}
+                      {(() => {
+                        const completedExchange = inv.creditNotes?.find(
+                          (cn) => cn.status === 'PRODUCT_REPLACED' && cn.type === 'CREDIT_EXCHANGE',
+                        );
+                        if (completedExchange && Number(completedExchange.replacementAmount) > 0) {
+                          return (
+                            <div>
+                              <div className="text-sm font-black text-violet-700">
+                                {formatCurrency(Number(completedExchange.replacementAmount))}
+                              </div>
+                              <div className="text-[10px] text-slate-400 font-semibold line-through">
+                                {formatCurrency(inv.totalAmount)}
+                              </div>
+                            </div>
+                          );
+                        }
+                        return formatCurrency(inv.totalAmount);
+                      })()}
                     </TableCell>
                     <TableCell>
                       <Badge
@@ -370,29 +420,49 @@ export default function EmployeeSalesTable({ mode = 'EMPLOYEE' }: EmployeeSalesT
                     </TableCell>
 
                     <TableCell>
-                      <Badge
-                        className={`rounded-full px-3 py-0.5 text-[10px] font-bold tracking-wider shadow-none
-                        ${
-                          inv.status === 'PAID' || inv.status === 'FINANCE_APPROVED'
+                      {(() => {
+                        // Derive a clean payment status from the invoice status
+                        const isPaid = inv.status === 'PAID';
+                        const isPartial = inv.status === 'PARTIAL';
+                        const isRefunded = inv.status === 'REFUNDED';
+
+                        const completedExchange = inv.creditNotes?.find(
+                          (cn) => cn.status === 'PRODUCT_REPLACED' && cn.type === 'CREDIT_EXCHANGE',
+                        );
+                        const completedReplacement = inv.creditNotes?.find(
+                          (cn) => cn.status === 'PRODUCT_REPLACED' && cn.type === 'REPLACEMENT',
+                        );
+
+                        let label = isRefunded
+                          ? 'CASH REFUND CREDIT'
+                          : isPaid
+                            ? 'PAID'
+                            : isPartial
+                              ? 'PARTIAL'
+                              : 'PENDING';
+                        let cls = isRefunded
+                          ? 'bg-red-100 text-red-700 hover:bg-red-100'
+                          : isPaid
                             ? 'bg-green-100 text-green-700 hover:bg-green-100'
-                            : inv.status === 'PENDING' ||
-                                inv.status === 'TRANSACTION_COMPLETED' ||
-                                inv.status === 'EMPLOYEE_APPROVED'
-                              ? 'bg-blue-100 text-blue-700 hover:bg-blue-100'
-                              : inv.status === 'FINANCE_REJECTED' || inv.status === 'REJECTED'
-                                ? 'bg-red-100 text-red-700 hover:bg-red-100'
-                                : 'bg-slate-100 text-slate-700 hover:bg-slate-100'
-                        }`}
-                      >
-                        {inv.status === 'TRANSACTION_COMPLETED' ||
-                        inv.status === 'EMPLOYEE_APPROVED'
-                          ? 'PENDING FINANCE'
-                          : inv.status === 'FINANCE_REJECTED'
-                            ? 'FINANCE REJECTED'
-                            : inv.status === 'FINANCE_APPROVED'
-                              ? 'APPROVED'
-                              : inv.status}
-                      </Badge>
+                            : isPartial
+                              ? 'bg-amber-100 text-amber-700 hover:bg-amber-100'
+                              : 'bg-slate-100 text-slate-600 hover:bg-slate-100';
+
+                        if (completedExchange) {
+                          label = 'CREDIT EXCHANGE';
+                          cls = 'bg-violet-100 text-violet-700 hover:bg-violet-100';
+                        } else if (completedReplacement) {
+                          label = 'PRODUCT REPLACED';
+                          cls = 'bg-blue-100 text-blue-700 hover:bg-blue-100';
+                        }
+                        return (
+                          <Badge
+                            className={`rounded-full px-3 py-0.5 text-[10px] font-bold tracking-wider shadow-none ${cls}`}
+                          >
+                            {label}
+                          </Badge>
+                        );
+                      })()}
                     </TableCell>
                     <TableCell className="text-muted-foreground text-sm font-medium">
                       {new Date(inv.createdAt).toLocaleDateString(undefined, {
@@ -514,19 +584,21 @@ export default function EmployeeSalesTable({ mode = 'EMPLOYEE' }: EmployeeSalesT
                   Select an approved quotation to finalize as a sale.
                 </span>
               </Button>
-              <Button
-                variant="outline"
-                className="flex flex-col items-start p-6 h-auto hover:bg-slate-50 border-2 hover:border-primary transition-all text-left gap-1 rounded-xl"
-                onClick={() => {
-                  setSelectModeOpen(false);
-                  setDirectSaleFormOpen(true);
-                }}
-              >
-                <span className="font-bold text-slate-900 text-sm">Direct Sale</span>
-                <span className="text-[11px] text-slate-500 font-normal">
-                  Create a new sale directly without an existing quotation.
-                </span>
-              </Button>
+              {isManagerOrAdmin && (
+                <Button
+                  variant="outline"
+                  className="flex flex-col items-start p-6 h-auto hover:bg-slate-50 border-2 hover:border-primary transition-all text-left gap-1 rounded-xl"
+                  onClick={() => {
+                    setSelectModeOpen(false);
+                    setDirectSaleFormOpen(true);
+                  }}
+                >
+                  <span className="font-bold text-slate-900 text-sm">Direct Sale</span>
+                  <span className="text-[11px] text-slate-500 font-normal">
+                    Create a new sale directly without an existing quotation.
+                  </span>
+                </Button>
+              )}
             </div>
             <div className="flex justify-end pt-2 border-t">
               <Button

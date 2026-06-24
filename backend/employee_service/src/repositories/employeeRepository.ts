@@ -46,7 +46,14 @@ export class EmployeeRepository {
   /**
    * Retrieves paginated employees with optional filtering and search.
    */
-  async findAll(skip = 0, take = 20, role?: EmployeeRole, branchId?: string, search?: string) {
+  async findAll(
+    skip = 0,
+    take = 20,
+    role?: EmployeeRole,
+    branchId?: string,
+    search?: string,
+    job?: string,
+  ) {
     const query = this.repo
       .createQueryBuilder('employee')
       .leftJoinAndSelect('employee.branch', 'branch')
@@ -58,6 +65,10 @@ export class EmployeeRepository {
 
     if (branchId) {
       query.andWhere('employee.branch_id = :branchId', { branchId });
+    }
+
+    if (job) {
+      query.andWhere('employee.employee_job = :job', { job });
     }
 
     if (search) {
