@@ -75,7 +75,6 @@ const fmt = (n: number) =>
   n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 const ProductStandardQuotation: React.FC<ProductStandardQuotationProps> = ({
-  isInvoice = false,
   productName = 'TONER CHIP SET',
   modelName = 'ALTALink C8130',
   billTo = {
@@ -705,9 +704,6 @@ const ProductStandardQuotation: React.FC<ProductStandardQuotationProps> = ({
               num: totals.total,
               bold: true,
             },
-            ...(isInvoice
-              ? [{ label: 'PAYMENT', value: fmt(totals.payment), num: totals.payment, bold: false }]
-              : []),
           ].map(({ label, value, num, bold, color }) => (
             <div
               key={label}
@@ -757,43 +753,6 @@ const ProductStandardQuotation: React.FC<ProductStandardQuotationProps> = ({
           <div style={{ borderTop: 'none', margin: '8px 0' }} />
 
           {/* Grand Total */}
-          {isInvoice && (
-            <div
-              style={{
-                display: 'flex',
-                flexDirection: 'column',
-              }}
-            >
-              <div
-                style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
-              >
-                <span
-                  style={{
-                    fontWeight: '500',
-                    fontSize: '12px',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.04em',
-                  }}
-                >
-                  BALANCE DUE
-                </span>
-                <span style={{ fontWeight: '500', fontSize: '15px' }}>
-                  QAR {fmt(totals.balanceDue)}
-                </span>
-              </div>
-              <div
-                style={{
-                  fontSize: '9.5px',
-                  color: '#111827',
-                  fontStyle: 'italic',
-                  textAlign: 'right',
-                  marginTop: '3px',
-                }}
-              >
-                {numberToWords(totals.balanceDue)}
-              </div>
-            </div>
-          )}
 
           {totals.paid && (
             <div

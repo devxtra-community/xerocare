@@ -85,7 +85,6 @@ const tdStyleHelper = (align: 'left' | 'center' | 'right' = 'center'): React.CSS
 });
 
 const SparePartsNormalQuotation: React.FC<SparePartsNormalQuotationProps> = ({
-  isInvoice = false,
   modelName = '',
   billTo = {
     name: 'XEROCARE W. L. L',
@@ -451,9 +450,6 @@ const SparePartsNormalQuotation: React.FC<SparePartsNormalQuotationProps> = ({
               prefix: 'QAR ',
               isBold: true,
             },
-            ...(isInvoice
-              ? [{ label: 'Payment', value: totals.payment, num: totals.payment }]
-              : []),
           ].map((row, i) => (
             <div
               key={i}
@@ -501,37 +497,6 @@ const SparePartsNormalQuotation: React.FC<SparePartsNormalQuotationProps> = ({
               </div>
             </div>
           ))}
-
-          {isInvoice && (
-            <div
-              style={{
-                display: 'flex',
-                flexDirection: 'column',
-                padding: '12px 0',
-                fontWeight: '300',
-              }}
-            >
-              <div
-                style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
-              >
-                <span style={{ fontSize: '13px', textTransform: 'uppercase' }}>Balance Due</span>
-                <span style={{ fontSize: '15px', color: '#000000', fontWeight: '300' }}>
-                  QAR {fmt(totals.balanceDue)}
-                </span>
-              </div>
-              <div
-                style={{
-                  fontSize: '9px',
-                  color: '#111827',
-                  fontStyle: 'italic',
-                  textAlign: 'right',
-                  marginTop: '4px',
-                }}
-              >
-                {numberToWords(totals.balanceDue)}
-              </div>
-            </div>
-          )}
         </div>
       </div>
 

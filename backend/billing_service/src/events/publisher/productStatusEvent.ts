@@ -12,6 +12,7 @@ export async function emitProductStatusUpdate(payload: {
   invoiceId: string;
   approvedBy: string;
   approvedAt: Date;
+  customerId?: string | null;
 }) {
   const channel = await getRabbitChannel();
 
@@ -27,6 +28,7 @@ export async function emitProductStatusUpdate(payload: {
     billType: payload.billType,
     approvedBy: payload.approvedBy,
     approvedAt: payload.approvedAt.toISOString(),
+    customerId: payload.customerId || null,
   };
 
   channel.publish(EXCHANGE, ROUTING_KEY, Buffer.from(JSON.stringify(eventPayload)), {

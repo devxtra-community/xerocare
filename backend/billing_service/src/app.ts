@@ -10,6 +10,7 @@ import { getRabbitChannel } from './config/rabbitmq';
 import invoiceRouter from './routes/invoiceRoutes';
 import usageRouter from './routes/usageRoutes';
 import paymentRouter from './routes/paymentRoutes';
+import openingBalanceRouter from './routes/openingBalanceRoutes';
 
 /**
  * This is the main engine for the Billing Service.
@@ -37,6 +38,7 @@ app.use('/health', healthRouter);
 app.use('/invoices', invoiceRouter);
 app.use('/usage', usageRouter);
 app.use('/payments', paymentRouter);
+app.use('/opening-balance', openingBalanceRouter);
 
 /**
  * Safety Net: Handling mistakes.

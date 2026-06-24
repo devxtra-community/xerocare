@@ -13,6 +13,7 @@ import { PaymentLedger } from '../entities/paymentLedgerEntity';
 import { QuotationTemplateAssignment } from '../entities/quotationTemplateAssignmentEntity';
 import { InvoiceLedger } from '../entities/invoiceLedgerEntity';
 import { PaymentTransaction } from '../entities/paymentTransactionEntity';
+import { OpeningBalanceEntry } from '../entities/openingBalanceEntryEntity';
 
 import { logger } from './logger';
 import { UsageRecordItem } from '../entities/usageRecordItemEntity';
@@ -40,6 +41,7 @@ export const Source = new DataSource({
     AuditLog,
     InvoiceLedger,
     PaymentTransaction,
+    OpeningBalanceEntry,
   ],
   poolSize: 1,
   extra: {
@@ -191,7 +193,80 @@ async function runPreMigrations() {
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
       `);
-      logger.info('Guaranteed invoice_ledger and payment_transactions tables exist.');
+
+      // Ensure invoices_type_enum has OPENING
+      try {
+        await client.query(`ALTER TYPE invoices_type_enum ADD VALUE IF NOT EXISTS 'OPENING';`);
+      } catch (err) {
+        logger.debug(`Skipped adding OPENING to invoices_type_enum: ${(err as Error).message}`);
+      }
+
+      // Add columns to invoices table
+      await client.query(`
+        ALTER TABLE invoices 
+        ADD COLUMN IF NOT EXISTS is_opening_entry BOOLEAN DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP NULL;
+      `);
+
+      // Add columns to invoice_ledger table
+      await client.query(`
+        ALTER TABLE invoice_ledger 
+        ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP NULL;
+      `);
+
+      // Ensure opening_balance_entries_balance_type_enum exists
+      await client.query(`
+        DO $$ BEGIN
+          IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'opening_balance_entries_balance_type_enum') THEN
+            CREATE TYPE opening_balance_entries_balance_type_enum AS ENUM (
+              'SALE_OUTSTANDING', 'RENT_CONTRACT', 'LEASE_CONTRACT', 'SERVICE_DEBT', 'OTHER_DEBT'
+            );
+          END IF;
+        END $$;
+      `);
+
+      // Create opening_balance_entries table
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS opening_balance_entries (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            entry_number VARCHAR(255) UNIQUE NOT NULL,
+            customer_id VARCHAR(255) NOT NULL,
+            branch_id UUID NOT NULL,
+            balance_type opening_balance_entries_balance_type_enum NOT NULL,
+            opening_balance DECIMAL(12,2) NOT NULL DEFAULT 0,
+            remaining_balance DECIMAL(12,2) NOT NULL DEFAULT 0,
+            original_total_amount DECIMAL(12,2) NOT NULL DEFAULT 0,
+            already_paid_amount DECIMAL(12,2) NOT NULL DEFAULT 0,
+            invoice_id UUID REFERENCES invoices(id) ON DELETE SET NULL,
+            is_fully_settled BOOLEAN NOT NULL DEFAULT FALSE,
+            migrated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            monthly_billing_amount DECIMAL(12,2) NULL,
+            billing_cycle_in_days INTEGER NULL DEFAULT 30,
+            next_payment_due_date DATE NULL,
+            total_contract_months INTEGER NULL,
+            months_completed INTEGER NULL,
+            months_remaining INTEGER NULL,
+            remaining_contract_value DECIMAL(12,2) NULL,
+            contract_start_date DATE NULL,
+            product_brand VARCHAR(255) NULL,
+            product_model VARCHAR(255) NULL,
+            serial_number VARCHAR(255) NULL,
+            product_id VARCHAR(255) NULL,
+            notes TEXT NULL,
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            deleted_at TIMESTAMP NULL
+        );
+      `);
+
+      // Ensure branch_name column exists
+      await client.query(`
+        ALTER TABLE opening_balance_entries ADD COLUMN IF NOT EXISTS branch_name VARCHAR(255) NULL;
+      `);
+
+      logger.info(
+        'Guaranteed invoice_ledger, payment_transactions, and opening_balance_entries tables exist.',
+      );
     } catch (colErr) {
       logger.warn('Failed to ensure invoices or invoice_items columns:', colErr);
     }

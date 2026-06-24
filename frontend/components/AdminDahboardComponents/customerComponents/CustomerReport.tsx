@@ -34,12 +34,14 @@ import { toast } from 'sonner';
 import { usePagination } from '@/hooks/usePagination';
 import Pagination from '@/components/Pagination';
 import { formatCurrency } from '@/lib/format';
+import { getOpeningBalanceEntries, OpeningBalanceEntry } from '@/lib/openingBalance';
 
 export default function CustomerReport() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [branches, setBranches] = useState<Branch[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [openingBalances, setOpeningBalances] = useState<OpeningBalanceEntry[]>([]);
 
   const [search, setSearch] = useState('');
   const [selectedBranchId, setSelectedBranchId] = useState<string>('all');
@@ -48,31 +50,38 @@ export default function CustomerReport() {
   const [loading, setLoading] = useState(true);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
-  const [detailTab, setDetailTab] = useState<'overview' | 'products' | 'invoices'>('overview');
+  const [detailTab, setDetailTab] = useState<
+    'overview' | 'products' | 'invoices' | 'opening-balances'
+  >('overview');
 
   const { page, limit, total, setPage, setTotal, totalPages } = usePagination(10);
 
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
-      const [customersRes, branchesRes, productsRes, invoicesRes] = await Promise.all([
-        getCustomers().catch((err) => {
-          console.error('Failed to fetch customers:', err);
-          return [] as Customer[];
-        }),
-        getBranches().catch((err) => {
-          console.error('Failed to fetch branches:', err);
-          return { success: false, data: [] } as { success: boolean; data: Branch[] };
-        }),
-        getAllProducts({ limit: 2000 }).catch((err) => {
-          console.error('Failed to fetch products:', err);
-          return [] as Product[];
-        }),
-        getInvoices().catch((err) => {
-          console.error('Failed to fetch invoices:', err);
-          return [] as Invoice[];
-        }),
-      ]);
+      const [customersRes, branchesRes, productsRes, invoicesRes, openingBalancesRes] =
+        await Promise.all([
+          getCustomers().catch((err) => {
+            console.error('Failed to fetch customers:', err);
+            return [] as Customer[];
+          }),
+          getBranches().catch((err) => {
+            console.error('Failed to fetch branches:', err);
+            return { success: false, data: [] } as { success: boolean; data: Branch[] };
+          }),
+          getAllProducts({ limit: 2000 }).catch((err) => {
+            console.error('Failed to fetch products:', err);
+            return [] as Product[];
+          }),
+          getInvoices().catch((err) => {
+            console.error('Failed to fetch invoices:', err);
+            return [] as Invoice[];
+          }),
+          getOpeningBalanceEntries({ limit: 1000 }).catch((err) => {
+            console.error('Failed to fetch opening balances:', err);
+            return { data: [] } as { data: OpeningBalanceEntry[] };
+          }),
+        ]);
 
       setCustomers(customersRes);
 
@@ -84,6 +93,7 @@ export default function CustomerReport() {
 
       setProducts(productsRes);
       setInvoices(invoicesRes);
+      setOpeningBalances(openingBalancesRes?.data || []);
     } catch (error) {
       console.error(error);
       toast.error('Failed to load customer report data');
@@ -114,6 +124,16 @@ export default function CustomerReport() {
     const custProds = getCustomerProducts(customerId);
     const uniqueBrands = new Set(custProds.map((p) => p.brand).filter(Boolean));
     return Array.from(uniqueBrands);
+  };
+
+  const getCustomerOpeningBalances = (customerId: string) => {
+    return openingBalances.filter((ob) => ob.customerId === customerId);
+  };
+
+  const getCustomerOutstandingMigratedBalance = (customerId: string) => {
+    return getCustomerOpeningBalances(customerId)
+      .filter((ob) => !ob.isFullySettled)
+      .reduce((sum, ob) => sum + Number(ob.remainingBalance || 0), 0);
   };
 
   const isPendingCashCustomer = (customerId: string) => {
@@ -425,6 +445,12 @@ export default function CustomerReport() {
                               <Wallet className="h-2.5 w-2.5" /> PENDING CASH
                             </span>
                           )}
+                          {getCustomerOutstandingMigratedBalance(cust.id) > 0 && (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-100 flex items-center gap-1">
+                              OB: QAR{' '}
+                              {getCustomerOutstandingMigratedBalance(cust.id).toLocaleString()}
+                            </span>
+                          )}
                         </div>
                       </TableCell>
 
@@ -500,7 +526,7 @@ export default function CustomerReport() {
 
             {/* Navigation Tabs */}
             <div className="flex border-b px-6 shrink-0 bg-white">
-              {(['overview', 'products', 'invoices'] as const).map((tab) => (
+              {(['overview', 'products', 'invoices', 'opening-balances'] as const).map((tab) => (
                 <button
                   key={tab}
                   onClick={() => setDetailTab(tab)}
@@ -510,7 +536,7 @@ export default function CustomerReport() {
                       : 'border-transparent text-slate-500 hover:text-slate-700'
                   }`}
                 >
-                  {tab}
+                  {tab === 'opening-balances' ? 'Opening Balances' : tab}
                 </button>
               ))}
             </div>
@@ -766,6 +792,63 @@ export default function CustomerReport() {
                             </TableRow>
                           );
                         })
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+
+              {/* Tab 4: Opening Balances */}
+              {detailTab === 'opening-balances' && (
+                <div className="bg-white rounded-2xl border shadow-sm overflow-hidden">
+                  <Table>
+                    <TableHeader className="bg-slate-50">
+                      <TableRow>
+                        <TableHead>Entry #</TableHead>
+                        <TableHead>Type</TableHead>
+                        <TableHead className="text-right">Original Value</TableHead>
+                        <TableHead className="text-right">Remaining Balance</TableHead>
+                        <TableHead className="text-center">Status</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {getCustomerOpeningBalances(selectedCustomer.id).length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={5} className="text-center py-6 text-slate-400 italic">
+                            No migrated opening balances found for this customer.
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        getCustomerOpeningBalances(selectedCustomer.id).map((ob) => (
+                          <TableRow key={ob.id} className="hover:bg-slate-50/40">
+                            <TableCell className="font-bold text-slate-850">
+                              <div>{ob.entryNumber}</div>
+                              <div className="text-[10px] text-slate-400 font-normal mt-0.5">
+                                Migrated: {new Date(ob.migratedAt).toLocaleDateString()}
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-xs font-semibold text-slate-650">
+                              {ob.balanceType.replace(/_/g, ' ')}
+                            </TableCell>
+                            <TableCell className="text-right font-medium">
+                              QAR {Number(ob.originalTotalAmount).toLocaleString()}
+                            </TableCell>
+                            <TableCell className="text-right font-bold text-slate-800">
+                              QAR {Number(ob.remainingBalance).toLocaleString()}
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <span
+                                className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                                  ob.isFullySettled
+                                    ? 'bg-green-50 text-green-700'
+                                    : 'bg-amber-50 text-amber-700 border border-amber-100'
+                                }`}
+                              >
+                                {ob.isFullySettled ? 'Settled' : 'Outstanding'}
+                              </span>
+                            </TableCell>
+                          </TableRow>
+                        ))
                       )}
                     </TableBody>
                   </Table>

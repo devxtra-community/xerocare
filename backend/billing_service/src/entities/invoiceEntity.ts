@@ -271,6 +271,10 @@ export class Invoice {
   isTemplate!: boolean;
 
   @Index()
+  @Column({ name: 'is_opening_entry', type: 'boolean', default: false })
+  isOpeningEntry!: boolean;
+
+  @Index()
   @Column({ type: 'uuid', nullable: true })
   templateId?: string | null;
 

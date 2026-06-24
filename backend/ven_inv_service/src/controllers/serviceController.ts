@@ -231,69 +231,49 @@ export class ServiceController {
     if (product) {
       productId = product.id;
 
-      // Step 1 - Check if machine is on RENT
-      const rentInvoice = await Source.query(
-        `
-        SELECT i.id, i.type, i."billType", i."contractStatus"
-        FROM invoices i
-        JOIN product_allocations pa ON i.id = pa."contractId"
-        WHERE i.type = 'PROFORMA' 
-          AND i."billType" = 'RENT' 
-          AND i."contractStatus" = 'ACTIVE' 
-          AND pa.status = 'ALLOCATED'
-          AND (pa."productId" = $1 OR pa."serialNumber" = $2)
-        LIMIT 1;
-      `,
-        [productId, serialNumber],
-      );
+      let rentInvoice = null;
+      let saleInvoice = null;
+      let leaseInvoice = null;
+      let latestAllocation = null;
 
-      if (rentInvoice && rentInvoice.length > 0) {
+      try {
+        const billingRes = await axios.get(
+          `${BILLING_SERVICE_URL}/invoices/machine/${productId}/billing-context?serialNumber=${encodeURIComponent(serialNumber)}`,
+        );
+        if (billingRes.data && billingRes.data.success) {
+          const billingData = billingRes.data.data;
+          rentInvoice = billingData.rentInvoice;
+          saleInvoice = billingData.saleInvoice;
+          leaseInvoice = billingData.leaseInvoice;
+          latestAllocation = billingData.latestAllocation;
+        }
+      } catch (err) {
+        logger.error('Failed to fetch machine billing context from billing service:', err);
+      }
+
+      // Step 1 - Check if machine is on RENT
+      if (rentInvoice) {
         serviceContext = ServiceContext.RENT;
         jobType = JobType.WARRANTY_ONSITE;
         track = 'A';
-        linkedInvoiceId = rentInvoice[0].id;
+        linkedInvoiceId = rentInvoice.id;
       } else {
         // Step 2 - Check if machine is under SALE warranty
-        const saleInvoice = await Source.query(
-          `
-          SELECT i.id, i."createdAt", i."effectiveFrom", ii.warranty
-          FROM invoices i
-          JOIN invoice_items ii ON i.id = ii."invoiceId"
-          WHERE i.type = 'FINAL'
-            AND i."billType" = 'SALE'
-            AND ii."productId" = $1
-          LIMIT 1;
-        `,
-          [productId],
-        );
-
         let isSaleWarrantyActive = false;
-        if (saleInvoice && saleInvoice.length > 0) {
-          const invoice = saleInvoice[0];
-          const saleDate = new Date(invoice.effectiveFrom || invoice.createdAt);
-          const warrantyStr = invoice.warranty || product.warranty || '12';
+        if (saleInvoice) {
+          const saleDate = new Date(saleInvoice.effectiveFrom || saleInvoice.createdAt);
+          const warrantyStr = saleInvoice.warranty || product.warranty || '12';
           const warrantyMonths = parseInt(warrantyStr, 10) || 12;
           const warrantyEndDate = new Date(saleDate);
           warrantyEndDate.setMonth(warrantyEndDate.getMonth() + warrantyMonths);
 
-          const allocation = await Source.query(
-            `
-            SELECT * FROM product_allocations 
-            WHERE "productId" = $1 
-            ORDER BY "createdAt" DESC 
-            LIMIT 1
-          `,
-            [productId],
-          );
-
           let copiesUsed = 0;
-          if (allocation && allocation.length > 0) {
-            const alloc = allocation[0];
+          if (latestAllocation) {
             copiesUsed =
-              (alloc.currentBwA4 || 0) +
-              (alloc.currentBwA3 || 0) * 2 +
-              (alloc.currentColorA4 || 0) +
-              (alloc.currentColorA3 || 0) * 2;
+              (latestAllocation.currentBwA4 || 0) +
+              (latestAllocation.currentBwA3 || 0) * 2 +
+              (latestAllocation.currentColorA4 || 0) +
+              (latestAllocation.currentColorA3 || 0) * 2;
           } else if (product.meter_reading) {
             copiesUsed = product.meter_reading;
           }
@@ -303,66 +283,41 @@ export class ServiceController {
           if (currentDate <= warrantyEndDate && copiesUsed < warrantyMaxCopies) {
             serviceContext = ServiceContext.WARRANTY;
             track = 'A';
-            linkedInvoiceId = invoice.id;
+            linkedInvoiceId = saleInvoice.id;
             isSaleWarrantyActive = true;
           }
         }
 
         if (!isSaleWarrantyActive) {
           // Step 3 - Check if machine is on LEASE
-          const leaseInvoice = await Source.query(
-            `
-            SELECT i.id, i."effectiveFrom", i."leaseTenureMonths", i."maxCopyLimit"
-            FROM invoices i
-            JOIN product_allocations pa ON i.id = pa."contractId"
-            WHERE i.type = 'PROFORMA'
-              AND i."billType" = 'LEASE'
-              AND i."contractStatus" = 'ACTIVE'
-              AND pa."productId" = $1
-            LIMIT 1;
-          `,
-            [productId],
-          );
-
-          if (leaseInvoice && leaseInvoice.length > 0) {
-            const lease = leaseInvoice[0];
-            const effectiveFrom = new Date(lease.effectiveFrom);
-            const leaseTenureMonths = Number(lease.leaseTenureMonths) || 0;
+          if (leaseInvoice) {
+            const effectiveFrom = new Date(leaseInvoice.effectiveFrom);
+            const leaseTenureMonths = Number(leaseInvoice.leaseTenureMonths) || 0;
             const warrantyEndDate = new Date(effectiveFrom);
             warrantyEndDate.setMonth(warrantyEndDate.getMonth() + leaseTenureMonths);
 
-            const allocation = await Source.query(
-              `
-              SELECT * FROM product_allocations 
-              WHERE "productId" = $1 
-              ORDER BY "createdAt" DESC 
-              LIMIT 1
-            `,
-              [productId],
-            );
-
             let copiesUsed = 0;
-            if (allocation && allocation.length > 0) {
-              const alloc = allocation[0];
+            if (latestAllocation) {
               copiesUsed =
-                (alloc.currentBwA4 || 0) +
-                (alloc.currentBwA3 || 0) * 2 +
-                (alloc.currentColorA4 || 0) +
-                (alloc.currentColorA3 || 0) * 2;
+                (latestAllocation.currentBwA4 || 0) +
+                (latestAllocation.currentBwA3 || 0) * 2 +
+                (latestAllocation.currentColorA4 || 0) +
+                (latestAllocation.currentColorA3 || 0) * 2;
             } else if (product.meter_reading) {
               copiesUsed = product.meter_reading;
             }
 
-            const maxCopyLimit = Number(lease.maxCopyLimit) || product.warranty_max_pages || 200000;
+            const maxCopyLimit =
+              Number(leaseInvoice.maxCopyLimit) || product.warranty_max_pages || 200000;
             const currentDate = new Date();
             if (currentDate <= warrantyEndDate && copiesUsed < maxCopyLimit) {
               serviceContext = ServiceContext.LEASE_UNDER_WARRANTY;
               track = 'A';
-              linkedInvoiceId = lease.id;
+              linkedInvoiceId = leaseInvoice.id;
             } else {
               serviceContext = ServiceContext.LEASE_EXPIRED;
               track = 'B';
-              linkedInvoiceId = lease.id;
+              linkedInvoiceId = leaseInvoice.id;
             }
           }
 

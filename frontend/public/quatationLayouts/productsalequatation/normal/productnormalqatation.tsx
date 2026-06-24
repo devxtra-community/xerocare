@@ -94,7 +94,6 @@ const tdStyle = (align: 'left' | 'center' | 'right' = 'center'): React.CSSProper
 });
 
 const ProductNormalQuotation: React.FC<ProductNormalQuotationProps> = ({
-  isInvoice = false,
   billTo = {
     name: 'XEROCARE W. L. L',
     address: 'SHARJAH UAE',
@@ -597,7 +596,6 @@ const ProductNormalQuotation: React.FC<ProductNormalQuotationProps> = ({
               prefix: 'QAR ',
               isBold: true,
             },
-            ...(isInvoice ? [{ label: 'Payment', value: totals.payment }] : []),
           ].map((row, i) => (
             <div
               key={i}
@@ -645,36 +643,7 @@ const ProductNormalQuotation: React.FC<ProductNormalQuotationProps> = ({
               </div>
             </div>
           ))}
-          {isInvoice && (
-            <div
-              style={{
-                display: 'flex',
-                flexDirection: 'column',
-                padding: '12px 0',
-                fontWeight: '300',
-              }}
-            >
-              <div
-                style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
-              >
-                <span style={{ fontSize: '13px', textTransform: 'uppercase' }}>Balance Due</span>
-                <span style={{ fontSize: '15px', color: '#000000', fontWeight: '300' }}>
-                  QAR {fmt(totals.balanceDue)}
-                </span>
-              </div>
-              <div
-                style={{
-                  fontSize: '10px',
-                  color: '#111827',
-                  fontStyle: 'italic',
-                  textAlign: 'right',
-                  marginTop: '4px',
-                }}
-              >
-                {numberToWords(totals.balanceDue)}
-              </div>
-            </div>
-          )}
+
           {totals.paid && (
             <div
               style={{

@@ -489,6 +489,7 @@ export class UsageService {
                     invoiceId: contract.id,
                     approvedBy: 'SYSTEM (Final Usage Logged)',
                     approvedAt: new Date(),
+                    customerId: null,
                   });
                 }
               }

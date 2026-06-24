@@ -2308,9 +2308,30 @@ export default function ServiceDashboardPage() {
                             <div className="flex items-center justify-between border-b border-slate-100 pb-2">
                               <h4 className="text-xs font-bold text-slate-700">Select Machine</h4>
                               {selectedMachine && (
-                                <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full">
-                                  Selected: {selectedMachine.serialNumber}
-                                </span>
+                                <div className="flex items-center gap-1.5">
+                                  <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full">
+                                    Selected: {selectedMachine.serialNumber}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setSelectedMachine(null);
+                                      setNewTicket((prev) => ({
+                                        ...prev,
+                                        productId: '',
+                                        contractReferenceId: '',
+                                        productBrand: '',
+                                        productModel: '',
+                                        productName: '',
+                                        serialNumber: '',
+                                        serviceContext: 'CHARGEABLE',
+                                      }));
+                                    }}
+                                    className="text-[10px] font-bold text-red-600 hover:text-white bg-red-50 hover:bg-red-500 border border-red-200 hover:border-red-500 px-2 py-0.5 rounded-full transition cursor-pointer"
+                                  >
+                                    Remove
+                                  </button>
+                                </div>
                               )}
                             </div>
 

@@ -305,6 +305,7 @@ export class BillingService {
             invoiceId: contract.id,
             approvedBy: 'SYSTEM',
             approvedAt: new Date(),
+            customerId: null,
           });
         } catch (e) {
           logger.error('Failed to emit product status update for allocation', {
@@ -1942,6 +1943,7 @@ export class BillingService {
             invoiceId: invoice.id,
             approvedBy: userId,
             approvedAt: invoice.financeApprovedAt || new Date(),
+            customerId: billType === 'RETURNED' ? null : invoice.customerId,
           });
         } catch (error) {
           logger.error('Failed to emit product status update', {
@@ -2062,6 +2064,7 @@ export class BillingService {
             invoiceId: invoice.id,
             approvedBy: userId,
             approvedAt: invoice.financeApprovedAt,
+            customerId: null,
           });
         } catch (e) {
           logger.error('Failed to emit product status update on finance reject', {
@@ -2317,6 +2320,7 @@ export class BillingService {
               invoiceId: contract.id,
               approvedBy: 'SYSTEM',
               approvedAt: new Date(),
+              customerId: null,
             });
           } catch (e) {
             logger.error('Failed to emit product status update for allocation', {
@@ -2772,6 +2776,7 @@ export class BillingService {
           invoiceId: oldAllocation.contractId,
           approvedBy: 'SYSTEM',
           approvedAt: ts,
+          customerId: null,
         }).catch((err) => logger.error('Failed to emit RETURNED event', err));
       }
       if (newAllocation.productId) {
@@ -2781,6 +2786,7 @@ export class BillingService {
           invoiceId: newAllocation.contractId,
           approvedBy: 'SYSTEM',
           approvedAt: ts,
+          customerId: invoice?.customerId || null,
         }).catch((err) => logger.error('Failed to emit LEASE/RENT event', err));
       }
 
@@ -3063,6 +3069,7 @@ export class BillingService {
           // Create ProductAllocation for safety/billing tracking
           await queryRunner.manager.insert(ProductAllocation, {
             contractId: savedInvoice.id,
+            modelId: item.modelId,
             productId: item.productId,
             serialNumber: item.serialNumber,
             status: AllocationStatus.ALLOCATED,
@@ -4224,6 +4231,25 @@ export class BillingService {
       ledger.paidAmount = Number(ledger.paidAmount) + Number(transaction.amount);
       ledger.balanceAmount = Math.max(0, Number(ledger.totalAmount) - Number(ledger.paidAmount));
       await ledgerRepo.save(ledger);
+
+      // Check if invoice is an opening balance entry
+      if (invoice.isOpeningEntry || invoice.type === 'OPENING') {
+        const { OpeningBalanceEntry } = await import('../entities/openingBalanceEntryEntity');
+        const openingBalanceRepo = Source.getRepository(OpeningBalanceEntry);
+        const entry = await openingBalanceRepo.findOne({ where: { invoiceId: invoice.id } });
+        if (entry) {
+          entry.remainingBalance = ledger.balanceAmount;
+          entry.isFullySettled = ledger.balanceAmount === 0;
+          await openingBalanceRepo.save(entry);
+
+          await logAudit(
+            entry.id,
+            'UPDATE',
+            userId || 'SYSTEM',
+            `Updated opening balance entry ${entry.entryNumber}: remaining balance is now QAR ${entry.remainingBalance}.`,
+          );
+        }
+      }
 
       // Check if invoice is fully paid
       if (ledger.balanceAmount === 0 && invoice.status !== InvoiceStatus.PAID) {

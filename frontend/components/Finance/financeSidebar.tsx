@@ -11,6 +11,7 @@ import {
   Tag,
   FileQuestion,
   RotateCcw,
+  FileText,
 } from 'lucide-react';
 
 import {
@@ -98,6 +99,11 @@ export default function FinanceSidebar() {
           title: 'Returns',
           icon: RotateCcw,
           href: '/finance/returns',
+        },
+        {
+          title: 'Opening Balances',
+          icon: FileText,
+          href: '/finance/opening-balances',
         },
       ],
     },

@@ -52,6 +52,12 @@ const menuItems = [
     modules: ['customers'],
   },
   {
+    title: 'Opening Balances',
+    icon: FileText,
+    href: '/employee/opening-balances',
+    modules: ['customers'],
+  },
+  {
     title: 'Leads',
     icon: UserPlus,
     href: '/employee/leads',

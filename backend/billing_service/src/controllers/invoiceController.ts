@@ -1614,3 +1614,75 @@ export const getInvoiceLedger = async (req: Request, res: Response, next: NextFu
     next(error);
   }
 };
+
+export const getMachineBillingContext = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const productId = req.params.productId as string;
+    const serialNumber = req.query.serialNumber as string;
+
+    const rentInvoice = await Source.query(
+      `
+      SELECT i.id, i.type, i."billType", i."contractStatus"
+      FROM invoices i
+      JOIN product_allocations pa ON i.id = pa."contractId"
+      WHERE i.type = 'PROFORMA' 
+        AND i."billType" = 'RENT' 
+        AND i."contractStatus" = 'ACTIVE' 
+        AND pa.status = 'ALLOCATED'
+        AND (pa."productId" = $1 OR pa."serialNumber" = $2)
+      LIMIT 1;
+    `,
+      [productId, serialNumber],
+    );
+
+    const saleInvoice = await Source.query(
+      `
+      SELECT i.id, i."createdAt", i."effectiveFrom", ii.warranty
+      FROM invoices i
+      JOIN invoice_items ii ON i.id = ii."invoiceId"
+      WHERE i.type = 'FINAL'
+        AND (i."billType" = 'SALE' OR (i."billType" IS NULL AND i."saleType" = 'PRODUCT_SALE'))
+        AND ii."productId" = $1
+      LIMIT 1;
+    `,
+      [productId],
+    );
+
+    const leaseInvoice = await Source.query(
+      `
+      SELECT i.id, i."effectiveFrom", i."leaseTenureMonths", i."maxCopyLimit"
+      FROM invoices i
+      JOIN product_allocations pa ON i.id = pa."contractId"
+      WHERE i.type = 'PROFORMA'
+        AND i."billType" = 'LEASE'
+        AND i."contractStatus" = 'ACTIVE'
+        AND pa."productId" = $1
+      LIMIT 1;
+    `,
+      [productId],
+    );
+
+    const latestAllocation = await Source.query(
+      `
+      SELECT * FROM product_allocations 
+      WHERE "productId" = $1 
+      ORDER BY "createdAt" DESC 
+      LIMIT 1;
+    `,
+      [productId],
+    );
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        rentInvoice: rentInvoice && rentInvoice.length > 0 ? rentInvoice[0] : null,
+        saleInvoice: saleInvoice && saleInvoice.length > 0 ? saleInvoice[0] : null,
+        leaseInvoice: leaseInvoice && leaseInvoice.length > 0 ? leaseInvoice[0] : null,
+        latestAllocation:
+          latestAllocation && latestAllocation.length > 0 ? latestAllocation[0] : null,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
