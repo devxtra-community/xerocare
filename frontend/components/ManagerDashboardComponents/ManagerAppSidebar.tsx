@@ -124,6 +124,11 @@ const menuItems = [
     href: '/manager/finance',
   },
   {
+    title: 'Opening Balances',
+    icon: FileText,
+    href: '/manager/opening-balances',
+  },
+  {
     title: 'Inventory',
     icon: Boxes,
     href: '/manager/inventory',

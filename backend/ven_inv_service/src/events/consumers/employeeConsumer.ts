@@ -1,4 +1,4 @@
-import { getRabbitChannel } from '../../config/rabbitmq';
+import { createRabbitChannel } from '../../config/rabbitmq';
 import { Source } from '../../config/db';
 import { EmployeeManager } from '../../entities/employeeManagerEntity';
 import { logger } from '../../config/logger';
@@ -7,7 +7,7 @@ const EXCHANGE = 'domain_events';
 const QUEUE = 'veninv.employee.events';
 
 export async function startEmployeeConsumer() {
-  const channel = await getRabbitChannel();
+  const channel = await createRabbitChannel();
 
   await channel.assertExchange(EXCHANGE, 'topic', { durable: true });
   await channel.assertQueue(QUEUE, { durable: true });

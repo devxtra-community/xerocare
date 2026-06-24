@@ -22,6 +22,7 @@ export interface Employee {
   } | null;
   employee_job?: string | null;
   finance_job?: string | null;
+  id_proof_key?: string | null;
 }
 
 export interface HRStats {

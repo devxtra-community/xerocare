@@ -7,6 +7,8 @@ import { LotStatus } from '../entities/lotEntity';
 import { getCached, setCached, deleteCached } from '../utils/cacheUtil';
 import { logger } from '../config/logger';
 import { generateSku } from '../utils/skuGenerator';
+import { Source } from '../config/db';
+import { Warehouse, WarehouseStatus } from '../entities/warehouseEntity';
 
 interface BulkUploadRow {
   sku?: string;
@@ -25,6 +27,7 @@ interface BulkUploadRow {
   mpn?: string;
   description?: string;
   yield?: string;
+  maxDiscountableAmount?: number;
 }
 
 export class SparePartService {
@@ -96,24 +99,22 @@ export class SparePartService {
       }
     }
 
-    // If lotId is present, ensure we have warehouse/vendor info (often cached/already fetched above)
-    if (lotId && (!warehouseId || !vendorId)) {
+    // If lotId is present, ensure we have warehouse/vendor info and lot is received
+    if (lotId) {
       const lot = await this.lotService.getLotById(lotId);
       if (lot) {
         if (!warehouseId) warehouseId = lot.warehouse_id;
         if (!vendorId) vendorId = lot.vendorId;
+
+        if (lot.status !== LotStatus.RECEIVED) {
+          throw new Error(
+            'Inventory cannot be created until the lot is received. Please confirm the lot reception first.',
+          );
+        }
       }
     }
 
     if (lotId && sku) {
-      // Guard: inventory cannot be created before lot is received
-      const lot = await this.lotService.getLotById(lotId);
-      if (lot.status !== LotStatus.RECEIVED) {
-        throw new Error(
-          'Inventory cannot be created until the lot is received. Please confirm the lot reception first.',
-        );
-      }
-
       // IMPROVED DUPLICATE DETECTION: If it's the same lot and same sku, it's definitely the same part.
       // Prioritize sku over fuzzy name matching.
       const existingByCode = await this.repo.findMasterBySkuAndLot(sku, lotId);
@@ -129,11 +130,10 @@ export class SparePartService {
         await deleteCached(`sparepart:${existingByCode.id}`);
 
         // Track usage on existing lot item
+        await this.lotService.linkSparePartToLotItem(lotId, data.part_name, existingByCode.id);
         await this.lotService.validateAndTrackUsage(lotId, LotItemType.SPARE_PART, sku, quantity);
         return { success: true, message: 'Existing spare part updated via SKU' };
       }
-
-      await this.lotService.validateAndTrackUsage(lotId, LotItemType.SPARE_PART, sku, quantity);
     }
 
     // Fallback fuzzy matching by name/model/etc.
@@ -157,8 +157,21 @@ export class SparePartService {
       }
 
       await deleteCached(`sparepart:${existingPart.id}`);
+
+      if (lotId) {
+        await this.lotService.linkSparePartToLotItem(lotId, data.part_name, existingPart.id);
+        await this.lotService.validateAndTrackUsage(
+          lotId,
+          LotItemType.SPARE_PART,
+          existingPart.sku || sku || '',
+          quantity,
+        );
+      }
+
       return { success: true, message: 'Existing spare part stock incremented' };
     }
+
+    const generatedSku = sku || generateSku();
 
     const sparePart = await this.repo.createMaster({
       part_name: data.part_name,
@@ -173,13 +186,25 @@ export class SparePartService {
       lot_id: lotId,
       warehouse_id: warehouseId,
       vendor_id: vendorId,
-      sku: sku || generateSku(),
+      sku: generatedSku,
       mpn: data.mpn,
       description: data.description,
       yield: data.yield,
+      maxDiscountableAmount: data.maxDiscountableAmount || 0,
+      max_discount_amount: data.maxDiscountableAmount || 0,
     });
 
     await setCached(`sparepart:${sparePart.id}`, sparePart, 3600);
+
+    if (lotId) {
+      await this.lotService.linkSparePartToLotItem(lotId, data.part_name, sparePart.id);
+      await this.lotService.validateAndTrackUsage(
+        lotId,
+        LotItemType.SPARE_PART,
+        generatedSku,
+        quantity,
+      );
+    }
 
     return { success: true, message: 'Spare part and stock processed' };
   }
@@ -199,7 +224,12 @@ export class SparePartService {
       }
     }
 
-    const primaryModelId = models && models.length > 0 ? models[0].id : data.model_id;
+    let primaryModelId: string | undefined = undefined;
+    if (data.model_ids !== undefined) {
+      primaryModelId = models && models.length > 0 ? models[0].id : undefined;
+    } else {
+      primaryModelId = data.model_id ?? undefined;
+    }
 
     const updateData: Partial<SparePart> = {
       part_name: data.part_name,
@@ -215,6 +245,8 @@ export class SparePartService {
       yield: data.yield,
       warehouse_id: data.warehouse_id,
       vendor_id: data.vendor_id,
+      maxDiscountableAmount: data.maxDiscountableAmount,
+      max_discount_amount: data.maxDiscountableAmount,
     };
     Object.keys(updateData).forEach(
       (key) =>
@@ -272,5 +304,46 @@ export class SparePartService {
     }
 
     return sparePart;
+  }
+
+  /**
+   * Retrieves stock levels for a spare part across warehouses, filtering by branch context.
+   */
+  async getStock(id: string, branchId?: string, isAdmin: boolean = false) {
+    const sparePart = await this.repo.findById(id);
+    if (!sparePart) return null;
+
+    const warehouseRepo = Source.getRepository(Warehouse);
+    const warehousesQuery = warehouseRepo
+      .createQueryBuilder('w')
+      .where('w.status != :deleted', { deleted: WarehouseStatus.DELETED });
+
+    if (branchId && !isAdmin) {
+      warehousesQuery.andWhere('w.branchId = :branchId', { branchId });
+    }
+    const branchWarehouses = await warehousesQuery.getMany();
+
+    const sku = sparePart.sku;
+    const partName = sparePart.part_name;
+    const parts = await Source.getRepository(SparePart).find({
+      where: sku ? { sku } : { part_name: partName },
+    });
+
+    const warehousesWithStock = branchWarehouses.map((w) => {
+      const matchingPartsInWarehouse = parts.filter((p) => p.warehouse_id === w.id);
+      const qty = matchingPartsInWarehouse.reduce((sum, p) => sum + p.quantity, 0);
+      return {
+        id: w.id,
+        name: w.warehouseName,
+        quantity: Math.max(0, qty),
+      };
+    });
+
+    const totalStock = warehousesWithStock.reduce((sum, w) => sum + w.quantity, 0);
+
+    return {
+      totalStock,
+      warehouses: warehousesWithStock,
+    };
   }
 }

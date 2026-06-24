@@ -1,14 +1,17 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { X, Upload, Save, Trash2, Plus, FileSpreadsheet } from 'lucide-react';
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+  X,
+  Upload,
+  Save,
+  Trash2,
+  Plus,
+  FileSpreadsheet,
+  ChevronDown,
+  ChevronUp,
+} from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
+
 import { Input } from '@/components/ui/input';
 import {
   Select,
@@ -56,6 +59,7 @@ export function BulkProductDialog({
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [file, setFile] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [expandedRows, setExpandedRows] = useState<Record<number, boolean>>({});
 
   const loadDependencies = async () => {
     const [vResult, wResult, lResult, mResult, bResult] = await Promise.allSettled([
@@ -71,7 +75,7 @@ export function BulkProductDialog({
       console.error('Failed to load vendors:', vResult.reason);
 
     if (wResult.status === 'fulfilled') setWarehouses(wResult.value);
-    else if (wResult.status === 'rejected')
+    else if (vResult.status === 'rejected')
       console.error('Failed to load warehouses:', wResult.reason);
 
     if (lResult.status === 'fulfilled') setLots(lResult.value.data || []);
@@ -92,6 +96,7 @@ export function BulkProductDialog({
   useEffect(() => {
     if (open) {
       setFile(null);
+      setExpandedRows({});
       const prepareInitialData = async () => {
         await loadDependencies();
 
@@ -109,21 +114,27 @@ export function BulkProductDialog({
 
             const newRows: Partial<BulkProductRow>[] = [];
             itemsToFill.forEach((item) => {
+              const modelId = item.modelId ?? item.model?.id ?? '';
+              const model = models.find((m) => m.id === modelId);
+              const brandName =
+                model?.brandRelation?.name ||
+                model?.brand?.name ||
+                item.model?.brandRelation?.name ||
+                '';
               const qty = Math.max(0, item.receivedQuantity - item.usedQuantity);
               for (let i = 0; i < qty; i++) {
                 newRows.push({
                   ...createEmptyRow(),
                   lot_id: initialLotId,
-                  model_id: item.modelId ?? item.model?.id ?? '',
-                  model_no: item.modelId ?? item.model?.id ?? '',
-                  brand: item.model?.brandRelation?.name || '',
+                  model_id: modelId,
+                  model_no: modelId,
+                  brand: brandName,
                   vendor_id: lot.vendorId || lot.vendor?.id || '',
-                  warehouse_id: lot.warehouse_id || '',
-                  // Autofill purchase_price from lot item's unitPrice.
-                  // salePrice is set to 0 to force user to enter a new retail price.
+                  warehouse_id: lot.warehouseId || lot.warehouse_id || '',
                   purchase_price: Number(item.unitPrice) || 0,
-                  sale_price: 0,
-                  name: item.model?.model_name || '',
+                  sale_price: Number(item.selling_price) || 0,
+                  name: item.customProductName || model?.model_name || '',
+                  description: model?.description || '',
                 });
               }
             });
@@ -137,7 +148,7 @@ export function BulkProductDialog({
 
       prepareInitialData();
     }
-  }, [open, initialLotId, initialItemId]);
+  }, [open, initialLotId, initialItemId, models]);
 
   const createEmptyRow = (): Partial<BulkProductRow> => ({
     model_id: '',
@@ -157,6 +168,9 @@ export function BulkProductDialog({
     wholesale_price: 0,
     lot_id: '',
     hs_code: '',
+    description: '',
+    features: [],
+    consumables: [],
   });
 
   /**
@@ -188,6 +202,63 @@ export function BulkProductDialog({
     };
 
     reader.readAsBinaryString(selectedFile);
+  };
+
+  const handleAddRow = () => {
+    const newRow = createEmptyRow();
+    const newRows = [...rows, newRow];
+    setRows(newRows);
+    setExpandedRows((prev) => ({
+      ...prev,
+      [newRows.length - 1]: true,
+    }));
+  };
+
+  const handleRemoveRow = (index: number) => {
+    setRows(rows.filter((_, i) => i !== index));
+    setExpandedRows((prev) => {
+      const next = { ...prev };
+      delete next[index];
+      const updatedExpanded: Record<number, boolean> = {};
+      Object.keys(next).forEach((k) => {
+        const idx = Number(k);
+        if (idx > index) {
+          updatedExpanded[idx - 1] = next[idx];
+        } else {
+          updatedExpanded[idx] = next[idx];
+        }
+      });
+      return updatedExpanded;
+    });
+  };
+
+  const toggleRowExpanded = (index: number) => {
+    setExpandedRows((prev) => ({
+      ...prev,
+      [index]: !prev[index],
+    }));
+  };
+
+  const updateRow = <K extends keyof BulkProductRow>(
+    index: number,
+    field: K,
+    value: BulkProductRow[K],
+  ) => {
+    const newRows = [...rows];
+    newRows[index] = { ...newRows[index], [field]: value };
+    setRows(newRows);
+  };
+
+  /**
+   * When a lot is assigned to a row, clear any prior "select from lot" model choice
+   * so the user re-selects the correct model from the new lot.
+   */
+  const handleLotChange = (index: number, lotId: string) => {
+    // '__none__' is the sentinel value for the "None" SelectItem (empty string is not allowed by Radix)
+    const resolvedLotId = lotId === '__none__' ? '' : lotId;
+    const newRows = [...rows];
+    newRows[index] = { ...newRows[index], lot_id: resolvedLotId, model_id: '', name: '' };
+    setRows(newRows);
   };
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -263,33 +334,6 @@ export function BulkProductDialog({
     }
   };
 
-  const handleAddRow = () => {
-    setRows([...rows, createEmptyRow()]);
-  };
-
-  const handleRemoveRow = (index: number) => {
-    setRows(rows.filter((_, i) => i !== index));
-  };
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const updateRow = (index: number, field: keyof BulkProductRow, value: any) => {
-    const newRows = [...rows];
-    newRows[index] = { ...newRows[index], [field]: value };
-    setRows(newRows);
-  };
-
-  /**
-   * When a lot is assigned to a row, clear any prior "select from lot" model choice
-   * so the user re-selects the correct model from the new lot.
-   */
-  const handleLotChange = (index: number, lotId: string) => {
-    // '__none__' is the sentinel value for the "None" SelectItem (empty string is not allowed by Radix)
-    const resolvedLotId = lotId === '__none__' ? '' : lotId;
-    const newRows = [...rows];
-    newRows[index] = { ...newRows[index], lot_id: resolvedLotId, model_id: '', name: '' };
-    setRows(newRows);
-  };
-
   /**
    * Returns a list of MODEL-type lot items for the lot assigned to a given row.
    */
@@ -298,31 +342,6 @@ export function BulkProductDialog({
     const lot = lots.find((l) => l.id === lotId);
     if (!lot) return [];
     return lot.items.filter((item) => item.itemType === LotItemType.MODEL);
-  };
-
-  /**
-   * When a model is selected from within a lot, auto-fill model_id, model_no, and name.
-   * The backend bulkCreateProducts uses `row.model_no` (the model UUID) to find the model,
-   * so we must populate both model_id AND model_no with the model's ID.
-   */
-  const handleSelectFromLot = (index: number, lotItemId: string, lotId: string) => {
-    const lot = lots.find((l) => l.id === lotId);
-    if (!lot) return;
-    const item = lot.items.find((i) => i.id === lotItemId);
-    if (!item) return;
-
-    const modelUuid = item.modelId ?? item.model?.id ?? '';
-    const relevantModel = models.find((m) => m.id === modelUuid);
-    const newRows = [...rows];
-    newRows[index] = {
-      ...newRows[index],
-      model_id: modelUuid,
-      model_no: modelUuid, // backend findbyid(row.model_no) expects the UUID
-      brand:
-        relevantModel?.brandRelation?.name || relevantModel?.brand?.name || rows[index].brand || '',
-      // name is intentionally NOT auto-filled — user must type their own product name
-    };
-    setRows(newRows);
   };
 
   const handleSubmit = async () => {
@@ -407,288 +426,663 @@ export function BulkProductDialog({
           </div>
         </div>
 
-        <div className="flex-1 overflow-x-auto p-4">
+        <div className="flex-1 overflow-y-auto p-4 space-y-4">
           {rows.length > 0 ? (
-            <div className="min-w-max">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="min-w-[180px]">Assign Lot</TableHead>
-                    <TableHead className="min-w-[200px]">Select from Lot</TableHead>
-                    <TableHead className="min-w-[140px]">Brand</TableHead>
-                    <TableHead className="min-w-[200px]">
-                      Model <span className="text-red-500">*</span>
-                    </TableHead>
-                    <TableHead className="min-w-[150px]">
-                      Serial No <span className="text-red-500">*</span>
-                    </TableHead>
-                    <TableHead className="min-w-[180px]">
-                      Name <span className="text-red-500">*</span>
-                    </TableHead>
-                    <TableHead className="min-w-[180px]">
-                      Warehouse <span className="text-red-500">*</span>
-                    </TableHead>
-                    <TableHead className="min-w-[180px]">
-                      Vendor <span className="text-red-500">*</span>
-                    </TableHead>
-                    <TableHead className="min-w-[130px]">Status</TableHead>
-                    <TableHead className="min-w-[150px]">MFD</TableHead>
-                    <TableHead className="min-w-[120px]">Purchase Price</TableHead>
-                    <TableHead className="min-w-[120px]">Sale Price</TableHead>
-                    <TableHead className="min-w-[130px]">Wholesale Price</TableHead>
-                    <TableHead className="min-w-[100px]">Tax %</TableHead>
-                    <TableHead className="min-w-[140px]">Print Colour</TableHead>
-                    <TableHead className="min-w-[130px]">HS Code</TableHead>
-                    <TableHead className="min-w-[130px]">Max Discount</TableHead>
-                    <TableHead className="min-w-[60px]"></TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {rows.map((row, i) => {
-                    const lotModelItems = getLotModelItems(row.lot_id ?? '');
-                    // Find the lot item that matches the currently assigned model so the
-                    // dropdown reflects the selection (both after manual pick AND Excel upload)
-                    const selectedLotItemId = row.model_id
-                      ? (lotModelItems.find(
-                          (item) =>
-                            item.modelId === row.model_id || item.model?.id === row.model_id,
-                        )?.id ?? '')
-                      : '';
-                    return (
-                      <TableRow key={i}>
-                        {/* ── Assign Lot ── */}
-                        <TableCell className="min-w-[180px]">
-                          <SearchableSelect
-                            value={row.lot_id ?? ''}
-                            onValueChange={(v) => handleLotChange(i, v)}
-                            options={[
-                              { value: '__none__', label: '— None —' },
-                              ...lots.map((l) => ({ value: l.id, label: l.lotNumber })),
-                            ]}
-                            placeholder="Select Lot"
-                            emptyText="No lots"
-                          />
-                        </TableCell>
+            rows.map((row, i) => {
+              const lotModelItems = getLotModelItems(row.lot_id ?? '');
+              const selectedLotItemId = row.model_id
+                ? (lotModelItems.find(
+                    (item) => item.modelId === row.model_id || item.model?.id === row.model_id,
+                  )?.id ?? '')
+                : '';
 
-                        {/* ── Select Product from Lot ── */}
-                        <TableCell className="min-w-[200px]">
-                          <SearchableSelect
-                            value={selectedLotItemId}
-                            disabled={!row.lot_id || lotModelItems.length === 0}
-                            onValueChange={(v) => handleSelectFromLot(i, v, row.lot_id ?? '')}
-                            options={lotModelItems.map((item) => ({
-                              value: item.id || '',
-                              label: item.model?.model_name || item.modelId || item.id || '',
-                              description:
-                                item.receivedQuantity > 0
-                                  ? `(qty: ${item.receivedQuantity - item.usedQuantity})`
-                                  : undefined,
-                            }))}
-                            placeholder={
-                              !row.lot_id
-                                ? 'Select a lot first'
-                                : lotModelItems.length === 0
-                                  ? 'No models in lot'
-                                  : 'Pick model from lot'
-                            }
-                            emptyText="No models"
-                          />
-                        </TableCell>
+              const isExpanded = !!expandedRows[i];
 
-                        <TableCell className="min-w-[140px]">
-                          <SearchableSelect
-                            value={row.brand || ''}
-                            onValueChange={(v) => {
-                              updateRow(i, 'brand', v);
-                              updateRow(i, 'model_id', '');
+              // Basic validation checklist
+              const isValid = !!(
+                row.model_id &&
+                row.warehouse_id &&
+                row.vendor_id &&
+                row.serial_no &&
+                row.name
+              );
+
+              const lotObj = lots.find((l) => l.id === row.lot_id);
+
+              return (
+                <div
+                  key={i}
+                  className="border border-slate-200 rounded-xl overflow-hidden shadow-sm bg-card transition-all duration-200 hover:shadow-md"
+                >
+                  {/* Header / Summary */}
+                  <div
+                    onClick={() => toggleRowExpanded(i)}
+                    className="p-4 bg-slate-50 border-b flex justify-between items-center cursor-pointer select-none"
+                  >
+                    <div className="flex items-center gap-3">
+                      {isValid ? (
+                        <span
+                          className="h-2.5 w-2.5 rounded-full bg-green-500 shrink-0"
+                          title="Valid Product"
+                        />
+                      ) : (
+                        <span
+                          className="h-2.5 w-2.5 rounded-full bg-amber-500 animate-pulse shrink-0"
+                          title="Missing required fields"
+                        />
+                      )}
+                      <div className="text-left">
+                        <h4 className="font-bold text-sm text-slate-800">
+                          Product #{i + 1}:{' '}
+                          <span className="text-primary">{row.name || 'Unnamed Product'}</span>
+                        </h4>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                          {row.brand ? `${row.brand}` : 'No Brand'} • Model:{' '}
+                          {row.model_id
+                            ? models.find((m) => m.id === row.model_id)?.model_name || 'Selected'
+                            : 'None'}{' '}
+                          • Serial: {row.serial_no || 'N/A'} • Price: ${row.sale_price || 0}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveRow(i)}
+                        className="text-red-500 hover:text-red-700 p-1.5 hover:bg-slate-100 rounded-lg transition-colors"
+                        title="Delete Product"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => toggleRowExpanded(i)}
+                        className="text-slate-400 hover:text-slate-600 p-1.5 hover:bg-slate-100 rounded-lg transition-colors"
+                      >
+                        {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Body (Form layout) */}
+                  {isExpanded && (
+                    <div className="p-6 bg-white space-y-6 text-left border-t">
+                      {/* Main Grid */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* Left Column */}
+                        <div className="space-y-4">
+                          <div className="grid grid-cols-2 gap-4">
+                            <Field label="Assign Lot">
+                              <SearchableSelect
+                                value={row.lot_id || ''}
+                                onValueChange={(v) => handleLotChange(i, v)}
+                                options={[
+                                  { value: '__none__', label: '— None —' },
+                                  ...lots.map((l) => ({ value: l.id, label: l.lotNumber })),
+                                ]}
+                                placeholder="Select Lot"
+                                emptyText="No lots"
+                              />
+                            </Field>
+
+                            <Field label="Select from Lot">
+                              <SearchableSelect
+                                value={selectedLotItemId}
+                                disabled={!row.lot_id || lotModelItems.length === 0}
+                                onValueChange={(v) => {
+                                  const item = lotModelItems.find((itm) => itm.id === v);
+                                  if (item) {
+                                    const modelId = item.modelId || item.model?.id || '';
+                                    const modelObj = models.find((m) => m.id === modelId);
+                                    const brandName =
+                                      modelObj?.brandRelation?.name ||
+                                      modelObj?.brand?.name ||
+                                      item.model?.brandRelation?.name ||
+                                      '';
+
+                                    updateRow(i, 'model_id', modelId);
+                                    updateRow(i, 'model_no', modelId);
+                                    updateRow(i, 'brand', brandName);
+                                    updateRow(
+                                      i,
+                                      'purchase_price',
+                                      Number(item.unitPrice) || row.purchase_price || 0,
+                                    );
+                                    updateRow(
+                                      i,
+                                      'sale_price',
+                                      Number(item.selling_price) || row.sale_price || 0,
+                                    );
+                                    updateRow(
+                                      i,
+                                      'name',
+                                      item.customProductName ||
+                                        modelObj?.model_name ||
+                                        row.name ||
+                                        '',
+                                    );
+                                    updateRow(
+                                      i,
+                                      'description',
+                                      modelObj?.description || row.description || '',
+                                    );
+                                    updateRow(
+                                      i,
+                                      'vendor_id',
+                                      lotObj?.vendorId || lotObj?.vendor?.id || row.vendor_id || '',
+                                    );
+                                    updateRow(
+                                      i,
+                                      'warehouse_id',
+                                      lotObj?.warehouseId ||
+                                        lotObj?.warehouse_id ||
+                                        row.warehouse_id ||
+                                        '',
+                                    );
+                                  }
+                                }}
+                                options={lotModelItems.map((item) => ({
+                                  value: item.id || '',
+                                  label: item.model?.model_name || item.modelId || item.id || '',
+                                  description:
+                                    item.receivedQuantity > 0
+                                      ? `(qty: ${item.receivedQuantity - item.usedQuantity})`
+                                      : undefined,
+                                }))}
+                                placeholder={
+                                  !row.lot_id
+                                    ? 'Select a lot first'
+                                    : lotModelItems.length === 0
+                                      ? 'No models in lot'
+                                      : 'Pick model from lot'
+                                }
+                                emptyText="No models"
+                              />
+                            </Field>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-4">
+                            <Field label="Brand">
+                              <SearchableSelect
+                                value={row.brand || ''}
+                                onValueChange={(v) => {
+                                  const brandObj = brands.find((b) => b.id === v || b.name === v);
+                                  updateRow(i, 'brand', brandObj?.name || v || '');
+                                  updateRow(i, 'model_id', '');
+                                  updateRow(i, 'name', '');
+                                }}
+                                options={brands.map((b) => ({
+                                  value: b.name || '',
+                                  label: b.name || '',
+                                }))}
+                                placeholder="Select Brand"
+                                emptyText="No brands"
+                              />
+                            </Field>
+
+                            <Field label="Model *">
+                              <SearchableSelect
+                                value={row.model_id || ''}
+                                onValueChange={(v) => {
+                                  updateRow(i, 'model_id', v);
+                                  updateRow(i, 'model_no', v);
+                                  const modelObj = models.find((m) => m.id === v);
+                                  if (modelObj) {
+                                    updateRow(i, 'name', modelObj.model_name || '');
+                                    updateRow(i, 'description', modelObj.description || '');
+                                  }
+                                }}
+                                options={models
+                                  .filter(
+                                    (m) =>
+                                      !row.brand ||
+                                      m.brandRelation?.name === row.brand ||
+                                      m.brand?.name === row.brand,
+                                  )
+                                  .map((m) => ({
+                                    value: m.id || '',
+                                    label: `${m.model_no} - ${m.model_name}`,
+                                  }))}
+                                placeholder="Select Model"
+                                emptyText="No models"
+                              />
+                            </Field>
+                          </div>
+
+                          <Field label="Product Name *">
+                            <Input
+                              value={row.name || ''}
+                              onChange={(e) => updateRow(i, 'name', e.target.value)}
+                              placeholder="Product Name"
+                            />
+                          </Field>
+
+                          <Field label="Serial Number *">
+                            <Input
+                              value={row.serial_no || ''}
+                              onChange={(e) => updateRow(i, 'serial_no', e.target.value)}
+                              placeholder="Serial Number"
+                            />
+                          </Field>
+
+                          <div className="grid grid-cols-2 gap-4">
+                            <Field label="Warehouse *">
+                              <SearchableSelect
+                                value={row.warehouse_id || ''}
+                                onValueChange={(v) => updateRow(i, 'warehouse_id', v)}
+                                options={warehouses.map((w) => ({
+                                  value: w.id || '',
+                                  label: w.warehouseName || '',
+                                }))}
+                                placeholder="Select Warehouse"
+                                emptyText="No warehouses"
+                              />
+                            </Field>
+
+                            <Field label="Vendor *">
+                              <SearchableSelect
+                                value={String(row.vendor_id || '')}
+                                onValueChange={(v) => updateRow(i, 'vendor_id', v)}
+                                options={vendors.map((v) => ({
+                                  value: String(v.id || ''),
+                                  label: v.name || '',
+                                }))}
+                                placeholder="Select Vendor"
+                                emptyText="No vendors"
+                              />
+                            </Field>
+                          </div>
+
+                          <Field label="Product Status *">
+                            <Select
+                              value={row.product_status || 'AVAILABLE'}
+                              onValueChange={(v) =>
+                                updateRow(
+                                  i,
+                                  'product_status',
+                                  v as BulkProductRow['product_status'],
+                                )
+                              }
+                            >
+                              <SelectTrigger className="w-full">
+                                <SelectValue placeholder="Status" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="AVAILABLE">Available</SelectItem>
+                                <SelectItem value="RENTED">Rented</SelectItem>
+                                <SelectItem value="LEASE">Lease</SelectItem>
+                                <SelectItem value="SOLD">Sold</SelectItem>
+                                <SelectItem value="DAMAGED">Damaged</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </Field>
+                        </div>
+
+                        {/* Right Column */}
+                        <div className="space-y-4">
+                          <div className="grid grid-cols-2 gap-4">
+                            <Field label="Purchase Price">
+                              <Input
+                                type="number"
+                                value={row.purchase_price ?? ''}
+                                onChange={(e) =>
+                                  updateRow(i, 'purchase_price', Number(e.target.value))
+                                }
+                                placeholder="0"
+                              />
+                            </Field>
+                            <Field label="Sale Price *">
+                              <Input
+                                type="number"
+                                value={row.sale_price ?? ''}
+                                onChange={(e) => updateRow(i, 'sale_price', Number(e.target.value))}
+                                placeholder="0"
+                              />
+                            </Field>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-4">
+                            <Field label="Wholesale Price">
+                              <Input
+                                type="number"
+                                value={row.wholesale_price ?? ''}
+                                onChange={(e) =>
+                                  updateRow(i, 'wholesale_price', Number(e.target.value))
+                                }
+                                placeholder="0"
+                              />
+                            </Field>
+                            <Field label="Tax Rate (%) *">
+                              <Input
+                                type="number"
+                                value={row.tax_rate ?? ''}
+                                onChange={(e) => updateRow(i, 'tax_rate', Number(e.target.value))}
+                                placeholder="0"
+                              />
+                            </Field>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-4">
+                            <Field label="Date of Manufacture *">
+                              <Input
+                                type="date"
+                                value={
+                                  row.MFD
+                                    ? row.MFD instanceof Date
+                                      ? row.MFD.toISOString().split('T')[0]
+                                      : typeof row.MFD === 'number'
+                                        ? excelSerialToDateString(row.MFD as number)
+                                        : String(row.MFD).split('T')[0]
+                                    : ''
+                                }
+                                onChange={(e) => updateRow(i, 'MFD', e.target.value)}
+                              />
+                            </Field>
+                            <Field label="Print Colour *">
+                              <Select
+                                value={row.print_colour || 'BLACK_WHITE'}
+                                onValueChange={(v) =>
+                                  updateRow(i, 'print_colour', v as BulkProductRow['print_colour'])
+                                }
+                              >
+                                <SelectTrigger className="w-full">
+                                  <SelectValue placeholder="Colour" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="BLACK_WHITE">B&W</SelectItem>
+                                  <SelectItem value="COLOUR">Colour</SelectItem>
+                                  <SelectItem value="BOTH">Both</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </Field>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-4">
+                            <Field label="HS Code">
+                              <Input
+                                value={row.hs_code || ''}
+                                onChange={(e) => updateRow(i, 'hs_code', e.target.value)}
+                                placeholder="HS Code"
+                              />
+                            </Field>
+                            <Field label="Max Discount">
+                              <Input
+                                type="number"
+                                value={row.max_discount_amount ?? ''}
+                                onChange={(e) =>
+                                  updateRow(i, 'max_discount_amount', Number(e.target.value))
+                                }
+                                placeholder="0"
+                              />
+                            </Field>
+                          </div>
+
+                          <Field label="Product Image">
+                            <div className="flex items-center gap-4 border border-input rounded-md p-2 bg-card">
+                              {row.imageUrl ? (
+                                <div className="relative h-12 w-12 rounded overflow-hidden border group shrink-0">
+                                  <img
+                                    src={row.imageUrl}
+                                    alt="Preview"
+                                    className="object-cover h-full w-full"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => updateRow(i, 'imageUrl', '')}
+                                    className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white"
+                                    title="Remove Image"
+                                  >
+                                    <X size={16} />
+                                  </button>
+                                </div>
+                              ) : (
+                                <div className="h-12 w-12 rounded border flex items-center justify-center text-[10px] text-gray-400 bg-slate-50 shrink-0">
+                                  No Image
+                                </div>
+                              )}
+                              <Input
+                                type="file"
+                                accept="image/*"
+                                onChange={async (e) => {
+                                  if (e.target.files && e.target.files[0]) {
+                                    const file = e.target.files[0];
+                                    try {
+                                      const res = await productService.uploadProductImage(file);
+                                      if (res.success && res.imageUrl) {
+                                        updateRow(i, 'imageUrl', res.imageUrl);
+                                        toast.success('Image uploaded successfully');
+                                      } else {
+                                        toast.error('Image upload failed');
+                                      }
+                                    } catch (err) {
+                                      console.error(err);
+                                      toast.error('Failed to upload image');
+                                    }
+                                  }
+                                }}
+                                className="h-9 text-xs file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-primary file:text-white hover:file:bg-primary/90"
+                              />
+                            </div>
+                          </Field>
+                        </div>
+                      </div>
+
+                      {/* Description Section */}
+                      <div className="pt-4 border-t">
+                        <label className="block text-xs font-bold text-slate-700 uppercase tracking-wide mb-2">
+                          Product Description
+                        </label>
+                        <Textarea
+                          value={row.description || ''}
+                          onChange={(e) => updateRow(i, 'description', e.target.value)}
+                          placeholder="Paste product description and details here"
+                          className="resize-y min-h-[120px] text-sm leading-relaxed focus-visible:ring-0 focus-visible:ring-offset-0 border-slate-200 focus:border-slate-300"
+                          rows={4}
+                        />
+                      </div>
+
+                      {/* Replacement Consumables */}
+                      <div className="pt-4 border-t">
+                        <div className="flex justify-between items-center mb-4">
+                          <label className="text-sm font-bold text-slate-800 uppercase tracking-wide">
+                            Replacement Consumables
+                          </label>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              const current = row.consumables || [];
+                              updateRow(i, 'consumables', [
+                                ...current,
+                                { partName: '', description: '', yield: '', price: '' },
+                              ]);
                             }}
-                            options={brands.map((b) => ({
-                              value: b.name || '',
-                              label: b.name || '',
-                            }))}
-                            placeholder="Brand"
-                            emptyText="No brands"
-                          />
-                        </TableCell>
-                        {/* ── Model ID ── */}
-                        <TableCell className="min-w-[200px]">
-                          <SearchableSelect
-                            value={row.model_id || ''}
-                            onValueChange={(v) => updateRow(i, 'model_id', v)}
-                            options={models
-                              .filter(
-                                (m) =>
-                                  !row.brand ||
-                                  m.brandRelation?.name === row.brand ||
-                                  m.brand?.name === row.brand,
-                              )
-                              .map((m) => ({
-                                value: m.id || '',
-                                label: `${m.model_no} - ${m.model_name}`,
-                              }))}
-                            placeholder="Model"
-                            emptyText="No models"
-                          />
-                        </TableCell>
+                            className="h-8 text-xs px-3 border-primary text-primary hover:bg-primary/5"
+                          >
+                            <Plus size={14} className="mr-1.5" /> Add Consumable
+                          </Button>
+                        </div>
 
-                        <TableCell className="min-w-[150px]">
-                          <Input
-                            value={row.serial_no}
-                            onChange={(e) => updateRow(i, 'serial_no', e.target.value)}
-                            placeholder="Serial #"
-                            className="min-w-full"
-                          />
-                        </TableCell>
-                        <TableCell className="min-w-[180px]">
-                          <Input
-                            value={row.name}
-                            onChange={(e) => updateRow(i, 'name', e.target.value)}
-                            placeholder="Product Name"
-                            className="min-w-full"
-                          />
-                        </TableCell>
-                        <TableCell className="min-w-[180px]">
-                          <SearchableSelect
-                            value={row.warehouse_id || ''}
-                            onValueChange={(v) => updateRow(i, 'warehouse_id', v)}
-                            options={warehouses.map((w) => ({
-                              value: w.id || '',
-                              label: w.warehouseName || '',
-                            }))}
-                            placeholder="Select"
-                            emptyText="No warehouses"
-                          />
-                        </TableCell>
-                        <TableCell className="min-w-[180px]">
-                          <SearchableSelect
-                            value={String(row.vendor_id || '')}
-                            onValueChange={(v) => updateRow(i, 'vendor_id', v)}
-                            options={vendors.map((v) => ({
-                              value: String(v.id || ''),
-                              label: v.name || '',
-                            }))}
-                            placeholder="Select"
-                            emptyText="No vendors"
-                          />
-                        </TableCell>
-                        <TableCell className="min-w-[130px]">
-                          <Select
-                            value={row.product_status}
-                            onValueChange={(v) => updateRow(i, 'product_status', v)}
+                        {(row.consumables || []).map((consumable, idx) => (
+                          <div
+                            key={idx}
+                            className="bg-slate-50 p-4 rounded-lg mb-4 border border-slate-200 relative group shadow-sm"
                           >
-                            <SelectTrigger className="min-w-full">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="AVAILABLE">Available</SelectItem>
-                              <SelectItem value="RENTED">Rented</SelectItem>
-                              <SelectItem value="LEASE">Lease</SelectItem>
-                              <SelectItem value="SOLD">Sold</SelectItem>
-                              <SelectItem value="DAMAGED">Damaged</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </TableCell>
-                        <TableCell className="min-w-[150px]">
-                          <Input
-                            type="date"
-                            value={
-                              row.MFD
-                                ? row.MFD instanceof Date
-                                  ? row.MFD.toISOString().split('T')[0]
-                                  : typeof row.MFD === 'number'
-                                    ? excelSerialToDateString(row.MFD as number)
-                                    : String(row.MFD).split('T')[0]
-                                : ''
-                            }
-                            onChange={(e) => updateRow(i, 'MFD', e.target.value)}
-                            className="min-w-full"
-                          />
-                        </TableCell>
-                        <TableCell className="min-w-[120px]">
-                          <Input
-                            type="number"
-                            value={row.purchase_price}
-                            onChange={(e) => updateRow(i, 'purchase_price', Number(e.target.value))}
-                            className="min-w-full"
-                          />
-                        </TableCell>
-                        <TableCell className="min-w-[120px]">
-                          <Input
-                            type="number"
-                            value={row.sale_price}
-                            onChange={(e) => updateRow(i, 'sale_price', Number(e.target.value))}
-                            className="min-w-full"
-                          />
-                        </TableCell>
-                        <TableCell className="min-w-[130px]">
-                          <Input
-                            type="number"
-                            value={row.wholesale_price}
-                            onChange={(e) =>
-                              updateRow(i, 'wholesale_price', Number(e.target.value))
-                            }
-                            placeholder="0"
-                            className="min-w-full"
-                          />
-                        </TableCell>
-                        <TableCell className="min-w-[100px]">
-                          <Input
-                            type="number"
-                            value={row.tax_rate}
-                            onChange={(e) => updateRow(i, 'tax_rate', Number(e.target.value))}
-                            className="min-w-full"
-                          />
-                        </TableCell>
-                        <TableCell className="min-w-[140px]">
-                          <Select
-                            value={row.print_colour}
-                            onValueChange={(v) => updateRow(i, 'print_colour', v)}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const newC = [...(row.consumables || [])];
+                                newC.splice(idx, 1);
+                                updateRow(i, 'consumables', newC);
+                              }}
+                              className="absolute top-2 right-2 text-slate-400 hover:text-red-500 transition-colors p-1"
+                            >
+                              <X size={16} />
+                            </button>
+                            <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                              <div>
+                                <label className="text-[11px] font-semibold text-slate-500 uppercase mb-1 block">
+                                  Part Number
+                                </label>
+                                <Input
+                                  value={consumable.partName}
+                                  onChange={(e) => {
+                                    const newC = [...(row.consumables || [])];
+                                    newC[idx] = { ...newC[idx], partName: e.target.value };
+                                    updateRow(i, 'consumables', newC);
+                                  }}
+                                  placeholder="e.g. C-EV 49 K"
+                                  className="h-9 focus:border-primary"
+                                />
+                              </div>
+                              <div>
+                                <label className="text-[11px] font-semibold text-slate-500 uppercase mb-1 block">
+                                  Description
+                                </label>
+                                <Input
+                                  value={consumable.description}
+                                  onChange={(e) => {
+                                    const newC = [...(row.consumables || [])];
+                                    newC[idx] = { ...newC[idx], description: e.target.value };
+                                    updateRow(i, 'consumables', newC);
+                                  }}
+                                  placeholder="e.g. Black Toner"
+                                  className="h-9 focus:border-primary"
+                                />
+                              </div>
+                              <div>
+                                <label className="text-[11px] font-semibold text-slate-500 uppercase mb-1 block">
+                                  Yield
+                                </label>
+                                <Input
+                                  value={consumable.yield}
+                                  onChange={(e) => {
+                                    const newC = [...(row.consumables || [])];
+                                    newC[idx] = { ...newC[idx], yield: e.target.value };
+                                    updateRow(i, 'consumables', newC);
+                                  }}
+                                  placeholder="e.g. 36000 pages"
+                                  className="h-9 focus:border-primary"
+                                />
+                              </div>
+                              <div>
+                                <label className="text-[11px] font-semibold text-slate-500 uppercase mb-1 block">
+                                  Price
+                                </label>
+                                <Input
+                                  type="number"
+                                  step="0.01"
+                                  value={consumable.price}
+                                  onChange={(e) => {
+                                    const newC = [...(row.consumables || [])];
+                                    newC[idx] = { ...newC[idx], price: e.target.value };
+                                    updateRow(i, 'consumables', newC);
+                                  }}
+                                  placeholder="e.g. 390.00"
+                                  className="h-9 focus:border-primary"
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                        {(!row.consumables || row.consumables.length === 0) && (
+                          <div className="text-center py-6 border-2 border-dashed border-slate-200 rounded-lg">
+                            <p className="text-xs text-slate-400">
+                              No replacement consumables added yet.
+                            </p>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Key Features */}
+                      <div className="pt-4 border-t">
+                        <div className="flex justify-between items-center mb-4">
+                          <label className="text-sm font-bold text-slate-800 uppercase tracking-wide">
+                            Key Features
+                          </label>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              const current = row.features || [];
+                              updateRow(i, 'features', [
+                                ...current,
+                                { subHeading: '', description: '' },
+                              ]);
+                            }}
+                            className="h-8 text-xs px-3 border-emerald-600 text-emerald-600 hover:bg-emerald-50"
                           >
-                            <SelectTrigger className="min-w-full">
-                              <SelectValue placeholder="Colour" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="BLACK_WHITE">B&W</SelectItem>
-                              <SelectItem value="COLOUR">Colour</SelectItem>
-                              <SelectItem value="BOTH">Both</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </TableCell>
-                        <TableCell className="min-w-[130px]">
-                          <Input
-                            value={row.hs_code || ''}
-                            onChange={(e) => updateRow(i, 'hs_code', e.target.value)}
-                            placeholder="HS Code"
-                            className="min-w-full"
-                          />
-                        </TableCell>
-                        <TableCell className="min-w-[130px]">
-                          <Input
-                            type="number"
-                            value={row.max_discount_amount}
-                            onChange={(e) =>
-                              updateRow(i, 'max_discount_amount', Number(e.target.value))
-                            }
-                            placeholder="0"
-                            className="min-w-full"
-                          />
-                        </TableCell>
-                        <TableCell className="min-w-[60px]">
-                          <button
-                            onClick={() => handleRemoveRow(i)}
-                            className="text-red-500 hover:text-red-700"
+                            <Plus size={14} className="mr-1.5" /> Add Feature
+                          </Button>
+                        </div>
+
+                        {(row.features || []).map((feature, idx) => (
+                          <div
+                            key={idx}
+                            className="bg-emerald-50/30 p-4 rounded-lg mb-4 border border-emerald-100 relative group shadow-sm"
                           >
-                            <Trash2 size={16} />
-                          </button>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const newF = [...(row.features || [])];
+                                newF.splice(idx, 1);
+                                updateRow(i, 'features', newF);
+                              }}
+                              className="absolute top-2 right-2 text-slate-400 hover:text-red-500 transition-colors p-1"
+                            >
+                              <X size={16} />
+                            </button>
+                            <div className="space-y-3">
+                              <div>
+                                <label className="text-[11px] font-semibold text-emerald-700 uppercase mb-1 block">
+                                  Sub Heading
+                                </label>
+                                <Input
+                                  value={feature.subHeading}
+                                  onChange={(e) => {
+                                    const newF = [...(row.features || [])];
+                                    newF[idx] = { ...newF[idx], subHeading: e.target.value };
+                                    updateRow(i, 'features', newF);
+                                  }}
+                                  placeholder="e.g. Speed"
+                                  className="h-9 focus:border-emerald-500"
+                                />
+                              </div>
+                              <div>
+                                <label className="text-[11px] font-semibold text-emerald-700 uppercase mb-1 block">
+                                  Description
+                                </label>
+                                <Textarea
+                                  value={feature.description}
+                                  onChange={(e) => {
+                                    const newF = [...(row.features || [])];
+                                    newF[idx] = { ...newF[idx], description: e.target.value };
+                                    updateRow(i, 'features', newF);
+                                  }}
+                                  placeholder="e.g. 30 ppm print speed for high productivity"
+                                  className="resize-none min-h-[60px] text-sm focus:border-emerald-500"
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                        {(!row.features || row.features.length === 0) && (
+                          <div className="text-center py-6 border-2 border-dashed border-emerald-100 rounded-lg">
+                            <p className="text-xs text-emerald-400">
+                              No special features added yet.
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })
           ) : (
-            <div className="h-full flex flex-col items-center justify-center text-gray-400">
+            <div className="h-full flex flex-col items-center justify-center text-gray-400 py-12">
               <Upload size={48} className="mb-4 opacity-20" />
               <p>Upload an Excel file to view and edit products here</p>
               <p className="text-sm">or click &quot;Add Row&quot; to start manually</p>
@@ -738,6 +1132,15 @@ export function BulkProductDialog({
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <label className="block text-xs font-bold text-slate-700 mb-1">{label}</label>
+      {children}
     </div>
   );
 }

@@ -11,6 +11,9 @@ import { ProductAllocation } from '../entities/productAllocationEntity';
 import { ReturnCredit } from '../entities/returnCreditEntity';
 import { PaymentLedger } from '../entities/paymentLedgerEntity';
 import { QuotationTemplateAssignment } from '../entities/quotationTemplateAssignmentEntity';
+import { InvoiceLedger } from '../entities/invoiceLedgerEntity';
+import { PaymentTransaction } from '../entities/paymentTransactionEntity';
+import { OpeningBalanceEntry } from '../entities/openingBalanceEntryEntity';
 
 import { logger } from './logger';
 import { UsageRecordItem } from '../entities/usageRecordItemEntity';
@@ -38,6 +41,9 @@ export const Source = new DataSource({
     PaymentLedger,
     QuotationTemplateAssignment,
     AuditLog,
+    InvoiceLedger,
+    PaymentTransaction,
+    OpeningBalanceEntry,
   ],
   poolSize: 1,
   extra: {
@@ -110,6 +116,16 @@ async function runPreMigrations() {
       }
     }
 
+    // Ensure new values exist in invoices_saletype_enum
+    const saleTypeValues = ['PRODUCT_SALE', 'SPAREPART_SALE', 'SERVICE'];
+    for (const val of saleTypeValues) {
+      try {
+        await client.query(`ALTER TYPE invoices_saletype_enum ADD VALUE IF NOT EXISTS '${val}';`);
+      } catch (err) {
+        logger.debug(`Skipped adding ${val} to invoices_saletype_enum: ${(err as Error).message}`);
+      }
+    }
+
     // Ensure billType enum exists
     await client.query(`
       DO $$ BEGIN
@@ -141,19 +157,136 @@ async function runPreMigrations() {
         ALTER TABLE invoices 
         ADD COLUMN IF NOT EXISTS "billType" invoices_billtype_enum NULL,
         ADD COLUMN IF NOT EXISTS "serviceTicketId" UUID NULL,
-        ADD COLUMN IF NOT EXISTS "maxCopyLimit" INTEGER NULL;
+        ADD COLUMN IF NOT EXISTS "maxCopyLimit" INTEGER NULL,
+        ADD COLUMN IF NOT EXISTS estimate_valid_until TIMESTAMP,
+        ADD COLUMN IF NOT EXISTS estimate_expired BOOLEAN DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS total_discount_amount DECIMAL(10,2) DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS visit_charge_amount DECIMAL(10,2) DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS visit_charge_method VARCHAR(30),
+        ADD COLUMN IF NOT EXISTS validity_extension_days INT,
+        ADD COLUMN IF NOT EXISTS validity_extension_fee DECIMAL(10,2) DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS validity_extension_fee_added BOOLEAN DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS technician_note_to_finance TEXT,
+        ADD COLUMN IF NOT EXISTS revision_count INT DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS expiry_date TIMESTAMP,
+        ADD COLUMN IF NOT EXISTS validity_days INT DEFAULT 30,
+        ADD COLUMN IF NOT EXISTS is_converted BOOLEAN DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS conversion_date TIMESTAMP,
+        ADD COLUMN IF NOT EXISTS not_converted_reason TEXT;
       `);
       await client.query(`
         ALTER TABLE invoice_items 
-        ADD COLUMN IF NOT EXISTS warranty VARCHAR(255) NULL;
+        ADD COLUMN IF NOT EXISTS warranty VARCHAR(255) NULL,
+        ADD COLUMN IF NOT EXISTS "discountAmount" DECIMAL(12, 2) DEFAULT 0;
       `);
       logger.info(
-        'Guaranteed billType, serviceTicketId, and maxCopyLimit columns exist on invoices table, and warranty column exists on invoice_items table.',
+        'Guaranteed billType, serviceTicketId, maxCopyLimit, and service estimate validity columns exist on invoices table, and warranty column exists on invoice_items table.',
+      );
+
+      // Create new ledger/payment tables if not exists
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS invoice_ledger (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            invoice_id UUID REFERENCES invoices(id) ON DELETE CASCADE,
+            total_amount DECIMAL(12,2) NOT NULL DEFAULT 0,
+            paid_amount DECIMAL(12,2) NOT NULL DEFAULT 0,
+            balance_amount DECIMAL(12,2) NOT NULL DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+      `);
+
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS payment_transactions (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            invoice_id UUID REFERENCES invoices(id) ON DELETE CASCADE,
+            transaction_date TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            payment_mode VARCHAR(50) NOT NULL,
+            reference_number VARCHAR(100),
+            amount DECIMAL(12,2) NOT NULL,
+            recorded_by UUID,
+            remarks TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+      `);
+
+      // Ensure invoices_type_enum has OPENING
+      try {
+        await client.query(`ALTER TYPE invoices_type_enum ADD VALUE IF NOT EXISTS 'OPENING';`);
+      } catch (err) {
+        logger.debug(`Skipped adding OPENING to invoices_type_enum: ${(err as Error).message}`);
+      }
+
+      // Add columns to invoices table
+      await client.query(`
+        ALTER TABLE invoices 
+        ADD COLUMN IF NOT EXISTS is_opening_entry BOOLEAN DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP NULL;
+      `);
+
+      // Add columns to invoice_ledger table
+      await client.query(`
+        ALTER TABLE invoice_ledger 
+        ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP NULL;
+      `);
+
+      // Ensure opening_balance_entries_balance_type_enum exists
+      await client.query(`
+        DO $$ BEGIN
+          IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'opening_balance_entries_balance_type_enum') THEN
+            CREATE TYPE opening_balance_entries_balance_type_enum AS ENUM (
+              'SALE_OUTSTANDING', 'RENT_CONTRACT', 'LEASE_CONTRACT', 'SERVICE_DEBT', 'OTHER_DEBT'
+            );
+          END IF;
+        END $$;
+      `);
+
+      // Create opening_balance_entries table
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS opening_balance_entries (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            entry_number VARCHAR(255) UNIQUE NOT NULL,
+            customer_id VARCHAR(255) NOT NULL,
+            branch_id UUID NOT NULL,
+            balance_type opening_balance_entries_balance_type_enum NOT NULL,
+            opening_balance DECIMAL(12,2) NOT NULL DEFAULT 0,
+            remaining_balance DECIMAL(12,2) NOT NULL DEFAULT 0,
+            original_total_amount DECIMAL(12,2) NOT NULL DEFAULT 0,
+            already_paid_amount DECIMAL(12,2) NOT NULL DEFAULT 0,
+            invoice_id UUID REFERENCES invoices(id) ON DELETE SET NULL,
+            is_fully_settled BOOLEAN NOT NULL DEFAULT FALSE,
+            migrated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            monthly_billing_amount DECIMAL(12,2) NULL,
+            billing_cycle_in_days INTEGER NULL DEFAULT 30,
+            next_payment_due_date DATE NULL,
+            total_contract_months INTEGER NULL,
+            months_completed INTEGER NULL,
+            months_remaining INTEGER NULL,
+            remaining_contract_value DECIMAL(12,2) NULL,
+            contract_start_date DATE NULL,
+            product_brand VARCHAR(255) NULL,
+            product_model VARCHAR(255) NULL,
+            serial_number VARCHAR(255) NULL,
+            product_id VARCHAR(255) NULL,
+            notes TEXT NULL,
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            deleted_at TIMESTAMP NULL
+        );
+      `);
+
+      // Ensure branch_name column exists
+      await client.query(`
+        ALTER TABLE opening_balance_entries ADD COLUMN IF NOT EXISTS branch_name VARCHAR(255) NULL;
+      `);
+
+      logger.info(
+        'Guaranteed invoice_ledger, payment_transactions, and opening_balance_entries tables exist.',
       );
     } catch (colErr) {
       logger.warn('Failed to ensure invoices or invoice_items columns:', colErr);
     }
-    logger.info('Pre-migration enum values added successfully');
+    logger.info('Pre-migration enum values and tables added successfully');
 
     // Run legacy status updates
     logger.info('Running pre-migration legacy status updates...');

@@ -6,6 +6,7 @@ import {
   updateSparePart,
   deleteSparePart,
   getSparePartById,
+  getSparePartStock,
 } from '../controllers/sparePartController';
 import { authMiddleware } from '../middlewares/authMiddleware';
 import { roleMiddleware } from '../middlewares/roleMiddleware';
@@ -20,6 +21,7 @@ router.get(
   roleMiddleware(['MANAGER', 'ADMIN', 'EMPLOYEE', 'FINANCE']),
   listSpareParts,
 );
+router.get('/:id/stock', authMiddleware, getSparePartStock);
 router.get(
   '/:id',
   authMiddleware,

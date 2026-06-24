@@ -134,4 +134,15 @@ export class LotService {
   async confirmLotReceived(lotId: string, branchId?: string): Promise<Lot> {
     return await this.lotRepository.confirmLotReceived(lotId, branchId);
   }
+
+  /**
+   * Links a spare part to a custom lot item.
+   */
+  async linkSparePartToLotItem(
+    lotId: string,
+    customSparePartName: string,
+    sparePartId: string,
+  ): Promise<void> {
+    await this.lotRepository.linkSparePartToLotItem(lotId, customSparePartName, sparePartId);
+  }
 }

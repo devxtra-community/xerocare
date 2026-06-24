@@ -23,6 +23,7 @@ export interface SparePart {
   updated_at: string;
   lotNumber?: string;
   compatible_model?: string;
+  maxDiscountableAmount?: number;
 }
 
 interface ApiResponse<T> {

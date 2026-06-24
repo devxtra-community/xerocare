@@ -765,10 +765,14 @@ const RentNormalQuotation: React.FC<RentNormalQuotationProps> = ({
         )}
         <div style={{ width: '250px' }}>
           {[
-            { label: 'Subtotal', value: totals.subTotal, num: totals.subTotal },
-            { label: 'Tax (0%)', value: totals.tax, num: totals.tax },
+            { label: 'Subtotal (Before VAT)', value: totals.subTotal, num: totals.subTotal },
             {
-              label: 'Total',
+              label: 'VAT Amount',
+              value: totals.tax,
+              num: totals.tax,
+            },
+            {
+              label: 'Grand Total (Including VAT)',
               value: totals.total,
               num: totals.total,
               prefix: 'QAR ',

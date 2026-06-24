@@ -99,6 +99,12 @@ export const createQuotation = async (req: Request, res: Response, next: NextFun
       monthlyEmiAmount: payload.monthlyEmiAmount,
       totalLeaseAmount: payload.totalLeaseAmount,
       monthlyLeaseAmount: payload.monthlyLeaseAmount,
+      validityDays:
+        req.body.validityDays !== undefined
+          ? Number(req.body.validityDays)
+          : req.body.validity_days !== undefined
+            ? Number(req.body.validity_days)
+            : undefined,
 
       // Security Deposit
       securityDepositAmount: req.body.securityDepositAmount,
@@ -1392,7 +1398,19 @@ export const getInvoiceAuditLogs = async (req: Request, res: Response, next: Nex
 
 export const createServiceQuotation = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { customerId, branchId, createdBy, serviceTicketId, items, saleType, status } = req.body;
+    const {
+      customerId,
+      branchId,
+      createdBy,
+      serviceTicketId,
+      items,
+      saleType,
+      status,
+      visitChargeAmount,
+      visitChargeMethod,
+      totalDiscountAmount,
+      technicianNoteToFinance,
+    } = req.body;
     const invoice = await billingService.createServiceQuotation({
       customerId,
       branchId,
@@ -1401,6 +1419,10 @@ export const createServiceQuotation = async (req: Request, res: Response, next: 
       items,
       saleType,
       status,
+      visitChargeAmount,
+      visitChargeMethod,
+      totalDiscountAmount,
+      technicianNoteToFinance,
     });
     return res.status(201).json({
       success: true,
@@ -1466,6 +1488,199 @@ export const getCustomerBillingHistory = async (
     return res.status(200).json({
       success: true,
       data: grouped,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const reviseEstimate = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = req.params.id as string;
+    const { items, visitChargeAmount, visitChargeMethod, discountAmount, technicianNoteToFinance } =
+      req.body;
+    const userId = req.user?.userId || 'SYSTEM';
+
+    const result = await billingService.reviseEstimate(
+      id,
+      { items, visitChargeAmount, visitChargeMethod, discountAmount, technicianNoteToFinance },
+      userId,
+    );
+
+    return res.status(200).json({
+      success: true,
+      data: result,
+      message: 'Estimate revised and submitted to finance successfully',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const financeExtendValidity = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = req.params.id as string;
+    const { extensionDays, extensionFee } = req.body;
+    const userId = req.user?.userId || 'SYSTEM';
+
+    const result = await billingService.financeExtendValidity(
+      id,
+      { extensionDays, extensionFee },
+      userId,
+    );
+
+    return res.status(200).json({
+      success: true,
+      data: result,
+      message: 'Estimate approved with validity extension successfully',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const reassignCustomer = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = req.params.id as string;
+    const { newCustomerId, discountAmount } = req.body;
+    const userId = req.user?.userId || 'SYSTEM';
+
+    if (!newCustomerId) {
+      throw new AppError('newCustomerId is required', 400);
+    }
+
+    const result = await billingService.reassignCustomer(id, userId, {
+      newCustomerId,
+      discountAmount: discountAmount !== undefined ? Number(discountAmount) : undefined,
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: result,
+      message: 'Quotation reassigned to new customer successfully',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const recordPayment = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = req.params.id as string;
+    const { mode, reference, bank, amount, transactionDate, remarks, isSecurityDeposit } = req.body;
+    const userId = req.user?.userId || 'SYSTEM';
+
+    if (!mode) {
+      throw new AppError('Payment mode is required', 400);
+    }
+    if (amount === undefined || isNaN(Number(amount)) || Number(amount) <= 0) {
+      throw new AppError('A valid payment amount greater than 0 is required', 400);
+    }
+
+    const result = await billingService.recordPayment(
+      id,
+      {
+        paymentMode: mode,
+        referenceNumber: reference,
+        amount: Number(amount),
+        transactionDate,
+        remarks: remarks || (bank ? `Bank: ${bank}` : undefined),
+        isSecurityDeposit: !!isSecurityDeposit,
+      },
+      userId,
+    );
+
+    return res.status(200).json({
+      success: true,
+      data: result,
+      message: 'Payment recorded successfully',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getInvoiceLedger = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = req.params.id as string;
+    const result = await billingService.getInvoiceLedger(id);
+
+    return res.status(200).json({
+      success: true,
+      data: result,
+      message: 'Ledger and transactions fetched successfully',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getMachineBillingContext = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const productId = req.params.productId as string;
+    const serialNumber = req.query.serialNumber as string;
+
+    const rentInvoice = await Source.query(
+      `
+      SELECT i.id, i.type, i."billType", i."contractStatus"
+      FROM invoices i
+      JOIN product_allocations pa ON i.id = pa."contractId"
+      WHERE i.type = 'PROFORMA' 
+        AND i."billType" = 'RENT' 
+        AND i."contractStatus" = 'ACTIVE' 
+        AND pa.status = 'ALLOCATED'
+        AND (pa."productId" = $1 OR pa."serialNumber" = $2)
+      LIMIT 1;
+    `,
+      [productId, serialNumber],
+    );
+
+    const saleInvoice = await Source.query(
+      `
+      SELECT i.id, i."createdAt", i."effectiveFrom", ii.warranty
+      FROM invoices i
+      JOIN invoice_items ii ON i.id = ii."invoiceId"
+      WHERE i.type = 'FINAL'
+        AND (i."billType" = 'SALE' OR (i."billType" IS NULL AND i."saleType" = 'PRODUCT_SALE'))
+        AND ii."productId" = $1
+      LIMIT 1;
+    `,
+      [productId],
+    );
+
+    const leaseInvoice = await Source.query(
+      `
+      SELECT i.id, i."effectiveFrom", i."leaseTenureMonths", i."maxCopyLimit"
+      FROM invoices i
+      JOIN product_allocations pa ON i.id = pa."contractId"
+      WHERE i.type = 'PROFORMA'
+        AND i."billType" = 'LEASE'
+        AND i."contractStatus" = 'ACTIVE'
+        AND pa."productId" = $1
+      LIMIT 1;
+    `,
+      [productId],
+    );
+
+    const latestAllocation = await Source.query(
+      `
+      SELECT * FROM product_allocations 
+      WHERE "productId" = $1 
+      ORDER BY "createdAt" DESC 
+      LIMIT 1;
+    `,
+      [productId],
+    );
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        rentInvoice: rentInvoice && rentInvoice.length > 0 ? rentInvoice[0] : null,
+        saleInvoice: saleInvoice && saleInvoice.length > 0 ? saleInvoice[0] : null,
+        leaseInvoice: leaseInvoice && leaseInvoice.length > 0 ? leaseInvoice[0] : null,
+        latestAllocation:
+          latestAllocation && latestAllocation.length > 0 ? latestAllocation[0] : null,
+      },
     });
   } catch (error) {
     next(error);

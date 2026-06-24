@@ -46,7 +46,8 @@ export default function EmployeeCustomerTable() {
       setCustomers(data);
     } catch (error) {
       console.error('Failed to fetch customers', error);
-      toast.error('Failed to fetch customers');
+      const err = error as { response?: { data?: { message?: string } } };
+      toast.error(err.response?.data?.message || 'Failed to fetch customers');
     } finally {
       setLoading(false);
     }
@@ -101,7 +102,8 @@ export default function EmployeeCustomerTable() {
       fetchCustomers();
     } catch (error) {
       console.error(error);
-      toast.error('Failed to delete customer');
+      const err = error as { response?: { data?: { message?: string } } };
+      toast.error(err.response?.data?.message || 'Failed to delete customer');
     } finally {
       setDeleteOpen(false);
     }
@@ -131,7 +133,11 @@ export default function EmployeeCustomerTable() {
       fetchCustomers();
     } catch (error) {
       console.error(error);
-      toast.error(selectedCustomer ? 'Failed to update customer' : 'Failed to create customer');
+      const err = error as { response?: { data?: { message?: string } } };
+      toast.error(
+        err.response?.data?.message ||
+          (selectedCustomer ? 'Failed to update customer' : 'Failed to create customer'),
+      );
     }
   };
 

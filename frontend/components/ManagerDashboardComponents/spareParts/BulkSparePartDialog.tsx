@@ -111,20 +111,24 @@ export default function BulkSparePartDialog({
     if (!lot) return [];
     const sparePartMap = new Map<string, LotSparePartOption>();
     lot.items
-      .filter((item) => item.itemType === LotItemType.SPARE_PART && item.sparePart)
+      .filter((item) => item.itemType === LotItemType.SPARE_PART)
       .forEach((item) => {
-        const sp = item.sparePart!;
-        if (sp.sku && !sparePartMap.has(sp.sku)) {
-          sparePartMap.set(sp.sku, {
-            sku: sp.sku,
-            partName: sp.part_name,
-            brand: sp.brand,
-            modelIds: sp.model_id ? [sp.model_id] : ['universal'],
-            purchasePrice: item.unitPrice || sp.purchase_price || 0,
-            basePrice: sp.base_price || 0,
-            wholesalePrice: sp.wholesale_price || 0,
-            mpn: sp.mpn || '',
-            label: `${sp.sku} - ${sp.part_name}`,
+        const sp = item.sparePart;
+        const sku = sp?.sku || `NEW-${item.id}`;
+        const partName = sp?.part_name || item.customSparePartName || 'Unnamed Spare';
+        const brand = sp?.brand || '';
+        const modelIds = sp?.model_id ? [sp.model_id] : item.modelIds || ['universal'];
+        if (!sparePartMap.has(sku)) {
+          sparePartMap.set(sku, {
+            sku: sp?.sku || '',
+            partName,
+            brand,
+            modelIds,
+            purchasePrice: item.unitPrice || sp?.purchase_price || 0,
+            basePrice: sp?.base_price || item.unitPrice || 0,
+            wholesalePrice: sp?.wholesale_price || 0,
+            mpn: item.mpn || sp?.mpn || '',
+            label: `${sp?.sku || 'NEW'} - ${partName}`,
           });
         }
       });
@@ -186,30 +190,28 @@ export default function BulkSparePartDialog({
     if (open && initialLotId && lots.length > 0) {
       const lot = lots.find((l) => l.id === initialLotId);
       if (lot && lot.items) {
-        let itemsToFill = lot.items.filter(
-          (item) => item.itemType === LotItemType.SPARE_PART && item.sparePart,
-        );
+        let itemsToFill = lot.items.filter((item) => item.itemType === LotItemType.SPARE_PART);
 
         if (initialItemId) {
           itemsToFill = itemsToFill.filter((item) => item.id === initialItemId);
         }
 
         const newRows = itemsToFill.map((item) => {
-          const sp = item.sparePart!;
+          const sp = item.sparePart;
           return {
             ...createEmptyRow(),
             lot_id: initialLotId,
-            sku: sp.sku,
-            part_name: sp.part_name,
-            brand: sp.brand,
-            model_ids: sp.model_id ? [sp.model_id] : ['universal'],
-            purchase_price: Number(item.unitPrice) || Number(sp.purchase_price) || 0,
-            base_price: Number(sp.base_price) || 0,
-            wholesale_price: Number(sp.wholesale_price) || 0,
+            sku: sp?.sku || '',
+            part_name: sp?.part_name || item.customSparePartName || '',
+            brand: sp?.brand || '',
+            model_ids: sp?.model_id ? [sp.model_id] : item.modelIds || ['universal'],
+            purchase_price: Number(item.unitPrice) || Number(sp?.purchase_price) || 0,
+            base_price: Number(sp?.base_price) || Number(item.unitPrice) || 0,
+            wholesale_price: Number(sp?.wholesale_price) || 0,
             quantity: Math.max(0, item.receivedQuantity - item.usedQuantity),
             vendor_id: lot.vendorId || lot.vendor?.id || '',
             warehouse_id: lot.warehouse_id || '',
-            mpn: sp.mpn || '',
+            mpn: item.mpn || sp?.mpn || '',
           };
         });
         setRows(newRows);

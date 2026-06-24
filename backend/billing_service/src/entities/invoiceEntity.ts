@@ -275,6 +275,10 @@ export class Invoice {
   isTemplate!: boolean;
 
   @Index()
+  @Column({ name: 'is_opening_entry', type: 'boolean', default: false })
+  isOpeningEntry!: boolean;
+
+  @Index()
   @Column({ type: 'uuid', nullable: true })
   templateId?: string | null;
 
@@ -309,6 +313,51 @@ export class Invoice {
 
   @Column({ type: 'integer', nullable: true })
   maxCopyLimit?: number | null;
+
+  @Column({ name: 'estimate_valid_until', type: 'timestamp', nullable: true })
+  estimateValidUntil!: Date | null;
+
+  @Column({ name: 'estimate_expired', type: 'boolean', default: false })
+  estimateExpired!: boolean;
+
+  @Column({ name: 'total_discount_amount', type: 'decimal', precision: 10, scale: 2, default: 0 })
+  totalDiscountAmount!: number;
+
+  @Column({ name: 'visit_charge_amount', type: 'decimal', precision: 10, scale: 2, default: 0 })
+  visitChargeAmount!: number;
+
+  @Column({ name: 'visit_charge_method', type: 'varchar', nullable: true })
+  visitChargeMethod!: string | null;
+
+  @Column({ name: 'validity_extension_days', type: 'int', nullable: true })
+  validityExtensionDays!: number | null;
+
+  @Column({ name: 'validity_extension_fee', type: 'decimal', precision: 10, scale: 2, default: 0 })
+  validityExtensionFee!: number | null;
+
+  @Column({ name: 'validity_extension_fee_added', type: 'boolean', default: false })
+  validityExtensionFeeAdded!: boolean;
+
+  @Column({ name: 'technician_note_to_finance', type: 'text', nullable: true })
+  technicianNoteToFinance!: string | null;
+
+  @Column({ name: 'revision_count', type: 'int', default: 0 })
+  revisionCount!: number;
+
+  @Column({ name: 'expiry_date', type: 'timestamp', nullable: true })
+  expiryDate?: Date | null;
+
+  @Column({ name: 'validity_days', type: 'integer', default: 30 })
+  validityDays!: number;
+
+  @Column({ name: 'is_converted', type: 'boolean', default: false })
+  isConverted!: boolean;
+
+  @Column({ name: 'conversion_date', type: 'timestamp', nullable: true })
+  conversionDate?: Date | null;
+
+  @Column({ name: 'not_converted_reason', type: 'text', nullable: true })
+  notConvertedReason?: string | null;
 
   @DeleteDateColumn()
   deletedAt?: Date;

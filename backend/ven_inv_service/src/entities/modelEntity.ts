@@ -85,6 +85,20 @@ export class Model {
   @Column({ type: 'uuid', nullable: true })
   branch_id?: string;
 
+  @Column({
+    name: 'max_discountable_amount',
+    type: 'decimal',
+    precision: 10,
+    scale: 2,
+    nullable: true,
+    default: 0,
+    transformer: {
+      to: (value: number) => value,
+      from: (value: string) => Number(value),
+    },
+  })
+  maxDiscountableAmount!: number;
+
   @OneToMany(() => Product, (product) => product.model)
   products!: Product[];
 }

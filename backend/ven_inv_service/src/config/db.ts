@@ -116,9 +116,28 @@ export const connectWithRetry = async (initialDelayMs = 2000): Promise<DataSourc
         await Source.query(`
           ALTER TABLE spare_parts 
           ADD COLUMN IF NOT EXISTS tax_rate NUMERIC(5,2) DEFAULT 0,
-          ADD COLUMN IF NOT EXISTS max_discount_amount NUMERIC(12,2) DEFAULT 0
+          ADD COLUMN IF NOT EXISTS max_discount_amount NUMERIC(12,2) DEFAULT 0,
+          ADD COLUMN IF NOT EXISTS max_discountable_amount DECIMAL(10,2) DEFAULT 0
         `);
         logger.info('Guaranteed tax_rate and max_discount_amount exist on spare_parts table.');
+        // Ensure max_discountable_amount exists on model / models table
+        try {
+          await Source.query(`
+            ALTER TABLE model 
+            ADD COLUMN IF NOT EXISTS max_discountable_amount DECIMAL(10,2) DEFAULT 0
+          `);
+          logger.info('Guaranteed max_discountable_amount exists on model table.');
+        } catch (err) {
+          logger.warn('Could not add max_discountable_amount to model table:', err);
+        }
+        try {
+          await Source.query(`
+            ALTER TABLE models 
+            ADD COLUMN IF NOT EXISTS max_discountable_amount DECIMAL(10,2) DEFAULT 0
+          `);
+        } catch {
+          // ignore
+        }
         // Ensure warranty column exists on products table
         await Source.query(`
           ALTER TABLE products 
@@ -306,6 +325,8 @@ export const connectWithRetry = async (initialDelayMs = 2000): Promise<DataSourc
             "repairCompletedAt" TIMESTAMP NULL,
             "diagnosisDuration" INTEGER NULL,
             "repairDuration" INTEGER NULL,
+            "discount_amount" DECIMAL(10,2) NOT NULL DEFAULT 0,
+            "technician_note_to_finance" TEXT NULL DEFAULT NULL,
             created_at TIMESTAMP NOT NULL DEFAULT NOW(),
             updated_at TIMESTAMP NOT NULL DEFAULT NOW()
           );
@@ -362,18 +383,36 @@ export const connectWithRetry = async (initialDelayMs = 2000): Promise<DataSourc
         `);
         logger.info('Guaranteed service_estimates table exists.');
 
+        // Check if old service_estimate_revisions table needs replacement
+        const tableCheck = await Source.query(`
+          SELECT column_name 
+          FROM information_schema.columns 
+          WHERE table_name = 'service_estimate_revisions' AND column_name = 'invoice_id'
+        `);
+        if (tableCheck.length === 0) {
+          logger.info('Dropping old service_estimate_revisions table...');
+          await Source.query(`DROP TABLE IF EXISTS service_estimate_revisions CASCADE;`);
+        }
+
         await Source.query(`
           CREATE TABLE IF NOT EXISTS service_estimate_revisions (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            "estimateId" UUID NOT NULL REFERENCES service_estimates(id) ON DELETE CASCADE,
-            "ticketId" UUID NOT NULL REFERENCES service_tickets(id) ON DELETE CASCADE,
-            version INTEGER NOT NULL,
-            "labourCost" NUMERIC(10,2) NOT NULL DEFAULT 0,
-            "totalCost" NUMERIC(10,2) NOT NULL DEFAULT 0,
-            status VARCHAR(50) NOT NULL,
-            reason TEXT NULL,
-            created_at TIMESTAMP NOT NULL DEFAULT NOW(),
-            updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+            invoice_id UUID NOT NULL,
+            ticket_id UUID NOT NULL REFERENCES service_tickets(id) ON DELETE CASCADE,
+            revision_number INTEGER NOT NULL,
+            revision_type VARCHAR(50) NOT NULL,
+            items_snapshot JSONB NOT NULL,
+            total_amount DECIMAL(10,2) NOT NULL,
+            discount_applied DECIMAL(10,2) DEFAULT 0,
+            visit_charge_amount DECIMAL(10,2) DEFAULT 0,
+            technician_note_to_finance TEXT,
+            submitted_by VARCHAR(255) NOT NULL,
+            finance_decision VARCHAR(50) DEFAULT NULL,
+            finance_decision_by VARCHAR(255) DEFAULT NULL,
+            finance_decision_note TEXT DEFAULT NULL,
+            finance_decision_at TIMESTAMP DEFAULT NULL,
+            valid_until TIMESTAMP DEFAULT NULL,
+            submitted_at TIMESTAMP NOT NULL DEFAULT NOW()
           );
         `);
         logger.info('Guaranteed service_estimate_revisions table exists.');
@@ -450,8 +489,16 @@ export const connectWithRetry = async (initialDelayMs = 2000): Promise<DataSourc
           ALTER TABLE service_tickets ADD COLUMN IF NOT EXISTS linked_invoice_id UUID;
           ALTER TABLE service_tickets ADD COLUMN IF NOT EXISTS meter_reading_at_service INT;
           ALTER TABLE service_tickets ADD COLUMN IF NOT EXISTS report_url VARCHAR(500);
+          ALTER TABLE service_tickets ADD COLUMN IF NOT EXISTS completion_bill_number VARCHAR(50);
+          ALTER TABLE service_tickets ADD COLUMN IF NOT EXISTS visit_charge_amount DECIMAL(10,2) DEFAULT 0;
+          ALTER TABLE service_tickets ADD COLUMN IF NOT EXISTS visit_charge_method VARCHAR(30) DEFAULT NULL;
+          ALTER TABLE service_tickets ADD COLUMN IF NOT EXISTS visit_charge_collected BOOLEAN DEFAULT FALSE;
+          ALTER TABLE service_tickets ADD COLUMN IF NOT EXISTS visit_charge_collected_at TIMESTAMP DEFAULT NULL;
+          ALTER TABLE service_tickets ADD COLUMN IF NOT EXISTS visit_charge_informed BOOLEAN DEFAULT FALSE;
+          ALTER TABLE service_tickets ADD COLUMN IF NOT EXISTS discount_amount DECIMAL(10,2) DEFAULT 0;
+          ALTER TABLE service_tickets ADD COLUMN IF NOT EXISTS technician_note_to_finance TEXT DEFAULT NULL;
         `);
-        logger.info('Added columns to service_tickets for Redesign.');
+        logger.info('Added columns to service_tickets for Redesign and Visit Charge.');
 
         // 3. Drop and recreate machine_service_history to support new redesign structure
         // We check if "totalPartsSpend" column exists; if not, we drop it.

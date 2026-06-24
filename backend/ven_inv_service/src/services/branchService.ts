@@ -16,22 +16,28 @@ export class BranchService {
     name: string;
     address: string;
     location: string;
-    manager_id?: string;
+    manager_id?: string | null;
     started_date: Date;
   }) {
-    if (payload.manager_id) {
-      const manager = await this.managerRepo.findActiveManager(payload.manager_id);
+    const managerId =
+      payload.manager_id && payload.manager_id.trim() !== '' ? payload.manager_id : null;
+
+    if (managerId) {
+      const manager = await this.managerRepo.findActiveManager(managerId);
       if (!manager) {
         throw new AppError('Manager does not exist or inactive', 400);
       }
 
-      const existingBranch = await this.repo.findByManagerId(payload.manager_id);
+      const existingBranch = await this.repo.findByManagerId(managerId);
       if (existingBranch) {
         throw new AppError(`Manager is already assigned to branch: ${existingBranch.name}`, 400);
       }
     }
 
-    const branch = await this.repo.create(payload);
+    const branch = await this.repo.create({
+      ...payload,
+      manager_id: managerId || undefined,
+    });
 
     if (!branch) {
       throw new AppError('Failed to create branch', 500);
@@ -93,16 +99,21 @@ export class BranchService {
       status?: BranchStatus;
     },
   ) {
-    if (payload.manager_id) {
-      const manager = await this.managerRepo.findActiveManager(payload.manager_id);
+    let managerId: string | null | undefined = payload.manager_id;
+    if (managerId !== undefined) {
+      if (managerId === '' || managerId === null) {
+        managerId = null;
+      } else {
+        const manager = await this.managerRepo.findActiveManager(managerId);
 
-      if (!manager) {
-        throw new AppError('Manager does not exist or inactive', 400);
-      }
+        if (!manager) {
+          throw new AppError('Manager does not exist or inactive', 400);
+        }
 
-      const existingBranch = await this.repo.findByManagerId(payload.manager_id);
-      if (existingBranch && existingBranch.id !== id) {
-        throw new AppError(`Manager is already assigned to branch: ${existingBranch.name}`, 400);
+        const existingBranch = await this.repo.findByManagerId(managerId);
+        if (existingBranch && existingBranch.id !== id) {
+          throw new AppError(`Manager is already assigned to branch: ${existingBranch.name}`, 400);
+        }
       }
     }
 
@@ -117,7 +128,10 @@ export class BranchService {
     }
 
     const updatePayload = Object.fromEntries(
-      Object.entries(payload).filter(([, v]) => v !== undefined),
+      Object.entries({
+        ...payload,
+        manager_id: managerId,
+      }).filter(([, v]) => v !== undefined),
     );
 
     if (Object.keys(updatePayload).length === 0) {

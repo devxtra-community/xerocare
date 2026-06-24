@@ -1,4 +1,4 @@
-import { getRabbitChannel, getRabbitConnection } from '../config/rabbitmq';
+import { createRabbitChannel } from '../config/rabbitmq';
 import { logger } from '../config/logger';
 import { Source } from '../config/db';
 import { Product, ProductStatus } from '../entities/productEntity';
@@ -11,7 +11,7 @@ const QUEUE = 'inventory.product.allocate.queue';
 const ROUTING_KEY = 'inventory.product.allocate';
 
 export async function startProductAllocationConsumer() {
-  const channel = await getRabbitChannel();
+  const channel = await createRabbitChannel();
 
   const DLX = 'dlx.inventory';
   const DLQ = 'dlq.inventory';
@@ -21,16 +21,6 @@ export async function startProductAllocationConsumer() {
   await channel.bindQueue(DLQ, DLX, '#');
 
   await channel.assertExchange(EXCHANGE, 'topic', { durable: true });
-
-  // Delete the old queue if it exists to allow changing the arguments safely
-  try {
-    const conn = await getRabbitConnection();
-    const tempChannel = await conn.createChannel();
-    await tempChannel.deleteQueue(QUEUE);
-    await tempChannel.close();
-  } catch {
-    // Ignore error if queue doesn't exist
-  }
 
   await channel.assertQueue(QUEUE, {
     durable: true,

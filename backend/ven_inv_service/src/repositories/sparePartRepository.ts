@@ -47,7 +47,7 @@ export class SparePartRepository {
     // Explicitly update properties to avoid reference issues
     if (data.part_name !== undefined) part.part_name = data.part_name;
     if (data.brand !== undefined) part.brand = data.brand;
-    if (data.model_id !== undefined) part.model_id = data.model_id;
+    if (data.model_id !== undefined) part.model_id = data.model_id ?? undefined;
     if (data.base_price !== undefined) part.base_price = data.base_price;
     if (data.purchase_price !== undefined) part.purchase_price = data.purchase_price;
     if (data.wholesale_price !== undefined) part.wholesale_price = data.wholesale_price;
@@ -58,6 +58,9 @@ export class SparePartRepository {
     if (data.yield !== undefined) part.yield = data.yield;
     if (data.warehouse_id !== undefined) part.warehouse_id = data.warehouse_id;
     if (data.vendor_id !== undefined) part.vendor_id = data.vendor_id;
+    if (data.maxDiscountableAmount !== undefined)
+      part.maxDiscountableAmount = data.maxDiscountableAmount;
+    if (data.max_discount_amount !== undefined) part.max_discount_amount = data.max_discount_amount;
 
     return this.masterRepo.save(part);
   }
@@ -130,6 +133,7 @@ export class SparePartRepository {
         'sp.wholesale_price AS wholesale_price',
         'sp.tax_rate AS tax_rate',
         'sp.max_discount_amount AS max_discount_amount',
+        'sp.maxDiscountableAmount AS maxDiscountableAmount',
         'sp.image_url AS image_url',
         'sp.description AS description',
         'sp.yield AS yield',

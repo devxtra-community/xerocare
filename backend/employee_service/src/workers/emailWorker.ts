@@ -33,7 +33,7 @@ export const startWorker = async () => {
 
     try {
       if (job.type === 'OTP') {
-        await sendOtpMail(job.email, job.otp);
+        await sendOtpMail(job.email, job.otp, job.purpose);
       }
 
       if (job.type === 'MAGIC') {

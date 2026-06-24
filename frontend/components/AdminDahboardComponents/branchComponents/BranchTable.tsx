@@ -133,12 +133,14 @@ export default function BranchReport() {
   const handleSave = async (data: BranchFormData) => {
     try {
       setSubmitting(true);
+      const managerId = data.manager_id && data.manager_id.trim() !== '' ? data.manager_id : null;
+
       if (editingBranch) {
         const res = await updateBranch(editingBranch.id, {
           name: data.name,
           address: data.address,
           location: data.location,
-          manager_id: data.manager_id,
+          manager_id: managerId,
           started_date: data.started_date,
           status: data.status,
         });
@@ -152,7 +154,7 @@ export default function BranchReport() {
           name: data.name,
           address: data.address,
           location: data.location,
-          manager_id: data.manager_id,
+          manager_id: managerId,
           started_date: data.started_date,
         });
 
@@ -402,7 +404,7 @@ function BranchFormModal({
           location: '',
           started_date: '',
           status: 'ACTIVE',
-          manager_id: '',
+          manager_id: null,
         },
   );
 

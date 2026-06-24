@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { createRfq, uploadRfqExcel, ItemType, RfqItem } from '@/lib/rfq';
 import { getVendors, Vendor } from '@/lib/vendor';
 import { getAllModels, Model } from '@/lib/model';
@@ -39,6 +39,9 @@ interface RfqCreateFormProps {
 
 export default function RfqCreateForm({ basePath }: RfqCreateFormProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const vendorIdParam = searchParams.get('vendorId');
+
   const [loading, setLoading] = useState(false);
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [models, setModels] = useState<Model[]>([]);
@@ -60,6 +63,12 @@ export default function RfqCreateForm({ basePath }: RfqCreateFormProps) {
   useEffect(() => {
     fetchData();
   }, []);
+
+  useEffect(() => {
+    if (vendorIdParam) {
+      setSelectedVendors([vendorIdParam]);
+    }
+  }, [vendorIdParam]);
 
   const fetchData = async () => {
     try {

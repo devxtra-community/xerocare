@@ -8,6 +8,28 @@ import { ContractStatus } from '../entities/enums/contractStatus';
 import { AppError } from '../errors/appError';
 import { logger } from '../config/logger';
 
+interface EnrichedItem {
+  quantity?: number;
+  unitPrice?: number;
+  description?: string;
+  sku?: string;
+  discount?: number;
+  discountAmount?: number;
+  metadata?: {
+    brand?: string;
+    model?: {
+      model_name?: string;
+    };
+    serial_no?: string;
+    part_name?: string;
+    name?: string;
+    description?: string;
+    tax_rate?: number;
+    sku?: string;
+    mpn?: string;
+  } | null;
+}
+
 export class BillingReportService {
   private invoiceRepo = new InvoiceRepository();
   private usageRepo = new UsageRepository();
@@ -1021,9 +1043,8 @@ export class BillingReportService {
         let metadata = null;
         if (item.productId) {
           metadata = await this.getProductDetails(item.productId);
-        } else if (item.description && !item.productId) {
-          // Could be a spare part if not a pricing rule
-          // In some cases, we might need a specific sparePartId in InvoiceItem
+        } else if (item.sparePartId) {
+          metadata = await this.getSparePartDetails(item.sparePartId);
         }
         return { ...item, metadata };
       }),
@@ -1126,6 +1147,28 @@ export class BillingReportService {
 
     const startY = doc.y;
 
+    let customerName = 'NO CUSTOMER ASSIGNED';
+    if (customer) {
+      if (customer.name) {
+        customerName = customer.name.toUpperCase();
+      } else if (customer.firstName || customer.first_name) {
+        const first = customer.firstName || customer.first_name || '';
+        const last = customer.lastName || customer.last_name || '';
+        customerName = `${first} ${last}`.trim().toUpperCase();
+      } else {
+        customerName = (customer.email || 'UNNAMED CUSTOMER').toUpperCase();
+      }
+    }
+
+    let repInitials = 'RSHD';
+    if (employee) {
+      const first = employee.first_name || employee.firstName || '';
+      const last = employee.last_name || employee.lastName || '';
+      if (first || last) {
+        repInitials = `${first ? first[0] : ''}${last ? last[0] : ''}`.toUpperCase();
+      }
+    }
+
     // --- Customer Info ---
     // --- Customer & Rep Info ---
     doc
@@ -1137,13 +1180,7 @@ export class BillingReportService {
       .fillColor('#1e293b')
       .font('Helvetica-Bold')
       .fontSize(12)
-      .text(
-        customer
-          ? `${customer.firstName} ${customer.lastName || ''}`.toUpperCase()
-          : 'NO CUSTOMER ASSIGNED',
-        40,
-        startY + 28,
-      );
+      .text(customerName, 40, startY + 28);
     doc
       .fillColor('#64748b')
       .font('Helvetica')
@@ -1178,11 +1215,7 @@ export class BillingReportService {
     doc
       .fillColor('#334155')
       .fontSize(9)
-      .text(
-        employee ? `${employee.first_name[0]}${employee.last_name[0]}`.toUpperCase() : 'RSHD',
-        infoX + 90,
-        startY + 35,
-      );
+      .text(repInitials, infoX + 90, startY + 35);
 
     doc.fillColor('#94a3b8').text('DUE DATE', infoX + 150, startY + 25);
     doc
@@ -1267,12 +1300,21 @@ export class BillingReportService {
       doc.rect(qtyX - 10, currentY - 5, 45, itemHeight).stroke(); // Qty col border
       doc.rect(rateX - 10, currentY - 5, 75, itemHeight).stroke(); // Rate col border
 
-      const mpn = item.metadata?.mpn || ' ';
-      const productName = (item.metadata?.name || item.description || 'ITEM').toUpperCase();
+      const mpn =
+        (item as EnrichedItem).metadata?.sku ||
+        (item as EnrichedItem).metadata?.mpn ||
+        (item as EnrichedItem).sku ||
+        ' ';
+      const productName = (
+        item.metadata?.part_name ||
+        item.metadata?.name ||
+        item.description ||
+        'ITEM'
+      ).toUpperCase();
       const description =
         item.description && item.description !== productName
           ? item.description
-          : 'Standard specification as per brand guidelines.';
+          : item.metadata?.description || 'Standard specification as per brand guidelines.';
 
       doc.fillColor('#475569').text(mpn, mpnX + 5, currentY + 5, { width: 50 });
 
@@ -1320,26 +1362,119 @@ export class BillingReportService {
     }
 
     // --- Subtotal / Grand Total ---
+    let totalBeforeDiscount = 0;
+    let totalDiscount = 0;
+    let totalVat = 0;
+
+    enrichedItems.forEach((item, idx) => {
+      const qty = item.quantity || 1;
+      const unitP = Number(item.unitPrice || 0);
+
+      const dStr = item.description || '';
+      const exDiscMatch = dStr.match(/\[DISC:([\d.]+)\]/);
+      const extractedDisc = exDiscMatch ? parseFloat(exDiscMatch[1]) : 0;
+
+      const globalDiscountPerItem =
+        idx === 0 && enrichedItems.length === 1 && quotation.discountAmount
+          ? Number(quotation.discountAmount)
+          : 0;
+
+      const disc =
+        (item as EnrichedItem).discount !== undefined && (item as EnrichedItem).discount! > 0
+          ? Number((item as EnrichedItem).discount)
+          : Number((item as EnrichedItem).discountAmount || 0) ||
+            extractedDisc ||
+            globalDiscountPerItem ||
+            0;
+
+      const discountedPrice = unitP - disc;
+      const taxRate = Number(item.metadata?.tax_rate || 0);
+      const vat = ((discountedPrice * taxRate) / 100) * qty;
+
+      totalBeforeDiscount += unitP * qty;
+      totalDiscount += disc * qty;
+      totalVat += vat;
+    });
+
+    const finalDiscountTotal = Math.max(totalDiscount, Number(quotation.discountAmount || 0));
+    const netAmount = totalBeforeDiscount - finalDiscountTotal;
+    const isVatAlreadyIncluded =
+      quotation.totalAmount &&
+      Math.abs(Number(quotation.totalAmount) - (netAmount + totalVat)) < 0.05;
+    const baseTotal = isVatAlreadyIncluded
+      ? Number(quotation.totalAmount) - totalVat
+      : Number(quotation.totalAmount || netAmount);
+    const grandTotal = baseTotal + totalVat;
+
     doc.moveDown(1);
     const totalsX = 350;
     const totalsWidth = 210;
+    const labelWidth = 110;
+    const valueWidth = 90;
+    const valueX = totalsX + 120;
+    let totalY = doc.y;
 
-    doc.fillColor('#dc2626').rect(totalsX, doc.y, totalsWidth, 35).fill();
+    // Subtotal Row
+    doc.font('Helvetica').fontSize(9).fillColor('#64748b');
+    doc.text('Subtotal (Before VAT)', totalsX, totalY, { width: labelWidth });
+    doc
+      .fillColor('#1e293b')
+      .text(
+        `QAR ${totalBeforeDiscount.toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
+        valueX,
+        totalY,
+        { width: valueWidth, align: 'right' },
+      );
+    totalY += 16;
+
+    // Discount Row
+    if (finalDiscountTotal > 0) {
+      doc.font('Helvetica').fontSize(9).fillColor('#64748b');
+      doc.text('Discount', totalsX, totalY, { width: labelWidth });
+      doc
+        .fillColor('#dc2626')
+        .text(
+          `- QAR ${finalDiscountTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
+          valueX,
+          totalY,
+          { width: valueWidth, align: 'right' },
+        );
+      totalY += 16;
+    }
+
+    // VAT Amount Row
+    doc.font('Helvetica').fontSize(9).fillColor('#64748b');
+    doc.text('VAT Amount', totalsX, totalY, { width: labelWidth });
+    doc
+      .fillColor('#1e293b')
+      .text(
+        `QAR ${totalVat.toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
+        valueX,
+        totalY,
+        { width: valueWidth, align: 'right' },
+      );
+    totalY += 20;
+
+    // Grand Total Row (Red Box)
+    doc.fillColor('#dc2626').rect(totalsX, totalY, totalsWidth, 35).fill();
     doc
       .fillColor('#ffffff')
       .font('Helvetica-Bold')
-      .fontSize(14)
-      .text('TOTAL', totalsX + 20, doc.y + 10);
+      .fontSize(10)
+      .text('Grand Total (incl. VAT)', totalsX + 10, totalY + 13, { width: 110 });
     doc
-      .fontSize(16)
+      .fontSize(12)
       .text(
-        `QAR ${Number(quotation.totalAmount).toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
-        totalsX,
-        doc.y - 12,
-        { width: totalsWidth - 20, align: 'right' },
+        `QAR ${grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
+        totalsX + 115,
+        totalY + 11,
+        { width: 85, align: 'right' },
       );
 
-    doc.moveDown(4);
+    totalY += 45;
+    doc.y = totalY;
+
+    doc.moveDown(2);
 
     // --- Terms & Conditions ---
     const termsY = doc.y;
@@ -1439,6 +1574,8 @@ export class BillingReportService {
         let metadata = null;
         if (item.productId) {
           metadata = await this.getProductDetails(item.productId);
+        } else if (item.sparePartId) {
+          metadata = await this.getSparePartDetails(item.sparePartId);
         }
         return { ...item, metadata };
       }),
@@ -1541,6 +1678,27 @@ export class BillingReportService {
 
     const startY = doc.y;
 
+    let customerName = 'NO CUSTOMER ASSIGNED';
+    if (customer) {
+      if (customer.name) {
+        customerName = customer.name.toUpperCase();
+      } else if (customer.firstName || customer.first_name) {
+        const first = customer.firstName || customer.first_name || '';
+        const last = customer.lastName || customer.last_name || '';
+        customerName = `${first} ${last}`.trim().toUpperCase();
+      } else {
+        customerName = (customer.email || 'UNNAMED CUSTOMER').toUpperCase();
+      }
+    }
+
+    let salesRepName = 'SERVICE AGENT';
+    if (employee) {
+      const first = employee.first_name || employee.firstName || '';
+      const last = employee.last_name || employee.lastName || '';
+      const fullname = `${first} ${last}`.trim();
+      salesRepName = fullname ? fullname.toUpperCase() : 'SERVICE AGENT';
+    }
+
     // --- Customer Info ---
     doc
       .fillColor('#94a3b8')
@@ -1551,13 +1709,7 @@ export class BillingReportService {
       .fillColor('#1e293b')
       .font('Helvetica-Bold')
       .fontSize(12)
-      .text(
-        customer
-          ? `${customer.firstName} ${customer.lastName || ''}`.toUpperCase()
-          : 'NO CUSTOMER ASSIGNED',
-        40,
-        startY + 28,
-      );
+      .text(customerName, 40, startY + 28);
     doc
       .fillColor('#64748b')
       .font('Helvetica')
@@ -1593,13 +1745,7 @@ export class BillingReportService {
       .fillColor('#334155')
       .font('Helvetica-Bold')
       .fontSize(9)
-      .text(
-        employee
-          ? `${employee.firstName} ${employee.lastName || ''}`.toUpperCase()
-          : 'SERVICE AGENT',
-        infoX + 90,
-        startY + 35,
-      );
+      .text(salesRepName, infoX + 90, startY + 35);
 
     // Brand / Model Box
     const modelY = startY + 80;
@@ -1653,9 +1799,19 @@ export class BillingReportService {
       doc.rect(qtyX - 10, currentY - 5, 45, itemHeight).stroke();
       doc.rect(rateX - 10, currentY - 5, 75, itemHeight).stroke();
 
-      const mpn = item.metadata?.mpn || ' ';
-      const productName = (item.metadata?.name || item.description || 'ITEM').toUpperCase();
-      const description = 'Official Xerocare verified equipment and services';
+      const mpn =
+        (item as EnrichedItem).metadata?.sku ||
+        (item as EnrichedItem).metadata?.mpn ||
+        (item as EnrichedItem).sku ||
+        ' ';
+      const productName = (
+        item.metadata?.part_name ||
+        item.metadata?.name ||
+        item.description ||
+        'ITEM'
+      ).toUpperCase();
+      const description =
+        item.metadata?.description || 'Official Xerocare verified equipment and services';
 
       doc
         .fillColor('#475569')
@@ -1706,25 +1862,115 @@ export class BillingReportService {
     }
 
     // --- Totals ---
+    let totalBeforeDiscount = 0;
+    let totalDiscount = 0;
+    let totalVat = 0;
+
+    enrichedItems.forEach((item, idx) => {
+      const qty = item.quantity || 1;
+      const unitP = Number(item.unitPrice || 0);
+
+      const dStr = item.description || '';
+      const exDiscMatch = dStr.match(/\[DISC:([\d.]+)\]/);
+      const extractedDisc = exDiscMatch ? parseFloat(exDiscMatch[1]) : 0;
+
+      const globalDiscountPerItem =
+        idx === 0 && enrichedItems.length === 1 && invoice.discountAmount
+          ? Number(invoice.discountAmount)
+          : 0;
+
+      const disc =
+        (item as EnrichedItem).discount !== undefined && (item as EnrichedItem).discount! > 0
+          ? Number((item as EnrichedItem).discount)
+          : Number((item as EnrichedItem).discountAmount || 0) ||
+            extractedDisc ||
+            globalDiscountPerItem ||
+            0;
+
+      const discountedPrice = unitP - disc;
+      const taxRate = Number(item.metadata?.tax_rate || 0);
+      const vat = ((discountedPrice * taxRate) / 100) * qty;
+
+      totalBeforeDiscount += unitP * qty;
+      totalDiscount += disc * qty;
+      totalVat += vat;
+    });
+
+    const finalDiscountTotal = Math.max(totalDiscount, Number(invoice.discountAmount || 0));
+    const netAmount = totalBeforeDiscount - finalDiscountTotal;
+    const isVatAlreadyIncluded =
+      invoice.totalAmount && Math.abs(Number(invoice.totalAmount) - (netAmount + totalVat)) < 0.05;
+    const baseTotal = isVatAlreadyIncluded
+      ? Number(invoice.totalAmount) - totalVat
+      : Number(invoice.totalAmount || netAmount);
+    const grandTotal = baseTotal + totalVat;
+
     const totalsX_ = 350;
     const totalsWidth_ = 210;
+    const labelWidth = 110;
+    const valueWidth = 90;
+    const valueX = totalsX_ + 120;
+    let totalY = doc.y + 10;
+
+    // Subtotal Row
+    doc.font('Helvetica').fontSize(9).fillColor('#64748b');
+    doc.text('Subtotal (Before VAT)', totalsX_, totalY, { width: labelWidth });
     doc
-      .fillColor('#dc2626')
-      .rect(totalsX_, doc.y + 10, totalsWidth_, 35)
-      .fill();
+      .fillColor('#1e293b')
+      .text(
+        `QAR ${totalBeforeDiscount.toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
+        valueX,
+        totalY,
+        { width: valueWidth, align: 'right' },
+      );
+    totalY += 16;
+
+    // Discount Row
+    if (finalDiscountTotal > 0) {
+      doc.font('Helvetica').fontSize(9).fillColor('#64748b');
+      doc.text('Discount', totalsX_, totalY, { width: labelWidth });
+      doc
+        .fillColor('#dc2626')
+        .text(
+          `- QAR ${finalDiscountTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
+          valueX,
+          totalY,
+          { width: valueWidth, align: 'right' },
+        );
+      totalY += 16;
+    }
+
+    // VAT Amount Row
+    doc.font('Helvetica').fontSize(9).fillColor('#64748b');
+    doc.text('VAT Amount', totalsX_, totalY, { width: labelWidth });
+    doc
+      .fillColor('#1e293b')
+      .text(
+        `QAR ${totalVat.toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
+        valueX,
+        totalY,
+        { width: valueWidth, align: 'right' },
+      );
+    totalY += 20;
+
+    // Grand Total Row (Red Box)
+    doc.fillColor('#dc2626').rect(totalsX_, totalY, totalsWidth_, 35).fill();
     doc
       .fillColor('#ffffff')
       .font('Helvetica-Bold')
-      .fontSize(14)
-      .text('TOTAL', totalsX_ + 20, doc.y + 20);
+      .fontSize(10)
+      .text('Grand Total (incl. VAT)', totalsX_ + 10, totalY + 13, { width: 110 });
     doc
-      .fontSize(16)
+      .fontSize(12)
       .text(
-        `QAR ${Number(invoice.totalAmount).toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
-        totalsX_,
-        doc.y - 12,
-        { width: totalsWidth_ - 20, align: 'right' },
+        `QAR ${grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
+        totalsX_ + 115,
+        totalY + 11,
+        { width: 85, align: 'right' },
       );
+
+    totalY += 45;
+    doc.y = totalY;
 
     // --- Footer Brands ---
     const footerY_ = 740;

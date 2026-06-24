@@ -15,6 +15,7 @@ import { toast } from 'sonner';
 import EditSparePartDialog from '@/components/ManagerDashboardComponents/spareParts/EditSparePartDialog';
 import SparePartDetailDialog from '@/components/ManagerDashboardComponents/spareParts/SparePartDetailDialog';
 import { ErrorDialog } from '@/components/dialogs/ErrorDialog';
+import { lotService } from '@/lib/lot';
 
 export const dynamic = 'force-dynamic';
 
@@ -69,7 +70,27 @@ function SparePartsContent() {
     if (lotId) {
       setInitialLotId(lotId);
       setInitialItemId(itemId || undefined);
-      setBulkOpen(true);
+
+      const checkLotSpareParts = async () => {
+        try {
+          const lot = await lotService.getLotById(lotId);
+          const sparePartItems = lot?.items?.filter((item) => item.itemType === 'SPARE_PART') || [];
+
+          if (sparePartItems.length > 1) {
+            setBulkOpen(true);
+          } else if (sparePartItems.length === 1) {
+            setInitialItemId(sparePartItems[0].id);
+            setAddOpen(true);
+          } else {
+            toast.error('No spare parts found in this lot');
+          }
+        } catch (err) {
+          console.error('Failed to fetch lot for routing:', err);
+          setBulkOpen(true);
+        }
+      };
+
+      checkLotSpareParts();
     }
   }, [searchParams]);
 
@@ -276,7 +297,19 @@ function SparePartsContent() {
         )}
 
         {addOpen && (
-          <AddSparePartDialog open={addOpen} onOpenChange={setAddOpen} onSuccess={loadParts} />
+          <AddSparePartDialog
+            open={addOpen}
+            onOpenChange={(open) => {
+              setAddOpen(open);
+              if (!open) {
+                setInitialLotId(undefined);
+                setInitialItemId(undefined);
+              }
+            }}
+            onSuccess={loadParts}
+            initialLotId={initialLotId}
+            initialItemId={initialItemId}
+          />
         )}
 
         {editOpen && selectedPart && (

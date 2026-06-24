@@ -26,6 +26,8 @@ interface AddSparePartDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess: () => void;
+  initialLotId?: string;
+  initialItemId?: string;
 }
 
 /**
@@ -39,6 +41,8 @@ export default function AddSparePartDialog({
   open,
   onOpenChange,
   onSuccess,
+  initialLotId,
+  initialItemId,
 }: AddSparePartDialogProps) {
   const [loading, setLoading] = useState(false);
   interface Warehouse {
@@ -73,6 +77,7 @@ export default function AddSparePartDialog({
     mpn: '',
     description: '',
     yield: '',
+    maxDiscountableAmount: '',
   });
 
   const [selectedLotItemId, setSelectedLotItemId] = useState<string>('');
@@ -119,6 +124,65 @@ export default function AddSparePartDialog({
     }
   };
 
+  useEffect(() => {
+    if (open && initialLotId && lots.length > 0) {
+      const selectedLot = lots.find((l) => l.id === initialLotId);
+      if (selectedLot) {
+        const sparePartItems =
+          selectedLot.items?.filter((item) => item.itemType === 'SPARE_PART') || [];
+
+        const selectedItem = initialItemId
+          ? sparePartItems.find((item) => item.id === initialItemId)
+          : sparePartItems[0];
+
+        if (selectedItem) {
+          setSelectedLotItemId(selectedItem.id);
+          const sp = selectedItem.sparePart;
+
+          let brandName = sp?.brand || '';
+          if (!brandName && selectedLot.items) {
+            for (const item of selectedLot.items) {
+              if (item.model?.brandRelation?.name) {
+                brandName = item.model.brandRelation.name;
+                break;
+              } else if (item.sparePart?.brand) {
+                brandName = item.sparePart.brand;
+                break;
+              }
+            }
+          }
+
+          setFormData({
+            part_name: sp?.part_name || selectedItem.customSparePartName || '',
+            brand: brandName,
+            model_ids: sp?.model_id ? [sp.model_id] : selectedItem.modelIds || [],
+            base_price: '',
+            purchase_price: selectedItem.unitPrice ? selectedItem.unitPrice.toString() : '',
+            wholesale_price: sp?.wholesale_price?.toString() || '',
+            warehouse_id: selectedLot.warehouse_id || selectedLot.warehouseId || '',
+            vendor_id: selectedLot.vendorId || selectedLot.vendor?.id || '',
+            quantity: Math.max(
+              1,
+              selectedItem.receivedQuantity - selectedItem.usedQuantity,
+            ).toString(),
+            lot_id: initialLotId,
+            mpn: selectedItem.mpn || sp?.mpn || '',
+            description: selectedItem.compatibleModels || sp?.description || '',
+            yield: sp?.yield || '',
+            maxDiscountableAmount: sp?.maxDiscountableAmount?.toString() || '',
+          });
+        } else {
+          setFormData((prev) => ({
+            ...prev,
+            lot_id: initialLotId,
+            vendor_id: selectedLot.vendorId || selectedLot.vendor?.id || '',
+            warehouse_id: selectedLot.warehouse_id || selectedLot.warehouseId || '',
+          }));
+        }
+      }
+    }
+  }, [open, initialLotId, initialItemId, lots]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -140,7 +204,7 @@ export default function AddSparePartDialog({
       const selectedLot = lots.find((l) => l.id === formData.lot_id);
       const selectedLotItem = selectedLot?.items?.find((item) => item.id === selectedLotItemId);
 
-      if (!selectedLotItem || !selectedLotItem.sparePart) {
+      if (!selectedLotItem) {
         toast.error('Invalid lot item selection');
         return;
       }
@@ -179,6 +243,7 @@ export default function AddSparePartDialog({
         base_price: Number(formData.base_price),
         purchase_price: Number(formData.purchase_price),
         wholesale_price: Number(formData.wholesale_price),
+        maxDiscountableAmount: Number(formData.maxDiscountableAmount || 0),
         quantity: requestedQuantity,
         lot_id: isNoLot ? undefined : formData.lot_id,
         mpn: formData.mpn,
@@ -203,6 +268,7 @@ export default function AddSparePartDialog({
         mpn: '',
         description: '',
         yield: '',
+        maxDiscountableAmount: '',
       });
       setSelectedLotItemId('');
     } catch (error: unknown) {
@@ -289,34 +355,48 @@ export default function AddSparePartDialog({
                     const selectedLot = lots.find((l) => l.id === formData.lot_id);
                     const selectedItem = selectedLot?.items?.find((item) => item.id === val);
 
-                    if (selectedItem?.sparePart) {
+                    if (selectedItem) {
+                      const sp = selectedItem.sparePart;
+
+                      let brandName = sp?.brand || '';
+                      if (!brandName && selectedLot?.items) {
+                        for (const item of selectedLot.items) {
+                          if (item.model?.brandRelation?.name) {
+                            brandName = item.model.brandRelation.name;
+                            break;
+                          } else if (item.sparePart?.brand) {
+                            brandName = item.sparePart.brand;
+                            break;
+                          }
+                        }
+                      }
+
                       setFormData({
                         ...formData,
-                        part_name: selectedItem.sparePart.part_name,
-                        brand: selectedItem.sparePart.brand,
-                        base_price: selectedItem.unitPrice.toString(),
+                        part_name: sp?.part_name || selectedItem.customSparePartName || '',
+                        brand: brandName,
+                        base_price: '',
                         purchase_price: selectedItem.unitPrice.toString(),
-                        wholesale_price: selectedItem.sparePart.wholesale_price?.toString() || '',
-                        model_ids: selectedItem.sparePart.model_id
-                          ? [selectedItem.sparePart.model_id]
-                          : [],
-                        mpn: selectedItem.sparePart.mpn || '',
-                        description: selectedItem.sparePart.description || '',
+                        wholesale_price: sp?.wholesale_price?.toString() || '',
+                        model_ids: sp?.model_id ? [sp.model_id] : selectedItem.modelIds || [],
+                        mpn: selectedItem.mpn || sp?.mpn || '',
+                        description: selectedItem.compatibleModels || sp?.description || '',
                       });
                     }
                   }}
                   options={(() => {
                     const selectedLot = lots.find((l) => l.id === formData.lot_id);
                     const sparePartItems =
-                      selectedLot?.items?.filter(
-                        (item) => item.itemType === 'SPARE_PART' && item.sparePart,
-                      ) || [];
+                      selectedLot?.items?.filter((item) => item.itemType === 'SPARE_PART') || [];
 
                     return sparePartItems.map((item) => {
                       const available = item.receivedQuantity - item.usedQuantity;
+                      const name =
+                        item.sparePart?.part_name || item.customSparePartName || 'Unnamed Spare';
+                      const sku = item.sparePart?.sku || 'NEW';
                       return {
                         value: item.id,
-                        label: `${item.sparePart!.sku} - ${item.sparePart!.part_name}`,
+                        label: `${sku} - ${name}`,
                         description: `Available: ${available} / ${item.receivedQuantity} | Price: QAR ${item.unitPrice}`,
                       };
                     });
@@ -386,7 +466,7 @@ export default function AddSparePartDialog({
             </div>
             <div className="space-y-2">
               <Label>Brand</Label>
-              {selectedLotItemId && !isNoLot ? (
+              {selectedLotItemId && !isNoLot && formData.brand ? (
                 <>
                   <Input value={formData.brand} disabled className="bg-muted cursor-not-allowed" />
                   <p className="text-xs text-muted-foreground mt-1">Auto-filled from lot item</p>
@@ -512,12 +592,19 @@ export default function AddSparePartDialog({
                 min="0"
                 value={formData.base_price}
                 onChange={(e) => setFormData({ ...formData, base_price: e.target.value })}
-                disabled={!!selectedLotItemId && !isNoLot}
-                className={selectedLotItemId && !isNoLot ? 'bg-muted cursor-not-allowed' : ''}
               />
-              {selectedLotItemId && !isNoLot && (
-                <p className="text-xs text-muted-foreground mt-1">Auto-filled from lot item</p>
-              )}
+            </div>
+            <div className="space-y-2">
+              <Label>Max Discount Allowed (QAR)</Label>
+              <Input
+                type="number"
+                min="0"
+                value={formData.maxDiscountableAmount}
+                onChange={(e) =>
+                  setFormData({ ...formData, maxDiscountableAmount: e.target.value })
+                }
+                placeholder="0"
+              />
             </div>
             <div className="space-y-2 col-span-2">
               <BulletDescriptionInput

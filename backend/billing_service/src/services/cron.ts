@@ -7,6 +7,12 @@ import { logger } from '../config/logger';
 import { BillingEventType } from '../events/billingEvents';
 import { ProductAllocation, AllocationStatus } from '../entities/productAllocationEntity';
 import { getBranchManagerEmail } from './billingHelpers';
+import { Raw } from 'typeorm';
+import cron from 'node-cron';
+import { PaymentTransaction } from '../entities/paymentTransactionEntity';
+import { InvoiceLedger } from '../entities/invoiceLedgerEntity';
+import { SaleType } from '../entities/enums/saleType';
+import { UsageRecord } from '../entities/usageRecordEntity';
 
 const EXCHANGE = 'domain_events';
 const INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 hours
@@ -271,4 +277,364 @@ export function startContractExpiryScheduler() {
     expireContractsJob();
     serviceContractExpiryJob();
   }, INTERVAL_MS);
+}
+
+async function getCustomerDetails(customerId: string | null | undefined) {
+  if (!customerId) return null;
+  try {
+    const crmServiceUrl = process.env.CRM_SERVICE_URL || 'http://localhost:3005';
+    const { sign } = await import('jsonwebtoken');
+    const token = sign(
+      { userId: 'billing_service', role: 'ADMIN' },
+      process.env.ACCESS_SECRET as string,
+      { expiresIn: '1m' },
+    );
+
+    const response = await fetch(`${crmServiceUrl}/customers/${customerId}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) return null;
+    const data = await response.json();
+    return data.data;
+  } catch {
+    return null;
+  }
+}
+
+export async function saleInvoiceReminderJob() {
+  logger.info('[CRON] Running Sale Invoice Reminder Job...');
+  try {
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    const invoiceRepo = Source.getRepository(Invoice);
+    const transactionRepo = Source.getRepository(PaymentTransaction);
+
+    const outstandingSaleInvoices = await invoiceRepo
+      .createQueryBuilder('invoice')
+      .leftJoinAndSelect('invoice_ledger', 'ledger', 'ledger.invoice_id = invoice.id')
+      .where('invoice.saleType = :saleType', { saleType: 'SALE' })
+      .andWhere('invoice.status NOT IN (:...excludeStatuses)', {
+        excludeStatuses: [
+          'DRAFT',
+          'SENT',
+          'PAID',
+          'CANCELLED',
+          'EXPIRED',
+          'SUPERSEDED',
+          'REJECTED',
+        ],
+      })
+      .andWhere('(ledger.balance_amount > 0 OR (ledger.id IS NULL AND invoice.totalAmount > 0))')
+      .getMany();
+
+    logger.info(
+      `[CRON] Found ${outstandingSaleInvoices.length} outstanding sale invoice(s) to verify.`,
+    );
+
+    for (const invoice of outstandingSaleInvoices) {
+      const recentPaymentsCount = await transactionRepo.count({
+        where: {
+          invoiceId: invoice.id,
+          transactionDate: Raw((alias) => `${alias} >= :thirtyDaysAgo`, { thirtyDaysAgo }),
+        },
+      });
+
+      if (recentPaymentsCount === 0) {
+        const ledger = await Source.getRepository(InvoiceLedger).findOne({
+          where: { invoiceId: invoice.id },
+        });
+        const balanceRemaining = ledger
+          ? Number(ledger.balanceAmount)
+          : Number(invoice.totalAmount);
+
+        // Fetch customer details
+        const customer = await getCustomerDetails(invoice.customerId);
+        const customerName = customer
+          ? `${customer.firstName} ${customer.lastName || ''}`.trim()
+          : ((invoice as unknown as Record<string, unknown>).customerName as string) || 'Customer';
+
+        const alertMsg = `Customer ${customerName} has an outstanding balance of QAR ${balanceRemaining} on invoice ${invoice.invoiceNumber} (Sale). No payment recorded in the last 30 days.`;
+        logger.warn(`[CRON] ${alertMsg}`);
+
+        // Email warning alert to Branch Manager
+        const managerEmail =
+          (await getBranchManagerEmail(invoice.branchId)) || 'manager@xerocare.com';
+        await NotificationPublisher.publishEmailRequest({
+          recipient: managerEmail,
+          subject: `Outstanding Sale Balance Warning - ${invoice.invoiceNumber}`,
+          body: alertMsg,
+          invoiceId: invoice.id,
+        });
+
+        const branchResult = await Source.query(
+          `SELECT manager_id FROM branches WHERE id = $1 LIMIT 1`,
+          [invoice.branchId],
+        );
+        const managerId = branchResult?.[0]?.manager_id;
+        if (managerId) {
+          await NotificationPublisher.publishInAppRequest({
+            recipientId: managerId,
+            title: 'Outstanding Sale Balance Warning',
+            message: alertMsg,
+            type: 'WARNING',
+            referenceId: invoice.id,
+            referenceType: 'CONTRACT',
+          });
+        }
+      }
+    }
+    logger.info('[CRON] Sale Invoice Reminder Job completed.');
+  } catch (error) {
+    logger.error('[CRON] Sale Invoice Reminder Job failed:', error);
+  }
+}
+
+export async function rentLeaseDueReminderJob() {
+  logger.info('[CRON] Running Rent & Lease Due Reminder Job...');
+  try {
+    const invoiceRepo = Source.getRepository(Invoice);
+    const usageRepo = Source.getRepository(UsageRecord);
+
+    const activeRentLeaseContracts = await invoiceRepo.find({
+      where: [
+        { saleType: SaleType.RENT, status: InvoiceStatus.ACTIVE_CONTRACT },
+        { saleType: SaleType.LEASE, status: InvoiceStatus.ACTIVE_CONTRACT },
+      ],
+    });
+
+    logger.info(
+      `[CRON] Found ${activeRentLeaseContracts.length} active rent/lease contract(s) to verify.`,
+    );
+
+    const today = new Date();
+    const todayDateOnly = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+
+    for (const contract of activeRentLeaseContracts) {
+      if (!contract.effectiveFrom) continue;
+
+      const history = await usageRepo.find({
+        where: { contractId: contract.id },
+        order: { billingPeriodEnd: 'DESC' },
+      });
+
+      let currentPeriodStart: Date;
+      const latestRecord = history[0];
+
+      if (latestRecord) {
+        currentPeriodStart = new Date(latestRecord.billingPeriodEnd);
+        currentPeriodStart.setDate(currentPeriodStart.getDate() + 1);
+      } else {
+        currentPeriodStart = new Date(contract.effectiveFrom);
+      }
+
+      const cycleDays = contract.billingCycleInDays || 30;
+
+      const currentPeriodEnd = new Date(currentPeriodStart);
+      currentPeriodEnd.setDate(currentPeriodEnd.getDate() + cycleDays - 1);
+
+      const nextDueDate = new Date(currentPeriodEnd);
+      nextDueDate.setDate(nextDueDate.getDate() + 5);
+
+      const billingDateOnly = new Date(
+        currentPeriodEnd.getFullYear(),
+        currentPeriodEnd.getMonth(),
+        currentPeriodEnd.getDate(),
+      );
+      const nextDueDateOnly = new Date(
+        nextDueDate.getFullYear(),
+        nextDueDate.getMonth(),
+        nextDueDate.getDate(),
+      );
+
+      const diffMs = nextDueDateOnly.getTime() - todayDateOnly.getTime();
+      const diffDays = Math.round(diffMs / (24 * 60 * 60 * 1000));
+
+      const diffBillingMs = billingDateOnly.getTime() - todayDateOnly.getTime();
+      const diffBillingDays = Math.round(diffBillingMs / (24 * 60 * 60 * 1000));
+
+      if (diffDays === 2 || diffBillingDays === 2) {
+        const customer = await getCustomerDetails(contract.customerId);
+        const customerEmail =
+          customer?.email ||
+          ((contract as unknown as Record<string, unknown>).customerEmail as string);
+        const customerName = customer
+          ? `${customer.firstName} ${customer.lastName || ''}`.trim()
+          : ((contract as unknown as Record<string, unknown>).customerName as string) || 'Customer';
+
+        const amount =
+          contract.saleType === 'RENT'
+            ? Number(contract.monthlyRent || 0)
+            : Number(contract.monthlyLeaseAmount || 0);
+
+        const targetDateStr =
+          diffDays === 2 ? nextDueDateOnly.toDateString() : billingDateOnly.toDateString();
+
+        const emailBody = `Dear ${customerName},\n\nThis is a reminder that your upcoming billing/due date for Contract #${contract.invoiceNumber} is in 2 days (on ${targetDateStr}). The due amount is QAR ${amount}.\n\nPlease ensure timely payment.\n\nBest regards,\nXerocare Team`;
+
+        if (customerEmail) {
+          await NotificationPublisher.publishEmailRequest({
+            recipient: customerEmail,
+            subject: `Upcoming Payment Reminder - Contract #${contract.invoiceNumber}`,
+            body: emailBody,
+            invoiceId: contract.id,
+          });
+          logger.info(
+            `[CRON] Sent payment due reminder email to customer ${customerEmail} for contract ${contract.invoiceNumber}`,
+          );
+        }
+
+        // Trigger system notification
+        const branchResult = await Source.query(
+          `SELECT manager_id FROM branches WHERE id = $1 LIMIT 1`,
+          [contract.branchId],
+        );
+        const managerId = branchResult?.[0]?.manager_id;
+        if (managerId) {
+          await NotificationPublisher.publishInAppRequest({
+            recipientId: managerId,
+            title: 'Upcoming Contract Billing Reminder',
+            message: `Contract ${contract.invoiceNumber} for Customer ${customerName} has billing due in 2 days.`,
+            type: 'INFO',
+            referenceId: contract.id,
+            referenceType: 'CONTRACT',
+          });
+        }
+        if (contract.customerId) {
+          await NotificationPublisher.publishInAppRequest({
+            recipientId: contract.customerId,
+            title: 'Upcoming Bill Reminder',
+            message: `Your billing for Contract ${contract.invoiceNumber} is due in 2 days.`,
+            type: 'INFO',
+            referenceId: contract.id,
+            referenceType: 'CONTRACT',
+          });
+        }
+      }
+    }
+
+    // Process Opening Balance Entries
+    try {
+      const { OpeningBalanceEntry, BalanceType } =
+        await import('../entities/openingBalanceEntryEntity');
+      const entryRepo = Source.getRepository(OpeningBalanceEntry);
+
+      const activeEntries = await entryRepo.find({
+        where: [
+          { balanceType: BalanceType.RENT_CONTRACT, isFullySettled: false },
+          { balanceType: BalanceType.LEASE_CONTRACT, isFullySettled: false },
+        ],
+        relations: ['invoice'],
+      });
+
+      logger.info(
+        `[CRON] Found ${activeEntries.length} active opening balance contract(s) to verify.`,
+      );
+
+      for (const entry of activeEntries) {
+        if (!entry.nextPaymentDueDate) continue;
+
+        const nextDueDateOnly = new Date(
+          entry.nextPaymentDueDate.getFullYear(),
+          entry.nextPaymentDueDate.getMonth(),
+          entry.nextPaymentDueDate.getDate(),
+        );
+
+        const diffMs = nextDueDateOnly.getTime() - todayDateOnly.getTime();
+        const diffDays = Math.round(diffMs / (24 * 60 * 60 * 1000));
+
+        // 1. Send reminder if due in 2 days
+        if (diffDays === 2) {
+          const customer = await getCustomerDetails(entry.customerId);
+          const customerEmail = customer?.email;
+          const customerName = customer
+            ? `${customer.firstName} ${customer.lastName || ''}`.trim()
+            : 'Customer';
+
+          const amount = Number(entry.monthlyBillingAmount || 0);
+          const emailBody = `Dear ${customerName},\n\nThis is a reminder that your upcoming billing/due date for your contract migration entry #${entry.entryNumber} is in 2 days (on ${nextDueDateOnly.toDateString()}). The due amount is QAR ${amount}.\n\nPlease ensure timely payment.\n\nBest regards,\nXerocare Team`;
+
+          if (customerEmail) {
+            await NotificationPublisher.publishEmailRequest({
+              recipient: customerEmail,
+              subject: `Upcoming Payment Reminder - Migration Contract #${entry.entryNumber}`,
+              body: emailBody,
+              invoiceId: entry.invoiceId,
+            });
+            logger.info(
+              `[CRON] Sent payment due reminder email for opening balance entry ${entry.entryNumber}`,
+            );
+          }
+
+          // Trigger system notification to branch manager/finance
+          const branchResult = await Source.query(
+            `SELECT manager_id FROM branches WHERE id = $1 LIMIT 1`,
+            [entry.branchId],
+          );
+          const managerId = branchResult?.[0]?.manager_id;
+          if (managerId) {
+            await NotificationPublisher.publishInAppRequest({
+              recipientId: managerId,
+              title: 'Upcoming Migration Contract Billing Reminder',
+              message: `Migration Contract ${entry.entryNumber} for Customer ${customerName} has billing due in 2 days.`,
+              type: 'INFO',
+              referenceId: entry.id,
+              referenceType: 'OPENING_BALANCE',
+            });
+          }
+        }
+
+        // 2. If today >= nextDueDate, advance nextPaymentDueDate by billingCycleInDays
+        // and decrement monthsRemaining / increment monthsCompleted.
+        if (todayDateOnly >= nextDueDateOnly) {
+          const cycleDays = entry.billingCycleInDays || 30;
+          const newDueDate = new Date(nextDueDateOnly);
+          newDueDate.setDate(newDueDate.getDate() + cycleDays);
+          entry.nextPaymentDueDate = newDueDate;
+
+          if (entry.totalContractMonths && entry.monthsCompleted !== undefined) {
+            entry.monthsCompleted += 1;
+            entry.monthsRemaining = Math.max(0, entry.totalContractMonths - entry.monthsCompleted);
+            entry.remainingContractValue =
+              (entry.monthlyBillingAmount || 0) * entry.monthsRemaining;
+
+            // Check if contract has fully completed all its months
+            if (entry.monthsCompleted >= entry.totalContractMonths) {
+              entry.isFullySettled = true;
+            }
+          }
+
+          await entryRepo.save(entry);
+          logger.info(
+            `[CRON] Advanced opening balance entry ${entry.entryNumber} due date to ${newDueDate.toDateString()} (billing cycle: ${cycleDays} days). Remaining contract months: ${entry.monthsRemaining}`,
+          );
+        }
+      }
+    } catch (innerErr) {
+      logger.error('[CRON] Failed processing opening balance entry reminders:', innerErr);
+    }
+
+    logger.info('[CRON] Rent & Lease Due Reminder Job completed.');
+  } catch (error) {
+    logger.error('[CRON] Rent & Lease Due Reminder Job failed:', error);
+  }
+}
+
+export function startReminderCronJobs() {
+  logger.info('[CRON] Initializing payment and due reminder cron jobs using node-cron...');
+
+  // 1. Sale Invoice Reminder (Monthly): Run at 9:00 AM on the 1st of every month
+  cron.schedule('0 9 1 * *', () => {
+    saleInvoiceReminderJob();
+  });
+
+  // 2. Rent & Lease Due Reminder (Daily): Run at 9:00 AM daily
+  cron.schedule('0 9 * * *', () => {
+    rentLeaseDueReminderJob();
+  });
 }

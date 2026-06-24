@@ -44,6 +44,7 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { ProductSelect, SelectableItem } from '@/components/invoice/ProductSelect';
 import { Product } from '@/lib/product';
+import { SparePart } from '@/lib/spare-part';
 import {
   createQuotationTemplate,
   getQuotationTemplates,
@@ -909,6 +910,7 @@ interface SaleItem {
   hsCode?: string;
   itemType: 'PRODUCT' | 'SPAREPART';
   isEditable: boolean;
+  availableStock?: number;
   bwIncludedLimit?: number;
   colorIncludedLimit?: number;
   combinedIncludedLimit?: number;
@@ -1114,6 +1116,27 @@ function QuotationTemplateFormModal({
     }
   }, [leaseTenureMonths, totalLeaseAmount]);
 
+  const selectedQuantities = React.useMemo(() => {
+    const map: Record<string, number> = {};
+    saleItems.forEach((it) => {
+      if (it.productId) {
+        map[it.productId] = (map[it.productId] || 0) + it.quantity;
+      }
+    });
+    return map;
+  }, [saleItems]);
+
+  const [activeItemTab, setActiveItemTab] = React.useState<'PRODUCT' | 'SPAREPART'>('PRODUCT');
+
+  // Synchronize activeItemTab with selectedLayoutCategory
+  React.useEffect(() => {
+    if (selectedLayoutCategory === 'spareparts') {
+      setActiveItemTab('SPAREPART');
+    } else {
+      setActiveItemTab('PRODUCT');
+    }
+  }, [selectedLayoutCategory]);
+
   // ── Sale item helpers ────────────────────────────────────────────────────
   const addItem = (item: SelectableItem) => {
     let description = '',
@@ -1121,14 +1144,66 @@ function QuotationTemplateFormModal({
       maxDiscount = 0,
       itemType: 'PRODUCT' | 'SPAREPART' = 'PRODUCT';
 
-    const pr = item as Product;
-    description = pr.name || pr.description || pr.model?.description || 'Product';
+    const isSpare = 'part_name' in item;
+    let productId: string | undefined = undefined;
+    let modelId: string | undefined = undefined;
+    let availableStock = 1;
 
-    basePrice = pr.sale_price || 0;
-    maxDiscount = pr.max_discount_amount || 0;
-    const productId = pr.id;
-    const modelId = pr.model?.id;
-    itemType = 'PRODUCT';
+    if (isSpare) {
+      const sp = item as unknown as SparePart & { quantity?: number };
+      description = sp.part_name || sp.description || 'Spare Part';
+      basePrice = Number(sp.base_price) || 0;
+      maxDiscount = sp.maxDiscountableAmount || 0;
+      productId = sp.id;
+      modelId = sp.model_id;
+      itemType = 'SPAREPART';
+      availableStock = typeof sp.quantity === 'number' ? sp.quantity : 999999;
+    } else {
+      const pr = item as Product;
+      description = pr.name || pr.description || pr.model?.description || 'Product';
+      basePrice = pr.sale_price || 0;
+      maxDiscount = pr.max_discount_amount || 0;
+      productId = pr.id;
+      modelId = pr.model?.id;
+      itemType = 'PRODUCT';
+      const isAvailable = !pr.product_status || pr.product_status === 'AVAILABLE';
+      if (!isAvailable) {
+        availableStock = 0;
+      } else {
+        availableStock =
+          typeof (pr as unknown as { stock?: number }).stock === 'number'
+            ? (pr as unknown as { stock?: number }).stock!
+            : 1;
+      }
+    }
+
+    const existingIdx = saleItems.findIndex(
+      (existing) =>
+        !existing.isManual && existing.productId === productId && existing.itemType === itemType,
+    );
+
+    if (existingIdx > -1) {
+      const currentQty = saleItems[existingIdx].quantity;
+      if (currentQty >= availableStock) {
+        toast.error(`Cannot add more. Only ${availableStock} item(s) available in inventory.`);
+        return;
+      }
+      setSaleItems((prev) => {
+        const updated = [...prev];
+        updated[existingIdx] = {
+          ...updated[existingIdx],
+          quantity: updated[existingIdx].quantity + 1,
+        };
+        return updated;
+      });
+      toast.success(`Incremented quantity for ${description}`);
+      return;
+    }
+
+    if (availableStock <= 0) {
+      toast.error(`Item is out of stock.`);
+      return;
+    }
 
     setSaleItems((prev) => [
       ...prev,
@@ -1144,6 +1219,7 @@ function QuotationTemplateFormModal({
         modelId,
         itemType,
         isEditable: !productId || basePrice === 0,
+        availableStock,
         bwSlabRanges: [],
         colorSlabRanges: [],
         comboSlabRanges: [],
@@ -1186,23 +1262,55 @@ function QuotationTemplateFormModal({
       const item = { ...copy[i] };
 
       if (field === 'quantity') {
-        item.quantity = Math.max(1, Number(val));
-      } else if (field === 'discount') {
-        let disc = Math.max(0, Number(val));
-        if (item.maxDiscount > 0 && disc > item.maxDiscount) {
-          toast.warning(`Maximum discount allowed is QAR ${item.maxDiscount}`);
-          disc = item.maxDiscount;
+        const reqQty = Math.max(1, Number(val));
+        const limit = typeof item.availableStock === 'number' ? item.availableStock : 999999;
+        let qty = reqQty;
+        if (reqQty > limit) {
+          toast.error(`Cannot set quantity to ${reqQty}. Only ${limit} available in inventory.`);
+          qty = limit;
         }
-        if (disc > item.basePrice) {
-          toast.error('Discount cannot exceed price');
-          disc = item.basePrice;
+        item.quantity = qty;
+
+        const maxAllowed = (item.maxDiscount || 0) * qty;
+        let disc = item.discount || 0;
+        if (maxAllowed > 0 && disc > maxAllowed) {
+          disc = maxAllowed;
+        }
+        const totalBase = item.basePrice * qty;
+        if (disc > totalBase) {
+          disc = totalBase;
         }
         item.discount = disc;
-        item.unitPrice = item.basePrice - disc;
+        item.unitPrice = item.basePrice - disc / qty;
+      } else if (field === 'discount') {
+        let disc = Math.max(0, Number(val));
+        const maxAllowed = (item.maxDiscount || 0) * item.quantity;
+        if (maxAllowed > 0 && disc > maxAllowed) {
+          toast.warning(`Maximum discount allowed is QAR ${maxAllowed}`);
+          disc = maxAllowed;
+        }
+        const totalBase = item.basePrice * item.quantity;
+        if (disc > totalBase) {
+          toast.error('Discount cannot exceed subtotal');
+          disc = totalBase;
+        }
+        item.discount = disc;
+        item.unitPrice = item.basePrice - disc / item.quantity;
       } else if (field === 'basePrice' && item.isEditable) {
         const bp = Number(val);
         item.basePrice = bp;
-        item.unitPrice = bp - item.discount;
+
+        const maxAllowed = (item.maxDiscount || 0) * item.quantity;
+        let disc = item.discount || 0;
+        if (maxAllowed > 0 && disc > maxAllowed) {
+          disc = maxAllowed;
+        }
+        const totalBase = bp * item.quantity;
+        if (disc > totalBase) {
+          disc = totalBase;
+        }
+        item.discount = disc;
+        item.unitPrice = bp - disc / item.quantity;
       } else {
         (item as unknown as Record<string, string | number>)[field as string] = val;
       }
@@ -1323,7 +1431,7 @@ function QuotationTemplateFormModal({
           description: it.description,
           quantity: it.quantity,
           unitPrice: it.basePrice,
-          discount: it.discount,
+          discount: it.discount / it.quantity,
           productId: it.productId,
           modelId: it.modelId,
           itemType: it.itemType,
@@ -1862,8 +1970,15 @@ function QuotationTemplateFormModal({
                 </Button>
               </div>
 
-              <div className="p-3 bg-slate-50 rounded-xl border">
-                <ProductSelect onSelect={addItem} />
+              <div className="p-3 bg-slate-50 rounded-xl border space-y-3">
+                <ProductSelect
+                  onSelect={addItem}
+                  mode={activeItemTab}
+                  selectedQuantities={selectedQuantities}
+                  placeholder={
+                    activeItemTab === 'SPAREPART' ? 'Select Spare Part' : 'Select Product'
+                  }
+                />
               </div>
 
               {/* Items Table */}

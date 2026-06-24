@@ -130,7 +130,7 @@ When a lease ticket is created, the system queries the `billing_service` (`GET /
 ### Phase 4: Repair & Completion
 
 - **Work Commenced**: The technician starts the job. Status updates to `IN_PROGRESS`.
-- **Job Completion**: Once resolved, the technician records `completionNotes` and clicks complete. Status updates to `COMPLETED`.
+- **Job Completion**: Once resolved, the technician records `completionNotes` and clicks complete (digital signatures are no longer required, falling back to a default signed state). Status updates to `COMPLETED`, and the system automatically generates a monthly sequential Service Completion Bill (e.g. `SCB-YYYYMM-XXXX`) saved to `completionBillNumber`.
 - **Inventory Sync**: Upon completion, the backend loops through the items and decrements the used quantity of spare parts from active inventory stock (`SparePart` entity quantity decremented).
 
 ---
@@ -211,6 +211,7 @@ The entities driving service tickets and diagnosis items are structured as follo
 | `scheduledVisitDate`   | `timestamp` | Nullable                                 | Planned site visit date               |
 | `completedAt`          | `timestamp` | Nullable                                 | Completion timestamp                  |
 | `completionNotes`      | `text`      | Nullable                                 | Resolution details                    |
+| `completionBillNumber` | `varchar`   | Nullable (sequential `SCB-YYYYMM-XXXX`)  | Completed bill number reference       |
 
 ### Service Ticket Item (`service_ticket_items` table)
 
@@ -241,18 +242,22 @@ All endpoints check roles to guarantee security and strict operational boundarie
 - **Technician Scope**: Users with the job role `SERVICE_TECHNICIAN` are restricted to tickets where `assignedTechnicianId` matches their user account.
 - **Permissions Directory**:
 
-| Endpoint                                   | Method | Required Roles / Jobs                     | Purpose                                         |
-| :----------------------------------------- | :----- | :---------------------------------------- | :---------------------------------------------- |
-| `/i/service/tickets`                       | `POST` | `SERVICE_HELP_DESK`                       | Register a new service ticket                   |
-| `/i/service/tickets`                       | `GET`  | `SERVICE_HELP_DESK`, `SERVICE_TECHNICIAN` | List tickets (branch/technician scoped)         |
-| `/i/service/tickets/:id`                   | `GET`  | `SERVICE_HELP_DESK`, `SERVICE_TECHNICIAN` | Get details of a single ticket                  |
-| `/i/service/tickets/:id/assign`            | `POST` | `SERVICE_HELP_DESK`                       | Assign tech and scheduled date                  |
-| `/i/service/tickets/:id/diagnose`          | `POST` | `SERVICE_TECHNICIAN`                      | Save inspection notes and parts used            |
-| `/i/service/tickets/:id/quote`             | `POST` | `SERVICE_TECHNICIAN`                      | Submit labor cost and request billing quotation |
-| `/i/service/tickets/:id/customer-approve`  | `POST` | `SERVICE_HELP_DESK`                       | Record customer approval & convert lead         |
-| `/i/service/tickets/:id/customer-reject`   | `POST` | `SERVICE_HELP_DESK`                       | Record customer rejection                       |
-| `/i/service/tickets/:id/start`             | `POST` | `SERVICE_TECHNICIAN`                      | Start repair job & trigger lead convert if free |
-| `/i/service/tickets/:id/complete`          | `POST` | `SERVICE_TECHNICIAN`                      | Finalize ticket & deduct spare parts stock      |
-| `/i/service/tickets/:id/cancel`            | `POST` | `ADMIN`, `MANAGER`                        | Cancel active ticket                            |
-| `/i/service/technicians`                   | `GET`  | `SERVICE_HELP_DESK`, `SERVICE_TECHNICIAN` | List branch technicians for assignment          |
-| `/i/service/customers/:customerId/history` | `GET`  | `SERVICE_HELP_DESK`, `SERVICE_TECHNICIAN` | Retrieve historical tickets & billing context   |
+| Endpoint                                      | Method | Required Roles / Jobs                        | Purpose                                           |
+| :-------------------------------------------- | :----- | :------------------------------------------- | :------------------------------------------------ |
+| `/i/service/tickets`                          | `POST` | `SERVICE_HELP_DESK`                          | Register a new service ticket                     |
+| `/i/service/tickets`                          | `GET`  | `SERVICE_HELP_DESK`, `SERVICE_TECHNICIAN`    | List tickets (branch/technician scoped)           |
+| `/i/service/tickets/:id`                      | `GET`  | `SERVICE_HELP_DESK`, `SERVICE_TECHNICIAN`    | Get details of a single ticket                    |
+| `/i/service/tickets/:id/assign`               | `POST` | `SERVICE_HELP_DESK`                          | Assign tech and scheduled date                    |
+| `/i/service/tickets/:id/diagnose`             | `POST` | `SERVICE_TECHNICIAN`                         | Save inspection notes and parts used              |
+| `/i/service/tickets/:id/quote`                | `POST` | `SERVICE_TECHNICIAN`                         | Submit labor cost and request billing quotation   |
+| `/i/service/tickets/:id/customer-approve`     | `POST` | `SERVICE_HELP_DESK`                          | Record customer approval & convert lead           |
+| `/i/service/tickets/:id/customer-reject`      | `POST` | `SERVICE_HELP_DESK`                          | Record customer rejection                         |
+| `/i/service/tickets/:id/start`                | `POST` | `SERVICE_TECHNICIAN`                         | Start repair job & trigger lead convert if free   |
+| `/i/service/tickets/:id/complete`             | `POST` | `SERVICE_TECHNICIAN`                         | Finalize ticket & deduct spare parts stock        |
+| `/i/service/tickets/:id/cancel`               | `POST` | `ADMIN`, `MANAGER`                           | Cancel active ticket                              |
+| `/i/service/technicians`                      | `GET`  | `SERVICE_HELP_DESK`, `SERVICE_TECHNICIAN`    | List branch technicians for assignment            |
+| `/i/service/customers/:customerId/history`    | `GET`  | `SERVICE_HELP_DESK`, `SERVICE_TECHNICIAN`    | Retrieve historical tickets & billing context     |
+| `/i/service/tickets/:id/quotation-pdf`        | `GET`  | `FINANCE`, `SERVICE_*`, `MANAGER`, `ADMIN`   | Generate and download Service Quotation PDF       |
+| `/i/service/tickets/:id/completion-bill-pdf`  | `GET`  | `FINANCE`, `SERVICE_*`, `MANAGER`, `ADMIN`   | Generate and download Service Completion Bill PDF |
+| `/i/service/tickets/:id/send-quotation`       | `POST` | `FINANCE`, `SERVICE_HELP_DESK`, `MGR`, `ADM` | Share Service Quotation via WhatsApp/Email        |
+| `/i/service/tickets/:id/send-completion-bill` | `POST` | `SERVICE_*`, `MANAGER`, `ADMIN`              | Share Service Completion Bill via WhatsApp/Email  |

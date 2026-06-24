@@ -19,9 +19,18 @@ import {
   AlertTriangle,
   Plus,
   Pencil,
+  Eye,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog';
 import {
   Table,
   TableBody,
@@ -68,6 +77,7 @@ export default function LotDetailsDialog({ lot, onClose, onSuccess }: LotDetails
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showEditPurchaseModal, setShowEditPurchaseModal] = useState(false);
   const [showCostModal, setShowCostModal] = useState(false);
+  const [showItemDetailsModal, setShowItemDetailsModal] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -549,14 +559,12 @@ export default function LotDetailsDialog({ lot, onClose, onSuccess }: LotDetails
                 {(currentLot.items || []).length} Distinct Entries
               </Badge>
             </div>
-            <div className="flex-1 overflow-auto">
+            <div className="flex-1 overflow-x-hidden overflow-y-auto">
               <Table>
                 <TableHeader className="bg-slate-50/50 sticky top-0 z-10">
                   <TableRow className="hover:bg-transparent">
-                    <TableHead className="w-[100px]">Type</TableHead>
+                    <TableHead className="w-[85px]">Type</TableHead>
                     <TableHead>Item Name</TableHead>
-                    <TableHead>MPN</TableHead>
-                    <TableHead>Item Model</TableHead>
                     <TableHead className="text-right">Expected</TableHead>
                     <TableHead className="text-right">
                       {isReceiving ? 'Received' : 'Rec.'}
@@ -610,28 +618,6 @@ export default function LotDetailsDialog({ lot, onClose, onSuccess }: LotDetails
                               </span>
                             )}
                           </div>
-                        </TableCell>
-                        <TableCell>
-                          <span className="text-xs font-mono text-blue-600 font-medium">
-                            {item.sparePart?.mpn || item.mpn || '—'}
-                          </span>
-                        </TableCell>
-                        {/* Item Model column */}
-                        <TableCell>
-                          {item.itemType === LotItemType.MODEL ? (
-                            <div className="flex flex-col">
-                              <span className="text-sm font-medium">
-                                {item.model?.model_name || '—'}
-                              </span>
-                              {item.model?.model_no && (
-                                <span className="text-[10px] text-slate-400 font-mono">
-                                  {item.model.model_no}
-                                </span>
-                              )}
-                            </div>
-                          ) : (
-                            <span className="text-slate-300">—</span>
-                          )}
                         </TableCell>
                         <TableCell className="text-right text-slate-400 font-medium">
                           {item.expectedQuantity}
@@ -761,10 +747,21 @@ export default function LotDetailsDialog({ lot, onClose, onSuccess }: LotDetails
                   </Button>
                 )}
               </div>
-              <div className="text-sm">
-                Items Total:{' '}
-                <span className="font-bold text-primary text-base">
-                  {formatCurrency(itemsTotal)}
+              <div className="text-sm flex items-center gap-1.5 font-medium">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-slate-400 hover:text-primary hover:bg-slate-100 transition-colors"
+                  onClick={() => setShowItemDetailsModal(true)}
+                  title="View Item Details"
+                >
+                  <Eye size={16} />
+                </Button>
+                <span>
+                  Items Total:{' '}
+                  <span className="font-bold text-primary text-base">
+                    {formatCurrency(itemsTotal)}
+                  </span>
                 </span>
               </div>
             </div>
@@ -1066,6 +1063,86 @@ export default function LotDetailsDialog({ lot, onClose, onSuccess }: LotDetails
             </div>
           </Card>
         </div>
+      )}
+      {/* Detailed Item View Modal */}
+      {showItemDetailsModal && (
+        <Dialog open={showItemDetailsModal} onOpenChange={setShowItemDetailsModal}>
+          <DialogContent className="bg-white p-6 sm:p-8 rounded-[2rem] max-w-[95vw] sm:max-w-[90vw] border-none shadow-2xl overflow-y-auto max-h-[85vh]">
+            <DialogHeader className="mb-4">
+              <DialogTitle className="text-xl font-bold text-slate-800">
+                Purchased Items Detailed View
+              </DialogTitle>
+              <DialogDescription className="text-slate-500 text-sm">
+                Full specifications, MPN, models, and received statuses for all items in Lot{' '}
+                {currentLot.lotNumber}.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="overflow-x-hidden border rounded-xl">
+              <Table>
+                <TableHeader className="bg-slate-50">
+                  <TableRow>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Item Name</TableHead>
+                    <TableHead>SKU</TableHead>
+                    <TableHead>MPN</TableHead>
+                    <TableHead>Item Model</TableHead>
+                    <TableHead className="text-right">Expected</TableHead>
+                    <TableHead className="text-right">Received</TableHead>
+                    <TableHead className="text-right">Damaged</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {(currentLot.items || []).map((item) => (
+                    <TableRow key={item.id} className="hover:bg-slate-50/50">
+                      <TableCell>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase">
+                          {item.itemType === LotItemType.MODEL ? 'Product' : 'Spare'}
+                        </span>
+                      </TableCell>
+                      <TableCell className="font-semibold text-slate-800 text-sm">
+                        {item.itemType === LotItemType.MODEL
+                          ? item.customProductName || item.model?.model_name || 'Unnamed Product'
+                          : item.sparePart?.part_name ||
+                            item.customSparePartName ||
+                            'Unnamed Spare'}
+                      </TableCell>
+                      <TableCell className="font-mono text-xs text-slate-500">
+                        {item.sparePart?.sku || '—'}
+                      </TableCell>
+                      <TableCell className="font-mono text-xs text-blue-600 font-medium">
+                        {item.sparePart?.mpn || item.mpn || '—'}
+                      </TableCell>
+                      <TableCell className="text-sm text-slate-600">
+                        {item.itemType === LotItemType.MODEL ? item.model?.model_name || '—' : '—'}
+                      </TableCell>
+                      <TableCell className="text-right font-medium text-slate-600">
+                        {item.expectedQuantity}
+                      </TableCell>
+                      <TableCell className="text-right font-bold text-slate-900">
+                        {item.receivedQuantity}
+                      </TableCell>
+                      <TableCell
+                        className={`text-right font-bold ${item.damagedQuantity > 0 ? 'text-red-500' : 'text-slate-300'}`}
+                      >
+                        {item.damagedQuantity}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+
+            <DialogFooter className="mt-6">
+              <Button
+                onClick={() => setShowItemDetailsModal(false)}
+                className="bg-primary hover:bg-primary/90 text-white rounded-xl px-6"
+              >
+                Close
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       )}
     </div>
   );

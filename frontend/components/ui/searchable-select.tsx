@@ -52,13 +52,13 @@ export function SearchableSelect({
 
   const filteredOptions = options.filter((option) => {
     const searchStr = searchQuery.toLowerCase();
-    const labelStr = (
-      option.searchText || (typeof option.label === 'string' ? option.label : '')
-    ).toLowerCase();
+    const labelStr = String(option.label || '').toLowerCase();
+    const valueStr = String(option.value || '').toLowerCase();
+    const descStr = option.description ? String(option.description).toLowerCase() : '';
     return (
       labelStr.includes(searchStr) ||
-      option.value.toLowerCase().includes(searchStr) ||
-      (option.description && option.description.toLowerCase().includes(searchStr))
+      valueStr.includes(searchStr) ||
+      (descStr && descStr.includes(searchStr))
     );
   });
 
