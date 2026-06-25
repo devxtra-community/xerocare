@@ -133,6 +133,13 @@ export interface Invoice {
   discountAmount?: number;
   effectiveFrom?: string;
   effectiveTo?: string;
+  // Warranty
+  warrantyType?: 'none' | 'duration' | 'copies';
+  warrantyDurationValue?: number;
+  warrantyDurationUnit?: 'months' | 'years';
+  warrantyCopyLimit?: number;
+  warrantyEmailSent?: boolean;
+  warrantyExpiryEmailSent?: boolean;
   notes?: string;
   createdAt: string;
   employeeName: string;
@@ -315,6 +322,13 @@ export interface CreateInvoicePayload {
   discountAmount?: number;
   effectiveFrom?: string;
   effectiveTo?: string;
+
+  // Warranty
+  warrantyType?: 'none' | 'duration' | 'copies';
+  warrantyDurationValue?: number;
+  warrantyDurationUnit?: 'months' | 'years';
+  warrantyCopyLimit?: number;
+
   pricingItems?: {
     description: string;
     bwIncludedLimit?: number;

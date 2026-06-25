@@ -41,6 +41,10 @@ export interface LeaseAgreementDetails {
   endDate: string;
   monthlyEmi: number;
   totalLeaseValue?: number;
+  warrantyType?: 'none' | 'duration' | 'copies';
+  warrantyDurationValue?: number;
+  warrantyDurationUnit?: 'months' | 'years';
+  warrantyCopyLimit?: number;
 }
 
 export interface LeasePremiumQuotationProps {
@@ -822,6 +826,107 @@ const LeasePremiumQuotation: React.FC<LeasePremiumQuotationProps> = ({
                 </div>
               ),
           )}
+        </div>
+      )}
+
+      {/* ─── 06. GLOBAL WARRANTY (Premium) ─── */}
+      {leaseDetails.warrantyType && leaseDetails.warrantyType !== 'none' && (
+        <div style={{ padding: '20px 60px' }}>
+          <div
+            style={{
+              fontSize: '10px',
+              color: ACCENT_COLOR,
+              fontWeight: '800',
+              textTransform: 'uppercase',
+              letterSpacing: '2px',
+              marginBottom: '15px',
+            }}
+          >
+            Elite Protection Program
+          </div>
+          <div
+            style={{
+              background: `linear-gradient(135deg, ${CARD_GRAY} 0%, #252830 100%)`,
+              padding: '30px',
+              borderRadius: '20px',
+              border: '1px solid rgba(197, 160, 89, 0.2)',
+              position: 'relative',
+              overflow: 'hidden',
+            }}
+          >
+            {/* Subtle gloss effect */}
+            <div
+              style={{
+                position: 'absolute',
+                top: 0,
+                right: 0,
+                width: '100px',
+                height: '100%',
+                background: 'linear-gradient(to left, rgba(197,160,89,0.05), transparent)',
+              }}
+            />
+            <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+              <div
+                style={{
+                  width: '50px',
+                  height: '50px',
+                  borderRadius: '15px',
+                  backgroundColor: 'rgba(197, 160, 89, 0.1)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '24px',
+                }}
+              >
+                🛡️
+              </div>
+              <div>
+                <div
+                  style={{
+                    fontSize: '18px',
+                    fontWeight: '800',
+                    color: '#fff',
+                    marginBottom: '4px',
+                  }}
+                >
+                  Coverage Type:{' '}
+                  {leaseDetails.warrantyType === 'duration'
+                    ? 'Full Term Duration'
+                    : 'Copy Count Based'}
+                </div>
+                <div style={{ fontSize: '14px', color: TEXT_MUTED, lineHeight: '1.6' }}>
+                  {leaseDetails.warrantyType === 'duration' ? (
+                    <>
+                      Comprehensive maintenance and replacement coverage for{' '}
+                      <span style={{ color: ACCENT_COLOR, fontWeight: '800' }}>
+                        {leaseDetails.warrantyDurationValue} {leaseDetails.warrantyDurationUnit}
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      Elite service and parts coverage active until{' '}
+                      <span style={{ color: ACCENT_COLOR, fontWeight: '800' }}>
+                        {leaseDetails.warrantyCopyLimit?.toLocaleString()} copies
+                      </span>
+                    </>
+                  )}
+                  <div
+                    style={{
+                      marginTop: '12px',
+                      fontSize: '11px',
+                      opacity: 0.8,
+                      fontStyle: 'italic',
+                    }}
+                  >
+                    * Technical support and replacement parts are provided free of charge during the
+                    warranty period specified above. After the warranty period expires, or once the
+                    applicable usage limit is reached, all technical support services, spare parts,
+                    repairs, and related charges will be billable at the prevailing rates.
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 

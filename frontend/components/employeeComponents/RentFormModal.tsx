@@ -87,6 +87,11 @@ export default function RentFormModal({
     totalLeaseAmount: string;
     monthlyEmiAmount: string;
     monthlyLeaseAmount: string;
+    // Warranty
+    warrantyType: 'none' | 'duration' | 'copies';
+    warrantyDurationValue: string;
+    warrantyDurationUnit: 'months' | 'years';
+    warrantyCopyLimit: string;
     pricingItems: PricingItem[];
   }>({
     customerId: initialData?.customerId || '',
@@ -115,6 +120,15 @@ export default function RentFormModal({
       initialData?.monthlyEmiAmount !== undefined ? String(initialData.monthlyEmiAmount) : '',
     monthlyLeaseAmount:
       initialData?.monthlyLeaseAmount !== undefined ? String(initialData.monthlyLeaseAmount) : '',
+    // Warranty
+    warrantyType: (initialData?.warrantyType as 'none' | 'duration' | 'copies') || 'none',
+    warrantyDurationValue:
+      initialData?.warrantyDurationValue !== undefined
+        ? String(initialData.warrantyDurationValue)
+        : '',
+    warrantyDurationUnit: (initialData?.warrantyDurationUnit as 'months' | 'years') || 'months',
+    warrantyCopyLimit:
+      initialData?.warrantyCopyLimit !== undefined ? String(initialData.warrantyCopyLimit) : '',
     pricingItems: (() => {
       if (!initialData) {
         // Default for NEW invoice
@@ -593,6 +607,15 @@ export default function RentFormModal({
           discountPercent: cleanNumber(form.discountPercent),
           advanceAmount: cleanNumber(form.advanceAmount),
 
+          // Warranty (Top Level)
+          warrantyType: form.warrantyType,
+          warrantyDurationValue:
+            form.warrantyType === 'duration' ? cleanNumber(form.warrantyDurationValue) : undefined,
+          warrantyDurationUnit:
+            form.warrantyType === 'duration' ? form.warrantyDurationUnit : undefined,
+          warrantyCopyLimit:
+            form.warrantyType === 'copies' ? cleanNumber(form.warrantyCopyLimit) : undefined,
+
           items: selectedModels.flatMap((m) => {
             const prefix = m.product_name || m.brandRelation?.name;
             const baseDesc = prefix ? `${prefix} ${m.model_name}` : m.model_name;
@@ -797,6 +820,11 @@ export default function RentFormModal({
   ) => {
     const newItems = [...form.pricingItems];
     const currentSlabs = newItems[index][type] || [];
+    // Block adding a new slab if the last one is already UNLIMITED
+    if (currentSlabs.length > 0) {
+      const lastTo = Number(currentSlabs[currentSlabs.length - 1].to);
+      if (lastTo >= 999999) return; // already unlimited – cannot add more
+    }
     newItems[index][type] = [...currentSlabs, { from: '', to: '', rate: '' }];
     setForm({ ...form, pricingItems: newItems });
   };
@@ -821,7 +849,14 @@ export default function RentFormModal({
   ) => {
     const newItems = [...form.pricingItems];
     const currentSlabs = newItems[itemIndex][type] || [];
-    currentSlabs[slabIndex] = { ...currentSlabs[slabIndex], [field]: value };
+    const updatedSlab = { ...currentSlabs[slabIndex], [field]: value };
+
+    // AUTO-UNLIMITED LOGIC: If FROM is > 100,000, set TO to 999999 (Unlimited)
+    if (field === 'from' && Number(value) > 100000) {
+      updatedSlab.to = '999999';
+    }
+
+    currentSlabs[slabIndex] = updatedSlab;
     newItems[itemIndex][type] = currentSlabs;
     setForm({ ...form, pricingItems: newItems });
   };
@@ -1259,7 +1294,123 @@ export default function RentFormModal({
             </div>
           </section>
 
-          {/* Section 4: Rules (Moved Down) */}
+          {/* Section 4: Warranty (Specific to Lease) */}
+          {form.saleType === 'LEASE' && (
+            <section className="space-y-4">
+              <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-emerald-400" /> Warranty Details
+              </h4>
+              <div className="p-5 rounded-xl bg-card border border-slate-100 shadow-sm space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Warranty Type Selection */}
+                  <div className="space-y-2">
+                    <label className="text-[11px] font-bold text-muted-foreground uppercase">
+                      Warranty Type <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      className="w-full h-10 rounded-lg border border-border bg-card px-3 text-sm font-semibold text-slate-700 focus:ring-2 focus:ring-blue-100 outline-none"
+                      value={form.warrantyType}
+                      onChange={(e) =>
+                        setForm({
+                          ...form,
+                          warrantyType: e.target.value as 'none' | 'duration' | 'copies',
+                        })
+                      }
+                    >
+                      <option value="none">None</option>
+                      <option value="duration">By Duration</option>
+                      <option value="copies">By Count of Copies</option>
+                    </select>
+                  </div>
+
+                  {/* Conditional Duration Input */}
+                  {form.warrantyType === 'duration' && (
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <label className="text-[11px] font-bold text-muted-foreground uppercase">
+                          Warranty Duration
+                        </label>
+                        <Input
+                          type="number"
+                          placeholder="e.g. 6"
+                          value={form.warrantyDurationValue}
+                          onChange={(e) =>
+                            setForm({
+                              ...form,
+                              warrantyDurationValue: handleNumberInput(e.target.value),
+                            })
+                          }
+                          className="font-bold"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[11px] font-bold text-muted-foreground uppercase">
+                          Unit
+                        </label>
+                        <select
+                          className="w-full h-10 rounded-lg border border-border bg-card px-3 text-sm font-semibold text-slate-700 focus:ring-2 focus:ring-blue-100 outline-none"
+                          value={form.warrantyDurationUnit}
+                          onChange={(e) =>
+                            setForm({
+                              ...form,
+                              warrantyDurationUnit: e.target.value as 'months' | 'years',
+                            })
+                          }
+                        >
+                          <option value="months">Months</option>
+                          <option value="years">Years</option>
+                        </select>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Conditional Copies Input */}
+                  {form.warrantyType === 'copies' && (
+                    <div className="space-y-2">
+                      <label className="text-[11px] font-bold text-muted-foreground uppercase">
+                        Warranty Copy Limit
+                      </label>
+                      <Input
+                        type="number"
+                        placeholder="e.g. 6000"
+                        value={form.warrantyCopyLimit}
+                        onChange={(e) =>
+                          setForm({ ...form, warrantyCopyLimit: handleNumberInput(e.target.value) })
+                        }
+                        className="font-bold"
+                      />
+                      <p className="text-[10px] text-muted-foreground italic font-medium">
+                        Warranty valid up to {form.warrantyCopyLimit || 'X'} copies
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Constant Warranty Note (Visual only when not None) */}
+                {form.warrantyType !== 'none' && (
+                  <div className="p-4 rounded-lg bg-amber-50 border border-amber-100 flex gap-3">
+                    <div className="h-5 w-5 bg-amber-200 rounded-full flex items-center justify-center shrink-0 mt-0.5">
+                      <span className="text-[10px] font-bold text-amber-700">!</span>
+                    </div>
+                    <div>
+                      <p className="text-[11px] font-bold text-amber-900 mb-1 uppercase tracking-wider">
+                        Important Warranty Note
+                      </p>
+                      <p className="text-[11px] text-amber-800 leading-relaxed font-medium">
+                        Upon expiration of the warranty period, complimentary technical support,
+                        maintenance services, and replacement parts will no longer be provided. Any
+                        technical assistance, repair services, replacement components, or related
+                        support requested after the warranty period will be subject to applicable
+                        service charges and parts costs at the prevailing rates.
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </section>
+          )}
+
+          {/* Section 5: Rules */}
           {(form.saleType === 'RENT' ||
             (form.saleType === 'LEASE' && form.leaseType === 'FSM')) && (
             <section className="space-y-4">
@@ -1428,18 +1579,19 @@ export default function RentFormModal({
                                 />
                                 <Input
                                   placeholder="To"
-                                  type="number"
-                                  value={slab.to}
-                                  onChange={(e) =>
+                                  type={slab.to === '999999' ? 'text' : 'number'}
+                                  value={slab.to === '999999' ? '∞' : slab.to}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
                                     handleUpdateSlab(
                                       index,
                                       slabType,
                                       sIdx,
                                       'to',
-                                      handleNumberInput(e.target.value),
-                                    )
-                                  }
-                                  className="h-7 text-xs"
+                                      val === '∞' ? '999999' : handleNumberInput(val),
+                                    );
+                                  }}
+                                  className="h-7 text-xs font-semibold"
                                 />
                                 <Input
                                   placeholder="Rate"

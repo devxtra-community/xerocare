@@ -470,9 +470,79 @@ const RentNormalQuotation: React.FC<RentNormalQuotationProps> = ({
                     )}
                   </div>
                 </td>
-                <td style={tdStyle()}>{item.qty}</td>
-                <td style={tdStyle()}>{item.limit}</td>
-                <td style={{ ...tdStyle('right') }}>{item.excessRate || 'N/A'}</td>
+                <td
+                  colSpan={3}
+                  style={{
+                    padding: 0,
+                    verticalAlign: 'top',
+                    height: '1px',
+                  }}
+                >
+                  <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+                    <div
+                      style={{
+                        display: 'flex',
+                        color: '#111',
+                        borderBottom: item.productImage ? '1px solid #eee' : 'none',
+                      }}
+                    >
+                      <div
+                        style={{
+                          flex: 1,
+                          padding: '12px 10px',
+                          textAlign: 'center',
+                          fontSize: '12px',
+                        }}
+                      >
+                        {item.qty}
+                      </div>
+                      <div
+                        style={{
+                          flex: 1,
+                          padding: '12px 10px',
+                          textAlign: 'center',
+                          fontSize: '12px',
+                        }}
+                      >
+                        {item.limit}
+                      </div>
+                      <div
+                        style={{
+                          flex: 1,
+                          padding: '12px 10px',
+                          textAlign: 'right',
+                          fontSize: '12px',
+                        }}
+                      >
+                        {item.excessRate || 'N/A'}
+                      </div>
+                    </div>
+                    {/* Product image filling the remaining vertical space */}
+                    {item.productImage && (
+                      <div
+                        style={{
+                          width: '100%',
+                          padding: '10px',
+                          flexGrow: 1,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}
+                      >
+                        <img
+                          src={item.productImage}
+                          alt="Product"
+                          style={{
+                            width: '100%',
+                            height: '100%',
+                            objectFit: 'contain',
+                            display: 'block',
+                          }}
+                        />
+                      </div>
+                    )}
+                  </div>
+                </td>
               </tr>
             ))}
           </tbody>
@@ -676,6 +746,77 @@ const RentNormalQuotation: React.FC<RentNormalQuotationProps> = ({
                           </table>
                         </div>
                       )}
+                      {/* Combined Slabs */}
+                      {item.comboSlabs && item.comboSlabs.length > 0 && (
+                        <div>
+                          <div
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '8px',
+                              marginBottom: '8px',
+                            }}
+                          >
+                            <div
+                              style={{
+                                width: '8px',
+                                height: '8px',
+                                background: 'linear-gradient(to right,#10b981,#3b82f6)',
+                                borderRadius: '2px',
+                              }}
+                            />
+                            <span style={{ fontSize: '10px', fontWeight: '300', color: '#1e293b' }}>
+                              COMBINED RATE TABLE (B&W + COLOR)
+                            </span>
+                          </div>
+                          <table
+                            style={{ width: '100%', fontSize: '11px', borderCollapse: 'collapse' }}
+                          >
+                            <thead>
+                              <tr
+                                style={{
+                                  color: '#64748b',
+                                  textAlign: 'left',
+                                  borderBottom: '1px solid #e2e8f0',
+                                }}
+                              >
+                                <th style={{ padding: '6px 0', fontWeight: '300' }}>Page Range</th>
+                                <th
+                                  style={{
+                                    padding: '6px 0',
+                                    textAlign: 'right',
+                                    fontWeight: '300',
+                                  }}
+                                >
+                                  Rate
+                                </th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {item.comboSlabs.map((s, i) => (
+                                <tr key={i} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                                  <td style={{ padding: '6px 0', color: '#334155' }}>
+                                    {s.from.toLocaleString()} –{' '}
+                                    {Number(s.to) === 0 || s.to >= 999999
+                                      ? 'UNLIMITED'
+                                      : s.to.toLocaleString()}
+                                  </td>
+                                  <td
+                                    style={{
+                                      padding: '6px 0',
+                                      textAlign: 'right',
+                                      fontWeight: '300',
+                                      color: '#059669',
+                                    }}
+                                  >
+                                    QAR {Number(s.rate || 0).toFixed(3)}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
                     </div>
                   </div>
                 ),
@@ -741,28 +882,12 @@ const RentNormalQuotation: React.FC<RentNormalQuotationProps> = ({
       <div
         style={{
           display: 'flex',
-          justifyContent: lineItems?.[0]?.productImage ? 'space-between' : 'flex-end',
+          justifyContent: 'flex-end',
           alignItems: 'stretch',
           marginBottom: '32px',
           minHeight: '1px',
         }}
       >
-        {lineItems?.[0]?.productImage && (
-          <div style={{ flex: 1, paddingRight: '20px', display: 'flex', alignItems: 'flex-end' }}>
-            <img
-              src={lineItems[0].productImage}
-              alt="Product"
-              style={{
-                maxWidth: '600px',
-                height: '100%',
-                maxHeight: '600px',
-                objectFit: 'contain',
-                filter: 'grayscale(100%)',
-                opacity: 0.8,
-              }}
-            />
-          </div>
-        )}
         <div style={{ width: '250px' }}>
           {[
             { label: 'Subtotal', value: totals.subTotal, num: totals.subTotal },

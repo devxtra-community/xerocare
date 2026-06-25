@@ -19,6 +19,8 @@ import { ContractStatus } from './enums/contractStatus';
 import { ProductAllocation } from './productAllocationEntity';
 import { BillType } from './enums/billType';
 import { CreditNote } from './creditNoteEntity';
+import { WarrantyType } from './enums/warrantyType';
+import { WarrantyDurationUnit } from './enums/warrantyDurationUnit';
 
 export enum SecurityDepositMode {
   CASH = 'CASH',
@@ -309,6 +311,33 @@ export class Invoice {
 
   @Column({ type: 'integer', nullable: true })
   maxCopyLimit?: number | null;
+
+  // --- Warranty Fields ---
+  @Column({
+    type: 'enum',
+    enum: WarrantyType,
+    default: WarrantyType.NONE,
+  })
+  warrantyType!: WarrantyType;
+
+  @Column({ type: 'int', nullable: true })
+  warrantyDurationValue?: number;
+
+  @Column({
+    type: 'enum',
+    enum: WarrantyDurationUnit,
+    nullable: true,
+  })
+  warrantyDurationUnit?: WarrantyDurationUnit;
+
+  @Column({ type: 'int', nullable: true })
+  warrantyCopyLimit?: number;
+
+  @Column({ type: 'boolean', default: false })
+  warrantyEmailSent!: boolean;
+
+  @Column({ type: 'boolean', default: false })
+  warrantyExpiryEmailSent!: boolean;
 
   @DeleteDateColumn()
   deletedAt?: Date;

@@ -116,6 +116,14 @@ async function runPreMigrations() {
         IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'invoices_billtype_enum') THEN
           CREATE TYPE invoices_billtype_enum AS ENUM ('SERVICE', 'AMC', 'FSMA', 'SMA', 'SALE', 'RENT', 'LEASE');
         END IF;
+
+        IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'invoices_warrantytype_enum') THEN
+          CREATE TYPE invoices_warrantytype_enum AS ENUM ('none', 'duration', 'copies');
+        END IF;
+
+        IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'invoices_warrantydurationunit_enum') THEN
+          CREATE TYPE invoices_warrantydurationunit_enum AS ENUM ('months', 'years');
+        END IF;
         
         IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'credit_note_status_enum') THEN
           CREATE TYPE credit_note_status_enum AS ENUM ('DRAFT', 'PENDING_APPROVAL', 'APPROVED', 'REJECTED', 'COMPLETED', 'PRODUCT_REPLACED');
@@ -141,7 +149,13 @@ async function runPreMigrations() {
         ALTER TABLE invoices 
         ADD COLUMN IF NOT EXISTS "billType" invoices_billtype_enum NULL,
         ADD COLUMN IF NOT EXISTS "serviceTicketId" UUID NULL,
-        ADD COLUMN IF NOT EXISTS "maxCopyLimit" INTEGER NULL;
+        ADD COLUMN IF NOT EXISTS "maxCopyLimit" INTEGER NULL,
+        ADD COLUMN IF NOT EXISTS "warrantyType" invoices_warrantytype_enum NOT NULL DEFAULT 'none',
+        ADD COLUMN IF NOT EXISTS "warrantyDurationValue" INTEGER NULL,
+        ADD COLUMN IF NOT EXISTS "warrantyDurationUnit" invoices_warrantydurationunit_enum NULL,
+        ADD COLUMN IF NOT EXISTS "warrantyCopyLimit" INTEGER NULL,
+        ADD COLUMN IF NOT EXISTS "warrantyEmailSent" BOOLEAN NOT NULL DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS "warrantyExpiryEmailSent" BOOLEAN NOT NULL DEFAULT FALSE;
       `);
       await client.query(`
         ALTER TABLE invoice_items 

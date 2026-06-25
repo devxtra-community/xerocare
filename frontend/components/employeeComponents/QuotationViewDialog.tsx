@@ -728,19 +728,27 @@ export function QuotationViewDialog({
       const isCpc = quotation.rentType === 'CPC' || quotation.rentType === 'CPC_COMBO';
 
       if (quotation.rentType === 'FIXED_COMBO' || quotation.rentType === 'CPC_COMBO') {
-        const lim = item.combinedIncludedLimit || 0;
-        limitStr = lim > 0 ? `Combined: ${lim}` : 'DIRECT BILLING (COMPO)';
-        excessStr = `Rate: ${Number(item.combinedExcessRate || 0).toFixed(3)}`;
-      } else if (quotation.rentType !== 'FIXED_FLAT') {
-        const bwLim = item.bwIncludedLimit || 0;
-        const clLim = item.colorIncludedLimit || 0;
-        limitStr =
-          bwLim > 0 || clLim > 0
-            ? `BW: ${bwLim}, Color: ${clLim}`
-            : isCpc
-              ? 'DIRECT BILLING'
-              : 'N/A';
-        excessStr = `BW: ${Number(item.bwExcessRate || 0).toFixed(3)}, Color: ${Number(item.colorExcessRate || 0).toFixed(3)}`;
+        if (item.comboSlabRanges?.length) {
+          limitStr = 'Slab Based';
+          excessStr = 'See Slabs';
+        } else {
+          const lim = item.combinedIncludedLimit || 0;
+          limitStr = lim > 0 ? `Combined: ${lim}` : isCpc ? '0 (Direct Billing)' : 'N/A';
+          excessStr = `Rate: ${Number(item.combinedExcessRate || 0).toFixed(3)}`;
+        }
+      } else if (quotation.rentType === 'FIXED_FLAT') {
+        limitStr = 'FLAT RATE';
+        excessStr = 'N/A';
+      } else {
+        if (item.bwSlabRanges?.length || item.colorSlabRanges?.length) {
+          limitStr = 'Usage Based';
+          excessStr = 'See Above Slabs';
+        } else {
+          const bwLim = item.bwIncludedLimit || 0;
+          const clLim = item.colorIncludedLimit || 0;
+          limitStr = `BW: ${bwLim}, Color: ${clLim}`;
+          excessStr = `BW: ${Number(item.bwExcessRate || 0).toFixed(3)}, Color: ${Number(item.colorExcessRate || 0).toFixed(3)}`;
+        }
       }
 
       const pMeta = productDetails[item.productId || ''] || productDetails[item.modelId || ''];
@@ -758,6 +766,19 @@ export function QuotationViewDialog({
       const fallbackModel = descParts[1] || 'N/A';
       const fallbackName = descParts.slice(2).join(' ') || 'PRODUCT';
 
+      const dedupeSlabs = (slabs: { from: number; to: number; rate: number }[]) => {
+        if (!slabs || slabs.length === 0) return [];
+        const result: typeof slabs = [];
+        let unlimitedfound = false;
+        for (const s of slabs) {
+          if (unlimitedfound) continue; // After first unlimited, ignore everything else
+          const isUnlimited = Number(s.to) >= 999999 || Number(s.to) === 0;
+          result.push(s);
+          if (isUnlimited) unlimitedfound = true;
+        }
+        return result;
+      };
+
       return {
         productName: pMeta?.name || pMeta?.product_name || fallbackName,
         brand: pMeta?.brandRelation?.name || pMeta?.brand || fallbackBrand,
@@ -770,10 +791,11 @@ export function QuotationViewDialog({
         qty: item.quantity || 1,
         limit: limitStr,
         excessRate: excessStr,
-        image: pMeta?.image || pMeta?.imageUrl || '',
-        bwSlabs: item.bwSlabRanges || [],
-        colorSlabs: item.colorSlabRanges || [],
-        comboSlabs: item.comboSlabRanges || [],
+        image: pMeta?.image || pMeta?.imageUrl || pMeta?.image_url || '',
+        productImage: pMeta?.imageUrl || pMeta?.image_url || pMeta?.image || '',
+        bwSlabs: dedupeSlabs(item.bwSlabRanges || []),
+        colorSlabs: dedupeSlabs(item.colorSlabRanges || []),
+        comboSlabs: dedupeSlabs(item.comboSlabRanges || []),
         warranty: item.warranty || pMeta?.warranty || '',
       };
     });
@@ -821,24 +843,42 @@ export function QuotationViewDialog({
         const lRentType = quotation.rentType || 'FIXED_LIMIT';
         const isCpc = lRentType === 'CPC' || lRentType === 'CPC_COMBO';
         if (lRentType === 'FIXED_COMBO' || lRentType === 'CPC_COMBO') {
-          const lim = item.combinedIncludedLimit || 0;
-          limitStr = lim > 0 ? `Combined: ${lim}` : 'DIRECT BILLING (COMBO)';
-          excessStr = `Rate: ${Number(item.combinedExcessRate || 0).toFixed(3)}`;
+          if (item.comboSlabRanges?.length) {
+            limitStr = 'Slab Based';
+            excessStr = 'See Slabs';
+          } else {
+            const lim = item.combinedIncludedLimit || 0;
+            limitStr = lim > 0 ? `Combined: ${lim}` : isCpc ? '0 (Direct Billing)' : 'N/A';
+            excessStr = `Rate: ${Number(item.combinedExcessRate || 0).toFixed(3)}`;
+          }
         } else if (lRentType === 'FIXED_FLAT') {
           limitStr = 'FLAT RATE';
           excessStr = 'N/A';
         } else {
-          const bwLim = item.bwIncludedLimit || 0;
-          const clLim = item.colorIncludedLimit || 0;
-          limitStr =
-            bwLim > 0 || clLim > 0
-              ? `BW: ${bwLim}, Color: ${clLim}`
-              : isCpc
-                ? 'DIRECT BILLING'
-                : 'N/A';
-          excessStr = `BW: ${Number(item.bwExcessRate || 0).toFixed(3)}, Color: ${Number(item.colorExcessRate || 0).toFixed(3)}`;
+          if (item.bwSlabRanges?.length || item.colorSlabRanges?.length) {
+            limitStr = 'Usage Based';
+            excessStr = 'See Slabs';
+          } else {
+            const bwLim = item.bwIncludedLimit || 0;
+            const clLim = item.colorIncludedLimit || 0;
+            limitStr = `BW: ${bwLim}, Color: ${clLim}`;
+            excessStr = `BW: ${Number(item.bwExcessRate || 0).toFixed(3)}, Color: ${Number(item.colorExcessRate || 0).toFixed(3)}`;
+          }
         }
       }
+
+      const dedupeSlabsForLease = (slabs: { from: number; to: number; rate: number }[]) => {
+        if (!slabs || slabs.length === 0) return [];
+        const result: typeof slabs = [];
+        let unlimitedfound = false;
+        for (const s of slabs) {
+          if (unlimitedfound) continue;
+          const isUnlimited = Number(s.to) >= 999999 || Number(s.to) === 0;
+          result.push(s);
+          if (isUnlimited) unlimitedfound = true;
+        }
+        return result;
+      };
 
       return {
         productName: pMeta?.name || pMeta?.product_name || fallbackName,
@@ -853,12 +893,13 @@ export function QuotationViewDialog({
         limit: limitStr,
         excessRate: excessStr,
         rate: String(item.unitPrice || 0),
-        bwSlabs: item.bwSlabRanges || [],
-        colorSlabs: item.colorSlabRanges || [],
-        comboSlabs: item.comboSlabRanges || [],
-        productImage: pMeta?.imageUrl,
+        bwSlabs: dedupeSlabsForLease(item.bwSlabRanges || []),
+        colorSlabs: dedupeSlabsForLease(item.colorSlabRanges || []),
+        comboSlabs: dedupeSlabsForLease(item.comboSlabRanges || []),
+        productImage: pMeta?.imageUrl || pMeta?.image_url || pMeta?.image || '',
+        image: pMeta?.image || pMeta?.imageUrl || pMeta?.image_url || '',
         discount: item.discount || 0,
-        warranty: pMeta?.warranty || '',
+        warranty: item.warranty || pMeta?.warranty || '',
       };
     });
 
@@ -884,6 +925,10 @@ export function QuotationViewDialog({
     totalLeaseValue: isFsmLease
       ? quotation.monthlyLeaseAmount || quotation.totalAmount || 0
       : quotation.totalAmount || 0,
+    warrantyType: quotation.warrantyType,
+    warrantyDurationValue: quotation.warrantyDurationValue,
+    warrantyDurationUnit: quotation.warrantyDurationUnit,
+    warrantyCopyLimit: quotation.warrantyCopyLimit,
     notes: quotation.notes,
   };
 
@@ -1405,10 +1450,10 @@ export function QuotationViewDialog({
                           quotation.rentType === 'CPC_COMBO' ? (
                             <>
                               <th className="text-center py-4 px-6 text-[12px] font-normal uppercase tracking-widest border-r border-red-600/40">
-                                Combo Limit
+                                {quotation.rentType === 'CPC_COMBO' ? 'Base Limit' : 'Combo Limit'}
                               </th>
                               <th className="text-center py-4 pr-10 text-[12px] font-normal uppercase tracking-widest">
-                                Combo Rate
+                                {quotation.rentType === 'CPC_COMBO' ? 'CPC Rate' : 'Combo Rate'}
                               </th>
                             </>
                           ) : quotation.rentType === 'FIXED_FLAT' ? (
@@ -1418,13 +1463,13 @@ export function QuotationViewDialog({
                           ) : (
                             <>
                               <th className="text-center py-4 px-6 text-[12px] font-normal uppercase tracking-widest border-r border-red-600/40">
-                                B/W Limit
+                                {quotation.rentType === 'CPC' ? 'B/W Base' : 'B/W Limit'}
                               </th>
                               <th className="text-center py-4 px-6 text-[12px] font-normal uppercase tracking-widest border-r border-red-600/40">
-                                Color Limit
+                                {quotation.rentType === 'CPC' ? 'Color Base' : 'Color Limit'}
                               </th>
                               <th className="text-center py-4 pr-10 text-[12px] font-normal uppercase tracking-widest">
-                                Excess (B/C)
+                                {quotation.rentType === 'CPC' ? 'CPC Rate' : 'Excess (B/C)'}
                               </th>
                             </>
                           )}
@@ -1434,7 +1479,7 @@ export function QuotationViewDialog({
                     <tbody className="divide-y-2 divide-red-50">
                       {enrichedItems.map((item, idx) => {
                         const detail = item.metadata;
-                        const image = detail?.imageUrl || detail?.image_url;
+                        const image = detail?.imageUrl || detail?.image_url || detail?.image;
                         const stripTags = (str: string) =>
                           str.replace(/\[[A-Z0-9]+:[^\]]*\]/g, '').trim();
                         const isManual =
@@ -1452,7 +1497,11 @@ export function QuotationViewDialog({
                               className="group hover:bg-red-50/40 transition-all duration-300 border-b border-red-50/50"
                               style={{ minHeight: '200px' }}
                             >
-                              <td className="py-3 px-4 border-r-2 border-red-50 align-top relative w-[60%]">
+                              <td
+                                className="py-3 px-4 border-r-2 border-red-50 align-top relative"
+                                colSpan={isRent || isLease ? 3 : 1}
+                                style={{ width: isRent || isLease ? 'auto' : '60%' }}
+                              >
                                 <div className="flex gap-4">
                                   {image && (
                                     <img
@@ -1526,10 +1575,24 @@ export function QuotationViewDialog({
                                   quotation.rentType === 'CPC_COMBO' ? (
                                     <>
                                       <td className="py-3 px-3 text-center border-r-2 border-red-50 align-top font-normal text-slate-900 text-sm">
-                                        {item.combinedIncludedLimit || 0}
+                                        {quotation.rentType === 'CPC_COMBO' &&
+                                        item.comboSlabRanges?.length ? (
+                                          <span className="text-xs text-red-600 font-normal italic">
+                                            Slab Based
+                                          </span>
+                                        ) : (
+                                          item.combinedIncludedLimit || 0
+                                        )}
                                       </td>
                                       <td className="py-3 pr-10 text-center align-top font-normal text-slate-900 text-sm whitespace-nowrap">
-                                        {Number(item.combinedExcessRate || 0).toFixed(3)}
+                                        {quotation.rentType === 'CPC_COMBO' &&
+                                        item.comboSlabRanges?.length ? (
+                                          <span className="text-xs text-red-600 font-normal italic">
+                                            See Slabs
+                                          </span>
+                                        ) : (
+                                          Number(item.combinedExcessRate || 0).toFixed(3)
+                                        )}
                                       </td>
                                     </>
                                   ) : quotation.rentType === 'FIXED_FLAT' ? (
@@ -1539,14 +1602,35 @@ export function QuotationViewDialog({
                                   ) : (
                                     <>
                                       <td className="py-3 px-3 text-center border-r-2 border-red-50 align-top font-normal text-slate-900 text-sm">
-                                        {item.bwIncludedLimit || 0}
+                                        {quotation.rentType === 'CPC' &&
+                                        item.bwSlabRanges?.length ? (
+                                          <span className="text-xs text-red-600 font-normal italic">
+                                            Slabs
+                                          </span>
+                                        ) : (
+                                          item.bwIncludedLimit || 0
+                                        )}
                                       </td>
                                       <td className="py-3 px-3 text-center border-r-2 border-red-50 align-top font-normal text-slate-900 text-sm">
-                                        {item.colorIncludedLimit || 0}
+                                        {quotation.rentType === 'CPC' &&
+                                        item.colorSlabRanges?.length ? (
+                                          <span className="text-xs text-red-600 font-normal italic">
+                                            Slabs
+                                          </span>
+                                        ) : (
+                                          item.colorIncludedLimit || 0
+                                        )}
                                       </td>
                                       <td className="py-3 pr-10 text-center align-top font-normal text-slate-900 text-sm whitespace-nowrap">
-                                        {(Number(item.bwExcessRate) || 0).toFixed(3)} /{' '}
-                                        {(Number(item.colorExcessRate) || 0).toFixed(3)}
+                                        {quotation.rentType === 'CPC' &&
+                                        (item.bwSlabRanges?.length ||
+                                          item.colorSlabRanges?.length) ? (
+                                          <span className="text-xs text-red-600 font-normal italic">
+                                            See Above Slabs
+                                          </span>
+                                        ) : (
+                                          `${(Number(item.bwExcessRate) || 0).toFixed(3)} / ${(Number(item.colorExcessRate) || 0).toFixed(3)}`
+                                        )}
                                       </td>
                                     </>
                                   )}
@@ -1559,81 +1643,135 @@ export function QuotationViewDialog({
                               <tr className="bg-red-50/10 border-b border-red-50">
                                 <td colSpan={7} className="py-3 px-8">
                                   <div className="grid grid-cols-3 gap-6 bg-white p-4 rounded-xl border border-red-100 shadow-[inset_0_2px_10px_rgba(0,0,0,0.02)]">
-                                    {item.bwSlabRanges && item.bwSlabRanges.length > 0 && (
-                                      <div>
-                                        <p className="text-[10px] font-normal text-slate-400 uppercase tracking-widest mb-2 border-b border-red-50 pb-1">
-                                          Black & White Slabs
-                                        </p>
-                                        {item.bwSlabRanges.map(
-                                          (
-                                            slab: { from: number; to: number; rate: number },
-                                            sIdx: number,
-                                          ) => (
-                                            <div
-                                              key={sIdx}
-                                              className="flex justify-between text-[11px] font-normal text-slate-700 py-1"
-                                            >
-                                              <span>
-                                                {slab.from} - {slab.to || '∞'} copies
-                                              </span>
-                                              <span className="text-red-700">
-                                                {Number(slab.rate).toFixed(3)} QAR
-                                              </span>
-                                            </div>
-                                          ),
-                                        )}
-                                      </div>
-                                    )}
-                                    {item.colorSlabRanges && item.colorSlabRanges.length > 0 && (
-                                      <div>
-                                        <p className="text-[10px] font-normal text-slate-400 uppercase tracking-widest mb-2 border-b border-red-50 pb-1">
-                                          Color Slabs
-                                        </p>
-                                        {item.colorSlabRanges.map(
-                                          (
-                                            slab: { from: number; to: number; rate: number },
-                                            sIdx: number,
-                                          ) => (
-                                            <div
-                                              key={sIdx}
-                                              className="flex justify-between text-[11px] font-normal text-slate-700 py-1"
-                                            >
-                                              <span>
-                                                {slab.from} - {slab.to || '∞'} copies
-                                              </span>
-                                              <span className="text-red-700">
-                                                {Number(slab.rate).toFixed(3)} QAR
-                                              </span>
-                                            </div>
-                                          ),
-                                        )}
-                                      </div>
-                                    )}
-                                    {item.comboSlabRanges && item.comboSlabRanges.length > 0 && (
-                                      <div>
-                                        <p className="text-[10px] font-normal text-slate-400 uppercase tracking-widest mb-2 border-b border-red-50 pb-1">
-                                          Combined Slabs
-                                        </p>
-                                        {item.comboSlabRanges.map(
-                                          (
-                                            slab: { from: number; to: number; rate: number },
-                                            sIdx: number,
-                                          ) => (
-                                            <div
-                                              key={sIdx}
-                                              className="flex justify-between text-[11px] font-normal text-slate-700 py-1"
-                                            >
-                                              <span>
-                                                {slab.from} - {slab.to || '∞'} copies
-                                              </span>
-                                              <span className="text-red-700">
-                                                {Number(slab.rate).toFixed(3)} QAR
-                                              </span>
-                                            </div>
-                                          ),
-                                        )}
-                                      </div>
-                                    )}
+                                    {item.bwSlabRanges &&
+                                      item.bwSlabRanges.length > 0 &&
+                                      (() => {
+                                        let unlimitedfound = false;
+                                        return (
+                                          <div>
+                                            <p className="text-[10px] font-normal text-slate-400 uppercase tracking-widest mb-2 border-b border-red-50 pb-1">
+                                              Black &amp; White Slabs
+                                            </p>
+                                            {(
+                                              item.bwSlabRanges as {
+                                                from: number;
+                                                to: number;
+                                                rate: number;
+                                              }[]
+                                            )
+                                              .filter((s) => {
+                                                if (unlimitedfound) return false;
+                                                if (!s.to || Number(s.to) >= 999999) {
+                                                  unlimitedfound = true;
+                                                }
+                                                return true;
+                                              })
+                                              .map((slab, sIdx) => (
+                                                <div
+                                                  key={sIdx}
+                                                  className="flex justify-between text-[11px] font-normal text-slate-700 py-1"
+                                                >
+                                                  <span>
+                                                    {Number(slab.from).toLocaleString()} –{' '}
+                                                    {!slab.to || Number(slab.to) >= 999999
+                                                      ? 'UNLIMITED'
+                                                      : Number(slab.to).toLocaleString()}{' '}
+                                                    copies
+                                                  </span>
+                                                  <span className="text-red-700">
+                                                    {Number(slab.rate).toFixed(3)} QAR
+                                                  </span>
+                                                </div>
+                                              ))}
+                                          </div>
+                                        );
+                                      })()}
+                                    {item.colorSlabRanges &&
+                                      item.colorSlabRanges.length > 0 &&
+                                      (() => {
+                                        let unlimitedfound = false;
+                                        return (
+                                          <div>
+                                            <p className="text-[10px] font-normal text-slate-400 uppercase tracking-widest mb-2 border-b border-red-50 pb-1">
+                                              Color Slabs
+                                            </p>
+                                            {(
+                                              item.colorSlabRanges as {
+                                                from: number;
+                                                to: number;
+                                                rate: number;
+                                              }[]
+                                            )
+                                              .filter((s) => {
+                                                if (unlimitedfound) return false;
+                                                if (!s.to || Number(s.to) >= 999999) {
+                                                  unlimitedfound = true;
+                                                }
+                                                return true;
+                                              })
+                                              .map((slab, sIdx) => (
+                                                <div
+                                                  key={sIdx}
+                                                  className="flex justify-between text-[11px] font-normal text-slate-700 py-1"
+                                                >
+                                                  <span>
+                                                    {Number(slab.from).toLocaleString()} –{' '}
+                                                    {!slab.to || Number(slab.to) >= 999999
+                                                      ? 'UNLIMITED'
+                                                      : Number(slab.to).toLocaleString()}{' '}
+                                                    copies
+                                                  </span>
+                                                  <span className="text-red-700">
+                                                    {Number(slab.rate).toFixed(3)} QAR
+                                                  </span>
+                                                </div>
+                                              ))}
+                                          </div>
+                                        );
+                                      })()}
+                                    {item.comboSlabRanges &&
+                                      item.comboSlabRanges.length > 0 &&
+                                      (() => {
+                                        let unlimitedfound = false;
+                                        return (
+                                          <div>
+                                            <p className="text-[10px] font-normal text-slate-400 uppercase tracking-widest mb-2 border-b border-red-50 pb-1">
+                                              Combined Slabs
+                                            </p>
+                                            {(
+                                              item.comboSlabRanges as {
+                                                from: number;
+                                                to: number;
+                                                rate: number;
+                                              }[]
+                                            )
+                                              .filter((s) => {
+                                                if (unlimitedfound) return false;
+                                                if (!s.to || Number(s.to) >= 999999) {
+                                                  unlimitedfound = true;
+                                                }
+                                                return true;
+                                              })
+                                              .map((slab, sIdx) => (
+                                                <div
+                                                  key={sIdx}
+                                                  className="flex justify-between text-[11px] font-normal text-slate-700 py-1"
+                                                >
+                                                  <span>
+                                                    {Number(slab.from).toLocaleString()} –{' '}
+                                                    {!slab.to || Number(slab.to) >= 999999
+                                                      ? 'UNLIMITED'
+                                                      : Number(slab.to).toLocaleString()}{' '}
+                                                    copies
+                                                  </span>
+                                                  <span className="text-red-700">
+                                                    {Number(slab.rate).toFixed(3)} QAR
+                                                  </span>
+                                                </div>
+                                              ))}
+                                          </div>
+                                        );
+                                      })()}
                                   </div>
                                 </td>
                               </tr>
@@ -1858,10 +1996,15 @@ export function QuotationViewDialog({
                     </div>
                     <div className="border border-t-0 border-red-700 rounded-b-3xl px-8 py-2 bg-white flex items-center gap-6 shadow-[0_20px_50px_-12px_rgba(185,28,28,0.2)]">
                       <p className="text-lg font-normal text-red-700 uppercase tracking-[0.1em] border-r-2 border-red-100 pr-6 leading-none">
-                        Monthly Rent
+                        {quotation.rentType?.includes('CPC') ? 'Usage Commitment' : 'Monthly Rent'}
                       </p>
                       <p className="text-xl font-normal text-slate-900 leading-none">
-                        QAR {Number(quotation.monthlyRent || 0).toLocaleString()}
+                        {quotation.rentType?.includes('CPC') &&
+                        (quotation.monthlyRent || 0) === 0 ? (
+                          <span className="italic opacity-60">Usage Based Billing</span>
+                        ) : (
+                          `QAR ${Number(quotation.monthlyRent || 0).toLocaleString()}`
+                        )}
                       </p>
                     </div>
                   </div>
@@ -1945,6 +2088,85 @@ export function QuotationViewDialog({
                             : quotation.monthlyEmiAmount || 0,
                         ).toLocaleString()}
                       </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* --- Warranty Details Section (Lease Only) --- */}
+                {isLease && quotation.warrantyType && quotation.warrantyType !== 'none' && (
+                  <div className="flex flex-col mt-8 pl-12 pr-0 animate-in fade-in slide-in-from-bottom-4 duration-700">
+                    <div className="border border-red-700 rounded-3xl px-8 py-6 bg-white shadow-[0_20px_50px_-12px_rgba(185,28,28,0.1)]">
+                      <div className="flex items-center justify-between border-b border-red-50 pb-3 mb-6">
+                        <div className="flex items-center gap-3">
+                          <div className="h-8 w-8 bg-emerald-50 rounded-xl flex items-center justify-center">
+                            <span className="text-emerald-600">🛡️</span>
+                          </div>
+                          <h3 className="text-xl font-normal text-slate-800 uppercase tracking-tighter">
+                            Warranty Details
+                          </h3>
+                        </div>
+                        <div className="bg-emerald-100 px-3 py-1 rounded-full">
+                          <p className="text-[9px] font-bold text-emerald-700 uppercase tracking-widest">
+                            Guaranteed Coverage
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-10 mb-8">
+                        <div>
+                          <p className="text-[10px] font-normal text-slate-400 uppercase tracking-widest mb-1">
+                            Identification
+                          </p>
+                          <div className="space-y-3">
+                            <div className="flex justify-between border-b border-slate-50 pb-2">
+                              <span className="text-[12px] text-slate-500 font-normal">
+                                Warranty Type
+                              </span>
+                              <span className="text-[12px] font-normal text-slate-900 uppercase italic">
+                                {quotation.warrantyType === 'duration'
+                                  ? 'By Duration'
+                                  : 'By Count of Copies'}
+                              </span>
+                            </div>
+
+                            {quotation.warrantyType === 'duration' && (
+                              <div className="flex justify-between border-b border-slate-50 pb-2">
+                                <span className="text-[12px] text-slate-500 font-normal">
+                                  Coverage Period
+                                </span>
+                                <span className="text-[12px] font-normal text-slate-900 uppercase">
+                                  {quotation.warrantyDurationValue} {quotation.warrantyDurationUnit}
+                                </span>
+                              </div>
+                            )}
+
+                            {quotation.warrantyType === 'copies' && (
+                              <div className="flex justify-between border-b border-slate-50 pb-2">
+                                <span className="text-[12px] text-slate-500 font-normal">
+                                  Maximum Copy Limit
+                                </span>
+                                <span className="text-[12px] font-normal text-slate-900">
+                                  {Number(quotation.warrantyCopyLimit || 0).toLocaleString()} COPIES
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="bg-amber-50/50 p-5 rounded-2xl border border-amber-100 flex flex-col justify-center">
+                          <p className="text-[10px] font-normal text-amber-700 uppercase tracking-widest mb-2 flex items-center gap-2">
+                            <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                            Terms & Limitations
+                          </p>
+                          <p className="text-[11px] text-amber-900 leading-relaxed font-normal">
+                            Technical support and replacement parts are provided free of charge
+                            during the warranty period specified above. After the warranty period
+                            expires, or once the applicable usage limit is reached, all technical
+                            support services, spare parts, repairs, and related charges will be
+                            billable at the prevailing rates.
+                          </p>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 )}
