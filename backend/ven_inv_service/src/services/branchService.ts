@@ -18,6 +18,20 @@ export class BranchService {
     location: string;
     manager_id?: string | null;
     started_date: Date;
+    // Currency & Country
+    country_code?: string;
+    currency_code?: string;
+    currency_symbol?: string;
+    currency_name?: string;
+    // Tax
+    has_tax?: boolean;
+    tax_name?: string | null;
+    tax_percent?: number | null;
+    tax_registration_number?: string | null;
+    // Address details
+    city?: string;
+    state?: string;
+    postal_code?: string;
   }) {
     const managerId =
       payload.manager_id && payload.manager_id.trim() !== '' ? payload.manager_id : null;
@@ -97,6 +111,20 @@ export class BranchService {
       manager_id?: string | null;
       started_date?: Date;
       status?: BranchStatus;
+      // Currency & Country
+      country_code?: string;
+      currency_code?: string;
+      currency_symbol?: string;
+      currency_name?: string;
+      // Tax
+      has_tax?: boolean;
+      tax_name?: string | null;
+      tax_percent?: number | null;
+      tax_registration_number?: string | null;
+      // Address details
+      city?: string;
+      state?: string;
+      postal_code?: string;
     },
   ) {
     let managerId: string | null | undefined = payload.manager_id;

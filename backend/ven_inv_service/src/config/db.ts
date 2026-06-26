@@ -112,6 +112,64 @@ export const connectWithRetry = async (initialDelayMs = 2000): Promise<DataSourc
           )
         `);
         logger.info('Guaranteed processed_invoice_items table exists.');
+
+        // --- Multi-Currency & Tax: new branch columns ---
+        await Source.query(`
+          ALTER TABLE branches
+          ADD COLUMN IF NOT EXISTS country_code VARCHAR(2),
+          ADD COLUMN IF NOT EXISTS currency_code VARCHAR(3),
+          ADD COLUMN IF NOT EXISTS currency_symbol VARCHAR(10),
+          ADD COLUMN IF NOT EXISTS currency_name VARCHAR(100),
+          ADD COLUMN IF NOT EXISTS has_tax BOOLEAN DEFAULT FALSE,
+          ADD COLUMN IF NOT EXISTS tax_name VARCHAR(50),
+          ADD COLUMN IF NOT EXISTS tax_percent DECIMAL(5,2),
+          ADD COLUMN IF NOT EXISTS tax_registration_number VARCHAR(50),
+          ADD COLUMN IF NOT EXISTS city VARCHAR(100),
+          ADD COLUMN IF NOT EXISTS state VARCHAR(100),
+          ADD COLUMN IF NOT EXISTS postal_code VARCHAR(20);
+        `);
+        logger.info('Guaranteed branch currency & tax columns exist.');
+
+        // --- Exchange Rates table ---
+        await Source.query(`
+          CREATE TABLE IF NOT EXISTS exchange_rates (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            from_currency VARCHAR(3) NOT NULL,
+            to_currency VARCHAR(3) NOT NULL,
+            rate DECIMAL(18,6) NOT NULL,
+            fetched_at TIMESTAMP NOT NULL DEFAULT NOW(),
+            UNIQUE(from_currency, to_currency)
+          );
+        `);
+        logger.info('Guaranteed exchange_rates table exists.');
+
+        // --- Currency columns on lots ---
+        await Source.query(`
+          ALTER TABLE lots
+          ADD COLUMN IF NOT EXISTS currency_code VARCHAR(3),
+          ADD COLUMN IF NOT EXISTS exchange_rate_snapshot DECIMAL(18,6);
+        `);
+        logger.info('Guaranteed lots currency columns exist.');
+
+        // --- Currency columns on rfq_vendors ---
+        await Source.query(`
+          ALTER TABLE rfq_vendors
+          ADD COLUMN IF NOT EXISTS vendor_currency_code VARCHAR(3),
+          ADD COLUMN IF NOT EXISTS vendor_amount DECIMAL(15,2),
+          ADD COLUMN IF NOT EXISTS branch_currency_code VARCHAR(3),
+          ADD COLUMN IF NOT EXISTS branch_converted_amount DECIMAL(15,2),
+          ADD COLUMN IF NOT EXISTS exchange_rate_snapshot DECIMAL(18,6),
+          ADD COLUMN IF NOT EXISTS exchange_rate_fetched_at TIMESTAMP;
+        `);
+        logger.info('Guaranteed rfq_vendors currency columns exist.');
+
+        // --- Currency columns on service_estimates ---
+        await Source.query(`
+          ALTER TABLE service_estimates
+          ADD COLUMN IF NOT EXISTS currency_code VARCHAR(3),
+          ADD COLUMN IF NOT EXISTS exchange_rate_snapshot DECIMAL(18,6);
+        `);
+        logger.info('Guaranteed service_estimates currency columns exist.');
         // Ensure tax_rate and max_discount_amount exist on spare_parts table
         await Source.query(`
           ALTER TABLE spare_parts 

@@ -64,6 +64,18 @@ export class Lot {
   @Column({ type: 'text', nullable: true })
   notes?: string;
 
+  @Column({ name: 'currency_code', type: 'varchar', length: 3, nullable: true })
+  currencyCode?: string;
+
+  @Column({
+    name: 'exchange_rate_snapshot',
+    type: 'decimal',
+    precision: 18,
+    scale: 6,
+    nullable: true,
+  })
+  exchangeRateSnapshot?: number;
+
   @OneToMany(() => LotItem, (lotItem) => lotItem.lot, { cascade: true })
   items!: LotItem[];
 

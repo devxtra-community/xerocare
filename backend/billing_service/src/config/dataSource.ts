@@ -219,9 +219,26 @@ async function runPreMigrations() {
 
       // Add columns to invoices table
       await client.query(`
-        ALTER TABLE invoices 
+        ALTER TABLE invoices
         ADD COLUMN IF NOT EXISTS is_opening_entry BOOLEAN DEFAULT FALSE,
         ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP NULL;
+      `);
+
+      // --- Multi-Currency & Tax columns on invoices ---
+      await client.query(`
+        ALTER TABLE invoices
+        ADD COLUMN IF NOT EXISTS currency_code VARCHAR(3),
+        ADD COLUMN IF NOT EXISTS exchange_rate_snapshot DECIMAL(18,6),
+        ADD COLUMN IF NOT EXISTS tax_name VARCHAR(50),
+        ADD COLUMN IF NOT EXISTS tax_percent DECIMAL(5,2),
+        ADD COLUMN IF NOT EXISTS tax_amount DECIMAL(12,2),
+        ADD COLUMN IF NOT EXISTS tax_registration_number VARCHAR(50);
+      `);
+
+      // --- Currency column on payment_transactions ---
+      await client.query(`
+        ALTER TABLE payment_transactions
+        ADD COLUMN IF NOT EXISTS currency_code VARCHAR(3);
       `);
 
       // Add columns to invoice_ledger table

@@ -1,3 +1,4 @@
+// Trigger reload to pick up new .env variables
 import { Request, Response, NextFunction } from 'express';
 import { AppError } from '../errors/appError';
 import { Source } from '../config/db';
@@ -1811,7 +1812,7 @@ export class ServiceController {
         query = query.where('ticket.branchId = :branchId', { branchId: req.user.branchId });
       }
 
-      if (req.user.employeeJob === 'SERVICE_TECHNICIAN') {
+      if (req.user.role === 'EMPLOYEE' && req.user.employeeJob === 'SERVICE_TECHNICIAN') {
         query = query.andWhere('ticket.assignedTechnicianId = :techId', {
           techId: req.user.userId,
         });
@@ -1837,6 +1838,19 @@ export class ServiceController {
         relations: ['items'],
       });
       if (!ticket) throw new Error('Ticket not found');
+
+      if (
+        req.user &&
+        req.user.role === 'EMPLOYEE' &&
+        req.user.employeeJob === 'SERVICE_TECHNICIAN'
+      ) {
+        if (ticket.assignedTechnicianId !== req.user.userId) {
+          return res.status(403).json({
+            success: false,
+            message: 'You are not assigned to this ticket',
+          });
+        }
+      }
 
       res.status(200).json({ success: true, data: ticket });
     } catch (error) {
