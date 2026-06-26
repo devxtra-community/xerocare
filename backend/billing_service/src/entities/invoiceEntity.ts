@@ -225,6 +225,32 @@ export class Invoice {
   @Column({ nullable: true })
   usageRecordId?: string; // Link to Usage Record (for Monthly Invoice)
 
+  // --- Currency (set at creation from branch, never updated) ---
+  @Column({ name: 'currency_code', type: 'varchar', length: 3, nullable: true })
+  currencyCode?: string;
+
+  @Column({
+    name: 'exchange_rate_snapshot',
+    type: 'decimal',
+    precision: 18,
+    scale: 6,
+    nullable: true,
+  })
+  exchangeRateSnapshot?: number;
+
+  // --- Tax Snapshot (copied from branch at invoice creation, never recalculated) ---
+  @Column({ name: 'tax_name', type: 'varchar', length: 50, nullable: true })
+  taxName?: string;
+
+  @Column({ name: 'tax_percent', type: 'decimal', precision: 5, scale: 2, nullable: true })
+  taxPercent?: number;
+
+  @Column({ name: 'tax_amount', type: 'decimal', precision: 12, scale: 2, nullable: true })
+  taxAmount?: number;
+
+  @Column({ name: 'tax_registration_number', type: 'varchar', length: 50, nullable: true })
+  taxRegistrationNumber?: string;
+
   @Column({ type: 'decimal', precision: 12, scale: 2, nullable: true })
   grossAmount?: number;
 

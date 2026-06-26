@@ -1,7 +1,22 @@
 /**
- * This tool shortens long numbers into a "human-friendly" format to save space.
- * For example, it turns "1500" into "1.5k" and "1,200,000" into "1.2M".
- * This makes it much easier to read large amounts of stock or money at a glance.
+ * Gulf ERP standard: "AED 1,000.00"
+ * Always currency code + single space + comma-separated amount with 2 decimal places.
+ * Never compact notation for monetary amounts.
+ */
+export function formatCurrency(amount: number | string, currencyCode: string = 'AED'): string {
+  const value = typeof amount === 'string' ? parseFloat(amount) : amount;
+  if (typeof value !== 'number' || isNaN(value)) return `${currencyCode} 0.00`;
+
+  const formatted = new Intl.NumberFormat('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(value);
+
+  return `${currencyCode} ${formatted}`;
+}
+
+/**
+ * Compact number display for non-monetary contexts (e.g. count badges).
  */
 export function formatCompactNumber(num: number | string): string {
   const value = typeof num === 'string' ? parseFloat(num) : num;
@@ -11,32 +26,4 @@ export function formatCompactNumber(num: number | string): string {
     notation: 'compact',
     maximumFractionDigits: 1,
   }).format(value);
-}
-
-/**
- * This tool formats any number into a Currency format (Defaulting to QAR).
- * It also uses the "Shortening" tool above for very large amounts of money.
- */
-export function formatCurrency(amount: number | string, currency: string = 'QAR'): string {
-  const value = typeof amount === 'string' ? parseFloat(amount) : amount;
-  if (typeof value !== 'number' || isNaN(value)) return `${currency} 0`;
-
-  // For smaller amounts, we show the full number with its currency symbol.
-  if (Math.abs(value) < 100000) {
-    try {
-      return new Intl.NumberFormat('en-US', {
-        style: 'currency',
-        currency: currency,
-        minimumFractionDigits: 0,
-      })
-        .format(value)
-        .replace(currency, `${currency} `);
-    } catch {
-      return `${currency} ${value.toLocaleString()}`;
-    }
-  }
-
-  // For very large amounts, we use the shortening tool (e.g., QAR 2.5M).
-  const compactValue = formatCompactNumber(value);
-  return `${currency} ${compactValue}`;
 }

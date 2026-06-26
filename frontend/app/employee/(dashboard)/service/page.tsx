@@ -1959,19 +1959,20 @@ export default function ServiceDashboardPage() {
                       >
                         <div className="flex items-center justify-end gap-1">
                           {/* HELP DESK ACTIONS */}
-                          {isHelpDesk && ticket.status === 'OPEN' && (
-                            <Button
-                              size="sm"
-                              className="bg-blue-600 hover:bg-[#1e3a8a] text-white h-7 px-2 rounded-md text-[11px] font-bold gap-1"
-                              onClick={() => {
-                                setSelectedTicket(ticket);
-                                setShowAssignModal(true);
-                              }}
-                            >
-                              <UserPlus className="size-3.5" />
-                              Assign Tech
-                            </Button>
-                          )}
+                          {isHelpDesk &&
+                            (ticket.status === 'OPEN' || ticket.status === 'FREE_SERVICE') && (
+                              <Button
+                                size="sm"
+                                className="bg-blue-600 hover:bg-[#1e3a8a] text-white h-7 px-2 rounded-md text-[11px] font-bold gap-1"
+                                onClick={() => {
+                                  setSelectedTicket(ticket);
+                                  setShowAssignModal(true);
+                                }}
+                              >
+                                <UserPlus className="size-3.5" />
+                                Assign Tech
+                              </Button>
+                            )}
 
                           {(isHelpDesk || isManagerOrAdmin) &&
                             (ticket.status === 'FINANCE_APPROVED' ||
@@ -2106,6 +2107,7 @@ export default function ServiceDashboardPage() {
                           {isTechnician &&
                             (ticket.status === 'CUSTOMER_APPROVED' ||
                               ticket.status === 'FREE_SERVICE') &&
+                            ticket.assignedTechnicianId === user?.userId &&
                             !ticket.repairStartedAt && (
                               <Button
                                 size="sm"
@@ -4726,19 +4728,21 @@ export default function ServiceDashboardPage() {
                         </Button>
                       )}
 
-                      {isHelpDesk && selectedTicket.status === 'OPEN' && (
-                        <Button
-                          size="sm"
-                          className="bg-blue-600 hover:bg-[#1e3a8a] text-white h-8 px-3 rounded-lg font-bold gap-1"
-                          onClick={() => {
-                            setShowDetailsModal(false);
-                            setShowAssignModal(true);
-                          }}
-                        >
-                          <UserPlus className="size-3.5" />
-                          Assign Tech
-                        </Button>
-                      )}
+                      {isHelpDesk &&
+                        (selectedTicket.status === 'OPEN' ||
+                          selectedTicket.status === 'FREE_SERVICE') && (
+                          <Button
+                            size="sm"
+                            className="bg-blue-600 hover:bg-[#1e3a8a] text-white h-8 px-3 rounded-lg font-bold gap-1"
+                            onClick={() => {
+                              setShowDetailsModal(false);
+                              setShowAssignModal(true);
+                            }}
+                          >
+                            <UserPlus className="size-3.5" />
+                            Assign Tech
+                          </Button>
+                        )}
 
                       {isTechnician &&
                         selectedTicket.status === 'ASSIGNED' &&
@@ -4809,6 +4813,7 @@ export default function ServiceDashboardPage() {
                       {isTechnician &&
                         (selectedTicket.status === 'CUSTOMER_APPROVED' ||
                           selectedTicket.status === 'FREE_SERVICE') &&
+                        selectedTicket.assignedTechnicianId === user?.userId &&
                         !selectedTicket.repairStartedAt && (
                           <Button
                             size="sm"

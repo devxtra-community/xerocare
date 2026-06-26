@@ -100,3 +100,33 @@ Available to help-desk workers and technicians directly within the ticket detail
 
 - **Local Service Tickets**: Full history of past breakdowns, PMs, and repairs.
 - **Contract & Invoice History**: Active leases, rentals, and payments grouped by contract types (`SALE`, `RENT`, `LEASE`, `SERVICE`) queried live from the `billing_service`.
+
+---
+
+## 🚀 Developer Onboarding & Quick Start
+
+For detailed system mechanics, build settings, database schemas, complex business logics, and login flow references, please consult the master **[Developer Onboarding & Reference Guide](docs/DEVELOPER_GUIDE.md)**.
+
+### ⏱️ Quick Start Commands
+
+1. **Install workspace dependencies**:
+   ```bash
+   pnpm install
+   ```
+2. **Start Postgres, MongoDB, Redis & RabbitMQ**:
+   ```bash
+   docker-compose up -d postgres mongodb redis rabbitmq
+   ```
+3. **Run services in development mode**:
+   ```bash
+   pnpm dev
+   ```
+4. **Compile and build frontend/backend packages**:
+   ```bash
+   pnpm run build
+   ```
+5. **Run typechecks and lints**:
+   ```bash
+   pnpm run lint
+   pnpm run typecheck
+   ```

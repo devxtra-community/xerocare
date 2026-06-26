@@ -145,6 +145,7 @@ export class EmployeeService {
       role: employee.role,
       status: employee.status,
       name: `${employee.first_name} ${employee.last_name}`,
+      branchId: employee.branch_id ?? null,
     });
 
     publishEmailJob({
@@ -188,6 +189,8 @@ export class EmployeeService {
     branchId?: string,
     search?: string,
     job?: string,
+    sortBy?: string,
+    sortOrder?: 'ASC' | 'DESC',
   ) {
     const skip = (page - 1) * limit;
 
@@ -198,6 +201,8 @@ export class EmployeeService {
       branchId,
       search,
       job,
+      sortBy,
+      sortOrder,
     );
 
     return {
@@ -317,6 +322,7 @@ export class EmployeeService {
       role: updated.role,
       status: updated.status,
       name: `${updated.first_name} ${updated.last_name}`,
+      branchId: updated.branch_id ?? null,
     });
 
     return updated;
@@ -337,6 +343,7 @@ export class EmployeeService {
 
     await publishEmployeeEvent(EmployeeEventType.DELETED, {
       employeeId: employee.id,
+      branchId: employee.branch_id ?? null,
     });
 
     return !!updated;

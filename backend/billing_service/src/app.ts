@@ -79,6 +79,10 @@ const startServer = async () => {
     startContractExpiryScheduler();
     startReminderCronJobs();
 
+    // Start Exchange Rate Cron (daily at midnight)
+    const { startExchangeRateCron } = await import('./services/exchangeRateCron');
+    startExchangeRateCron();
+
     const PORT = process.env.PORT || 3004;
 
     // Start listening for requests

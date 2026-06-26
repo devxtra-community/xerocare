@@ -47,6 +47,9 @@ export class PaymentTransaction {
   @Column({ name: 'remarks', type: 'text', nullable: true })
   remarks?: string;
 
+  @Column({ name: 'currency_code', type: 'varchar', length: 3, nullable: true })
+  currencyCode?: string;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt!: Date;
 }
