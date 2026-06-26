@@ -23,10 +23,13 @@ import { ItemType } from '../entities/enums/itemType';
 import { InvoiceType } from '../entities/enums/invoiceType';
 import { emitProductStatusUpdate } from '../events/publisher/productStatusEvent';
 import { ContractStatus } from '../entities/enums/contractStatus';
+import { WarrantyType } from '../entities/enums/warrantyType';
+import { WarrantyDurationUnit } from '../entities/enums/warrantyDurationUnit';
 import { ProductAllocation, AllocationStatus } from '../entities/productAllocationEntity';
 import { DeviceMeterReading, ReadingSource } from '../entities/deviceMeterReadingEntity';
 import { UsageRecord } from '../entities/usageRecordEntity';
 import { UsageService } from './usageService';
+import { NotificationService } from './notificationService';
 import { PaymentMode } from '../entities/paymentLedgerEntity';
 import {
   emitProductAllocate,
@@ -57,6 +60,7 @@ export class BillingService {
   private calculator = new BillingCalculationService();
   private usageService = new UsageService();
   private returnCreditRepo = new ReturnCreditRepository();
+  private notificationService = new NotificationService();
 
   // ... existing methods ...
 
@@ -482,25 +486,25 @@ export class BillingService {
     securityDepositReference?: string;
     securityDepositDate?: string;
     securityDepositBank?: string;
+
+    // Warranty Fields
+    warrantyType?: string;
+    warrantyDurationValue?: number;
+    warrantyDurationUnit?: string;
+    warrantyCopyLimit?: number;
+
     layoutId?: string;
     notes?: string;
   }) {
-    if (payload.items) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      payload.items.forEach((item: any) => {
-        if (item.itemType === 'SPAREPART' || item.itemType === 'SPARE_PART') {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          item.itemType = 'SPARE_PART' as any;
-        } else {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          item.itemType = 'PRODUCT' as any;
-        }
-      });
-    }
-
     // 1. Validation Logic
-
-    await this.validateQuotationDiscounts(payload.items);
+    if (
+      payload.saleType !== SaleType.SPAREPART_SALE &&
+      payload.items?.some(
+        (item) => item.itemType === 'SPARE_PART' || (item.itemType as unknown) === 'SPAREPART',
+      )
+    ) {
+      throw new AppError('Spare parts are only allowed in Spare Parts Sale quotations', 400);
+    }
 
     if (payload.rentType === RentType.FIXED_LIMIT || payload.rentType === RentType.FIXED_COMBO) {
       if (payload.pricingItems) {
@@ -657,6 +661,12 @@ export class BillingService {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       layoutId: payload.layoutId || (payload as any).layout_id,
       notes: payload.notes,
+
+      // Warranty
+      warrantyType: payload.warrantyType as WarrantyType,
+      warrantyDurationValue: payload.warrantyDurationValue,
+      warrantyDurationUnit: payload.warrantyDurationUnit as WarrantyDurationUnit,
+      warrantyCopyLimit: payload.warrantyCopyLimit,
 
       totalAmount: 0, // Placeholder
       items: invoiceItems,
@@ -1445,6 +1455,10 @@ export class BillingService {
       );
     }
 
+    if (invoice.type === InvoiceType.PROFORMA) {
+      return invoice;
+    }
+
     if (invoice.type !== InvoiceType.QUOTATION) {
       throw new AppError('Only quotations can be converted', 400);
     }
@@ -1796,6 +1810,18 @@ export class BillingService {
 
       // Emit status updates
       this.emitProductStatusUpdates(savedInvoice, userId);
+
+      // --- NEW: Warranty Confirmation Email for LEASE ---
+      if (savedInvoice.saleType === SaleType.LEASE) {
+        try {
+          await this.notificationService.sendWarrantyConfirmationEmail(savedInvoice.id);
+        } catch (err) {
+          logger.error(
+            `Failed to send warranty confirmation email for lease ${savedInvoice.id}`,
+            err,
+          );
+        }
+      }
 
       // Notify Creator
       if (savedInvoice.createdBy) {

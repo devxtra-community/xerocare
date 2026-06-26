@@ -132,6 +132,14 @@ async function runPreMigrations() {
         IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'invoices_billtype_enum') THEN
           CREATE TYPE invoices_billtype_enum AS ENUM ('SERVICE', 'AMC', 'FSMA', 'SMA', 'SALE', 'RENT', 'LEASE');
         END IF;
+
+        IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'invoices_warrantytype_enum') THEN
+          CREATE TYPE invoices_warrantytype_enum AS ENUM ('none', 'duration', 'copies');
+        END IF;
+
+        IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'invoices_warrantydurationunit_enum') THEN
+          CREATE TYPE invoices_warrantydurationunit_enum AS ENUM ('months', 'years');
+        END IF;
         
         IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'credit_note_status_enum') THEN
           CREATE TYPE credit_note_status_enum AS ENUM ('DRAFT', 'PENDING_APPROVAL', 'APPROVED', 'REJECTED', 'COMPLETED', 'PRODUCT_REPLACED');
@@ -158,21 +166,12 @@ async function runPreMigrations() {
         ADD COLUMN IF NOT EXISTS "billType" invoices_billtype_enum NULL,
         ADD COLUMN IF NOT EXISTS "serviceTicketId" UUID NULL,
         ADD COLUMN IF NOT EXISTS "maxCopyLimit" INTEGER NULL,
-        ADD COLUMN IF NOT EXISTS estimate_valid_until TIMESTAMP,
-        ADD COLUMN IF NOT EXISTS estimate_expired BOOLEAN DEFAULT FALSE,
-        ADD COLUMN IF NOT EXISTS total_discount_amount DECIMAL(10,2) DEFAULT 0,
-        ADD COLUMN IF NOT EXISTS visit_charge_amount DECIMAL(10,2) DEFAULT 0,
-        ADD COLUMN IF NOT EXISTS visit_charge_method VARCHAR(30),
-        ADD COLUMN IF NOT EXISTS validity_extension_days INT,
-        ADD COLUMN IF NOT EXISTS validity_extension_fee DECIMAL(10,2) DEFAULT 0,
-        ADD COLUMN IF NOT EXISTS validity_extension_fee_added BOOLEAN DEFAULT FALSE,
-        ADD COLUMN IF NOT EXISTS technician_note_to_finance TEXT,
-        ADD COLUMN IF NOT EXISTS revision_count INT DEFAULT 0,
-        ADD COLUMN IF NOT EXISTS expiry_date TIMESTAMP,
-        ADD COLUMN IF NOT EXISTS validity_days INT DEFAULT 30,
-        ADD COLUMN IF NOT EXISTS is_converted BOOLEAN DEFAULT FALSE,
-        ADD COLUMN IF NOT EXISTS conversion_date TIMESTAMP,
-        ADD COLUMN IF NOT EXISTS not_converted_reason TEXT;
+        ADD COLUMN IF NOT EXISTS "warrantyType" invoices_warrantytype_enum NOT NULL DEFAULT 'none',
+        ADD COLUMN IF NOT EXISTS "warrantyDurationValue" INTEGER NULL,
+        ADD COLUMN IF NOT EXISTS "warrantyDurationUnit" invoices_warrantydurationunit_enum NULL,
+        ADD COLUMN IF NOT EXISTS "warrantyCopyLimit" INTEGER NULL,
+        ADD COLUMN IF NOT EXISTS "warrantyEmailSent" BOOLEAN NOT NULL DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS "warrantyExpiryEmailSent" BOOLEAN NOT NULL DEFAULT FALSE;
       `);
       await client.query(`
         ALTER TABLE invoice_items 
@@ -239,6 +238,24 @@ async function runPreMigrations() {
       await client.query(`
         ALTER TABLE payment_transactions
         ADD COLUMN IF NOT EXISTS currency_code VARCHAR(3);
+      `);
+
+      // --- Quotation validity + service estimate columns ---
+      await client.query(`
+        ALTER TABLE invoices
+        ADD COLUMN IF NOT EXISTS "validityDays" INTEGER NULL,
+        ADD COLUMN IF NOT EXISTS "expiryDate" TIMESTAMP NULL,
+        ADD COLUMN IF NOT EXISTS "isConverted" BOOLEAN NOT NULL DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS "estimateValidUntil" TIMESTAMP NULL,
+        ADD COLUMN IF NOT EXISTS "estimateExpired" BOOLEAN NULL,
+        ADD COLUMN IF NOT EXISTS "visitChargeAmount" DECIMAL(12,2) NULL,
+        ADD COLUMN IF NOT EXISTS "visitChargeMethod" VARCHAR(100) NULL,
+        ADD COLUMN IF NOT EXISTS "totalDiscountAmount" DECIMAL(12,2) NULL,
+        ADD COLUMN IF NOT EXISTS "technicianNoteToFinance" TEXT NULL,
+        ADD COLUMN IF NOT EXISTS "revisionCount" INTEGER NULL DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS "validityExtensionDays" INTEGER NULL,
+        ADD COLUMN IF NOT EXISTS "validityExtensionFee" DECIMAL(12,2) NULL,
+        ADD COLUMN IF NOT EXISTS "validityExtensionFeeAdded" BOOLEAN NOT NULL DEFAULT FALSE;
       `);
 
       // Add columns to invoice_ledger table

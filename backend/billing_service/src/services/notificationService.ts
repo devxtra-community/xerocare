@@ -3,6 +3,7 @@ import { AppError } from '../errors/appError';
 import { logger } from '../config/logger';
 import { UsageRecord } from '../entities/usageRecordEntity';
 import { InvoiceItem } from '../entities/invoiceItemEntity';
+import { Invoice } from '../entities/invoiceEntity';
 
 export class NotificationService {
   private invoiceRepo = new InvoiceRepository();
@@ -376,6 +377,228 @@ export class NotificationService {
       return data.data;
     } catch {
       return null;
+    }
+  }
+
+  /**
+   * Sends a confirmation email to the customer when a lease is accepted, including warranty details.
+   */
+  async sendWarrantyConfirmationEmail(contractId: string) {
+    const contract = await this.invoiceRepo.findById(contractId);
+    if (
+      !contract ||
+      contract.saleType !== 'LEASE' ||
+      !contract.warrantyType ||
+      contract.warrantyType === 'none'
+    ) {
+      return;
+    }
+    if (contract.warrantyEmailSent) return;
+
+    try {
+      const customerDetails = await this.getCustomerDetails(contract.customerId);
+      const customerEmail =
+        customerDetails?.email || (contract as Invoice & { customerEmail?: string }).customerEmail;
+      if (!customerEmail) {
+        logger.warn(`No email found for customer in contract ${contract.id}`);
+        return;
+      }
+
+      const customerName = customerDetails?.firstName
+        ? `${customerDetails.firstName} ${customerDetails.lastName || ''}`.trim()
+        : (contract as Invoice & { customerName?: string }).customerName || 'Customer';
+
+      const productsList = (contract.productAllocations || [])
+        .map(
+          (p) => `
+          <div style="padding: 10px; border: 1px solid #e5e7eb; border-radius: 4px; margin-bottom: 8px;">
+            <p style="margin: 0; font-size: 14px;"><strong>Model:</strong> ${p.serialNumber.split('-')[0]} (${
+              p.serialNumber
+            })</p>
+            <p style="margin: 4px 0 0 0; font-size: 12px; color: #6b7280;">Initial Meter: ${
+              p.initialBwA4
+            } (B/W), ${p.initialColorA4} (Color)</p>
+          </div>
+        `,
+        )
+        .join('');
+
+      const agreementDetails = `
+        <div style="background-color: #f3f4f6; padding: 15px; border-radius: 6px; margin: 20px 0;">
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+            <div>
+              <p style="margin: 5px 0; font-size: 13px;"><strong>Lease Type:</strong> ${
+                contract.leaseType || 'N/A'
+              }</p>
+              <p style="margin: 5px 0; font-size: 13px;"><strong>Tenure:</strong> ${
+                contract.leaseTenureMonths || 0
+              } Months</p>
+              <p style="margin: 5px 0; font-size: 13px;"><strong>Start Date:</strong> ${new Date(
+                contract.effectiveFrom,
+              ).toLocaleDateString()}</p>
+              ${
+                contract.effectiveTo
+                  ? `<p style="margin: 5px 0; font-size: 13px;"><strong>Expiry Date:</strong> ${new Date(
+                      contract.effectiveTo,
+                    ).toLocaleDateString()}</p>`
+                  : ''
+              }
+            </div>
+            <div>
+              <p style="margin: 5px 0; font-size: 13px;"><strong>Monthly Rent:</strong> QAR ${Number(
+                contract.monthlyLeaseAmount || contract.monthlyRent || 0,
+              ).toLocaleString()}</p>
+              <p style="margin: 5px 0; font-size: 13px;"><strong>Advance Paid:</strong> QAR ${Number(
+                contract.advanceAmount || 0,
+              ).toLocaleString()}</p>
+              <p style="margin: 5px 0; font-size: 13px;"><strong>Security Deposit:</strong> QAR ${Number(
+                contract.securityDepositAmount || 0,
+              ).toLocaleString()}</p>
+              <p style="margin: 5px 0; font-size: 13px;"><strong>Billing Cycle:</strong> ${
+                contract.billingCycleInDays || 30
+              } Days</p>
+            </div>
+          </div>
+        </div>
+      `;
+
+      // Build warranty info string
+      const warrantyInfo =
+        contract.warrantyType === 'duration'
+          ? `${contract.warrantyDurationValue || ''} ${contract.warrantyDurationUnit || ''}`.trim()
+          : contract.warrantyCopyLimit
+            ? `${contract.warrantyCopyLimit.toLocaleString()} copies`
+            : 'N/A';
+
+      // Build optional notes section
+      const notesSection = contract.notes
+        ? `<div style="margin-top: 25px; padding: 15px; background-color: #f9fafb; border-radius: 6px; border: 1px solid #e5e7eb;">
+            <h4 style="margin: 0 0 8px 0; font-size: 14px; color: #374151;">Additional Notes</h4>
+            <p style="margin: 0; font-size: 13px; color: #4b5563; line-height: 1.6;">${contract.notes}</p>
+          </div>`
+        : '';
+
+      const htmlBody = `
+        <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 700px; margin: 0 auto; padding: 30px; border: 1px solid #e5e7eb; border-radius: 12px; color: #374151;">
+          <div style="text-align: center; border-bottom: 2px solid #3b82f6; padding-bottom: 20px; margin-bottom: 25px;">
+            <h1 style="color: #1e3a8a; margin: 0; font-size: 24px;">Lease Agreement & Warranty Confirmation</h1>
+            <p style="color: #6b7280; margin: 5px 0 0 0;">Contract Reference: ${contract.invoiceNumber}</p>
+          </div>
+
+          <p>Dear <strong>${customerName}</strong>,</p>
+          <p>We are pleased to confirm that your lease agreement with Xerocare has been successfully activated. Below are the finalized details of your contract, allocated equipment, and warranty coverage.</p>
+          
+          <h3 style="font-size: 18px; color: #1e3a8a; border-left: 4px solid #3b82f6; padding-left: 10px; margin-top: 30px;">1. Lease Agreement Details</h3>
+          ${agreementDetails}
+
+          <h3 style="font-size: 18px; color: #1e3a8a; border-left: 4px solid #3b82f6; padding-left: 10px; margin-top: 30px;">2. Allocated Equipment</h3>
+          <div style="margin: 15px 0;">
+            ${productsList || '<p style="font-style: italic; color: #9ca3af;">No specific machines listed.</p>'}
+          </div>
+
+          <h3 style="font-size: 18px; color: #1e3a8a; border-left: 4px solid #3b82f6; padding-left: 10px; margin-top: 30px;">3. Warranty Coverage</h3>
+          <div style="background-color: #f0f9ff; padding: 15px; border-radius: 6px; border: 1px solid #bae6fd; margin: 15px 0;">
+            <p style="margin: 5px 0;"><strong>Warranty Type:</strong> ${
+              contract.warrantyType === 'duration' ? 'By Duration' : 'By Count of Copies'
+            }</p>
+            <p style="margin: 5px 0;"><strong>Warranty Limit:</strong> ${warrantyInfo}</p>
+          </div>
+
+          ${notesSection}
+
+          <div style="background-color: #fffbeb; padding: 20px; border-radius: 8px; border: 1px solid #fde68a; margin-top: 35px;">
+            <h4 style="margin: 0 0 10px 0; color: #92400e; font-size: 15px;">⚠️ Important Technical Support Notice</h4>
+            <p style="margin: 0; font-size: 13px; color: #92400e; line-height: 1.6;">
+              Upon expiration of the warranty period (${warrantyInfo}), complimentary technical support, periodic maintenance, and replacement parts will no longer be provided under the initial warranty terms. 
+              Subsequent technical assistance, repair services, or replacement components requested will be subject to standard service charges and parts costs at our prevailing market rates.
+            </p>
+          </div>
+
+          <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #f3f4f6; text-align: center; font-size: 13px; color: #9ca3af;">
+            <p style="margin: 0;">This is an automated confirmation. Please keep this for your records.</p>
+            <p style="margin: 5px 0 0 0;">Thank you for choosing Xerocare for your office equipment needs.</p>
+          </div>
+        </div>
+      `;
+
+      const { NotificationPublisher } = await import('../events/publisher/notificationPublisher');
+      await NotificationPublisher.publishEmailRequest({
+        recipient: customerEmail,
+        subject: `Lease Warranty Confirmation - ${contract.invoiceNumber}`,
+        body: htmlBody,
+        invoiceId: contract.id,
+      });
+
+      contract.warrantyEmailSent = true;
+      await this.invoiceRepo.save(contract);
+      logger.info(
+        `[NotificationService] Warranty confirmation email sent for ${contract.invoiceNumber}`,
+      );
+    } catch (error) {
+      logger.error('Failed to send warranty confirmation email', error);
+    }
+  }
+
+  /**
+   * Sends an automated email to the customer when their warranty expires (by duration or copy count).
+   */
+  async sendWarrantyExpiryEmail(contractId: string) {
+    const contract = await this.invoiceRepo.findById(contractId);
+    if (
+      !contract ||
+      contract.saleType !== 'LEASE' ||
+      !contract.warrantyType ||
+      contract.warrantyType === 'none'
+    ) {
+      return;
+    }
+    if (contract.warrantyExpiryEmailSent) return;
+
+    try {
+      const customerDetails = await this.getCustomerDetails(contract.customerId);
+      const customerEmail =
+        customerDetails?.email || (contract as Invoice & { customerEmail?: string }).customerEmail;
+      if (!customerEmail) return;
+
+      const customerName = customerDetails?.firstName
+        ? `${customerDetails.firstName} ${customerDetails.lastName || ''}`.trim()
+        : (contract as Invoice & { customerName?: string }).customerName || 'Customer';
+
+      const htmlBody = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #fee2e2; border-radius: 8px;">
+          <h2 style="color: #991b1b;">Warranty Expiry Notice</h2>
+          <p>Dear ${customerName},</p>
+          <p>Please be advised that the warranty coverage for your lease contract <strong>${contract.invoiceNumber}</strong> has expired.</p>
+          
+          <div style="background-color: #fef2f2; padding: 15px; border-radius: 6px; border: 1px solid #fecaca; margin: 20px 0;">
+             <p style="margin: 0; font-size: 14px; color: #991b1b;"><strong>Warranty Status: EXPIRED</strong></p>
+          </div>
+
+          <div style="background-color: #fffbeb; padding: 15px; border-radius: 6px; border: 1px solid #fde68a;">
+            <p style="margin: 0; font-size: 14px; color: #92400e;"><strong>Important Legal Notice:</strong></p>
+            <p style="margin: 5px 0; font-size: 13px; color: #92400e; line-height: 1.5;">
+              As per the terms of your lease agreement, upon expiration of the warranty period, complimentary technical support, maintenance services, and replacement parts will no longer be provided. Any technical assistance, repair services, replacement components, or related support requested from this date forward will be subject to applicable service charges and parts costs at the prevailing rates.
+            </p>
+          </div>
+
+          <p style="margin-top: 20px; font-size: 14px; color: #6b7280;">If you wish to discuss extended maintenance options, please contact our support team.</p>
+          <p style="margin-top: 10px; font-size: 14px; color: #6b7280;">Thank you, <br/> Xerocare Management</p>
+        </div>
+      `;
+
+      const { NotificationPublisher } = await import('../events/publisher/notificationPublisher');
+      await NotificationPublisher.publishEmailRequest({
+        recipient: customerEmail,
+        subject: `Warranty Expiry Notice - ${contract.invoiceNumber}`,
+        body: htmlBody,
+        invoiceId: contract.id,
+      });
+
+      contract.warrantyExpiryEmailSent = true;
+      await this.invoiceRepo.save(contract);
+      logger.info(`[NotificationService] Warranty expiry email sent for ${contract.invoiceNumber}`);
+    } catch (error) {
+      logger.error('Failed to send warranty expiry email', error);
     }
   }
 }

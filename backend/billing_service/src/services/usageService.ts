@@ -12,6 +12,7 @@ import { NotificationService } from './notificationService';
 import { NotificationPublisher } from '../events/publisher/notificationPublisher';
 import { logger } from '../config/logger';
 import { SaleType } from '../entities/enums/saleType';
+import { WarrantyType } from '../entities/enums/warrantyType';
 import { ProductAllocation, AllocationStatus } from '../entities/productAllocationEntity';
 import { emitProductStatusUpdate } from '../events/publisher/productStatusEvent';
 import { UsageRecordItem } from '../entities/usageRecordItemEntity';
@@ -503,6 +504,14 @@ export class UsageService {
           }
         }
 
+        // --- WARRANTY CHECK (COPY LIMIT) ---
+        await this.checkWarrantyExpiryByCount(contract, {
+          bwA4: totalEndBwA4 || payload.bwA4Count,
+          bwA3: totalEndBwA3 || payload.bwA3Count,
+          colorA4: totalEndColorA4 || payload.colorA4Count,
+          colorA3: totalEndColorA3 || payload.colorA3Count,
+        });
+
         return usage;
       } catch (error) {
         await queryRunner.rollbackTransaction();
@@ -551,7 +560,39 @@ export class UsageService {
       // Return next period for UI convenience
       const nextPeriod = this.calculateNextPeriod(contract, new Date(payload.billingPeriodEnd));
 
+      // --- WARRANTY CHECK (COPY LIMIT) ---
+      await this.checkWarrantyExpiryByCount(contract, {
+        bwA4: totalEndBwA4 || payload.bwA4Count,
+        bwA3: totalEndBwA3 || payload.bwA3Count,
+        colorA4: totalEndColorA4 || payload.colorA4Count,
+        colorA3: totalEndColorA3 || payload.colorA3Count,
+      });
+
       return { usage, nextPeriod };
+    }
+  }
+
+  /**
+   * Helper to check and trigger warranty expiry by copy count.
+   */
+  private async checkWarrantyExpiryByCount(
+    contract: Invoice,
+    readings: { bwA4: number; bwA3: number; colorA4: number; colorA3: number },
+  ) {
+    if (
+      contract.saleType === SaleType.LEASE &&
+      contract.warrantyType === WarrantyType.COPIES &&
+      !contract.warrantyExpiryEmailSent
+    ) {
+      const currentTotalReading =
+        readings.bwA4 + readings.bwA3 + readings.colorA4 + readings.colorA3;
+      const copyLimit = contract.warrantyCopyLimit || 0;
+      if (copyLimit > 0 && currentTotalReading >= copyLimit) {
+        logger.info(
+          `[UsageService] Lease Warranty Copy Limit exceeded for ${contract.invoiceNumber}. Limit: ${copyLimit}, Reading: ${currentTotalReading}`,
+        );
+        await this.notificationService.sendWarrantyExpiryEmail(contract.id);
+      }
     }
   }
 

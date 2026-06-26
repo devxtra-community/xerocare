@@ -2,6 +2,8 @@ import { Source } from '../config/dataSource';
 import { Invoice } from '../entities/invoiceEntity';
 import { InvoiceType } from '../entities/enums/invoiceType';
 import { InvoiceStatus } from '../entities/enums/invoiceStatus';
+import { SaleType } from '../entities/enums/saleType';
+import { WarrantyType } from '../entities/enums/warrantyType';
 import { getRabbitChannel } from '../config/rabbitmq';
 import { logger } from '../config/logger';
 import { BillingEventType } from '../events/billingEvents';
@@ -11,7 +13,6 @@ import { Raw } from 'typeorm';
 import cron from 'node-cron';
 import { PaymentTransaction } from '../entities/paymentTransactionEntity';
 import { InvoiceLedger } from '../entities/invoiceLedgerEntity';
-import { SaleType } from '../entities/enums/saleType';
 import { UsageRecord } from '../entities/usageRecordEntity';
 
 const EXCHANGE = 'domain_events';
@@ -268,14 +269,61 @@ export async function serviceContractExpiryJob() {
   }
 }
 
+/**
+ * Checks for Lease Warranty expiration based on duration.
+ */
+export async function leaseWarrantyExpiryJob() {
+  logger.info('[CRON] Running daily Lease Warranty Expiry Check Job...');
+  try {
+    const invoiceRepo = Source.getRepository(Invoice);
+    const { NotificationService } = await import('./notificationService');
+    const notificationService = new NotificationService();
+
+    const leaseContracts = await invoiceRepo.find({
+      where: {
+        saleType: SaleType.LEASE,
+        warrantyType: WarrantyType.DURATION,
+        warrantyExpiryEmailSent: false,
+      },
+    });
+
+    const now = new Date();
+
+    for (const contract of leaseContracts) {
+      if (!contract.financeApprovedAt) continue;
+
+      const startDate = new Date(contract.financeApprovedAt);
+      const expiryDate = new Date(startDate);
+
+      if (contract.warrantyDurationUnit === 'months') {
+        expiryDate.setMonth(expiryDate.getMonth() + (contract.warrantyDurationValue || 0));
+      } else if (contract.warrantyDurationUnit === 'years') {
+        expiryDate.setFullYear(expiryDate.getFullYear() + (contract.warrantyDurationValue || 0));
+      }
+
+      if (now >= expiryDate) {
+        logger.info(
+          `[CRON] Warranty expired for LEASE ${contract.invoiceNumber}. Expiry Date: ${expiryDate}`,
+        );
+        await notificationService.sendWarrantyExpiryEmail(contract.id);
+      }
+    }
+    logger.info('[CRON] Lease Warranty Expiry Check Job completed.');
+  } catch (error) {
+    logger.error('[CRON] Lease Warranty Expiry Check Job failed:', error);
+  }
+}
+
 export function startContractExpiryScheduler() {
   logger.info('[CRON] Starting Contract Expiry Scheduler...');
   // Run once immediately on start, then every 24 hours
   expireContractsJob();
   serviceContractExpiryJob();
+  leaseWarrantyExpiryJob();
   setInterval(() => {
     expireContractsJob();
     serviceContractExpiryJob();
+    leaseWarrantyExpiryJob();
   }, INTERVAL_MS);
 }
 

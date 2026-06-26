@@ -39,6 +39,10 @@ export interface LeaseAgreementDetails {
   endDate: string;
   monthlyEmi: number; // periodic payment (monthly rent for FSM, EMI for EMI-type)
   totalLeaseValue?: number; // total lease value (FSM: total contract value; EMI: totalAmount)
+  warrantyType?: 'none' | 'duration' | 'copies';
+  warrantyDurationValue?: number;
+  warrantyDurationUnit?: 'months' | 'years';
+  warrantyCopyLimit?: number;
 }
 
 export interface LeaseNormalQuotationProps {
@@ -980,6 +984,70 @@ const LeaseNormalQuotation: React.FC<LeaseNormalQuotationProps> = ({
           </div>
         )}
       </div>
+
+      {/* ─── GLOBAL WARRANTY (Optional) ─── */}
+      {leaseDetails.warrantyType && leaseDetails.warrantyType !== 'none' && (
+        <div style={{ marginBottom: '28px' }}>
+          <div
+            style={{
+              fontSize: '13px',
+              fontWeight: '300',
+              color: ACCENT,
+              marginBottom: '12px',
+              textTransform: 'uppercase',
+              paddingBottom: '5px',
+              borderBottom: `1px solid ${ACCENT}`,
+            }}
+          >
+            Warranty Coverage
+          </div>
+          <div
+            style={{
+              padding: '16px 20px',
+              backgroundColor: '#fdf2f2',
+              border: '1px solid #fecaca',
+              borderRadius: '12px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '6px',
+            }}
+          >
+            <div style={{ fontSize: '14px', fontWeight: '300', color: '#1a1a1a' }}>
+              {leaseDetails.warrantyType === 'duration' ? (
+                <>
+                  Your equipment is covered by a comprehensive warranty for a period of{' '}
+                  <span style={{ fontWeight: '300', color: '#dc2626' }}>
+                    {leaseDetails.warrantyDurationValue} {leaseDetails.warrantyDurationUnit}
+                  </span>{' '}
+                  from the contract start date.
+                </>
+              ) : (
+                <>
+                  Your equipment is covered by a comprehensive warranty up to a maximum of{' '}
+                  <span style={{ fontWeight: '300', color: '#dc2626' }}>
+                    {leaseDetails.warrantyCopyLimit?.toLocaleString()}
+                  </span>{' '}
+                  copies, whichever comes first.
+                </>
+              )}
+            </div>
+            <div
+              style={{
+                fontSize: '11px',
+                color: '#7f1d1d',
+                opacity: 0.8,
+                fontStyle: 'italic',
+                lineHeight: '1.4',
+              }}
+            >
+              * Technical support and replacement parts are provided free of charge during the
+              warranty period specified above. After the warranty period expires, or once the
+              applicable usage limit is reached, all technical support services, spare parts,
+              repairs, and related charges will be billable at the prevailing rates.
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ─── TOTALS & MONTHLY AMOUNT ─── */}
       <div

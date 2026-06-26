@@ -111,6 +111,12 @@ interface SaleItem {
   bwSlabRanges?: Array<{ from: string; to: string; rate: string }>;
   colorSlabRanges?: Array<{ from: string; to: string; rate: string }>;
   comboSlabRanges?: Array<{ from: string; to: string; rate: string }>;
+  bwRateUpTo100k?: string;
+  colorRateUpTo100k?: string;
+  comboRateUpTo100k?: string;
+  useBwRateUpTo100k?: boolean;
+  useColorRateUpTo100k?: boolean;
+  useComboRateUpTo100k?: boolean;
   consumables?: Consumable[];
 }
 
@@ -1297,6 +1303,12 @@ function QuotationFormModal({
   const [totalLeaseAmount, setTotalLeaseAmount] = useState('');
   const [monthlyEmiAmount, setMonthlyEmiAmount] = useState('');
 
+  // ── WARRANTY state ──────────────────────────────────────────────────────
+  const [warrantyType, setWarrantyType] = useState<'none' | 'duration' | 'copies'>('none');
+  const [warrantyDurationValue, setWarrantyDurationValue] = useState('');
+  const [warrantyDurationUnit, setWarrantyDurationUnit] = useState<'months' | 'years'>('months');
+  const [warrantyCopyLimit, setWarrantyCopyLimit] = useState('');
+
   const [lastEditedLease, setLastEditedLease] = useState<'TOTAL' | 'PERIODIC'>('TOTAL');
 
   // ── SECURITY DEPOSIT state ──────────────────────────────────────────────
@@ -1433,6 +1445,15 @@ function QuotationFormModal({
     if (initialData.leaseTenureMonths) setLeaseTenureMonths(String(initialData.leaseTenureMonths));
     if (initialData.totalLeaseAmount) setTotalLeaseAmount(String(initialData.totalLeaseAmount));
     if (initialData.monthlyEmiAmount) setMonthlyEmiAmount(String(initialData.monthlyEmiAmount));
+
+    // Warranty initial mapping
+    if (initialData.warrantyType)
+      setWarrantyType(initialData.warrantyType as 'none' | 'duration' | 'copies');
+    if (initialData.warrantyDurationValue)
+      setWarrantyDurationValue(String(initialData.warrantyDurationValue));
+    if (initialData.warrantyDurationUnit)
+      setWarrantyDurationUnit(initialData.warrantyDurationUnit as 'months' | 'years');
+    if (initialData.warrantyCopyLimit) setWarrantyCopyLimit(String(initialData.warrantyCopyLimit));
 
     if (initialData.securityDepositAmount)
       setSecurityDepositAmount(String(initialData.securityDepositAmount));
@@ -1795,10 +1816,151 @@ function QuotationFormModal({
         bwSlabRanges: [],
         colorSlabRanges: [],
         comboSlabRanges: [],
+        useBwRateUpTo100k: false,
+        useColorRateUpTo100k: false,
+        useComboRateUpTo100k: false,
+        bwRateUpTo100k: '',
+        colorRateUpTo100k: '',
+        comboRateUpTo100k: '',
       },
     ]);
     toast.info('Added custom item row');
   };
+
+  const renderSlabSection = (
+    itemIndex: number,
+    title: string,
+    type: 'bwSlabRanges' | 'colorSlabRanges' | 'comboSlabRanges',
+    slabs: SaleItem['bwSlabRanges'],
+    toggleField: keyof SaleItem,
+    isToggleOn: boolean,
+    rateField: keyof SaleItem,
+    rateValue: string,
+  ) => (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between bg-gray-100/50 px-3 py-2 rounded-lg border border-slate-200/50">
+        <div className="flex items-center gap-3">
+          <span className="text-[10px] font-black text-slate-700 uppercase tracking-widest">
+            {title}
+          </span>
+          <button
+            onClick={() => updateItem(itemIndex, toggleField, !isToggleOn)}
+            className={`text-[9px] px-2.5 py-1 rounded-full font-black uppercase tracking-tight transition-all shadow-sm ${
+              isToggleOn
+                ? 'bg-blue-600 text-white border border-blue-500 hover:bg-blue-700'
+                : 'bg-white text-slate-500 border border-slate-200 hover:border-blue-300 hover:text-blue-600'
+            }`}
+          >
+            {isToggleOn ? '✓ Fixed Rate (0-100K) ON' : '+ Enable Fixed Rate (0-100K)'}
+          </button>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-7 text-[10px] font-black text-blue-600 px-3 bg-white border-blue-100 hover:bg-blue-50 hover:border-blue-200 shadow-sm gap-2"
+          onClick={() => addSlab(itemIndex, type)}
+        >
+          <Plus size={12} className="stroke-[3]" /> Add Slab
+        </Button>
+      </div>
+
+      {isToggleOn && (
+        <div className="flex gap-4 items-center bg-blue-50/50 p-3 rounded-xl border border-blue-100 animate-in fade-in slide-in-from-left-2 duration-300">
+          <div className="flex-1">
+            <p className="text-[10px] font-black text-blue-800 uppercase tracking-wider">
+              Fixed Rate Up To 100K
+            </p>
+            <p className="text-[9px] text-blue-400 font-bold italic mt-0.5">
+              (Applies to usage from 0 to 100,000 units)
+            </p>
+          </div>
+          <div className="relative w-32">
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-black text-blue-300 pointer-events-none">
+              QAR
+            </span>
+            <Input
+              placeholder="0.00"
+              type="number"
+              value={rateValue || ''}
+              onChange={(e) => updateItem(itemIndex, rateField, e.target.value)}
+              className="h-9 text-xs font-black text-blue-700 bg-white border-blue-200 focus:ring-2 focus:ring-blue-500/20 pr-10 text-right"
+            />
+          </div>
+          <div className="w-8 shrink-0" /> {/* Spacer for alignment */}
+        </div>
+      )}
+
+      {slabs && slabs.length > 0 && (
+        <div className="space-y-2 mt-2">
+          {/* Table Header */}
+          <div className="grid grid-cols-12 gap-3 px-3 mb-1">
+            <div className="col-span-3 text-[9px] font-black text-slate-400 uppercase tracking-widest">
+              From
+            </div>
+            <div className="col-span-3 text-[9px] font-black text-slate-400 uppercase tracking-widest">
+              To
+            </div>
+            <div className="col-span-5 text-[9px] font-black text-slate-400 uppercase tracking-widest text-right pr-2">
+              Rate per Page (QAR)
+            </div>
+            <div className="col-span-1" />
+          </div>
+
+          {slabs.map((slab, sIdx) => (
+            <div
+              key={`${type}-${sIdx}`}
+              className="group flex gap-2 items-center bg-white p-1 rounded-xl border border-transparent hover:border-slate-200 hover:shadow-sm transition-all animate-in fade-in slide-in-from-top-1 duration-200"
+            >
+              <div className="grid grid-cols-12 gap-3 flex-1 items-center">
+                <div className="col-span-3">
+                  <Input
+                    placeholder="0"
+                    type="number"
+                    value={slab.from}
+                    onChange={(e) => updateSlab(itemIndex, type, sIdx, 'from', e.target.value)}
+                    className="h-9 text-xs font-bold bg-slate-50/50 border-slate-100 focus:bg-white text-center"
+                  />
+                </div>
+                <div className="col-span-3">
+                  <Input
+                    placeholder="∞"
+                    type={slab.to === '1000000' ? 'text' : 'number'}
+                    value={slab.to === '1000000' ? 'UNLIMITED' : slab.to}
+                    onChange={(e) => updateSlab(itemIndex, type, sIdx, 'to', e.target.value)}
+                    className={`h-9 text-xs font-bold text-center border-slate-100 ${
+                      slab.to === '1000000'
+                        ? 'text-blue-600 bg-blue-50 border-blue-100'
+                        : 'bg-slate-50/50 focus:bg-white'
+                    }`}
+                  />
+                </div>
+                <div className="col-span-5 relative">
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-black text-slate-300 pointer-events-none group-hover:text-blue-300">
+                    QAR
+                  </span>
+                  <Input
+                    placeholder="0.00"
+                    type="number"
+                    value={slab.rate}
+                    onChange={(e) => updateSlab(itemIndex, type, sIdx, 'rate', e.target.value)}
+                    className="h-9 text-xs font-black text-blue-600 bg-blue-50/30 border-blue-50 focus:bg-white text-right pr-10"
+                  />
+                </div>
+                <div className="col-span-1 flex justify-center">
+                  <button
+                    onClick={() => removeSlab(itemIndex, type, sIdx)}
+                    className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all opacity-0 group-hover:opacity-100"
+                  >
+                    <Trash2 size={15} />
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 
   const addSlab = (index: number, type: 'bwSlabRanges' | 'colorSlabRanges' | 'comboSlabRanges') => {
     setSaleItems((prev) => {
@@ -1884,7 +2046,7 @@ function QuotationFormModal({
     });
   };
 
-  const updateItem = (index: number, field: keyof SaleItem, value: string | number) => {
+  const updateItem = (index: number, field: keyof SaleItem, value: string | number | boolean) => {
     setSaleItems((prev) => {
       const items = [...prev];
       const item = items[index];
@@ -1939,9 +2101,21 @@ function QuotationFormModal({
           'bwExcessRate',
           'colorExcessRate',
           'combinedExcessRate',
+          'bwExcessRate',
+          'colorExcessRate',
+          'combinedExcessRate',
+          'bwRateUpTo100k',
+          'colorRateUpTo100k',
+          'comboRateUpTo100k',
         ].includes(field as string)
       ) {
         items[index] = { ...item, [field]: Number(value) };
+      } else if (
+        ['useBwRateUpTo100k', 'useColorRateUpTo100k', 'useComboRateUpTo100k'].includes(
+          field as string,
+        )
+      ) {
+        items[index] = { ...item, [field]: !!value };
       }
       return items;
     });
@@ -2105,6 +2279,16 @@ function QuotationFormModal({
         securityDepositBank,
 
         // Warranty
+        warrantyType,
+        warrantyDurationValue:
+          warrantyType === 'duration' && warrantyDurationValue
+            ? Number(warrantyDurationValue)
+            : undefined,
+        warrantyDurationUnit: warrantyType === 'duration' ? warrantyDurationUnit : undefined,
+        warrantyCopyLimit:
+          warrantyType === 'copies' && warrantyCopyLimit ? Number(warrantyCopyLimit) : undefined,
+
+        // Warranty
         // For FSM Leases, we need rentType and monthly rent mapped dynamically
         rentType: leaseType === 'FSM' ? (rentType as CreateInvoicePayload['rentType']) : undefined,
         monthlyRent: leaseType === 'FSM' && monthlyRent ? Number(monthlyRent) : undefined,
@@ -2154,28 +2338,43 @@ function QuotationFormModal({
                       ? it.combinedExcessRate || 0
                       : 0,
                   bwSlabRanges:
-                    (rentType === 'CPC' || rentType === 'CPC_COMBO') && it.bwSlabRanges?.length
-                      ? it.bwSlabRanges.map((r) => ({
-                          from: Number(r.from) || 0,
-                          to: Number(r.to) || 0,
-                          rate: Number(r.rate) || 0,
-                        }))
+                    rentType === 'CPC' || rentType === 'CPC_COMBO'
+                      ? [
+                          ...(it.useBwRateUpTo100k && it.bwRateUpTo100k
+                            ? [{ from: 0, to: 100000, rate: Number(it.bwRateUpTo100k) }]
+                            : []),
+                          ...(it.bwSlabRanges || []).map((r) => ({
+                            from: Number(r.from) || 0,
+                            to: Number(r.to) || 0,
+                            rate: Number(r.rate) || 0,
+                          })),
+                        ].filter((s) => s.rate > 0)
                       : undefined,
                   colorSlabRanges:
-                    (rentType === 'CPC' || rentType === 'CPC_COMBO') && it.colorSlabRanges?.length
-                      ? it.colorSlabRanges.map((r) => ({
-                          from: Number(r.from) || 0,
-                          to: Number(r.to) || 0,
-                          rate: Number(r.rate) || 0,
-                        }))
+                    rentType === 'CPC' || rentType === 'CPC_COMBO'
+                      ? [
+                          ...(it.useColorRateUpTo100k && it.colorRateUpTo100k
+                            ? [{ from: 0, to: 100000, rate: Number(it.colorRateUpTo100k) }]
+                            : []),
+                          ...(it.colorSlabRanges || []).map((r) => ({
+                            from: Number(r.from) || 0,
+                            to: Number(r.to) || 0,
+                            rate: Number(r.rate) || 0,
+                          })),
+                        ].filter((s) => s.rate > 0)
                       : undefined,
                   comboSlabRanges:
-                    (rentType === 'CPC' || rentType === 'CPC_COMBO') && it.comboSlabRanges?.length
-                      ? it.comboSlabRanges.map((r) => ({
-                          from: Number(r.from) || 0,
-                          to: Number(r.to) || 0,
-                          rate: Number(r.rate) || 0,
-                        }))
+                    rentType === 'CPC' || rentType === 'CPC_COMBO'
+                      ? [
+                          ...(it.useComboRateUpTo100k && it.comboRateUpTo100k
+                            ? [{ from: 0, to: 100000, rate: Number(it.comboRateUpTo100k) }]
+                            : []),
+                          ...(it.comboSlabRanges || []).map((r) => ({
+                            from: Number(r.from) || 0,
+                            to: Number(r.to) || 0,
+                            rate: Number(r.rate) || 0,
+                          })),
+                        ].filter((s) => s.rate > 0)
                       : undefined,
                 }
               : {}),
@@ -2208,28 +2407,43 @@ function QuotationFormModal({
                     ? it.combinedExcessRate || 0
                     : 0,
                 bwSlabRanges:
-                  (rentType === 'CPC' || rentType === 'CPC_COMBO') && it.bwSlabRanges?.length
-                    ? it.bwSlabRanges.map((r) => ({
-                        from: Number(r.from) || 0,
-                        to: Number(r.to) || 0,
-                        rate: Number(r.rate) || 0,
-                      }))
+                  rentType === 'CPC' || rentType === 'CPC_COMBO'
+                    ? [
+                        ...(it.useBwRateUpTo100k && it.bwRateUpTo100k
+                          ? [{ from: 0, to: 100000, rate: Number(it.bwRateUpTo100k) }]
+                          : []),
+                        ...(it.bwSlabRanges || []).map((r) => ({
+                          from: Number(r.from) || 0,
+                          to: Number(r.to) || 0,
+                          rate: Number(r.rate) || 0,
+                        })),
+                      ].filter((s) => s.rate > 0)
                     : undefined,
                 colorSlabRanges:
-                  (rentType === 'CPC' || rentType === 'CPC_COMBO') && it.colorSlabRanges?.length
-                    ? it.colorSlabRanges.map((r) => ({
-                        from: Number(r.from) || 0,
-                        to: Number(r.to) || 0,
-                        rate: Number(r.rate) || 0,
-                      }))
+                  rentType === 'CPC' || rentType === 'CPC_COMBO'
+                    ? [
+                        ...(it.useColorRateUpTo100k && it.colorRateUpTo100k
+                          ? [{ from: 0, to: 100000, rate: Number(it.colorRateUpTo100k) }]
+                          : []),
+                        ...(it.colorSlabRanges || []).map((r) => ({
+                          from: Number(r.from) || 0,
+                          to: Number(r.to) || 0,
+                          rate: Number(r.rate) || 0,
+                        })),
+                      ].filter((s) => s.rate > 0)
                     : undefined,
                 comboSlabRanges:
-                  (rentType === 'CPC' || rentType === 'CPC_COMBO') && it.comboSlabRanges?.length
-                    ? it.comboSlabRanges.map((r) => ({
-                        from: Number(r.from) || 0,
-                        to: Number(r.to) || 0,
-                        rate: Number(r.rate) || 0,
-                      }))
+                  rentType === 'CPC' || rentType === 'CPC_COMBO'
+                    ? [
+                        ...(it.useComboRateUpTo100k && it.comboRateUpTo100k
+                          ? [{ from: 0, to: 100000, rate: Number(it.comboRateUpTo100k) }]
+                          : []),
+                        ...(it.comboSlabRanges || []).map((r) => ({
+                          from: Number(r.from) || 0,
+                          to: Number(r.to) || 0,
+                          rate: Number(r.rate) || 0,
+                        })),
+                      ].filter((s) => s.rate > 0)
                     : undefined,
               }))
             : [],
@@ -3149,340 +3363,41 @@ function QuotationFormModal({
                                 {rentType === 'CPC' && (
                                   <div className="space-y-4 mt-2">
                                     {/* B/W Slabs */}
-                                    <div className="space-y-2">
-                                      <div className="flex justify-between items-center bg-gray-100 px-2 py-1 rounded">
-                                        <span className="text-[10px] font-bold">
-                                          Black & White Slabs
-                                        </span>
-                                        <Button
-                                          variant="ghost"
-                                          size="sm"
-                                          className="h-6 text-[10px] text-blue-600 px-2"
-                                          onClick={() => addSlab(index, 'bwSlabRanges')}
-                                        >
-                                          + Add Slab
-                                        </Button>
-                                      </div>
-                                      {m.bwSlabRanges?.map((slab, sIdx) => (
-                                        <div
-                                          key={`bw-${sIdx}`}
-                                          className="flex gap-2 items-center pl-2 border-l-2 border-blue-200"
-                                        >
-                                          <Input
-                                            placeholder="From"
-                                            type="number"
-                                            value={slab.from}
-                                            onChange={(e) =>
-                                              updateSlab(
-                                                index,
-                                                'bwSlabRanges',
-                                                sIdx,
-                                                'from',
-                                                e.target.value,
-                                              )
-                                            }
-                                            className="h-7 text-xs flex-1"
-                                          />
-                                          <div className="relative flex-1">
-                                            <Input
-                                              placeholder="To"
-                                              type={slab.to === '1000000' ? 'text' : 'number'}
-                                              value={slab.to === '1000000' ? 'UNLIMITED' : slab.to}
-                                              onChange={(e) =>
-                                                updateSlab(
-                                                  index,
-                                                  'bwSlabRanges',
-                                                  sIdx,
-                                                  'to',
-                                                  e.target.value,
-                                                )
-                                              }
-                                              className={`h-7 text-xs pr-14 ${slab.to === '1000000' ? 'font-bold text-blue-600 bg-blue-50/50' : ''}`}
-                                            />
-                                            <div className="absolute right-0 top-0 flex items-center h-7 gap-0.5 pr-0.5">
-                                              <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                className="h-6 px-1 text-[8px] font-bold text-blue-600 hover:bg-blue-100"
-                                                onClick={() =>
-                                                  updateSlab(
-                                                    index,
-                                                    'bwSlabRanges',
-                                                    sIdx,
-                                                    'to',
-                                                    '100000',
-                                                  )
-                                                }
-                                              >
-                                                100K
-                                              </Button>
-                                              <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                className="h-6 px-1 text-[10px] font-bold text-blue-600 hover:bg-blue-100"
-                                                onClick={() =>
-                                                  updateSlab(
-                                                    index,
-                                                    'bwSlabRanges',
-                                                    sIdx,
-                                                    'to',
-                                                    slab.to === '1000000' ? '' : '1000000',
-                                                  )
-                                                }
-                                              >
-                                                {slab.to === '1000000' ? '✕' : '∞'}
-                                              </Button>
-                                            </div>
-                                          </div>
-                                          <Input
-                                            placeholder="Rate"
-                                            type="number"
-                                            value={slab.rate}
-                                            onChange={(e) =>
-                                              updateSlab(
-                                                index,
-                                                'bwSlabRanges',
-                                                sIdx,
-                                                'rate',
-                                                e.target.value,
-                                              )
-                                            }
-                                            className="h-7 text-xs font-bold text-blue-600 flex-1"
-                                          />
-                                          <Button
-                                            variant="ghost"
-                                            size="icon"
-                                            className="h-7 w-7 text-red-400"
-                                            onClick={() => removeSlab(index, 'bwSlabRanges', sIdx)}
-                                          >
-                                            <Trash2 size={12} />
-                                          </Button>
-                                        </div>
-                                      ))}
-                                    </div>
+                                    {renderSlabSection(
+                                      index,
+                                      'Black & White Slabs',
+                                      'bwSlabRanges',
+                                      m.bwSlabRanges,
+                                      'useBwRateUpTo100k',
+                                      !!m.useBwRateUpTo100k,
+                                      'bwRateUpTo100k',
+                                      m.bwRateUpTo100k || '',
+                                    )}
                                     {/* Color Slabs */}
-                                    <div className="space-y-2">
-                                      <div className="flex justify-between items-center bg-gray-100 px-2 py-1 rounded">
-                                        <span className="text-[10px] font-bold">Color Slabs</span>
-                                        <Button
-                                          variant="ghost"
-                                          size="sm"
-                                          className="h-6 text-[10px] text-blue-600 px-2"
-                                          onClick={() => addSlab(index, 'colorSlabRanges')}
-                                        >
-                                          + Add Slab
-                                        </Button>
-                                      </div>
-                                      {m.colorSlabRanges?.map((slab, sIdx) => (
-                                        <div
-                                          key={`color-${sIdx}`}
-                                          className="flex gap-2 items-center pl-2 border-l-2 border-blue-200"
-                                        >
-                                          <Input
-                                            placeholder="From"
-                                            type="number"
-                                            value={slab.from}
-                                            onChange={(e) =>
-                                              updateSlab(
-                                                index,
-                                                'colorSlabRanges',
-                                                sIdx,
-                                                'from',
-                                                e.target.value,
-                                              )
-                                            }
-                                            className="h-7 text-xs flex-1"
-                                          />
-                                          <div className="relative flex-1">
-                                            <Input
-                                              placeholder="To"
-                                              type={slab.to === '1000000' ? 'text' : 'number'}
-                                              value={slab.to === '1000000' ? 'UNLIMITED' : slab.to}
-                                              onChange={(e) =>
-                                                updateSlab(
-                                                  index,
-                                                  'colorSlabRanges',
-                                                  sIdx,
-                                                  'to',
-                                                  e.target.value,
-                                                )
-                                              }
-                                              className={`h-7 text-xs pr-14 ${slab.to === '1000000' ? 'font-bold text-blue-600 bg-blue-50/50' : ''}`}
-                                            />
-                                            <div className="absolute right-0 top-0 flex items-center h-7 gap-0.5 pr-0.5">
-                                              <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                className="h-6 px-1 text-[8px] font-bold text-blue-600 hover:bg-blue-100"
-                                                onClick={() =>
-                                                  updateSlab(
-                                                    index,
-                                                    'colorSlabRanges',
-                                                    sIdx,
-                                                    'to',
-                                                    '100000',
-                                                  )
-                                                }
-                                              >
-                                                100K
-                                              </Button>
-                                              <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                className="h-6 px-1 text-[10px] font-bold text-blue-600 hover:bg-blue-100"
-                                                onClick={() =>
-                                                  updateSlab(
-                                                    index,
-                                                    'colorSlabRanges',
-                                                    sIdx,
-                                                    'to',
-                                                    slab.to === '1000000' ? '' : '1000000',
-                                                  )
-                                                }
-                                              >
-                                                {slab.to === '1000000' ? '✕' : '∞'}
-                                              </Button>
-                                            </div>
-                                          </div>
-                                          <Input
-                                            placeholder="Rate"
-                                            type="number"
-                                            value={slab.rate}
-                                            onChange={(e) =>
-                                              updateSlab(
-                                                index,
-                                                'colorSlabRanges',
-                                                sIdx,
-                                                'rate',
-                                                e.target.value,
-                                              )
-                                            }
-                                            className="h-7 text-xs font-bold text-blue-600 flex-1"
-                                          />
-                                          <Button
-                                            variant="ghost"
-                                            size="icon"
-                                            className="h-7 w-7 text-red-400"
-                                            onClick={() =>
-                                              removeSlab(index, 'colorSlabRanges', sIdx)
-                                            }
-                                          >
-                                            <Trash2 size={12} />
-                                          </Button>
-                                        </div>
-                                      ))}
-                                    </div>
+                                    {renderSlabSection(
+                                      index,
+                                      'Color Slabs',
+                                      'colorSlabRanges',
+                                      m.colorSlabRanges,
+                                      'useColorRateUpTo100k',
+                                      !!m.useColorRateUpTo100k,
+                                      'colorRateUpTo100k',
+                                      m.colorRateUpTo100k || '',
+                                    )}
                                   </div>
                                 )}
                                 {rentType === 'CPC_COMBO' && (
-                                  <div className="space-y-2 mt-2">
-                                    <div className="flex justify-between items-center bg-gray-100 px-2 py-1 rounded">
-                                      <span className="text-[10px] font-bold">Combined Slabs</span>
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        className="h-6 text-[10px] text-blue-600 px-2"
-                                        onClick={() => addSlab(index, 'comboSlabRanges')}
-                                      >
-                                        + Add Slab
-                                      </Button>
-                                    </div>
-                                    {m.comboSlabRanges?.map((slab, sIdx) => (
-                                      <div
-                                        key={`combo-${sIdx}`}
-                                        className="flex gap-2 items-center pl-2 border-l-2 border-blue-200"
-                                      >
-                                        <Input
-                                          placeholder="From"
-                                          type="number"
-                                          value={slab.from}
-                                          onChange={(e) =>
-                                            updateSlab(
-                                              index,
-                                              'comboSlabRanges',
-                                              sIdx,
-                                              'from',
-                                              e.target.value,
-                                            )
-                                          }
-                                          className="h-7 text-xs flex-1"
-                                        />
-                                        <div className="relative flex-1">
-                                          <Input
-                                            placeholder="To"
-                                            type={slab.to === '1000000' ? 'text' : 'number'}
-                                            value={slab.to === '1000000' ? 'UNLIMITED' : slab.to}
-                                            onChange={(e) =>
-                                              updateSlab(
-                                                index,
-                                                'comboSlabRanges',
-                                                sIdx,
-                                                'to',
-                                                e.target.value,
-                                              )
-                                            }
-                                            className={`h-7 text-xs pr-14 ${slab.to === '1000000' ? 'font-bold text-blue-600 bg-blue-50/50' : ''}`}
-                                          />
-                                          <div className="absolute right-0 top-0 flex items-center h-7 gap-0.5 pr-0.5">
-                                            <Button
-                                              variant="ghost"
-                                              size="sm"
-                                              className="h-6 px-1 text-[8px] font-bold text-blue-600 hover:bg-blue-100"
-                                              onClick={() =>
-                                                updateSlab(
-                                                  index,
-                                                  'comboSlabRanges',
-                                                  sIdx,
-                                                  'to',
-                                                  '100000',
-                                                )
-                                              }
-                                            >
-                                              100K
-                                            </Button>
-                                            <Button
-                                              variant="ghost"
-                                              size="sm"
-                                              className="h-6 px-1 text-[10px] font-bold text-blue-600 hover:bg-blue-100"
-                                              onClick={() =>
-                                                updateSlab(
-                                                  index,
-                                                  'comboSlabRanges',
-                                                  sIdx,
-                                                  'to',
-                                                  slab.to === '1000000' ? '' : '1000000',
-                                                )
-                                              }
-                                            >
-                                              {slab.to === '1000000' ? '✕' : '∞'}
-                                            </Button>
-                                          </div>
-                                        </div>
-                                        <Input
-                                          placeholder="Rate"
-                                          type="number"
-                                          value={slab.rate}
-                                          onChange={(e) =>
-                                            updateSlab(
-                                              index,
-                                              'comboSlabRanges',
-                                              sIdx,
-                                              'rate',
-                                              e.target.value,
-                                            )
-                                          }
-                                          className="h-7 text-xs font-bold text-blue-600 flex-1"
-                                        />
-                                        <Button
-                                          variant="ghost"
-                                          size="icon"
-                                          className="h-7 w-7 text-red-400"
-                                          onClick={() => removeSlab(index, 'comboSlabRanges', sIdx)}
-                                        >
-                                          <Trash2 size={12} />
-                                        </Button>
-                                      </div>
-                                    ))}
+                                  <div className="space-y-4 mt-2">
+                                    {renderSlabSection(
+                                      index,
+                                      'Combined Slabs',
+                                      'comboSlabRanges',
+                                      m.comboSlabRanges,
+                                      'useComboRateUpTo100k',
+                                      !!m.useComboRateUpTo100k,
+                                      'comboRateUpTo100k',
+                                      m.comboRateUpTo100k || '',
+                                    )}
                                   </div>
                                 )}
                               </div>
@@ -3840,340 +3755,41 @@ function QuotationFormModal({
                                 {rentType === 'CPC' && (
                                   <div className="space-y-4 mt-2">
                                     {/* B/W Slabs */}
-                                    <div className="space-y-2">
-                                      <div className="flex justify-between items-center bg-gray-100 px-2 py-1 rounded">
-                                        <span className="text-[10px] font-bold">
-                                          Black & White Slabs
-                                        </span>
-                                        <Button
-                                          variant="ghost"
-                                          size="sm"
-                                          className="h-6 text-[10px] text-blue-600 px-2"
-                                          onClick={() => addSlab(index, 'bwSlabRanges')}
-                                        >
-                                          + Add Slab
-                                        </Button>
-                                      </div>
-                                      {m.bwSlabRanges?.map((slab, sIdx) => (
-                                        <div
-                                          key={`bw-${sIdx}`}
-                                          className="flex gap-2 items-center pl-2 border-l-2 border-blue-200"
-                                        >
-                                          <Input
-                                            placeholder="From"
-                                            type="number"
-                                            value={slab.from}
-                                            onChange={(e) =>
-                                              updateSlab(
-                                                index,
-                                                'bwSlabRanges',
-                                                sIdx,
-                                                'from',
-                                                e.target.value,
-                                              )
-                                            }
-                                            className="h-7 text-xs flex-1"
-                                          />
-                                          <div className="relative flex-1">
-                                            <Input
-                                              placeholder="To"
-                                              type={slab.to === '1000000' ? 'text' : 'number'}
-                                              value={slab.to === '1000000' ? 'UNLIMITED' : slab.to}
-                                              onChange={(e) =>
-                                                updateSlab(
-                                                  index,
-                                                  'bwSlabRanges',
-                                                  sIdx,
-                                                  'to',
-                                                  e.target.value,
-                                                )
-                                              }
-                                              className={`h-7 text-xs pr-14 ${slab.to === '1000000' ? 'font-bold text-blue-600 bg-blue-50/50' : ''}`}
-                                            />
-                                            <div className="absolute right-0 top-0 flex items-center h-7 gap-0.5 pr-0.5">
-                                              <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                className="h-6 px-1 text-[8px] font-bold text-blue-600 hover:bg-blue-100"
-                                                onClick={() =>
-                                                  updateSlab(
-                                                    index,
-                                                    'bwSlabRanges',
-                                                    sIdx,
-                                                    'to',
-                                                    '100000',
-                                                  )
-                                                }
-                                              >
-                                                100K
-                                              </Button>
-                                              <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                className="h-6 px-1 text-[10px] font-bold text-blue-600 hover:bg-blue-100"
-                                                onClick={() =>
-                                                  updateSlab(
-                                                    index,
-                                                    'bwSlabRanges',
-                                                    sIdx,
-                                                    'to',
-                                                    slab.to === '1000000' ? '' : '1000000',
-                                                  )
-                                                }
-                                              >
-                                                {slab.to === '1000000' ? '✕' : '∞'}
-                                              </Button>
-                                            </div>
-                                          </div>
-                                          <Input
-                                            placeholder="Rate"
-                                            type="number"
-                                            value={slab.rate}
-                                            onChange={(e) =>
-                                              updateSlab(
-                                                index,
-                                                'bwSlabRanges',
-                                                sIdx,
-                                                'rate',
-                                                e.target.value,
-                                              )
-                                            }
-                                            className="h-7 text-xs font-bold text-blue-600 flex-1"
-                                          />
-                                          <Button
-                                            variant="ghost"
-                                            size="icon"
-                                            className="h-7 w-7 text-red-400"
-                                            onClick={() => removeSlab(index, 'bwSlabRanges', sIdx)}
-                                          >
-                                            <Trash2 size={12} />
-                                          </Button>
-                                        </div>
-                                      ))}
-                                    </div>
+                                    {renderSlabSection(
+                                      index,
+                                      'Black & White Slabs',
+                                      'bwSlabRanges',
+                                      m.bwSlabRanges,
+                                      'useBwRateUpTo100k',
+                                      !!m.useBwRateUpTo100k,
+                                      'bwRateUpTo100k',
+                                      m.bwRateUpTo100k || '',
+                                    )}
                                     {/* Color Slabs */}
-                                    <div className="space-y-2">
-                                      <div className="flex justify-between items-center bg-gray-100 px-2 py-1 rounded">
-                                        <span className="text-[10px] font-bold">Color Slabs</span>
-                                        <Button
-                                          variant="ghost"
-                                          size="sm"
-                                          className="h-6 text-[10px] text-blue-600 px-2"
-                                          onClick={() => addSlab(index, 'colorSlabRanges')}
-                                        >
-                                          + Add Slab
-                                        </Button>
-                                      </div>
-                                      {m.colorSlabRanges?.map((slab, sIdx) => (
-                                        <div
-                                          key={`color-${sIdx}`}
-                                          className="flex gap-2 items-center pl-2 border-l-2 border-blue-200"
-                                        >
-                                          <Input
-                                            placeholder="From"
-                                            type="number"
-                                            value={slab.from}
-                                            onChange={(e) =>
-                                              updateSlab(
-                                                index,
-                                                'colorSlabRanges',
-                                                sIdx,
-                                                'from',
-                                                e.target.value,
-                                              )
-                                            }
-                                            className="h-7 text-xs flex-1"
-                                          />
-                                          <div className="relative flex-1">
-                                            <Input
-                                              placeholder="To"
-                                              type={slab.to === '1000000' ? 'text' : 'number'}
-                                              value={slab.to === '1000000' ? 'UNLIMITED' : slab.to}
-                                              onChange={(e) =>
-                                                updateSlab(
-                                                  index,
-                                                  'colorSlabRanges',
-                                                  sIdx,
-                                                  'to',
-                                                  e.target.value,
-                                                )
-                                              }
-                                              className={`h-7 text-xs pr-14 ${slab.to === '1000000' ? 'font-bold text-blue-600 bg-blue-50/50' : ''}`}
-                                            />
-                                            <div className="absolute right-0 top-0 flex items-center h-7 gap-0.5 pr-0.5">
-                                              <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                className="h-6 px-1 text-[8px] font-bold text-blue-600 hover:bg-blue-100"
-                                                onClick={() =>
-                                                  updateSlab(
-                                                    index,
-                                                    'colorSlabRanges',
-                                                    sIdx,
-                                                    'to',
-                                                    '100000',
-                                                  )
-                                                }
-                                              >
-                                                100K
-                                              </Button>
-                                              <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                className="h-6 px-1 text-[10px] font-bold text-blue-600 hover:bg-blue-100"
-                                                onClick={() =>
-                                                  updateSlab(
-                                                    index,
-                                                    'colorSlabRanges',
-                                                    sIdx,
-                                                    'to',
-                                                    slab.to === '1000000' ? '' : '1000000',
-                                                  )
-                                                }
-                                              >
-                                                {slab.to === '1000000' ? '✕' : '∞'}
-                                              </Button>
-                                            </div>
-                                          </div>
-                                          <Input
-                                            placeholder="Rate"
-                                            type="number"
-                                            value={slab.rate}
-                                            onChange={(e) =>
-                                              updateSlab(
-                                                index,
-                                                'colorSlabRanges',
-                                                sIdx,
-                                                'rate',
-                                                e.target.value,
-                                              )
-                                            }
-                                            className="h-7 text-xs font-bold text-blue-600 flex-1"
-                                          />
-                                          <Button
-                                            variant="ghost"
-                                            size="icon"
-                                            className="h-7 w-7 text-red-400"
-                                            onClick={() =>
-                                              removeSlab(index, 'colorSlabRanges', sIdx)
-                                            }
-                                          >
-                                            <Trash2 size={12} />
-                                          </Button>
-                                        </div>
-                                      ))}
-                                    </div>
+                                    {renderSlabSection(
+                                      index,
+                                      'Color Slabs',
+                                      'colorSlabRanges',
+                                      m.colorSlabRanges,
+                                      'useColorRateUpTo100k',
+                                      !!m.useColorRateUpTo100k,
+                                      'colorRateUpTo100k',
+                                      m.colorRateUpTo100k || '',
+                                    )}
                                   </div>
                                 )}
                                 {rentType === 'CPC_COMBO' && (
                                   <div className="space-y-2 mt-2">
-                                    <div className="flex justify-between items-center bg-gray-100 px-2 py-1 rounded">
-                                      <span className="text-[10px] font-bold">Combined Slabs</span>
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        className="h-6 text-[10px] text-blue-600 px-2"
-                                        onClick={() => addSlab(index, 'comboSlabRanges')}
-                                      >
-                                        + Add Slab
-                                      </Button>
-                                    </div>
-                                    {m.comboSlabRanges?.map((slab, sIdx) => (
-                                      <div
-                                        key={`combo-${sIdx}`}
-                                        className="flex gap-2 items-center pl-2 border-l-2 border-blue-200"
-                                      >
-                                        <Input
-                                          placeholder="From"
-                                          type="number"
-                                          value={slab.from}
-                                          onChange={(e) =>
-                                            updateSlab(
-                                              index,
-                                              'comboSlabRanges',
-                                              sIdx,
-                                              'from',
-                                              e.target.value,
-                                            )
-                                          }
-                                          className="h-7 text-xs flex-1"
-                                        />
-                                        <div className="relative flex-1">
-                                          <Input
-                                            placeholder="To"
-                                            type={slab.to === '1000000' ? 'text' : 'number'}
-                                            value={slab.to === '1000000' ? 'UNLIMITED' : slab.to}
-                                            onChange={(e) =>
-                                              updateSlab(
-                                                index,
-                                                'comboSlabRanges',
-                                                sIdx,
-                                                'to',
-                                                e.target.value,
-                                              )
-                                            }
-                                            className={`h-7 text-xs pr-14 ${slab.to === '1000000' ? 'font-bold text-blue-600 bg-blue-50/50' : ''}`}
-                                          />
-                                          <div className="absolute right-0 top-0 flex items-center h-7 gap-0.5 pr-0.5">
-                                            <Button
-                                              variant="ghost"
-                                              size="sm"
-                                              className="h-6 px-1 text-[8px] font-bold text-blue-600 hover:bg-blue-100"
-                                              onClick={() =>
-                                                updateSlab(
-                                                  index,
-                                                  'comboSlabRanges',
-                                                  sIdx,
-                                                  'to',
-                                                  '100000',
-                                                )
-                                              }
-                                            >
-                                              100K
-                                            </Button>
-                                            <Button
-                                              variant="ghost"
-                                              size="sm"
-                                              className="h-6 px-1 text-[10px] font-bold text-blue-600 hover:bg-blue-100"
-                                              onClick={() =>
-                                                updateSlab(
-                                                  index,
-                                                  'comboSlabRanges',
-                                                  sIdx,
-                                                  'to',
-                                                  slab.to === '1000000' ? '' : '1000000',
-                                                )
-                                              }
-                                            >
-                                              {slab.to === '1000000' ? '✕' : '∞'}
-                                            </Button>
-                                          </div>
-                                        </div>
-                                        <Input
-                                          placeholder="Rate"
-                                          type="number"
-                                          value={slab.rate}
-                                          onChange={(e) =>
-                                            updateSlab(
-                                              index,
-                                              'comboSlabRanges',
-                                              sIdx,
-                                              'rate',
-                                              e.target.value,
-                                            )
-                                          }
-                                          className="h-7 text-xs font-bold text-blue-600 flex-1"
-                                        />
-                                        <Button
-                                          variant="ghost"
-                                          size="icon"
-                                          className="h-7 w-7 text-red-400"
-                                          onClick={() => removeSlab(index, 'comboSlabRanges', sIdx)}
-                                        >
-                                          <Trash2 size={12} />
-                                        </Button>
-                                      </div>
-                                    ))}
+                                    {renderSlabSection(
+                                      index,
+                                      'Combined Slabs',
+                                      'comboSlabRanges',
+                                      m.comboSlabRanges,
+                                      'useComboRateUpTo100k',
+                                      !!m.useComboRateUpTo100k,
+                                      'comboRateUpTo100k',
+                                      m.comboRateUpTo100k || '',
+                                    )}
                                   </div>
                                 )}
                               </div>
@@ -4378,6 +3994,93 @@ function QuotationFormModal({
                             />
                           </div>
                         </>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Section 4: Lease Warranty (Conditional) */}
+                  <div className="bg-card p-5 rounded-xl border border-amber-100 bg-amber-50/20 shadow-sm space-y-4 mt-4">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[11px] font-bold text-amber-600 uppercase flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-amber-400" /> Warranty
+                        Configuration
+                      </label>
+                      <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100 border-none text-[9px] font-black tracking-widest px-2 py-0.5">
+                        LEASE SPECIFIC
+                      </Badge>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-bold text-slate-500 uppercase">
+                          Warranty Type
+                        </label>
+                        <Select
+                          value={warrantyType}
+                          onValueChange={(v) =>
+                            setWarrantyType(v as 'none' | 'duration' | 'copies')
+                          }
+                        >
+                          <SelectTrigger className="h-9 text-sm border-amber-100 bg-white shadow-sm">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">No Warranty</SelectItem>
+                            <SelectItem value="duration">By Duration (Time-based)</SelectItem>
+                            <SelectItem value="copies">By Count of Copies</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {warrantyType === 'duration' && (
+                        <div className="grid grid-cols-2 gap-2 animate-in fade-in slide-in-from-top-1">
+                          <div className="space-y-2">
+                            <label className="text-[10px] font-bold text-slate-500 uppercase">
+                              Value
+                            </label>
+                            <Input
+                              type="number"
+                              placeholder="e.g. 6"
+                              value={warrantyDurationValue}
+                              onChange={(e) => setWarrantyDurationValue(e.target.value)}
+                              className="h-9 text-sm border-amber-100 shadow-sm"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <label className="text-[10px] font-bold text-slate-500 uppercase">
+                              Unit
+                            </label>
+                            <Select
+                              value={warrantyDurationUnit}
+                              onValueChange={(v) =>
+                                setWarrantyDurationUnit(v as 'months' | 'years')
+                              }
+                            >
+                              <SelectTrigger className="h-9 text-sm border-amber-100 bg-white">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="months">Months</SelectItem>
+                                <SelectItem value="years">Years</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+                      )}
+
+                      {warrantyType === 'copies' && (
+                        <div className="space-y-2 animate-in fade-in slide-in-from-top-1">
+                          <label className="text-[10px] font-bold text-slate-500 uppercase">
+                            Warranty Copy Limit (Total)
+                          </label>
+                          <Input
+                            type="number"
+                            placeholder="e.g. 100000"
+                            value={warrantyCopyLimit}
+                            onChange={(e) => setWarrantyCopyLimit(e.target.value)}
+                            className="h-9 text-sm border-amber-100 shadow-sm"
+                          />
+                        </div>
                       )}
                     </div>
                   </div>

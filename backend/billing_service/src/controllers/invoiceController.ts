@@ -112,6 +112,15 @@ export const createQuotation = async (req: Request, res: Response, next: NextFun
       securityDepositReference: req.body.securityDepositReference,
       securityDepositDate: req.body.securityDepositDate,
       securityDepositBank: req.body.securityDepositBank,
+
+      // Warranty Fields
+      warrantyType: req.body.warrantyType,
+      warrantyDurationValue: req.body.warrantyDurationValue,
+      warrantyDurationUnit: req.body.warrantyDurationUnit,
+      warrantyCopyLimit: req.body.warrantyCopyLimit,
+
+      layoutId: req.body.layoutId,
+      notes: req.body.notes,
     });
 
     return res.status(201).json({

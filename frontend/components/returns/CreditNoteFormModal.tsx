@@ -207,23 +207,20 @@ export default function CreditNoteFormModal({ open, onClose, onSave, record }: P
     [record, selectedInvoice],
   );
 
-  const handleInvoiceChange = useCallback(
-    async (invoiceId: string) => {
-      setSelectedInvoiceId(invoiceId);
-      setSelectedProductId('');
-      setSelectedProduct(null);
-      setProductMeta(null);
-      try {
-        const res = await getInvoiceById(invoiceId);
-        setSelectedInvoice(
-          res.data.success ? res.data.data : invoices.find((i) => i.id === invoiceId),
-        );
-      } catch {
-        setSelectedInvoice(invoices.find((i) => i.id === invoiceId) || null);
+  const handleInvoiceChange = useCallback(async (invoiceId: string) => {
+    setSelectedInvoiceId(invoiceId);
+    setSelectedProductId('');
+    setSelectedProduct(null);
+    setProductMeta(null);
+    try {
+      const res = await getInvoiceById(invoiceId);
+      if (res.data.success) {
+        setSelectedInvoice(res.data.data);
       }
-    },
-    [invoices],
-  );
+    } catch {
+      // Fallback handled by state remaining stable or being set to null elsewhere
+    }
+  }, []);
 
   /* ── lifecycle ── */
   useEffect(() => {
@@ -238,10 +235,14 @@ export default function CreditNoteFormModal({ open, onClose, onSave, record }: P
         setReturnType(record.type);
         setNotes(record.notes || '');
       }
-    } else {
+    }
+  }, [open, record]);
+
+  useEffect(() => {
+    if (!open) {
       resetForm();
     }
-  }, [open, record, handleInvoiceChange]);
+  }, [open]);
 
   useEffect(() => {
     if (selectedCustomer) {

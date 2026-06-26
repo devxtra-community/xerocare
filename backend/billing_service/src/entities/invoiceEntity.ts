@@ -19,6 +19,8 @@ import { ContractStatus } from './enums/contractStatus';
 import { ProductAllocation } from './productAllocationEntity';
 import { BillType } from './enums/billType';
 import { CreditNote } from './creditNoteEntity';
+import { WarrantyType } from './enums/warrantyType';
+import { WarrantyDurationUnit } from './enums/warrantyDurationUnit';
 
 export enum SecurityDepositMode {
   CASH = 'CASH',
@@ -340,51 +342,75 @@ export class Invoice {
   @Column({ type: 'integer', nullable: true })
   maxCopyLimit?: number | null;
 
-  @Column({ name: 'estimate_valid_until', type: 'timestamp', nullable: true })
-  estimateValidUntil!: Date | null;
+  // --- Warranty Fields ---
+  @Column({
+    type: 'enum',
+    enum: WarrantyType,
+    default: WarrantyType.NONE,
+  })
+  warrantyType!: WarrantyType;
 
-  @Column({ name: 'estimate_expired', type: 'boolean', default: false })
-  estimateExpired!: boolean;
+  @Column({ type: 'int', nullable: true })
+  warrantyDurationValue?: number;
 
-  @Column({ name: 'total_discount_amount', type: 'decimal', precision: 10, scale: 2, default: 0 })
-  totalDiscountAmount!: number;
+  @Column({
+    type: 'enum',
+    enum: WarrantyDurationUnit,
+    nullable: true,
+  })
+  warrantyDurationUnit?: WarrantyDurationUnit;
 
-  @Column({ name: 'visit_charge_amount', type: 'decimal', precision: 10, scale: 2, default: 0 })
-  visitChargeAmount!: number;
+  @Column({ type: 'int', nullable: true })
+  warrantyCopyLimit?: number;
 
-  @Column({ name: 'visit_charge_method', type: 'varchar', nullable: true })
-  visitChargeMethod!: string | null;
+  @Column({ type: 'boolean', default: false })
+  warrantyEmailSent!: boolean;
 
-  @Column({ name: 'validity_extension_days', type: 'int', nullable: true })
-  validityExtensionDays!: number | null;
-
-  @Column({ name: 'validity_extension_fee', type: 'decimal', precision: 10, scale: 2, default: 0 })
-  validityExtensionFee!: number | null;
-
-  @Column({ name: 'validity_extension_fee_added', type: 'boolean', default: false })
-  validityExtensionFeeAdded!: boolean;
-
-  @Column({ name: 'technician_note_to_finance', type: 'text', nullable: true })
-  technicianNoteToFinance!: string | null;
-
-  @Column({ name: 'revision_count', type: 'int', default: 0 })
-  revisionCount!: number;
-
-  @Column({ name: 'expiry_date', type: 'timestamp', nullable: true })
-  expiryDate?: Date | null;
-
-  @Column({ name: 'validity_days', type: 'integer', default: 30 })
-  validityDays!: number;
-
-  @Column({ name: 'is_converted', type: 'boolean', default: false })
-  isConverted!: boolean;
-
-  @Column({ name: 'conversion_date', type: 'timestamp', nullable: true })
-  conversionDate?: Date | null;
-
-  @Column({ name: 'not_converted_reason', type: 'text', nullable: true })
-  notConvertedReason?: string | null;
+  @Column({ type: 'boolean', default: false })
+  warrantyExpiryEmailSent!: boolean;
 
   @DeleteDateColumn()
   deletedAt?: Date;
+
+  // --- Quotation Validity Fields ---
+  @Column({ type: 'int', nullable: true })
+  validityDays?: number;
+
+  @Column({ type: 'timestamp', nullable: true })
+  expiryDate?: Date;
+
+  @Column({ type: 'boolean', default: false })
+  isConverted!: boolean;
+
+  // --- Service Estimate Fields (billType = SERVICE) ---
+  @Column({ type: 'timestamp', nullable: true })
+  estimateValidUntil?: Date;
+
+  @Column({ type: 'boolean', nullable: true })
+  estimateExpired?: boolean;
+
+  @Column({ type: 'decimal', precision: 12, scale: 2, nullable: true })
+  visitChargeAmount?: number;
+
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  visitChargeMethod?: string | null;
+
+  @Column({ type: 'decimal', precision: 12, scale: 2, nullable: true })
+  totalDiscountAmount?: number;
+
+  @Column({ type: 'text', nullable: true })
+  technicianNoteToFinance?: string | null;
+
+  @Column({ type: 'int', nullable: true, default: 0 })
+  revisionCount?: number;
+
+  // --- Validity Extension Fields ---
+  @Column({ type: 'int', nullable: true })
+  validityExtensionDays?: number;
+
+  @Column({ type: 'decimal', precision: 12, scale: 2, nullable: true })
+  validityExtensionFee?: number;
+
+  @Column({ type: 'boolean', default: false })
+  validityExtensionFeeAdded?: boolean;
 }
